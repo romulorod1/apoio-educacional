@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.29';
+  var VERSAO = '1.42.32';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -45,7 +45,7 @@
     faixa.id = 'aviso-banco-trocado';
     faixa.className = 'faixa-aviso';
     faixa.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;padding:32px;' +
-      'background:rgba(255,255,255,0.97);font-size:18px';
+      'background:rgba(255,255,255,0.97);font-size:1.25rem';
     faixa.textContent = 'O aplicativo foi atualizado em outra janela. Feche esta janela e abra o aplicativo de novo. ' +
       'O que já estava guardado continua lá.';
     (document.body || document.documentElement).appendChild(faixa);
@@ -81,6 +81,26 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.32',
+      itens: [
+        'PDFs e fotos anexados a uma aula passam a sincronizar com a nuvem. Os anexos que já estavam no tablet não sobem sozinhos.'
+      ]
+    },
+    {
+      versao: '1.42.31',
+      itens: [
+        'No celular, o aviso de versão nova cabe na tela: "Versão nova pronta." com os botões Atualizar e Depois logo abaixo, mesmo com a letra maior.',
+        'A barra de cima do celular ficou menor e some quando está tudo salvo; ela volta quando há algo esperando a nuvem.'
+      ]
+    },
+    {
+      versao: '1.42.30',
+      itens: [
+        'O aplicativo ganhou uma aparência nova e mais limpa: uma só cor para as ações (o azul-marinho), letras um pouco maiores e mais fáceis de ler, e ícones desenhados no lugar das setas e marcas.',
+        'Os botões ficaram mais altos, para o toque ficar mais confortável. Nada mudou de lugar e nenhum dado seu foi alterado.'
+      ]
+    },
     {
       versao: '1.42.29',
       itens: [
@@ -1003,9 +1023,9 @@
           '<div class="mini-btn-acao">Editar exercícios antes</div>' +
         '</div>' +
         '<div class="mini-checks-montagem">' +
-          '<div class="mini-check-label"><span class="mini-visto">✓</span> Teoria antes dos exercícios</div>' +
-          '<div class="mini-check-label"><span class="mini-visto">✓</span> Lista de exercícios selecionados</div>' +
-          '<div class="mini-check-label"><span class="mini-visto">✓</span> Gabarito com resolução comentada</div>' +
+          '<div class="mini-check-label"><span class="mini-visto">' + icone('check').outerHTML + '</span> Teoria antes dos exercícios</div>' +
+          '<div class="mini-check-label"><span class="mini-visto">' + icone('check').outerHTML + '</span> Lista de exercícios selecionados</div>' +
+          '<div class="mini-check-label"><span class="mini-visto">' + icone('check').outerHTML + '</span> Gabarito com resolução comentada</div>' +
         '</div>' +
       '</div>';
     } else if (tipo === 'aula') {
@@ -1015,7 +1035,7 @@
           '<span class="mini-tag-verde">Na tela ou papel</span>' +
         '</div>' +
         '<div class="mini-checks-montagem" style="margin-bottom:6px">' +
-          '<div class="mini-check-label"><span class="mini-visto">✓</span> Abrir a lista como folha da aula</div>' +
+          '<div class="mini-check-label"><span class="mini-visto">' + icone('check').outerHTML + '</span> Abrir a lista como folha da aula</div>' +
         '</div>' +
         '<div class="mini-acoes-aula">' +
           '<div class="mini-btn-acao principal">Gerar e anexar</div>' +
@@ -1117,7 +1137,8 @@
           btnAvancar.textContent = 'Entendi e começar a usar';
           btnAvancar.classList.add('destaque');
         } else {
-          btnAvancar.textContent = 'Avançar →';
+          trocarComIcone(btnAvancar, '', 'Avançar');
+          btnAvancar.appendChild(icone('chr'));
           btnAvancar.classList.remove('destaque');
         }
       }
@@ -1242,6 +1263,7 @@
         if (k === 'class') e.className = atributos[k];
         else if (k === 'texto') e.textContent = atributos[k];
         else if (k === 'html') e.innerHTML = atributos[k];
+        else if (k === 'icone' || k === 'iconeDepois') return; // o desenho entra no fim, abaixo
         else if (k.indexOf('ao') === 0 && typeof atributos[k] === 'function') {
           e.addEventListener(k.slice(2).toLowerCase(), atributos[k]);
         } else if (atributos[k] !== null && atributos[k] !== undefined && atributos[k] !== false) {
@@ -1253,8 +1275,109 @@
       if (f === null || f === undefined) return;
       e.appendChild(typeof f === 'string' ? document.createTextNode(f) : f);
     });
+    // { icone: 'chl' } põe o ícone antes do texto; { iconeDepois: 'chr' }, depois
+    if (atributos && atributos.icone) e.insertBefore(icone(atributos.icone, '', e.firstChild ? '' : 'ico-so'), e.firstChild);
+    if (atributos && atributos.iconeDepois) e.appendChild(icone(atributos.iconeDepois));
     return e;
   }
+
+  /* OS ÍCONES DO SISTEMA VISUAL (F1 do redesenho, 09/11/2026).
+   *
+   * Botão e controle não mostram caractere solto (‹ › ↻ ✓ × ▲ ▼ ▾ ▸ ✎): mostram
+   * um destes desenhos, SVG de traço 1,75 na grade de 24, pontas redondas, na
+   * cor da letra (a classe .ico do styles.css). Os 36 primeiros são os do
+   * desenho final (design\final\build.js, o ICONS); os do fim vieram das telas
+   * da Biblioteca (design\biblioteca) e do "Buscar de novo" do celular. A
+   * reposição usa o "swap", de setas trocadas, que não se confunde com o
+   * "atualizar", de seta em roda.
+   *
+   * Como pedir um ícone:
+   *   no app.js   icone('chl')                       decorativo, ao lado de um texto
+   *               icone('x', 'Fechar')               sozinho: o rótulo vira aria-label
+   *               icone('check', '', 'ico-grande')   com uma classe a mais
+   *   no HTML     <button data-icone="x" aria-label="Fechar"></button>; o
+   *               preencherIcones() da abertura põe o desenho no começo do
+   *               botão (data-icone-depois="chr" põe no fim, como em "Próxima").
+   *   nas telas novas, de fora deste arquivo: window.Icones.criar(nome, rotulo,
+   *   classe), window.Icones.nomes e window.Icones.desenhos (o conjunto).
+   * O botão que só tem o ícone leva aria-label no próprio botão; o ícone ao
+   * lado de um texto é aria-hidden. */
+  var ICONES_DO_SISTEMA = {
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    x: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+    pencil: '<path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/>',
+    cloud: '<path d="M7 18.5h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 11.5 3.5 3.5 0 0 0 7 18.5z"/><path d="M9.5 14l2 2 3.5-3.5"/>',
+    download: '<path d="M12 4v10M7.5 9.5L12 14l4.5-4.5M5 19.5h14"/>',
+    shield: '<path d="M12 3.5l7 2.8v5.4c0 4.4-2.9 7.4-7 8.8-4.1-1.4-7-4.4-7-8.8V6.3z"/><path d="M9.3 12l2 2 3.5-3.6"/>',
+    swap: '<path d="M5 8h13M15 5l3 3-3 3M19 16H6M9 13l-3 3 3 3"/>',
+    chl: '<path d="M14.5 5.5L8 12l6.5 6.5"/>',
+    chr: '<path d="M9.5 5.5L16 12l-6.5 6.5"/>',
+    chd: '<path d="M6 9.5l6 6 6-6"/>',
+    chu: '<path d="M6 14.5l6-6 6 6"/>',
+    more: '<circle cx="5.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="18.5" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
+    msg: '<path d="M4.5 5.5h15v10.5H10l-5.5 4z"/><path d="M8.5 10h7"/>',
+    phone: '<path d="M6 4h3.2l1.6 4.2-2.1 1.3a10.5 10.5 0 0 0 5.8 5.8l1.3-2.1 4.2 1.6V18a2 2 0 0 1-2 2A15 15 0 0 1 4 6a2 2 0 0 1 2-2z"/>',
+    pin: '<path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>',
+    book: '<path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v14.5H7.5A2.5 2.5 0 0 0 5 20z"/><path d="M5 20a2 2 0 0 0 2 1.5H19"/>',
+    exerc: '<path d="M11 6.5h9M11 12h9M11 17.5h9"/><path d="M4 6.5l1.6 1.6L8.3 5.2M4 12l1.6 1.6 2.7-2.9M4 17.5l1.6 1.6 2.7-2.9"/>',
+    medal: '<circle cx="12" cy="15" r="5"/><path d="M9 10.6L6.5 3.5h3.8L12 8l1.7-4.5h3.8L15 10.6"/>',
+    search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/>',
+    cal: '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+    users: '<circle cx="9" cy="8.5" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5a3.5 3.5 0 0 1 0 7M17.5 14.3A6 6 0 0 1 21 20"/>',
+    wallet: '<rect x="3.5" y="6" width="17" height="13" rx="2.5"/><path d="M3.5 10h17M15.5 14.5h2"/>',
+    lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
+    clip: '<path d="M19.5 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.2-8.2a3.4 3.4 0 0 1 4.8 4.8l-8.1 8.1a1.8 1.8 0 0 1-2.6-2.6l7.4-7.4"/>',
+    back: '<path d="M19 12H5.5M11 6l-6 6 6 6"/>',
+    pen: '<path d="M15 4.5l4.5 4.5L9 19.5H4.5V15z"/><path d="M12.5 7l4.5 4.5"/>',
+    eraser: '<path d="M9 20h11"/><path d="M4.8 15.2l9.4-9.4a1.5 1.5 0 0 1 2.1 0l3 3a1.5 1.5 0 0 1 0 2.1L12 18.2H7.8z"/><path d="M9.5 10.5l5 5"/>',
+    undo: '<path d="M9 13.5L4.5 9 9 4.5"/><path d="M4.5 9H14a5.5 5.5 0 0 1 0 11h-3"/>',
+    target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".8" fill="currentColor"/>',
+    repeat: '<path d="M17 3.5l3 3-3 3"/><path d="M4 11.5v-1a4 4 0 0 1 4-4h12"/><path d="M7 20.5l-3-3 3-3"/><path d="M20 12.5v1a4 4 0 0 1-4 4H4"/>',
+    family: '<circle cx="8" cy="8" r="3"/><circle cx="16.5" cy="9.5" r="2.5"/><path d="M2.5 19.5a5.5 5.5 0 0 1 11 0M13.5 19.5a4 4 0 0 1 8 0"/>',
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    trend: '<path d="M3.5 17l5.5-5.5 4 4 7-7"/><path d="M15 8.5h5v5"/>',
+    home: '<path d="M4 11l8-6.5 8 6.5V20H4z"/><path d="M10 20v-5h4v5"/>',
+    // das telas da Biblioteca (design\biblioteca)
+    mapa: '<path d="M9 4.5L3.5 6.5v13l5.5-2 6 2 5.5-2v-13l-5.5 2z"/><path d="M9 4.5v13M15 6.5v13"/>',
+    comparar: '<rect x="3.5" y="4.5" width="7" height="15" rx="1.5"/><rect x="13.5" y="4.5" width="7" height="15" rx="1.5"/>',
+    copiar: '<rect x="7" y="3.5" width="12" height="15" rx="2"/><path d="M5 7v11.5a2 2 0 0 0 2 2h9"/>',
+    folha: '<path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z"/><path d="M14 3.5v5h5"/><path d="M9 16.5l1-2.5 4.5-4.5 1.5 1.5-4.5 4.5z"/>',
+    painel: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/>',
+    // do app: buscar de novo (seta em roda) e o alerta da gravação que falhou
+    atualizar: '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/>',
+    alerta: '<path d="M12 4.5l8.5 15h-17z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/>',
+    // o olho de esconder os valores: aberto (à mostra) e riscado (escondidos)
+    olho: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+    olho_fechado: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>'
+  };
+  function icone(nome, rotulo, classe) {
+    var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('class', 'ico' + (classe ? ' ' + classe : ''));
+    s.setAttribute('viewBox', '0 0 24 24');
+    s.setAttribute('focusable', 'false');
+    if (rotulo) { s.setAttribute('role', 'img'); s.setAttribute('aria-label', rotulo); } else s.setAttribute('aria-hidden', 'true');
+    s.setAttribute('data-icone-nome', nome);
+    s.innerHTML = ICONES_DO_SISTEMA[nome] || '';
+    return s;
+  }
+  /* Troca o conteúdo de um elemento por ícone e texto, sem perder o ícone (o
+   * textContent apagaria o desenho). */
+  function trocarComIcone(alvo, nome, texto) {
+    while (alvo.firstChild) alvo.removeChild(alvo.firstChild);
+    if (nome) alvo.appendChild(icone(nome));
+    if (texto) alvo.appendChild(document.createTextNode(texto));
+  }
+  function preencherIcones(raiz) {
+    Array.prototype.forEach.call((raiz || document).querySelectorAll('[data-icone],[data-icone-depois]'), function (b) {
+      if (b.querySelector(':scope > svg.ico')) return;
+      var antes = b.getAttribute('data-icone'), depois = b.getAttribute('data-icone-depois');
+      if (antes) b.insertBefore(icone(antes), b.firstChild);
+      if (depois) b.appendChild(icone(depois));
+    });
+  }
+  self.Icones = { desenhos: ICONES_DO_SISTEMA, nomes: Object.keys(ICONES_DO_SISTEMA), criar: icone, preencher: preencherIcones };
 
   /* Janela sobre janela.
    *
@@ -1435,6 +1558,7 @@
     var caixa = $('#aviso');
     caixa.classList.remove('aviso-dourado'); // só o Desfazer do dispensar (D6c) é dourado
     $('#aviso-texto').textContent = texto;
+    $('#aviso-texto').removeAttribute('data-versao'); // só o aviso de versão nova o põe
     var botao = $('#aviso-acao');
     if (aoAgir) {
       botao.style.display = '';
@@ -1451,6 +1575,8 @@
       botao2.textContent = aoAgir2 ? rotulo2 : '';
       botao2.onclick = aoAgir2 ? function () { esconderAviso(); aoAgir2(); } : null;
     }
+    // com duas ações, o celular põe o texto numa linha e os botões na de baixo
+    caixa.classList.toggle('com-duas-acoes', !!(aoAgir && aoAgir2));
     /* Medido no momento de mostrar: a janela pode ter mudado de altura depois
      * de aberta, e é agora que o aviso precisa caber. */
     posicionarAviso();
@@ -1493,7 +1619,8 @@
   function atualizarBotaoOlho() {
     var b = $('#alternar-valores');
     if (!b) return;
-    b.textContent = valoresOcultos ? '●̸' : '◉';
+    trocarComIcone(b, valoresOcultos ? 'olho_fechado' : 'olho');
+    b.firstChild.setAttribute('class', 'ico ico-so');
     b.setAttribute('title', valoresOcultos ? 'Mostrar os valores' : 'Esconder os valores');
     b.setAttribute('aria-label', b.getAttribute('title'));
     b.classList.toggle('ativo', valoresOcultos);
@@ -2089,6 +2216,8 @@
   // ================= início =================
 
   function iniciar() {
+    // os ícones pedidos no index.html (data-icone), antes de qualquer tela
+    preencherIcones(document);
     /* navigator.storage.persist() a cada abertura; o resultado vai ao
      * diagnóstico (D7): no Safari do iPhone ele costuma ser recusado, e o
      * painel diz isso em vez de falhar calado. */
@@ -2243,10 +2372,20 @@
   function mostrarAvisoDeVersao() {
     var versao = versaoPendenteAtiva && versaoPendenteAtiva.versao;
     versaoProntaParaOPainel = versao || 'nova';
+    /* No celular, curto (o dono viu o texto maior que o botão e o "Atualizar
+     * agora" saindo da tela em 360 px): o texto numa linha e os dois botões
+     * na de baixo, lado a lado (styles.css, .aviso.com-duas-acoes). O número
+     * fica no aviso (data-versao) e no Diagnóstico. */
+    if (modoCelular) {
+      avisar('Versão nova pronta.', 'Atualizar', aplicarAtualizacao, 'Depois', atualizarDepoisDaAula);
+      $('#aviso-texto').setAttribute('data-versao', versao || '');
+      desenharAjustes();
+      renovarAvisosCelular(); // e vira aviso do painel de Hoje do celular
+      return;
+    }
     avisar('Versão nova pronta' + (versao ? ' (' + versao + ')' : ''),
       'Atualizar agora', aplicarAtualizacao, 'Depois da aula', atualizarDepoisDaAula);
     desenharAjustes();
-    if (modoCelular) renovarAvisosCelular(); // e vira aviso do painel de Hoje do celular
   }
 
   function atualizarDepoisDaAula() {
@@ -2633,7 +2772,7 @@
 
     var cabecalho = el('div', { class: 'zoom-dia-cabecalho' }, [
       el('div', { class: 'zoom-dia-info' }, [
-        el('span', { class: 'zoom-dia-icone', texto: '🔍' }),
+        el('span', { class: 'zoom-dia-icone', 'aria-hidden': 'true', icone: 'search' }),
         el('h3', { class: 'zoom-dia-titulo', texto: formatarDataExtensa(dia) }),
         hoje ? el('span', { class: 'tag zoom-tag-hoje', texto: 'Hoje' }) : null,
         feriado ? el('span', {
@@ -2646,12 +2785,11 @@
         type: 'button',
         class: 'btn pequeno zoom-btn-fechar',
         'aria-label': 'Fechar destaque do dia',
-        texto: '✕ Fechar destaque',
         aoClick: function () {
           diaComZoom = null;
           desenharAgenda();
         }
-      })
+      }, [icone('x'), 'Fechar destaque'])
     ]);
     painel.appendChild(cabecalho);
 
@@ -2689,7 +2827,7 @@
               el('span', { class: 'card-aula-zoom-hora', texto: horaTexto + ' (' + durMin + ' min)' }),
               el('span', { class: 'tag card-aula-zoom-status', texto: rotuloSituacao }),
               a.tipo === 'mapeamento' ? el('span', { class: 'tag', texto: 'Mapeamento' }) : null,
-              a.temNota ? el('span', { class: 'tag tag-nota', texto: '✎ Com anotações' }) : null
+              a.temNota ? el('span', { class: 'tag tag-nota' }, [icone('pencil'), 'Com anotações']) : null
             ].filter(Boolean)),
             el('div', { class: 'card-aula-zoom-aluno' }, [
               el('span', { class: 'bolinha', style: 'background:' + corAluno }),
@@ -2700,9 +2838,8 @@
           ]),
           el('span', {
             class: 'btn pequeno card-aula-zoom-btn',
-            'aria-hidden': 'true',
-            texto: 'Abrir aula ›'
-          })
+            'aria-hidden': 'true'
+          }, ['Abrir aula', icone('chr')])
         ]);
         lista.appendChild(card);
       });
@@ -3228,7 +3365,7 @@
 
     var linhaFolha = el('div', { id: 'linha-folha', class: 'barra u-margem-baixo-6' });
     linhaFolha.appendChild(el('button', {
-      type: 'button', class: 'btn destaque',
+      type: 'button', class: 'btn secundaria',
       texto: aulaEmEdicao.temNota ? 'Abrir folha de aula' : 'Escrever à mão na folha',
       aoClick: function () { abrirEditorNota(aulaEmEdicao.id); }
     }));
@@ -3645,7 +3782,7 @@
       bloco.appendChild(el('div', { class: 'barra u-margem-0' }, [
         el('button', {
           type: 'button', id: 'escolher-assunto',
-          class: quantos ? 'btn pequeno' : (passoAOferecer ? 'btn u-flex-1' : 'btn destaque u-flex-1'),
+          class: quantos ? 'btn pequeno' : (passoAOferecer ? 'btn u-flex-1' : 'btn destaque u-flex-1'), icone: 'plus',
           texto: quantos ? 'Mais um assunto' : (passoAOferecer
             ? 'Escolher outro assunto' : 'Escolher o assunto da aula'),
           aoClick: function () { abrirAssunto(aula.id); }
@@ -6427,7 +6564,7 @@
       var corpo = el('div', { class: 'corpo-bloco' });
       corpo.style.display = aberto ? '' : 'none';
       var linha = el('span', { class: 'resumo-bloco' });
-      var seta = el('span', { class: 'seta-bloco', texto: aberto ? '▾' : '▸' });
+      var seta = el('span', { class: 'seta-bloco' }, [icone(aberto ? 'chd' : 'chr')]);
       var cabeca = el('button', {
         type: 'button', class: 'cabeca-bloco', 'data-bloco': titulo,
         'aria-expanded': aberto ? 'true' : 'false'
@@ -6440,7 +6577,7 @@
       cabeca.addEventListener('click', function () {
         var vai = corpo.style.display === 'none';
         corpo.style.display = vai ? '' : 'none';
-        seta.textContent = vai ? '▾' : '▸';
+        trocarComIcone(seta, vai ? 'chd' : 'chr');
         cabeca.setAttribute('aria-expanded', vai ? 'true' : 'false');
       });
       caixa.appendChild(el('div', { class: 'bloco-proposta' }, [cabeca, corpo]));
@@ -8015,7 +8152,7 @@
       elStatus.title = 'Gravando anotações no banco IndexedDB deste aparelho';
       elStatus.onclick = null;
     } else if (estado === 'erro') {
-      elStatus.textContent = '⚠ Não salvou. Tentar de novo';
+      trocarComIcone(elStatus, 'alerta', 'Não salvou. Tentar de novo');
       elStatus.title = (msg ? msg + ' · ' : '') + 'Toque ou pressione Enter para tentar gravar novamente';
       elStatus.onclick = function () {
         if (editorAtual && editorAtual._aulaId) {
@@ -8024,7 +8161,7 @@
         }
       };
     } else {
-      elStatus.textContent = '✓ Salvo neste tablet';
+      trocarComIcone(elStatus, 'check', 'Salvo neste tablet');
       elStatus.title = 'Todas as anotações estão guardadas no tablet';
       elStatus.onclick = null;
     }
@@ -8379,17 +8516,17 @@
     rodape.appendChild(el('div', { class: 'separador' }));
 
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn pequeno', texto: '‹',
+      type: 'button', class: 'btn pequeno', 'aria-label': 'Página anterior',
       aoClick: function () { editorAtual.irParaPagina(editorAtual.indicePagina - 1); desenharRodapeNota(aula); }
-    }));
+    }, [icone('chl', '', 'ico-so')]));
     rodape.appendChild(el('span', {
       class: 'contador-pagina',
       texto: 'Página ' + (editorAtual.indicePagina + 1) + ' de ' + editorAtual.nota.paginas.length
     }));
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn pequeno', texto: '›',
+      type: 'button', class: 'btn pequeno', 'aria-label': 'Página seguinte',
       aoClick: function () { editorAtual.irParaPagina(editorAtual.indicePagina + 1); desenharRodapeNota(aula); }
-    }));
+    }, [icone('chr', '', 'ico-so')]));
     rodape.appendChild(el('button', {
       type: 'button', class: 'btn pequeno', texto: '+ Página',
       aoClick: function () { editorAtual.novaPagina(); desenharRodapeNota(aula); }
@@ -9229,9 +9366,9 @@
     });
 
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn', texto: '‹ Voltar',
+      type: 'button', class: 'btn',
       aoClick: function () { abrirMapeamento(aluno.id); }
-    }));
+    }, [icone('chl'), 'Voltar']));
     rodape.appendChild(el('button', {
       type: 'button', class: 'btn principal', texto: 'Fechar',
       aoClick: function () { fecharModal('modal-mapeamento'); }
@@ -9757,23 +9894,23 @@
          * seta desce o passo que ela queria subir, e ela só descobre relendo a
          * lista. Agora há 16 px entre uma e outra. */
         botoes.push(el('button', {
-          type: 'button', texto: '↑', title: 'Subir este passo',
+          type: 'button', title: 'Subir este passo', 'aria-label': 'Subir este passo',
           class: 'btn pequeno subir-passo u-alt-min-44 u-larg-min-44 u-medida-borda u-recuo-11-15 u-letra-5 u-margem-dir-16' +
             (i === 0 ? ' u-invisivel' : ''),
           aoClick: function () {
             if (i === 0) return;
             mudar(function () { Core.moverPasso(trilha, i, i - 1); });
           }
-        }));
+        }, [icone('chu', '', 'ico-so')]));
         botoes.push(el('button', {
-          type: 'button', texto: '↓', title: 'Descer este passo',
+          type: 'button', title: 'Descer este passo', 'aria-label': 'Descer este passo',
           class: 'btn pequeno descer-passo u-alt-min-44 u-larg-min-44 u-medida-borda u-recuo-11-15 u-letra-5' +
             (i === passos.length - 1 ? ' u-invisivel' : ''),
           aoClick: function () {
             if (i === passos.length - 1) return;
             mudar(function () { Core.moverPasso(trilha, i, i + 1); });
           }
-        }));
+        }, [icone('chd', '', 'ico-so')]));
       }
       if (!encerrada) {
         botoes.push(el('button', {
@@ -9952,11 +10089,11 @@
     }));
 
     rodape.appendChild(el('button', {
-      type: 'button', class: 'btn u-alt-min-44', id: 'cancelar-encerramento', texto: '‹ Voltar',
+      type: 'button', class: 'btn u-alt-min-44', id: 'cancelar-encerramento',
       aoClick: function () {
         if (voltar) voltar(); else fecharModal('modal-trilha');
       }
-    }));
+    }, [icone('chl'), 'Voltar']));
     rodape.appendChild(el('button', {
       /* Sem a classe perigo junto da principal: as duas mandam na cor e a
        * segunda vence, deixando texto vermelho sobre fundo azul-escuro. E
@@ -10002,7 +10139,7 @@
         /* O botão de voltar só existe quando há mesmo uma trilha atrás. Vindo da
          * ficha do aluno, a trilha ainda não foi montada, e "Voltar para a
          * trilha" prometeria uma tela que não existe. */
-        rotuloVoltar: temTrilhaAtras ? '‹ Voltar para a trilha' : null,
+        rotuloVoltar: temTrilhaAtras ? 'Voltar para a trilha' : null,
         voltar: temTrilhaAtras ? function () { fecharModal('modal-tema'); } : null,
         aoEscolher: function (t) {
           fecharModal('modal-tema');
@@ -10535,7 +10672,7 @@
       el('div', { class: 'barra u-margem-baixo-6' }, [
         el('span', {
           texto: 'Do mapeamento de ' + Core.ddmmaaaa(l.data),
-          class: 'u-letra-2 u-peso-negrito u-espaco-letras-05em u-caixa-maiusculas u-cor-teal'
+          class: 'u-letra-2 u-peso-negrito u-cor-teal'
         }),
         el('span', { class: 'cresce' }),
         el('button', {
@@ -11744,7 +11881,7 @@
 
     function voltarPara(rotulo, titulo, aoTocar) {
       return el('div', { class: 'barra u-margem-baixo-8' }, [
-        el('button', { type: 'button', class: 'btn pequeno', texto: '‹ Voltar', aoClick: aoTocar }),
+        el('button', { type: 'button', class: 'btn pequeno', aoClick: aoTocar }, [icone('chl'), 'Voltar']),
         el('h3', { class: 'titulo u-letra-5', texto: titulo })
       ]);
     }
@@ -11892,7 +12029,7 @@
     }
 
     function desenharDisciplina(d) {
-      lista.appendChild(voltarPara('‹ Voltar', d.nome, function () { irPara({ tipo: 'raiz' }); }));
+      lista.appendChild(voltarPara('Voltar', d.nome, function () { irPara({ tipo: 'raiz' }); }));
       var arquivo = topicosPorDisciplina ? topicosPorDisciplina[d.chave] : null;
       var grupos = (arquivo && arquivo.grupos) || [];
       if (!grupos.length) {
@@ -11913,7 +12050,7 @@
     /* Os blocos viram título e os tópicos ficam logo abaixo, na mesma tela.
      * Um nível a menos para tocar, e ela vê o grupo inteiro de uma vez. */
     function desenharGrupo(d, g) {
-      lista.appendChild(voltarPara('‹ Voltar', d.nome + ', ' + g.rotulo, function () {
+      lista.appendChild(voltarPara('Voltar', d.nome + ', ' + g.rotulo, function () {
         irPara({ tipo: 'disciplina', d: d });
       }));
       (g.blocos || []).forEach(function (b) {
@@ -12036,7 +12173,7 @@
     if (!indiceTemas) { avisar('O banco de matemática não abriu agora.'); return; }
     desenharEscolhaTema(indiceTemas, aula, aluno, '', {
       rotuloEscolher: 'Usar',
-      rotuloVoltar: '‹ Voltar',
+      rotuloVoltar: 'Voltar',
       voltar: function () { desenharEscolhaAssunto(aula, aluno); },
       aoEscolher: function (t) {
         registrarAssunto(aula, {
@@ -12060,8 +12197,8 @@
       corpo.appendChild(el('div', { class: 'barra u-margem-baixo-8' }, [
         el('button', {
           type: 'button', class: 'btn pequeno',
-          texto: opcoes.rotuloVoltar || '‹ Voltar', aoClick: opcoes.voltar
-        })
+          aoClick: opcoes.voltar
+        }, [icone('chl'), opcoes.rotuloVoltar || 'Voltar'])
       ]));
     }
 
@@ -12470,7 +12607,7 @@
 
       cartao.appendChild(el('div', { class: 'barra u-margem-8-0-0' }, [
         el('button', {
-          type: 'button', class: 'btn' + (temResumo ? '' : ' destaque'),
+          type: 'button', class: 'btn' + (temResumo ? '' : ' secundaria'),
           texto: temResumo ? 'Editar o feedback' : 'Escrever o feedback',
           aoClick: function () { abrirResumo(f.aluno.id, mesAtual); }
         })
@@ -16209,7 +16346,7 @@
     var botao = function (id, texto) {
       var atual = id ? e.assuntos.indexOf(id) >= 0 : !e.assuntos.length;
       var b = el('button', { type: 'button', 'data-assunto': id, class: atual ? 'atual' : '',
-        texto: (atual ? '✓ ' : '') + texto, aoClick: function () { escolher(id ? [id] : []); } });
+        aoClick: function () { escolher(id ? [id] : []); } }, [atual ? icone('check') : null, texto]);
       if (atual) b.setAttribute('aria-current', 'true');
       return b;
     };
@@ -17502,12 +17639,12 @@
         detalhe ? el('div', { class: 'detalhe', texto: detalhe }) : null
       ]),
       extra || null,
-      el('span', { class: 'bib-seta', texto: '›', 'aria-hidden': 'true' })
+      el('span', { class: 'bib-seta', 'aria-hidden': 'true' }, [icone('chr')])
     ]);
   }
 
   function voltarBib(rotulo, aoTocar) {
-    return el('button', { type: 'button', class: 'btn pequeno bib-voltar', texto: '‹ ' + rotulo, aoClick: aoTocar });
+    return el('button', { type: 'button', class: 'btn pequeno bib-voltar', aoClick: aoTocar }, [icone('chl'), rotulo]);
   }
 
   function desenharModulosDaSerie(corpo) {
@@ -18394,10 +18531,10 @@
       var vetor = r[tipo];
       return el('li', { class: 'bib-minha-item', 'data-id': chave }, [
         el('span', { class: 'cresce', texto: tipo === 'itens' ? rotuloDoItemDaLista(chave) : rotuloDaPaginaDaLista(chave) }),
-        el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Subir', texto: '▲', 'data-acao': 'subir',
+        el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Subir', icone: 'chu', 'data-acao': 'subir',
           disabled: k === 0 ? 'disabled' : null,
           aoClick: function () { vetor.splice(k - 1, 0, vetor.splice(k, 1)[0]); desenharCorpoBiblioteca(); } }),
-        el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Descer', texto: '▼', 'data-acao': 'descer',
+        el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Descer', icone: 'chd', 'data-acao': 'descer',
           disabled: k === total - 1 ? 'disabled' : null,
           aoClick: function () { vetor.splice(k + 1, 0, vetor.splice(k, 1)[0]); desenharCorpoBiblioteca(); } }),
         el('button', { type: 'button', class: 'btn pequeno', texto: 'Tirar', 'data-acao': 'tirar',
@@ -18718,10 +18855,10 @@
       if (!it) return;
       var setas = el('div', { class: 'bib-lp-setas', role: 'group', 'aria-label': 'Ordem' }, [
         el('button', { type: 'button', class: 'btn pequeno bib-lp-subir', 'data-subir': id,
-          disabled: pos === 0 ? 'disabled' : null, 'aria-label': 'Subir', texto: '▲',
+          disabled: pos === 0 ? 'disabled' : null, 'aria-label': 'Subir', icone: 'chu',
           aoClick: function () { if (moverNoCarrinho(id, -1)) redesenharListaPronta(id, 'subir'); } }),
         el('button', { type: 'button', class: 'btn pequeno bib-lp-descer', 'data-descer': id,
-          disabled: pos === ids.length - 1 ? 'disabled' : null, 'aria-label': 'Descer', texto: '▼',
+          disabled: pos === ids.length - 1 ? 'disabled' : null, 'aria-label': 'Descer', icone: 'chd',
           aoClick: function () { if (moverNoCarrinho(id, 1)) redesenharListaPronta(id, 'descer'); } })
       ]);
       /* O NÚMERO DO EXERCÍCIO SOZINHO NÃO IDENTIFICA NADA dentro de uma lista
@@ -22448,6 +22585,12 @@
     origem.classList.toggle('cel-desatualizado', !!estado.destaque);
     var nuvem = $('#cel-nuvem');
     if (nuvem) nuvem.setAttribute('data-tom', estado.tom);
+    /* A barra do alto some no celular da dona quando está tudo em dia (nada
+     * esperando sinal, nada com erro, recebido há pouco) e volta quando há
+     * pendência ou erro: o estado continua no #cel-origem, para quem lê a tela. */
+    var celular = $('#modo-celular');
+    if (celular) celular.classList.toggle('topo-recolhido', edita && estado.tom === 'em-dia' && !estado.destaque &&
+      temDadosNoCelular() && !celularPedeEntrada);
     var acoes = $('#cel-acoes');
     acoes.innerHTML = '';
     if (!temDadosNoCelular() || celularPedeEntrada) return;
@@ -22460,7 +22603,7 @@
       } else {
         // um ícone só (D6c): o alto fica enxuto, e o nome vai para quem lê a tela
         acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno cel-icone', id: 'cel-atualizar', 'aria-label': 'Buscar de novo', title: 'Buscar de novo',
-          disabled: celularBuscando, texto: '↻', aoClick: atualizarCelularDaNuvem }));
+          disabled: celularBuscando, icone: 'atualizar', aoClick: atualizarCelularDaNuvem }));
       }
       /* A saída da marca, só com a tela larga (a janela E o aparelho): num
        * celular, em pé ou deitado, ela não aparece. */
@@ -22673,12 +22816,12 @@
     var s = a.status || 'realizada';
     var cobra = cobravelDaAula(a);
     if (s === 'cancelada') return { classe: 'cancelada', icone: '', texto: rotuloDeCancelamentoCelular(cobra) };
-    if (s === 'falta') return { classe: 'falta', icone: '✕', texto: cobra ? 'Faltou' : 'Faltou, sem cobrança' };
+    if (s === 'falta') return { classe: 'falta', icone: 'x', texto: cobra ? 'Faltou' : 'Faltou, sem cobrança' };
     var fim = fimDaAulaCelular(a);
     var aindaNao = a.data > hoje || (a.data === hoje && fim !== null && fim > minutosAgoraCelular());
-    if (s === 'reposicao') return { classe: 'reposicao', icone: '↻', texto: aindaNao ? 'Reposição agendada' : 'Reposição' };
+    if (s === 'reposicao') return { classe: 'reposicao', icone: 'swap', texto: aindaNao ? 'Reposição agendada' : 'Reposição' };
     if (aindaNao) return { classe: 'agendada', icone: '', texto: 'Agendada' };
-    return { classe: 'realizada', icone: '✓', texto: cobra ? 'Realizada' : 'Realizada, sem cobrança' };
+    return { classe: 'realizada', icone: 'check', texto: cobra ? 'Realizada' : 'Realizada, sem cobrança' };
   }
 
   /* As outras aulas que ocupam o mesmo horário: a regra do tablet
@@ -22723,10 +22866,10 @@
     var titulo = (dia === hoje ? 'Hoje, ' : '') + Core.diaSemanaCurto(dia) + ' ' + Core.ddmm(dia);
     if (dia.slice(0, 4) !== hoje.slice(0, 4)) titulo += '/' + dia.slice(0, 4);
     var topo = [
-      el('button', { type: 'button', class: 'btn pequeno', id: 'cel-semana-anterior', 'aria-label': 'Semana anterior', texto: '‹',
+      el('button', { type: 'button', class: 'btn pequeno', id: 'cel-semana-anterior', 'aria-label': 'Semana anterior', icone: 'chl',
         aoClick: function () { irParaDiaCelular(somarDiasCelular(dia, -7)); } }),
       el('h2', { class: 'cel-titulo cresce', id: 'cel-dia-titulo', texto: titulo }),
-      el('button', { type: 'button', class: 'btn pequeno', id: 'cel-semana-seguinte', 'aria-label': 'Semana seguinte', texto: '›',
+      el('button', { type: 'button', class: 'btn pequeno', id: 'cel-semana-seguinte', 'aria-label': 'Semana seguinte', icone: 'chr',
         aoClick: function () { irParaDiaCelular(somarDiasCelular(dia, 7)); } })
     ];
     if (dia !== hoje) {
@@ -22823,9 +22966,9 @@
       marca ? el('span', { class: 'cel-bloco-marca', texto: marca === 'agora' ? 'Agora' : 'Próxima' }) : null,
       el('span', { class: 'cel-bloco-nome', texto: nome }),
       el('span', { class: 'cel-bloco-hora', texto: (a.hora ? a.hora + (fim !== null ? ' a ' + horaDeMinutosCelular(Math.min(fim, 24 * 60 - 1)) : '') + ' · ' : '') + Core.fmtDuracao(dur) }),
-      el('span', { class: 'cel-bloco-situacao', texto: (sit.icone ? sit.icone + ' ' : '') + sit.texto })
+      el('span', { class: 'cel-bloco-situacao', icone: sit.icone || null, texto: sit.texto })
     ];
-    if (choques.length) filhos.push(el('span', { class: 'cel-bloco-choque', texto: '⚠ Mesmo horário: ' + fraseDoChoqueCelular(choques) }));
+    if (choques.length) filhos.push(el('span', { class: 'cel-bloco-choque', icone: 'alerta', texto: 'Mesmo horário: ' + fraseDoChoqueCelular(choques) }));
     if (semRegistro) filhos.push(el('span', { class: 'cel-bloco-sem-registro', 'aria-hidden': 'true', title: 'Sem registro de como foi' }));
     return el('button', {
       type: 'button', class: 'cel-bloco cel-bloco-' + sit.classe + (choques.length ? ' com-choque' : '') + (marca ? ' cel-bloco-' + marca : '') + (semRegistro ? ' sem-registro' : ''), 'data-aula': a.id,
@@ -23289,7 +23432,7 @@
       el('span', { class: 'cel-avisos-sincronia-texto', texto: estado.frase }),
       temMarcaCelular() && temNuvem() && Nuvem.estado().entrada
         ? el('button', { type: 'button', class: 'btn pequeno cel-icone', id: 'cel-avisos-atualizar', 'aria-label': 'Buscar de novo', title: 'Buscar de novo',
-          disabled: celularBuscando, texto: '↻', aoClick: atualizarCelularDaNuvem }) : null
+          disabled: celularBuscando, icone: 'atualizar', aoClick: atualizarCelularDaNuvem }) : null
     ]);
     var painel = el('div', { class: classeDoPainel, id: 'cel-avisos', role: 'region', 'aria-label': 'Avisos de hoje' }, [
       el('div', { class: 'cel-avisos-cabeca' }, [
@@ -23380,7 +23523,7 @@
       ]));
       /* "Marcar aula neste dia" é o "+" flutuante, no canto de baixo. */
       caixa.appendChild(el('div', { class: 'cel-fab-lugar' }, [
-        botaoDeAcaoCelular('marcar-aula', { class: 'cel-fab', id: 'cel-marcar-aula', 'aria-label': 'Marcar aula neste dia', texto: '+',
+        botaoDeAcaoCelular('marcar-aula', { class: 'cel-fab', id: 'cel-marcar-aula', 'aria-label': 'Marcar aula neste dia', icone: 'plus',
           aoClick: function () { abrirFormularioCelular({ tipo: 'aula', data: dia }); } })
       ]));
     }
@@ -23528,7 +23671,7 @@
     var titulo = aluno && folhaCelular.passo === 'acoes'
       ? el('h2', { class: 'cel-titulo', id: 'cel-folha-titulo' }, [
         el('button', { type: 'button', class: 'cel-folha-nome', id: 'cel-folha-ficha', 'aria-label': 'Ver a ficha de ' + aluno.nome + ': telefone, WhatsApp e endereço',
-          aoClick: function () { irAoPassoDaFolha('ficha'); } }, [el('span', { texto: aluno.nome }), el('span', { class: 'cel-folha-nome-seta', 'aria-hidden': 'true', texto: '›' })])
+          aoClick: function () { irAoPassoDaFolha('ficha'); } }, [el('span', { texto: aluno.nome }), el('span', { class: 'cel-folha-nome-seta', 'aria-hidden': 'true', icone: 'chr' })])
       ])
       : el('h2', { class: 'cel-titulo', id: 'cel-folha-titulo', texto: aluno ? aluno.nome : 'Aluno' });
     folha.appendChild(el('div', { class: 'cel-folha-cabeca', style: '--cor-aluno:' + corDoAlunoCelular(aluno) }, [
@@ -23602,7 +23745,7 @@
       var s = a.status || 'realizada';
       var acoes = [];
       var botao = function (acao, id, texto, fazer, atual) {
-        return botaoDeAcaoCelular(acao, { class: 'btn cel-folha-botao' + (atual ? ' atual' : ''), id: id, texto: (atual ? '✓ ' : '') + texto,
+        return botaoDeAcaoCelular(acao, { class: 'btn cel-folha-botao' + (atual ? ' atual' : ''), id: id, icone: atual ? 'check' : null, texto: texto,
           'aria-pressed': atual ? 'true' : null, aoClick: fazer });
       };
       if (!futura) {
@@ -24267,10 +24410,10 @@
 
   function barraDoMesCelular(redesenhar) {
     return el('div', { class: 'barra cel-mes' }, [
-      el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Mês anterior', texto: '‹',
+      el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Mês anterior', icone: 'chl',
         aoClick: function () { mesCelular = somarMeses(mesCelular, -1); redesenhar(); } }),
       el('h2', { class: 'cel-titulo cresce', texto: Core.mesExtenso(mesCelular) }),
-      el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Mês seguinte', texto: '›',
+      el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Mês seguinte', icone: 'chr',
         aoClick: function () { mesCelular = somarMeses(mesCelular, 1); redesenhar(); } })
     ]);
   }
