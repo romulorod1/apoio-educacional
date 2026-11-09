@@ -854,7 +854,11 @@ function paginaSintetica() {
   }, dona.localId, copiaK2), copiaK2);
   const rC16 = await receber(pagC);
   console.log('   recebimento em C depois de restaurar K2: ' + JSON.stringify(rC16));
-  conf('C ficou sem aulas e sem folhas (nenhuma nota de aula que não existe)', JSON.stringify({ aulas: await pagC.evaluate(() => Store.carregar().then(d => d.aulas.length)), notas: await pagC.evaluate(() => Store.todasAsNotas().then(n => Object.keys(n).sort())) }), JSON.stringify({ aulas: 0, notas: [] }));
+  /* Depois do "Apagar tudo", o app reabre vazio e grava a carga inicial de exemplo (app.js, cargaInicial), que a cópia
+   * enviada leva junto: C fica com as MESMAS aulas de A, e não com zero. Investigado em 09/11 (testa_registros_ressurreicao):
+   * não é ressurreição. O que esta seção prova é das folhas: nenhuma nota de aula que não existe. */
+  const idsAulas = pag => pag.evaluate(() => Store.carregar().then(d => d.aulas.map(a => a.id).sort()));
+  conf('C ficou com as mesmas aulas de A (a carga inicial depois do Apagar tudo) e sem folhas de aula que não existe', JSON.stringify({ aulas: await idsAulas(pagC), notas: await pagC.evaluate(() => Store.todasAsNotas().then(n => Object.keys(n).sort())) }), JSON.stringify({ aulas: await idsAulas(pagA), notas: [] }));
   conf('nenhum erro de página em A e C depois das seções da revisão', [pagA, pagC].map(p => p.errosDePagina.join(' | ')).filter(Boolean).join(' || '), '');
   await pagC.close(); await contextoC.close();
 })().then(() => derrubarEmulador().then(H.fim(amb)), e => derrubarEmulador().then(() => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e))));
