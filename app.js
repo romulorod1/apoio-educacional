@@ -2504,6 +2504,7 @@
         $('.conteudo').scrollTop = 0;
         // a tela do livro (B2) é da Biblioteca: trocar de aba a fecha
         fecharTelaDoLivro();
+        fecharLadoALado();
         /* Redesenha a tela ao abrir para exibir dados atualizados */
         if (b.dataset.tela === 'biblioteca') {
           /* Pelo menu, e não pelo Material de uma aula: sem aula de origem, e os
@@ -16090,12 +16091,16 @@
       var porId = Object.create(null), lista = [], eixo = {};
       (r[2] || []).forEach(function (d) { eixo[d.chave] = d.eixo; });
       (r[0] || []).forEach(function (t) {
-        var a = { id: t.id, titulo: (t.pt && t.pt.titulo) || t.id, serie: t.serie, disciplina: Core.MATERIA_PADRAO, eixo: 'ano' };
+        /* tema: o que junta os assuntos irmãos na comparação lado a lado (B6):
+         * a unidade na matemática, o bloco nas outras matérias */
+        var a = { id: t.id, titulo: (t.pt && t.pt.titulo) || t.id, serie: t.serie, disciplina: Core.MATERIA_PADRAO, eixo: 'ano',
+          tema: t.unidade || '', temaNome: t.unidade ? rotuloUnidade(t) : '' };
         porId[a.id] = a; lista.push(a);
       });
       (r[1] || []).forEach(function (p) {
         if (!p.id) return;
-        var a = { id: p.id, titulo: p.titulo, serie: p.grupo, disciplina: p.disciplina, eixo: eixo[p.disciplina] || '' };
+        var a = { id: p.id, titulo: p.titulo, serie: p.grupo, disciplina: p.disciplina, eixo: eixo[p.disciplina] || '',
+          tema: p.bloco || '', temaNome: p.bloco || '', serieNome: p.grupoRotulo || '', disciplinaNome: p.disciplinaNome || '' };
         porId[a.id] = a; lista.push(a);
       });
       var v = { porId: porId, lista: lista };
@@ -16401,6 +16406,15 @@
       linha.setAttribute('data-capitulo', String(e.n));
       corpo.appendChild(linha);
     });
+    /* B6: o mesmo assunto em todos os livros do ano, lado a lado, com o que
+     * cada um não trata dito; o Voltar de lá volta à aula. */
+    if (t.id) {
+      corpo.appendChild(el('button', { type: 'button', class: 'btn u-margem-topo-12', id: 'livros-ver-todos', icone: 'comparar',
+        texto: 'Ver em todos os livros', aoClick: function () {
+          fecharModal('modal-livros');
+          abrirLadoALado(t.id, { aula: { t: t, achados: achados } });
+        } }));
+    }
     abrirModal('modal-livros');
   }
 
@@ -17844,6 +17858,8 @@
       painel.appendChild(el('p', { class: 'bibl-apoio bibl-vazio', texto: 'Nenhum livro de ' + disc.nome +
         (bibLivrosNav.ano && bibLivrosNav.ano !== SEM_ANO ? ' do ' + nomeDoAno(bibLivrosNav.ano) : '') + ' neste tablet.' }));
     }
+    var comparar = secaoComparar(disc, bibLivrosNav.ano, livros, redesenhar);
+    if (comparar) painel.appendChild(comparar);
     caixa.appendChild(el('div', { class: 'bibl-paineis' }, [lista, painel]));
   }
 
@@ -17990,7 +18006,20 @@
       var assuntos;
       if (!mapa.length) assuntos = [el('p', { class: 'bibl-falta-texto', texto: 'Este livro ainda não tem mapa de assuntos.' })];
       else if (!ma || !ma.assuntos.length) assuntos = [el('p', { class: 'bibl-falta-texto', texto: 'Nenhum assunto ligado ainda.' })];
-      else assuntos = ma.assuntos.map(function (id) { return el('div', { class: 'bibl-assunto', 'data-assunto': id, texto: nomeDoAssunto(id) }); });
+      else {
+        // B6: quantos livros do tablet tratam cada assunto, e o atalho para a comparação lado a lado
+        var contar = nomes ? livrosPorAssunto(Object.keys(bibLivrosCache || {}).map(function (k) { return bibLivrosCache[k]; })) : null;
+        assuntos = ma.assuntos.map(function (id) {
+          var a = nomes && nomes.porId[id];
+          var n = a && contar ? contar(a) : 0;
+          return el('div', { class: 'bibl-assunto', 'data-assunto': id }, [
+            el('span', { class: 'cresce', texto: nomeDoAssunto(id) }),
+            n ? el('button', { type: 'button', class: 'bibl-n-livros', 'data-comparar': id,
+              'aria-label': 'Comparar ' + a.titulo + (n > 1 ? ' em ' + n + ' livros' : ': só este livro trata'),
+              aoClick: function () { abrirLadoALado(id); } }, [icone('comparar'), n > 1 ? n + ' livros' : 'só neste']) : null
+          ]);
+        });
+      }
       corpo.appendChild(el('aside', { class: 'bibl-livro-painel', 'aria-label': pAtual.palavra + ' ' + pAtual.numero }, [
         el('div', { class: 'bibl-livro-painel-corpo' }, [
           // o rótulo pequeno em cima e o título limpo embaixo, como no desenho
@@ -18015,6 +18044,407 @@
         if (v && bibLivroAberto === l.id) desenharTelaDoLivro(l, v);
       }, function () { /* fica com os ids */ });
     }
+  }
+
+  /* ---- B6: o assunto lado a lado ----
+   *
+   * Para um assunto do índice e o ano dele, uma TABELA: as linhas são os
+   * assuntos irmãos (o mesmo tema do índice: a unidade na matemática, o bloco
+   * nas outras matérias), as colunas são os livros do tablet daquela matéria e
+   * daquele ano, e cada célula diz o capítulo e as páginas do arquivo onde o
+   * mapa liga o assunto ao livro. Onde não liga, a célula diz com todas as
+   * letras:
+   *   "não trata"  o mapa do livro foi REVISADO e não liga o assunto: é fato
+   *                do mapa;
+   *   "sem mapa"   o livro não tem mapa, ou tem capítulo do passe automático
+   *                que ela ainda não confirmou: a ausência ali não é
+   *                confiável, e por isso não vira "não trata".
+   * Só lê: o mapa (com as correções dela), o índice de assuntos e a lista dos
+   * livros (Store.listarLivros, referências de Blob). Nada é gravado e nenhum
+   * livro é aberto para desenhar a tabela. */
+  var ladoAtual = null;   // { disciplina, serie, tema, escolhido, so, aula, deEscolha }
+  var ladoVez = 0;
+
+  /* O mapa revisado: tem capítulo, e nenhum veio do passe automático sem a
+   * palavra dela (o mapa da orquestradora, o que ela confirmou e o que ela
+   * corrigiu valem; o 'a_confirmar' não). */
+  function mapaFoiRevisado(mapa) {
+    return mapa.length > 0 && mapa.every(function (e) { return e.estado !== 'a_confirmar'; });
+  }
+  function celulaDoLadoALado(mapa, revisado, assuntoId) {
+    var achadas = mapa.filter(function (e) { return e.assuntos.indexOf(assuntoId) >= 0; });
+    if (achadas.length) return { tipo: 'trata', entradas: achadas };
+    return { tipo: revisado ? 'nao-trata' : 'sem-mapa' };
+  }
+  var DISCIPLINA_DA_MATERIA = { filosofia: 'filosofia-sociologia', sociologia: 'filosofia-sociologia' };
+  function disciplinaDoMapa(meta) {
+    var d = (meta && (meta.mapa_disciplina || meta.materia)) || '';
+    return DISCIPLINA_DA_MATERIA[d] || d;
+  }
+  // o livro entra na comparação do assunto: a mesma matéria e, no eixo de ano, o mesmo ano
+  function livroDoAssunto(meta, a) {
+    return disciplinaDoMapa(meta) === a.disciplina && (a.eixo !== 'ano' || Biblioteca.livroDoAno(meta, a.serie));
+  }
+  function serieDoAssunto(a) { return a.eixo === 'ano' ? nomeDoAno(a.serie) : (a.serieNome || a.serie || ''); }
+  function nomeDaDisciplina(id, a) {
+    var m = Core.materiaPorId(id);
+    return (m && m.rotulo) || (a && a.disciplinaNome) || id;
+  }
+  /* Quantos livros tratam cada assunto: um passe pelos mapas, e a conta por
+   * assunto só olha os livros do ano dele. */
+  function livrosPorAssunto(livros) {
+    var porAssunto = Object.create(null);
+    var correcoes = correcoesDosLivros();
+    (livros || []).forEach(function (l) {
+      if (!l || !l.meta) return;
+      Biblioteca.mapaDoLivro(l.meta, correcoes[l.id]).forEach(function (e) {
+        e.assuntos.forEach(function (id) { (porAssunto[id] = porAssunto[id] || Object.create(null))[l.id] = l.meta; });
+      });
+    });
+    return function (a) {
+      var x = a && porAssunto[a.id];
+      if (!x) return 0;
+      return Object.keys(x).filter(function (id) { return livroDoAssunto(x[id], a); }).length;
+    };
+  }
+  function pluralLivros(n) { return n ? plural(n, 'livro', 'livros') : 'nenhum livro'; }
+
+  /* Na aba: "Comparar livros por assunto, 6º ano", com os assuntos do ano que
+   * mais livros tratam e o "Todos os N assuntos", que abre a busca de assunto
+   * por todos os anos. */
+  var secaoCompararPediuIndice = false;
+  function secaoComparar(disc, ano, livros, redesenhar) {
+    if (!ano || ano === SEM_ANO || !disc.livros.length) return null;
+    if (!assuntosDosLivros) {
+      if (!secaoCompararPediuIndice) {
+        secaoCompararPediuIndice = true;
+        carregarAssuntosDosLivros().then(function (v) { if (v && assuntosDosLivros) redesenhar(); }, function () { /* sem índice, sem a seção */ });
+      }
+      return null;
+    }
+    var doAno = assuntosDosLivros.lista.filter(function (a) { return a.disciplina === disc.id && a.eixo === 'ano' && a.serie === ano; });
+    if (!doAno.length) return null;
+    var contar = livrosPorAssunto(livros);
+    var mais = doAno.map(function (a, i) { return { a: a, n: contar(a), i: i }; })
+      .filter(function (x) { return x.n > 0; })
+      .sort(function (x, y) { return y.n - x.n || x.i - y.i; }).slice(0, 4);
+    return el('section', { class: 'bibl-comparar', id: 'bib-comparar', 'aria-label': 'Comparar livros por assunto' }, [
+      el('h3', { class: 'bibl-rotulo', texto: 'Comparar livros por assunto, ' + nomeDoAno(ano) }),
+      el('div', { class: 'bibl-comparar-lista' }, mais.map(function (x) {
+        return el('button', { type: 'button', class: 'bibl-comparar-chip', 'data-comparar': x.a.id,
+          aoClick: function () { abrirLadoALado(x.a.id); } }, [
+          icone('comparar'), el('span', { class: 'bibl-comparar-nome', texto: x.a.titulo }), el('span', { class: 'bibl-apoio', texto: pluralLivros(x.n) })
+        ]);
+      }).concat([
+        el('button', { type: 'button', class: 'bibl-comparar-chip', id: 'bib-comparar-todos', iconeDepois: 'chr',
+          texto: 'Todos os ' + doAno.length + ' assuntos', aoClick: function () { abrirEscolhaDoAssunto(disc.id, ano, ''); } })
+      ]))
+    ]);
+  }
+
+  function telaDoLado() { return $('#lado-a-lado'); }
+  function mostrarTelaDoLado(modo) {
+    var tela = telaDoLado();
+    if (tela.hidden) {
+      // por cima da tela de onde veio (a aba, o livro ou a aula) e por baixo do leitor que abrir depois
+      tela.style.zIndex = String(degrauModal + 1);
+      tela.hidden = false;
+    }
+    tela.dataset.modo = modo;
+    return tela;
+  }
+  function fecharLadoALado() {
+    var tela = telaDoLado();
+    ladoAtual = null;
+    ladoVez++;
+    if (!tela || tela.hidden) return;
+    tela.hidden = true;
+    tela.innerHTML = '';
+    tela.style.zIndex = '';
+    delete tela.dataset.modo;
+  }
+
+  /* Abre a comparação do assunto `assuntoId`: o tema dele, no ano dele, com
+   * a linha dele marcada. opcoes.aula: { t, achados }, quando veio do "Abrir
+   * no livro" da aula; opcoes.deEscolha: o termo da busca de onde veio. */
+  function abrirLadoALado(assuntoId, opcoes) {
+    opcoes = opcoes || {};
+    return carregarAssuntosDosLivros().then(function (nomes) {
+      var a = nomes && nomes.porId[assuntoId];
+      if (!a) { avisar('Não consegui abrir o índice de assuntos agora. Tente de novo daqui a pouco.'); return; }
+      ladoAtual = { disciplina: a.disciplina, serie: a.serie, tema: a.tema, escolhido: a.id, so: false,
+        aula: opcoes.aula || null, deEscolha: opcoes.deEscolha !== undefined ? opcoes.deEscolha : null };
+      return desenharLadoALado();
+    }, function () { avisar('Não consegui abrir o índice de assuntos agora. Tente de novo daqui a pouco.'); });
+  }
+
+  function desenharLadoALado() {
+    var vez = ++ladoVez;
+    return Promise.all([carregarAssuntosDosLivros(), Store.listarLivros()]).then(function (r) {
+      if (vez !== ladoVez || !ladoAtual) return;
+      montarLadoALado(r[0], r[1] || []);
+    }).catch(function () {
+      if (vez !== ladoVez) return;
+      avisar('Não consegui ler os livros guardados agora. Tente de novo.');
+    });
+  }
+
+  function montarLadoALado(nomes, livros) {
+    var s = ladoAtual;
+    var linhas = nomes.lista.filter(function (a) {
+      return a.disciplina === s.disciplina && a.serie === s.serie && a.tema === s.tema && (s.tema || a.id === s.escolhido);
+    });
+    if (!linhas.length) return;
+    var base = linhas[0];
+    var escolhido = nomes.porId[s.escolhido] || null;
+    var visiveis = s.so && escolhido ? linhas.filter(function (a) { return a.id === escolhido.id; }) : linhas;
+    var correcoes = correcoesDosLivros();
+    var colunas = livros.filter(function (l) { return l && l.meta && livroDoAssunto(l.meta, base); }).map(function (l, i) {
+      var mapa = Biblioteca.mapaDoLivro(l.meta, correcoes[l.id]);
+      return { id: l.id, meta: l.meta, mapa: mapa, revisado: mapaFoiRevisado(mapa), cor: CORES_DAS_CAPAS[i % CORES_DAS_CAPAS.length] };
+    });
+    var celulas = visiveis.map(function (a) {
+      return colunas.map(function (c) { return celulaDoLadoALado(c.mapa, c.revisado, a.id); });
+    });
+    var disciplinaNome = nomeDaDisciplina(s.disciplina, base);
+    var serieNome = serieDoAssunto(base);
+    var titulo = (base.temaNome || base.titulo) + (serieNome ? ', ' + serieNome : '');
+    var comLigacao = colunas.filter(function (c, j) {
+      return linhas.some(function (a) { return c.mapa.some(function (e) { return e.assuntos.indexOf(a.id) >= 0; }); });
+    }).length;
+
+    var tela = mostrarTelaDoLado('tabela');
+    var rolagem = tela.dataset.tema === s.disciplina + '|' + s.serie + '|' + s.tema ? (tela.querySelector('.lado-rola') || {}).scrollTop || 0 : 0;
+    tela.innerHTML = '';
+    tela.dataset.tema = s.disciplina + '|' + s.serie + '|' + s.tema;
+    tela.dataset.escolhido = escolhido ? escolhido.id : '';
+
+    // o ano: os anos em que o mesmo tema existe e há livro da matéria (e o de agora)
+    var anos = [];
+    if (base.eixo === 'ano') {
+      nomes.lista.forEach(function (a) {
+        if (a.disciplina !== s.disciplina || a.tema !== s.tema || anos.indexOf(a.serie) >= 0) return;
+        if (a.serie === s.serie || livros.some(function (l) { return l && l.meta && livroDoAssunto(l.meta, a); })) anos.push(a.serie);
+      });
+      anos.sort(function (x, y) { return ordemDoAno(x) - ordemDoAno(y); });
+    }
+    var trocarAno = function (serie) {
+      if (serie === s.serie) return;
+      ladoAtual = { disciplina: s.disciplina, serie: serie, tema: s.tema, escolhido: null, so: false, aula: null, deEscolha: s.deEscolha };
+      desenharLadoALado();
+    };
+    tela.appendChild(el('header', { class: 'lado-cabeca' }, [
+      el('button', { type: 'button', class: 'btn bibl-voltar-livro', id: 'lado-voltar', icone: 'chl', texto: 'Voltar',
+        aoClick: function () {
+          var termo = s.deEscolha;
+          if (termo !== null && termo !== undefined) abrirEscolhaDoAssunto(s.disciplina, s.serie, termo);
+          else fecharLadoALado();
+        } }),
+      el('div', { class: 'cresce lado-nome' }, [
+        el('div', { class: 'lado-quem' }, [
+          el('h2', { class: 'bibl-titulo-livro', id: 'lado-titulo', texto: titulo }),
+          el('span', { class: 'bibl-apoio', texto: disciplinaNome })
+        ]),
+        el('p', { class: 'bibl-apoio', id: 'lado-resumo', texto: colunas.length ?
+          pluralLivros(colunas.length) + (serieNome ? ' do ' + serieNome : '') + ', ' +
+            (comLigacao === colunas.length && comLigacao > 1 ? 'todos' : comLigacao) + ' com capítulo ligado' :
+          'nenhum livro no tablet' })
+      ]),
+      anos.length > 1 ? el('div', { class: 'bibl-anos lado-anos', role: 'radiogroup', 'aria-label': 'Ano' }, anos.map(function (a) {
+        var on = a === s.serie;
+        return el('button', { type: 'button', class: 'bibl-ano' + (on ? ' ativo' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false',
+          'data-ano': a, texto: nomeDoAno(a), aoClick: function () { trocarAno(a); } });
+      })) : null
+    ]));
+
+    // mostrar: o tema inteiro ou só o assunto escolhido
+    var chips = [el('button', { type: 'button', class: 'bibl-ano' + (!s.so ? ' ativo' : ''), 'data-mostrar': 'tudo', 'aria-pressed': !s.so ? 'true' : 'false',
+      texto: 'Todo o assunto', aoClick: function () { if (s.so) { s.so = false; desenharLadoALado(); } } })];
+    if (escolhido && linhas.length > 1) {
+      chips.push(el('button', { type: 'button', class: 'bibl-ano' + (s.so ? ' ativo' : ''), 'data-mostrar': 'so', 'aria-pressed': s.so ? 'true' : 'false',
+        texto: 'Só ' + escolhido.titulo, aoClick: function () { if (!s.so) { s.so = true; desenharLadoALado(); } } }));
+    }
+    tela.appendChild(el('div', { class: 'lado-filtro' }, [
+      el('span', { class: 'bibl-apoio', texto: 'Mostrar' }),
+      el('div', { class: 'bibl-anos lado-chips' }, chips),
+      el('p', { class: 'bibl-pequena lado-legenda', id: 'lado-legenda' }, [
+        el('span', { class: 'lado-nao', texto: 'não trata' }), ': o mapa revisado não liga. ',
+        el('span', { class: 'lado-sem', texto: 'sem mapa' }), ': o mapa do livro ainda não foi revisado.'
+      ])
+    ]));
+
+    var rola = el('section', { class: 'lado-rola', 'aria-label': 'Livros lado a lado' });
+    if (!colunas.length) {
+      rola.appendChild(el('p', { class: 'bibl-apoio lado-vazio', id: 'lado-sem-livros',
+        texto: 'Nenhum livro de ' + disciplinaNome + (serieNome ? ' do ' + serieNome : '') + ' neste tablet. Importe o pacote de livros em Ajustes.' }));
+      tela.appendChild(rola);
+      return;
+    }
+    var grade = el('div', { class: 'lado-grade', role: 'table', 'aria-label': titulo });
+    grade.style.setProperty('--lado-colunas', String(colunas.length));
+    // a cabeça: um livro por coluna
+    var cabeca = [el('div', { class: 'lado-canto', role: 'columnheader' })];
+    colunas.forEach(function (c) {
+      var nTrata = linhas.filter(function (a) { return c.mapa.some(function (e) { return e.assuntos.indexOf(a.id) >= 0; }); }).length;
+      cabeca.push(el('div', { class: 'lado-livro', role: 'columnheader', 'data-livro': c.id }, [
+        capaDoLivro(c, true),
+        el('div', { class: 'lado-livro-texto' }, [
+          el('span', { class: 'bibl-forte', texto: tituloDoLivro(c.meta) }),
+          el('span', { class: 'bibl-apoio', texto: nTrata + ' de ' + linhas.length + (linhas.length === 1 ? ' assunto' : ' assuntos') }),
+          !c.mapa.length ? el('span', { class: 'tag lado-tag', 'data-falta': 'mapa', texto: 'sem mapa de assuntos' }) :
+            !c.revisado ? el('span', { class: 'tag lado-tag', 'data-falta': 'revisao', texto: 'mapa a confirmar' }) : null
+        ])
+      ]));
+    });
+    grade.appendChild(el('div', { class: 'lado-linha lado-linha-cabeca', role: 'row' }, cabeca));
+    visiveis.forEach(function (a, i) {
+      var cs = celulas[i];
+      var falha = cs.some(function (x) { return x.tipo === 'nao-trata'; });
+      var todos = cs.every(function (x) { return x.tipo === 'trata'; });
+      var ehEscolhido = escolhido && a.id === escolhido.id;
+      var rotulo = el('div', { class: 'lado-rotulo', role: 'rowheader' }, [
+        el('span', { class: 'lado-sinal' }, [falha ? icone('alerta', 'algum livro não trata') : todos ? icone('check', 'todos os livros tratam') : null]),
+        el('span', { class: 'lado-rotulo-texto' }, [
+          el('span', { class: 'lado-assunto', texto: a.titulo }),
+          ehEscolhido && s.aula ? el('button', { type: 'button', class: 'btn pequeno lado-abrir-no-livro', id: 'lado-abrir-no-livro', icone: 'book',
+            texto: 'Abrir no livro', aoClick: function () { var au = s.aula; fecharLadoALado(); abrirLivrosDoAssunto(au.t, au.achados); } }) : null
+        ])
+      ]);
+      var linha = [rotulo];
+      cs.forEach(function (x, j) {
+        var c = colunas[j];
+        var conteudo;
+        if (x.tipo === 'trata') {
+          conteudo = x.entradas.map(function (e) {
+            var epub = c.meta.formato === 'epub';
+            var cap = rotuloDoCapituloDoMapa(c.meta, e);
+            var paginas = e.obraInteira ? 'o livro inteiro' : epub ? 'parte ' + e.capitulo :
+              'p. ' + paginaParaMostrar(c.meta, e) + (e.pagina_fim && e.pagina_fim > e.pagina ? ' a ' + e.pagina_fim : '');
+            return el('button', { type: 'button', class: 'lado-pg', 'data-n': String(e.n),
+              'data-pagina': epub ? null : String(paginaDoArquivo(c.meta, e)),
+              'aria-label': a.titulo + ', ' + tituloDoLivro(c.meta) + ', ' + cap + ', ' + paginas,
+              aoClick: function () { abrirCapitulo(c, e); } }, [
+              el('span', { class: 'lado-pg-texto' }, [
+                el('span', { class: 'lado-pg-cap', texto: cap }),
+                el('span', { class: 'lado-pg-p', texto: paginas })
+              ]),
+              icone('chr')
+            ]);
+          });
+        } else if (x.tipo === 'nao-trata') {
+          conteudo = [el('span', { class: 'lado-nao', texto: 'não trata' })];
+        } else {
+          conteudo = [el('span', { class: 'lado-sem', 'aria-label': 'sem mapa revisado', texto: 'sem mapa' })];
+        }
+        linha.push(el('div', { class: 'lado-celula', role: 'cell', 'data-livro': c.id, 'data-tipo': x.tipo }, conteudo));
+      });
+      grade.appendChild(el('div', { class: 'lado-linha' + (ehEscolhido ? ' escolhido' : '') + (falha ? ' com-falha' : ''), role: 'row', 'data-assunto': a.id }, linha));
+    });
+    // o pé: abrir cada livro no primeiro capítulo ligado ao que está à vista
+    var pe = [el('div', { class: 'lado-canto', role: 'cell' })];
+    colunas.forEach(function (c, j) {
+      var primeira = null;
+      celulas.forEach(function (cs) {
+        var x = cs[j];
+        if (x.tipo !== 'trata') return;
+        x.entradas.forEach(function (e) {
+          if (!primeira || (e.pagina || e.capitulo || 0) < (primeira.pagina || primeira.capitulo || 0)) primeira = e;
+        });
+      });
+      var epub = c.meta.formato === 'epub';
+      pe.push(el('div', { class: 'lado-celula lado-pe', role: 'cell' }, [primeira ? el('button', { type: 'button', class: 'btn lado-abrir',
+        'data-livro': c.id, icone: 'book', texto: epub || primeira.obraInteira ? 'Abrir o capítulo' : 'Abrir na p. ' + paginaParaMostrar(c.meta, primeira),
+        aoClick: function () { abrirCapitulo(c, primeira); } }) : null]));
+    });
+    grade.appendChild(el('div', { class: 'lado-linha lado-linha-pe', role: 'row' }, pe));
+    rola.appendChild(grade);
+    tela.appendChild(rola);
+    rola.scrollTop = rolagem;
+    // a linha escolhida à vista
+    var marcada = escolhido && !rolagem ? grade.querySelector('.lado-linha.escolhido') : null;
+    if (marcada && marcada.offsetTop + marcada.offsetHeight > rola.clientHeight) rola.scrollTop = Math.max(0, marcada.offsetTop - rola.clientHeight / 3);
+  }
+
+  // "Cap. 3, Frações": o numeral do título, ou a posição do capítulo no sumário
+  function rotuloDoCapituloDoMapa(meta, e) {
+    if (e.obraInteira) return 'Livro inteiro';
+    var caps = capitulosDoSumario(meta.sumario);
+    var k = -1;
+    caps.forEach(function (c, i) { if (k < 0 && c.titulo === e.titulo) k = i; });
+    var p = partesDoCapitulo(e.titulo, k >= 0 ? k + 1 : e.n);
+    return (p.palavra === 'Capítulo' ? 'Cap. ' : p.palavra + ' ') + p.numero + ', ' + p.titulo;
+  }
+
+  /* A busca de assunto que ATRAVESSA OS ANOS: sem termo, os assuntos da
+   * matéria e do ano de onde ela veio; com termo, os de todos os anos e
+   * matérias que têm o termo no título, cada um com o ano e quantos livros do
+   * tablet o tratam. O toque abre a comparação, e o Voltar dela volta aqui. */
+  var LIMITE_DA_ESCOLHA = 60;
+  function abrirEscolhaDoAssunto(disciplina, serie, termo) {
+    ladoAtual = null;
+    var vez = ++ladoVez;
+    return Promise.all([carregarAssuntosDosLivros(), Store.listarLivros()]).then(function (r) {
+      if (vez !== ladoVez) return;
+      var nomes = r[0], livros = r[1] || [];
+      if (!nomes) { avisar('Não consegui abrir o índice de assuntos agora. Tente de novo daqui a pouco.'); return; }
+      var contar = livrosPorAssunto(livros);
+      var tela = mostrarTelaDoLado('escolha');
+      tela.innerHTML = '';
+      delete tela.dataset.tema;
+      var lista = el('div', { class: 'lado-escolha-lista', id: 'lado-escolha-lista', role: 'list' });
+      var desenharLista = function (t) {
+        lista.innerHTML = '';
+        var palavras = Core.chaveDeBusca(t || '').split(/\s+/).filter(Boolean);
+        var achados = !palavras.length ?
+          nomes.lista.filter(function (a) { return a.disciplina === disciplina && a.serie === serie; }) :
+          nomes.lista.filter(function (a) {
+            var chave = Core.chaveDeBusca(a.titulo + ' ' + (a.temaNome || ''));
+            return palavras.every(function (p) { return chave.indexOf(p) >= 0; });
+          }).sort(function (x, y) {
+            // a matéria de onde ela veio primeiro, e dentro dela a ordem dos anos
+            return (x.disciplina === disciplina ? 0 : 1) - (y.disciplina === disciplina ? 0 : 1) || ordemDoAno(x.serie) - ordemDoAno(y.serie);
+          });
+        lista.appendChild(el('p', { class: 'bibl-apoio', id: 'lado-escolha-conta', texto: !palavras.length ?
+          plural(achados.length, 'assunto', 'assuntos') + ' de ' + nomeDaDisciplina(disciplina) + ' do ' + nomeDoAno(serie) + '. Escreva para buscar em todos os anos.' :
+          achados.length ? plural(achados.length, 'assunto', 'assuntos') + ' em todos os anos' : 'Nenhum assunto com "' + t.trim() + '".' }));
+        achados.slice(0, LIMITE_DA_ESCOLHA).forEach(function (a) {
+          var n = contar(a);
+          var onde = serieDoAssunto(a) + (a.disciplina !== disciplina ? ', ' + nomeDaDisciplina(a.disciplina, a) : '');
+          lista.appendChild(el('button', { type: 'button', class: 'lado-escolha-item', role: 'listitem', 'data-comparar': a.id,
+            aoClick: function () { abrirLadoALado(a.id, { deEscolha: campo.value }); } }, [
+            el('span', { class: 'cresce lado-escolha-texto' }, [
+              el('span', { class: 'lado-assunto', texto: a.titulo }),
+              el('span', { class: 'bibl-apoio', texto: [a.temaNome, onde].filter(Boolean).join(' · ') })
+            ]),
+            el('span', { class: 'tag lado-ano', texto: serieDoAssunto(a) }),
+            el('span', { class: n ? 'bibl-apoio lado-n' : 'bibl-falta-texto lado-n', texto: pluralLivros(n) }),
+            icone('chr')
+          ]));
+        });
+        if (achados.length > LIMITE_DA_ESCOLHA) {
+          lista.appendChild(el('p', { class: 'bibl-apoio', texto: 'E mais ' + (achados.length - LIMITE_DA_ESCOLHA) + '. Escreva mais para achar.' }));
+        }
+      };
+      var campo = el('input', { type: 'search', id: 'lado-busca', class: 'lado-busca-campo', autocomplete: 'off',
+        'aria-label': 'Buscar assunto em todos os anos', placeholder: 'Buscar assunto em todos os anos',
+        aoInput: function () { desenharLista(campo.value); } });
+      campo.value = termo || '';
+      tela.appendChild(el('header', { class: 'lado-cabeca' }, [
+        el('button', { type: 'button', class: 'btn bibl-voltar-livro', id: 'lado-voltar', icone: 'chl', texto: 'Voltar', aoClick: fecharLadoALado }),
+        el('div', { class: 'cresce lado-nome' }, [
+          el('h2', { class: 'bibl-titulo-livro', id: 'lado-titulo', texto: 'Comparar livros por assunto' }),
+          el('p', { class: 'bibl-apoio', texto: 'Escolha o assunto: a comparação mostra em que capítulo cada livro o trata.' })
+        ])
+      ]));
+      tela.appendChild(el('div', { class: 'lado-filtro' }, [
+        el('label', { class: 'bibl-busca lado-busca' }, [icone('search'), campo])
+      ]));
+      tela.appendChild(el('section', { class: 'lado-rola lado-escolha', 'aria-label': 'Assuntos' }, [lista]));
+      desenharLista(campo.value);
+    }).catch(function () {
+      if (vez !== ladoVez) return;
+      avisar('Não consegui ler os livros guardados agora. Tente de novo.');
+    });
   }
 
   // ---------- a tela ----------
