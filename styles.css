@@ -20,7 +20,7 @@
  *   ícone    <svg class="ico">, de traço 1,75, na cor da letra. Peça pelo
  *            icone(nome) ou pelo { icone: nome } do el() no app.js, ou por
  *            data-icone="nome" no index.html (a lista dos nomes está no
- *            ICONES do app.js). .ico-so é o ícone sozinho no botão, um pouco
+ *            ICONES_DO_SISTEMA do app.js). .ico-so é o ícone sozinho no botão, um pouco
  *            maior; o botão dele leva aria-label.
  * Cor ou tamanho novo entra aqui no :root, nunca solto numa regra
  * (_teste/testa_sistema_visual.js trava isso).
@@ -171,6 +171,8 @@ button, input, select, textarea { font-family: inherit; }
   flex: none;
   display: inline-block;
   vertical-align: -0.25em;
+  /* ao lado do texto, não engrossa a linha: a caixa conta como 1em */
+  margin-block: -0.125em;
   stroke: currentColor;
   fill: none;
   stroke-width: 1.75;

@@ -1262,7 +1262,7 @@
    *   classe), window.Icones.nomes e window.Icones.desenhos (o conjunto).
    * O botão que só tem o ícone leva aria-label no próprio botão; o ícone ao
    * lado de um texto é aria-hidden. */
-  var ICONES = {
+  var ICONES_DO_SISTEMA = {
     plus: '<path d="M12 5v14M5 12h14"/>',
     bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
@@ -1316,7 +1316,7 @@
     s.setAttribute('focusable', 'false');
     if (rotulo) { s.setAttribute('role', 'img'); s.setAttribute('aria-label', rotulo); } else s.setAttribute('aria-hidden', 'true');
     s.setAttribute('data-icone-nome', nome);
-    s.innerHTML = ICONES[nome] || '';
+    s.innerHTML = ICONES_DO_SISTEMA[nome] || '';
     return s;
   }
   /* Troca o conteúdo de um elemento por ícone e texto, sem perder o ícone (o
@@ -1334,7 +1334,7 @@
       if (depois) b.appendChild(icone(depois));
     });
   }
-  self.Icones = { desenhos: ICONES, nomes: Object.keys(ICONES), criar: icone, preencher: preencherIcones };
+  self.Icones = { desenhos: ICONES_DO_SISTEMA, nomes: Object.keys(ICONES_DO_SISTEMA), criar: icone, preencher: preencherIcones };
 
   /* Janela sobre janela.
    *

@@ -20,7 +20,8 @@
  *              sozinho) visível como texto num botão, nem no ::before ou no
  *              ::after dele;
  *   CONTRASTE  4,5:1 (3:1 na letra grande) nos textos medidos;
- *   NUMEROS    o corpo tem algarismos tabulares.
+ *   NUMEROS    o corpo tem algarismos tabulares;
+ *   ICONE      todo ícone visível tem desenho, de traço 1,75.
  * No celular a 412 x 915 (Hoje, a folha da aula, Alunos, Fechamento, Enviar)
  * e no tablet a 1280 x 800 (Agenda, a janela da aula, Alunos, Fechamento,
  * Biblioteca, Ajustes). O celular abre sem conta: só lê, e as ações que pedem
@@ -30,7 +31,8 @@
  * servido; a âncora tem de existir uma vez só):
  *   --envenenado-botao-verde  o botão principal volta ao verde;
  *   --envenenado-fonte-11px   o menor degrau da escala volta a 11 px;
- *   --envenenado-glifo-solto  a seta da semana do celular volta a ser "‹".
+ *   --envenenado-glifo-solto  a seta da semana do celular volta a ser "‹";
+ *   --envenenado-icone-vazio  o ícone sai sem desenho (o botão fica vazio).
  *
  *   --prints <pasta>   Hoje e a aula no celular, a janela da aula e a
  *                      Biblioteca no tablet.
@@ -45,7 +47,7 @@ const { conf, secao, esperar, pausa } = H;
 
 const PORTA = 8934;
 const LIMITE_LOG = Number(process.env.LIMITE_LOG || 40);
-const MODOS = ['--envenenado-botao-verde', '--envenenado-fonte-11px', '--envenenado-glifo-solto'];
+const MODOS = ['--envenenado-botao-verde', '--envenenado-fonte-11px', '--envenenado-glifo-solto', '--envenenado-icone-vazio'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && MODOS.indexOf(a) < 0);
 const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
@@ -62,7 +64,10 @@ const VENENOS = {
     troca: '--letra-12: .6875rem;' },
   '--envenenado-glifo-solto': { arquivo: 'app.js', tipos: ['GLIFO'],
     ancora: "id: 'cel-semana-anterior', 'aria-label': 'Semana anterior', icone: 'chl',",
-    troca: "id: 'cel-semana-anterior', 'aria-label': 'Semana anterior', texto: '‹'," }
+    troca: "id: 'cel-semana-anterior', 'aria-label': 'Semana anterior', texto: '‹'," },
+  '--envenenado-icone-vazio': { arquivo: 'app.js', tipos: ['ICONE'],
+    ancora: "s.innerHTML = ICONES_DO_SISTEMA[nome] || '';",
+    troca: "s.innerHTML = '';" }
 };
 
 secao('0. Os venenos e as âncoras');
@@ -163,9 +168,22 @@ function medir(raizSel, escala) {
       }
     }
   }
+  /* ICONE: o desenho que entrou no lugar do glifo tem de aparecer (um ícone
+   * sem traço deixa o botão vazio, sem que nenhuma outra medida veja). */
+  let icones = 0;
+  for (const s of raiz.querySelectorAll('svg.ico')) {
+    if (s.closest('[hidden],[inert]')) continue;
+    const cs = getComputedStyle(s), r = s.getBoundingClientRect();
+    if (cs.display === 'none' || cs.visibility === 'hidden' || r.width < 1 || r.height < 1) continue;
+    icones++;
+    let caixa = null;
+    try { caixa = s.getBBox(); } catch (e) { caixa = null; }
+    if (!s.firstElementChild || !caixa || caixa.width + caixa.height < 2) out.push('ICONE vazio "' + (s.getAttribute('data-icone-nome') || '?') + '" em ' + desc(s.parentElement));
+    if (parseFloat(cs.strokeWidth) !== 1.75 && parseFloat(cs.strokeWidth) !== 2.25) out.push('ICONE traço ' + cs.strokeWidth + ' em ' + desc(s.parentElement));
+  }
   const tab = getComputedStyle(document.body).fontVariantNumeric;
   if (!/tabular-nums/.test(tab)) out.push('NUMEROS o corpo não tem algarismos tabulares (' + tab + ')');
-  return { problemas: [...new Set(out)], textos, acoes, botoes, piorContraste: +pior.toFixed(2) };
+  return { problemas: [...new Set(out)], textos, acoes, botoes, icones, piorContraste: +pior.toFixed(2) };
 }
 
 /* ---------- os dados de teste ---------- */
@@ -213,7 +231,7 @@ async function medirTela(pag, aparelho, tela, raiz, print) {
   const m = await pag.evaluate(medir, raiz || 'body', 1);
   registro.push(Object.assign({ aparelho, tela }, m));
   console.log('   medida ' + aparelho + ' | ' + tela + ' | textos ' + m.textos + ' | botões ' + m.botoes + ' | de ação ' + m.acoes +
-    ' | pior contraste ' + m.piorContraste + ':1 | problemas ' + m.problemas.length);
+    ' | ícones ' + m.icones + ' | pior contraste ' + m.piorContraste + ':1 | problemas ' + m.problemas.length);
   m.problemas.slice(0, LIMITE_LOG).forEach(p => console.log('      ' + p));
   if (m.problemas.length > LIMITE_LOG) console.log('      (e mais ' + (m.problemas.length - LIMITE_LOG) + ')');
   conf(aparelho + ', ' + tela + ': a tela tem textos medidos', m.textos > 3, true);
@@ -292,7 +310,9 @@ async function rodar() {
   const todos = registro.flatMap(r => r.problemas.map(p => r.aparelho + ' ' + r.tela + ': ' + p));
   const doTipo = t => todos.filter(p => p.indexOf(': ' + t + ' ') >= 0);
   const doVeneno = MODO ? VENENOS[MODO].tipos : [];
-  for (const t of ['COR', 'FONTE', 'ESCALA', 'PESO', 'CAIXA', 'ITALICO', 'GLIFO', 'CONTRASTE', 'NUMEROS']) {
+  const hojeCel = registro.find(r => r.aparelho === 'celular' && r.tela === 'Hoje');
+  conf('o Hoje do celular tem ícones medidos (' + (hojeCel ? hojeCel.icones : 0) + ')', !!hojeCel && hojeCel.icones >= 3, true);
+  for (const t of ['COR', 'FONTE', 'ESCALA', 'PESO', 'CAIXA', 'ITALICO', 'GLIFO', 'CONTRASTE', 'NUMEROS', 'ICONE']) {
     const achados = doTipo(t);
     if (doVeneno.indexOf(t) >= 0) {
       if (achados.length) vistos.push(MODO);
