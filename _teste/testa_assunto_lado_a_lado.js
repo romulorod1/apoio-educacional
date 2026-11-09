@@ -12,9 +12,11 @@
  *            capítulos 2 e 3, Operações com frações (MAT06-06) no 3,
  *            decimais (MAT06-07) no 4;
  *   livro-b  o mapa da orquestradora (revisado), sem Frações: MAT06-01 e
- *            MAT06-06 só;
+ *            MAT06-06, e um capítulo de revisão ligado a um assunto do 5º ano
+ *            (MAT05-03, a série vizinha que o gerador liga);
  *   livro-c  o passe automático (não revisado): MAT06-07 no capítulo 1, o 2
- *            sem assunto.
+ *            sem assunto; depois, parcialmente confirmado, e por fim todo;
+ *   livro-d  do 6º ano, com o mapa vazio (mapa: []).
  * Aluno e aula fictícios ("Aluno Alfa Teste"). Nenhum livro de verdade.
  *
  * O que prova:
@@ -38,10 +40,12 @@
  *   8. 15 livros e 16 assuntos abrem sem travar (medido), nada gravado, e
  *      nenhum erro de página.
  *
- * Veneno:
- *   node _teste/testa_assunto_lado_a_lado.js --envenenado-nao-trata-vira-sem-mapa
- *     o app.js servido troca as duas ausências ("sem mapa" onde o mapa foi
- *     revisado, "não trata" onde não foi): a prova TEM de ver ("VENENO visto").
+ * Venenos (cada um TEM de ser visto: "VENENO visto"):
+ *   --envenenado-nao-trata-vira-sem-mapa  troca as duas ausências;
+ *   --envenenado-mapa-vazio-nao-trata     o livro de mapa vazio conta como
+ *                                         revisado ([].every dá true);
+ *   --envenenado-parcial-nao-trata        basta um capítulo confirmado para o
+ *                                         livro contar como revisado.
  *
  *   --prints <pasta>   grava os prints do painel cego (tablet 1280x800, escala 2).
  */
@@ -52,15 +56,26 @@ const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8958;
-const VENENOS = ['--envenenado-nao-trata-vira-sem-mapa'];
-const VENENO = process.argv.indexOf('--envenenado-nao-trata-vira-sem-mapa') !== -1;
+const VENENOS = ['--envenenado-nao-trata-vira-sem-mapa', '--envenenado-mapa-vazio-nao-trata', '--envenenado-parcial-nao-trata'];
+const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
+const VENENO = MODO === '--envenenado-nao-trata-vira-sem-mapa';
 const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
 
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const ANCORA = "return { tipo: revisado ? 'nao-trata' : 'sem-mapa' };";
+const ANCORA_VAZIO = 'return mapa.length > 0 && mapa.every(';
+const ANCORA_PARCIAL = "mapa.every(function (e) { return e.estado !== 'a_confirmar'; })";
 const trocas = {};
 if (VENENO) trocas['/app.js'] = APP.split(ANCORA).join("return { tipo: revisado ? 'sem-mapa' : 'nao-trata' };");
+if (MODO === '--envenenado-mapa-vazio-nao-trata') trocas['/app.js'] = APP.split(ANCORA_VAZIO).join('return mapa.every(');
+if (MODO === '--envenenado-parcial-nao-trata') trocas['/app.js'] = APP.split(ANCORA_PARCIAL).join("mapa.some(function (e) { return e.estado !== 'a_confirmar'; })");
+async function venenoVisto(rotulo, visto, detalhe) {
+  secao('VENENO: ' + MODO);
+  conf(MODO.slice(2) + ': ' + rotulo + ' (defeito detectado)', visto, true);
+  if (visto) console.log('VENENO visto: ' + detalhe);
+  await H.fim(amb)();
+}
 
 const relogio = H.relogioDaRodada('2026-11-11', '09:00');
 const hojeIso = relogio.iso;
@@ -111,10 +126,12 @@ const LIVROS = [
   livro('livro-b', 'Matemática B', 'matematica', ['06'], [
     ['Capítulo 1: Sistema de numeração', 1, 2, ['MAT06-01']],
     ['Capítulo 2: Operações com frações', 3, 4, ['MAT06-06']],
-    ['Capítulo 3: Geometria', 5, 6, []]], 'mapa', 6),
+    ['Capítulo 3: Revisão do 5º ano', 5, 6, ['MAT05-03']]], 'mapa', 6),
   livro('livro-c', 'Matemática C', 'matematica', ['06'], [
     ['Capítulo 1: Decimais', 1, 2, ['MAT06-07']],
-    ['Capítulo 2: Partes do inteiro', 3, 4, []]], 'auto', 4)
+    ['Capítulo 2: Partes do inteiro', 3, 4, []]], 'auto', 4),
+  Object.assign(livro('livro-d', 'Matemática D', 'matematica', ['06'], [
+    ['Capítulo 1: Números', 1, 2, []]], 'nenhum', 2), { mapa: [] })
 ];
 
 async function gravarLivros(pag, livros, pacote) {
@@ -237,10 +254,14 @@ const medir = pag => pag.evaluate(() => {
     d.alunos = [{ id: 'al_alfa', nome: 'Aluno Alfa Teste', responsavel: 'Responsável Alfa Teste', ativo: true, anoEscolar: '06',
       precos: [{ id: 'pa', inicio: '2026-01-01', fim: null, valorHora: 100 }] }];
     d.aulas = [{ id: 'au_fracoes', alunoId: 'al_alfa', data: h, hora: '10:00', duracaoMin: 60, status: 'agendada', cobravel: true,
-      areas: [], anexos: [], temas: [{ id: 'MAT06-05', titulo: 'Frações: o que são e como comparar', fonte: 'banco', disciplina: 'matematica' }] }];
+      areas: [], anexos: [], temas: [{ id: 'MAT06-05', titulo: 'Frações: o que são e como comparar', fonte: 'banco', disciplina: 'matematica' },
+        { id: 'MAT06-03', titulo: 'Múltiplos, divisores, MMC e MDC', fonte: 'banco', disciplina: 'matematica' }] }];
     await Store.salvar(d);
   }, hojeIso);
-  conf('os três livros sintéticos entraram', await gravarLivros(pag, LIVROS, 'prova-b6'), 3);
+  conf('a âncora do mapa vazio aparece uma vez só no app.js', APP.split(ANCORA_VAZIO).length - 1, 1);
+  conf('a âncora do mapa parcial aparece uma vez só no app.js', APP.split(ANCORA_PARCIAL).length - 1, 1);
+  if (MODO) conf('o app.js servido está envenenado (' + MODO + ')', trocas['/app.js'] !== APP, true);
+  conf('os quatro livros sintéticos entraram', await gravarLivros(pag, LIVROS, 'prova-b6'), 4);
   await H.abrirApp(pag, amb.ORIGEM);
   const antes = await pag.evaluate(() => Store.carregar().then(d => JSON.stringify(d)));
 
@@ -256,25 +277,27 @@ const medir = pag => pag.evaluate(() => {
   let lado = (await esperar('a tabela de Frações', () => lerLado(pag), v => v.visivel && v.modo === 'tabela' && !!v.colunas, 10000)).valor;
   conf('a tela cobre o trilho, com Voltar escrito', lado.cobreOTrilho + '|' + lado.voltar, 'true|Voltar');
   conf('o título é o tema e o ano', lado.titulo, 'Números, 6º ano');
-  conf('o resumo diz quantos livros e quantos ligam', lado.resumo, '3 livros do 6º ano, todos com capítulo ligado');
-  conf('as colunas são os três livros do 6º ano', lado.colunas, 'livro-a,livro-b,livro-c');
+  if (MODO === '--envenenado-mapa-vazio-nao-trata') {
+    const fr = lado.celulas.split(' ; ').filter(x => x.indexOf('MAT06-05:') === 0).join('');
+    return venenoVisto('o livro de mapa vazio diz "não trata"', /livro-d=não trata/.test(fr), fr);
+  }
+  conf('o resumo diz quantos livros e quantos ainda sem mapa revisado', lado.resumo, '4 livros do 6º ano; 2 com o mapa ainda não revisado');
+  conf('as colunas são os quatro livros do 6º ano', lado.colunas, 'livro-a,livro-b,livro-c,livro-d');
   conf('as linhas são os 8 assuntos de Números do 6º ano', lado.linhas, 'MAT06-01,MAT06-02,MAT06-03,MAT06-04,MAT06-05,MAT06-06,MAT06-07,MAT06-08');
   conf('a linha de Frações vem marcada', lado.marcada, 'MAT06-05');
   conf('a cabeça de cada livro diz quantos assuntos ele trata, e o livro não revisado diz isso',
-    lado.cabecas, 'livro-a=4 de 8 assuntos ; livro-b=2 de 8 assuntos ; livro-c=1 de 8 assuntos|mapa a confirmar');
+    lado.cabecas, 'livro-a=4 de 8 assuntos ; livro-b=2 de 8 assuntos ; livro-c=1 de 8 assuntos|mapa a confirmar ; livro-d=0 de 8 assuntos|sem mapa de assuntos');
+  conf('a linha escolhida diz isso sem depender da cor', await pag.evaluate(() => {
+    const l = document.querySelector('#lado-a-lado .lado-linha.escolhido');
+    return l.getAttribute('aria-current') + '|' + l.querySelector('.lado-escolhido').textContent;
+  }), 'true|o assunto escolhido');
   const celulas = Object.fromEntries(lado.celulas.split(' ; ').map(x => [x.slice(0, x.indexOf(':')), x.slice(x.indexOf(':') + 1)]));
   conf('Frações no livro-a: os dois capítulos, com as páginas do arquivo', celulas['MAT06-05'].split('|')[0],
     'livro-a=Cap. 2, Frações p. 3 a 4 Cap. 3, Comparar e operar frações p. 5 a 6');
   const ausencias = celulas['MAT06-05'].split('|').slice(1).join('|');
-  if (VENENO) {
-    secao('VENENO: as duas ausências trocadas');
-    const visto = ausencias !== 'livro-b=não trata|livro-c=sem mapa';
-    conf('envenenado-nao-trata-vira-sem-mapa: a tabela trocou "não trata" e "sem mapa" (defeito detectado)', visto, true);
-    if (visto) console.log('VENENO visto: ' + ausencias);
-    await H.fim(amb)();
-    return;
-  }
-  conf('"não trata" no livro-b (mapa revisado) e "sem mapa" no livro-c (passe automático)', ausencias, 'livro-b=não trata|livro-c=sem mapa');
+  if (VENENO) return venenoVisto('a tabela trocou "não trata" e "sem mapa"', ausencias.indexOf('livro-b=não trata') < 0, ausencias);
+  conf('"não trata" no livro-b (mapa revisado), "sem mapa" no livro-c (passe automático) e no livro-d (mapa vazio)', ausencias,
+    'livro-b=não trata|livro-c=sem mapa|livro-d=sem mapa');
   conf('as duas frases têm cores diferentes (âmbar para "não trata")', await pag.evaluate(() => {
     const n = document.querySelector('.lado-celula[data-tipo="nao-trata"] .lado-nao');
     const s = document.querySelector('.lado-celula[data-tipo="sem-mapa"] .lado-sem');
@@ -282,10 +305,22 @@ const medir = pag => pag.evaluate(() => {
     const rgb = h => { const x = parseInt(h.slice(1), 16); return 'rgb(' + (x >> 16) + ', ' + ((x >> 8) & 255) + ', ' + (x & 255) + ')'; };
     return getComputedStyle(n).color === rgb(ambar) && getComputedStyle(s).color !== getComputedStyle(n).color;
   }), true);
-  conf('decimais: livro-a e livro-c tratam, livro-b não', celulas['MAT06-07'], 'livro-a=Cap. 4, Decimais p. 7 a 8|livro-b=não trata|livro-c=Cap. 1, Decimais p. 1 a 2');
+  conf('decimais: livro-a e livro-c tratam, livro-b não', celulas['MAT06-07'], 'livro-a=Cap. 4, Decimais p. 7 a 8|livro-b=não trata|livro-c=Cap. 1, Decimais p. 1 a 2|livro-d=sem mapa');
+  conf('a legenda diz as duas frases, no mesmo corpo de 14 px, com o ícone de alerta', await pag.evaluate(() => {
+    const g = document.querySelector('#lado-legenda');
+    const f = Array.from(g.querySelectorAll('strong')).map(x => getComputedStyle(x).fontSize + '/' + getComputedStyle(x).fontWeight);
+    return g.innerText.replace(/\s+/g, ' ').trim() + '|' + (new Set(f)).size + '|' + Math.round(parseFloat(getComputedStyle(g).fontSize)) + '|' + !!g.querySelector('[data-icone-nome="alerta"]');
+  }), 'não trata: o mapa revisado não liga sem mapa: o mapa do livro ainda não foi revisado|1|14|true');
   conf('a falha salta na coluna de ícone da linha (alerta onde algum livro não trata)', lado.sinais,
     'MAT06-01=-,MAT06-02=alerta,MAT06-03=alerta,MAT06-04=alerta,MAT06-05=alerta,MAT06-06=-,MAT06-07=alerta,MAT06-08=alerta');
   conf('o pé abre cada livro no primeiro capítulo ligado', lado.rodape, 'livro-a=Abrir na p. 1,livro-b=Abrir na p. 1,livro-c=Abrir na p. 1');
+  conf('o botão do pé diz o livro para quem ouve', await pag.evaluate(() => document.querySelector('#lado-a-lado .lado-abrir[data-livro="livro-b"]').getAttribute('aria-label')),
+    'Abrir na p. 1, Matemática B');
+  conf('o pé não encosta na borda de baixo (respiro de 24 px ou mais ao rolar até o fim)', await pag.evaluate(() => {
+    const r = document.querySelector('#lado-a-lado .lado-rola'); r.scrollTop = r.scrollHeight;
+    const b = Array.from(r.querySelectorAll('.lado-abrir')).pop().getBoundingClientRect();
+    const sobra = r.getBoundingClientRect().bottom - b.bottom; r.scrollTop = 0; return sobra >= 24;
+  }), true);
   await clicar(pag, '#lado-a-lado [data-mostrar="so"]');
   lado = (await esperar('só Frações', () => lerLado(pag), v => v.visivel && v.linhas === 'MAT06-05', 5000)).valor;
   conf('"Só" o assunto escolhido deixa a linha dele', lado.linhas, 'MAT06-05');
@@ -312,7 +347,7 @@ const medir = pag => pag.evaluate(() => {
   await clicar(pag, '#lado-voltar');
   conf('o Voltar fecha a tabela', (await lerLado(pag)).visivel, false);
   if (PRINTS) {
-    await pag.evaluate(() => { const c = document.querySelector('.conteudo'); const s = document.querySelector('#bib-comparar'); if (c && s) c.scrollTop += s.getBoundingClientRect().bottom - c.getBoundingClientRect().bottom + 24; });
+    await pag.evaluate(() => { const c = document.querySelector('.conteudo'); if (c) c.scrollTop = 0; });
     await pausa(300);
     await pag.screenshot({ path: path.join(PRINTS, 'tab_biblioteca.png') });
     await pag.evaluate(() => { document.querySelector('.conteudo').scrollTop = 0; });
@@ -356,41 +391,72 @@ const medir = pag => pag.evaluate(() => {
   esc = (await esperar('o resultado de "fraç"', lerEscolha, v => /todos os anos/.test(v.conta) && v.itens.length > 2, 5000)).valor;
   console.log('   ' + esc.itens.join(' ; '));
   conf('"fraç" acha assuntos de vários anos, cada um com o ano e quantos livros o tratam', esc.itens.filter(x => /^MAT0[456]-/.test(x)).join(' ; '),
-    'MAT04-05|4º ano|nenhum livro ; MAT05-03|5º ano|nenhum livro ; MAT05-04|5º ano|nenhum livro ; MAT06-05|6º ano|1 livro ; MAT06-06|6º ano|2 livros');
+    'MAT04-05|4º ano|nenhum livro ; MAT05-03|5º ano|1 livro ; MAT05-04|5º ano|nenhum livro ; MAT06-05|6º ano|1 livro ; MAT06-06|6º ano|2 livros');
   conf('os anos da lista são vários', new Set(esc.itens.map(x => x.split('|')[1])).size >= 3, true);
   await clicar(pag, '#lado-escolha-lista [data-comparar="MAT05-03"]');
   lado = (await esperar('a tabela do 5º ano', () => lerLado(pag), v => v.visivel && v.modo === 'tabela' && v.escolhido === 'MAT05-03', 5000)).valor;
-  conf('sem livros do ano, a tela diz isso', lado.semLivros, 'Nenhum livro de Matemática do 5º ano neste tablet. Importe o pacote de livros em Ajustes.');
+  conf('o livro do 6º com capítulo ligado ao assunto do 5º (série vizinha) entra na tabela do 5º, e a contagem fecha (1 livro, 1 coluna)',
+    lado.colunas + '|' + lado.celulas.split(' ; ').filter(x => x.indexOf('MAT05-03:') === 0).join(''), 'livro-b|MAT05-03:livro-b=Cap. 3, Revisão do 5º ano p. 5 a 6');
+  conf('a cabeça diz que o livro é de outro ano, e o resumo também', await pag.evaluate(() => (document.querySelector('#lado-a-lado [data-vizinho]') || {}).textContent) + '|' + lado.resumo,
+    'de outro ano|1 livro; 1 de outro ano, com capítulo ligado; com o mapa revisado');
+  await clicar(pag, '#lado-voltar');
+  await esperar('a busca de volta', lerEscolha, v => /todos os anos/.test(v.conta), 5000);
+  await clicar(pag, '#lado-escolha-lista [data-comparar="MAT04-05"]');
+  lado = (await esperar('a tabela do 4º ano', () => lerLado(pag), v => v.visivel && v.modo === 'tabela' && v.escolhido === 'MAT04-05', 5000)).valor;
+  conf('sem livros do ano, a tela diz isso', lado.semLivros, 'Nenhum livro de Matemática do 4º ano neste tablet. Importe o pacote de livros em Ajustes.');
   conf('e a cabeça também', lado.resumo, 'nenhum livro no tablet');
-  conf('os anos do tema: os com livro e o de agora', lado.anos, '05*,06');
+  conf('os anos do tema: os com livro (o 5º pelo livro de série vizinha) e o de agora', lado.anos, '04*,05,06');
   await clicar(pag, '#lado-a-lado .lado-anos [data-ano="06"]');
   lado = (await esperar('o tema no 6º ano', () => lerLado(pag), v => v.visivel && v.titulo === 'Números, 6º ano', 5000)).valor;
-  conf('o chip do ano leva ao mesmo tema no outro ano', lado.colunas, 'livro-a,livro-b,livro-c');
+  conf('o chip do ano leva ao mesmo tema no outro ano', lado.colunas, 'livro-a,livro-b,livro-c,livro-d');
   await clicar(pag, '#lado-voltar');
   esc = (await esperar('a busca de volta', lerEscolha, v => /todos os anos/.test(v.conta), 5000)).valor;
   conf('o Voltar da tabela volta à busca com o termo', await pag.evaluate(() => document.querySelector('#lado-busca').value), 'fraç');
+  await pag.evaluate(() => { const i = document.querySelector('#lado-busca'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  conf('e com a matéria e o ano de onde ela veio, e não os do último assunto', (await lerEscolha()).conta,
+    '14 assuntos de Matemática do 6º ano. Escreva para buscar em todos os anos.');
   await clicar(pag, '#lado-voltar');
   conf('e o Voltar da busca fecha', (await lerLado(pag)).visivel, false);
 
   // ================================================================
   secao('5. A correção dela no mapa aparece na tabela');
-  await pag.evaluate(async () => {
-    const d = await Store.carregar();
-    d.ajustes = d.ajustes || {};
-    d.ajustes.mapaDosLivros = { 'livro-c': {
-      1: { titulo: 'Capítulo 1: Decimais', assuntos: ['MAT06-07'], acao: 'confirmou', quando: '2026-11-11T09:00:00.000Z' },
-      2: { titulo: 'Capítulo 2: Partes do inteiro', assuntos: ['MAT06-05'], acao: 'corrigiu', quando: '2026-11-11T09:01:00.000Z' } } };
-    await Store.salvar(d);
-  });
-  await H.abrirApp(pag, amb.ORIGEM);
-  await abrirBibliotecaNoAno(pag, 'matematica', '06');
-  await clicar(pag, '#bib-comparar [data-comparar="MAT06-05"]');
-  lado = (await esperar('a tabela com a correção', () => lerLado(pag), v => v.visivel && /livro-c=Cap\. 2/.test(v.celulas), 10000)).valor;
-  const c2 = Object.fromEntries(lado.celulas.split(' ; ').map(x => [x.slice(0, x.indexOf(':')), x.slice(x.indexOf(':') + 1)]));
+  const CAP1 = { titulo: 'Capítulo 1: Decimais', assuntos: ['MAT06-07'], acao: 'confirmou', quando: '2026-11-11T09:00:00.000Z' };
+  const corrigirELer = async (doLivroC, rotulo, pronto) => {
+    await pag.evaluate(async c => {
+      const d = await Store.carregar();
+      d.ajustes = d.ajustes || {};
+      d.ajustes.mapaDosLivros = { 'livro-c': c };
+      await Store.salvar(d);
+    }, doLivroC);
+    await H.abrirApp(pag, amb.ORIGEM);
+    await abrirBibliotecaNoAno(pag, 'matematica', '06');
+    await clicar(pag, '#bib-comparar [data-comparar="MAT06-05"]');
+    const v = (await esperar(rotulo, () => lerLado(pag), x => x.visivel && pronto(x), 10000)).valor;
+    const cel = Object.fromEntries(v.celulas.split(' ; ').map(x => [x.slice(0, x.indexOf(':')), x.slice(x.indexOf(':') + 1)]));
+    await clicar(pag, '#lado-voltar');
+    return { v, cel };
+  };
+  // (b) parcial: o capítulo 1 confirmado e o 2 ainda do passe automático
+  let k = await corrigirELer({ 1: CAP1 }, 'a tabela com o livro-c parcial', x => !!x.celulas);
+  if (MODO === '--envenenado-parcial-nao-trata') {
+    return venenoVisto('o livro parcialmente confirmado diz "não trata"', k.cel['MAT06-05'].split('|')[2] === 'livro-c=não trata', k.cel['MAT06-05']);
+  }
+  conf('parcial (um capítulo confirmado, outro a confirmar): as ausências do livro-c continuam "sem mapa"',
+    k.cel['MAT06-05'].split('|')[2] + ' ; ' + k.cel['MAT06-06'].split('|')[2], 'livro-c=sem mapa ; livro-c=sem mapa');
+  conf('e a cabeça dele continua "mapa a confirmar"', k.v.cabecas.split(' ; ')[2], 'livro-c=1 de 8 assuntos|mapa a confirmar');
+  // (c) a correção para "nenhum assunto" é ausência confirmada
+  k = await corrigirELer({ 1: CAP1, 2: { titulo: 'Capítulo 2: Partes do inteiro', assuntos: [], acao: 'corrigiu', quando: '2026-11-11T09:01:00.000Z' } },
+    'a tabela com o capítulo 2 sem assunto', x => /livro-c=não trata/.test(x.celulas));
+  conf('"nenhum assunto" no capítulo 2: o livro-c passa a revisado, e as ausências viram "não trata"',
+    k.cel['MAT06-05'].split('|')[2] + ' ; ' + k.cel['MAT06-07'].split('|')[2], 'livro-c=não trata ; livro-c=Cap. 1, Decimais p. 1 a 2');
+  // a correção para um assunto
+  k = await corrigirELer({ 1: CAP1, 2: { titulo: 'Capítulo 2: Partes do inteiro', assuntos: ['MAT06-05'], acao: 'corrigiu', quando: '2026-11-11T09:02:00.000Z' } },
+    'a tabela com a correção', x => /livro-c=Cap\. 2/.test(x.celulas));
+  lado = k.v;
+  const c2 = k.cel;
   conf('Frações: o capítulo que ela ligou no livro-c', c2['MAT06-05'].split('|')[2], 'livro-c=Cap. 2, Partes do inteiro p. 3 a 4');
-  conf('o livro-c, todo confirmado, vira revisado: "não trata" onde era "sem mapa"', c2['MAT06-06'], 'livro-a=Cap. 3, Comparar e operar frações p. 5 a 6|livro-b=Cap. 2, Operações com frações p. 3 a 4|livro-c=não trata');
+  conf('o livro-c, todo confirmado, vira revisado: "não trata" onde era "sem mapa"', c2['MAT06-06'], 'livro-a=Cap. 3, Comparar e operar frações p. 5 a 6|livro-b=Cap. 2, Operações com frações p. 3 a 4|livro-c=não trata|livro-d=sem mapa');
   conf('e a cabeça dele perde o "mapa a confirmar"', lado.cabecas.split(' ; ')[2], 'livro-c=2 de 8 assuntos');
-  await clicar(pag, '#lado-voltar');
 
   // ================================================================
   secao('6. A aula: "Abrir no livro" e "Ver em todos os livros"');
@@ -409,6 +475,20 @@ const medir = pag => pag.evaluate(() => {
   conf('o "Abrir no livro" da linha volta à lista dos livros do assunto, com a aula aberta embaixo', await pag.evaluate(() =>
     document.querySelector('#modal-aula').classList.contains('aberto') && /Os livros do ano/.test(document.querySelector('#corpo-modal-livros').textContent)), true);
   await fecharModal(pag, 'modal-livros');
+  conf('o assunto da aula que nenhum livro trata ganha "Ver em todos os livros" no lugar do "Abrir no livro"', await pag.evaluate(() =>
+    !document.querySelector('#corpo-modal-aula [data-abrir-no-livro="MAT06-03"]') + '|' +
+    ((document.querySelector('#corpo-modal-aula [data-ver-nos-livros="MAT06-03"]') || {}).textContent || '')), 'true|Ver em todos os livros');
+  await clicar(pag, '#corpo-modal-aula [data-ver-nos-livros="MAT06-03"]');
+  lado = (await esperar('a tabela do assunto sem livro', () => lerLado(pag), v => v.visivel && v.escolhido === 'MAT06-03', 10000)).valor;
+  conf('a tabela diz livro a livro que ninguém trata, sem "Abrir no livro" na linha',
+    lado.celulas.split(' ; ').filter(x => x.indexOf('MAT06-03:') === 0).join('') + '|' + lado.abrirNoLivro,
+    'MAT06-03:livro-a=não trata|livro-b=não trata|livro-c=não trata|livro-d=sem mapa|false');
+  await pag.evaluate(() => history.back());
+  const voltou = await esperar('o Voltar do sistema', () => pag.evaluate(() =>
+    document.querySelector('#lado-a-lado').hidden + '|' + document.querySelector('#modal-aula').classList.contains('aberto')), v => v === 'true|true', 5000);
+  conf('o Voltar do sistema fecha a TABELA, e a aula continua aberta', voltou.valor, 'true|true');
+  await pausa(300);
+  conf('e continua aberta (a entrada da aula voltou para o histórico)', await pag.evaluate(() => document.querySelector('#modal-aula').classList.contains('aberto')), true);
   await fecharModal(pag, 'modal-aula');
 
   // ================================================================
@@ -439,7 +519,24 @@ const medir = pag => pag.evaluate(() => {
       await letra(pag, '');
     }
   }
+  // estreito de celular (360 px a 130%): a coluna dos assuntos encolhe
+  await pag.setViewport({ width: 800, height: 1280, hasTouch: true });
+  await abrirBibliotecaNoAno(pag, 'matematica', '06');
+  await clicar(pag, '#bib-comparar [data-comparar="MAT06-05"]');
+  await esperar('a tabela', () => lerLado(pag), v => v.visivel && !!v.colunas, 5000);
+  await pag.setViewport({ width: 360, height: 780, hasTouch: true });
+  await letra(pag, LETRA_130);
+  await pausa(300);
+  const estreito = await pag.evaluate(() => {
+    const r = document.querySelector('#lado-a-lado .lado-rotulo').getBoundingClientRect();
+    return { coluna: Math.round(r.width), limite: Math.round(8 * parseFloat(getComputedStyle(document.documentElement).fontSize)), pagina: document.documentElement.scrollWidth <= innerWidth };
+  });
+  console.log('   360 px a 130%: ' + JSON.stringify(estreito));
+  conf('360 px a 130%: a coluna dos assuntos fica em 8rem, e a página não rola de lado', estreito.coluna <= estreito.limite + 1 && estreito.pagina, true);
+  if (PRINTS) await pag.screenshot({ path: path.join(PRINTS, 'cel_assunto_360_130.png') });
+  await letra(pag, '');
   await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
+  await clicar(pag, '#lado-voltar');
 
   // ================================================================
   secao('8. Nada gravado; 15 livros e 16 assuntos abrem sem travar');
@@ -471,6 +568,22 @@ const medir = pag => pag.evaluate(() => {
   conf('15 colunas e 16 linhas (240 células)', t0 && grande && grande.colunas + 'x' + grande.linhas + '=' + grande.celulas, '15x16=240');
   conf('abre em menos de 1,5 s do toque ao desenho', grande && grande.ms < 1500, true);
   conf('com 15 livros, a página não rola de lado (só a tabela)', await pag.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await clicar(pag, '#lado-voltar');
+  await clicar(pag, '#bib-comparar-todos');
+  await esperar('a busca de assunto', () => lerLado(pag), v => v.visivel && v.modo === 'escolha', 5000);
+  await pag.focus('#lado-busca');
+  await pag.keyboard.type('Modernismo');
+  await esperar('o assunto 15 do Modernismo na lista', () => pag.evaluate(() => !!document.querySelector('#lado-escolha-lista [data-comparar="POREM3-T15"]')), v => v, 5000);
+  await clicar(pag, '#lado-escolha-lista [data-comparar="POREM3-T15"]');
+  await esperar('a tabela do assunto 15', () => lerLado(pag), v => v.visivel && v.escolhido === 'POREM3-T15', 5000);
+  await pausa(200);
+  const vista = await pag.evaluate(() => {
+    const rola = document.querySelector('#lado-a-lado .lado-rola').getBoundingClientRect();
+    const cab = document.querySelector('#lado-a-lado .lado-linha-cabeca .lado-livro').getBoundingClientRect();
+    const r = document.querySelector('#lado-a-lado .lado-linha.escolhido .lado-rotulo').getBoundingClientRect();
+    return { linhas: document.querySelectorAll('#lado-a-lado .lado-linha[data-assunto]').length, aVista: r.top >= cab.bottom - 1 && r.bottom <= rola.bottom + 1 };
+  });
+  conf('com ' + vista.linhas + ' linhas, a linha escolhida (a 15ª) abre à vista, abaixo da cabeça presa', vista.linhas >= 12 && vista.aVista, true);
 
   conf('nenhum erro de página', errosDePagina.join(' | '), '');
   if (PRINTS) console.log('   prints em ' + PRINTS);
