@@ -424,6 +424,7 @@ roda "atualizacao --rede-lenta"                 node "_teste/testa_atualizacao_a
 # e o teste tem que enxergar o pacote errado entrando.
 roda "biblioteca importar"                      node "_teste/testa_biblioteca_importar.js"
 roda "biblioteca importar --envenenado-hash"    node "_teste/testa_biblioteca_importar.js" --envenenado-hash
+roda "biblioteca importar --envenenado-aviso-fica" node "_teste/testa_biblioteca_importar.js" --envenenado-aviso-fica
 # FRENTE B: a aba Biblioteca (sem pacote, "Em construcao"; com pacote, serie,
 # modulo, aula, miniaturas sob demanda, lista de 40 abaixo de 2 s, tela cheia,
 # busca "bhaskara" agrupada, abrir como folha). O modo envenenado serve um app.js

@@ -105,6 +105,16 @@
   var PREFIXO_MINIATURA = 'bib:';
 
   var bancoAberto = null;
+  /* O navegador avisa o bloqueio uma vez só, e ele pode chegar antes de o
+   * app.js rodar: o nuvem.js já pede o banco enquanto a página carrega. Fica
+   * guardado aqui, e o app.js pergunta quando entra (Store.bancoBloqueado). */
+  var bancoBloqueadoAgora = false;
+  // o mesmo vale para a troca de versão por outra janela (C2a): Store.bancoTrocado
+  var bancoTrocadoAgora = false;
+  function avisarBloqueio() {
+    bancoBloqueadoAgora = true;
+    if (typeof root.aoBancoBloqueado === 'function') root.aoBancoBloqueado();
+  }
 
   /* Os depósitos que este código precisa encontrar abertos. Quem faltar é
    * criado na transação de versão (criarDepositos) ou, se o banco já está na
@@ -230,7 +240,7 @@
     if (bancoAberto) return Promise.resolve(bancoAberto);
     return new Promise(function (resolve, reject) {
       var sonda = indexedDB.open(NOME_BANCO);
-      sonda.onblocked = function () { if (typeof root.aoBancoBloqueado === 'function') root.aoBancoBloqueado(); };
+      sonda.onblocked = avisarBloqueio;
       sonda.onerror = function () { reject(sonda.error); };
       sonda.onsuccess = function () {
         var b = sonda.result;
@@ -249,7 +259,7 @@
         /* Outra janela do aplicativo, ainda na versão antiga, segura o banco na
          * versão 1: a subida espera ela fechar. Sem aviso, a tela ficaria em
          * branco sem motivo aparente; quem mostra o aviso é o app.js. */
-        req.onblocked = function () { if (typeof root.aoBancoBloqueado === 'function') root.aoBancoBloqueado(); };
+        req.onblocked = avisarBloqueio;
         req.onsuccess = function () { adotar(req.result); };
         /* CÓDIGO MAIS VELHO QUE O BANCO (C2a): o banco já está numa versão maior
          * que a deste código (outra janela subiu no meio). O navegador recusa com
@@ -274,8 +284,10 @@
           if (bancoAberto === conexao) bancoAberto = null;
           /* E AVISA (C2a): esta janela fica com o código de antes, e a próxima
            * gravação dela abriria o banco numa versão que não existe mais. */
+          bancoTrocadoAgora = true;
           if (typeof root.aoBancoTrocado === 'function') root.aoBancoTrocado();
         };
+        bancoBloqueadoAgora = false;
         if (typeof root.aoBancoLiberado === 'function') root.aoBancoLiberado();
         resolve(conexao);
       }
@@ -2099,6 +2111,8 @@
 
   root.Store = {
     bancoVazio: bancoVazio,
+    bancoBloqueado: function () { return bancoBloqueadoAgora; },
+    bancoTrocado: function () { return bancoTrocadoAgora; },
     carregar: carregar, salvar: salvar, excluirAlunoEmCascata: excluirAlunoEmCascata,
     lerNota: lerNota, salvarNota: salvarNota, apagarNota: apagarNota, todasAsNotas: todasAsNotas,
     salvarMidia: salvarMidia, lerMidia: lerMidia, apagarMidia: apagarMidia,
