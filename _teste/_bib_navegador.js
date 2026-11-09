@@ -393,10 +393,16 @@ function montarRelogio(iso, hhmm, ehPadrao) {
   const dia = n => isoDeData(new Base(p[0], p[1] - 1, p[2] + n, 12, 0));
   /* (arranjo) A página aberta e o processo estão no dia da rodada: sem isto,
    * uma prova que esqueceu o naPagina passaria no dia de hoje sem ninguém ver. */
-  const conferir = async pag => conf('(arranjo) a página e o processo estão no dia da rodada (' + iso + ')',
+  /* confDaProva: o conf da prova que não usa o placar deste helper. */
+  const conferir = async (pag, confDaProva) => (confDaProva || conf)('(arranjo) a página e o processo estão no dia da rodada (' + iso + ')',
     [await pag.evaluate(() => Core.hojeIso()), isoDeData(new Date())].join(' '), iso + ' ' + iso);
+  /* O mesmo arranjo sem depender do app (Core): serve a página de uma versão
+   * antiga do aplicativo, como as provas de atualização servem. */
+  const conferirData = async (pag, confDaProva) => (confDaProva || conf)('(arranjo) a página e o processo estão no dia da rodada (' + iso + ')',
+    [await pag.evaluate(() => { const d = new Date(), q = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + q(d.getMonth() + 1) + '-' + q(d.getDate()); }),
+      isoDeData(new Date())].join(' '), iso + ' ' + iso);
   return {
-    iso, hhmm, fixo, dia, conferir,
+    iso, hhmm, fixo, dia, conferir, conferirData,
     /* O padrão (ehPadrao) cede a vez: se a página já tem uma escolha explícita
      * da prova, ele não entra; se tem só o padrão, a escolha explícita o
      * substitui. Em qualquer ordem a página fica com a escolha da prova. */
