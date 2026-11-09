@@ -219,4 +219,57 @@ function fim(amb) {
   };
 }
 
-module.exports = { RAIZ, conf, secao, pausa, esperar, criarAmbiente, abrirApp, irParaAba, contarDeposito, placar, fim };
+/* O relógio da rodada: a prova inteira acontece num dia e numa hora escolhidos,
+ * e nunca no dia e na hora em que o CI roda (o portão de 09/11 caiu porque uma
+ * conferência dependia da hora real, depois da meia-noite UTC).
+ *
+ * relogioDaRodada('2026-11-16', '11:00') troca o Date do processo: new Date()
+ * e Date.now() começam nesse instante (hora local) e andam no passo do relógio
+ * de verdade; com argumentos, Date é o de sempre. naPagina(pag) põe o mesmo
+ * relógio na página, antes de qualquer script dela, e vale a cada recarga.
+ *
+ * O relógio ANDA, não fica parado: o app carimba as gravações com a hora e
+ * monta o id da cópia com Date.now(), e um relógio parado daria a duas cópias
+ * o mesmo id e a duas gravações a mesma hora. Para parar numa hora, a prova
+ * usa por cima o fixarRelogio dela, que guarda este como o Date de volta.
+ *
+ * O passo da página vem do relógio do sistema (performance.timeOrigin), e não
+ * do Date do processo: assim a página e o processo concordam mesmo quando o
+ * Date do processo foi trocado antes (o controle que finge a meia-noite). */
+function relogioDaRodada(iso, hhmm) {
+  const Base = Date;
+  const p = iso.split('-').map(Number), h = hhmm.split(':').map(Number);
+  const fixo = new Base(p[0], p[1] - 1, p[2], h[0], h[1]).getTime();
+  const base0 = Base.now();
+  const sistema = () => performance.timeOrigin + performance.now();
+  const deslocamento = fixo - sistema();
+  const agora = () => fixo + (Base.now() - base0);
+  function DaRodada(...a) {
+    if (!new.target) return new Base(agora()).toString();
+    return a.length ? new Base(...a) : new Base(agora());
+  }
+  DaRodada.prototype = Base.prototype;
+  DaRodada.now = agora; DaRodada.UTC = Base.UTC; DaRodada.parse = Base.parse;
+  global.Date = DaRodada;
+  const isoDe = d => { const q = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + q(d.getMonth() + 1) + '-' + q(d.getDate()); };
+  /* O dia `n` dias depois (antes, se negativo) do dia fixo, em aaaa-mm-dd. */
+  const dia = n => isoDe(new Base(p[0], p[1] - 1, p[2] + n, 12, 0));
+  return {
+    iso, hhmm, fixo, dia,
+    naPagina: pag => pag.evaluateOnNewDocument(desl => {
+      if (window.__DataDaRodada) return;
+      const Real = Date;
+      const agoraPag = () => Real.now() + desl;
+      function DaRodada(...a) {
+        if (!new.target) return new Real(agoraPag()).toString();
+        return a.length ? new Real(...a) : new Real(agoraPag());
+      }
+      DaRodada.prototype = Real.prototype;
+      DaRodada.now = agoraPag; DaRodada.UTC = Real.UTC; DaRodada.parse = Real.parse;
+      window.__DataDaRodada = DaRodada;
+      window.Date = DaRodada;
+    }, deslocamento)
+  };
+}
+
+module.exports = { RAIZ, conf, secao, pausa, esperar, criarAmbiente, abrirApp, irParaAba, contarDeposito, placar, fim, relogioDaRodada };

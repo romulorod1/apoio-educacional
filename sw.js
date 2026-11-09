@@ -125,8 +125,13 @@
  * painel no iPhone e as frases do Safari (app.js e nuvem.js), com a lista igual. O v88 troca os ícones só no site do Cloudflare (o
  * monta_site.sh põe icons/pages-dev/ por cima de icons/): sem o nome novo, o
  * worker do endereço novo seguiria servindo os ícones velhos do cache. O v89 (D6c lote 1) traz a agenda do dia no celular
- * (app.js, index.html e styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v89';
+ * (app.js, index.html e styles.css), com a lista igual. O v90 conserta a rolagem inicial da agenda do celular
+ * de madrugada (app.js), com a lista igual. O v91 (D6c lote 2) traz a ficha do aluno e o WhatsApp
+ * no celular e os campos opcionais no cadastro (app.js, index.html e
+ * styles.css), com a lista igual. O v92 (D6c lote 3) traz o selo de pago e o que falta
+ * receber no celular e os nomes novos do cancelamento (app.js, core.js, pdf.js
+ * e styles.css), com a lista igual. */
+var CACHE = 'apoio-educacional-v92';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

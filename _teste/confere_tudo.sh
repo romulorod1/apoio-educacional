@@ -237,6 +237,12 @@ roda "dinheiro"      node _teste/testa_dinheiro.js
 roda "cartao do mes" node _teste/testa_cartao.js
 roda "proposta"      node _teste/testa_proposta.js
 roda "textos e novidades" node _teste/testa_textos_e_novidades.js
+# todo veneno pedido por este portão existe na prova chamada (um nome errado
+# roda calado como modo normal e passa)
+roda "venenos existem" node _teste/testa_venenos_existem.js
+roda "venenos existem --envenenado-nome-falso" node _teste/testa_venenos_existem.js --envenenado-nome-falso
+roda "venenos existem --envenenado-letra-trocada" node _teste/testa_venenos_existem.js --envenenado-letra-trocada
+roda "venenos existem --envenenado-prefixo" node _teste/testa_venenos_existem.js --envenenado-prefixo
 # A tabela de materias e uma so (core.js) e as copias tem que bater com ela:
 # a do cartao.js, a do pdf.js, o banco/topicos/indice.json e a exportada para
 # o Python. Foi a divergencia entre quatro vocabularios de materia que deixou
@@ -874,6 +880,56 @@ roda "celular edita --envenenado-duracao-padrao"    node "_teste/testa_celular_e
 roda "celular edita --envenenado-cancela-sempre-sem" node "_teste/testa_celular_edita.js" --envenenado-cancela-sempre-sem
 # (revisao do lote 1) tocar na situacao que a aula ja tem nao volta a cobranca ao padrao
 roda "celular edita --envenenado-cobranca-volta"    node "_teste/testa_celular_edita.js" --envenenado-cobranca-volta
+# (portao de 09/11) a rolagem inicial com o relogio fixo em varias horas: a folga antiga deixa
+# a linha de agora cortada sob a faixa dos dias as 00:30 e as 06:00
+roda "celular edita --envenenado-rolagem-antiga"   node "_teste/testa_celular_edita.js" --envenenado-rolagem-antiga
+# D6c (lote 2): a aba Alunos e a ficha minima (ligar, WhatsApp, valor por hora,
+# ultimo relato, casa ou online), as mensagens prontas em wa.me, os campos
+# opcionais que sobem pela fila e chegam ao tablet, e a cobranca do "Escrever
+# como foi" pelo estado atual da aula. Venenos: o numero sem 55, o texto
+# errado, a ficha que abre o WhatsApp sozinha, o campo lido sem conferir, os
+# campos que nao sobem, a cobranca pelo retrato e o observador que cadastra.
+roda "celular ficha (D6c lote 2)"                   node "_teste/testa_celular_ficha.js"
+roda "celular ficha --envenenado-sem-55"            node "_teste/testa_celular_ficha.js" --envenenado-sem-55
+roda "celular ficha --envenenado-texto-errado"      node "_teste/testa_celular_ficha.js" --envenenado-texto-errado
+roda "celular ficha --envenenado-abre-sozinho"      node "_teste/testa_celular_ficha.js" --envenenado-abre-sozinho
+roda "celular ficha --envenenado-campo-obrigatorio" node "_teste/testa_celular_ficha.js" --envenenado-campo-obrigatorio
+roda "celular ficha --envenenado-campos-nao-sobem"  node "_teste/testa_celular_ficha.js" --envenenado-campos-nao-sobem
+roda "celular ficha --envenenado-cobranca-retrato"  node "_teste/testa_celular_ficha.js" --envenenado-cobranca-retrato
+roda "celular ficha --envenenado-observador-cadastra" node "_teste/testa_celular_ficha.js" --envenenado-observador-cadastra
+# (revisao do lote 2) a extracao antiga do telefone do texto livre (o telefone
+# de um estranho; a tabela dos 28 casos dela), o link online com http, e o alto que nunca avisa que pode
+# estar desatualizado
+roda "celular ficha --envenenado-extracao-antiga"   node "_teste/testa_celular_ficha.js" --envenenado-extracao-antiga
+roda "celular ficha --envenenado-aceita-http"       node "_teste/testa_celular_ficha.js" --envenenado-aceita-http
+roda "celular ficha --envenenado-nunca-desatualizado" node "_teste/testa_celular_ficha.js" --envenenado-nunca-desatualizado
+# D6c (lote 3): dinheiro de relance. O selo de cada familia (pago, parcial, em
+# aberto) e o total a receber do Fechamento do celular batem com o tablet ao
+# centavo (Core.seloDoPagamento e Core.totaisDoMes); o "Pago" em dois toques
+# propoe o valor das aulas ja dadas, sobe pela fila e chega ao tablet; a
+# cancelada sem cobranca nao entra e os dois cancelamentos tem nomes que nao se
+# confundem; junho continua 10 encontros, 10:30 e R$ 1.050,00; o observador ve
+# o selo e o total sem marcar pago. Um veneno para cada propriedade.
+roda "celular dinheiro (D6c lote 3)"                node "_teste/testa_celular_dinheiro.js"
+roda "celular dinheiro --envenenado-selo-pelo-mes"  node "_teste/testa_celular_dinheiro.js" --envenenado-selo-pelo-mes
+roda "celular dinheiro --envenenado-parcial-vira-pago" node "_teste/testa_celular_dinheiro.js" --envenenado-parcial-vira-pago
+roda "celular dinheiro --envenenado-aberto-vira-nada" node "_teste/testa_celular_dinheiro.js" --envenenado-aberto-vira-nada
+roda "celular dinheiro --envenenado-total-do-mes"   node "_teste/testa_celular_dinheiro.js" --envenenado-total-do-mes
+roda "celular dinheiro --envenenado-proposto-do-mes" node "_teste/testa_celular_dinheiro.js" --envenenado-proposto-do-mes
+roda "celular dinheiro --envenenado-cancelada-cobra" node "_teste/testa_celular_dinheiro.js" --envenenado-cancelada-cobra
+roda "celular dinheiro --envenenado-nome-antigo"    node "_teste/testa_celular_dinheiro.js" --envenenado-nome-antigo
+roda "celular dinheiro --envenenado-pago-fora-da-acao" node "_teste/testa_celular_dinheiro.js" --envenenado-pago-fora-da-acao
+roda "celular dinheiro --envenenado-preco-de-hoje"  node "_teste/testa_celular_dinheiro.js" --envenenado-preco-de-hoje
+roda "celular dinheiro --envenenado-observador-paga" node "_teste/testa_celular_dinheiro.js" --envenenado-observador-paga
+# (revisao do lote 3) o proposto com a cancelada e cobrada a frente e sem a aula
+# de hoje que ainda nao acabou; o numero grande e o que falta; os meses
+# anteriores em aberto; cancelar a aula dada pergunta; pagar e desmarcar redesenham
+roda "celular dinheiro --envenenado-sem-cancelada-a-frente" node "_teste/testa_celular_dinheiro.js" --envenenado-sem-cancelada-a-frente
+roda "celular dinheiro --envenenado-tira-hoje-do-proposto" node "_teste/testa_celular_dinheiro.js" --envenenado-tira-hoje-do-proposto
+roda "celular dinheiro --envenenado-falta-e-o-total" node "_teste/testa_celular_dinheiro.js" --envenenado-falta-e-o-total
+roda "celular dinheiro --envenenado-sem-meses-anteriores" node "_teste/testa_celular_dinheiro.js" --envenenado-sem-meses-anteriores
+roda "celular dinheiro --envenenado-cancela-sem-confirmar" node "_teste/testa_celular_dinheiro.js" --envenenado-cancela-sem-confirmar
+roda "celular dinheiro --envenenado-sem-redesenho"  node "_teste/testa_celular_dinheiro.js" --envenenado-sem-redesenho
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
