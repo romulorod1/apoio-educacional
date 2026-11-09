@@ -886,6 +886,15 @@
       !!local.apagadoEm !== !!chegou.apagadoEm;
   }
 
+  /* A versão da mensagem do mês que ficou de fora num conflito, dentro do item
+   * (db.resumos[].versaoDeFora): o texto, o aparelho e a hora, só a última. O
+   * campo é livre no registro: a 1.42.18 o carrega sem ler. Devolve os mesmos
+   * dados quando não há o que guardar (o texto é igual ao que ficou). */
+  function comVersaoDeFora(dados, perdeu) {
+    if (!dados || !perdeu || typeof perdeu.texto !== 'string' || perdeu.texto === (dados.texto || '')) return dados;
+    return Object.assign({}, dados, { versaoDeFora: { texto: perdeu.texto, aparelho: perdeu.aparelho || '', em: perdeu.em || '' } });
+  }
+
   /* O maior par (carimbo, nome): é o cursor da próxima consulta. */
   function parMaior(a, b) {
     if (!a) return b;
@@ -986,6 +995,22 @@
               }
             }
             var entrada = fila[chegou.id];
+            /* A MENSAGEM DO MÊS (tipo `resumo`) vence pela hora em que foi
+             * ESCRITA, e não pela ordem em que chega: o texto que ela escreveu
+             * sem sinal às 10h não pode cobrir a correção do tablet das 14h só
+             * porque o celular pegou sinal às 18h. Se o que chega foi escrito
+             * depois da edição local na fila, ele vence: a entrada sai da fila,
+             * a versão local vai para o histórico (o houvePerdedor abaixo) e o
+             * registro guarda a hora da versão que perdeu, para o editor dizer.
+             * Só este tipo; os outros seguem a regra de sempre. */
+            var perdeuLocalEm = null;
+            if (local && entrada && !entrada.quarentena && chegou.tipo === 'resumo' && !entrada.restauro &&
+                Date.parse(chegou.atualizadoEm || '') > Date.parse(entrada.atualizadoEm || '')) {
+              saida.delete(chegou.id);
+              delete fila[chegou.id];
+              perdeuLocalEm = entrada.atualizadoEm;
+              entrada = null;
+            }
             /* A RESTAURAÇÃO VENCE (decisão da sessão, 08/11): restaurar uma cópia, mais
              * velha ou não, é a vontade dela de voltar àquele ponto, no mesmo
              * tablet ou num novo. A entrada da restauração é uma edição local
@@ -996,6 +1021,12 @@
             if (local && entrada && !entrada.quarentena) {
               // a edição local ainda não enviada vence: só o carimbo é anotado
               local.nuvem = carimbo;
+              /* Na mensagem do mês, a versão do outro aparelho que perdeu fica
+               * dentro do próprio item, à vista nos dois editores, e sobe junto. */
+              if (chegou.tipo === 'resumo' && !chegou.apagadoEm && chegou.dados && !local.apagadoEm && local.dados) {
+                var comFora = comVersaoDeFora(local.dados, { texto: chegou.dados.texto, aparelho: chegou.aparelho, em: chegou.atualizadoEm });
+                if (comFora !== local.dados) { local.dados = comFora; contas.mudou = true; }
+              }
               registros.put(local);
               porId[chegou.id] = local;
               if (JSON.stringify(local.dados) !== JSON.stringify(chegou.dados || null) || !!local.apagadoEm !== !!chegou.apagadoEm) {
@@ -1019,6 +1050,20 @@
                 (local.apagadoEm && !novo.apagadoEm))) {
               houvePerdedor = true;
               contas.perdedoresLocais++;
+            }
+            if (perdeuLocalEm) {
+              novo.perdeuLocalEm = perdeuLocalEm; // só neste aparelho: o envio não leva este campo
+              /* A versão daqui que perdeu fica dentro do item (versaoDeFora), e
+               * não só no histórico deste aparelho, que ela não vê no celular e
+               * que a próxima cópia trazida apaga. O item sobe de novo, com a
+               * hora da versão que venceu, para o outro aparelho também mostrar. */
+              if (local && local.dados && !local.apagadoEm && novo.dados) {
+                var fora = comVersaoDeFora(novo.dados, { texto: local.dados.texto, aparelho: local.aparelho, em: local.atualizadoEm });
+                if (fora !== novo.dados) {
+                  novo.dados = fora;
+                  if (!soLeitura || celularEdita) enfileirar(saida, { id: novo.id, tipo: novo.tipo, atualizadoEm: novo.atualizadoEm, apagadoEm: null });
+                }
+              }
             }
             registros.put(novo);
             porId[chegou.id] = novo;
