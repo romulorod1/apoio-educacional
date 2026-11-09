@@ -221,12 +221,31 @@ async function abrirCelular(w, h) {
   conf('um ativo só, a Agenda, com aria-current', t.ativos + '|' + t.atuais, 'agenda|agenda');
   conf('alvos de 48 px, rótulos inteiros e nada transborda (' + (t.ruins.join('; ') || 'nada') + ')', t.ruins.length, 0);
 
+  /* Ajustes é um item como os outros: ícone de traço 1,75 na grade 24, a
+   * pílula de 56x32 e o alvo de 48 px (o painel cego viu "texto solto"). */
+  const lerItem = tela => pag.evaluate(t => {
+    const b = document.querySelector('#abas .aba[data-tela="' + t + '"]');
+    const ind = b.querySelector('.nav-ind'), ico = ind && ind.querySelector('svg.nav-ico');
+    const r = b.getBoundingClientRect(), q = ind ? ind.getBoundingClientRect() : { width: 0, height: 0 };
+    return { ico: !!ico && ico.getAttribute('viewBox') === '0 0 24 24' && getComputedStyle(ico).strokeWidth === '1.75px' && ico.getBoundingClientRect().width === 20,
+      pilula: Math.round(q.width) + 'x' + Math.round(q.height), alvo: r.width >= 48 && r.height >= 48,
+      fundo: ind ? getComputedStyle(ind).backgroundColor : '', rotulo: getComputedStyle(b.querySelector('.nav-rotulo')).fontSize };
+  }, tela);
+  let aj = await lerItem('ajustes');
+  const ag = await lerItem('agenda');
+  conf('Ajustes tem o ícone de traço 1,75 na grade 24, como os outros', aj.ico, true);
+  conf('Ajustes tem a mesma pílula, o mesmo rótulo e o alvo de 48 px', aj.pilula + ' ' + aj.rotulo + ' ' + aj.alvo, ag.pilula + ' ' + ag.rotulo + ' true');
+
   for (const tela of ['alunos', 'biblioteca', 'fechamento', 'ajustes', 'agenda']) {
     await pag.click('#abas .aba[data-tela="' + tela + '"]');
     await pausa(250);
     t = await lerTrilho(pag);
     conf('pelo trilho, ' + tela + ': a tela certa aparece e só ela fica ativa e atual', t.telas + '|' + t.ativos + '|' + t.atuais,
       'tela-' + tela + '|' + tela + '|' + tela);
+    if (tela === 'ajustes') {
+      aj = await lerItem('ajustes');
+      conf('Ajustes ativo acende a pílula como os outros', aj.fundo, ag.fundo);
+    }
   }
 
   await letra(pag, LETRA_130);
@@ -277,7 +296,7 @@ async function abrirCelular(w, h) {
   secao('3. Celular: a barra de baixo com a Biblioteca');
   conf('o "+" de Hoje no celular é o de antes ("Marcar aula neste dia")',
     fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').split("botaoDeAcaoCelular('marcar-aula', { class: 'cel-fab', id: 'cel-marcar-aula', 'aria-label': 'Marcar aula neste dia', texto: '+'").length - 1, 1);
-  for (const [w, h, l] of [[360, 780, ''], [390, 844, ''], [412, 915, ''], [360, 780, LETRA_130]]) {
+  for (const [w, h, l] of [[360, 780, ''], [390, 844, ''], [412, 915, ''], [360, 780, LETRA_130], [390, 844, LETRA_130]]) {
     const nome = w + ' px' + (l ? ' com a letra a 130%' : '');
     const cel = await abrirCelular(w, h);
     await letra(cel, l);

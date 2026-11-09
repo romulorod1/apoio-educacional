@@ -3500,8 +3500,10 @@ body.modo-celular .celular .linha { flex-direction: column; }
   --nav-mais-fundo: #1F3A5F;
   --nav-mais-traco: #C9A75B;
   --nav-sombra: 0 1px 2px rgba(22, 44, 73, .06), 0 1px 3px rgba(22, 44, 73, .08);
-  /* 12 px como no protótipo, e cresce com a letra do aparelho como as outras */
-  --nav-rotulo: calc(var(--letra-1) * 12 / 11);
+  /* O protótipo pede 12 px, mas a escala de hoje (trava B12: no máximo 6
+     tamanhos) não tem 12: fica o degrau mais perto sem descer de 12, o de
+     13 px, que cresce com a letra do aparelho. A F1 traz o 12 na escala dela. */
+  --nav-rotulo: var(--letra-2);
 }
 .nav-ico {
   width: 20px; height: 20px; flex: none;
@@ -3541,13 +3543,15 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 #abas .aba:hover .nav-ind { background: var(--nav-ativo-fundo); }
 #abas .aba.ativa { color: var(--nav-ativo-texto); font-weight: 600; }
 #abas .aba.ativa .nav-ind { background: var(--nav-ativo-fundo); }
-/* Ajustes não é destino do desenho: fica no pé do trilho, só com o nome. */
+/* Ajustes não é destino do desenho: fica no pé do trilho, com o mesmo item
+   dos outros. O ícone dele (controles deslizantes, no index.html) é provisório:
+   a F1 troca pelo do sistema dela. */
 #abas .aba.nav-pe { margin-top: auto; }
-#abas .aba.nav-pe .nav-ind { display: none; }
-#abas .aba.nav-pe.ativa { background: var(--nav-ativo-fundo); }
 #abas button:focus-visible { outline: 2px solid var(--nav-ativo-texto); outline-offset: -2px; }
 
-/* ---- celular: a barra de baixo ---- */
+/* ---- celular: a barra de baixo ----
+   As colunas seguem quantos destinos estiverem à vista: com quatro (se Enviar
+   e Fechamento virarem um só), basta tirar o item da lista no index.html. */
 .cel-abas {
   flex-shrink: 0;
   display: grid; grid-auto-flow: column;
