@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.18';
+  var VERSAO = '1.42.20';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.20',
+      itens: [
+        'No celular, o aviso de versão nova cabe na tela: "Versão nova pronta." com os botões Atualizar e Depois logo abaixo, mesmo com a letra maior.',
+        'A barra de cima do celular ficou menor e some quando está tudo salvo; ela volta quando há algo esperando a nuvem.'
+      ]
+    },
     {
       versao: '1.42.18',
       itens: [

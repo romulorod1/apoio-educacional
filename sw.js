@@ -133,8 +133,10 @@
  * e styles.css), com a lista igual. O v93 traz o aviso de banco bloqueado e o de troca de
  * versão guardados no Store, para o app.js não perder o aviso que chega antes
  * dele (app.js e store.js), com a lista igual. Versão silenciosa. O v94 (D6c lote 4) traz os avisos no Hoje do celular
- * (app.js, core.js e styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v94';
+ * (app.js, core.js e styles.css), com a lista igual. O v96 traz o celular sem transbordo: o aviso de versão em
+ * duas linhas, a barra de cima menor e a trava de transbordo (app.js e
+ * styles.css), com a lista igual. */
+var CACHE = 'apoio-educacional-v96';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
