@@ -86,6 +86,7 @@ conf('o editor só leitura trata todo ponteiro como dedo, num lugar só', DRAW.s
 conf('o celular abre a folha só para ler pelo cartão da aula', APP.indexOf("'data-ver-folha': a.id") > 0 && APP.indexOf('function abrirFolhaParaLer(aulaId)') > 0, true);
 conf('o fechar da folha só leitura não passa pelo gravarNota', APP.indexOf('if (leitorDeFolha) { fecharLeitorDeFolha(); return; }') > 0, true);
 conf('as regras têm o caminho das folhas com hash obrigatório na página viva', /match \/folhas\/\{folha\}/.test(REGRAS) && REGRAS.indexOf("(('apagadoEm' in d) || ('hash' in d && 'bytes' in d))") > 0, true);
+conf('as regras recusam a lápide com bytes', REGRAS.indexOf("(!('apagadoEm' in d) || !('bytes' in d))") > 0, true);
 conf('a página canônica arredonda a 0,1, a regra da cópia', STORE.indexOf('ponto[i] = Math.round(ponto[i] * 10) / 10;') > 0 && STORE.indexOf('copia.paginas = (copia.paginas || []).map(arredondarPagina);') > 0, true);
 /* Revisão da fatia 1: sem WebCrypto não há hash de outro algoritmo (a página
  * ficaria inválida para sempre em todo receptor): o sha256Hex rejeita, o
@@ -483,6 +484,18 @@ function paginaSintetica() {
     updateTransforms: [{ fieldPath: 'servidorEm', setToServerValue: 'REQUEST_TIME' }]
   }]);
   conf('o documento adulterado foi posto no emulador (a forma passa pelas regras; o hash é que não bate)', adulterado.status, 200);
+  // A lápide não pode levar bytes: apagar a página tem de tirar o conteúdo da nuvem. Mesma forma do adulterado
+  // (que passou, 200), mais apagadoEm: as regras TÊM de recusar. Id de outra aula, para nada mudar se passasse.
+  const lapideComBytes = await commitRest(dona.idToken, [{
+    update: { name: RAIZ_DOCS + '/usuarios/' + dona.localId + '/folhas/folha:x9:0', fields: {
+      id: { stringValue: 'folha:x9:0' }, aulaId: { stringValue: 'x9' }, n: { integerValue: '0' }, hash: { stringValue: sha256(paginaFalsa) },
+      bytes: { bytesValue: bytesFalsos }, tamanho: { integerValue: String(paginaFalsa.length) }, algoritmo: { stringValue: 'gzip' },
+      atualizadoEm: { stringValue: new Date().toISOString() }, apagadoEm: { stringValue: new Date().toISOString() },
+      aparelho: { stringValue: 'apAdulterador' }, esquema: { integerValue: '1' } } },
+    updateTransforms: [{ fieldPath: 'servidorEm', setToServerValue: 'REQUEST_TIME' }]
+  }]);
+  conf('a lápide com bytes é recusada pelas regras (403)', lapideComBytes.status, 403);
+  conf('e nada ficou no caminho dela', (await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x9:0')).status, 404);
   const canCAntes7 = await canonicas(pagC, 'x1');
   const rC7 = await receber(pagC);
   prop('C não aplicou a página adulterada: contou como inválida e a folha ficou igual', rC7.invalidas === 1 && rC7.folhas === 0 && JSON.stringify(await canonicas(pagC, 'x1')) === JSON.stringify(canCAntes7) && (await pagC.evaluate(() => Nuvem.estado().registros.folhasInvalidas)) === 1, MODOS[3]);
