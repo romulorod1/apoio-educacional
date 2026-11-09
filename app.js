@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.16';
+  var VERSAO = '1.42.17';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -60,6 +60,9 @@
       'Feche as outras janelas do aplicativo; esta abre sozinha em seguida. Nada foi perdido.';
     (document.body || document.documentElement).appendChild(faixa);
   };
+  // o bloqueio pode ter chegado antes deste arquivo rodar, e o navegador não repete
+  if (self.Store && typeof Store.bancoBloqueado === 'function' && Store.bancoBloqueado()) self.aoBancoBloqueado();
+  if (self.Store && typeof Store.bancoTrocado === 'function' && Store.bancoTrocado()) self.aoBancoTrocado();
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
