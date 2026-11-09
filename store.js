@@ -2327,7 +2327,7 @@
                 return;
               }
               controle.put({ sha256: c.sha256, tamanho: c.tamanho || null, tipo: c.tipo || null, origem: p.origem, aulaId: c.aulaId || '',
-                nome: c.nome || '', w: c.largura || null, h: c.altura || null, atualizadoEm: c.atualizadoEm || agora, apagadoEm: null, nuvem: carimbo }, chave);
+                nome: c.nomeArquivo || '', w: c.largura || null, h: c.altura || null, atualizadoEm: c.atualizadoEm || agora, apagadoEm: null, nuvem: carimbo }, chave);
               contas.aplicados++;
               deposito.count(p.id).onsuccess = function (ev) { if (!ev.target.result) contas.faltam.push(c.id); };
             };

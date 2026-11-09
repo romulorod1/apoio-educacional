@@ -904,6 +904,17 @@ roda "nuvem folhas --envenenado-pagina-grande-tenta" node "_teste/testa_nuvem_fo
 roda "nuvem folhas --envenenado-sem-reconciliar"    node "_teste/testa_nuvem_folhas.js" --envenenado-sem-reconciliar
 # (lente B, 2a rodada) a pagina grande na quarentena que a copia restaurada nao tem sai da fila
 roda "nuvem folhas --envenenado-quarentena-sobrevive-ao-restauro" node "_teste/testa_nuvem_folhas.js" --envenenado-quarentena-sobrevive-ao-restauro
+# N2 (fase 2 da nuvem, fatia 2): os anexos e as imagens das folhas sobem pelo
+# sha256 (arquivos/{sha} em partes de 768 KiB, anexos/{id} liga o arquivo a
+# aula), so do tablet; o celular baixa ao abrir e confere o sha256; o mesmo
+# arquivo em duas aulas sobe uma vez; o Remover e a exclusao em cascata
+# lapidam; o anexo de antes desta versao nao sobe sozinho; a restauracao e a
+# volta para a versao do ar nao perdem nem duplicam nada. Venenos: o sha256
+# errado no envio TEM de ser recusado por quem baixa; a dedupe que sai TEM de
+# ser vista no segundo envio.
+roda "nuvem anexos (N2 fatia 2)"                    node "_teste/testa_nuvem_anexos.js"
+roda "nuvem anexos --envenenado-sha-errado"         node "_teste/testa_nuvem_anexos.js" --envenenado-sha-errado
+roda "nuvem anexos --envenenado-sobe-duas-vezes"    node "_teste/testa_nuvem_anexos.js" --envenenado-sobe-duas-vezes
 # (revisao do PR 118) o "Apagar tudo" zera a fila deste aparelho e o recebimento
 # em curso confere a marca dentro da transacao; o celular nao enfileira a lapide
 # da fusao; a restauracao enfileira tambem o que e igual a copia; a confirmacao

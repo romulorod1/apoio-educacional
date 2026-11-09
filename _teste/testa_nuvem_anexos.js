@@ -559,7 +559,16 @@ const idDoAnexoNaAula = (pag, aulaId, nome) => pag.evaluate((a, n) => Store.carr
   conf('o documento do PDF de x1 é lápide na nuvem, sem nome nem tamanho', e7.erro === null && !!campoTexto(doc7, 'apagadoEm') && campoTexto(doc7, 'nome') === undefined, true);
   conf('o arquivo continua na nuvem (o anexo de x2 aponta para ele; a varredura é da fatia 4)', (await lerDoc(dona.idToken, dona.localId, 'arquivos/' + SHA_PDF)).status, 200);
   const rC7 = await receber(pagC);
-  conf('C recebeu a lápide', rC7.erro === null && rC7.anexos >= 1, true);
+  console.log('   recebimento em C: ' + JSON.stringify(rC7));
+  /* Achado da primeira rodada: o nome do ARQUIVO cobria o nome do DOCUMENTO no
+   * lote, e o cursor dos anexos virava "Lista_de_fracoes_teste.pdf" (a consulta
+   * seguinte morria em INVALID_ARGUMENT, para sempre). */
+  conf('o segundo recebimento em C, com cursor, não dá erro, e o cursor anda pelo nome do documento', rC7.erro === null &&
+    /\/anexos\//.test((await pagC.evaluate(() => Store.lerCursorAnexos())).nome || ''), true);
+  /* O celular também recebe sozinho (ao abrir, ao voltar); a prova espera a
+   * lápide chegar, venha pelo recebimento dela ou pelo dele. */
+  const lapideEmC = await esperar('a lápide do PDF chegou em C', () => receber(pagC).then(() => pagC.evaluate(id => Store.estadoDoArquivo('anexo:' + id).then(e => !!(e && e.apagadoEm)), idPdf)), v => v === true, 15000);
+  conf('C recebeu a lápide', lapideEmC.ok, true);
   conf('o PDF sumiu do celular (o arquivo saiu do aparelho e o estado é lápide)', JSON.stringify([await shaNoAparelho(pagC, 'anexo:' + idPdf), !!(await pagC.evaluate(id => Store.estadoDoArquivo('anexo:' + id).then(e => e && e.apagadoEm), idPdf))]), '[null,true]');
   await H.abrirApp(pagC, amb.ORIGEM);
   await pagC.evaluate(() => { const b = document.querySelector('.cel-aba[data-cel="hoje"]'); if (b) b.click(); });
@@ -570,7 +579,9 @@ const idDoAnexoNaAula = (pag, aulaId, nome) => pag.evaluate((a, n) => Store.carr
   await clicar(pagC, '#cel-folha-fechar');
 
   secao('8. A exclusão do aluno em cascata lapida o anexo e a imagem dele na nuvem');
-  await pagA.evaluate(async png => {
+  await pagA.evaluate(async () => {
+    const c = document.createElement('canvas'); c.width = 40; c.height = 30; const x = c.getContext('2d'); x.fillStyle = '#1F3A5F'; x.fillRect(0, 0, 40, 30);
+    const png = c.toDataURL('image/png');   // outra imagem: a de antes tem o mesmo sha256 e não subiria de novo
     const d = await Store.carregar();
     const blob = new Blob([new Uint8Array([37, 80, 68, 70, 45, 49, 46, 52, 10, 1, 2, 3])], { type: 'application/pdf' });
     await Store.salvarAnexo('anBeta', { nome: 'Beta_teste.pdf', tipo: 'application/pdf', blob: blob }, { aulaId: 'y1' });
@@ -579,7 +590,7 @@ const idDoAnexoNaAula = (pag, aulaId, nome) => pag.evaluate((a, n) => Store.carr
     await Store.salvarMidia('mBeta', { dataUrl: png, w: 40, h: 30 }, { aulaId: 'y1' });
     await Store.salvarNota('y1', { paginas: [{ fundo: 'pautado', itens: [{ t: 'imagem', ref: 'mBeta', x: 1, y: 1, w: 40, h: 30 }] }] });
     await Store.salvar(d);
-  }, PNG_ANTIGO);
+  });
   const e8a = await enviarAteEsvaziar(pagA, 3);
   conf('o anexo e a imagem de Beta subiram', e8a.erro === null && (await lerDoc(dona.idToken, dona.localId, 'anexos/anexo:anBeta')).status === 200 && (await lerDoc(dona.idToken, dona.localId, 'anexos/midia:mBeta')).status === 200, true);
   await pagA.evaluate(async () => { const d = await Store.carregar(); await Store.excluirAlunoEmCascata(d, 'beta'); });
@@ -612,8 +623,9 @@ const idDoAnexoNaAula = (pag, aulaId, nome) => pag.evaluate((a, n) => Store.carr
   conf('de novo, nenhuma parte sobe e nenhum documento novo aparece (nada duplica)', e9b.erro === null && partesEscritas(pagA, escritas9b) === 0 &&
     (await listar(dona.idToken, dona.localId, 'anexos')).length === anexosNaNuvem && (await listar(dona.idToken, dona.localId, 'arquivos')).length === arquivosNaNuvem, true);
   console.log('   documentos em anexos/: ' + anexosNaNuvem + ', em arquivos/: ' + arquivosNaNuvem);
-  const rC9 = await receber(pagC);
-  conf('C recebe as lápides da restauração e o PDF de x2 sai de lá também', rC9.erro === null && (await pagC.evaluate(id => Store.estadoDoArquivo('anexo:' + id).then(e => !!(e && e.apagadoEm)), idPdf2)), true);
+  console.log('   recebimento em C: ' + JSON.stringify(await receber(pagC)) + '; estado do PDF de x2 em C: ' + JSON.stringify(await pagC.evaluate(id => Store.estadoDoArquivo('anexo:' + id), idPdf2)));
+  const lapide9 = await esperar('a lápide do PDF de x2 chegou em C', () => receber(pagC).then(() => pagC.evaluate(id => Store.estadoDoArquivo('anexo:' + id).then(e => !!(e && e.apagadoEm)), idPdf2)), v => v === true, 15000);
+  conf('C recebe as lápides da restauração e o PDF de x2 sai de lá também', lapide9.ok, true);
 
   secao('10. PRODUÇÃO: a volta para a versão do ar (' + VERSAO_DO_AR + ') e a volta para esta');
   /* Uma entrada de anexo esperando na fila: o arquivo gravado sem rede. */
@@ -649,8 +661,10 @@ const idDoAnexoNaAula = (pag, aulaId, nome) => pag.evaluate((a, n) => Store.carr
   delete trocas['/app.js']; delete trocas['/store.js']; delete trocas['/nuvem.js'];
   await H.abrirApp(pagA, amb.ORIGEM);
   conf('a página voltou para esta versão', await pagA.evaluate(() => typeof Store.reconciliarArquivos), 'function');
-  const fila10 = await esperar('a reconciliação lapidou o anexo removido solto', () => filaArquivos(pagA).then(l => l.map(e => e.id + (e.apagada ? ':lapide' : '')).join(',')), v => v === 'anexo:antigo2:lapide,anexo:pendente1', 10000);
-  conf('de volta, a fila tem a entrada pendente de antes e a lápide do que a versão do ar removeu solto', fila10.ok, true);
+  /* A abertura sincroniza sozinha (a fila pode subir antes de a prova olhar):
+   * a prova olha o ESTADO do anexo removido solto, e a nuvem depois. */
+  const rec10 = await esperar('a reconciliação lapidou o anexo removido solto', () => pagA.evaluate(() => Store.estadoDoArquivo('anexo:antigo2').then(e => !!(e && e.apagadoEm))), v => v === true, 10000);
+  conf('de volta, a reconciliação lapidou o anexo que a versão do ar removeu solto', rec10.ok, true);
   conf('o anexo gravado pela versão do ar (sem estado) não entrou na fila', (await filaArquivos(pagA)).some(e => e.id === 'anexo:doAr1'), false);
   const e10 = await enviarAteEsvaziar(pagA, 3);
   conf('subiram: o pendente vivo, o antigo2 como lápide; o do ar não', e10.erro === null && (await lerDoc(dona.idToken, dona.localId, 'anexos/anexo:pendente1')).status === 200 &&
@@ -678,5 +692,21 @@ const idDoAnexoNaAula = (pag, aulaId, nome) => pag.evaluate((a, n) => Store.carr
   conf('nenhum erro de página em A, C e O', [pagA, pagC, pagO].map(p => p.errosDePagina.join(' | ')).filter(Boolean).join(' || '), '');
   await pagO.close(); await contextoO.close();
   await pagC.close(); await contextoC.close();
+
+  /* No fim, porque o tablet novo que restaura passa a valer (a restauração
+   * vence) e mexeria nas seções de cima. */
+  secao('12. Um segundo tablet recebe o metadado e baixa o arquivo na hora, sem ela abrir');
+  const contextoB = await pagA.browser().createBrowserContext();
+  const pagB = await contextoB.newPage();
+  await prepararPagina(pagB, false);
+  await H.abrirApp(pagB, amb.ORIGEM);
+  await H.irParaAba(pagB, 'ajustes');
+  conf('o tablet B entrou com a conta da dona', await entrarPelaTela(pagB, DONA.email, DONA.senha, '#nuvem-enviar'), true);
+  conf('B restaurou a cópia K0 (sem o anexo pendente1)', await restaurarPelaApi(pagB, dona.localId, copiaK0, false), copiaK0);
+  conf('pendente1 não está em B depois de restaurar', await shaNoAparelho(pagB, 'anexo:pendente1'), null);
+  const naHora = await esperar('B recebeu e baixou pendente1', () => receber(pagB).then(() => shaNoAparelho(pagB, 'anexo:pendente1')), v => !!v, 20000);
+  conf('o tablet baixa na hora o arquivo cujo metadado chegou, e o sha256 bate', naHora.ok && naHora.valor === (await shaNoAparelho(pagA, 'anexo:pendente1')), true);
+  conf('nenhum erro de página em B', pagB.errosDePagina.join(' | '), '');
+  await pagB.close(); await contextoB.close();
   try { fs.rmSync(PASTA_ARQ, { recursive: true, force: true }); } catch (e) { /* fica no temporário */ }
 })().then(() => derrubarEmulador().then(H.fim(amb)), e => derrubarEmulador().then(() => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e))));

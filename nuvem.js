@@ -115,6 +115,7 @@
   var TETO_PAGINA_BYTES = 900 * 1024;   // uma página comprimida acima disto não cabe num documento (as regras também recusam)
   var TETO_KEEPALIVE = 60 * 1024;       // o corpo que ainda cabe num fetch com keepalive (o navegador limita a 64 KiB)
   var TETO_ARQUIVO_BYTES = 25 * 1024 * 1024; // o limite de anexo que o aplicativo já tem; as regras recusam acima disto
+  var ARQUIVOS_POR_LOTE = 4;                 // arquivos vivos (com os bytes na memória) por lote do envio
   var ATRASO_ENVIO_REGISTROS = 2500; // depois de uma gravação dela, espera as vizinhas antes de subir
   var NOME_BANCO = 'apoio-nuvem';
   var UM_DIA = 24 * 60 * 60 * 1000;
@@ -1237,6 +1238,12 @@
             folhasSemSuporte += comArquivos - itens.length;
           }
           itens = itens.filter(function (i) { return !!i.registro && !jaCulpados[i.fila.id]; });
+          /* Poucos ARQUIVOS vivos por lote (N2, fatia 2): os bytes de cada um são
+           * lidos para o sha256 e para subir, e uma restauração com muitos
+           * anexos não pode ler todos de uma vez na memória do tablet. O resto
+           * fica na fila e vem no lote seguinte. */
+          var arquivosNoLote = 0;
+          itens = itens.filter(function (i) { return !(i.registro.tipo === 'anexo' && !i.registro.apagadoEm) || ++arquivosNoLote <= ARQUIVOS_POR_LOTE; });
           if (!itens.length || lotes >= 50) return { enviados: enviados };
           lotes++;
           return descartarLapidesOrfas(itens).then(function (itens) {
@@ -1553,7 +1560,8 @@
             var base = { servidorEm: v.servidorEm || null, nome: d.name };
             // forma que não é a de um arquivo: só o cursor passa por cima
             if (typeof v.id !== 'string' || !root.Store.partesDoIdDoArquivo(v.id) || (!v.apagadoEm && !SHA256_VALIDO.test(String(v.sha256 || '')))) { invalidos++; return base; }
-            return Object.assign(base, { id: v.id, aulaId: v.aulaId || '', origem: v.origem || '', sha256: v.sha256 || null, nome: v.nome || '', tipo: v.tipo || null,
+            // `nome` é o do documento (o cursor anda por ele); o nome do arquivo vai em `nomeArquivo`
+            return Object.assign(base, { id: v.id, aulaId: v.aulaId || '', origem: v.origem || '', sha256: v.sha256 || null, nomeArquivo: v.nome || '', tipo: v.tipo || null,
               tamanho: v.tamanho || null, largura: v.largura || null, altura: v.altura || null, atualizadoEm: v.atualizadoEm || null,
               apagadoEm: v.apagadoEm || null, aparelho: v.aparelho || '', updateTime: d.updateTime || null, eco: !!(meuId && v.aparelho === meuId) });
           });
