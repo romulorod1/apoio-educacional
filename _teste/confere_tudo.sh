@@ -930,8 +930,9 @@ roda "celular avisos --envenenado-registrada-falta-registrar" node "_teste/testa
 roda "celular avisos --envenenado-lembrete-fora-da-janela" node "_teste/testa_celular_avisos.js" --envenenado-lembrete-fora-da-janela
 # (revisao do lote 4) cobrar e fechar o mes so no celular que e da dona, nunca pela falta de observador
 roda "celular avisos --envenenado-observador-sem-sessao" node "_teste/testa_celular_avisos.js" --envenenado-observador-sem-sessao
-# (avisos compactos, 09/11) recolhidos num selinho na linha da data, o painel ate a
-# metade da tela, o ponto no bloco da aula sem registro pela mesma lista, e o
+# (avisos compactos, 09/11, desenho final base C) recolhidos num selinho na linha
+# da data, o painel por cima da agenda (uma linha por tipo, Dispensar todos, a
+# sincronia no rodape), o ponto no bloco da aula sem registro pela mesma lista, e o
 # deslizar que dispensa ate o dia seguinte, guardado so no aparelho. Venenos: o
 # painel aberto sem toque, o ponto na aula registrada, o ponto por outro
 # criterio, os avisos empilhados de antes (a agenda desce dos 422 px), o selinho

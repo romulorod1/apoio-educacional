@@ -126,7 +126,7 @@ const ANCORAS = {
   [V_VALOR]: ['app.js', 'porAluno[p.alunoId].meses.push({ mes: p.mes, falta: s.falta, selo: s.selo });', 'porAluno[p.alunoId].meses.push({ mes: p.mes, falta: s.devido, selo: s.selo });'],
   [V_REGISTRADA]: ['app.js', '    return !Core.aulaTemRegistro(a);', '    return true;'],
   // (compactos) o painel aberto sem toque
-  [V_ABERTA]: ['app.js', 'return { recolhida: e.recolhida !== false, dispensados: dispensados };', 'return { recolhida: e.recolhida === true, dispensados: dispensados };'],
+  [V_ABERTA]: ['app.js', 'var avisosCelularEmMemoria = { recolhida: true, dispensados: {} };', 'var avisosCelularEmMemoria = { recolhida: false, dispensados: {} };'],
   // o ponto também na aula registrada
   [V_MARCA_REG]: ['app.js', 'blocoDaAulaCelular(l.aula, marcas[l.aula.id], !!semRegistro[l.aula.id])',
     'blocoDaAulaCelular(l.aula, marcas[l.aula.id], !!semRegistro[l.aula.id] || Core.aulaTemRegistro(l.aula))'],
@@ -134,7 +134,8 @@ const ANCORAS = {
   [V_DISCORDA]: ['app.js', 'aulasDoAvisoSemRegistroCelular(hoje, minutosAgoraCelular()).forEach(function (a) { semRegistro[a.id] = true; });',
     'aulasDoDiaCelular(dia).filter(function (a) { return !Core.aulaTemRegistro(a); }).forEach(function (a) { semRegistro[a.id] = true; });'],
   // os avisos de antes: todos à vista, empilhados, sem o corte na metade da tela
-  [V_EMPILHADOS]: ['app.js', 'var aberto = !lerEstadoDosAvisosCelular().recolhida;', 'var aberto = true; ajustarPainelDosAvisosCelular = function () {};'],
+  [V_EMPILHADOS]: ['app.js', "var aberto = !lerEstadoDosAvisosCelular().recolhida, classeDoPainel = 'cel-avisos cel-avisos-sobre';",
+    "var aberto = true, classeDoPainel = 'cel-avisos';"],
   // o selinho numa linha só dele, entre a data e os dias
   [V_EMPURRA]: ['app.js', "topo.insertBefore(selo, topo.querySelector('#cel-semana-seguinte'));",
     "faixa.insertBefore(el('div', { class: 'cel-avisos-linha' }, [selo]), faixa.querySelector('.cel-semana-dias'));"],
@@ -373,17 +374,17 @@ async function momento(pag, iso, hhmm) {
 }
 /* O que o alto de Hoje mostra: cada aviso com o tipo, o texto, a aula, o
  * mês, o aluno e o link (se houver). */
-/* O painel pode estar recolhido: o texto se lê do mesmo jeito. O "sem
- * registro" é o título e a lista: "1 aula sem registro de como foi: seg
- * 05/10, 10:00, Aluno Alfa Teste", com as aulas da lista em ordem. */
+/* O painel pode estar recolhido: o texto se lê do mesmo jeito. Cada linha
+ * é "título | detalhe" ("4 aulas sem registro | Aluno Alfa Teste hoje,
+ * 10:00. Aluno Gama Teste hoje, 09:00."), a primeira ação, as aulas da
+ * linha em ordem e as chaves do dispensar. */
 const avisos = pag => pag.evaluate(() => Array.from(document.querySelectorAll('#cel-semana #cel-avisos .cel-aviso')).map(a => {
-  const l = a.querySelector('a[href]'), ac = a.querySelector('[data-acao-celular]'), mais = a.querySelector('#cel-aviso-mais-familias .cel-aviso-texto');
-  const tit = a.querySelector('.cel-aviso-titulo'), itens = Array.from(a.querySelectorAll('.cel-aviso-item'));
-  const texto = tit ? tit.textContent + ': ' + itens.map(i => i.querySelector('.cel-aviso-texto').textContent).join(' ; ')
-    : a.querySelector('.cel-aviso-botao .cel-aviso-texto').textContent;
-  return { tipo: a.dataset.aviso, texto: texto.replace(/\u00a0/g, ' '),
-    seta: a.querySelector('.cel-aviso-botao .cel-aviso-seta').textContent,
-    aula: itens.length ? itens[0].dataset.aula : (a.dataset.aula || ''), aulas: itens.map(i => i.dataset.aula),
+  const l = a.querySelector('a[href]'), ac = a.querySelector('[data-acao-celular]'), mais = a.querySelector('#cel-aviso-mais-familias');
+  const t = s => { const e = a.querySelector(s); return e ? e.textContent : ''; };
+  const primeira = a.querySelector('.cel-aviso-acao');
+  return { tipo: a.dataset.aviso, texto: [t('.cel-aviso-titulo'), t('.cel-aviso-detalhe')].filter(Boolean).join(' | ').replace(/\u00a0/g, ' '),
+    seta: primeira ? primeira.textContent : '',
+    aula: a.dataset.aula || '', aulas: (a.dataset.aulas || '').split(' ').filter(Boolean), chaves: a.dataset.chaves || '',
     mes: a.dataset.mes || '', aluno: a.dataset.aluno || '', link: l ? l.getAttribute('href') : '', rotuloLink: l ? l.textContent : '',
     mais: mais ? mais.textContent : '', acao: ac ? ac.getAttribute('data-acao-celular') : '' };
 }));
@@ -438,6 +439,7 @@ const leiaute = pag => pag.evaluate(() => {
 const mensagemDoLink = href => { const i = String(href || '').indexOf('?text='); return i < 0 ? '' : decodeURIComponent(href.slice(i + 6)).replace(/\u00a0/g, ' '); };
 const fmt = s => String(s || '').replace(/\u00a0/g, ' ');
 const WA_ALFA = '5511987654321';
+const REG = '#cel-avisos .cel-aviso-registrar';
 
 (async function () {
   secao('1. O tablet cria os alunos fictícios, as aulas e os pagamentos e sobe a cópia');
@@ -551,7 +553,7 @@ const WA_ALFA = '5511987654321';
   conf('é a aula seguinte de hoje, a das 15:30 do Alfa', await pagC.evaluate(() => (document.querySelector('#cel-tempo .cel-bloco-proxima') || { dataset: {} }).dataset.aula), 'alfa-1006');
   const reg = av.find(a => a.tipo === 'registrar') || {};
   prop('sem registro: a aula do Alfa de ontem; a do Gama de hoje (com relato), a de ontem (com nota só minha), a falta e a cancelada ficam fora (' + reg.texto + ' ; ' + reg.aula + ')',
-    reg.texto === '1 aula sem registro de como foi: seg 05/10, 10:00, Aluno Alfa Teste' && reg.aula === 'alfa-1005', V_REGISTRADA);
+    reg.texto === '1 aula sem registro | Aluno Alfa Teste seg 05/10, 10:00.' && reg.aula === 'alfa-1005', V_REGISTRADA);
   seVeneno(V_REGISTRADA);
   conf('o aviso de registrar é uma ação do celular da dona', reg.acao, 'registrar-como-foi');
   const cob = av.find(a => a.tipo === 'cobrar') || {};
@@ -561,10 +563,10 @@ const WA_ALFA = '5511987654321';
   console.log('   selo de julho do Alfa: ' + JSON.stringify(seloJulho) + ' ; mensagem: ' + msg);
   conf('(arranjo) o selo de julho do Alfa é parcial, faltam R$ 150,00', seloJulho.selo + ' ' + seloJulho.texto, 'parcial R$ 150,00');
   prop('o aviso de cobrar: o Alfa (julho, o que espera há mais tempo) com o que falta pelo selo, e mais uma família (' + cob.texto + ')',
-    cob.texto === 'Em aberto: Aluno Alfa Teste, julho de 2026, ' + seloJulho.texto && cob.aluno === 'alfa', V_VALOR);
+    cob.texto === 'Em aberto: Aluno Alfa Teste | julho de 2026, ' + seloJulho.texto && cob.aluno === 'alfa', V_VALOR);
   conf('o botão diz quem ele cobra ("Cobrar" e o nome curto que separa o Alfa dos outros alunos), e as outras famílias ficam num toque à parte',
     cob.rotuloLink + ' | ' + cob.mais, 'Cobrar Aluno Alfa | E mais 1 família');
-  conf('cada aviso mostra à direita o que o toque faz', av.map(a => a.seta).join(' '), 'Registrar ›');
+  conf('cada linha leva a ação dela embaixo do texto', av.map(a => a.seta).join(' | '), 'Registrar | Cobrar Aluno Alfa');
   prop('o link abre o WhatsApp do Alfa com o texto escrito: o mês e o valor do selo, sem nome nenhum (' + msg + ')',
     cob.link.indexOf('https://wa.me/' + WA_ALFA + '?text=') === 0 &&
     msg === 'Olá! Tudo bem? Passando para lembrar do pagamento das aulas de julho de 2026: ficou faltando ' + seloJulho.texto + '. Obrigada!' &&
@@ -572,8 +574,8 @@ const WA_ALFA = '5511987654321';
   seVeneno(V_VALOR);
   conf('nada foi a wa.me sem toque', pagC.paraFora.length, 0);
   const sel4 = await selinho(pagC);
-  prop('recolhidos por padrão: o selinho "3" (1 sem registro e 2 famílias), o painel fechado (' + JSON.stringify(sel4) + ')',
-    sel4.existe && sel4.numero === '3' && sel4.expandido === 'false' && !sel4.painelVisivel, [V_ABERTA, V_EMPILHADOS, V_TOPO]);
+  prop('recolhidos por padrão: o selinho "2" (uma linha por tipo: a sem registro e a cobrança), o painel fechado (' + JSON.stringify(sel4) + ')',
+    sel4.existe && sel4.numero === '2' && sel4.expandido === 'false' && !sel4.painelVisivel, [V_ABERTA, V_EMPILHADOS, V_TOPO]);
   seVeneno(V_ABERTA);
   let m = await medirTela(pagC);
   conf('Hoje recolhido: alvos de 48 px e sem rolagem de lado', telaBoa(m), '');
@@ -603,7 +605,7 @@ const WA_ALFA = '5511987654321';
   seVeneno(V_DIA5);
   conf('dia 5: a aula do Alfa das 10:00 (a Próxima, Gama às 16:00, é o selo do bloco)', textos(av) + ' | ' +
     (await pagC.evaluate(() => (document.querySelector('#cel-tempo .cel-bloco-proxima') || { dataset: {} }).dataset.aula)),
-    '1 aula sem registro de como foi: seg 05/10, 10:00, Aluno Alfa Teste | gama-1005');
+    '1 aula sem registro | Aluno Alfa Teste hoje, 10:00. | gama-1005');
   await tirarPrint(pagC, '3_dia_5_sem_cobrar.png');
 
   secao('6. Dia 3, 20:00: nenhum aviso');
@@ -626,15 +628,15 @@ const WA_ALFA = '5511987654321';
   seVeneno(V_JANELA);
   conf('29/10, 31/10, 01/11 e 05/11: o lembrete de fechar outubro (' + ['2026-10-29 18h', '2026-10-31', '2026-11-01', '2026-11-05'].map(d => fechar(d).mes || '-').join(',') + ')',
     ['2026-10-29 18h', '2026-10-31', '2026-11-01', '2026-11-05'].map(d => fechar(d).mes || '-').join(','), '2026-10,2026-10,2026-10,2026-10');
-  conf('29/10 às 18:00: "Fechar outubro de 2026: 4 aulas sem registro e 3 famílias em aberto", com a seta "Abrir"', fechar('2026-10-29 18h').texto + ' | ' + fechar('2026-10-29 18h').seta,
-    'Fechar outubro de 2026: 4 aulas sem registro e 3 famílias em aberto | Abrir');
+  conf('29/10 às 18:00: "Fechar outubro de 2026", "4 aulas sem registro e 3 famílias em aberto", com a ação "Abrir"', fechar('2026-10-29 18h').texto + ' | ' + fechar('2026-10-29 18h').seta,
+    'Fechar outubro de 2026 | 4 aulas sem registro e 3 famílias em aberto | Abrir');
   conf('31/10: a ordem é falta registrar, cobrar (o que já venceu) e fechar', tipos(janela['2026-10-31']), 'registrar,cobrar,fechar');
-  conf('05/11: o mesmo outubro, com as 4 aulas sem registro', fechar('2026-11-05').texto, 'Fechar outubro de 2026: 4 aulas sem registro e 3 famílias em aberto');
+  conf('05/11: o mesmo outubro, com as 4 aulas sem registro', fechar('2026-11-05').texto, 'Fechar outubro de 2026 | 4 aulas sem registro e 3 famílias em aberto');
   /* (compactos) Sem o corte em 3: recolhidos, os quatro cabem no selinho. */
   conf('29/10 ao meio-dia: os três avisos, na ordem de urgência (' + tipos(janela['2026-10-29']) + ')', tipos(janela['2026-10-29']), 'registrar,cobrar,fechar');
-  conf('29/10: a aula do Gama de terça', textos(janela['2026-10-29'].slice(0, 1)), '1 aula sem registro de como foi: ter 27/10, 10:00, Aluno Gama Teste');
+  conf('29/10: a aula do Gama de terça', textos(janela['2026-10-29'].slice(0, 1)), '1 aula sem registro | Aluno Gama Teste ter 27/10, 10:00.');
   conf('31/10: as duas sem registro, da mais recente para a mais antiga', (janela['2026-10-31'].find(a => a.tipo === 'registrar') || {}).texto,
-    '2 aulas sem registro de como foi: qui 29/10, 16:00, Aluno Alfa Teste ; ter 27/10, 10:00, Aluno Gama Teste');
+    '2 aulas sem registro | Aluno Alfa Teste qui 29/10, 16:00. Aluno Gama Teste ter 27/10, 10:00.');
   conf('01/11 a 05/11: sem cobrança (antes do dia 6), e em 06/11 ela volta', ['2026-11-01', '2026-11-05', '2026-11-06'].map(d => janela[d].some(a => a.tipo === 'cobrar')).join(','), 'false,false,true');
   const cob6 = janela['2026-11-06'].find(a => a.tipo === 'cobrar') || {};
   const selos6 = await pagC.evaluate(() => Store.carregar().then(d => ['2026-07', '2026-10'].map(mes => Core.seloDoPagamento(d, Core.calcularFechamento(d, 'alfa', mes, '2026-11-06')).falta)));
@@ -642,7 +644,7 @@ const WA_ALFA = '5511987654321';
   console.log('   selos do Alfa em 06/11: ' + JSON.stringify(selos6) + ' ; ' + msg6);
   conf('(arranjo) os selos do Alfa em 06/11: julho faltam 150, outubro 300', selos6.join(','), '150,300');
   prop('06/11: o Alfa com julho e outubro, R$ 450,00 (a soma do que falta pelos selos), e mais 2 famílias (' + cob6.texto + ')',
-    cob6.texto + ' | ' + cob6.mais === 'Em aberto: Aluno Alfa Teste, julho de 2026 e outubro de 2026, R$ 450,00 | E mais 2 famílias', V_VALOR);
+    cob6.texto + ' | ' + cob6.mais === 'Em aberto: Aluno Alfa Teste | julho de 2026 e outubro de 2026, R$ 450,00 | E mais 2 famílias', V_VALOR);
   conf('06/11: a mensagem diz cada mês com o que falta e o total', msg6,
     'Olá! Tudo bem? Passando para lembrar do pagamento das aulas em aberto: julho de 2026, R$ 150,00; outubro de 2026, R$ 300,00 (total de R$ 450,00). Obrigada!');
 
@@ -661,15 +663,15 @@ const WA_ALFA = '5511987654321';
   prop('nem o mês a fechar, que é dela (29/10: ' + tipos(avD29) + ')', tipos(avD29) === 'registrar', V_OBS);
   seVeneno(V_OBS);
   await momento(pagD, '2026-10-06', '14:50');
-  conf('o observador lê a aula sem registro, sem botão de ação', textos(avD) + ' | ' + avD.map(a => a.acao).join(''),
-    '1 aula sem registro de como foi: seg 05/10, 10:00, Aluno Alfa Teste | ');
+  conf('o observador lê a aula sem registro, com "Ver a aula" e sem ação que grava', textos(avD) + ' | ' + avD.map(a => a.seta + '/' + a.acao).join(''),
+    '1 aula sem registro | Aluno Alfa Teste seg 05/10, 10:00. | Ver a aula/');
   await abrirPainel(pagD);
   m = await medirTela(pagD);
   conf('o observador, Hoje com avisos: alvos de 48 px, sem rolagem de lado, nenhum botão de edição nem ação (' + m.soltos.join(', ') + ' ; ' + m.acoes + ')',
     telaBoa(m) + '|' + m.soltos.join(', ') + '|' + m.acoes, '||0');
   await tirarPrint(pagD, '4_observador.png');
   await fecharPainel(pagD);
-  conf('o toque do observador no aviso abre a folha da aula, só de leitura', (await clicar(pagD, '#cel-aviso-registrar-alfa-1005')) + ' ' +
+  conf('o toque do observador no aviso abre a folha da aula, só de leitura', (await clicar(pagD, '#cel-aviso-registrar')) + ' ' +
     (await existe(pagD, '#cel-folha[data-aula="alfa-1005"]')) + ' ' + (await pagD.evaluate(() => document.querySelectorAll('#cel-folha [data-acao-celular]').length)), 'true true 0');
   await clicar(pagD, '#cel-folha-fechar');
   await pausa(2500);
@@ -707,11 +709,11 @@ const WA_ALFA = '5511987654321';
   const cobT = avT.find(a => a.tipo === 'cobrar') || {};
   console.log('   ' + JSON.stringify(cobT));
   prop('sem telefone válido no campo, o aviso de cobrar não tem link e diz por quê (' + cobT.texto + ' ; ' + (cobT.link || 'sem link') + ')',
-    !cobT.link && !(await existe(pagC, '#cel-aviso-cobrar')) && cobT.texto === 'Em aberto: Aluno Alfa Teste, julho de 2026, R$ 150,00. Sem celular na ficha para o WhatsApp', V_TELEFONE);
+    !cobT.link && !(await existe(pagC, '#cel-aviso-cobrar')) && cobT.texto === 'Em aberto: Aluno Alfa Teste | julho de 2026, R$ 150,00. Sem celular na ficha para o WhatsApp', V_TELEFONE);
   seVeneno(V_TELEFONE);
 
   secao('10. O toque em "falta registrar" abre o registro daquela aula, e salvar tira o aviso');
-  conf('o toque abre o "Registrar como foi" da aula do Alfa de ontem', (await clicar(pagC, '#cel-aviso-registrar-alfa-1005')) + ' ' + (await existe(pagC, '#cel-relato-texto')) + ' ' +
+  conf('o toque abre o "Registrar como foi" da aula do Alfa de ontem', (await clicar(pagC, '#cel-aviso-registrar')) + ' ' + (await existe(pagC, '#cel-relato-texto')) + ' ' +
     (await pagC.evaluate(() => (document.querySelector('#cel-hoje h2.cel-titulo + .ajuda') || {}).textContent)), 'true true Aluno Alfa Teste, 05/10/2026, 10:00');
   await digitar(pagC, '#cel-relato-texto', 'Frações equivalentes, de teste.');
   await clicar(pagC, '#cel-relato-salvar');
@@ -737,7 +739,7 @@ const WA_ALFA = '5511987654321';
   secao('11b. (revisão) O lembrete conta a família em aberto só a partir do corte dos pagamentos');
   const antesCorte = await momento(pagC, '2026-11-01', '09:00');
   conf('(controle) 01/11, com o corte em junho: outubro tem 3 aulas sem registro e 3 famílias em aberto', (antesCorte.find(a => a.tipo === 'fechar') || {}).texto,
-    'Fechar outubro de 2026: 3 aulas sem registro e 3 famílias em aberto');
+    'Fechar outubro de 2026 | 3 aulas sem registro e 3 famílias em aberto');
   await soltarRelogio(pagC);
   await pagA.evaluate(() => Store.carregar().then(d => { d.ajustes.pagamentosDesde = '2026-11'; return Store.salvar(d); }));
   const sA3 = await sincronizar(pagA);
@@ -747,7 +749,7 @@ const WA_ALFA = '5511987654321';
   conf('(arranjo) o corte de novembro chegou ao celular', corteChegou.ok, true);
   const depoisCorte = await momento(pagC, '2026-11-01', '09:00');
   conf('com o corte em novembro, outubro não conta família em aberto, como a lista de pendentes', (depoisCorte.find(a => a.tipo === 'fechar') || {}).texto,
-    'Fechar outubro de 2026: 3 aulas sem registro');
+    'Fechar outubro de 2026 | 3 aulas sem registro');
 
   secao('13. (compactos) Todos os avisos em 390 x 844: o selinho, o painel, o ponto na agenda e o dispensar');
   /* O dia com TODOS os avisos: 29/10 ao meio-dia, no fim do mês (fechar
@@ -781,9 +783,9 @@ const WA_ALFA = '5511987654321';
   conf('(arranjo) 390 x 844, e os três tipos de aviso valem juntos, com a Próxima no bloco (' + tipos(avC) + ')', (await leiaute(pagC)).janela + ' ' + tipos(avC), '390x844 registrar,cobrar,fechar');
   let sel = await selinho(pagC);
   console.log('   selinho: ' + JSON.stringify(sel));
-  prop('recolhidos por padrão: só o selinho, com o número 7 (4 sem registro, 2 famílias e o mês), na linha da data, e o painel fechado',
-    sel.existe && sel.numero === '7' && sel.expandido === 'false' && !sel.painelVisivel && sel.naLinhaDaData, [V_EMPILHADOS, V_EMPURRA, V_TOPO]);
-  conf('o selinho diz a quem lê a tela o que há', sel.rotulo, '7 avisos de hoje: 4 sem registro, 2 a cobrar, fechar outubro de 2026. Toque para ver');
+  prop('recolhidos por padrão: só o selinho, com o número 3 (uma linha por tipo: sem registro, cobrar e o mês), na linha da data, e o painel fechado',
+    sel.existe && sel.numero === '3' && sel.expandido === 'false' && !sel.painelVisivel && sel.naLinhaDaData, [V_EMPILHADOS, V_EMPURRA, V_TOPO]);
+  prop('o selinho diz a quem lê a tela o que há (' + sel.rotulo + ')', sel.rotulo === '3 avisos de hoje: 4 sem registro, 2 a cobrar, fechar outubro de 2026. Toque para ver', V_EMPILHADOS);
   const empurra = await pagC.evaluate(() => {
     const f = document.querySelector('#cel-semana'), s = document.querySelector('#cel-avisos-selo');
     const com = f.getBoundingClientRect().height;
@@ -826,7 +828,7 @@ const WA_ALFA = '5511987654321';
   await pagC.evaluate(() => { const v = document.querySelector('#prova-letra'); if (v) v.remove(); });
   await pagC.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true });
   tetos.forEach(t => console.log('   topo fixo ' + t.tela + ' letra ' + t.letra + ': ' + t.preso + ' px, ' + t.pct + '% (rolagem ' + t.rolagem + ', selinho ' + t.selo + ', aberto ' + t.aberto + ')'));
-  conf('(arranjo) as seis medidas foram com a agenda rolada até agora e o selinho com os 7', tetos.every(t => t.rolagem > 0 && t.selo === '7'), true);
+  conf('(arranjo) as seis medidas foram com a agenda rolada até agora e o selinho com os 3', tetos.every(t => t.rolagem > 0 && t.selo === '3'), true);
   prop('o topo fixo fica em no máximo 20% da altura nas três telas, com a letra normal e a 130% (' + tetos.map(t => t.tela + '/' + t.letra + ' ' + t.pct + '%').join(', ') + ')',
     tetos.every(t => t.pct <= 20), V_TOPO);
   seVeneno(V_TOPO);
@@ -888,9 +890,10 @@ const WA_ALFA = '5511987654321';
   conf('o toque no selinho abre o painel', (await tocar(pagC, cdp, '#cel-avisos-selo')) + ' ' + (await selinho(pagC)).painelVisivel, 'true true');
   avC = await avisos(pagC);
   const reg13 = avC.find(a => a.tipo === 'registrar') || { aulas: [] };
-  prop('o painel lista as 4 aulas sem registro, da mais recente para a mais antiga, com dia, hora e aluno (' + reg13.texto + ')',
+  prop('o painel junta as 4 aulas sem registro numa linha, da mais recente para a mais antiga, com aluno, dia e hora (' + reg13.texto + ')',
     reg13.aulas.join(',') === SEM_REGISTRO.join(',') &&
-    reg13.texto === '4 aulas sem registro de como foi: qui 29/10, 10:00, Aluno Alfa Teste ; qui 29/10, 09:00, Aluno Gama Teste ; qui 29/10, 08:00, Aluno Beta Teste ; qui 29/10, 07:00, Aluno Alfa Teste',
+    reg13.texto === '4 aulas sem registro | Aluno Alfa Teste hoje, 10:00. Aluno Gama Teste hoje, 09:00. Aluno Beta Teste hoje, 08:00. Aluno Alfa Teste hoje, 07:00.' &&
+    reg13.chaves === SEM_REGISTRO.map(id => 'registrar:' + id).join(' '),
     V_REGISTRADA);
   seVeneno(V_REGISTRADA);
   const cob13 = avC.find(a => a.tipo === 'cobrar') || {};
@@ -904,34 +907,40 @@ const WA_ALFA = '5511987654321';
   conf('o toque fecha o painel, e a agenda volta ao lugar: a mesma rolagem e o bloco da Próxima na mesma altura (' + JSON.stringify(antesDeAbrir) + ')',
     (await tocar(pagC, cdp, '#cel-avisos-selo')) + ' ' + (await selinho(pagC)).painelVisivel + ' ' + JSON.stringify(await posicao()), 'true false ' + JSON.stringify(antesDeAbrir));
   await tocar(pagC, cdp, '#cel-avisos-selo');
-  conf('o toque curto numa aula da lista abre o "Registrar como foi" dela', (await tocar(pagC, cdp, '#cel-aviso-registrar-gama-1029')) + ' ' +
+  conf('o toque curto em "Registrar" abre o "Registrar como foi" da mais recente, e o painel recolhe', (await tocar(pagC, cdp, '#cel-aviso-registrar')) + ' ' +
     (await existe(pagC, '#cel-relato-texto')) + ' ' + (await pagC.evaluate(() => (document.querySelector('#cel-hoje h2.cel-titulo + .ajuda') || {}).textContent)),
-    'true true Aluno Gama Teste, 29/10/2026, 09:00');
+    'true true Aluno Alfa Teste, 29/10/2026, 10:00');
   avC = await momento(pagC, ...CENA);
-  conf('(arranjo) de volta a Hoje, o painel segue aberto (a escolha do aparelho)', (await selinho(pagC)).painelVisivel, true);
+  conf('(arranjo) de volta a Hoje, o painel está recolhido (a ação o recolheu)', (await selinho(pagC)).painelVisivel, false);
+  const sinc = await pagC.evaluate(() => [(document.querySelector('#cel-avisos-sincronia .cel-avisos-sincronia-texto') || {}).textContent, (document.querySelector('#cel-origem') || {}).textContent,
+    !!document.querySelector('#cel-avisos-sincronia #cel-avisos-atualizar')]);
+  conf('o rodapé do painel tem a sincronia (o mesmo estado da barra de cima) e o ↻ (' + sinc[0] + ')', sinc[0] === sinc[1] && !!sinc[0] && sinc[2], true);
+  await abrirPainel(pagC);
 
   /* Deslizar: só de lado, passado o limiar. */
   const flush = await sincronizar(pagC);
   conf('(arranjo) a fila do celular está vazia antes de dispensar', flush.erroE + ' ' + (await pagC.evaluate(() => Store.estadoDaFila().then(e => e.pendentes))), 'null 0');
   const tituloDaSemana = () => texto(pagC, '#cel-dia-titulo');
   const titulo0 = await tituloDaSemana();
-  await deslizar(pagC, cdp, '.cel-aviso-item[data-aula="alfa-1029b"]', 30, 0);
-  await deslizar(pagC, cdp, '.cel-aviso-item[data-aula="alfa-1029b"]', 20, 140);
-  conf('o arrasto curto (30 px) e o de pé (mais vertical que de lado) não dispensam', (await selinho(pagC)).numero + ' ' + (await existe(pagC, '.cel-aviso-item[data-aula="alfa-1029b"]')), '7 true');
+  await deslizar(pagC, cdp, REG, 30, 0);
+  await deslizar(pagC, cdp, REG, 20, 140);
+  conf('o arrasto curto (30 px) e o de pé (mais vertical que de lado) não dispensam', (await selinho(pagC)).numero + ' ' + (await existe(pagC, REG)), '3 true');
+  await fecharPainel(pagC);
   await deslizar(pagC, cdp, '.cel-semana-dias', -160, 0);
-  conf('o arrasto de lado na faixa dos dias não dispensa nada nem muda o dia', (await selinho(pagC)).numero + ' ' + (await tituloDaSemana()), '7 ' + titulo0);
+  conf('o arrasto de lado na faixa dos dias não dispensa nada nem muda o dia', (await selinho(pagC)).numero + ' ' + (await tituloDaSemana()), '3 ' + titulo0);
+  await abrirPainel(pagC);
   const commits0 = pagC.commitsNaRede;
-  await deslizar(pagC, cdp, '.cel-aviso-item[data-aula="alfa-1029b"]', 160, 6);
+  await deslizar(pagC, cdp, REG, 160, 6);
   const inicioDoDesfazer = Date.now();
-  const depois = { selo: (await selinho(pagC)).numero, item: await existe(pagC, '.cel-aviso-item[data-aula="alfa-1029b"]'), marcas: await marcadas(),
-    desfazer: await pagC.evaluate(() => !!document.querySelector('#aviso.aberto') && (document.querySelector('#aviso-acao') || {}).textContent) };
+  const depois = { selo: (await selinho(pagC)).numero, item: await existe(pagC, REG), marcas: await marcadas(),
+    desfazer: await pagC.evaluate(() => !!document.querySelector('#aviso.aberto.aviso-dourado') && (document.querySelector('#aviso-acao') || {}).textContent) };
   console.log('   depois de dispensar: ' + JSON.stringify(depois));
-  prop('arrastar para o lado dispensa: a aula sai da lista e do ponto, o selinho conta 6, e o "Desfazer" aparece',
-    !depois.item && depois.selo === '6' && depois.marcas === ['alfa-1029a', 'beta-1029', 'gama-1029'].join(',') && depois.desfazer === 'Desfazer', V_NAO_SOME);
+  prop('arrastar a linha para o lado dispensa: as 4 aulas saem do painel e do ponto na agenda, o selinho conta 2, e o "Desfazer" aparece na barra escura, em dourado',
+    !depois.item && depois.selo === '2' && depois.marcas === '' && depois.desfazer === 'Desfazer', V_NAO_SOME);
   seVeneno(V_NAO_SOME);
   await tirarPrint(pagC, '7_compacto_dispensado_desfazer.png');
   conf('a chave guardada no aparelho é o tipo e o id da aula, no dia de hoje', await pagC.evaluate(() => localStorage.getItem('apoio-educacional:celular-avisos')),
-    JSON.stringify({ recolhida: false, dispensados: { '2026-10-29': ['registrar:alfa-1029b'] } }));
+    JSON.stringify({ recolhida: false, dispensados: { '2026-10-29': SEM_REGISTRO.map(id => 'registrar:' + id) } }));
   conf('dispensar não muda a semana: o mesmo dia no título', await tituloDaSemana(), titulo0);
   await pausa(2500);
   const fila1 = await pagC.evaluate(() => Store.estadoDaFila().then(e => e.pendentes));
@@ -952,22 +961,27 @@ const WA_ALFA = '5511987654321';
   await esperarAte(12900);
   const aos13 = await desfazerAberto();
   conf('o "Desfazer" do dispensar segue à vista aos 10,5 s e aos 11,5 s e some até 12,9 s (' + [aos10, aos11, aos13].join(', ') + ')', [aos10, aos11, aos13].join(','), 'true,true,false');
+  await fecharPainel(pagC);
   conf('a faixa da semana continua andando: a seta leva à semana seguinte e "Hoje" volta', (await tocar(pagC, cdp, '#cel-semana-seguinte')) + ' ' +
     ((await tituloDaSemana()) !== titulo0) + ' ' + (await tocar(pagC, cdp, '#cel-dia-hoje')) + ' ' + ((await tituloDaSemana()) === titulo0), 'true true true true');
   avC = await momento(pagC, ...CENA);
-  await deslizar(pagC, cdp, '.cel-aviso-item[data-aula="alfa-1029b"]', 160, 6);
-  conf('(arranjo) dispensada de novo', (await selinho(pagC)).numero, '6');
-  conf('o "Desfazer" traz a aula de volta', (await clicar(pagC, '#aviso-acao')) + ' ' + (await selinho(pagC)).numero + ' ' + (await existe(pagC, '.cel-aviso-item[data-aula="alfa-1029b"]')), 'true 7 true');
-  await deslizar(pagC, cdp, '.cel-aviso-item[data-aula="alfa-1029b"]', -160, 6);
+  await abrirPainel(pagC);
+  await deslizar(pagC, cdp, REG, 160, 6);
+  conf('(arranjo) dispensada de novo', (await selinho(pagC)).numero, '2');
+  conf('o "Desfazer" traz as aulas de volta', (await clicar(pagC, '#aviso-acao')) + ' ' + (await selinho(pagC)).numero + ' ' + (await existe(pagC, REG)) + ' ' + (await marcadas()),
+    'true 3 true ' + SEM_REGISTRO.slice().sort().join(','));
+  await deslizar(pagC, cdp, REG, -160, 6);
   await deslizar(pagC, cdp, '.cel-aviso-cobrar', 160, 6);
   const avDisp = await avisos(pagC);
   const cobB = avDisp.find(a => a.tipo === 'cobrar') || {};
   console.log('   dispensadas a aula e a cobrança do Alfa: ' + JSON.stringify(avDisp.map(a => a.tipo + ': ' + a.texto)));
   conf('o ✕ do aviso faz o mesmo que deslizar (o gesto tem um botão equivalente), e o Desfazer volta',
     (await clicar(pagC, '.cel-aviso-fechar .cel-aviso-dispensar')) + ' ' + (await existe(pagC, '.cel-aviso-fechar')) + ' ' + (await selinho(pagC)).numero + ' ' +
-    (await clicar(pagC, '#aviso-acao')) + ' ' + (await existe(pagC, '.cel-aviso-fechar')) + ' ' + (await selinho(pagC)).numero, 'true false 4 true true 5');
-  conf('para a esquerda também; e dispensado o Alfa, a cobrança passa à família seguinte (o Beta), pela chave da família, e o selinho conta 5',
-    (await selinho(pagC)).numero + ' | ' + cobB.aluno + ' | ' + cobB.texto, '5 | beta | Em aberto: Aluno Beta Teste, agosto de 2026, R$ 100,00. Sem celular na ficha para o WhatsApp');
+    (await clicar(pagC, '#aviso-acao')) + ' ' + (await existe(pagC, '.cel-aviso-fechar')) + ' ' + (await selinho(pagC)).numero, 'true false 1 true true 2');
+  conf('"Dispensar todos" tira o selinho, e o Desfazer devolve tudo', (await clicar(pagC, '#cel-avisos-dispensar-todos')) + ' ' + (await existe(pagC, '#cel-avisos-selo')) + ' ' +
+    (await clicar(pagC, '#aviso-acao')) + ' ' + (await selinho(pagC)).numero, 'true false true 2');
+  conf('para a esquerda também; e dispensado o Alfa, a cobrança passa à família seguinte (o Beta), pela chave da família, e o selinho segue com 2 linhas',
+    (await selinho(pagC)).numero + ' | ' + cobB.aluno + ' | ' + cobB.texto, '2 | beta | Em aberto: Aluno Beta Teste | agosto de 2026, R$ 100,00. Sem celular na ficha para o WhatsApp');
 
   /* O dia seguinte, pelo relógio fixo: o que ainda vale volta. */
   const dia30 = await momento(pagC, '2026-10-30', '12:00');
@@ -996,12 +1010,12 @@ const WA_ALFA = '5511987654321';
   const avS = await momento(pagS, ...CENA);
   const selS = await selinho(pagS);
   console.log('   sem armazenamento: ' + JSON.stringify(selS) + ' ; ' + tipos(avS));
-  conf('com o armazenamento lançando erro, o app abre no Hoje e mostra o selinho, recolhido, com os 7', lancou + ' ' + selS.existe + ' ' + selS.numero + ' ' + selS.expandido + ' ' + selS.painelVisivel,
-    'true true 7 false false');
+  conf('com o armazenamento lançando erro, o app abre no Hoje e mostra o selinho, recolhido, com os 3', lancou + ' ' + selS.existe + ' ' + selS.numero + ' ' + selS.expandido + ' ' + selS.painelVisivel,
+    'true true 3 false false');
   const cdpS = await pagS.createCDPSession();
   await tocar(pagS, cdpS, '#cel-avisos-selo');
-  await deslizar(pagS, cdpS, '.cel-aviso-item[data-aula="alfa-1029b"]', 160, 6);
-  conf('sem armazenamento, o painel abre e o dispensar vale enquanto o app está aberto', (await selinho(pagS)).painelVisivel + ' ' + (await selinho(pagS)).numero, 'true 6');
+  await deslizar(pagS, cdpS, REG, 160, 6);
+  conf('sem armazenamento, o painel abre e o dispensar vale enquanto o app está aberto', (await selinho(pagS)).painelVisivel + ' ' + (await selinho(pagS)).numero, 'true 2');
   conf('nenhum erro de página sem armazenamento', pagS.errosDePagina.join(' | '), '');
   await pagS.close();
 
@@ -1017,8 +1031,8 @@ const WA_ALFA = '5511987654321';
   conf('(arranjo) a cena chegou ao observador', obsChegou.ok, true);
   const avE = await momento(pagE, ...CENA);
   const selE = await selinho(pagE);
-  prop('o observador, no dia de todos os avisos: o selinho com 4 (as 4 sem registro), sem cobrar e sem o mês a fechar (' + selE.numero + ' ; ' + tipos(avE) + ')',
-    selE.numero === '4' && tipos(avE) === 'registrar' && !(await existe(pagE, '#cel-aviso-cobrar')), [V_OBS, V_SAIR]);
+  prop('o observador, no dia de todos os avisos: o selinho com 1 (a linha das 4 sem registro), sem cobrar e sem o mês a fechar (' + selE.numero + ' ; ' + tipos(avE) + ')',
+    selE.numero === '1' && tipos(avE) === 'registrar' && !(await existe(pagE, '#cel-aviso-cobrar')), [V_OBS, V_SAIR]);
   await abrirPainel(pagE);
   await tirarPrint(pagE, '8_compacto_observador.png');
   conf('o observador, painel aberto: nenhuma ação de gravar e nenhum link de WhatsApp', (await pagE.evaluate(() => document.querySelectorAll('#cel-avisos [data-acao-celular]').length)) + ' ' +
