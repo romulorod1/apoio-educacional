@@ -100,7 +100,7 @@
     if (!e) return false;
     if (PERMANENTES.indexOf(e.name || e.nome) >= 0) return true;
     // o leitor de zip recusa o EPUB pelo formato (e.zip); a falta de descompressão é do navegador
-    if (e.zip && !/SEM_DESCOMPRESSAO/.test(String(e.message || e.mensagem || ''))) return true;
+    if (e.zip && !e.passageira && !/SEM_DESCOMPRESSAO/.test(String(e.message || e.mensagem || ''))) return true;
     return false;
   }
   function semEspaco(e) { return !!e && (e.name || e.nome) === 'QuotaExceededError'; }
@@ -213,7 +213,13 @@
   /* Uma falha do livro `id` (do arquivo de hash `hash`), contada no registro
    * dele. Usada pelo Worker (o erro que ele viu) e pela página (o Worker que
    * morreu ou estourou o prazo). Só mexe no registro do MESMO arquivo. */
-  function registrarFalha(id, hash, erro) {
+  /* naPagina: a falha veio com o livro já aberto, lendo a página `proxima`
+   * (o Worker que morre ou trava no meio). Ela conta para ESSA página: na
+   * TENTATIVAS_POR_PAGINA-ésima vez seguida, só a página sai (fica entre as
+   * que não puderam ser lidas) e a leitura segue da seguinte. Só a falha na
+   * ABERTURA conta para o livro inteiro. */
+  var TENTATIVAS_POR_PAGINA = 3;
+  function registrarFalha(id, hash, erro, naPagina) {
     return transacao(['livros'], 'readwrite', function (t, dar) {
       var dep = t.objectStore('livros');
       var q = dep.get(id);
@@ -221,6 +227,18 @@
         var r = q.result;
         if (!r || r.hash !== hash || r.motor !== MOTOR || r.pronto) { dar(null); return; }
         var permanente = falhaPermanente(erro);
+        if (!permanente && naPagina && r.total != null) {
+          var n = r.proxima;
+          r.falhaDaPagina = r.falhaDaPagina && r.falhaDaPagina.n === n ? { n: n, vezes: r.falhaDaPagina.vezes + 1 } : { n: n, vezes: 1 };
+          if (r.falhaDaPagina.vezes >= TENTATIVAS_POR_PAGINA) {
+            r.ilegiveis = (r.ilegiveis || []).concat([n]);
+            r.proxima = n + 1;
+            r.falhaDaPagina = null;
+          }
+          dep.put(r);
+          dar({ pronto: false, falhas: r.falhas || 0, permanente: false, pagina: n });
+          return;
+        }
         if (!permanente) {
           // a conta zera quando o livro avançou desde a última falha
           r.falhas = r.proximaNaFalha === r.proxima ? (r.falhas || 0) + 1 : 1;
@@ -324,10 +342,12 @@
     }
 
     /* Uma página lida: o texto (se tiver) e o avanço do livro, juntos. */
-    function gravarPagina(reg, n, texto) {
-      var comTexto = temTexto(texto);
-      var novo = Object.assign({}, reg, { proxima: n + 1,
-        semTexto: comTexto || reg.semTexto.indexOf(n) >= 0 ? reg.semTexto : reg.semTexto.concat([n]) });
+    function gravarPagina(reg, n, texto, ilegivel) {
+      var comTexto = !ilegivel && temTexto(texto);
+      var ileg = reg.ilegiveis || [];
+      var novo = Object.assign({}, reg, { proxima: n + 1, falhaDaPagina: null,
+        ilegiveis: ilegivel && ileg.indexOf(n) < 0 ? ileg.concat([n]) : ileg,
+        semTexto: comTexto || ilegivel || reg.semTexto.indexOf(n) >= 0 ? reg.semTexto : reg.semTexto.concat([n]) });
       return gravarConferido(reg, n, function (t) {
         var p = t.objectStore('paginas');
         if (comTexto) p.put({ id: reg.id, pagina: n, texto: texto });
@@ -452,6 +472,25 @@
           return livro.formato === 'epub' ? abrirEpub(livro.blob, livro.espinha || []) : abrirPdf(livro.blob, prazos);
         }).then(function (f) {
           fonte = f;
+          avisar({ tipo: 'aberto', id: livro.id });
+          /* Uma página: o texto, ou '' (sem texto pelo CONTEÚDO dela), ou
+           * ilegível. A falha passageira é tentada de novo, com o livro
+           * reaberto (a fatia que falhou deixa o documento quebrado), até
+           * TENTATIVAS_POR_PAGINA vezes; depois SÓ essa página sai, e o livro
+           * segue. Se a reabertura falhar, o erro é da abertura. */
+          function lerPagina(n) {
+            var tentativa = 0;
+            function uma() {
+              return fonte.ler(n).then(function (bruto) { return { texto: normalizar(bruto) }; }, function (e) {
+                if (falhaPermanente(e)) return { texto: '' };
+                if (++tentativa >= TENTATIVAS_POR_PAGINA) return { texto: '', ilegivel: true };
+                return fonte.soltar().then(function () {
+                  return livro.formato === 'epub' ? abrirEpub(livro.blob, livro.espinha || []) : abrirPdf(livro.blob, prazos);
+                }).then(function (nova) { fonte = nova; return uma(); });
+              });
+            }
+            return uma();
+          }
           var antes = reg.proxima;
           var comTotal = Object.assign({}, reg, { total: f.total });
           return gravarConferido(reg, antes, function (t) { t.objectStore('livros').put(comTotal); }).then(function () {
@@ -464,13 +503,9 @@
               }
               if (pararPedido) return 'parou';
               var n = reg.proxima;
-              return f.ler(n).then(function (bruto) { return normalizar(bruto); }, function (e) {
-                // a página que não se lê pelo CONTEÚDO dela conta como sem texto; o resto é passageiro
-                if (falhaPermanente(e)) return '';
-                throw e;
-              }).then(function (texto) {
+              return lerPagina(n).then(function (lida) {
                 if (pararPedido) return 'parou';
-                return gravarPagina(reg, n, texto).then(function (novo) {
+                return gravarPagina(reg, n, lida.texto, lida.ilegivel).then(function (novo) {
                   reg = novo;
                   lidas++;
                   avisar({ tipo: 'pagina', id: livro.id, pagina: n, total: reg.total });
@@ -687,7 +722,7 @@
       situacao.falhasNaSessao[livro.id] = (situacao.falhasNaSessao[livro.id] || 0) + 1;
       var feito = atual;
       feito.parando = true;
-      registrarFalha(livro.id, livro.hash, { name: 'Prazo', message: motivo }).catch(function () { return null; })
+      registrarFalha(livro.id, livro.hash, { name: 'Prazo', message: motivo }, !!feito.aberto).catch(function () { return null; })
         .then(function (conta) {
           if (atual !== feito) return;
           if (conta && conta.pronto) situacao.prontos = Math.min(situacao.total, situacao.prontos + 1);
@@ -703,6 +738,7 @@
       if (!m.indice || !atual || m.id !== atual.livro.id) return;
       atual.noticia = Date.now();
       if (m.tipo === 'iniciou') { atual.iniciou = true; return; }
+      if (m.tipo === 'aberto') { atual.aberto = true; return; }
       if (m.tipo === 'pagina') {
         situacao.livro = m.id; situacao.pagina = m.pagina; situacao.de = m.total;
         situacao.lidasNaSessao[m.id] = (situacao.lidasNaSessao[m.id] || 0) + 1;
@@ -779,7 +815,9 @@
         if (parado || (!atual && !fila.length)) { pararVigia(); return; }
         var agora = Date.now();
         if (atual && atual.enviado) {
-          if (agora - atual.noticia > CONFIG.semNoticiaMs || agora - atual.inicio > CONFIG.livroMs) {
+          /* Em segundo plano (e no sono do aparelho, em que o relógio de parede
+           * anda e o Worker não) o prazo não é julgado. */
+          if (!pausado && (agora - atual.noticia > CONFIG.semNoticiaMs || agora - atual.inicio > CONFIG.livroMs)) {
             perderTrabalhador('o Worker do índice passou do prazo');
             return;
           }
@@ -835,7 +873,12 @@
     if (typeof document !== 'undefined' && document.addEventListener) {
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'hidden') { pausado = true; pedirParada(); }
-        else if (pausado) { pausado = false; proximo(); }
+        else if (pausado) {
+          pausado = false;
+          // a conta do prazo recomeça na volta: o tempo apagado não é do Worker
+          if (atual) { atual.noticia = Date.now(); atual.inicio = Date.now(); }
+          proximo();
+        }
       });
     }
 
@@ -913,7 +956,7 @@
 
     function naoLidasDe(reg) {
       if (reg.erro) return reg.total || null;
-      return (reg.semTexto || []).length;
+      return (reg.semTexto || []).length + (reg.ilegiveis || []).length;
     }
 
     /* buscarNosLivros(termo, { ano, disciplina })
@@ -960,7 +1003,7 @@
           if (reg.erro || naoLidas) {
             saida.naoLidos.push({ id: l.id, titulo: l.meta.titulo || l.id, volume: l.meta.volume || null, formato: d.formato,
               total: reg.total, naoLidas: naoLidas, livroInteiro: !!reg.erro,
-              motivo: reg.erro ? (reg.erro.permanente ? 'arquivo' : 'leitura') : 'sem-texto' });
+              motivo: reg.erro ? (reg.erro.permanente ? 'arquivo' : 'leitura') : ((reg.ilegiveis || []).length ? 'leitura' : 'sem-texto') });
           }
           if (reg.erro) return;
           // o livro começado já responde pelas páginas lidas

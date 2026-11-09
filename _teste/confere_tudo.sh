@@ -723,6 +723,8 @@ roda "livros indice --envenenado-com-acento"      node "_teste/testa_livros_indi
 # indice (outra janela segurando a conexao nao o deixa pela metade).
 roda "livros indice --envenenado-erro-vira-pronto"    node "_teste/testa_livros_indice.js" --envenenado-erro-vira-pronto
 roda "livros indice --envenenado-apagar-espera-indice" node "_teste/testa_livros_indice.js" --envenenado-apagar-espera-indice
+# A pagina que sempre falha (de forma passageira) sai sozinha; o livro fica na busca.
+roda "livros indice --envenenado-pagina-ruim-derruba-livro" node "_teste/testa_livros_indice.js" --envenenado-pagina-ruim-derruba-livro
 # C15.2 e C15.3: "Este capitulo cobre" no leitor, Confirmar e Corrigir (so a
 # materia e o ano do livro), a correcao depois de recarregar e na copia de
 # seguranca (os livros nao), e o "Abrir no livro" da aula na pagina do PDF e no
