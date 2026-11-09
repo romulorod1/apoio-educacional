@@ -134,7 +134,7 @@
  * versão guardados no Store, para o app.js não perder o aviso que chega antes
  * dele (app.js e store.js), com a lista igual. Versão silenciosa. O v94 (D6c lote 4) traz os avisos no Hoje do celular
  * (app.js, core.js e styles.css), com a lista igual. O v95 (F4 do redesenho) traz os avisos do Hoje do celular
- * num sininho com painel (app.js e styles.css), com a lista igual. O v99 (N2 fatia 1) traz as folhas por página na nuvem
+ * num sininho com painel (app.js e styles.css), com a lista igual. O v98 (importar vários pacotes) traz a importação em série e o resumo (app.js, index.html e styles.css), com a lista igual. O v99 (N2 fatia 1) traz as folhas por página na nuvem
  * (app.js, nuvem.js, store.js, draw.js e styles.css), com a lista igual. */
 var CACHE = 'apoio-educacional-v99';
 var BAIXADOS = 'apoio-educacional-baixados';

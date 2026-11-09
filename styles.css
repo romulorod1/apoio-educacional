@@ -3454,3 +3454,12 @@ body.modo-celular .celular > .aviso { position: static; transform: none; transit
 body.modo-celular .celular > .aviso.aberto { display: flex; }
 body.modo-celular .celular > .aviso button { min-height: var(--alvo-celular); min-width: var(--alvo-celular); }
 body.modo-celular .celular .linha { flex-direction: column; }
+
+/* Resumo de quando ela importa vários pacotes de uma vez (Ajustes, Biblioteca):
+   a lista cresce para baixo e rola sozinha se for longa; nunca para o lado. */
+.resumo-importacao-lista { list-style: none; margin: 8px 0 0; padding: 0; max-height: 50vh; overflow-y: auto; }
+.resumo-importacao-linha { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; min-width: 0; }
+.resumo-importacao-sinal { flex: 0 0 auto; width: 1.4em; text-align: center; font-weight: 700; }
+.resumo-importacao-texto { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.resumo-importacao-detalhe { display: block; margin-top: 2px; }
+#fechar-resumo-importacao { min-height: 48px; }

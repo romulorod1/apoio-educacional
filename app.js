@@ -90,6 +90,13 @@
       ]
     },
     {
+      versao: '1.42.22',
+      itens: [
+        'Em Ajustes, na Biblioteca, dá para escolher vários pacotes de uma vez. O aplicativo importa um por vez, mostra "Importando 5 de 17" e, no fim, uma lista do que entrou, do que já estava e do que não entrou, com o motivo.',
+        'Se um pacote falhar, os outros continuam. Se você escolher de novo os mesmos pacotes, os que já estão no tablet são pulados sem demora.'
+      ]
+    },
+    {
       versao: '1.42.19',
       itens: [
         'No Hoje do celular, os avisos ficam recolhidos num sininho com o número, ao lado da data. A agenda ganha a tela.',
@@ -2223,10 +2230,21 @@
    * das três substituições inteiras, e ela decide. Sem pendência, segue direto,
    * como antes. */
   var podeRecarregar = false;
+  /* IMPORTAÇÃO DA BIBLIOTECA EM ANDAMENTO: recarregar mataria a série no meio
+   * (o pacote de agora é abortado sem estrago, mas os outros não entram e ela
+   * não vê resumo nenhum). Pergunta antes, como com a mudança não guardada. */
+  var importandoBiblioteca = false;
   function prontoParaRecarregar() {
-    if (!mudancaNaoGuardada) return Promise.resolve(true);
-    return salvar().then(function () { return true; }, function () {
-      return confirmar('Atualizar o aplicativo agora?' + avisoDePendenciaNaConfirmacao());
+    var depoisDaImportacao = importandoBiblioteca
+      ? Promise.resolve(confirmar('A importação da biblioteca ainda está andando e para se o aplicativo atualizar agora. ' +
+        'Atualizar mesmo assim? O que já entrou fica no tablet.'))
+      : Promise.resolve(true);
+    return depoisDaImportacao.then(function (ok) {
+      if (!ok) return false;
+      if (!mudancaNaoGuardada) return true;
+      return salvar().then(function () { return true; }, function () {
+        return confirmar('Atualizar o aplicativo agora?' + avisoDePendenciaNaConfirmacao());
+      });
     });
   }
 
@@ -15241,44 +15259,107 @@
     })));
   }
 
-  function importarBiblioteca(ev) {
-    var arquivo = ev.target.files && ev.target.files[0];
-    ev.target.value = '';
-    if (!arquivo) return;
-    if (typeof Zip === 'undefined' || !Zip.suportado()) {
-      mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa({ recusa: true, tipo: 'navegador' }));
-      return;
+  /* O nome que a tela dá ao pacote: o do manifest, quando ele diz, e senão o
+   * do arquivo. Só texto; nada daqui grava. */
+  function nomeDoPacote(manifest, arquivo) {
+    var doArquivo = curto(String((arquivo && arquivo.name) || 'pacote').replace(/\.zip$/i, ''));
+    if (!manifest || typeof manifest !== 'object') return doArquivo;
+    if (typeof manifest.titulo === 'string' && manifest.titulo.trim()) return curto(manifest.titulo.trim());
+    if (typeof manifest.nome === 'string' && manifest.nome.trim()) return curto(manifest.nome.trim());
+    if (manifest.conteudo !== 'livros') {
+      try {
+        var t = Biblioteca.resumo(manifest)[0];
+        if (t && t !== 'Pacote da biblioteca') return curto(t);
+      } catch (e) { /* o nome do arquivo serve */ }
     }
-    var botao = $('#importar-biblioteca');
-    if (botao) botao.disabled = true;
-    mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...']);
+    return doArquivo;
+  }
+  // o nome vem do pacote: um nome enorme não pode tomar a tela
+  function curto(t) { return t.length > 120 ? t.slice(0, 117) + '...' : t; }
+
+  /* A versão que o tablet já tem, quando ela não é menor que a do pacote (o
+   * pacote não traz nada de novo). É a MESMA regra antes de ler o arquivo e na
+   * hora de gravar. */
+  function versaoQueJaBasta(lista, manifest) {
+    var atual = lista.filter(function (p) { return p.pacote === manifest.pacote; })[0];
+    return atual && atual.versao >= manifest.versao ? atual.versao : null;
+  }
+
+  function resultadoDePulo(versaoAtual, nova) {
+    var igual = versaoAtual === nova;
+    return {
+      estado: 'pulou', motivo: igual ? 'ja-estava' : 'mais-nova', versaoAtual: versaoAtual, versaoNova: nova,
+      classe: 'faixa-aviso',
+      linhas: [igual
+        ? 'Esta versão do pacote já está no tablet. Nada foi mudado.'
+        : 'O tablet já tem a versão ' + versaoAtual + ' deste pacote, mais nova que a do arquivo (versão ' +
+          nova + '). Nada foi mudado.']
+    };
+  }
+
+  /* Antes de LER o arquivo (um pacote pode ter centenas de MB): se o manifest já
+   * diz que o tablet tem esta versão ou uma mais nova, pula sem ler. É o que
+   * acontece quando ela escolhe os 17 de novo depois de uma falha. A conferência
+   * de dentro da gravação continua valendo. No pacote de livros, uma versão
+   * MENOR que a de algum livro do tablet também pula inteira: senão um livro
+   * que a versão nova tirou voltaria. Qualquer dúvida (manifest estranho, erro
+   * ao ler o banco) segue o caminho de sempre. */
+  function puloAntesDeLer(manifest) {
+    if (!manifest || typeof manifest.pacote !== 'string' || typeof manifest.versao !== 'number') return Promise.resolve(null);
+    if (manifest.conteudo === 'livros') {
+      return Store.listarLivros().then(function (livros) {
+        var maior = 0;
+        livros.forEach(function (l) { if (l.pacote === manifest.pacote && l.versao > maior) maior = l.versao; });
+        return maior > manifest.versao ? resultadoDePulo(maior, manifest.versao) : null;
+      }).catch(function () { return null; });
+    }
+    return Store.listarPacotesBiblioteca().then(function (lista) {
+      var v = versaoQueJaBasta(lista, manifest);
+      return v === null ? null : resultadoDePulo(v, manifest.versao);
+    }).catch(function () { return null; });
+  }
+
+  /* Um pacote, do arquivo ao banco. É a unidade que o seletor chama uma vez
+   * (um arquivo) ou em série (vários). NUNCA rejeita: devolve sempre
+   *   { estado: 'entrou' | 'pulou' | 'falhou', classe, linhas, ... }
+   * onde `classe` e `linhas` são o que a tela mostra quando o pacote vem
+   * sozinho (as frases de sempre). Nada é gravado antes de o pacote inteiro ser
+   * conferido, e a gravação é uma transação só: uma falha aqui deixa o tablet
+   * como estava. `ctx.nome` recebe o nome do manifest assim que ele é lido, e
+   * `andamento(linhas)` mostra o que está acontecendo. */
+  function importarUmPacote(arquivo, ctx, andamento) {
     var aberto = null;
+    var saidaLivros = null;
+    andamento(['Conferindo o pacote ' + arquivo.name + '...']);
     /* O pacote de livros (C15.1) NUNCA é lido inteiro: a espiada lê só o
      * diretório do zip e o manifest, e os livros vêm um por vez, direto do
      * arquivo (Biblioteca.abrirLivrosDoArquivo). O de exercícios segue como
      * sempre, inteiro, porque são milhares de SVG pequenos. */
-    Biblioteca.espiarPacote(arquivo).then(function (espiado) {
-      if (espiado && espiado.manifest.conteudo === 'livros') {
-        return Biblioteca.abrirLivrosDoArquivo(espiado, function (feitos, total) {
-          mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...',
-            feitos + ' de ' + total + ' livros conferidos.']);
-        });
-      }
-      return arquivo.arrayBuffer().then(function (conteudo) {
-        return Biblioteca.abrirPacote(conteudo, function (feitos, total) {
-          if (feitos % 50 === 0 || feitos === total) {
-            mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...',
-              feitos + ' de ' + total + ' arquivos conferidos.']);
-          }
+    return Biblioteca.espiarPacote(arquivo).then(function (espiado) {
+      if (espiado) ctx.nome = nomeDoPacote(espiado.manifest, arquivo);
+      return puloAntesDeLer(espiado && espiado.manifest).then(function (pulo) {
+        if (pulo) { var pulou = new Error('pulou'); pulou.puloAntesDeLer = pulo; throw pulou; }
+        if (espiado && espiado.manifest.conteudo === 'livros') {
+          return Biblioteca.abrirLivrosDoArquivo(espiado, function (feitos, total) {
+            andamento(['Conferindo o pacote ' + arquivo.name + '...', feitos + ' de ' + total + ' livros conferidos.']);
+          });
+        }
+        return arquivo.arrayBuffer().then(function (conteudo) {
+          return Biblioteca.abrirPacote(conteudo, function (feitos, total) {
+            if (feitos % 50 === 0 || feitos === total) {
+              andamento(['Conferindo o pacote ' + arquivo.name + '...', feitos + ' de ' + total + ' arquivos conferidos.']);
+            }
+          });
         });
       });
     }).then(function (a) {
       aberto = a;
+      ctx.nome = nomeDoPacote(a.manifest, arquivo);
       /* Pacote de livros (C15.1): outro depósito e outra conta (livro a
        * livro, store.gravarLivros). Sai daqui pelo catch, com a marca
        * LIVROS_IMPORTADOS, para não passar pelos passos dos exercícios. */
       if (a.livros) {
-        return importarLivros(a).then(function () { throw LIVROS_IMPORTADOS; });
+        return importarLivros(a, andamento).then(function (r) { saidaLivros = r; throw LIVROS_IMPORTADOS; });
       }
       return Promise.all([Store.itensDaBiblioteca(), Store.teoriaDaBiblioteca()]);
     }).then(function (r) {
@@ -15297,10 +15378,10 @@
       }
       return Store.listarPacotesBiblioteca();
     }).then(function (lista) {
-      var atual = lista.filter(function (p) { return p.pacote === aberto.manifest.pacote; })[0];
-      if (atual && atual.versao >= aberto.manifest.versao) {
+      var jaBasta = versaoQueJaBasta(lista, aberto.manifest);
+      if (jaBasta !== null) {
         var e = new Error('versao');
-        e.versaoAtual = atual.versao;
+        e.versaoAtual = jaBasta;
         throw e;
       }
       return Store.estimarEspaco();
@@ -15320,28 +15401,161 @@
       }
       return Store.tornarPersistente();
     }).then(function () {
-      mostrarEstadoImportacao('faixa-info', ['Gravando a biblioteca no tablet...']);
+      andamento(['Gravando a biblioteca no tablet...']);
       return Store.gravarPacoteBiblioteca(aberto);
     }).then(function (registro) {
-      temPacoteBiblioteca = true;
-      mostrarEstadoImportacao('faixa-info',
-        ['Biblioteca importada.'].concat(Biblioteca.resumo(registro.manifest, registro.bytes)));
-      desenharPacotesBiblioteca();
-      bibliotecaMudou();
+      return {
+        estado: 'entrou', exercicios: true, classe: 'faixa-info',
+        linhas: ['Biblioteca importada.'].concat(Biblioteca.resumo(registro.manifest, registro.bytes))
+      };
     }).catch(function (e) {
-      if (e === LIVROS_IMPORTADOS) return;
-      if (e && e.versaoAtual != null) {
-        var nova = aberto.manifest.versao;
-        mostrarEstadoImportacao('faixa-aviso', [e.versaoAtual === nova
-          ? 'Esta versão do pacote já está no tablet. Nada foi mudado.'
-          : 'O tablet já tem a versão ' + e.versaoAtual + ' deste pacote, mais nova que a do arquivo (versão ' +
-            nova + '). Nada foi mudado.']);
-        return;
-      }
-      mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa(e));
-    }).then(function () {
-      if (botao) botao.disabled = false;
+      if (e === LIVROS_IMPORTADOS) return saidaLivros;
+      if (e && e.puloAntesDeLer) return e.puloAntesDeLer;
+      if (e && e.versaoAtual != null) return resultadoDePulo(e.versaoAtual, aberto.manifest.versao);
+      var linhas = linhasDaRecusa(e);
+      return { estado: 'falhou', classe: 'faixa-aviso', linhas: linhas, porque: porqueDaRecusa(linhas) };
     });
+  }
+
+  /* Do que a tela diz para um pacote que não entrou, a parte que vale numa
+   * lista: o que ela pode fazer, e o detalhe em letra pequena. Sem a frase de
+   * abertura nem a de "o que já estava continua igual", que o resumo diz uma
+   * vez só. */
+  function porqueDaRecusa(linhas) {
+    var texto = [], detalhe = '';
+    linhas.slice(1).forEach(function (l) {
+      if (l && l.detalhe) detalhe = l.detalhe;
+      else if (typeof l === 'string' && l !== 'O que já estava no tablet continua igual.') texto.push(l);
+    });
+    return { texto: texto.join(' '), detalhe: detalhe };
+  }
+
+  function pausaCurta() { return new Promise(function (resolve) { setTimeout(resolve, 0); }); }
+
+  function importarBiblioteca(ev) {
+    /* Copia a lista antes de limpar o seletor: limpar esvazia a FileList. Os
+     * File são só referências para o disco; nenhum é lido aqui. */
+    var arquivos = Array.prototype.slice.call(ev.target.files || []);
+    ev.target.value = '';
+    if (!arquivos.length) return;
+    if (typeof Zip === 'undefined' || !Zip.suportado()) {
+      mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa({ recusa: true, tipo: 'navegador' }));
+      return;
+    }
+    var botao = $('#importar-biblioteca');
+    if (botao) botao.disabled = true;
+    importandoBiblioteca = true;
+    var terminou = arquivos.length === 1 ? importarUmArquivoSozinho(arquivos[0]) : importarEmSerie(arquivos);
+    // o botão volta mesmo se algo inesperado derrubar a série: ela nunca fica sem poder tentar de novo
+    var libera = function () { importandoBiblioteca = false; if (botao) botao.disabled = false; };
+    terminou.then(libera, libera);
+  }
+
+  /* Um arquivo só: igual a antes de existir a seleção múltipla. */
+  function importarUmArquivoSozinho(arquivo) {
+    return importarUmPacote(arquivo, { nome: nomeDoPacote(null, arquivo) }, function (linhas) {
+      mostrarEstadoImportacao('faixa-info', linhas);
+    }).then(function (r) {
+      mostrarEstadoImportacao(r.classe, r.linhas);
+      if (r.exercicios) {
+        temPacoteBiblioteca = true;
+        desenharPacotesBiblioteca();
+        bibliotecaMudou();
+      }
+    });
+  }
+
+  /* Vários arquivos: UM PACOTE POR VEZ, na ordem em que ela escolheu. O
+   * próximo só começa depois que o anterior foi gravado e solto: nenhum File é
+   * lido antes da sua vez, e do resultado de cada pacote fica só o texto do
+   * resumo, nunca o pacote. Uma falha vira linha do resumo, e a série segue. */
+  function importarEmSerie(arquivos) {
+    var total = arquivos.length, resultados = [], i = 0;
+    // a tela apagada pausaria a série no meio: pede ao aparelho para ficar ligado enquanto ela anda
+    var tela = null, acabou = false;
+    function soltaATela() {
+      acabou = true;
+      try { if (tela && typeof tela.release === 'function') tela.release(); } catch (e) { /* ok */ }
+    }
+    try {
+      if (navigator.wakeLock && typeof navigator.wakeLock.request === 'function') {
+        navigator.wakeLock.request('screen').then(function (w) {
+          tela = w;
+          // a série pode ter acabado antes de o aparelho responder: então a trava nasce já solta
+          if (acabou) soltaATela();
+        }, function () { /* sem a trava: segue */ });
+      }
+    } catch (e) { /* sem a trava: segue */ }
+    function proximo() {
+      if (i >= total) return Promise.resolve();
+      var arquivo = arquivos[i++], n = i;
+      var ctx = { nome: nomeDoPacote(null, arquivo) };
+      return importarUmPacote(arquivo, ctx, function (linhas) {
+        mostrarEstadoImportacao('faixa-info', ['Importando ' + n + ' de ' + total + ': ' + ctx.nome].concat(linhas, ['Deixe a tela ligada até terminar.']));
+        var caixa = $('#estado-importacao-biblioteca');
+        if (caixa) caixa.setAttribute('data-progresso', n + '/' + total);
+      }).then(function (r) {
+        resultados.push({ nome: ctx.nome, arquivo: arquivo.name, estado: r.estado, motivo: r.motivo,
+          versaoAtual: r.versaoAtual, versaoNova: r.versaoNova, porque: r.porque || null, exercicios: !!r.exercicios });
+        // quem abrir a aba Biblioteca no meio da série já vê o que entrou
+        if (r.exercicios && r.estado === 'entrou') { temPacoteBiblioteca = true; desenharPacotesBiblioteca(); }
+        return pausaCurta().then(proximo);
+      });
+    }
+    return proximo().then(function () {
+      soltaATela();
+      // o resumo vem primeiro: um erro ao refazer a aba não pode escondê-lo
+      mostrarResumoDaSerie(resultados);
+      if (resultados.some(function (r) { return r.exercicios && r.estado === 'entrou'; })) {
+        try { desenharPacotesBiblioteca(); bibliotecaMudou(); } catch (e) { /* a aba se refaz na próxima abertura */ }
+      }
+    }, function (e) { soltaATela(); throw e; });
+  }
+
+  /* O resumo: uma folha na própria tela de Ajustes, com o que entrou, o que
+   * ficou como estava e o que não entrou (e por quê), e o botão que a fecha. */
+  function mostrarResumoDaSerie(resultados) {
+    var caixa = $('#estado-importacao-biblioteca');
+    if (!caixa) return;
+    var entraram = resultados.filter(function (r) { return r.estado === 'entrou'; }).length;
+    var pularam = resultados.filter(function (r) { return r.estado === 'pulou'; }).length;
+    var falharam = resultados.filter(function (r) { return r.estado === 'falhou'; }).length;
+    var partes = [];
+    if (entraram) partes.push(entraram === 1 ? '1 entrou' : entraram + ' entraram');
+    if (pularam) partes.push(pularam === 1 ? '1 ficou como estava' : pularam + ' ficaram como estavam');
+    if (falharam) partes.push(falharam === 1 ? '1 não entrou' : falharam + ' não entraram');
+    var sinal = { entrou: ['✓', 'Entrou'], pulou: ['↺', 'Ficou como estava'], falhou: ['✕', 'Não entrou'] };
+    var linhas = resultados.map(function (r) {
+      var motivo = '', detalhe = '';
+      if (r.estado === 'pulou') {
+        motivo = r.motivo === 'ja-estava' ? 'já estava no tablet.'
+          : r.motivo === 'mais-nova' ? 'o tablet já tem uma versão mais nova (versão ' + r.versaoAtual + ', e o arquivo é a ' + r.versaoNova + ').'
+          : r.motivo === 'livros-mais-novos' ? 'o tablet já tem livros mais novos, e eles ficaram como estavam.'
+          : 'os livros já vieram de outro pacote e ficaram como estavam.';
+      } else if (r.estado === 'falhou' && r.porque) {
+        motivo = r.porque.texto;
+        detalhe = r.porque.detalhe;
+      }
+      return el('li', { class: 'resumo-importacao-linha', 'data-estado': r.estado, 'data-arquivo': r.arquivo }, [
+        el('span', { class: 'resumo-importacao-sinal', role: 'img', 'aria-label': sinal[r.estado][1], texto: sinal[r.estado][0] }),
+        el('span', { class: 'resumo-importacao-texto' }, [
+          el('span', { class: 'u-peso-seminegrito', texto: r.nome }),
+          motivo ? el('span', { texto: ': ' + motivo }) : null,
+          detalhe ? el('span', { class: 'u-letra-2 u-opacidade-75 resumo-importacao-detalhe', texto: detalhe }) : null
+        ])
+      ]);
+    });
+    caixa.innerHTML = '';
+    caixa.removeAttribute('data-progresso');
+    caixa.appendChild(el('div', { class: (falharam ? 'faixa-aviso' : 'faixa-info') + ' u-margem-baixo-10', id: 'resumo-importacao-biblioteca' }, [
+      el('div', { class: 'u-peso-seminegrito', texto: 'Importação terminada: ' + partes.join(', ') + '.' }),
+      falharam ? el('div', { texto: 'O que já estava no tablet continua igual.' }) : null,
+      el('ul', { class: 'resumo-importacao-lista' }, linhas),
+      el('div', { class: 'barra u-margem-8-0-0' }, [
+        el('button', { type: 'button', class: 'btn pequeno', id: 'fechar-resumo-importacao', texto: 'Fechar',
+          aoClick: function () { caixa.innerHTML = ''; } })
+      ])
+    ]));
   }
 
   /* O que a tela diz quando o pacote não entra: o que aconteceu, o que ela
@@ -15421,6 +15635,7 @@
    * trabalho dela: as etiquetas de dificuldade e o registro de quem já fez o
    * quê. Os dois ficam, e a frase diz isso com todas as letras. */
   function removerPacote(p, titulo) {
+    if (importandoBiblioteca) { avisar('Espere a importação terminar para remover.'); return Promise.resolve(); }
     var espaco = Biblioteca.mb(p.bytes || 0);
     /* O QUE FICA vem antes do quanto volta. O espaço é o motivo de ela estar
      * aqui, mas não é o que assusta: abrir a pergunta por "0,3 MB" faz a frase
@@ -15520,7 +15735,7 @@
     });
   }
 
-  function importarLivros(aberto) {
+  function importarLivros(aberto, andamento) {
     return Store.estimarEspaco().then(function (espaco) {
       // os livros vão como estão: a folga de 10% cobre o registro de cada um
       if (espaco && espaco.quota) {
@@ -15536,12 +15751,22 @@
       }
       return Store.tornarPersistente();
     }).then(function () {
-      mostrarEstadoImportacao('faixa-info', ['Gravando os livros no tablet...']);
+      andamento(['Gravando os livros no tablet...']);
       return Store.gravarLivros(aberto);
     }).then(function (contas) {
-      mostrarEstadoImportacao('faixa-info', ['Livros importados.'].concat(Biblioteca.resumoDeLivros(contas),
-        ['Para ler, abra a aba Biblioteca e toque em Livros.']));
-      return desenharLivrosAjustes();
+      var linhas = ['Livros importados.'].concat(Biblioteca.resumoDeLivros(contas),
+        ['Para ler, abra a aba Biblioteca e toque em Livros.']);
+      // livro que SAIU do pacote novo também é gravação (some do tablet com a posição de leitura)
+      var entrou = contas.novos + contas.atualizados + contas.removidos > 0;
+      var deOutro = contas.deOutroPacote && contas.deOutroPacote.length > 0;
+      /* O redesenho da lista é só tela: se ele falhar com os livros já gravados,
+       * o resultado continua sendo o da gravação (nunca "não entrou"). */
+      return Promise.resolve().then(desenharLivrosAjustes).catch(function () { /* a lista se refaz na próxima abertura */ }).then(function () {
+        return {
+          estado: entrou ? 'entrou' : 'pulou', classe: 'faixa-info', linhas: linhas,
+          motivo: entrou ? null : contas.maisNovos ? 'livros-mais-novos' : deOutro ? 'outro-pacote' : 'ja-estava'
+        };
+      });
     });
   }
 
@@ -15589,6 +15814,7 @@
   }
 
   function removerLivroDoTablet(l) {
+    if (importandoBiblioteca) { avisar('Espere a importação terminar para remover.'); return Promise.resolve(); }
     var espaco = Biblioteca.mb(l.bytes || 0);
     if (!confirmar('Tirar "' + tituloDoLivro(l.meta) + '" deste tablet?\n\n' +
         'Para ler de novo, é só importar o pacote de livros outra vez do Drive. O lugar onde você parou ' +
