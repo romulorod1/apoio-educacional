@@ -49,6 +49,8 @@
  *   --envenenado-sem-choque      a conta de choque do celular não vê nada;
  *   --envenenado-duracao-padrao  remarcar não traz a duração da aula (vem 1 h);
  *   --envenenado-cancela-sempre-sem  "Cancelar com cobrança" grava sem cobrança;
+ *   --envenenado-rolagem-antiga  a folga de 8 px da rolagem inicial: com o
+ *                         relógio fixo às 00:30, a linha de agora fica cortada;
  *   --envenenado-cobranca-volta  tocar na situação que a aula já tem volta a
  *                         cobrança ao padrão (a regra de antes da revisão);
  *   --envenenado-celular-envia-copia  a trava da cópia confunde o celular da
@@ -70,8 +72,8 @@ const { conf, secao, pausa, esperar } = H;
 
 const MODOS = ['--envenenado-celular-envia-copia', '--envenenado-observador-edita', '--envenenado-corte-sobe',
   '--envenenado-remarca-todas', '--envenenado-remarca-solta', '--envenenado-sem-choque', '--envenenado-duracao-padrao', '--envenenado-cancela-sempre-sem',
-  '--envenenado-cobranca-volta'];
-const V_TODAS = MODOS[3], V_SOLTA = MODOS[4], V_CHOQUE = MODOS[5], V_DURACAO = MODOS[6], V_CANCELA = MODOS[7], V_COBRANCA = MODOS[8];
+  '--envenenado-cobranca-volta', '--envenenado-rolagem-antiga'];
+const V_TODAS = MODOS[3], V_SOLTA = MODOS[4], V_CHOQUE = MODOS[5], V_DURACAO = MODOS[6], V_CANCELA = MODOS[7], V_COBRANCA = MODOS[8], V_ROLAGEM = MODOS[9];
 /* --prints <pasta>: tira os quatro prints do D6c em 390 x 844 (dados fictícios). */
 const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
@@ -146,6 +148,15 @@ if (MODO === V_SOLTA) comNuvemIgual(APP.replace(REMARCA, 'comoAcaoDoCelular(func
 if (MODO === V_CHOQUE) comNuvemIgual(APP.replace(CHOQUE, '    return [];'));
 if (MODO === V_DURACAO) comNuvemIgual(APP.replace(DURACAO, 'duracaoMin: 60 }, a.id, a.status,'));
 if (MODO === V_COBRANCA) comNuvemIgual(APP.replace(MESMA_SITUACAO, '    if (false) {'));
+/* A folga entre a faixa dos dias e a linha que a rolagem inicial mostra: maior que o vão de 6 px entre as
+ * linhas, ela deixava a linha de cima com 2 px à vista, cortada (o portão de 09/11, de madrugada em UTC). */
+const FOLGA = '  var FOLGA_SOB_A_FAIXA = 4;';
+/* As duas defesas da rolagem: a folga menor que o vão e a volta que repete até nenhuma linha ficar
+ * cortada. Cada uma sozinha já segura (com uma só volta e folga 8, a 00:30 fica cortada). O veneno
+ * volta as duas ao que estava na a8f74ab. */
+const VOLTAS = '    for (var volta = 0; volta < linhas.length; volta++) {';
+conf('a folga e a volta da rolagem inicial estão cada uma num lugar só', APP.split(FOLGA).length + ',' + APP.split(VOLTAS).length, '2,2');
+if (MODO === V_ROLAGEM) comNuvemIgual(APP.replace(FOLGA, '  var FOLGA_SOB_A_FAIXA = 8;').replace(VOLTAS, '    for (var volta = 0; volta < 1; volta++) {'));
 if (MODO === V_CANCELA) comNuvemIgual(APP.replace(CANCELA_COM, "{ status: 'cancelada', cobravel: false }, 'Aula cancelada com cobrança.'"));
 if (MODO) conf('os arquivos servidos ficaram diferentes do repositório (' + MODO + ')', trocas['/nuvem.js'] !== NUVEM && trocas['/app.js'] !== APP, true);
 
@@ -356,6 +367,19 @@ async function tabletAbreERecebe(pag, rotulo, condicao, arg) {
 const fila = pag => pag.evaluate(() => Store.lerFila().then(l => l.map(e => e.id)));
 const filaVazia = pag => esperar('a fila do celular esvaziou', () => pag.evaluate(() => Store.lerFila().then(l => l.length)), v => v === 0, 20000);
 
+/* O relógio da página parado numa hora: new Date() e Date.now() devolvem o
+ * dia e a hora pedidos; com argumentos, Date é o de sempre. soltarRelogio volta. */
+const fixarRelogio = (pag, iso, hhmm) => pag.evaluate((iso, hhmm) => {
+  const Real = window.__DataReal || Date;
+  window.__DataReal = Real;
+  const p = iso.split('-').map(Number), h = hhmm.split(':').map(Number);
+  const fixo = new Real(p[0], p[1] - 1, p[2], h[0], h[1]).getTime();
+  function Fixa(...a) { return a.length ? new Real(...a) : new Real(fixo); }
+  Fixa.prototype = Real.prototype; Fixa.now = () => fixo; Fixa.UTC = Real.UTC; Fixa.parse = Real.parse;
+  window.Date = Fixa;
+}, iso, hhmm);
+const soltarRelogio = pag => pag.evaluate(() => { if (window.__DataReal) window.Date = window.__DataReal; });
+
 /* (D6c) A agenda pela tela: a faixa da semana troca de semana pelas setas até
  * o dia aparecer, e um toque nele; o toque no bloco abre a folha da aula. */
 async function irParaDia(pag, iso) {
@@ -530,10 +554,29 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('Hoje: todo alvo tem 48 px ou mais (' + m.alvos + ' alvos)', m.pequenos.join('; '), '');
   conf('Hoje: os botões de edição são todos das ações do celular (' + m.dasAcoes.join(', ') + ')', m.soltos.join(', '), '');
   conf('Hoje: o "+" flutuante e "Cadastrar aluno" à vista', m.dasAcoes.indexOf('+') >= 0 && m.dasAcoes.indexOf('Cadastrar aluno') >= 0, true);
-  conf('(revisão) a rolagem inicial não deixa nenhuma linha cortada sob a faixa dos dias', await pagC.evaluate(() => {
-    const baixo = document.querySelector('#cel-semana').getBoundingClientRect().bottom;
-    const l = Array.from(document.querySelectorAll('#cel-tempo .cel-tempo-linha')).find(x => x.getBoundingClientRect().bottom > baixo + 1);
-    return !l || l.getBoundingClientRect().top >= baixo - 1; }), true);
+  /* A rolagem inicial de Hoje vai à aula de agora, à próxima ou à linha de agora: depende da hora.
+   * O relógio da página fica fixo em horas escolhidas (madrugada, antes da primeira aula, entre as
+   * aulas, depois da última, quase meia-noite), e a prova nunca depende da hora em que o CI roda. */
+  const rolagens = [];
+  for (const hhmm of ['00:30', '06:00', '10:45', '12:00', '23:30', '23:59']) {
+    await fixarRelogio(pagC, HOJE, hhmm);
+    await clicar(pagC, '#cel-abas .cel-aba[data-cel="fechamento"]');
+    await clicar(pagC, '#cel-abas .cel-aba[data-cel="hoje"]');
+    await pausa(150);
+    rolagens.push(hhmm + ' ' + await pagC.evaluate(() => {
+      const baixo = document.querySelector('#cel-semana').getBoundingClientRect().bottom;
+      const agora = document.querySelector('#cel-agora');
+      const l = Array.from(document.querySelectorAll('#cel-tempo .cel-tempo-linha')).find(x => x.getBoundingClientRect().bottom > baixo + 1);
+      const cortada = l && l.getBoundingClientRect().top < baixo - 1 ? 'cortada:' + (l.textContent.trim().slice(0, 20) || 'linha de agora') : 'inteira';
+      return cortada + (agora ? ' agora=' + agora.textContent : ' sem-agora'); }));
+  }
+  await soltarRelogio(pagC);
+  await clicar(pagC, '#cel-abas .cel-aba[data-cel="fechamento"]');
+  await clicar(pagC, '#cel-abas .cel-aba[data-cel="hoje"]');
+  conf('(arranjo) o relógio fixo chega ao app: a linha de agora mostra a hora fixada em cada rodada', rolagens.every(r => r.indexOf('agora=' + r.slice(0, 5)) > 0), true);
+  prop('(revisão) a rolagem inicial não deixa nenhuma linha cortada sob a faixa dos dias, em toda hora (' + rolagens.join(' | ') + ')',
+    rolagens.every(r => / inteira /.test(r)), V_ROLAGEM);
+  if (MODO === V_ROLAGEM) fimDoVeneno();
   conf('(revisão) as bolinhas de hoje dizem de quem é cada aula a quem lê a tela', await pagC.evaluate(h =>
     document.querySelector('.cel-semana-dia[data-dia="' + h + '"] .cel-semana-bolinhas').getAttribute('aria-label'), HOJE), '2 aulas: Aluno Alfa Teste às 10:30, Aluno Gama Teste às 14:00');
   conf('o "+" diz o que faz a quem lê a tela', await pagC.evaluate(() => document.querySelector('#cel-marcar-aula').getAttribute('aria-label')), 'Marcar aula neste dia');
