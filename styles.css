@@ -5,6 +5,12 @@
 
 :root {
   --navy: #1F3A5F;
+  /* o painel de avisos do celular (D6c, desenho final de 09/11): a ação
+     secundária em marinho claro, o trilho que o deslize revela e o fundo
+     escurecido por trás do painel */
+  --acao-clara: #E8EDF4;
+  --trilho-do-deslize: #ECEEF1;
+  --fundo-escurecido: rgba(15, 23, 42, .35);
   --navy-escuro: #16314F;
   --teal: #2E7D6B;
   --teal-claro: #E6F1EE;
@@ -2936,13 +2942,15 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
   z-index: 3;
   background: var(--ivory);
   margin: -12px -16px 8px;
-  padding: 8px 16px 6px;
+  padding: 4px 16px;
   border-bottom: 1px solid var(--fio-claro);
 }
-.cel-semana-topo { flex-wrap: nowrap; align-items: center; margin-bottom: 4px; }
+/* Presa, só a linha da data: o alto preso (a barra e ela) cabe em 20% da
+   tela, também com a letra a 130% num celular de 360 (auditoria de 09/11). */
+.cel-semana-topo { flex-wrap: nowrap; align-items: center; margin-bottom: 0; }
 .cel-semana-topo .btn { min-width: var(--alvo-celular); flex-shrink: 0; }
-.cel-semana-topo .cel-titulo { margin: 0; text-align: center; font-size: var(--letra-5); }
-.cel-semana-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.cel-semana-topo .cel-titulo { margin: 0; text-align: center; font-size: var(--letra-5); line-height: 1.15; }
+.cel-semana-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0 0 8px; }
 .cel-semana-dia {
   min-height: 56px;
   min-width: 0; /* em 390 px cada dia tem 49; num celular de 360, encolhe sem rolar de lado */
@@ -2965,50 +2973,148 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-semana-dia.ativo .cel-semana-numero { color: var(--branco); }
 .cel-semana-bolinhas { display: flex; gap: 2px; min-height: 7px; }
 .cel-bolinha { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1px var(--branco); }
-/* Os avisos do alto de Hoje (D6c, lote 4): no máximo 3, presos com a faixa
-   da semana, cada um com a altura de um toque e o texto em até duas linhas. */
-.cel-avisos { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
-.cel-aviso { display: flex; flex-direction: column; gap: 4px; }
-.cel-aviso-linha { display: flex; align-items: stretch; gap: 6px; }
-.cel-aviso-botao {
-  flex: 1;
-  min-width: 0;
+/* Os avisos do alto de Hoje (D6c, lote 4; selinho e painel em 09/11, o
+   desenho final "cel_hoje_avisos: base C"). Recolhidos, são só o selinho
+   (o sino com o número, marinho) na linha da data, com a altura de toque
+   que a linha já tem: nenhuma linha a mais. Abertos, o painel por cima da
+   agenda, sobre um fundo escurecido: uma linha por aviso, com o ícone, o
+   título, o detalhe, a ação e o ✕; no rodapé, a sincronia. O marinho é a
+   única cor de ação; o âmbar e o verde, só sinal pequeno; sem caixa alta.
+   Cada linha se dispensa arrastando para o lado: pan-y deixa a rolagem de
+   pé com o navegador e o movimento de lado com o aplicativo, e o trilho
+   cinza claro é o fundo que o deslize revela. */
+.cel-avisos-selo {
+  flex: 0 0 auto;
+  min-width: var(--alvo-celular);
   min-height: var(--alvo-celular);
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  text-align: left;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
   font: inherit;
-  font-size: var(--letra-3);
-  line-height: 1.3;
-  color: var(--texto);
-  background: var(--branco);
-  border: 1px solid var(--fio-claro);
-  border-left: 5px solid var(--teal);
-  border-radius: 10px;
-  padding: 4px 10px;
-  overflow-wrap: anywhere;
   cursor: pointer;
 }
-.cel-aviso-texto { flex: 1; min-width: 0; }
-/* O que o toque faz, à direita, com cara de botão: a seta ou a palavra. */
-.cel-aviso-seta {
-  flex: 0 0 auto;
-  font-weight: 700;
-  color: var(--navy);
-  border: 1px solid var(--fio);
-  border-radius: 8px;
-  padding: 4px 8px;
-  background: var(--fundo-leve);
+.cel-avisos-selo-pilula {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px 0 8px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: var(--branco);
+  font-size: var(--letra-3);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
-.cel-aviso-registrar .cel-aviso-botao { border-left-color: var(--aviso-texto); }
-.cel-aviso-fechar .cel-aviso-botao { border-left-color: var(--navy); }
-.cel-aviso-cobrar .cel-aviso-botao { border-left-color: var(--vermelho); }
-/* A coluna da direita da cobrança: o "Cobrar" (o link do WhatsApp) e o "E
-   mais", cada um com a altura de um toque. */
-.cel-aviso-direita { flex: 0 0 132px; display: flex; flex-direction: column; gap: 4px; }
-.cel-aviso-direita .cel-aviso-botao { flex: 0 0 auto; border-left-width: 1px; padding: 4px 8px; }
-body.modo-celular .celular .cel-aviso a.cel-link-botao { flex: 0 0 auto; min-width: 84px; padding: 4px 8px; display: inline-flex; align-items: center; justify-content: center; }
+.cel-avisos-selo-sino svg { width: 18px; height: 18px; display: block; }
+/* Aberto, o painel fica por cima de tudo o que rola, o "+" também. */
+.cel-semana:has(.cel-avisos-sobre:not([hidden])) { z-index: 6; }
+.cel-avisos-fundo { position: fixed; inset: 0; z-index: 1; background: var(--fundo-escurecido); }
+.cel-avisos-fundo[hidden], .cel-avisos[hidden] { display: none; }
+.cel-avisos { display: flex; flex-direction: column; margin-top: 6px; background: var(--branco); border-radius: 16px; overflow: hidden; }
+.cel-avisos-sobre {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  z-index: 2;
+  margin: 0;
+  box-shadow: var(--sombra-forte);
+}
+.cel-avisos-cabeca {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px 4px 16px;
+  border-bottom: 1px solid var(--fio-claro);
+}
+.cel-avisos-titulo { margin: 0; font-size: var(--letra-5); font-weight: 600; color: var(--texto); }
+.cel-avisos-todos {
+  min-height: var(--alvo-celular);
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--navy);
+  font: inherit;
+  font-size: var(--letra-4);
+  font-weight: 600;
+  cursor: pointer;
+}
+.cel-avisos-lista { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.cel-aviso-trilho { background: var(--trilho-do-deslize); border-bottom: 1px solid var(--fio-claro); }
+.cel-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 4px 12px 16px;
+  background: var(--branco);
+  touch-action: pan-y;
+  transition: transform 0.15s ease;
+}
+.cel-aviso.arrastando { transition: none; }
+.cel-aviso-icone {
+  flex: 0 0 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--acao-clara);
+  color: var(--navy);
+}
+.cel-aviso-icone svg { display: block; }
+.cel-aviso-registrar .cel-aviso-icone { background: var(--aviso-fundo); color: var(--aviso-texto); }
+.cel-aviso-corpo { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cel-aviso-titulo { font-size: var(--letra-4); font-weight: 600; color: var(--texto); line-height: 1.3; }
+.cel-aviso-detalhe { font-size: var(--letra-3); color: var(--novidades-subtitulo); line-height: 1.35; margin-top: 2px; }
+/* As aulas sem registro, uma por linha (aluno, dia e hora). */
+.cel-aviso-aulas { list-style: none; margin: 2px 0 0; padding: 0; }
+.cel-aviso-aulas li + li { margin-top: 2px; }
+.cel-aviso-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+body.modo-celular .celular .cel-aviso .cel-aviso-acao {
+  min-height: var(--alvo-celular);
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 0;
+  background: var(--acao-clara);
+  color: var(--navy);
+  font-size: var(--letra-4);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+}
+body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: var(--navy); color: var(--branco); }
+.cel-aviso-dispensar {
+  flex: 0 0 var(--alvo-celular);
+  min-width: var(--alvo-celular);
+  min-height: var(--alvo-celular);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--novidades-subtitulo);
+  cursor: pointer;
+}
+.cel-avisos-rodape {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 16px;
+  font-size: var(--letra-3);
+  color: var(--novidades-subtitulo);
+}
+.cel-avisos-rodape[data-tom="problema"] { color: var(--vermelho); }
+.cel-avisos-nuvem { flex: 0 0 auto; display: inline-flex; }
+.cel-avisos-sincronia-texto { flex: 1; min-width: 0; }
+/* O Desfazer do dispensar: dourado sobre o marinho, sem borda. */
+.aviso.aviso-dourado button#aviso-acao { color: var(--gold); border-color: transparent; font-size: var(--letra-4); }
 
 .cel-tempo { margin-top: 4px; }
 .cel-tempo-linha { position: relative; display: flex; gap: 8px; margin-bottom: 6px; }
@@ -3023,6 +3129,7 @@ body.modo-celular .celular .cel-aviso a.cel-link-botao { flex: 0 0 auto; min-wid
 .cel-tempo-item { flex: 1; min-width: 0; display: flex; }
 .cel-tempo-agora-solta { min-height: 12px; }
 .cel-bloco {
+  position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
@@ -3180,6 +3287,18 @@ body.modo-celular .celular .btn.principal.cel-salvar-com-choque { background: va
   padding: 1px 6px;
 }
 .cel-bloco-agora .cel-bloco-marca { background: var(--vermelho); }
+/* A aula que já passou sem registro de como foi: um ponto no canto do bloco
+   (o texto vai no rótulo do bloco, para quem lê a tela). */
+.cel-bloco-sem-registro {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--aviso-texto);
+  box-shadow: 0 0 0 2px var(--branco);
+}
 .cel-folha-resumo { margin-bottom: 12px; font-size: var(--letra-3); }
 .cel-folha-acoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0 12px; }
 body.modo-celular .celular .cel-folha .cel-folha-botao { min-height: 56px; font-size: var(--letra-5); font-weight: 700; white-space: normal; }
