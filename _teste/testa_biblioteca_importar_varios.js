@@ -16,7 +16,10 @@
  *   6. a versão 2 substitui a 1 na mesma seleção (nas duas ordens) e em
  *      seleções seguidas; a mais velha depois da mais nova é pulada;
  *   7. um pacote de livros no meio da série, e sozinho (a frase de sempre);
- *      o que SAI do pacote novo também conta como gravação.
+ *      o que SAI do pacote novo também conta como gravação;
+ *   8. falha NO MEIO (hash errado, id repetido entre dois da mesma seleção, sem
+ *      espaço) e livros v2 e v1 em ordem trocada; a série pede a tela ligada e
+ *      a mesma versão é pulada pelo manifest, sem ler o arquivo.
  *
  * Venenos, no mesmo arquivo (cada um TEM de ser enxergado):
  *   --envenenado-para-na-falha     o primeiro erro interrompe a série
@@ -42,8 +45,8 @@ const PORTA = 8880;
 const ANCORAS = {
   '--envenenado-para-na-falha': ['        return pausaCurta().then(proximo);',
     "        return r.estado === 'falhou' ? Promise.resolve() : pausaCurta().then(proximo);"],
-  '--envenenado-reimporta-igual': ['if (atual && atual.versao >= aberto.manifest.versao) {',
-    'if (atual && atual.versao > aberto.manifest.versao) {'],
+  '--envenenado-reimporta-igual': ['return atual && atual.versao >= manifest.versao ? atual.versao : null;',
+    'return atual && atual.versao > manifest.versao ? atual.versao : null;'],
   '--envenenado-le-todos-antes': ['    var total = arquivos.length, resultados = [], i = 0;',
     '    var total = arquivos.length, resultados = [], i = 0;\n' +
     '    window.__seguraTodos = arquivos.map(function (a) { return a.arrayBuffer(); });']
@@ -112,7 +115,7 @@ async function importar(pag, arquivos, rotulo) {
   await pag.evaluate(() => {
     document.querySelector('#estado-importacao-biblioteca').innerHTML = '';
     document.querySelector('#cartao-biblioteca').hidden = false;
-    window.__ordem = []; window.__prog = [];
+    window.__ordem = []; window.__prog = []; window.__wake = [];
   });
   const entrada = await pag.$('#arquivo-biblioteca');
   await entrada.uploadFile(...arquivos);
@@ -130,7 +133,7 @@ async function importar(pag, arquivos, rotulo) {
       titulo: resumo ? resumo.firstElementChild.textContent : null,
       linhas: Array.from(document.querySelectorAll('#resumo-importacao-biblioteca li')).map(li => ({
         estado: li.dataset.estado, arquivo: li.dataset.arquivo, texto: li.innerText.replace(/\s+/g, ' ').trim() })),
-      ordem: window.__ordem.slice(), progresso: window.__prog.slice(),
+      ordem: window.__ordem.slice(), progresso: window.__prog.slice(), wake: window.__wake.slice(),
       botaoLivre: document.querySelector('#importar-biblioteca').disabled === false
     };
   }).then(x => Object.assign(x, { esperou: r.ok }));
@@ -173,7 +176,10 @@ function medirOrdem(ordem, arquivos, idsDosPacotes) {
   const pag = await amb.pagina();
   await pag.setViewport({ width: 1280, height: 800 });
   await pag.evaluateOnNewDocument(() => {
-    window.__ordem = []; window.__prog = [];
+    window.__ordem = []; window.__prog = []; window.__wake = [];
+    // a trava de tela: o teste só conta o pedido e a soltura
+    Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: {
+      request: tipo => { window.__wake.push('pede:' + tipo); return Promise.resolve({ release() { window.__wake.push('solta'); } }); } } });
     // cada leitura do arquivo escolhido (e de qualquer fatia dele) entra no log, com o nome do arquivo
     ['slice', 'arrayBuffer', 'stream', 'text'].forEach(m => {
       const o = File.prototype[m];
@@ -184,6 +190,12 @@ function medirOrdem(ordem, arquivos, idsDosPacotes) {
   await H.abrirApp(pag, amb.ORIGEM);
   await pag.evaluate(() => {
     // cada gravação entra no log; o progresso geral é anotado a cada mudança da caixa de estado
+    // espaço curto por uma vez, quando a prova pede (window.__semEspaco)
+    const espacoReal = Store.estimarEspaco;
+    Store.estimarEspaco = function () {
+      if (window.__semEspaco > 0) { window.__semEspaco--; return Promise.resolve({ quota: 1000, usage: 0 }); }
+      return espacoReal.apply(this, arguments);
+    };
     ['gravarPacoteBiblioteca', 'gravarLivros'].forEach(m => {
       const o = Store[m];
       Store[m] = function (aberto) { window.__ordem.push('grava:' + aberto.manifest.pacote); return o.apply(this, arguments); };
@@ -213,6 +225,7 @@ function medirOrdem(ordem, arquivos, idsDosPacotes) {
   conf('a frase de sempre', /^Biblioteca importada\./.test(r.texto), true);
   conf('sem o resumo de vários', r.temResumo, false);
   conf('o botão volta livre', r.botaoLivre, true);
+  conf('um arquivo só não pede a tela ligada', r.wake.join(','), '');
   conf('um pacote gravado', JSON.stringify((await lerPacotes(pag)).map(p => p.pacote)), JSON.stringify([IDS.m1]));
 
   // ================================================================
@@ -236,6 +249,7 @@ function medirOrdem(ordem, arquivos, idsDosPacotes) {
     conf('um pacote por vez: nenhum arquivo é tocado depois de o seguinte', ord.naoDecrescente, true);
     conf('e só um arquivo foi lido antes da primeira gravação', ord.lidosAntes, 1);
     conf('três gravações, uma por pacote', ord.gravacoes, 3);
+    conf('a série pede a tela ligada e solta no fim', r.wake.join(','), 'pede:screen,solta');
     conf('o botão volta livre', r.botaoLivre, true);
     conf('o resumo fecha', await pag.evaluate(() => { document.querySelector('#fechar-resumo-importacao').click(); return document.querySelector('#estado-importacao-biblioteca').children.length; }), 0);
   }
@@ -255,6 +269,7 @@ function medirOrdem(ordem, arquivos, idsDosPacotes) {
   conf('o resumo diz: 4 ficaram como estavam', r.titulo, 'Importação terminada: 4 ficaram como estavam.');
   conf('todas "pulou", com "já estava no tablet"', r.linhas.map(l => l.estado + ':' + /já estava no tablet/.test(l.texto)).join(','), 'pulou:true,pulou:true,pulou:true,pulou:true');
   conf('nenhuma gravação', ord4.gravacoes, 0);
+  conf('e nenhum arquivo foi lido inteiro (pulou pelo manifest, só pela espiada)', r.ordem.filter(e => e.indexOf('le:arrayBuffer') === 0).length, 0);
   conf('o banco ficou idêntico (versão e hora de gravação)', JSON.stringify(depois), JSON.stringify(antes));
 
   // ================================================================
@@ -324,6 +339,34 @@ function medirOrdem(ordem, arquivos, idsDosPacotes) {
   await pag.evaluate(id => Store.removerPacoteBiblioteca(id), IDS.m1);
   r = await importar(pag, [livrosV3, m1v1], 'os mesmos livros no meio da série');
   conf('o mesmo livro de novo fica como estava, e o de exercícios entra', r.linhas.map(l => l.estado).join(','), 'pulou,entrou');
+
+  // ================================================================
+  secao('8. Falha NO MEIO (hash errado, id repetido entre dois da mesma seleção, sem espaço) e livros em ordem trocada');
+  const defeito = path.join(TMP, 'nono-hash.zip');
+  Sintetico.gerar(defeito, { veneno: 'hash', pacote: 'nono-defeito' });
+  const nonoA = path.join(TMP, 'nono-a.zip'), nonoB = path.join(TMP, 'nono-b.zip');
+  Sintetico.gerar(nonoA, { pacote: 'nono-a' });
+  Sintetico.gerar(nonoB, { pacote: 'nono-b' });
+  const enemNovo = pacote('enem-v1c', 'enem', 1);
+  r = await importar(pag, [defeito, nonoA, nonoB, enemNovo], 'hash errado, id repetido e um bom no fim');
+  conf('os quatro estados, na ordem: falhou, entrou, falhou, entrou', r.linhas.map(l => l.estado).join(','), 'falhou,entrou,falhou,entrou');
+  conf('o resumo diz: 2 entraram, 2 não entraram', r.titulo, 'Importação terminada: 2 entraram, 2 não entraram.');
+  conf('o hash errado diz que não confere com o manifest', /não confere com o manifest/.test(r.linhas[0].texto), true);
+  conf('o id repetido diz de que pacote veio', /Repete conteúdo que já veio do pacote nono-a/.test(r.linhas[2].texto), true);
+  conf('o pacote de depois dos dois erros entrou', (await lerPacotes(pag)).some(p => p.pacote === IDS.enem), true);
+  conf('o pacote de hash errado não ficou no banco', (await lerPacotes(pag)).some(p => p.pacote === 'nono-defeito'), false);
+  // sem espaço no primeiro: o seguinte confere o espaço de novo e entra
+  await pag.evaluate(ids => Promise.all(ids.map(i => Store.removerPacoteBiblioteca(i))), [IDS.m2, IDS.enem]);
+  await pag.evaluate(() => { window.__semEspaco = 1; });
+  r = await importar(pag, [m2v1, enemNovo], 'sem espaço no primeiro');
+  conf('sem espaço no primeiro: falhou, e o seguinte entrou', r.linhas.map(l => l.estado).join(','), 'falhou,entrou');
+  conf('a linha diz que o tablet não tem espaço', /O tablet não tem espaço/.test(r.linhas[0].texto), true);
+  conf('o que falhou não gravou nada', (await lerPacotes(pag)).some(p => p.pacote === IDS.m2), false);
+  // livros: a v2 (que tirou um livro) e depois a v1, na mesma seleção, terminam igual à ordem certa
+  await pag.evaluate(() => Store.removerLivro('livro-b'));
+  r = await importar(pag, [livrosV2, livrosV1], 'livros v2 e depois v1');
+  conf('livros v2 e v1 (ordem trocada): a v2 entra e a v1 fica como estava', r.linhas.map(l => l.estado).join(','), 'entrou,pulou');
+  conf('o livro que a v2 tirou NÃO volta', await H.contarDeposito(pag, 'livros'), 1);
 
   if (pag.errosDePagina.length) console.log('   erros de página: ' + pag.errosDePagina.join(' | ').slice(0, 400));
   conf('nenhum erro de JavaScript na página', pag.errosDePagina.length, 0);
