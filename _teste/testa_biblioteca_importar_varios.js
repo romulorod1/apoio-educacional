@@ -36,7 +36,8 @@ const H = require('./_bib_navegador.js');
 const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, esperar } = H;
 
-const MODOS = ['--envenenado-para-na-falha', '--envenenado-reimporta-igual', '--envenenado-le-todos-antes'];
+const MODOS = ['--envenenado-para-na-falha', '--envenenado-reimporta-igual', '--envenenado-le-todos-antes',
+  '--envenenado-livro-velho-volta'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && MODOS.indexOf(a) < 0);
 const PORTA = 8880;
@@ -47,6 +48,8 @@ const ANCORAS = {
     "        return r.estado === 'falhou' ? Promise.resolve() : pausaCurta().then(proximo);"],
   '--envenenado-reimporta-igual': ['return atual && atual.versao >= manifest.versao ? atual.versao : null;',
     'return atual && atual.versao > manifest.versao ? atual.versao : null;'],
+  '--envenenado-livro-velho-volta': ['return maior > manifest.versao ? resultadoDePulo(maior, manifest.versao) : null;',
+    'return false ? resultadoDePulo(maior, manifest.versao) : null;'],
   '--envenenado-le-todos-antes': ['    var total = arquivos.length, resultados = [], i = 0;',
     '    var total = arquivos.length, resultados = [], i = 0;\n' +
     '    window.__seguraTodos = arquivos.map(function (a) { return a.arrayBuffer(); });']
@@ -179,7 +182,8 @@ function medirOrdem(ordem, arquivos, idsDosPacotes) {
     window.__ordem = []; window.__prog = []; window.__wake = [];
     // a trava de tela: o teste só conta o pedido e a soltura
     Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: {
-      request: tipo => { window.__wake.push('pede:' + tipo); return Promise.resolve({ release() { window.__wake.push('solta'); } }); } } });
+      request: tipo => { window.__wake.push('pede:' + tipo);
+        return new Promise(r => setTimeout(() => r({ release() { window.__wake.push('solta'); } }), window.__wakeAtraso || 0)); } } });
     // cada leitura do arquivo escolhido (e de qualquer fatia dele) entra no log, com o nome do arquivo
     ['slice', 'arrayBuffer', 'stream', 'text'].forEach(m => {
       const o = File.prototype[m];
@@ -259,7 +263,12 @@ function medirOrdem(ordem, arquivos, idsDosPacotes) {
   secao('4. A mesma versão de novo: pulada, sem gravar');
   const antes = await lerPacotes(pag);
   const todos = [um, tres[0], tres[1], tres[2]];
+  // o aparelho demora a responder à trava de tela: a série (toda pulada) acaba antes, e a trava tem de nascer solta
+  await pag.evaluate(() => { window.__wakeAtraso = 1500; });
   r = await importar(pag, todos, 'a mesma versão de novo');
+  const wakeTardio = await esperar('a trava que respondeu depois do fim', () => pag.evaluate(() => window.__wake.join(',')), v => v === 'pede:screen,solta', 6000);
+  await pag.evaluate(() => { window.__wakeAtraso = 0; });
+  if (MODO !== '--envenenado-reimporta-igual') conf('a trava de tela que respondeu DEPOIS do fim da série é solta', wakeTardio.valor, 'pede:screen,solta');
   const depois = await lerPacotes(pag);
   const ord4 = medirOrdem(r.ordem, todos, Object.assign({ [IDS.m1]: 0 }, { [IDS.m2]: 1, [IDS.enem]: 2, [IDS.banco]: 3 }));
   if (MODO === '--envenenado-reimporta-igual') {
@@ -365,6 +374,11 @@ function medirOrdem(ordem, arquivos, idsDosPacotes) {
   // livros: a v2 (que tirou um livro) e depois a v1, na mesma seleção, terminam igual à ordem certa
   await pag.evaluate(() => Store.removerLivro('livro-b'));
   r = await importar(pag, [livrosV2, livrosV1], 'livros v2 e depois v1');
+  if (MODO === '--envenenado-livro-velho-volta') {
+    conf('VENENO visto: o livro que a v2 tirou VOLTOU com a v1 (' + await H.contarDeposito(pag, 'livros') + ' livros no tablet)',
+      await H.contarDeposito(pag, 'livros') === 2, true);
+    return;
+  }
   conf('livros v2 e v1 (ordem trocada): a v2 entra e a v1 fica como estava', r.linhas.map(l => l.estado).join(','), 'entrou,pulou');
   conf('o livro que a v2 tirou NÃO volta', await H.contarDeposito(pag, 'livros'), 1);
 

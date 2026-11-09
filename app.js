@@ -15358,13 +15358,20 @@
   function importarEmSerie(arquivos) {
     var total = arquivos.length, resultados = [], i = 0;
     // a tela apagada pausaria a série no meio: pede ao aparelho para ficar ligado enquanto ela anda
-    var tela = null;
+    var tela = null, acabou = false;
+    function soltaATela() {
+      acabou = true;
+      try { if (tela && typeof tela.release === 'function') tela.release(); } catch (e) { /* ok */ }
+    }
     try {
       if (navigator.wakeLock && typeof navigator.wakeLock.request === 'function') {
-        navigator.wakeLock.request('screen').then(function (w) { tela = w; }, function () { /* sem a trava: segue */ });
+        navigator.wakeLock.request('screen').then(function (w) {
+          tela = w;
+          // a série pode ter acabado antes de o aparelho responder: então a trava nasce já solta
+          if (acabou) soltaATela();
+        }, function () { /* sem a trava: segue */ });
       }
     } catch (e) { /* sem a trava: segue */ }
-    function soltaATela() { try { if (tela && typeof tela.release === 'function') tela.release(); } catch (e) { /* ok */ } }
     function proximo() {
       if (i >= total) return Promise.resolve();
       var arquivo = arquivos[i++], n = i;
