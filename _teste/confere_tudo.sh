@@ -1027,6 +1027,17 @@ roda "celular avisos --envenenado-registrada-falta-registrar" node "_teste/testa
 roda "celular avisos --envenenado-lembrete-fora-da-janela" node "_teste/testa_celular_avisos.js" --envenenado-lembrete-fora-da-janela
 # (revisao do lote 4) cobrar e fechar o mes so no celular que e da dona, nunca pela falta de observador
 roda "celular avisos --envenenado-observador-sem-sessao" node "_teste/testa_celular_avisos.js" --envenenado-observador-sem-sessao
+# A trava de transbordo do celular (e o alvo de 48 px das abas): todas as telas e estados (entrar, Hoje com e
+# sem avisos e com o aviso de versao nova, Alunos, ficha, Fechamento, Enviar, os
+# formularios, a folha so leitura, o observador e o Diagnostico) em 360, 390 e
+# 412 px, com a letra normal e em 130%: nenhum elemento rola de lado, nenhum
+# texto sai da caixa e nada passa da borda. Venenos: o aviso de versao antigo
+# ("Atualizar agora" e "Depois da aula" lado a lado) e um elemento de 500 px.
+roda "celular transbordo"                           node "_teste/testa_celular_transbordo.js"
+roda "celular transbordo --envenenado-aviso-largo"  node "_teste/testa_celular_transbordo.js" --envenenado-aviso-largo
+roda "celular transbordo --envenenado-elemento-largo" node "_teste/testa_celular_transbordo.js" --envenenado-elemento-largo
+# as cinco abas do observador com a regra que deixava o "Hoje" com 47 px (alvo de 48)
+roda "celular transbordo --envenenado-aba-estreita" node "_teste/testa_celular_transbordo.js" --envenenado-aba-estreita
 # A mensagem do mes (o feedback do fechamento) editada no celular: o mesmo
 # campo do tablet (Core.textoDoMes e Core.gravarTextoDoMes), o texto salvo sai
 # no PDF do Enviar e do Ver, sobe pela fila e chega ao tablet; a edicao do
