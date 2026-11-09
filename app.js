@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.18';
+  var VERSAO = '1.42.25';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,29 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.25',
+      itens: [
+        'No celular, a mensagem do mês de cada aluno pode ser editada: no Fechamento, toque em "Editar a mensagem do mês". É o mesmo texto do tablet, e ele vai para a família no PDF do mês.',
+        'Se o tablet e o celular mexerem na mesma mensagem, fica a escrita mais recente, e a outra versão fica guardada em "Ver a versão que ficou de fora", para você usar se quiser.',
+        'Para editar pelo celular, o tablet precisa estar nesta versão: se não estiver, o celular avisa.'
+      ]
+    },
+    {
+      versao: '1.42.22',
+      itens: [
+        'Em Ajustes, na Biblioteca, dá para escolher vários pacotes de uma vez. O aplicativo importa um por vez, mostra "Importando 5 de 17" e, no fim, uma lista do que entrou, do que já estava e do que não entrou, com o motivo.',
+        'Se um pacote falhar, os outros continuam. Se você escolher de novo os mesmos pacotes, os que já estão no tablet são pulados sem demora.'
+      ]
+    },
+    {
+      versao: '1.42.19',
+      itens: [
+        'No Hoje do celular, os avisos ficam recolhidos num sininho com o número, ao lado da data. A agenda ganha a tela.',
+        'Toque no sininho para ver os avisos, um por linha, cada um com o que fazer. Deslize um aviso para o lado, ou toque no X, para dispensar até amanhã; dá para desfazer logo em seguida.',
+        'O aviso de versão nova também aparece ali.'
+      ]
+    },
     {
       versao: '1.42.18',
       itens: [
@@ -1384,6 +1407,7 @@
 
   function avisar(texto, rotuloAcao, aoAgir, rotulo2, aoAgir2) {
     var caixa = $('#aviso');
+    caixa.classList.remove('aviso-dourado'); // só o Desfazer do dispensar (D6c) é dourado
     $('#aviso-texto').textContent = texto;
     var botao = $('#aviso-acao');
     if (aoAgir) {
@@ -2107,6 +2131,8 @@
    * desinstalar e instalar de novo. */
   var registroSW = null;
   var versaoPendenteAtiva = null;
+  // a versão do último "Versão nova pronta" (ou 'nova', quando o worker não disse o número): vira aviso do painel do celular
+  var versaoProntaParaOPainel = null;
 
   /* A versão que roda é a que ela escolheu (D2, veja o sw.js): o worker novo
    * pode ter assumido quando ela fechou o aplicativo e continuar servindo a
@@ -2190,9 +2216,11 @@
    * abertura seguinte e fica em Ajustes. */
   function mostrarAvisoDeVersao() {
     var versao = versaoPendenteAtiva && versaoPendenteAtiva.versao;
+    versaoProntaParaOPainel = versao || 'nova';
     avisar('Versão nova pronta' + (versao ? ' (' + versao + ')' : ''),
       'Atualizar agora', aplicarAtualizacao, 'Depois da aula', atualizarDepoisDaAula);
     desenharAjustes();
+    if (modoCelular) renovarAvisosCelular(); // e vira aviso do painel de Hoje do celular
   }
 
   function atualizarDepoisDaAula() {
@@ -2209,10 +2237,21 @@
    * das três substituições inteiras, e ela decide. Sem pendência, segue direto,
    * como antes. */
   var podeRecarregar = false;
+  /* IMPORTAÇÃO DA BIBLIOTECA EM ANDAMENTO: recarregar mataria a série no meio
+   * (o pacote de agora é abortado sem estrago, mas os outros não entram e ela
+   * não vê resumo nenhum). Pergunta antes, como com a mudança não guardada. */
+  var importandoBiblioteca = false;
   function prontoParaRecarregar() {
-    if (!mudancaNaoGuardada) return Promise.resolve(true);
-    return salvar().then(function () { return true; }, function () {
-      return confirmar('Atualizar o aplicativo agora?' + avisoDePendenciaNaConfirmacao());
+    var depoisDaImportacao = importandoBiblioteca
+      ? Promise.resolve(confirmar('A importação da biblioteca ainda está andando e para se o aplicativo atualizar agora. ' +
+        'Atualizar mesmo assim? O que já entrou fica no tablet.'))
+      : Promise.resolve(true);
+    return depoisDaImportacao.then(function (ok) {
+      if (!ok) return false;
+      if (!mudancaNaoGuardada) return true;
+      return salvar().then(function () { return true; }, function () {
+        return confirmar('Atualizar o aplicativo agora?' + avisoDePendenciaNaConfirmacao());
+      });
     });
   }
 
@@ -13432,7 +13471,6 @@
 
   function abrirResumo(alunoId, mes) {
     var aluno = alunoPorId(alunoId);
-    var registro = db.resumos.filter(function (r) { return r.alunoId === alunoId && r.mes === mes; })[0];
     $('#titulo-modal-resumo').textContent = 'Feedback de ' + aluno.nome + ', ' + Core.mesExtenso(mes);
     var corpo = $('#corpo-modal-resumo');
     corpo.innerHTML = '';
@@ -13443,7 +13481,7 @@
       id: 'campo-resumo', class: 'u-alt-min-280',
       placeholder: 'Como foi o mês, o que evoluiu, o que merece atenção e o que vem a seguir.'
     });
-    area.value = registro ? registro.texto : '';
+    area.value = Core.textoDoMes(db, alunoId, mes);
     corpo._roteiro = null;
     if (roteiroLigado()) {
       corpo.appendChild(el('div', {
@@ -13452,6 +13490,9 @@
       corpo._roteiro = blocoDoRoteiro(area);
       corpo.appendChild(corpo._roteiro);
     }
+    // a versão do celular que ficou de fora no último conflito, se houver (o mesmo bloco do editor do celular)
+    var deFora = Core.versaoDeForaDoMes(db, alunoId, mes);
+    if (deFora) corpo.appendChild(blocoDaVersaoDeFora(deFora, area));
     corpo.appendChild(area);
     corpo._alunoId = alunoId;
     corpo._mes = mes;
@@ -13468,11 +13509,8 @@
       texto = texto.trim() ? texto.replace(/\s+$/, '') + '\n\n' + pendente : pendente;
       $('#campo-resumo').value = texto;
     }
-    var registro = db.resumos.filter(function (r) {
-      return r.alunoId === corpo._alunoId && r.mes === corpo._mes;
-    })[0];
-    if (registro) registro.texto = texto;
-    else db.resumos.push({ alunoId: corpo._alunoId, mes: corpo._mes, texto: texto });
+    // o mesmo campo e a mesma função que o editor do celular usa
+    Core.gravarTextoDoMes(db, corpo._alunoId, corpo._mes, texto);
     // as perguntas que ela reescreveu ficam para os próximos meses (C11)
     if (corpo._roteiro) corpo._roteiro.guardarPerguntas();
     salvarEDepois(function (gravou) {
@@ -14295,7 +14333,7 @@
       new Blob([bytes], { type: 'application/pdf' }), 'Fechamento do mês');
   }
 
-  function exportarAlunoEmPdf(f, comFolhas, extraOpcoes) {
+  function exportarAlunoEmPdf(f, comFolhas, extraOpcoes, entrega) {
     /* Feedback em branco não sai no PDF, nem o título dele. Ela confirma antes,
      * porque esquecer de escrever é mais comum do que decidir mandar sem. */
     /* Devolve uma promessa de verdadeiro quando o PDF saiu para o compartilhar,
@@ -14342,7 +14380,8 @@
       };
       var opts = opcoesDoDocumento(Object.assign(baseOpts, extraOpcoes || {}));
       var bytes = gen.gerarFechamento(f, opts);
-      entregarArquivo(nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf',
+      // `entrega`: o "Ver o PDF" do celular baixa (abre no leitor) em vez de compartilhar
+      (entrega || entregarArquivo)(nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf',
         new Blob([bytes], { type: 'application/pdf' }),
         'Fechamento de ' + f.alunoNome);
       return true;
@@ -15148,44 +15187,107 @@
     })));
   }
 
-  function importarBiblioteca(ev) {
-    var arquivo = ev.target.files && ev.target.files[0];
-    ev.target.value = '';
-    if (!arquivo) return;
-    if (typeof Zip === 'undefined' || !Zip.suportado()) {
-      mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa({ recusa: true, tipo: 'navegador' }));
-      return;
+  /* O nome que a tela dá ao pacote: o do manifest, quando ele diz, e senão o
+   * do arquivo. Só texto; nada daqui grava. */
+  function nomeDoPacote(manifest, arquivo) {
+    var doArquivo = curto(String((arquivo && arquivo.name) || 'pacote').replace(/\.zip$/i, ''));
+    if (!manifest || typeof manifest !== 'object') return doArquivo;
+    if (typeof manifest.titulo === 'string' && manifest.titulo.trim()) return curto(manifest.titulo.trim());
+    if (typeof manifest.nome === 'string' && manifest.nome.trim()) return curto(manifest.nome.trim());
+    if (manifest.conteudo !== 'livros') {
+      try {
+        var t = Biblioteca.resumo(manifest)[0];
+        if (t && t !== 'Pacote da biblioteca') return curto(t);
+      } catch (e) { /* o nome do arquivo serve */ }
     }
-    var botao = $('#importar-biblioteca');
-    if (botao) botao.disabled = true;
-    mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...']);
+    return doArquivo;
+  }
+  // o nome vem do pacote: um nome enorme não pode tomar a tela
+  function curto(t) { return t.length > 120 ? t.slice(0, 117) + '...' : t; }
+
+  /* A versão que o tablet já tem, quando ela não é menor que a do pacote (o
+   * pacote não traz nada de novo). É a MESMA regra antes de ler o arquivo e na
+   * hora de gravar. */
+  function versaoQueJaBasta(lista, manifest) {
+    var atual = lista.filter(function (p) { return p.pacote === manifest.pacote; })[0];
+    return atual && atual.versao >= manifest.versao ? atual.versao : null;
+  }
+
+  function resultadoDePulo(versaoAtual, nova) {
+    var igual = versaoAtual === nova;
+    return {
+      estado: 'pulou', motivo: igual ? 'ja-estava' : 'mais-nova', versaoAtual: versaoAtual, versaoNova: nova,
+      classe: 'faixa-aviso',
+      linhas: [igual
+        ? 'Esta versão do pacote já está no tablet. Nada foi mudado.'
+        : 'O tablet já tem a versão ' + versaoAtual + ' deste pacote, mais nova que a do arquivo (versão ' +
+          nova + '). Nada foi mudado.']
+    };
+  }
+
+  /* Antes de LER o arquivo (um pacote pode ter centenas de MB): se o manifest já
+   * diz que o tablet tem esta versão ou uma mais nova, pula sem ler. É o que
+   * acontece quando ela escolhe os 17 de novo depois de uma falha. A conferência
+   * de dentro da gravação continua valendo. No pacote de livros, uma versão
+   * MENOR que a de algum livro do tablet também pula inteira: senão um livro
+   * que a versão nova tirou voltaria. Qualquer dúvida (manifest estranho, erro
+   * ao ler o banco) segue o caminho de sempre. */
+  function puloAntesDeLer(manifest) {
+    if (!manifest || typeof manifest.pacote !== 'string' || typeof manifest.versao !== 'number') return Promise.resolve(null);
+    if (manifest.conteudo === 'livros') {
+      return Store.listarLivros().then(function (livros) {
+        var maior = 0;
+        livros.forEach(function (l) { if (l.pacote === manifest.pacote && l.versao > maior) maior = l.versao; });
+        return maior > manifest.versao ? resultadoDePulo(maior, manifest.versao) : null;
+      }).catch(function () { return null; });
+    }
+    return Store.listarPacotesBiblioteca().then(function (lista) {
+      var v = versaoQueJaBasta(lista, manifest);
+      return v === null ? null : resultadoDePulo(v, manifest.versao);
+    }).catch(function () { return null; });
+  }
+
+  /* Um pacote, do arquivo ao banco. É a unidade que o seletor chama uma vez
+   * (um arquivo) ou em série (vários). NUNCA rejeita: devolve sempre
+   *   { estado: 'entrou' | 'pulou' | 'falhou', classe, linhas, ... }
+   * onde `classe` e `linhas` são o que a tela mostra quando o pacote vem
+   * sozinho (as frases de sempre). Nada é gravado antes de o pacote inteiro ser
+   * conferido, e a gravação é uma transação só: uma falha aqui deixa o tablet
+   * como estava. `ctx.nome` recebe o nome do manifest assim que ele é lido, e
+   * `andamento(linhas)` mostra o que está acontecendo. */
+  function importarUmPacote(arquivo, ctx, andamento) {
     var aberto = null;
+    var saidaLivros = null;
+    andamento(['Conferindo o pacote ' + arquivo.name + '...']);
     /* O pacote de livros (C15.1) NUNCA é lido inteiro: a espiada lê só o
      * diretório do zip e o manifest, e os livros vêm um por vez, direto do
      * arquivo (Biblioteca.abrirLivrosDoArquivo). O de exercícios segue como
      * sempre, inteiro, porque são milhares de SVG pequenos. */
-    Biblioteca.espiarPacote(arquivo).then(function (espiado) {
-      if (espiado && espiado.manifest.conteudo === 'livros') {
-        return Biblioteca.abrirLivrosDoArquivo(espiado, function (feitos, total) {
-          mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...',
-            feitos + ' de ' + total + ' livros conferidos.']);
-        });
-      }
-      return arquivo.arrayBuffer().then(function (conteudo) {
-        return Biblioteca.abrirPacote(conteudo, function (feitos, total) {
-          if (feitos % 50 === 0 || feitos === total) {
-            mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...',
-              feitos + ' de ' + total + ' arquivos conferidos.']);
-          }
+    return Biblioteca.espiarPacote(arquivo).then(function (espiado) {
+      if (espiado) ctx.nome = nomeDoPacote(espiado.manifest, arquivo);
+      return puloAntesDeLer(espiado && espiado.manifest).then(function (pulo) {
+        if (pulo) { var pulou = new Error('pulou'); pulou.puloAntesDeLer = pulo; throw pulou; }
+        if (espiado && espiado.manifest.conteudo === 'livros') {
+          return Biblioteca.abrirLivrosDoArquivo(espiado, function (feitos, total) {
+            andamento(['Conferindo o pacote ' + arquivo.name + '...', feitos + ' de ' + total + ' livros conferidos.']);
+          });
+        }
+        return arquivo.arrayBuffer().then(function (conteudo) {
+          return Biblioteca.abrirPacote(conteudo, function (feitos, total) {
+            if (feitos % 50 === 0 || feitos === total) {
+              andamento(['Conferindo o pacote ' + arquivo.name + '...', feitos + ' de ' + total + ' arquivos conferidos.']);
+            }
+          });
         });
       });
     }).then(function (a) {
       aberto = a;
+      ctx.nome = nomeDoPacote(a.manifest, arquivo);
       /* Pacote de livros (C15.1): outro depósito e outra conta (livro a
        * livro, store.gravarLivros). Sai daqui pelo catch, com a marca
        * LIVROS_IMPORTADOS, para não passar pelos passos dos exercícios. */
       if (a.livros) {
-        return importarLivros(a).then(function () { throw LIVROS_IMPORTADOS; });
+        return importarLivros(a, andamento).then(function (r) { saidaLivros = r; throw LIVROS_IMPORTADOS; });
       }
       return Promise.all([Store.itensDaBiblioteca(), Store.teoriaDaBiblioteca()]);
     }).then(function (r) {
@@ -15204,10 +15306,10 @@
       }
       return Store.listarPacotesBiblioteca();
     }).then(function (lista) {
-      var atual = lista.filter(function (p) { return p.pacote === aberto.manifest.pacote; })[0];
-      if (atual && atual.versao >= aberto.manifest.versao) {
+      var jaBasta = versaoQueJaBasta(lista, aberto.manifest);
+      if (jaBasta !== null) {
         var e = new Error('versao');
-        e.versaoAtual = atual.versao;
+        e.versaoAtual = jaBasta;
         throw e;
       }
       return Store.estimarEspaco();
@@ -15227,28 +15329,161 @@
       }
       return Store.tornarPersistente();
     }).then(function () {
-      mostrarEstadoImportacao('faixa-info', ['Gravando a biblioteca no tablet...']);
+      andamento(['Gravando a biblioteca no tablet...']);
       return Store.gravarPacoteBiblioteca(aberto);
     }).then(function (registro) {
-      temPacoteBiblioteca = true;
-      mostrarEstadoImportacao('faixa-info',
-        ['Biblioteca importada.'].concat(Biblioteca.resumo(registro.manifest, registro.bytes)));
-      desenharPacotesBiblioteca();
-      bibliotecaMudou();
+      return {
+        estado: 'entrou', exercicios: true, classe: 'faixa-info',
+        linhas: ['Biblioteca importada.'].concat(Biblioteca.resumo(registro.manifest, registro.bytes))
+      };
     }).catch(function (e) {
-      if (e === LIVROS_IMPORTADOS) return;
-      if (e && e.versaoAtual != null) {
-        var nova = aberto.manifest.versao;
-        mostrarEstadoImportacao('faixa-aviso', [e.versaoAtual === nova
-          ? 'Esta versão do pacote já está no tablet. Nada foi mudado.'
-          : 'O tablet já tem a versão ' + e.versaoAtual + ' deste pacote, mais nova que a do arquivo (versão ' +
-            nova + '). Nada foi mudado.']);
-        return;
-      }
-      mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa(e));
-    }).then(function () {
-      if (botao) botao.disabled = false;
+      if (e === LIVROS_IMPORTADOS) return saidaLivros;
+      if (e && e.puloAntesDeLer) return e.puloAntesDeLer;
+      if (e && e.versaoAtual != null) return resultadoDePulo(e.versaoAtual, aberto.manifest.versao);
+      var linhas = linhasDaRecusa(e);
+      return { estado: 'falhou', classe: 'faixa-aviso', linhas: linhas, porque: porqueDaRecusa(linhas) };
     });
+  }
+
+  /* Do que a tela diz para um pacote que não entrou, a parte que vale numa
+   * lista: o que ela pode fazer, e o detalhe em letra pequena. Sem a frase de
+   * abertura nem a de "o que já estava continua igual", que o resumo diz uma
+   * vez só. */
+  function porqueDaRecusa(linhas) {
+    var texto = [], detalhe = '';
+    linhas.slice(1).forEach(function (l) {
+      if (l && l.detalhe) detalhe = l.detalhe;
+      else if (typeof l === 'string' && l !== 'O que já estava no tablet continua igual.') texto.push(l);
+    });
+    return { texto: texto.join(' '), detalhe: detalhe };
+  }
+
+  function pausaCurta() { return new Promise(function (resolve) { setTimeout(resolve, 0); }); }
+
+  function importarBiblioteca(ev) {
+    /* Copia a lista antes de limpar o seletor: limpar esvazia a FileList. Os
+     * File são só referências para o disco; nenhum é lido aqui. */
+    var arquivos = Array.prototype.slice.call(ev.target.files || []);
+    ev.target.value = '';
+    if (!arquivos.length) return;
+    if (typeof Zip === 'undefined' || !Zip.suportado()) {
+      mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa({ recusa: true, tipo: 'navegador' }));
+      return;
+    }
+    var botao = $('#importar-biblioteca');
+    if (botao) botao.disabled = true;
+    importandoBiblioteca = true;
+    var terminou = arquivos.length === 1 ? importarUmArquivoSozinho(arquivos[0]) : importarEmSerie(arquivos);
+    // o botão volta mesmo se algo inesperado derrubar a série: ela nunca fica sem poder tentar de novo
+    var libera = function () { importandoBiblioteca = false; if (botao) botao.disabled = false; };
+    terminou.then(libera, libera);
+  }
+
+  /* Um arquivo só: igual a antes de existir a seleção múltipla. */
+  function importarUmArquivoSozinho(arquivo) {
+    return importarUmPacote(arquivo, { nome: nomeDoPacote(null, arquivo) }, function (linhas) {
+      mostrarEstadoImportacao('faixa-info', linhas);
+    }).then(function (r) {
+      mostrarEstadoImportacao(r.classe, r.linhas);
+      if (r.exercicios) {
+        temPacoteBiblioteca = true;
+        desenharPacotesBiblioteca();
+        bibliotecaMudou();
+      }
+    });
+  }
+
+  /* Vários arquivos: UM PACOTE POR VEZ, na ordem em que ela escolheu. O
+   * próximo só começa depois que o anterior foi gravado e solto: nenhum File é
+   * lido antes da sua vez, e do resultado de cada pacote fica só o texto do
+   * resumo, nunca o pacote. Uma falha vira linha do resumo, e a série segue. */
+  function importarEmSerie(arquivos) {
+    var total = arquivos.length, resultados = [], i = 0;
+    // a tela apagada pausaria a série no meio: pede ao aparelho para ficar ligado enquanto ela anda
+    var tela = null, acabou = false;
+    function soltaATela() {
+      acabou = true;
+      try { if (tela && typeof tela.release === 'function') tela.release(); } catch (e) { /* ok */ }
+    }
+    try {
+      if (navigator.wakeLock && typeof navigator.wakeLock.request === 'function') {
+        navigator.wakeLock.request('screen').then(function (w) {
+          tela = w;
+          // a série pode ter acabado antes de o aparelho responder: então a trava nasce já solta
+          if (acabou) soltaATela();
+        }, function () { /* sem a trava: segue */ });
+      }
+    } catch (e) { /* sem a trava: segue */ }
+    function proximo() {
+      if (i >= total) return Promise.resolve();
+      var arquivo = arquivos[i++], n = i;
+      var ctx = { nome: nomeDoPacote(null, arquivo) };
+      return importarUmPacote(arquivo, ctx, function (linhas) {
+        mostrarEstadoImportacao('faixa-info', ['Importando ' + n + ' de ' + total + ': ' + ctx.nome].concat(linhas, ['Deixe a tela ligada até terminar.']));
+        var caixa = $('#estado-importacao-biblioteca');
+        if (caixa) caixa.setAttribute('data-progresso', n + '/' + total);
+      }).then(function (r) {
+        resultados.push({ nome: ctx.nome, arquivo: arquivo.name, estado: r.estado, motivo: r.motivo,
+          versaoAtual: r.versaoAtual, versaoNova: r.versaoNova, porque: r.porque || null, exercicios: !!r.exercicios });
+        // quem abrir a aba Biblioteca no meio da série já vê o que entrou
+        if (r.exercicios && r.estado === 'entrou') { temPacoteBiblioteca = true; desenharPacotesBiblioteca(); }
+        return pausaCurta().then(proximo);
+      });
+    }
+    return proximo().then(function () {
+      soltaATela();
+      // o resumo vem primeiro: um erro ao refazer a aba não pode escondê-lo
+      mostrarResumoDaSerie(resultados);
+      if (resultados.some(function (r) { return r.exercicios && r.estado === 'entrou'; })) {
+        try { desenharPacotesBiblioteca(); bibliotecaMudou(); } catch (e) { /* a aba se refaz na próxima abertura */ }
+      }
+    }, function (e) { soltaATela(); throw e; });
+  }
+
+  /* O resumo: uma folha na própria tela de Ajustes, com o que entrou, o que
+   * ficou como estava e o que não entrou (e por quê), e o botão que a fecha. */
+  function mostrarResumoDaSerie(resultados) {
+    var caixa = $('#estado-importacao-biblioteca');
+    if (!caixa) return;
+    var entraram = resultados.filter(function (r) { return r.estado === 'entrou'; }).length;
+    var pularam = resultados.filter(function (r) { return r.estado === 'pulou'; }).length;
+    var falharam = resultados.filter(function (r) { return r.estado === 'falhou'; }).length;
+    var partes = [];
+    if (entraram) partes.push(entraram === 1 ? '1 entrou' : entraram + ' entraram');
+    if (pularam) partes.push(pularam === 1 ? '1 ficou como estava' : pularam + ' ficaram como estavam');
+    if (falharam) partes.push(falharam === 1 ? '1 não entrou' : falharam + ' não entraram');
+    var sinal = { entrou: ['✓', 'Entrou'], pulou: ['↺', 'Ficou como estava'], falhou: ['✕', 'Não entrou'] };
+    var linhas = resultados.map(function (r) {
+      var motivo = '', detalhe = '';
+      if (r.estado === 'pulou') {
+        motivo = r.motivo === 'ja-estava' ? 'já estava no tablet.'
+          : r.motivo === 'mais-nova' ? 'o tablet já tem uma versão mais nova (versão ' + r.versaoAtual + ', e o arquivo é a ' + r.versaoNova + ').'
+          : r.motivo === 'livros-mais-novos' ? 'o tablet já tem livros mais novos, e eles ficaram como estavam.'
+          : 'os livros já vieram de outro pacote e ficaram como estavam.';
+      } else if (r.estado === 'falhou' && r.porque) {
+        motivo = r.porque.texto;
+        detalhe = r.porque.detalhe;
+      }
+      return el('li', { class: 'resumo-importacao-linha', 'data-estado': r.estado, 'data-arquivo': r.arquivo }, [
+        el('span', { class: 'resumo-importacao-sinal', role: 'img', 'aria-label': sinal[r.estado][1], texto: sinal[r.estado][0] }),
+        el('span', { class: 'resumo-importacao-texto' }, [
+          el('span', { class: 'u-peso-seminegrito', texto: r.nome }),
+          motivo ? el('span', { texto: ': ' + motivo }) : null,
+          detalhe ? el('span', { class: 'u-letra-2 u-opacidade-75 resumo-importacao-detalhe', texto: detalhe }) : null
+        ])
+      ]);
+    });
+    caixa.innerHTML = '';
+    caixa.removeAttribute('data-progresso');
+    caixa.appendChild(el('div', { class: (falharam ? 'faixa-aviso' : 'faixa-info') + ' u-margem-baixo-10', id: 'resumo-importacao-biblioteca' }, [
+      el('div', { class: 'u-peso-seminegrito', texto: 'Importação terminada: ' + partes.join(', ') + '.' }),
+      falharam ? el('div', { texto: 'O que já estava no tablet continua igual.' }) : null,
+      el('ul', { class: 'resumo-importacao-lista' }, linhas),
+      el('div', { class: 'barra u-margem-8-0-0' }, [
+        el('button', { type: 'button', class: 'btn pequeno', id: 'fechar-resumo-importacao', texto: 'Fechar',
+          aoClick: function () { caixa.innerHTML = ''; } })
+      ])
+    ]));
   }
 
   /* O que a tela diz quando o pacote não entra: o que aconteceu, o que ela
@@ -15328,6 +15563,7 @@
    * trabalho dela: as etiquetas de dificuldade e o registro de quem já fez o
    * quê. Os dois ficam, e a frase diz isso com todas as letras. */
   function removerPacote(p, titulo) {
+    if (importandoBiblioteca) { avisar('Espere a importação terminar para remover.'); return Promise.resolve(); }
     var espaco = Biblioteca.mb(p.bytes || 0);
     /* O QUE FICA vem antes do quanto volta. O espaço é o motivo de ela estar
      * aqui, mas não é o que assusta: abrir a pergunta por "0,3 MB" faz a frase
@@ -15427,7 +15663,7 @@
     });
   }
 
-  function importarLivros(aberto) {
+  function importarLivros(aberto, andamento) {
     return Store.estimarEspaco().then(function (espaco) {
       // os livros vão como estão: a folga de 10% cobre o registro de cada um
       if (espaco && espaco.quota) {
@@ -15443,12 +15679,22 @@
       }
       return Store.tornarPersistente();
     }).then(function () {
-      mostrarEstadoImportacao('faixa-info', ['Gravando os livros no tablet...']);
+      andamento(['Gravando os livros no tablet...']);
       return Store.gravarLivros(aberto);
     }).then(function (contas) {
-      mostrarEstadoImportacao('faixa-info', ['Livros importados.'].concat(Biblioteca.resumoDeLivros(contas),
-        ['Para ler, abra a aba Biblioteca e toque em Livros.']));
-      return desenharLivrosAjustes();
+      var linhas = ['Livros importados.'].concat(Biblioteca.resumoDeLivros(contas),
+        ['Para ler, abra a aba Biblioteca e toque em Livros.']);
+      // livro que SAIU do pacote novo também é gravação (some do tablet com a posição de leitura)
+      var entrou = contas.novos + contas.atualizados + contas.removidos > 0;
+      var deOutro = contas.deOutroPacote && contas.deOutroPacote.length > 0;
+      /* O redesenho da lista é só tela: se ele falhar com os livros já gravados,
+       * o resultado continua sendo o da gravação (nunca "não entrou"). */
+      return Promise.resolve().then(desenharLivrosAjustes).catch(function () { /* a lista se refaz na próxima abertura */ }).then(function () {
+        return {
+          estado: entrou ? 'entrou' : 'pulou', classe: 'faixa-info', linhas: linhas,
+          motivo: entrou ? null : contas.maisNovos ? 'livros-mais-novos' : deOutro ? 'outro-pacote' : 'ja-estava'
+        };
+      });
     });
   }
 
@@ -15496,6 +15742,7 @@
   }
 
   function removerLivroDoTablet(l) {
+    if (importandoBiblioteca) { avisar('Espere a importação terminar para remover.'); return Promise.resolve(); }
     var espaco = Biblioteca.mb(l.bytes || 0);
     if (!confirmar('Tirar "' + tituloDoLivro(l.meta) + '" deste tablet?\n\n' +
         'Para ler de novo, é só importar o pacote de livros outra vez do Drive. O lugar onde você parou ' +
@@ -21737,8 +21984,10 @@
     celularPedeEntrada = false;
     formCelular = null;
     folhaCelular = null;
+    fecharMensagemCelular(); // o que ela escreveu já está no rascunho
     alunoCelular = null; // a aba Alunos volta à lista
     diaRoladoCelular = null; // voltando a Hoje, a linha do tempo rola até agora
+    painelDosAvisosAberto = PAINEL_ABERTO_AO_CHEGAR; // e os avisos chegam recolhidos
     esconderAviso(); // o aviso de uma ação não segue para outra tela
     var conteudo = $('#cel-conteudo');
     if (conteudo) conteudo.scrollTop = 0;
@@ -21884,6 +22133,7 @@
   function formularioAbertoNoCelular() {
     if (telaCelular === 'hoje') return !!(formCelular && $('#cel-hoje [data-form-celular]')) ||
       !!(folhaCelular && folhaCelular.passo === 'remarcar' && $('#cel-folha [data-form-celular]'));
+    if ($('#cel-mensagem')) return true; // o editor da mensagem do mês, em qualquer tela
     if (telaCelular === 'fechamento') return !!$('#cel-fechamento .pagamento-valor');
     return false;
   }
@@ -22117,7 +22367,10 @@
    * aula. Um toque no dia troca o dia. */
   function faixaDaSemanaCelular(dia) {
     var hoje = Core.hojeIso();
-    var titulo = (dia === hoje ? 'Hoje, ' : '') + Core.diaSemanaLongo(dia) + ', ' + Core.ddmm(dia);
+    /* O dia da semana curto ("Hoje, qui 29/10"): com a letra a 130%, num
+     * celular de 360, o nome longo quebrava em três linhas e o alto preso
+     * passava de 20% da tela. O nome longo fica no rótulo de cada dia. */
+    var titulo = (dia === hoje ? 'Hoje, ' : '') + Core.diaSemanaCurto(dia) + ' ' + Core.ddmm(dia);
     if (dia.slice(0, 4) !== hoje.slice(0, 4)) titulo += '/' + dia.slice(0, 4);
     var topo = [
       el('button', { type: 'button', class: 'btn pequeno', id: 'cel-semana-anterior', 'aria-label': 'Semana anterior', texto: '‹',
@@ -22151,10 +22404,15 @@
         }))
       ]);
     });
-    return el('div', { class: 'cel-semana', id: 'cel-semana' }, [
-      el('div', { class: 'barra cel-semana-topo' }, topo),
-      el('div', { class: 'cel-semana-dias' }, botoes)
-    ]);
+    /* Presa no alto fica só a linha da data (com as setas e o selinho dos
+     * avisos): a barra do aplicativo e ela, juntas, cabem em 20% da altura
+     * do celular. Os dias da semana vêm logo abaixo e rolam com a agenda
+     * (a medida da auditoria de 09/11: a semana inteira presa, com os
+     * avisos, eram 295 px, 35% de 390 x 844). */
+    return {
+      faixa: el('div', { class: 'cel-semana', id: 'cel-semana' }, [el('div', { class: 'barra cel-semana-topo' }, topo)]),
+      dias: el('div', { class: 'cel-semana-dias', id: 'cel-semana-dias' }, botoes)
+    };
   }
 
   /* Os minutos em que se pode começar uma aula num buraco: o começo dele e
@@ -22200,8 +22458,11 @@
     return linhas;
   }
 
-  /* marca: 'agora' (a aula que está acontecendo) ou 'proxima' (a seguinte de hoje). */
-  function blocoDaAulaCelular(a, marca) {
+  /* marca: 'agora' (a aula que está acontecendo) ou 'proxima' (a seguinte de hoje).
+   * semRegistro: a aula está na lista "sem registro" dos avisos (o mesmo
+   * critério e a mesma janela, aulasDoAvisoSemRegistroCelular), e ganha um
+   * ponto discreto no canto, com o texto para quem lê a tela. */
+  function blocoDaAulaCelular(a, marca, semRegistro) {
     var aluno = alunoPorId(a.alunoId);
     var sit = situacaoNoCelular(a);
     var dur = Number(a.duracaoMin) || 60;
@@ -22215,10 +22476,11 @@
       el('span', { class: 'cel-bloco-situacao', texto: (sit.icone ? sit.icone + ' ' : '') + sit.texto })
     ];
     if (choques.length) filhos.push(el('span', { class: 'cel-bloco-choque', texto: '⚠ Mesmo horário: ' + fraseDoChoqueCelular(choques) }));
+    if (semRegistro) filhos.push(el('span', { class: 'cel-bloco-sem-registro', 'aria-hidden': 'true', title: 'Sem registro de como foi' }));
     return el('button', {
-      type: 'button', class: 'cel-bloco cel-bloco-' + sit.classe + (choques.length ? ' com-choque' : '') + (marca ? ' cel-bloco-' + marca : ''), 'data-aula': a.id,
+      type: 'button', class: 'cel-bloco cel-bloco-' + sit.classe + (choques.length ? ' com-choque' : '') + (marca ? ' cel-bloco-' + marca : '') + (semRegistro ? ' sem-registro' : ''), 'data-aula': a.id,
       style: '--cor-aluno:' + corDoAlunoCelular(aluno) + ';min-height:' + Math.max(ALTURA_MINIMA_BLOCO, Math.round(dur * PX_POR_MINUTO_CELULAR)) + 'px',
-      'aria-label': (marca ? (marca === 'agora' ? 'Agora: ' : 'Próxima: ') : '') + nome + ', ' + (a.hora || 'sem horário') + ', ' + Core.fmtDuracao(dur) + ', ' + sit.texto + (choques.length ? ', no mesmo horário de outra aula' : ''),
+      'aria-label': (marca ? (marca === 'agora' ? 'Agora: ' : 'Próxima: ') : '') + nome + ', ' + (a.hora || 'sem horário') + ', ' + Core.fmtDuracao(dur) + ', ' + sit.texto + (choques.length ? ', no mesmo horário de outra aula' : '') + (semRegistro ? ', sem registro de como foi' : ''),
       aoClick: function () { abrirFolhaDaAulaCelular(a.id); }
     }, filhos);
   }
@@ -22237,8 +22499,8 @@
   }
 
   /* Hoje, a aula que está acontecendo leva "Agora", e a seguinte, "Próxima":
-   * a marca do bloco na linha do tempo (lote 1) e o aviso "Próxima" do alto
-   * (lote 4) saem daqui, para os dois nunca apontarem aulas diferentes. */
+   * a marca do bloco na linha do tempo (lote 1). Desde 09/11 ela não se
+   * repete nos avisos do alto: o selo do bloco é o único. */
   function marcasDeAgoraCelular(dia, agora) {
     var marcas = {};
     var valem = aulasDoDiaCelular(dia).filter(function (a) { return a.status !== 'cancelada' && Core.minutosDaHora(a.hora) !== null; });
@@ -22255,11 +22517,15 @@
     var hoje = Core.hojeIso();
     var agora = dia === hoje ? minutosAgoraCelular() : null;
     var linhaAgora = null;
+    /* A marca de sem registro sai da MESMA lista do aviso (o critério, a
+     * janela e os dispensados de hoje): o ponto e a lista nunca discordam. */
+    var semRegistro = {};
+    aulasDoAvisoSemRegistroCelular(hoje, minutosAgoraCelular()).forEach(function (a) { semRegistro[a.id] = true; });
     var semHora = aulasDoDiaCelular(dia).filter(function (a) { return Core.minutosDaHora(a.hora) === null; });
     semHora.forEach(function (a) {
       caixa.appendChild(el('div', { class: 'cel-tempo-linha' }, [
         el('span', { class: 'cel-tempo-hora', texto: 'sem hora' }),
-        el('div', { class: 'cel-tempo-item' }, [blocoDaAulaCelular(a)])
+        el('div', { class: 'cel-tempo-item' }, [blocoDaAulaCelular(a, null, !!semRegistro[a.id])])
       ]));
     });
     var marcaDeAgora = function () {
@@ -22273,7 +22539,7 @@
         linhaAgora = marcaDeAgora();
         caixa.appendChild(el('div', { class: 'cel-tempo-linha cel-tempo-agora-solta' }, [linhaAgora]));
       }
-      var item = el('div', { class: 'cel-tempo-item' }, [l.tipo === 'aula' ? blocoDaAulaCelular(l.aula, marcas[l.aula.id]) : buracoLivreCelular(l, dia, edita)]);
+      var item = el('div', { class: 'cel-tempo-item' }, [l.tipo === 'aula' ? blocoDaAulaCelular(l.aula, marcas[l.aula.id], !!semRegistro[l.aula.id]) : buracoLivreCelular(l, dia, edita)]);
       var linha = el('div', { class: 'cel-tempo-linha cel-tempo-' + l.tipo }, [
         el('span', { class: 'cel-tempo-hora', texto: horaDeMinutosCelular(l.ini) }), item
       ]);
@@ -22291,18 +22557,63 @@
     return caixa;
   }
 
-  // ---------- Os avisos do alto de Hoje (D6c, lote 4) ----------
+  // ---------- Os avisos do alto de Hoje (D6c, lote 4; compactos em 09/11) ----------
 
-  /* O que o app mostra sozinho no alto de Hoje, no máximo 3, na ordem de
-   * urgência: a próxima aula de hoje, a aula que já passou sem registro, o
-   * mês a fechar e a família a cobrar. Ficam presos com a faixa da semana,
-   * e cada um leva à ação dele. Nada aqui grava: o "falta registrar" abre o
-   * formulário de sempre, e o "Cobrar" abre o WhatsApp com o texto escrito. */
-  var MAX_AVISOS_CELULAR = 3;
-  /* "Falta registrar como foi": a aula dos últimos 7 dias (hoje e os seis
-   * de antes), dada (realizada ou reposição) e já acabada, sem registro pelo
-   * critério do tablet (Core.aulaTemRegistro, o do "Relato da aula
-   * anterior"). A falta e a cancelada não têm o que registrar. */
+  /* O que o app mostra sozinho no alto de Hoje, na ordem de urgência: as
+   * aulas que já passaram sem registro, a família a cobrar e o mês a fechar
+   * (a próxima aula fica só no selo PRÓXIMA do bloco, na agenda). Recolhidos (o padrão), viram só um selinho com
+   * o número, ao lado da data, sem linha própria: a agenda não desce. Um
+   * toque no selinho abre o painel com os detalhes, preso com a faixa da
+   * semana e nunca além da metade da tela. Arrastar um aviso do painel para
+   * o lado o dispensa até o dia seguinte. Nada aqui grava no banco: o "sem
+   * registro" abre o formulário de sempre, o "Cobrar" abre o WhatsApp com o
+   * texto escrito, e o recolhido e os dispensados são do APARELHO
+   * (localStorage), nunca da fila de registros nem da nuvem. */
+
+  /* O estado do aparelho: { dispensados: { 'AAAA-MM-DD': [chaves] } }. O
+   * painel aberto NÃO se grava (revisão da F4): recolhido é o padrão a cada
+   * chegada ao Hoje e a cada abertura do aplicativo; aberto só vive em
+   * memória, até ela sair de Hoje.
+   * A chave de um aviso é o tipo e o id dele, nunca o texto:
+   * 'registrar:<aula>', 'cobrar:<aluno>:<meses>' e 'fechar:<mês>'. Sem
+   * armazenamento (o navegador recusa, ou lança erro), vale a cópia em
+   * memória: abre recolhido, sem dispensados, e o que ela dispensar vale
+   * até fechar o aplicativo. */
+  var CHAVE_AVISOS_CELULAR = 'apoio-educacional:celular-avisos';
+  var avisosCelularEmMemoria = { dispensados: {} };
+  var PAINEL_ABERTO_AO_CHEGAR = false;
+  var painelDosAvisosAberto = PAINEL_ABERTO_AO_CHEGAR;
+  function lerEstadoDosAvisosCelular() {
+    var e = null;
+    try { e = JSON.parse(localStorage.getItem(CHAVE_AVISOS_CELULAR) || 'null'); } catch (x) { e = null; }
+    if (!e || typeof e !== 'object') e = avisosCelularEmMemoria;
+    var dispensados = {};
+    if (e.dispensados && typeof e.dispensados === 'object') {
+      Object.keys(e.dispensados).forEach(function (d) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d) && Array.isArray(e.dispensados[d])) dispensados[d] = e.dispensados[d].filter(function (c) { return typeof c === 'string'; });
+      });
+    }
+    return { dispensados: dispensados };
+  }
+  /* Gravar limpa os dias que já passaram: só o de hoje (e algum à frente,
+   * se o relógio voltou) fica. */
+  function gravarEstadoDosAvisosCelular(e) {
+    var hoje = Core.hojeIso(), limpo = {};
+    Object.keys(e.dispensados).forEach(function (d) { if (d >= hoje && e.dispensados[d].length) limpo[d] = e.dispensados[d]; });
+    avisosCelularEmMemoria = { dispensados: limpo };
+    try { localStorage.setItem(CHAVE_AVISOS_CELULAR, JSON.stringify(avisosCelularEmMemoria)); } catch (x) { /* sem armazenamento: fica a memória */ }
+  }
+  /* Os dispensados valem só no dia em que foram dispensados: no dia seguinte,
+   * o aviso que ainda vale volta. */
+  function dispensadosDeHojeCelular(hoje) {
+    var e = lerEstadoDosAvisosCelular();
+    return e.dispensados[hoje] || [];
+  }
+
+  /* "Sem registro": a aula dos últimos 7 dias (hoje e os seis de antes),
+   * dada (realizada ou reposição) e já acabada, sem registro pelo critério
+   * do tablet (Core.aulaTemRegistro, o do "Relato da aula anterior"). A
+   * falta e a cancelada não têm o que registrar. */
   var DIAS_DO_FALTA_REGISTRAR = 7;
   function aulaPedeRegistroCelular(a, hoje, agora) {
     if (!a || !a.data || a.data > hoje || !alunoPorId(a.alunoId)) return false;
@@ -22318,6 +22629,13 @@
   function aulasSemRegistroCelular(de, ate, hoje, agora) {
     return db.aulas.filter(function (a) { return a.data >= de && a.data <= ate && aulaPedeRegistroCelular(a, hoje, agora); })
       .sort(function (a, b) { return (b.data + (b.hora || '')).localeCompare(a.data + (a.hora || '')); });
+  }
+  /* A lista do aviso e a marca do bloco na agenda saem DAQUI: a janela de 7
+   * dias, o critério do tablet e, fora, as que ela dispensou hoje. */
+  function aulasDoAvisoSemRegistroCelular(hoje, agora) {
+    var fora = dispensadosDeHojeCelular(hoje);
+    return aulasSemRegistroCelular(somarDiasCelular(hoje, -(DIAS_DO_FALTA_REGISTRAR - 1)), hoje, hoje, agora)
+      .filter(function (a) { return fora.indexOf('registrar:' + a.id) < 0; });
   }
   /* O selo que os avisos leem é o do Fechamento (Core.seloDoPagamento). */
   function seloDoAvisoCelular(f) { return Core.seloDoPagamento(db, f); }
@@ -22336,6 +22654,11 @@
       porAluno[p.alunoId].meses.push({ mes: p.mes, falta: s.falta, selo: s.selo });
     });
     return ordem;
+  }
+  /* A família e os meses dela: se aparecer mais um mês em aberto, é outro
+   * aviso, e o dispensado antes não o esconde. */
+  function chaveDaCobrancaCelular(fam) {
+    return 'cobrar:' + fam.aluno.id + ':' + fam.meses.map(function (m) { return m.mes; }).join(',');
   }
   function faltaDaFamiliaCelular(fam) {
     return fam.meses.reduce(function (c, m) { return c + Math.round(m.falta * 100); }, 0) / 100;
@@ -22371,22 +22694,47 @@
     if (!semRegistro && !abertas) return null;
     return { mes: mes, semRegistro: semRegistro, abertas: abertas };
   }
-  function daquiACelular(min) {
-    if (min < 60) return 'daqui a ' + min + ' min';
-    var h = Math.floor(min / 60), r = min % 60;
-    return 'daqui a ' + h + ' h' + (r ? ' ' + r + ' min' : '');
+  /* Os ícones do painel (traço de 1,75, o do desenho final de 09/11). */
+  var ICONES_DOS_AVISOS = {
+    registrar: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M14 6l4 4"/>',
+    cobrar: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M16 15h2"/>',
+    fechar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/><path d="M9 15l2 2 4-4"/>',
+    versao: '<path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/>',
+    sino: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+    fechar_x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    nuvem: '<path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 9.5 4.3 4.3 0 0 0 7 18z"/><path d="M9.5 13.5l2 2 3.5-3.5"/>'
+  };
+  function iconeDoAvisoCelular(nome, classe) {
+    var s = el('span', { class: classe || 'cel-aviso-icone', 'aria-hidden': 'true' });
+    s.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">' +
+      ICONES_DOS_AVISOS[nome] + '</svg>';
+    return s;
   }
-  function avisoCelular(tipo, filhos) {
-    return el('div', { class: 'cel-aviso cel-aviso-' + tipo, 'data-aviso': tipo }, filhos);
+  /* Um botão de ação do aviso: o principal é marinho cheio; os outros,
+   * marinho claro. */
+  function acaoDoAvisoCelular(id, texto, fazer, principal, acao) {
+    var atributos = { type: 'button', class: 'btn cel-aviso-acao' + (principal ? ' principal' : ''), texto: texto, aoClick: fazer };
+    if (id) atributos.id = id;
+    if (acao) atributos['data-acao-celular'] = acao;
+    return el('button', atributos);
   }
-  /* O aviso tem cara de botão: o texto à esquerda e, à direita, o que o
-   * toque faz ("Registrar", "Abrir" ou a seta). */
-  function botaoDoAvisoCelular(id, texto, seta, fazer, acao) {
-    var atributos = { class: 'cel-aviso-botao', id: id, aoClick: fazer };
-    var filhos = [el('span', { class: 'cel-aviso-texto', texto: texto }), el('span', { class: 'cel-aviso-seta', 'aria-hidden': 'true', texto: seta })];
-    if (acao) { atributos['data-acao-celular'] = acao; }
-    atributos.type = 'button';
-    return el('button', atributos, filhos);
+  /* Uma linha do painel: o ícone, o título, o detalhe, as ações embaixo e o
+   * ✕ à direita. O trilho por baixo é o fundo cinza claro que o deslize
+   * revela. As chaves (uma por aula, família e mês) vão no data-chaves. */
+  function linhaDoAvisoCelular(l) {
+    var atributos = { class: 'cel-aviso cel-aviso-' + l.tipo, 'data-aviso': l.tipo, 'data-chaves': l.chaves.join(' ') };
+    Object.keys(l.dados || {}).forEach(function (k) { atributos['data-' + k] = l.dados[k]; });
+    var corpo = el('div', { class: 'cel-aviso-corpo' }, [
+      el('div', { class: 'cel-aviso-titulo', texto: l.titulo }),
+      l.linhas ? el('ul', { class: 'cel-aviso-detalhe cel-aviso-aulas' }, l.linhas.map(function (t) { return el('li', { texto: t }); }))
+        : l.detalhe ? el('div', { class: 'cel-aviso-detalhe', texto: l.detalhe }) : null,
+      l.acoes.length ? el('div', { class: 'cel-aviso-acoes' }, l.acoes) : null
+    ]);
+    var x = el('button', { type: 'button', class: 'cel-aviso-dispensar', 'aria-label': 'Dispensar até amanhã', title: 'Dispensar até amanhã',
+      aoClick: function () { dispensarAvisoCelular(l.chaves, l.nome); } }, [iconeDoAvisoCelular('fechar_x', 'cel-aviso-x')]);
+    var linha = el('div', atributos, [iconeDoAvisoCelular(l.icone), corpo, x]);
+    deslizarParaDispensarCelular(linha, l.chaves, l.nome);
+    return el('div', { class: 'cel-aviso-trilho' }, [linha]);
   }
   /* O nome curto do aluno para o botão de cobrar: as primeiras palavras do
    * nome que já o separam de todo outro aluno ativo ("Ana" ou, se houver
@@ -22401,88 +22749,246 @@
     }
     return partes.join(' ');
   }
-  /* Os avisos, já na ordem e já cortados em 3: a próxima, a aula sem
-   * registro, a cobrança (o que já venceu) e o mês a fechar. A cobrança e o
-   * mês a fechar só no celular que é, comprovadamente, o da dona
-   * (celularEdita: a marca, a conta dela à vista e não a de outra), a mesma
-   * porta das ações que gravam. A falta de observador não basta: o
-   * observador que saiu da conta continua com a cópia dela no aparelho. */
+  /* "Aluno Alfa Teste, hoje, 10:00" ou "Aluno Alfa Teste, seg 05/10, 10:00". */
+  function aulaNoAvisoCelular(a, hoje) {
+    var al = alunoPorId(a.alunoId);
+    return (al ? al.nome : 'aluno removido') + ', ' + (a.data === hoje ? 'hoje' + (a.hora ? ', ' + a.hora : '') : quandoCurtoCelular(a.data, a.hora));
+  }
+  /* Os avisos de hoje, uma linha por tipo, na ordem de urgência, sem os
+   * dispensados: { linhas, conta, resumo }. A conta do selinho é o número de
+   * linhas. As aulas sem registro vão juntas ("4 aulas sem registro"), e o
+   * Registrar abre a mais recente (cada uma também se abre pelo ponto no
+   * bloco dela, na agenda). A cobrança e o mês a fechar só no celular que é,
+   * comprovadamente, o da dona (celularEdita: a marca, a conta dela à vista
+   * e não a de outra), a mesma porta das ações que gravam. A falta de
+   * observador não basta: o observador que saiu da conta continua com a
+   * cópia dela no aparelho. A versão nova pronta entra quando o worker a
+   * anuncia (versaoPendenteAtiva) e nunca com a aula aberta. */
   function avisosDoHojeCelular() {
     var hoje = Core.hojeIso(), agora = minutosAgoraCelular();
     var edita = celularEdita(), daDona = edita;
-    var avisos = [];
-    var seguinte = marcasDeAgoraCelular(hoje, agora).seguinte;
-    if (seguinte) {
-      var quem = alunoPorId(seguinte.alunoId);
-      avisos.push(avisoCelular('proxima', [botaoDoAvisoCelular('cel-aviso-proxima',
-        'Próxima: ' + seguinte.hora + ', ' + (quem ? quem.nome : 'aluno removido') + ', ' + daquiACelular(Core.minutosDaHora(seguinte.hora) - agora), '›',
-        function () { abrirFolhaDaAulaCelular(seguinte.id); })]));
-    }
-    var semRegistro = aulasSemRegistroCelular(somarDiasCelular(hoje, -(DIAS_DO_FALTA_REGISTRAR - 1)), hoje, hoje, agora);
+    var fora = dispensadosDeHojeCelular(hoje);
+    var linhas = [], resumo = [];
+    /* A próxima aula não é aviso (auditoria de UX de 09/11): o bloco dela na
+     * agenda já leva o selo, e a rolagem até agora a deixa à vista. */
+    var semRegistro = aulasDoAvisoSemRegistroCelular(hoje, agora);
     if (semRegistro.length) {
-      var a = semRegistro[0], dele = alunoPorId(a.alunoId);
-      var resto = semRegistro.length > 1 ? ' (e mais ' + (semRegistro.length - 1) + ')' : '';
-      var onde = dele.nome + ', ' + quandoCurtoCelular(a.data, a.hora) + resto;
-      /* Quem edita abre o "Registrar como foi" daquela aula; quem só lê, a
-       * folha dela, sem botão de mudar. */
-      var aviso = avisoCelular('registrar', [edita
-        ? botaoDoAvisoCelular('cel-aviso-registrar', 'Falta registrar como foi: ' + onde, 'Registrar',
-          function () { abrirFormularioCelular({ tipo: 'relato', aulaId: a.id }); }, 'registrar-como-foi')
-        : botaoDoAvisoCelular('cel-aviso-registrar', 'Ainda sem registro de como foi: ' + onde, '›',
-          function () { abrirFolhaDaAulaCelular(a.id); })]);
-      aviso.setAttribute('data-aula', a.id);
-      avisos.push(aviso);
+      var primeira = semRegistro[0];
+      linhas.push({ tipo: 'registrar', icone: 'registrar', chaves: semRegistro.map(function (a) { return 'registrar:' + a.id; }),
+        dados: { aula: primeira.id, aulas: semRegistro.map(function (a) { return a.id; }).join(' ') },
+        titulo: semRegistro.length + ' ' + palavraPlural(semRegistro.length, 'aula sem registro', 'aulas sem registro'),
+        nome: 'das aulas sem registro', linhas: semRegistro.map(function (a) { return aulaNoAvisoCelular(a, hoje); }),
+        /* Quem edita abre o "Registrar como foi" da mais recente; quem só lê,
+         * a folha dela, sem botão de mudar. */
+        acoes: [edita
+          ? acaoDoAvisoCelular('cel-aviso-registrar', 'Registrar', function () { fecharAvisosCelular(); abrirFormularioCelular({ tipo: 'relato', aulaId: primeira.id }); }, false, 'registrar-como-foi')
+          : acaoDoAvisoCelular('cel-aviso-registrar', 'Ver a aula', function () { fecharAvisosCelular(); abrirFolhaDaAulaCelular(primeira.id); })] });
+      resumo.push(semRegistro.length + ' sem registro');
     }
     if (daDona && Core.cobrancaLiberada(hoje)) {
-      var familias = familiasACobrarCelular(hoje);
+      var familias = familiasACobrarCelular(hoje).filter(function (f) { return fora.indexOf(chaveDaCobrancaCelular(f)) < 0; });
       if (familias.length) {
         var fam = familias[0];
         var tel = telefoneDoCampo(fam.aluno);
         var link = linkDoWhatsapp(tel, mensagemDeCobrancaCelular(fam));
         var outras = familias.slice(1);
-        var textoCobrar = 'Em aberto: ' + fam.aluno.nome + ', ' + fam.meses.map(function (x) { return mesMinusculoCelular(x.mes); }).join(' e ') +
-          ', ' + dinheiro(faltaDaFamiliaCelular(fam)) + (link ? '' : '. Sem celular na ficha para o WhatsApp');
         var curto = nomeCurtoCelular(fam.aluno);
+        var acoes = [];
+        if (link) acoes.push(botaoDeLinkCelular('cel-aviso-cobrar', 'Cobrar ' + curto, link, { class: 'btn cel-link-botao cel-aviso-acao',
+          'aria-label': 'Cobrar a família de ' + fam.aluno.nome + ' pelo WhatsApp: abre a conversa com a mensagem escrita' }));
         /* As outras famílias não entram no botão de cobrar: um toque à parte
          * leva ao Fechamento do mês mais antigo delas, onde cada uma tem o
-         * seu selo. Os dois ficam numa coluna à direita do texto. */
-        var mais = outras.length ? botaoDoAvisoCelular('cel-aviso-mais-familias',
-          'E mais ' + outras.length + ' ' + palavraPlural(outras.length, 'família', 'famílias'), '›',
-          function () { mesCelular = outras[0].meses[0].mes; irParaTelaCelular('fechamento'); }) : null;
-        var cobrar = link ? botaoDeLinkCelular('cel-aviso-cobrar', 'Cobrar ' + curto, link, { 'aria-label': 'Cobrar a família de ' + fam.aluno.nome + ' pelo WhatsApp: abre a conversa com a mensagem escrita' }) : null;
-        var linha = el('div', { class: 'cel-aviso-linha' }, [
-          botaoDoAvisoCelular('cel-aviso-cobranca', textoCobrar, '›', function () { mesCelular = fam.meses[0].mes; irParaTelaCelular('fechamento'); }),
-          cobrar || mais ? el('div', { class: 'cel-aviso-direita' }, [cobrar, mais]) : null
-        ]);
-        var avisoCobrar = avisoCelular('cobrar', [linha]);
-        avisoCobrar.setAttribute('data-aluno', fam.aluno.id);
-        avisos.push(avisoCobrar);
+         * seu selo. */
+        acoes.push(acaoDoAvisoCelular('cel-aviso-cobranca', 'Ver o mês', function () { fecharAvisosCelular(); mesCelular = fam.meses[0].mes; irParaTelaCelular('fechamento'); }));
+        if (outras.length) acoes.push(acaoDoAvisoCelular('cel-aviso-mais-familias', 'E mais ' + outras.length + ' ' + palavraPlural(outras.length, 'família', 'famílias'),
+          function () { fecharAvisosCelular(); mesCelular = outras[0].meses[0].mes; irParaTelaCelular('fechamento'); }));
+        linhas.push({ tipo: 'cobrar', icone: 'cobrar', chaves: [chaveDaCobrancaCelular(fam)], dados: { aluno: fam.aluno.id }, nome: 'da cobrança de ' + curto,
+          titulo: 'Em aberto: ' + fam.aluno.nome,
+          detalhe: fam.meses.map(function (x) { return mesMinusculoCelular(x.mes); }).join(' e ') + ', ' + dinheiro(faltaDaFamiliaCelular(fam)) +
+            (link ? '' : '. Sem celular na ficha para o WhatsApp'),
+          acoes: acoes });
+        resumo.push(familias.length + ' a cobrar');
       }
     }
     if (daDona) {
       var fechar = mesAFecharCelular(hoje, agora);
-      if (fechar) {
-        var falta = [
-          fechar.semRegistro ? fechar.semRegistro + ' ' + palavraPlural(fechar.semRegistro, 'aula sem registro', 'aulas sem registro') : '',
-          fechar.abertas ? fechar.abertas + ' ' + palavraPlural(fechar.abertas, 'família em aberto', 'famílias em aberto') : ''
-        ].filter(Boolean).join(' e ');
-        var avisoFechar = avisoCelular('fechar', [botaoDoAvisoCelular('cel-aviso-fechar', 'Fechar ' + mesMinusculoCelular(fechar.mes) + ': ' + falta, 'Abrir',
-          function () { mesCelular = fechar.mes; irParaTelaCelular('fechamento'); })]);
-        avisoFechar.setAttribute('data-mes', fechar.mes);
-        avisos.push(avisoFechar);
+      if (fechar && fora.indexOf('fechar:' + fechar.mes) < 0) {
+        linhas.push({ tipo: 'fechar', icone: 'fechar', chaves: ['fechar:' + fechar.mes], dados: { mes: fechar.mes }, nome: 'de fechar ' + mesMinusculoCelular(fechar.mes),
+          titulo: 'Fechar ' + mesMinusculoCelular(fechar.mes),
+          detalhe: [
+            fechar.semRegistro ? fechar.semRegistro + ' ' + palavraPlural(fechar.semRegistro, 'aula sem registro', 'aulas sem registro') : '',
+            fechar.abertas ? fechar.abertas + ' ' + palavraPlural(fechar.abertas, 'família em aberto', 'famílias em aberto') : ''
+          ].filter(Boolean).join(' e '),
+          acoes: [acaoDoAvisoCelular('cel-aviso-fechar', 'Abrir', function () { fecharAvisosCelular(); mesCelular = fechar.mes; irParaTelaCelular('fechamento'); })] });
+        resumo.push('fechar ' + mesMinusculoCelular(fechar.mes));
       }
     }
-    return avisos.slice(0, MAX_AVISOS_CELULAR);
+    var versao = versaoPendenteAtiva ? (versaoPendenteAtiva.versao || 'nova') : versaoProntaParaOPainel;
+    if (versao && !folhaCelular && !formCelular && fora.indexOf('versao:' + versao) < 0) {
+      linhas.push({ tipo: 'versao', icone: 'versao', chaves: ['versao:' + versao], nome: 'da versão nova', titulo: 'Versão nova pronta.', detalhe: '',
+        acoes: [acaoDoAvisoCelular('cel-aviso-versao', 'Atualizar', function () { fecharAvisosCelular(); aplicarAtualizacao(); }, true)] });
+      resumo.push('versão nova pronta');
+    }
+    return { linhas: linhas, conta: linhas.length, resumo: resumo };
   }
-  function caixaDeAvisosCelular() {
-    var avisos = avisosDoHojeCelular();
-    return avisos.length ? el('div', { class: 'cel-avisos', id: 'cel-avisos', role: 'region', 'aria-label': 'Avisos de hoje' }, avisos) : null;
+
+  /* Dispensar: as chaves entram nos dispensados de hoje, os avisos e a
+   * agenda (a marca de sem registro) se refazem no lugar, e a barra escura
+   * oferece o Desfazer por 12 s. A rolagem da agenda não muda. */
+  function dispensarAvisoCelular(chaves, nome) {
+    var hoje = Core.hojeIso();
+    var estado = lerEstadoDosAvisosCelular();
+    var lista = estado.dispensados[hoje] || [];
+    chaves.forEach(function (chave) { if (lista.indexOf(chave) < 0) lista.push(chave); });
+    estado.dispensados[hoje] = lista;
+    gravarEstadoDosAvisosCelular(estado);
+    refazerAvisosEAgendaCelular();
+    avisar(nome ? 'Aviso ' + nome + ' dispensado até amanhã.' : 'Avisos dispensados até amanhã.', 'Desfazer', function () {
+      var e = lerEstadoDosAvisosCelular();
+      e.dispensados[hoje] = (e.dispensados[hoje] || []).filter(function (c) { return chaves.indexOf(c) < 0; });
+      gravarEstadoDosAvisosCelular(e);
+      refazerAvisosEAgendaCelular();
+    });
+    /* O Desfazer do dispensar fica 12 segundos (os 9 de sempre eram pouco
+     * para quem desliza com a outra mão ocupada; auditoria de UX de 09/11),
+     * em dourado sobre o marinho, como no desenho final. */
+    $('#aviso').classList.add('aviso-dourado');
+    /* A barra escura fica acima das abas de baixo, nunca por trás delas. */
+    var abas = $('#cel-abas');
+    if (abas && abas.getBoundingClientRect().height) {
+      $('#aviso').style.setProperty('--sobe', Math.max(0, Math.round(window.innerHeight - abas.getBoundingClientRect().top - 24 + 8)) + 'px');
+    }
+    clearTimeout(tempoAviso);
+    tempoAviso = setTimeout(esconderAviso, TEMPO_DO_DESFAZER_DISPENSAR);
   }
-  /* A cada minuto, com a linha de agora, os avisos se refazem ("daqui a"). */
+  var TEMPO_DO_DESFAZER_DISPENSAR = 12000;
+  function refazerAvisosEAgendaCelular() {
+    if (!$('#cel-hoje.ativa')) return;
+    var velha = $('#cel-tempo');
+    if (velha) velha.parentNode.replaceChild(linhaDoTempoCelular(diaCelular || Core.hojeIso(), celularEdita()), velha);
+    renovarAvisosCelular();
+  }
+
+  /* Arrastar para o lado dispensa; o toque curto continua sendo o clique.
+   * Por pointer events (o toque do Galaxy chega como pointer de toque): o
+   * aviso tem touch-action: pan-y, então o dedo na vertical rola o painel
+   * como sempre, e só o movimento de lado é nosso, sem rolar a página de
+   * lado. Dispensa passado o limiar, com o movimento mais de lado que de
+   * pé; antes disso o aviso volta ao lugar. O evento não sobe: a faixa da
+   * semana não vê o arrasto. */
+  var LIMIAR_DE_DISPENSAR = 72;
+  function deslizarParaDispensarCelular(elemento, chaves, nome) {
+    var x0 = 0, y0 = 0, id = null, arrastando = false, engoleClique = false;
+    function voltar() { elemento.style.transform = ''; elemento.classList.remove('arrastando'); }
+    elemento.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      id = e.pointerId; x0 = e.clientX; y0 = e.clientY; arrastando = false; engoleClique = false;
+    });
+    elemento.addEventListener('pointermove', function (e) {
+      if (e.pointerId !== id) return;
+      var dx = e.clientX - x0, dy = e.clientY - y0;
+      if (!arrastando && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+        arrastando = true;
+        elemento.classList.add('arrastando');
+        try { elemento.setPointerCapture(e.pointerId); } catch (x) { /* o toque já é capturado */ }
+      }
+      if (arrastando) {
+        e.stopPropagation();
+        elemento.style.transform = 'translateX(' + dx + 'px)';
+      }
+    });
+    function soltar(e, cancelou) {
+      if (e.pointerId !== id) return;
+      id = null;
+      if (!arrastando) return;
+      e.stopPropagation();
+      engoleClique = true;
+      var dx = e.clientX - x0, dy = e.clientY - y0;
+      if (!cancelou && Math.abs(dx) >= LIMIAR_DE_DISPENSAR && Math.abs(dx) > Math.abs(dy) * 1.5) dispensarAvisoCelular(chaves, nome);
+      else voltar();
+      setTimeout(function () { engoleClique = false; }, 400);
+    }
+    elemento.addEventListener('pointerup', function (e) { soltar(e, false); });
+    elemento.addEventListener('pointercancel', function (e) { soltar(e, true); });
+    // o arrasto que terminou sobre um botão não vira toque nele
+    elemento.addEventListener('click', function (e) { if (engoleClique) { e.preventDefault(); e.stopPropagation(); engoleClique = false; } }, true);
+    return elemento;
+  }
+
+  /* O selinho e o painel, postos na faixa da semana. O selinho (o sino com o
+   * número, marinho) mora na linha da data, com a altura de toque que a
+   * linha já tem: recolhido, não ocupa linha nenhuma. O painel abre por
+   * cima da agenda, sobre um fundo escurecido, sem mexer nela: fechar
+   * devolve tudo no mesmo lugar. No rodapé, a sincronia (o estado da nuvem
+   * e o ↻), como no desenho final. */
+  function porAvisosNaFaixaCelular(faixa) {
+    var av = avisosDoHojeCelular();
+    if (!av.conta) return;
+    var aberto = painelDosAvisosAberto, classeDoPainel = 'cel-avisos cel-avisos-sobre';
+    var rotulo = av.conta + ' ' + palavraPlural(av.conta, 'aviso', 'avisos') + ' de hoje: ' + av.resumo.join(', ');
+    var selo = el('button', { type: 'button', class: 'cel-avisos-selo', id: 'cel-avisos-selo', 'aria-controls': 'cel-avisos',
+      'aria-expanded': aberto ? 'true' : 'false', 'aria-label': rotulo + '. ' + (aberto ? 'Toque para recolher' : 'Toque para ver'),
+      aoClick: function () { alternarAvisosCelular(); } }, [
+      el('span', { class: 'cel-avisos-selo-pilula' }, [iconeDoAvisoCelular('sino', 'cel-avisos-selo-sino'), el('span', { class: 'cel-avisos-selo-numero', texto: String(av.conta) })])
+    ]);
+    var todos = [];
+    av.linhas.forEach(function (l) { todos = todos.concat(l.chaves); });
+    var estado = estadoCurtoDaNuvemCelular();
+    var rodape = el('div', { class: 'cel-avisos-rodape', id: 'cel-avisos-sincronia', 'data-tom': estado.tom }, [
+      iconeDoAvisoCelular('nuvem', 'cel-avisos-nuvem'),
+      el('span', { class: 'cel-avisos-sincronia-texto', texto: estado.frase }),
+      temMarcaCelular() && temNuvem() && Nuvem.estado().entrada
+        ? el('button', { type: 'button', class: 'btn pequeno cel-icone', id: 'cel-avisos-atualizar', 'aria-label': 'Buscar de novo', title: 'Buscar de novo',
+          disabled: celularBuscando, texto: '↻', aoClick: atualizarCelularDaNuvem }) : null
+    ]);
+    var painel = el('div', { class: classeDoPainel, id: 'cel-avisos', role: 'region', 'aria-label': 'Avisos de hoje' }, [
+      el('div', { class: 'cel-avisos-cabeca' }, [
+        el('h2', { class: 'cel-avisos-titulo', texto: 'Avisos' }),
+        el('button', { type: 'button', class: 'cel-avisos-todos', id: 'cel-avisos-dispensar-todos', texto: 'Dispensar todos',
+          aoClick: function () { dispensarAvisoCelular(todos); } })
+      ]),
+      el('div', { class: 'cel-avisos-lista' }, av.linhas.map(linhaDoAvisoCelular)),
+      rodape
+    ]);
+    var fundo = el('div', { class: 'cel-avisos-fundo', id: 'cel-avisos-fundo', aoClick: function () { alternarAvisosCelular(); } });
+    if (!aberto) { painel.hidden = true; fundo.hidden = true; }
+    if (!/cel-avisos-sobre/.test(classeDoPainel)) fundo.hidden = true;
+    var topo = faixa.querySelector('.cel-semana-topo');
+    topo.insertBefore(selo, topo.querySelector('#cel-semana-seguinte'));
+    faixa.appendChild(fundo);
+    faixa.appendChild(painel);
+  }
+  /* Aberto, o painel fica logo abaixo da linha da data e para antes das abas
+   * de baixo; o que passa disso rola dentro dele. */
+  function ajustarPainelDosAvisosCelular() {
+    var painel = $('#cel-avisos'), faixa = $('#cel-semana');
+    if (!painel || painel.hidden || !faixa || !painel.classList.contains('cel-avisos-sobre')) return;
+    var topo = Math.round(faixa.getBoundingClientRect().bottom) + 6;
+    var abas = $('#cel-abas');
+    var baixo = abas && abas.getBoundingClientRect().height ? abas.getBoundingClientRect().top : window.innerHeight;
+    painel.style.top = topo + 'px';
+    painel.style.maxHeight = Math.max(160, Math.floor(baixo - topo - 12)) + 'px';
+  }
+  function alternarAvisosCelular() {
+    painelDosAvisosAberto = !painelDosAvisosAberto;
+    var recolhida = !painelDosAvisosAberto;
+    var painel = $('#cel-avisos'), selo = $('#cel-avisos-selo'), fundo = $('#cel-avisos-fundo');
+    if (!painel || !selo) return;
+    painel.hidden = recolhida;
+    if (fundo) fundo.hidden = recolhida || !painel.classList.contains('cel-avisos-sobre');
+    selo.setAttribute('aria-expanded', recolhida ? 'false' : 'true');
+    selo.setAttribute('aria-label', selo.getAttribute('aria-label').replace(/Toque para (ver|recolher)$/, recolhida ? 'Toque para ver' : 'Toque para recolher'));
+    ajustarPainelDosAvisosCelular();
+  }
+  /* A ação de um aviso leva a outra tela ou à folha: o painel recolhe antes. */
+  function fecharAvisosCelular() {
+    if (painelDosAvisosAberto) alternarAvisosCelular();
+  }
+  /* A cada minuto, com a linha de agora, os avisos se refazem. */
   function renovarAvisosCelular() {
-    var faixa = $('#cel-semana'), velha = $('#cel-avisos'), nova = caixaDeAvisosCelular();
-    if (velha) velha.parentNode.removeChild(velha);
-    if (faixa && nova) faixa.appendChild(nova);
+    var faixa = $('#cel-semana');
+    ['#cel-avisos', '#cel-avisos-selo', '#cel-avisos-fundo'].forEach(function (s) { var v = $(s); if (v) v.parentNode.removeChild(v); });
+    if (faixa && (diaCelular || Core.hojeIso()) === Core.hojeIso()) { porAvisosNaFaixaCelular(faixa); ajustarPainelDosAvisosCelular(); }
   }
 
   function desenharHojeCelular() {
@@ -22495,10 +23001,13 @@
     if (hojeVistoCelular && hojeVistoCelular !== hoje && diaCelular === hojeVistoCelular) { diaCelular = hoje; diaRoladoCelular = null; }
     var dia = diaCelular || hoje;
     var edita = celularEdita();
-    var faixa = faixaDaSemanaCelular(dia);
-    // os avisos (D6c, lote 4) só no dia de hoje, presos com a faixa: a rolagem até agora não os esconde
-    if (dia === hoje) { var avisos = caixaDeAvisosCelular(); if (avisos) faixa.appendChild(avisos); }
+    var semana = faixaDaSemanaCelular(dia), faixa = semana.faixa;
+    // os avisos (D6c, lote 4) só no dia de hoje, presos com a faixa: a rolagem até agora não os esconde;
+    // recolhidos, são o selinho na linha da data; abertos, o painel, até a metade da tela
+    if (dia === hoje) porAvisosNaFaixaCelular(faixa);
     caixa.appendChild(faixa);
+    caixa.appendChild(semana.dias);
+    ajustarPainelDosAvisosCelular();
     var aulas = aulasDoDiaCelular(dia);
     if (!aulas.length) {
       caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-sem-aula', texto: dia === hoje ? 'Nenhuma aula hoje.' : 'Nenhuma aula neste dia.' }));
@@ -23463,6 +23972,7 @@
         bloco.setAttribute('data-acao-celular', 'pago-em');
         filhos.push(bloco);
       }
+      if (podeEditarMensagemCelular()) filhos.push(botaoDaMensagemCelular(f.aluno.id, mesCelular));
       caixa.appendChild(el('div', { class: 'cartao cel-fechamento-aluno', 'data-aluno': f.aluno.id, 'data-selo': selo.selo }, filhos));
     });
   }
@@ -23524,15 +24034,275 @@
         } })
     ]));
     fechs.forEach(function (f) {
-      caixa.appendChild(el('div', { class: 'cartao cel-familia' }, [
+      var alunoId = f.aluno.id;
+      /* O PDF é calculado no toque, e não no desenho da tela: a mensagem do
+       * mês que ela acabou de salvar (aqui ou no Fechamento) entra nele. */
+      var pdfAgora = function (entrega) { return exportarAlunoEmPdf(Core.calcularFechamento(db, alunoId, mesCelular), false, null, entrega); };
+      caixa.appendChild(el('div', { class: 'cartao cel-familia', 'data-aluno': alunoId }, [
         el('strong', { texto: f.alunoNome }),
         el('div', { class: 'ajuda u-margem-0', texto: f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula', 'aulas') +
           ' · ' + dinheiro(f.valorFeito) }),
         el('div', { class: 'barra u-margem-baixo-0 u-margem-topo-8' }, [
-          el('button', { type: 'button', class: 'btn', texto: 'Enviar o PDF', aoClick: function () { exportarAlunoEmPdf(f, false); } })
-        ])
+          el('button', { type: 'button', class: 'btn cel-ver-pdf', texto: 'Ver o PDF', aoClick: function () { pdfAgora(baixar); } }),
+          el('button', { type: 'button', class: 'btn cel-enviar-pdf', texto: 'Enviar o PDF', aoClick: function () { pdfAgora(); } })
+        ]),
+        podeEditarMensagemCelular() ? botaoDaMensagemCelular(alunoId, mesCelular) : null
       ]));
     });
+  }
+
+  // ---------- a mensagem do mês, editada no celular ----------
+
+  /* É o MESMO texto que o tablet edita na janela do feedback: o mesmo campo
+   * (db.resumos, pelo Core.textoDoMes e Core.gravarTextoDoMes) e o mesmo
+   * caminho até o PDF (calcularFechamento lê dali). Gravar é uma das ações do
+   * celular da dona: passa pelo comoAcaoDoCelular, entra na fila de registros
+   * como `resumo:<aluno>:<mês>` e sobe. Quem só lê, e o observador, não têm o
+   * botão. O roteiro de perguntas do tablet fica no tablet: aqui é o texto.
+   *
+   * O editor ocupa a tela, com Salvar e Cancelar num rodapé que acompanha a
+   * parte visível (visualViewport): com o teclado aberto, os dois continuam à
+   * vista. Sair sem salvar guarda um rascunho neste aparelho (localStorage,
+   * como o relato da aula), oferecido ao reabrir. */
+  var editorMensagemCelular = null; // { alunoId, mes, base, soltar }
+
+  function podeEditarMensagemCelular() { return celularEdita(); }
+
+  function botaoDaMensagemCelular(alunoId, mes) {
+    /* Mais leve que o "Marcar como pago" e separado dele por um respiro e um
+     * fio: são decisões diferentes, e a do dinheiro é a que pesa. */
+    return el('div', { class: 'cel-mensagem-acesso', 'data-acao-celular': 'mensagem-do-mes' }, [
+      el('button', { type: 'button', class: 'cel-editar-mensagem', 'data-aluno': alunoId, texto: 'Editar a mensagem do mês',
+        aoClick: function () { abrirMensagemCelular(alunoId, mes); } })
+    ]);
+  }
+
+  function chaveRascunhoMensagem(alunoId, mes) { return 'rascunho-mensagem-mes:' + alunoId + ':' + mes; }
+  function lerRascunhoMensagem(alunoId, mes) {
+    try {
+      var r = JSON.parse(localStorage.getItem(chaveRascunhoMensagem(alunoId, mes)) || 'null');
+      if (!r || typeof r.texto !== 'string' || typeof r.base !== 'string') return null;
+      return r;
+    } catch (e) { return null; }
+  }
+  function guardarRascunhoMensagem(ed, texto) {
+    try {
+      if (texto === ed.base) localStorage.removeItem(chaveRascunhoMensagem(ed.alunoId, ed.mes));
+      else localStorage.setItem(chaveRascunhoMensagem(ed.alunoId, ed.mes), JSON.stringify({ texto: texto, base: ed.base, quando: Date.now() }));
+    } catch (e) { /* sem armazenamento: o texto continua na tela até ela sair */ }
+  }
+  function limparRascunhoMensagem(alunoId, mes) {
+    try { localStorage.removeItem(chaveRascunhoMensagem(alunoId, mes)); } catch (e) { /* sem armazenamento */ }
+  }
+
+  /* De onde veio o texto salvo, pelo registro dele (Core.origemDoTextoDoMes):
+   * o aparelho que gravou e a hora, e o que faltar no registro. */
+  function origemDaMensagemCelular(alunoId, mes, temTexto) {
+    var id = 'resumo:' + alunoId + ':' + mes;
+    return Promise.all([Store.lerRegistros(), Store.lerFila()]).then(function (v) {
+      var reg = (v[0] || []).filter(function (r) { return r.id === id; })[0] || null;
+      var naFila = (v[1] || []).some(function (e) { return e.id === id; });
+      return Core.origemDoTextoDoMes(reg, { naFila: naFila, meuAparelho: Store.aparelho(), temTexto: temTexto });
+    }, function () { return ''; });
+  }
+
+  /* A versão do aplicativo no tablet da dona, pelo diagnóstico que cada
+   * aparelho sobe (D7): o do papel "tablet" com o resumo mais recente. A
+   * última lida fica neste aparelho, para quando ele estiver sem sinal. Sem
+   * diagnóstico nenhum de tablet (nunca subiu, ou a nuvem não respondeu e não
+   * há leitura guardada), devolve null e o editor abre: não dá para afirmar
+   * que o tablet é antigo, e travar aí tiraria dela o celular sem sinal. */
+  var CHAVE_VERSAO_DO_TABLET = 'versao-do-tablet-vista';
+  function versaoDoTabletCelular() {
+    var guardada = null;
+    try { guardada = JSON.parse(localStorage.getItem(CHAVE_VERSAO_DO_TABLET) || 'null'); } catch (e) { guardada = null; }
+    if (!temNuvem() || (typeof navigator !== 'undefined' && navigator.onLine === false)) return Promise.resolve(guardada);
+    var lida = Nuvem.listarDiagnosticos().then(function (lista) {
+      var t = (lista || []).filter(function (d) { return d.papel === 'tablet' && d.app; })[0] || null;
+      var v = t ? { app: String(t.app), quando: t.quando || '' } : null;
+      try { localStorage.setItem(CHAVE_VERSAO_DO_TABLET, JSON.stringify(v)); } catch (e) { /* sem armazenamento */ }
+      return v;
+    }, function () { return guardada; });
+    var espera = new Promise(function (r) { setTimeout(function () { r(guardada); }, 4000); });
+    return Promise.race([lida, espera]);
+  }
+
+  /* Um tablet numa versão anterior a esta não conhece a regra da mensagem do
+   * mês (vence a escrita mais recente) e, com uma edição dele mais velha na
+   * fila, cobriria a do celular. Enquanto o tablet não atualiza, o celular não
+   * edita a mensagem. */
+  function abrirMensagemCelular(alunoId, mes) {
+    if (!podeEditarMensagemCelular()) return;
+    return versaoDoTabletCelular().then(function (v) {
+      if (v && Core.versaoAntes(v.app, VERSAO) === true) {
+        avisar('Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão ' + v.app + ', e esta é a ' + VERSAO + '.');
+        return;
+      }
+      abrirEditorDaMensagemCelular(alunoId, mes);
+    });
+  }
+
+  /* "Ver a versão que ficou de fora": a do outro aparelho que perdeu no último
+   * conflito, guardada no item. Um toque mostra, outro troca o texto do campo
+   * por ela (ela ainda salva, ou não). Serve ao editor do celular e à janela
+   * do feedback do tablet. */
+  function blocoDaVersaoDeFora(v, campo) {
+    var deste = v.aparelho && typeof Store.aparelho === 'function' && v.aparelho === Store.aparelho();
+    var quem = deste ? (modoCelular ? 'Deste celular' : 'Deste tablet') : (modoCelular ? 'Do tablet' : 'Do celular');
+    var quando = Core.quandoDoCarimbo(v.em);
+    var painel = el('div', { class: 'versao-de-fora-painel', id: 'versao-de-fora-painel', hidden: 'hidden' }, [
+      el('div', { class: 'ajuda u-margem-0', texto: quem + (quando ? ', ' + quando : '') + ':' }),
+      el('div', { class: 'versao-de-fora-texto', id: 'versao-de-fora-texto', texto: v.texto }),
+      el('button', { type: 'button', class: 'btn pequeno', id: 'versao-de-fora-usar', texto: 'Usar esta',
+        aoClick: function () {
+          campo.value = v.texto;
+          campo.dispatchEvent(new Event('input', { bubbles: true }));
+          campo.focus();
+        } })
+    ]);
+    var botao = el('button', { type: 'button', class: 'btn pequeno', id: 'versao-de-fora-ver', texto: 'Ver a versão que ficou de fora',
+      aoClick: function () {
+        painel.hidden = !painel.hidden;
+        botao.textContent = painel.hidden ? 'Ver a versão que ficou de fora' : 'Esconder a versão que ficou de fora';
+      } });
+    return el('div', { class: 'versao-de-fora', id: 'versao-de-fora' }, [botao, painel]);
+  }
+
+  function abrirEditorDaMensagemCelular(alunoId, mes) {
+    if (!podeEditarMensagemCelular()) return;
+    var aluno = alunoPorId(alunoId);
+    var f = Core.calcularFechamento(db, alunoId, mes);
+    if (!aluno || !f) { avisar('Este aluno não tem aulas neste mês.'); return; }
+    fecharMensagemCelular();
+    esconderAviso();
+    var base = Core.textoDoMes(db, alunoId, mes);
+    var ed = editorMensagemCelular = { alunoId: alunoId, mes: mes, base: base, soltar: null };
+    var rascunho = lerRascunhoMensagem(alunoId, mes);
+    if (rascunho && rascunho.texto === base) { limparRascunhoMensagem(alunoId, mes); rascunho = null; }
+
+    var campo = el('textarea', { id: 'cel-mensagem-texto', class: 'cel-mensagem-texto', 'aria-labelledby': 'cel-mensagem-titulo',
+      placeholder: 'Como foi o mês, o que evoluiu, o que merece atenção e o que vem a seguir.' });
+    campo.value = base;
+    var faixa = null;
+    if (rascunho) {
+      var hora = Core.quandoDoCarimbo(new Date(rascunho.quando).toISOString());
+      /* O rascunho volta sozinho quando o texto salvo é o mesmo de quando ela
+       * começou. Se o texto mudou depois (no tablet, por exemplo), o salvo fica
+       * na tela e o rascunho é oferecido: um toque troca. */
+      var mudou = rascunho.base !== base;
+      if (!mudou) campo.value = rascunho.texto;
+      var botaoRascunho = el('button', { type: 'button', class: 'btn pequeno', id: mudou ? 'cel-mensagem-usar-rascunho' : 'cel-mensagem-descartar',
+        texto: mudou ? 'Usar o rascunho' : 'Descartar o rascunho',
+        aoClick: function () {
+          if (mudou) { campo.value = rascunho.texto; ed.base = base; guardarRascunhoMensagem(ed, campo.value); }
+          else { campo.value = base; limparRascunhoMensagem(alunoId, mes); }
+          if (faixa && faixa.parentNode) faixa.parentNode.removeChild(faixa);
+          campo.focus();
+        } });
+      faixa = el('div', { class: 'faixa-info cel-mensagem-rascunho', id: 'cel-mensagem-rascunho' }, [
+        el('div', { texto: mudou
+          ? 'Há um rascunho deste aparelho, de ' + hora.replace(/^em /, '') + ', mas o texto salvo mudou depois dele. Abaixo está o texto salvo.'
+          : 'Rascunho recuperado, de ' + hora.replace(/^em /, '') + '. Ainda não foi salvo.' }),
+        botaoRascunho
+      ]);
+    }
+    campo.addEventListener('input', function () { guardarRascunhoMensagem(ed, campo.value); });
+
+    var contas = f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula dada', 'aulas dadas') +
+      ' · ' + f.horasFeitas + ' h · ' + dinheiro(f.valorFeito);
+    var origem = el('div', { class: 'ajuda u-margem-0 cel-mensagem-origem', id: 'cel-mensagem-origem' });
+    var editor = el('div', { class: 'cel-mensagem', id: 'cel-mensagem', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'cel-mensagem-titulo',
+      'data-acao-celular': 'mensagem-do-mes', 'data-aluno': alunoId, 'data-mes': mes }, [
+      /* O alto, a faixa e o texto rolam juntos quando não cabem (teclado aberto
+       * com a letra grande); o rodapé fica sempre à vista. */
+      el('div', { class: 'cel-mensagem-corpo' }, [
+      el('div', { class: 'cel-mensagem-cabeca' }, [
+        el('h2', { class: 'cel-titulo', id: 'cel-mensagem-titulo', texto: 'Mensagem do mês' }),
+        el('div', { class: 'cel-mensagem-quem', texto: aluno.nome + ' · ' + Core.mesExtenso(mes) }),
+        // o texto não é anotação dela: vai para a família, no PDF do mês
+        el('div', { class: 'cel-mensagem-destino', id: 'cel-mensagem-destino', texto: 'Vai para a família no PDF de ' + Core.mesExtenso(mes).toLowerCase() + '.' }),
+        el('div', { class: 'ajuda u-margem-0', id: 'cel-mensagem-contas', texto: contas }),
+        origem
+      ]),
+      faixa,
+      Core.versaoDeForaDoMes(db, alunoId, mes) ? blocoDaVersaoDeFora(Core.versaoDeForaDoMes(db, alunoId, mes), campo) : null,
+      campo
+      ]),
+      el('div', { class: 'cel-mensagem-rodape' }, [
+        el('button', { type: 'button', class: 'btn', id: 'cel-mensagem-cancelar', texto: 'Cancelar', aoClick: cancelarMensagemCelular }),
+        el('button', { type: 'button', class: 'btn principal', id: 'cel-mensagem-salvar', texto: 'Salvar', aoClick: salvarMensagemCelular })
+      ])
+    ]);
+    ($('#modo-celular') || document.body).appendChild(editor);
+    ed.soltar = acompanharTecladoCelular(editor);
+    origemDaMensagemCelular(alunoId, mes, !!base.trim()).then(function (frase) {
+      if (editorMensagemCelular !== ed) return;
+      origem.textContent = frase;
+      origem.hidden = !frase;
+    });
+    setTimeout(function () { if (editorMensagemCelular === ed) campo.focus(); }, 60);
+  }
+
+  /* O editor fica do tamanho da parte visível da tela: quando o teclado abre,
+   * a parte visível encolhe e o rodapé sobe junto. Devolve quem solta. */
+  function acompanharTecladoCelular(editor) {
+    var vv = window.visualViewport;
+    function ajustar() {
+      var altura = vv ? vv.height : window.innerHeight;
+      editor.style.height = Math.round(altura) + 'px';
+      editor.style.top = Math.round(vv ? vv.offsetTop : 0) + 'px';
+    }
+    ajustar();
+    if (vv) { vv.addEventListener('resize', ajustar); vv.addEventListener('scroll', ajustar); }
+    window.addEventListener('resize', ajustar);
+    return function () {
+      if (vv) { vv.removeEventListener('resize', ajustar); vv.removeEventListener('scroll', ajustar); }
+      window.removeEventListener('resize', ajustar);
+    };
+  }
+
+  function fecharMensagemCelular() {
+    var ed = editorMensagemCelular;
+    editorMensagemCelular = null;
+    if (ed && ed.soltar) ed.soltar();
+    var velho = $('#cel-mensagem');
+    if (velho) velho.parentNode.removeChild(velho);
+  }
+
+  /* Cancelar fecha sem gravar nada no banco; o que ela escreveu fica no
+   * rascunho deste aparelho, e ela é avisada. */
+  function cancelarMensagemCelular() {
+    var ed = editorMensagemCelular, campo = $('#cel-mensagem-texto');
+    var ficou = !!(ed && campo && campo.value !== ed.base);
+    if (ed && campo) guardarRascunhoMensagem(ed, campo.value);
+    fecharMensagemCelular();
+    if (ficou) avisar('A mensagem não foi salva. O rascunho ficou neste aparelho.');
+  }
+
+  function salvarMensagemCelular() {
+    var ed = editorMensagemCelular, campo = $('#cel-mensagem-texto');
+    if (!ed || !campo || !podeEditarMensagemCelular()) return;
+    var texto = campo.value;
+    var aluno = alunoPorId(ed.alunoId);
+    var salvoAgora = Core.textoDoMes(db, ed.alunoId, ed.mes);
+    if (texto === salvoAgora) {
+      limparRascunhoMensagem(ed.alunoId, ed.mes);
+      fecharMensagemCelular();
+      avisar('A mensagem já estava assim. Nada mudou.');
+      return;
+    }
+    /* O texto salvo mudou com o editor aberto (chegou do tablet): ela decide
+     * antes de passar por cima. Com o "não", o editor fica como está. */
+    if (salvoAgora !== ed.base && !confirmar('Chegou uma versão nova do tablet enquanto você escrevia. ' +
+      'Salvar a sua por cima? A do tablet fica guardada no histórico.')) return;
+    var rotuloMensagem = 'Mensagem do mês de ' + (aluno ? aluno.nome : 'aluno') + ' salva.';
+    fecharMensagemCelular();
+    return comoAcaoDoCelular(function () { return comDesfazer(rotuloMensagem, function () {
+      Core.gravarTextoDoMes(db, ed.alunoId, ed.mes, texto);
+    }); }).then(function () {
+      limparRascunhoMensagem(ed.alunoId, ed.mes);
+      desenharCelular();
+    }, function () { desenharCelular(); });
   }
 
   // ---------- o aparelho observador (D7): diagnóstico e ajustes ----------
