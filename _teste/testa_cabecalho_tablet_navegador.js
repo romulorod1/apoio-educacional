@@ -100,7 +100,7 @@ const PASTA_PRINTS = process.env.SALVAR_PRINTS || '';
       H.conf(`[${w}px] cabecalho exatamente em 64px de altura`, m.alturaCabecalho, 64);
       H.conf(`[${w}px] subtitulo oculto para poupar largura`, m.subtituloOculto, true);
       H.conf(`[${w}px] todas as 5 abas em uma unica linha`, m.mesmaLinha, true);
-      H.conf(`[${w}px] abas com altura de toque confortavel de 44px`, m.alturas.every(h => h === 44), true);
+      H.conf(`[${w}px] abas com altura de toque confortavel de pelo menos 44px`, m.alturas.every(h => h >= 44), true);
       H.conf(`[${w}px] botao do olho com 44x44px`, m.alturaOlho === 44 && m.larguraOlho === 44, true);
       H.conf(`[${w}px] sem transbordamento horizontal (scrollWidth <= clientWidth)`, m.semTransbordamento, true);
       H.conf(`[${w}px] todos os elementos dentro dos limites da tela`, m.tudoDentroDaTela, true);

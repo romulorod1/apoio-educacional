@@ -195,7 +195,7 @@ button, input, select, textarea { font-family: inherit; }
 .cabecalho {
   background: var(--branco);
   border-bottom: 2px solid var(--navy);
-  padding: 10px 16px 8px;
+  padding: 8px 16px 6px; /* F1: com as abas de 48 px (antes 44), o cabeçalho segue com 64 */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2132,7 +2132,10 @@ button.alvo-rascunho:hover { background: var(--soft); }
    "Marcar para o material" e "Marcado, tirar" têm tamanhos diferentes, e sem
    isto a fileira inteira se reacomodava no toque: ela marcava, o dedo já ia
    para "Próxima ›" e o botão tinha saído de baixo dele. */
-#bib-marcar-visor { min-width: 196px; }
+/* F1: em em, e não em px: com a letra de 16 px (antes 15) "Marcar para o
+   material" passava dos 196 px e o botão encolhia 9 px ao marcar. 13,5em
+   cabe o rótulo mais longo em qualquer tamanho de letra. */
+#bib-marcar-visor { min-width: 13.5em; }
 /* O leitor de PDF (C14). O fundo é o mesmo do visor da biblioteca, para a
    folha branca se destacar. O corpo rola nos dois sentidos: com zoom a página
    fica mais larga que a janela, e ela anda pela folha arrastando o dedo. */
