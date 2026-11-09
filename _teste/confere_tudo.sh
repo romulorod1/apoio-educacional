@@ -7,9 +7,9 @@
 #
 #   sh _teste/confere_tudo.sh            o portao inteiro, com Chrome
 #   sh _teste/confere_tudo.sh --rapido   tudo menos o que abre navegador
-#   sh _teste/confere_tudo.sh --pedaco 2/4
+#   sh _teste/confere_tudo.sh --pedaco 2/8
 #                                        so as provas de navegador da fatia 2
-#                                        de 4 (o CI roda as fatias em maquinas
+#                                        de 8 (o CI roda as fatias em maquinas
 #                                        paralelas; o que nao abre navegador
 #                                        fica com o --rapido)
 #   sh _teste/confere_tudo.sh --listar [--pedaco K/N]
@@ -47,11 +47,14 @@ done
 
 # AS FATIAS DO PORTAO INTEIRO. O inteiro passou de oitenta minutos numa maquina
 # so, e quase todo esse tempo e Chrome, uma prova depois da outra. No CI ele
-# roda em N maquinas paralelas, cada uma com a sua fatia: a prova de navegador
-# de numero i (na ordem em que este arquivo as chama, contando de 1) vai para a
-# fatia ((i - 1) mod N) + 1. A ordem e a mesma em toda maquina, porque o arquivo
-# e o mesmo, entao as fatias nao se cruzam e juntas cobrem todas; quem prova
-# isso e o testa_pedacos_do_portao, sem navegador, no --rapido.
+# roda em N maquinas paralelas (hoje 8), cada uma com a sua fatia. A divisao e
+# pelo TEMPO MEDIDO de cada prova (_teste/tempos_do_portao.tsv), gulosa: a mais
+# demorada primeiro, para a fatia mais leve (_teste/divide_portao.js; prova nova
+# sem tempo recebe a mediana). A divisao pela contagem deixou uma fatia em 32
+# min e outra em 47. A conta e a mesma em toda maquina, porque a lista e a
+# tabela sao as mesmas, entao as fatias nao se cruzam e juntas cobrem todas; quem
+# prova isso e o testa_pedacos_do_portao, sem navegador, no --rapido.
+minhas_provas=""
 pk=""; pn=""
 if [ "${pedaco_dado:-0}" = "1" ]; then
   # sem barra ("4") ou vazio nao e fatia: viraria o 4/4 ou o portao inteiro, calado
@@ -67,6 +70,9 @@ if [ "${pedaco_dado:-0}" = "1" ]; then
   # Fatia e o portao rapido nao combinam: o rapido pula o navegador, e a fatia
   # diria que rodou as provas que so pulou.
   if [ "$rapido" = "1" ]; then printf 'o --rapido nao roda navegador; nao combina com --pedaco\n'; exit 2; fi
+  # Os nomes das provas desta fatia. Se o divisor falhar a fatia NAO pode virar
+  # "nenhuma prova" calada (nem o portao inteiro): sai com 2.
+  minhas_provas=$(node _teste/divide_portao.js "$pk" "$pn") || { printf 'nao consegui dividir o portao em fatias (divide_portao.js)\n'; exit 2; }
 fi
 numero_navegador=0
 rodadas_aqui=0
@@ -146,7 +152,7 @@ roda() {
   # de um teste falso derrubaria o portao inteiro na primeira prova)
   if [ "$na_secao_navegador" = "1" ]; then
     numero_navegador=$((numero_navegador + 1))
-    if [ -n "$pn" ] && [ $(( (numero_navegador - 1) % pn + 1 )) -ne "$pk" ]; then
+    if [ -n "$pn" ] && ! printf '%s\n' "$minhas_provas" | grep -Fxq -- "$nome"; then
       return 0
     fi
   elif [ -n "$pn" ]; then
