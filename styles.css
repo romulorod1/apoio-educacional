@@ -1,6 +1,29 @@
 /* styles.css
  * Identidade do Apoio Educacional aplicada à interface.
  * Pensado para tablet: alvos de toque grandes e leitura confortável em pé ou deitado.
+ *
+ * O SISTEMA VISUAL (F1 do redesenho, 09/11/2026), a base de toda tela nova:
+ *   ação     --acao (o marinho #1F3A5F) é a ÚNICA cor de ação: botão
+ *            principal, link, segmento escolhido e foco. --acao-forte no
+ *            toque, --acao-clara no botão de destaque e no anel do campo,
+ *            --sobre-acao para a letra em cima do marinho.
+ *   dourado  --gold (#C9A75B) só em cima do marinho (o "+" flutuante).
+ *   fundo    --fundo (#FBF9F5).
+ *   estado   o verde (--teal) e o âmbar (--aviso-texto) só como sinal pequeno
+ *            de estado ("Realizada", "em dia"), nunca como botão.
+ *   letra    a fonte do sistema; cinco tamanhos, em rem para crescer com a
+ *            letra do aparelho: --letra-12, --letra-14, --letra-16 (o corpo),
+ *            --letra-20 e --letra-24; dois pesos, --peso-normal (400) e
+ *            --peso-forte (600); algarismos tabulares no corpo inteiro. Nada
+ *            abaixo de 12 px, sem itálico, sem caixa alta e sem serifa.
+ *   alvo     --alvo e --alvo-celular, 48 px.
+ *   ícone    <svg class="ico">, de traço 1,75, na cor da letra. Peça pelo
+ *            icone(nome) ou pelo { icone: nome } do el() no app.js, ou por
+ *            data-icone="nome" no index.html (a lista dos nomes está no
+ *            ICONES do app.js). .ico-so é o ícone sozinho no botão, um pouco
+ *            maior; o botão dele leva aria-label.
+ * Cor ou tamanho novo entra aqui no :root, nunca solto numa regra
+ * (_teste/testa_sistema_visual.js trava isso).
  */
 
 :root {
@@ -19,7 +42,7 @@
   --soft: #EFF3F7;
   --soft-2: #E8EEF4;
   --fio: #C9D2DD;
-  --muted: #6B7280;
+  --muted: #5F6876; /* F1: o cinza do desenho final, 4,5:1 também sobre o --soft */
   --texto: #1A1C1F;
   --branco: #FFFFFF;
   --vermelho: #B4453C;
@@ -51,7 +74,7 @@
 
   /* As outras cores da folha (B12). Cor quase igual a uma destas (diferença
      de cor abaixo de 2, que o olho não separa) usa a mesma variável. */
-  --aviso-texto: #8A6D2F;
+  --aviso-texto: #7A5F27; /* F1: 4,5:1 sobre o --aviso-fundo */
   --aviso-fundo: #FBF3E3;
   --fio-claro: #DDE3EA;
   --novidades-verde: #16A34A;
@@ -141,7 +164,7 @@ button, input, select, textarea { font-family: inherit; }
 :focus-visible { outline: 2px solid var(--acao); outline-offset: 2px; }
 
 /* Os ícones (F1): SVG de traço 1,75 na grade de 24, pontas redondas, na cor
-   do texto. Saem do ícone() do app.js, do mesmo desenho do conjunto final. */
+   do texto. Saem do icone() do app.js, do mesmo desenho do conjunto final. */
 .ico {
   width: 1.25em;
   height: 1.25em;
@@ -155,6 +178,11 @@ button, input, select, textarea { font-family: inherit; }
   stroke-linejoin: round;
 }
 .ico-grande { width: 24px; height: 24px; }
+/* o ícone sozinho num botão (as setas da semana, o fechar): um pouco maior */
+.ico-so { width: 1.5em; height: 1.5em; vertical-align: middle; }
+.cel-folha-nome-seta .ico, .bib-seta .ico, .seta-bloco .ico { width: 1.25em; height: 1.25em; }
+/* o "+" flutuante: o único dourado, e em cima do marinho */
+.cel-fab .ico { color: var(--gold); stroke-width: 2.25; }
 
 /* ---------- cabeçalho ---------- */
 
@@ -210,7 +238,7 @@ button, input, select, textarea { font-family: inherit; }
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
-  min-height: 44px;
+  min-height: var(--alvo, 48px);
 }
 .aba:hover { background: var(--soft); }
 .aba.ativa { background: var(--navy); color: var(--branco); }
@@ -263,7 +291,7 @@ h3.subtitulo {
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
-  min-height: 44px;
+  min-height: var(--alvo, 48px);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -420,7 +448,19 @@ label.campo-checkbox {
   align-items: center;
 }
 .pilula.cancelada { opacity: .5; text-decoration: line-through; }
-.pilula.tem-nota::after { content: " ✎"; }
+/* o lápis da aula com anotação: o mesmo desenho do ícone "pencil", na cor da
+   letra (a máscara recorta o fundo), no lugar do caractere solto */
+.pilula.tem-nota::after {
+  content: "";
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-left: .25em;
+  vertical-align: -0.125em;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l1-4L16 5l3 3L8 19z'/%3E%3Cpath d='M14 7l3 3'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l1-4L16 5l3 3L8 19z'/%3E%3Cpath d='M14 7l3 3'/%3E%3C/svg%3E") center / contain no-repeat;
+}
 
 /* ---------- zoom do dia no calendario (T12) ---------- */
 
@@ -3350,10 +3390,10 @@ body.modo-celular .celular .cel-folha .cel-folha-botao { min-height: 56px; font-
 .versao-de-fora-painel { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
   background: var(--fundo-leve); border: 1px solid var(--fio-claro); border-radius: 10px; padding: 8px 10px; }
 .versao-de-fora-painel[hidden] { display: none; }
-.versao-de-fora-texto { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--letra-3); }
+.versao-de-fora-texto { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--letra-14); }
 .cel-mensagem-corpo { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 8px; }
 .cel-mensagem-cabeca { flex-shrink: 0; min-width: 0; }
-.cel-mensagem-destino { font-weight: 700; color: var(--teal); font-size: var(--letra-3); margin-top: 2px; overflow-wrap: anywhere; }
+.cel-mensagem-destino { font-weight: 600; color: var(--navy); font-size: var(--letra-14); margin-top: 2px; overflow-wrap: anywhere; }
 /* No cartão do Fechamento e do Enviar: depois de um respiro e de um fio, um
    botão de texto, mais leve que o "Marcar como pago". */
 .cel-mensagem-acesso { margin-top: 16px; padding-top: 4px; border-top: 1px solid var(--fio-claro); }
@@ -3364,10 +3404,10 @@ body.modo-celular .celular .cel-editar-mensagem {
   padding: 0 4px;
   background: transparent;
   border: 0;
-  color: var(--teal);
+  color: var(--acao);
   font: inherit;
-  font-size: var(--letra-3);
-  font-weight: 700;
+  font-size: var(--letra-14);
+  font-weight: 600;
   text-align: left;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -3375,7 +3415,7 @@ body.modo-celular .celular .cel-editar-mensagem {
   cursor: pointer;
 }
 .cel-mensagem-cabeca .cel-titulo { margin: 0 0 2px; }
-.cel-mensagem-quem { font-weight: 700; color: var(--navy); font-size: var(--letra-3); overflow-wrap: anywhere; }
+.cel-mensagem-quem { font-weight: 600; color: var(--navy); font-size: var(--letra-14); overflow-wrap: anywhere; }
 .cel-mensagem-origem { margin-top: 2px; overflow-wrap: anywhere; }
 .cel-mensagem-origem[hidden] { display: none; }
 .cel-mensagem-rascunho { flex-shrink: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
@@ -3387,7 +3427,7 @@ body.modo-celular .celular .cel-mensagem-rascunho .btn { white-space: normal; }
   box-sizing: border-box;
   resize: none;
   font: inherit;
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
   line-height: 1.5;
 }
 .cel-mensagem-rodape {
@@ -3537,7 +3577,7 @@ body.modo-celular .celular .linha { flex-direction: column; }
    a lista cresce para baixo e rola sozinha se for longa; nunca para o lado. */
 .resumo-importacao-lista { list-style: none; margin: 8px 0 0; padding: 0; max-height: 50vh; overflow-y: auto; }
 .resumo-importacao-linha { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; min-width: 0; }
-.resumo-importacao-sinal { flex: 0 0 auto; width: 1.4em; text-align: center; font-weight: 700; }
+.resumo-importacao-sinal { flex: 0 0 auto; width: 1.4em; text-align: center; font-weight: 600; }
 .resumo-importacao-texto { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .resumo-importacao-detalhe { display: block; margin-top: 2px; }
 #fechar-resumo-importacao { min-height: 48px; }

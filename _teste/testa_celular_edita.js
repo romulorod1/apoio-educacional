@@ -316,6 +316,15 @@ const commitsLidos = pag => pag.evaluate(() => { try { return JSON.parse(session
 const escritasLidas = async pag => [].concat.apply([], await commitsLidos(pag));
 const escritasDeCopia = async pag => (await escritasLidas(pag)).filter(ehCopia);
 const texto = (pag, sel) => pag.evaluate(s => { const e = document.querySelector(s); return e ? e.textContent : null; }, sel);
+/* F1: os sinais ✓ ✕ e o da reposição viraram ícones (svg); aqui cada ícone é
+ * lido como o sinal de antes, seguido de espaço, para a frase seguir igual. */
+const textoComSinal = (pag, sel) => pag.evaluate(s => {
+  const e = document.querySelector(s); if (!e) return null;
+  const SINAL = { check: '✓', x: '✕', swap: '↻' };
+  const c = e.cloneNode(true);
+  c.querySelectorAll('svg[data-icone-nome]').forEach(v => v.replaceWith(document.createTextNode((SINAL[v.getAttribute('data-icone-nome')] || '?') + ' ')));
+  return c.textContent;
+}, sel);
 const existe = (pag, sel) => pag.evaluate(s => !!document.querySelector(s), sel);
 const clicar = (pag, sel) => pag.evaluate(s => { const e = document.querySelector(s); if (!e) return false; e.click(); return true; }, sel);
 async function digitar(pag, sel, valor) {
@@ -440,8 +449,10 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
   const alvos = Array.from(raiz.querySelectorAll('button, a[href], input, select, textarea, [role=button], summary')).filter(visivel);
   const pequenos = alvos.filter(e => { const r = e.getBoundingClientRect(); return r.height < 48 || r.width < 48; })
     .map(e => (e.id || e.className || e.textContent.trim().slice(0, 30)) + ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height));
-  const botoes = Array.from(raiz.querySelectorAll('button')).filter(visivel).filter(b => re.test(b.textContent));
-  const dasAcoes = botoes.filter(b => b.closest('[data-acao-celular]')).map(b => b.textContent.trim());
+  /* F1: o "+" agora é um ícone; ele conta como o "+" de antes */
+  const tx = b => (b.querySelector('svg[data-icone-nome="plus"]') ? '+' : '') + b.textContent;
+  const botoes = Array.from(raiz.querySelectorAll('button')).filter(visivel).filter(b => re.test(tx(b)));
+  const dasAcoes = botoes.filter(b => b.closest('[data-acao-celular]')).map(b => tx(b).trim());
   const soltos = botoes.filter(b => !b.closest('[data-acao-celular]')).filter(b => !b.closest('#cel-entrada')).map(b => b.textContent.trim());
   const campos = Array.from(raiz.querySelectorAll('input, select, textarea')).filter(visivel)
     .filter(e => !e.closest('#cel-entrada') && !e.hasAttribute('data-consulta')).map(e => e.id || e.tagName);
@@ -700,16 +711,16 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   await clicar(pagC, '#cel-folha-faltou');
   const situacao = id => pagC.evaluate(i => Store.carregar().then(b => { const a = b.aulas.find(x => x.id === i); return a.status + '/' + a.cobravel; }), id);
   conf('Faltou: a aula de ontem fica "falta", cobrada como a falta sem aviso do tablet', (await esperar('faltou gravou', () => situacao('aula-ontem'), v => v === 'falta/true', 10000)).ok, true);
-  conf('o bloco diz "Faltou"', /✕ Faltou/.test((await texto(pagC, '.cel-bloco[data-aula="aula-ontem"]')) || ''), true);
+  conf('o bloco diz "Faltou"', /✕ Faltou/.test((await textoComSinal(pagC, '.cel-bloco[data-aula="aula-ontem"]')) || ''), true);
   await abrirFolha(pagC, 'aula-ontem');
   await clicar(pagC, '#cel-folha-realizada');
   conf('Realizada: a aula volta a "realizada", cobrada', (await esperar('realizada gravou', () => situacao('aula-ontem'), v => v === 'realizada/true', 10000)).ok, true);
-  conf('o bloco diz "✓ Realizada"', /✓ Realizada/.test((await texto(pagC, '.cel-bloco[data-aula="aula-ontem"]')) || ''), true);
+  conf('o bloco diz "✓ Realizada"', /✓ Realizada/.test((await textoComSinal(pagC, '.cel-bloco[data-aula="aula-ontem"]')) || ''), true);
 
   secao('3d. (revisão) Tocar na situação que a aula já tem não mexe na cobrança, e a reposição tem botão próprio');
   await abrirFolha(pagC, 'aula-gratis');
   conf('(arranjo) a aula de ontem marcada no tablet como realizada sem cobrança mostra "✓ Realizada" na folha',
-    (await texto(pagC, '#cel-folha-realizada')) === '✓ Realizada' && (await situacao('aula-gratis')) === 'realizada/false', true);
+    (await textoComSinal(pagC, '#cel-folha-realizada')) === '✓ Realizada' && (await situacao('aula-gratis')) === 'realizada/false', true);
   await clicar(pagC, '#cel-folha-realizada');
   await pausa(600);
   prop('tocar em Realizada para confirmar deixa a aula sem cobrança (' + (await situacao('aula-gratis')) + ')', (await situacao('aula-gratis')) === 'realizada/false', V_COBRANCA);
@@ -717,7 +728,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('e o aviso diz que nada mudou', /^Nada mudou: a aula já está como realizada, sem cobrança\./.test((await texto(pagC, '#aviso-texto')) || ''), true);
   await irParaDia(pagC, HOJE);
   await abrirFolha(pagC, 'aula-hoje-gama');
-  conf('a reposição tem o botão "✓ Reposição", e Realizada não aparece marcada', (await texto(pagC, '#cel-folha-reposicao')) === '✓ Reposição' &&
+  conf('a reposição tem o botão "✓ Reposição", e Realizada não aparece marcada', (await textoComSinal(pagC, '#cel-folha-reposicao')) === '✓ Reposição' &&
     (await texto(pagC, '#cel-folha-realizada')) === 'Realizada', true);
   await clicar(pagC, '#cel-folha-reposicao');
   await pausa(400);

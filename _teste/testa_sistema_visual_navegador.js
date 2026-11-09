@@ -35,7 +35,7 @@
  *   --prints <pasta>   Hoje e a aula no celular, a janela da aula e a
  *                      Biblioteca no tablet.
  *
- * Porta 8884. Relógio fixo: segunda, 16/11/2026, 11:00.
+ * Porta 8934. Relógio fixo: segunda, 16/11/2026, 11:00.
  */
 'use strict';
 const fs = require('fs');
@@ -43,7 +43,7 @@ const path = require('path');
 const H = require('./_bib_navegador.js');
 const { conf, secao, esperar, pausa } = H;
 
-const PORTA = 8884;
+const PORTA = 8934;
 const LIMITE_LOG = Number(process.env.LIMITE_LOG || 40);
 const MODOS = ['--envenenado-botao-verde', '--envenenado-fonte-11px', '--envenenado-glifo-solto'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
@@ -61,8 +61,8 @@ const VENENOS = {
     ancora: '--letra-12: .75rem;',
     troca: '--letra-12: .6875rem;' },
   '--envenenado-glifo-solto': { arquivo: 'app.js', tipos: ['GLIFO'],
-    ancora: "id: 'cel-semana-anterior', 'aria-label': 'Semana anterior' }, [icone('chl')]",
-    troca: "id: 'cel-semana-anterior', 'aria-label': 'Semana anterior', texto: '‹' }, []" }
+    ancora: "id: 'cel-semana-anterior', 'aria-label': 'Semana anterior', icone: 'chl',",
+    troca: "id: 'cel-semana-anterior', 'aria-label': 'Semana anterior', texto: '‹'," }
 };
 
 secao('0. Os venenos e as âncoras');
