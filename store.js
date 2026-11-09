@@ -986,6 +986,22 @@
               }
             }
             var entrada = fila[chegou.id];
+            /* A MENSAGEM DO MÊS (tipo `resumo`) vence pela hora em que foi
+             * ESCRITA, e não pela ordem em que chega: o texto que ela escreveu
+             * sem sinal às 10h não pode cobrir a correção do tablet das 14h só
+             * porque o celular pegou sinal às 18h. Se o que chega foi escrito
+             * depois da edição local na fila, ele vence: a entrada sai da fila,
+             * a versão local vai para o histórico (o houvePerdedor abaixo) e o
+             * registro guarda a hora da versão que perdeu, para o editor dizer.
+             * Só este tipo; os outros seguem a regra de sempre. */
+            var perdeuLocalEm = null;
+            if (local && entrada && !entrada.quarentena && chegou.tipo === 'resumo' && !entrada.restauro &&
+                Date.parse(chegou.atualizadoEm || '') > Date.parse(entrada.atualizadoEm || '')) {
+              saida.delete(chegou.id);
+              delete fila[chegou.id];
+              perdeuLocalEm = entrada.atualizadoEm;
+              entrada = null;
+            }
             /* A RESTAURAÇÃO VENCE (decisão da sessão, 08/11): restaurar uma cópia, mais
              * velha ou não, é a vontade dela de voltar àquele ponto, no mesmo
              * tablet ou num novo. A entrada da restauração é uma edição local
@@ -1020,6 +1036,7 @@
               houvePerdedor = true;
               contas.perdedoresLocais++;
             }
+            if (perdeuLocalEm) novo.perdeuLocalEm = perdeuLocalEm; // só neste aparelho: o envio não leva este campo
             registros.put(novo);
             porId[chegou.id] = novo;
             contas.aplicados++;

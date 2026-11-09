@@ -3931,7 +3931,14 @@
     if (!reg.aparelho) return 'Gravado ' + quando + '. O registro não diz em que aparelho.';
     var doTablet = reg.aparelho !== opcoes.meuAparelho;
     if (!quando) return (doTablet ? 'Editado no tablet' : 'Editado neste celular') + '. O registro não diz a hora.';
-    if (doTablet) return 'Editado no tablet ' + quando + '.';
+    /* A versão deste aparelho perdeu para uma escrita depois no tablet (a
+     * regra do store para o tipo resumo): ela fica sabendo, e onde está a dela. */
+    if (doTablet && reg.perdeuLocalEm) {
+      var dela = quandoDoCarimbo(reg.perdeuLocalEm, opcoes.hoje);
+      return 'O tablet editou este texto depois de você, ' + quando + '. A sua versão' + (dela ? ', ' + dela + ',' : '') +
+        ' ficou guardada no histórico.';
+    }
+    if (doTablet) return 'O tablet editou este texto ' + quando + '. Se você salvar, a sua versão substitui a do tablet, que fica guardada no histórico.';
     if (opcoes.naFila || reg.nuvem) return 'Editado neste celular ' + quando + '.';
     return 'Veio na cópia do tablet feita ' + quando + '.';
   }

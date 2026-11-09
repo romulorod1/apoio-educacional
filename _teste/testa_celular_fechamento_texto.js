@@ -30,7 +30,12 @@
  *   --envenenado-texto-fora-do-pdf       o celular grava o texto num campo dele, que o PDF não lê;
  *   --envenenado-texto-nao-sobe          o Salvar grava fora da ação do celular e nada sobe;
  *   --envenenado-observador-edita-texto  o observador ganha o "Editar a mensagem do mês";
- *   --envenenado-vale-o-primeiro         no recebimento, o que chega vence a edição local na fila (store.js).
+ *   --envenenado-vale-o-primeiro         no recebimento, o que chega vence a edição local na fila (store.js);
+ *   --envenenado-vale-quem-chega-depois  a regra de antes: a edição local na fila vence mesmo escrita antes (store.js).
+ *
+ * Na mensagem do mês vence a escrita MAIS RECENTE (o atualizadoEm de quem
+ * escreveu), e não a que chega por último: o texto escrito no ônibus sem
+ * sinal não cobre a correção feita depois no tablet.
  *
  * O relógio da página fica fixo em 15/10/2026 18:00 (a prova não depende do
  * dia em que roda).
@@ -48,8 +53,9 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODOS = ['--envenenado-texto-fora-do-pdf', '--envenenado-texto-nao-sobe', '--envenenado-observador-edita-texto', '--envenenado-vale-o-primeiro'];
-const [V_PDF, V_SOBE, V_OBS, V_PRIMEIRO] = MODOS;
+const MODOS = ['--envenenado-texto-fora-do-pdf', '--envenenado-texto-nao-sobe', '--envenenado-observador-edita-texto', '--envenenado-vale-o-primeiro',
+  '--envenenado-vale-quem-chega-depois'];
+const [V_PDF, V_SOBE, V_OBS, V_PRIMEIRO, V_CHEGA] = MODOS;
 const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 /* Um argumento --envenenado-... que não está na lista rodaria calado como o
@@ -87,7 +93,9 @@ const ANCORAS = {
   [V_SOBE]: ['app.js', 'return comoAcaoDoCelular(function () { return comDesfazer(rotuloMensagem,',
     'return (function (f) { return f(); })(function () { return comDesfazer(rotuloMensagem,'],
   [V_OBS]: ['app.js', 'function podeEditarMensagemCelular() { return celularEdita(); }', 'function podeEditarMensagemCelular() { return true; }'],
-  [V_PRIMEIRO]: ['store.js', 'if (local && entrada && !entrada.quarentena) {', 'if (local && entrada && !entrada.quarentena && false) {']
+  [V_PRIMEIRO]: ['store.js', 'if (local && entrada && !entrada.quarentena) {', 'if (local && entrada && !entrada.quarentena && false) {'],
+  // a regra de antes: a edição local na fila vence sempre, mesmo escrita antes da que chega
+  [V_CHEGA]: ['store.js', "chegou.tipo === 'resumo' && !entrada.restauro &&", 'false &&']
 };
 const FONTES = { 'app.js': APP, 'store.js': STORE };
 conf('cada âncora de veneno está no arquivo dela uma vez só', MODOS.map(m => FONTES[ANCORAS[m][0]].split(ANCORAS[m][1]).length - 1).join(','), MODOS.map(() => 1).join(','));
@@ -180,6 +188,11 @@ const amb = H.criarAmbiente(PORTA_APP, 'nath_fechtexto_celular', trocas);
 
 const HOJE = '2026-10-15';
 const RELOGIO = HOJE + 'T18:00:00';
+/* UM relógio para as três páginas: o desvio é calculado uma vez, aqui, e não a
+ * cada carga da página. Com um por carga, a página recarregada voltava às
+ * 18:00 e a outra seguia andando, e a hora de escrita de cada lado (que decide
+ * a mensagem do mês) não era comparável. */
+const DESVIO = new Date(RELOGIO).getTime() - Date.now();
 const MES = HOJE.slice(0, 7);
 
 async function prepararPagina(pag, movel) {
@@ -188,18 +201,19 @@ async function prepararPagina(pag, movel) {
   pag.errosDePagina = [];
   pag.on('pageerror', e => pag.errosDePagina.push(e.message));
   pag.dialogos = [];
-  pag.on('dialog', async d => { pag.dialogos.push(d.message()); try { await d.accept(); } catch (e) { /* ok */ } });
+  // pag.recusar = true: a próxima pergunta é recusada (o "Cancelar" do diálogo)
+  pag.on('dialog', async d => { pag.dialogos.push(d.message()); try { if (pag.recusar) await d.dismiss(); else await d.accept(); } catch (e) { /* ok */ } });
   pag.commitsNaRede = 0;
   pag.on('request', r => {
     const u = r.url();
     if (u.indexOf(FS) === 0 && /:commit\b/.test(u) && r.method() === 'POST') pag.commitsNaRede++;
   });
   /* O relógio da página, fixo no meio do mês (e andando a partir dali). */
-  await pag.evaluateOnNewDocument(alvo => {
-    const Real = Date, desvio = new Real(alvo).getTime() - Real.now();
+  await pag.evaluateOnNewDocument(desvio => {
+    const Real = Date;
     class Fixo extends Real { constructor(...a) { if (a.length) super(...a); else super(Real.now() + desvio); } static now() { return Real.now() + desvio; } }
     window.Date = Fixo;
-  }, RELOGIO);
+  }, DESVIO);
   await pag.evaluateOnNewDocument(cfg => { window.NUVEM_EMULADOR = cfg; }, CFG);
   if (!movel) {
     await pag.evaluateOnNewDocument(() => {
@@ -424,6 +438,11 @@ const RASCUNHO = 'Rascunho que ela não salvou: começou bem o mês.';
 const JUNHO = 'Junho de referência: o texto de sempre.';
 const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
 const SEL_MSG = '.cel-editar-mensagem[data-aluno="msg"]';
+const DO_TABLET_FRASE = iso => 'O tablet editou este texto hoje às ' + hhmmDe(iso) + '. Se você salvar, a sua versão substitui a do tablet, que fica guardada no histórico.';
+const ONIBUS_C = 'Escrito no ônibus, sem sinal, às dez.';
+const ONIBUS_T = 'Corrigido no tablet depois, às duas.';
+const ABERTO_T = 'Chegou do tablet com o editor aberto no celular.';
+const ABERTO_C = 'Escrito no celular enquanto o tablet mandava outra.';
 
 (async function () {
   secao('1. O tablet cria os alunos fictícios e as mensagens, e sobe a cópia');
@@ -487,6 +506,16 @@ const SEL_MSG = '.cel-editar-mensagem[data-aluno="msg"]';
     return b ? b.textContent + ' | ' + !!b.closest('[data-acao-celular]') + ' | ' + !!b.closest('.cel-fechamento-aluno[data-aluno="msg"]') : 'sem botão';
   }, SEL_MSG);
   prop('o cartão do aluno no Fechamento tem "Editar a mensagem do mês", dentro das ações do celular (' + noFech + ')', noFech === 'Editar a mensagem do mês | true | true');
+  const pesos = await pagC.evaluate(() => {
+    const c = document.querySelector('.cel-fechamento-aluno[data-aluno="msg"]');
+    const p = c.querySelector('.btn-marcar-pago'), e = c.querySelector('.cel-editar-mensagem');
+    if (!p || !e) return 'sem os dois botões';
+    const fp = getComputedStyle(p), fe = getComputedStyle(e);
+    return { respiro: Math.round(e.getBoundingClientRect().top - p.getBoundingClientRect().bottom), editarEhBtn: e.classList.contains('btn'),
+      fundoIgual: fp.backgroundColor === fe.backgroundColor && fp.borderTopWidth === fe.borderTopWidth };
+  });
+  conf('o "Editar" é mais leve que o "Marcar como pago" e fica a um respiro dele (' + JSON.stringify(pesos) + ')',
+    pesos.respiro >= 16 && !pesos.editarEhBtn && !pesos.fundoIgual, true);
   conf('cada aluno do mês tem o botão (msg e rasc)', await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-fechamento .cel-editar-mensagem')).map(b => b.dataset.aluno).sort().join(',')), 'msg,rasc');
   let m = await medirTela(pagC);
   conf('o Fechamento com o botão: alvos de 48 px, sem rolagem de lado, nenhum botão de edição solto', telaBoa(m) + '|' + m.soltos.join(', '), '|');
@@ -516,7 +545,8 @@ const SEL_MSG = '.cel-editar-mensagem[data-aluno="msg"]';
   conf('o aluno e o mês no alto', aberto.quem, 'Aluno Mensagem Teste · ' + (await pagC.evaluate(m => Core.mesExtenso(m), MES)));
   const origem0 = await esperar('a origem do texto apareceu', () => texto(pagC, '#cel-mensagem-origem'), v => !!v, 5000);
   const regInicial = await pagA.evaluate(id => Store.lerRegistros().then(l => (l.find(r => r.id === id) || {}).atualizadoEm || ''), 'resumo:msg:' + MES);
-  conf('o texto inicial veio do tablet, e o editor diz (' + origem0.valor + ')', origem0.valor, 'Editado no tablet hoje às ' + hhmmDe(regInicial) + '.');
+  conf('o texto inicial veio do tablet, e o editor diz o que acontece se ela salvar (' + origem0.valor + ')', origem0.valor, DO_TABLET_FRASE(regInicial));
+  conf('o alto do editor diz que o texto vai para a família, no PDF do mês', await texto(pagC, '#cel-mensagem-destino'), 'Vai para a família no PDF de outubro de 2026.');
   m = await medirTela(pagC);
   conf('o editor: alvos de 48 px, sem rolagem de lado, Salvar e Cancelar dentro das ações do celular', telaBoa(m) + '|' + m.soltos.join(', '), '|');
   conf('o texto ocupa a tela: mais da metade da altura', await pagC.evaluate(() => document.querySelector('#cel-mensagem-texto').getBoundingClientRect().height > window.innerHeight / 2), true);
@@ -595,7 +625,7 @@ const SEL_MSG = '.cel-editar-mensagem[data-aluno="msg"]';
   const origem1 = await esperar('a origem do texto', () => texto(pagC, '#cel-mensagem-origem'), v => !!v, 5000);
   const valor1 = await pagC.evaluate(() => document.querySelector('#cel-mensagem-texto').value);
   conf('o editor abre com o texto do tablet', valor1, DO_TABLET);
-  conf('e diz de onde veio, com a hora do registro (' + origem1.valor + ')', origem1.valor, 'Editado no tablet hoje às ' + hhmmDe(regTablet.em) + '.');
+  conf('e diz de onde veio, com a hora do registro, e o que acontece se ela salvar (' + origem1.valor + ')', origem1.valor, DO_TABLET_FRASE(regTablet.em));
   await tirarPrint(pagC, '4_editado_no_tablet.png');
   await clicar(pagC, '#cel-mensagem-cancelar');
   conf('Cancelar sem mudar nada fecha e não grava', (await existe(pagC, '#cel-mensagem')) + ' ' + (await fila(pagC)).filter(id => /^resumo:/.test(id)).length, 'false 0');
@@ -611,7 +641,59 @@ const SEL_MSG = '.cel-editar-mensagem[data-aluno="msg"]';
     hhmmDe('2026-10-14T21:02:00.000Z') + '. O registro não diz em que aparelho. | O registro deste texto não diz o aparelho nem a hora.');
   conf('(controle) a função que o editor chama é essa', APP.indexOf('Core.origemDoTextoDoMes(reg,') >= 0, true);
 
-  secao('8. Os dois lados editam o mesmo mês: vale a última, nos dois sentidos');
+  secao('8. Os dois lados editam o mesmo mês: vale a escrita mais recente, nos dois sentidos');
+  /* 8o. O ônibus: sem sinal, ela escreve no celular; depois o tablet corrige e
+   * sobe; por fim o celular pega sinal. Vence a do tablet, escrita depois,
+   * mesmo chegando antes; a do celular vai para o histórico, e o editor diz. */
+  const histAntes = await pagC.evaluate(() => Store.listarHistorico().then(l => l.filter(h => /Antes de receber do outro aparelho/.test(h.rotulo)).length));
+  await pagC.setOfflineMode(true);
+  await clicar(pagC, '#cel-fechamento ' + SEL_MSG);
+  await esperar('o editor abriu', () => existe(pagC, '#cel-mensagem-texto'), v => v === true, 5000);
+  await digitar(pagC, '#cel-mensagem-texto', ONIBUS_C);
+  await clicar(pagC, '#cel-mensagem-salvar');
+  await esperar('o celular gravou sem sinal', () => textoNoDisco(pagC, 'msg', MES), v => v === ONIBUS_C, 5000);
+  conf('8o: (arranjo) sem sinal, a edição do celular espera na fila', (await fila(pagC)).filter(id => /^resumo:/.test(id)).join(','), 'resumo:msg:' + MES);
+  await pausa(1500);
+  conf('8o: o tablet corrige depois e sobe', await editarNoTablet(pagA, 'msg', MES, ONIBUS_T), true);
+  await sincronizar(pagA);
+  const horaTablet = await pagA.evaluate(id => Store.lerRegistros().then(l => (l.find(r => r.id === id) || {}).atualizadoEm), 'resumo:msg:' + MES);
+  await pagC.setOfflineMode(false);
+  await pausa(500);
+  await sincronizar(pagC);
+  await pausa(3000);
+  await sincronizar(pagC);
+  await sincronizar(pagA);
+  const fimO = { tablet: await textoNoDisco(pagA, 'msg', MES), celular: await textoNoDisco(pagC, 'msg', MES) };
+  console.log('   8o: ' + JSON.stringify(fimO));
+  prop('8o: o celular escreveu sem sinal ANTES da correção do tablet: os dois ficam com a do tablet, a mais recente', fimO.tablet === ONIBUS_T && fimO.celular === ONIBUS_T, V_CHEGA);
+  seVeneno(V_CHEGA);
+  conf('8o: a fila do celular não guarda mais a versão que perdeu', (await fila(pagC)).filter(id => /^resumo:/.test(id)).length, 0);
+  conf('8o: a versão do celular que perdeu está no histórico', (await pagC.evaluate(() => Store.listarHistorico().then(l => l.filter(h => /Antes de receber do outro aparelho/.test(h.rotulo)).length))) > histAntes, true);
+  await clicar(pagC, '#cel-fechamento ' + SEL_MSG);
+  await esperar('o editor abriu', () => existe(pagC, '#cel-mensagem-texto'), v => v === true, 5000);
+  const origemO = await esperar('a origem do texto', () => texto(pagC, '#cel-mensagem-origem'), v => !!v, 5000);
+  conf('8o: ao abrir, o editor diz que o tablet editou depois dela (' + origemO.valor + ')',
+    new RegExp('^O tablet editou este texto depois de você, hoje às ' + hhmmDe(horaTablet) + '\\. A sua versão, hoje às \\d\\d:\\d\\d, ficou guardada no histórico\\.$').test(origemO.valor || ''), true);
+  await tirarPrint(pagC, '6_tablet_editou_depois.png');
+  /* O texto do tablet chega com o editor aberto: o Salvar pergunta antes de
+   * passar por cima; com o "não", nada muda e o editor fica. */
+  conf('8e: (arranjo) o tablet manda outra com o editor do celular aberto', await editarNoTablet(pagA, 'msg', MES, ABERTO_T), true);
+  await sincronizar(pagA);
+  await sincronizar(pagC);
+  conf('8e: (arranjo) chegou ao disco do celular, com o editor ainda aberto', (await textoNoDisco(pagC, 'msg', MES)) + ' ' + (await existe(pagC, '#cel-mensagem')), ABERTO_T + ' true');
+  await digitar(pagC, '#cel-mensagem-texto', ABERTO_C);
+  const dlgE = pagC.dialogos.length;
+  pagC.recusar = true;
+  await clicar(pagC, '#cel-mensagem-salvar');
+  await pausa(300);
+  pagC.recusar = false;
+  conf('8e: o Salvar avisa antes de passar por cima, e o "não" deixa o editor e o texto do tablet',
+    pagC.dialogos.slice(dlgE).join(' ; ') + ' | ' + (await existe(pagC, '#cel-mensagem')) + ' | ' + (await textoNoDisco(pagC, 'msg', MES)),
+    'Chegou uma versão nova do tablet enquanto você escrevia. Salvar a sua por cima? A do tablet fica guardada no histórico. | true | ' + ABERTO_T);
+  await clicar(pagC, '#cel-mensagem-salvar');
+  conf('8e: com o "sim", a dela fica', (await esperar('gravou', () => textoNoDisco(pagC, 'msg', MES), v => v === ABERTO_C, 5000)).valor, ABERTO_C);
+  await sincronizar(pagC);
+  await sincronizar(pagA);
   /* 8a. O tablet grava e sobe primeiro; o celular, sem receber, grava depois:
    * a edição do celular, ainda na fila, vence o que chega. */
   conf('8a: o tablet grava a primeira', await editarNoTablet(pagA, 'msg', MES, T1), true);
@@ -729,12 +811,13 @@ const SEL_MSG = '.cel-editar-mensagem[data-aluno="msg"]';
    * no meio, e os dois lados trocam o texto. */
   const BASE = '94fa74b';
   const antigo = f => spawnSync('git', ['show', BASE + ':' + f], { cwd: H.RAIZ, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout || '';
-  const iguais = ['store.js', 'nuvem.js', 'sw.js'].map(f => antigo(f).replace(/\r\n/g, '\n') === fs.readFileSync(path.join(H.RAIZ, f), 'utf8').replace(/\r\n/g, '\n'));
-  conf('o store.js, o nuvem.js e o sw.js desta versão são os da 1.42.18 (a fila e o recebimento não mudaram)', iguais.join(','), 'true,true,true');
+  const iguais = ['nuvem.js', 'sw.js'].map(f => antigo(f).replace(/\r\n/g, '\n') === fs.readFileSync(path.join(H.RAIZ, f), 'utf8').replace(/\r\n/g, '\n'));
+  conf('o nuvem.js e o sw.js desta versão são os da 1.42.18 (o envio e o recebimento pela rede não mudaram)', iguais.join(','), 'true,true');
   const regCel = await pagC.evaluate(id => Store.lerRegistros().then(l => { const r = l.find(x => x.id === id); return r ? r.tipo + ' ' + Object.keys(r.dados || {}).sort().join(',') : 'sem registro'; }), 'resumo:msg:' + MES);
   conf('o registro que o celular grava tem a forma de sempre (' + regCel + ')', regCel, 'resumo alunoId,mes,texto');
-  ['app.js', 'core.js', 'styles.css'].forEach(f => { trocas['/' + f] = antigo(f); });
-  conf('(arranjo) o código da 1.42.18 foi lido do git', ['app.js', 'core.js', 'styles.css'].every(f => trocas['/' + f].length > 1000) && /var VERSAO = '1\.42\.18'/.test(trocas['/app.js']), true);
+  // o store.js também: a regra nova do resumo é só desta versão, e o tablet que voltou não a tem
+  ['app.js', 'core.js', 'styles.css', 'store.js'].forEach(f => { trocas['/' + f] = antigo(f); });
+  conf('(arranjo) o código da 1.42.18 foi lido do git', ['app.js', 'core.js', 'styles.css', 'store.js'].every(f => trocas['/' + f].length > 1000) && /var VERSAO = '1\.42\.18'/.test(trocas['/app.js']), true);
   await pagA.evaluate(async () => {
     const regs = navigator.serviceWorker ? await navigator.serviceWorker.getRegistrations() : [];
     await Promise.all(regs.map(r => r.unregister()));
@@ -770,7 +853,7 @@ const SEL_MSG = '.cel-editar-mensagem[data-aluno="msg"]';
   await esperar('o editor abriu', () => existe(pagC, '#cel-mensagem-texto'), v => v === true, 5000);
   const origemVolta = await esperar('a origem do texto', () => texto(pagC, '#cel-mensagem-origem'), v => !!v, 5000);
   conf('o editor do celular abre com ele e diz que veio do tablet (' + origemVolta.valor + ')',
-    (await pagC.evaluate(() => document.querySelector('#cel-mensagem-texto').value)) + ' | ' + /^Editado no tablet hoje às \d\d:\d\d\.$/.test(origemVolta.valor || ''), VOLTA_T + ' | true');
+    (await pagC.evaluate(() => document.querySelector('#cel-mensagem-texto').value)) + ' | ' + /^O tablet editou este texto hoje às \d\d:\d\d\. Se você salvar/.test(origemVolta.valor || ''), VOLTA_T + ' | true');
   await clicar(pagC, '#cel-mensagem-cancelar');
   conf('junho, já fechado, não mudou em lugar nenhum: o mesmo texto no tablet antigo e no celular',
     (await textoNoDisco(pagA, 'ref', '2026-06')) + ' | ' + (await textoNoDisco(pagC, 'ref', '2026-06')), JUNHO + ' | ' + JUNHO);

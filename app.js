@@ -23545,8 +23545,10 @@
   function podeEditarMensagemCelular() { return celularEdita(); }
 
   function botaoDaMensagemCelular(alunoId, mes) {
-    return el('div', { class: 'barra u-margem-baixo-0 u-margem-topo-8', 'data-acao-celular': 'mensagem-do-mes' }, [
-      el('button', { type: 'button', class: 'btn cel-editar-mensagem', 'data-aluno': alunoId, texto: 'Editar a mensagem do mês',
+    /* Mais leve que o "Marcar como pago" e separado dele por um respiro e um
+     * fio: são decisões diferentes, e a do dinheiro é a que pesa. */
+    return el('div', { class: 'cel-mensagem-acesso', 'data-acao-celular': 'mensagem-do-mes' }, [
+      el('button', { type: 'button', class: 'cel-editar-mensagem', 'data-aluno': alunoId, texto: 'Editar a mensagem do mês',
         aoClick: function () { abrirMensagemCelular(alunoId, mes); } })
     ]);
   }
@@ -23625,14 +23627,20 @@
     var origem = el('div', { class: 'ajuda u-margem-0 cel-mensagem-origem', id: 'cel-mensagem-origem' });
     var editor = el('div', { class: 'cel-mensagem', id: 'cel-mensagem', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'cel-mensagem-titulo',
       'data-acao-celular': 'mensagem-do-mes', 'data-aluno': alunoId, 'data-mes': mes }, [
+      /* O alto, a faixa e o texto rolam juntos quando não cabem (teclado aberto
+       * com a letra grande); o rodapé fica sempre à vista. */
+      el('div', { class: 'cel-mensagem-corpo' }, [
       el('div', { class: 'cel-mensagem-cabeca' }, [
         el('h2', { class: 'cel-titulo', id: 'cel-mensagem-titulo', texto: 'Mensagem do mês' }),
         el('div', { class: 'cel-mensagem-quem', texto: aluno.nome + ' · ' + Core.mesExtenso(mes) }),
+        // o texto não é anotação dela: vai para a família, no PDF do mês
+        el('div', { class: 'cel-mensagem-destino', id: 'cel-mensagem-destino', texto: 'Vai para a família no PDF de ' + Core.mesExtenso(mes).toLowerCase() + '.' }),
         el('div', { class: 'ajuda u-margem-0', id: 'cel-mensagem-contas', texto: contas }),
         origem
       ]),
       faixa,
-      campo,
+      campo
+      ]),
       el('div', { class: 'cel-mensagem-rodape' }, [
         el('button', { type: 'button', class: 'btn', id: 'cel-mensagem-cancelar', texto: 'Cancelar', aoClick: cancelarMensagemCelular }),
         el('button', { type: 'button', class: 'btn principal', id: 'cel-mensagem-salvar', texto: 'Salvar', aoClick: salvarMensagemCelular })
@@ -23689,12 +23697,17 @@
     if (!ed || !campo || !podeEditarMensagemCelular()) return;
     var texto = campo.value;
     var aluno = alunoPorId(ed.alunoId);
-    if (texto === Core.textoDoMes(db, ed.alunoId, ed.mes)) {
+    var salvoAgora = Core.textoDoMes(db, ed.alunoId, ed.mes);
+    if (texto === salvoAgora) {
       limparRascunhoMensagem(ed.alunoId, ed.mes);
       fecharMensagemCelular();
       avisar('A mensagem já estava assim. Nada mudou.');
       return;
     }
+    /* O texto salvo mudou com o editor aberto (chegou do tablet): ela decide
+     * antes de passar por cima. Com o "não", o editor fica como está. */
+    if (salvoAgora !== ed.base && !confirmar('Chegou uma versão nova do tablet enquanto você escrevia. ' +
+      'Salvar a sua por cima? A do tablet fica guardada no histórico.')) return;
     var rotuloMensagem = 'Mensagem do mês de ' + (aluno ? aluno.nome : 'aluno') + ' salva.';
     fecharMensagemCelular();
     return comoAcaoDoCelular(function () { return comDesfazer(rotuloMensagem, function () {

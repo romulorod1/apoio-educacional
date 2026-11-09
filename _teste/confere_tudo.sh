@@ -942,6 +942,9 @@ roda "celular mensagem --envenenado-texto-fora-do-pdf" node "_teste/testa_celula
 roda "celular mensagem --envenenado-texto-nao-sobe" node "_teste/testa_celular_fechamento_texto.js" --envenenado-texto-nao-sobe
 roda "celular mensagem --envenenado-observador-edita-texto" node "_teste/testa_celular_fechamento_texto.js" --envenenado-observador-edita-texto
 roda "celular mensagem --envenenado-vale-o-primeiro" node "_teste/testa_celular_fechamento_texto.js" --envenenado-vale-o-primeiro
+# (revisao) na mensagem do mes vence a escrita mais recente: o texto escrito no
+# onibus sem sinal nao cobre a correcao feita depois no tablet
+roda "celular mensagem --envenenado-vale-quem-chega-depois" node "_teste/testa_celular_fechamento_texto.js" --envenenado-vale-quem-chega-depois
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
