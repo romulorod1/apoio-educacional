@@ -22,6 +22,7 @@
  *      a lista ISENTOS abaixo diz quem mais e por quê, e hoje está vazia: a
  *      faixa da semana é uma grade de sete colunas e não rola);
  *   2. não passa da borda direita: getBoundingClientRect().right <= innerWidth + 1.
+ *   3. as abas de baixo (#cel-abas) têm o alvo de 48 px nas duas medidas.
  * Cada falha imprime a tela, a largura, a letra, o seletor e quantos px passou.
  *
  * O aviso de versão nova no celular: "Versão nova pronta." e o botão
@@ -39,7 +40,9 @@
  *   --envenenado-aviso-largo     o aviso volta ao texto e aos botões antigos
  *                                ("Versão nova pronta (x)", "Atualizar agora",
  *                                "Depois da aula") e ao estilo antigo;
- *   --envenenado-elemento-largo  um elemento de 500 px de largura na tela Alunos.
+ *   --envenenado-elemento-largo  um elemento de 500 px de largura na tela Alunos;
+ *   --envenenado-aba-estreita    as cinco abas do observador voltam à regra que
+ *                                deixava o "Hoje" com 47 px em 360 e 130%.
  *
  *   --prints <pasta>   o aviso de versão em 360 x 740, letra normal e 130%.
  *
@@ -54,8 +57,8 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODOS = ['--envenenado-aviso-largo', '--envenenado-elemento-largo'];
-const [V_AVISO, V_LARGO] = MODOS;
+const MODOS = ['--envenenado-aviso-largo', '--envenenado-elemento-largo', '--envenenado-aba-estreita'];
+const [V_AVISO, V_LARGO, V_ABA] = MODOS;
 const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && MODOS.indexOf(a) < 0);
@@ -109,6 +112,9 @@ conf('a âncora do aviso novo está no app.js uma vez só', APP.split(AVISO_NOVO
 conf('o estilo do aviso novo está no styles.css uma vez só, com começo e fim',
   [CSS.split(AVISO_NOVO_CSS_INICIO).length - 1, CSS.split(AVISO_NOVO_CSS_FIM).length - 1].join(','), '1,1');
 conf('a âncora do elemento largo (o título da lista de Alunos) está no app.js uma vez só', APP.split(ANCORA_LARGO).length - 1, 1);
+const ABA_NOVA = '.cel-abas.muitas .cel-aba { flex: 1 1 auto; padding: 0; min-width: var(--alvo-celular); }';
+const ABA_VELHA = '.cel-abas.muitas .cel-aba { flex: 1 1 auto; padding: 0 1px; }';
+conf('a regra das cinco abas está no styles.css uma vez só', CSS.split(ABA_NOVA).length - 1, 1);
 conf('o sw.js tem o nome do cache onde a prova o troca', /var CACHE = '[^']+';/.test(SW), true);
 const TRAV = new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']');
 conf('o app.js, o styles.css e esta prova não têm travessão',
@@ -123,6 +129,7 @@ if (MODO === V_AVISO) {
   trocas['/app.js'] = APP.replace(AVISO_NOVO_APP, '');
   trocas['/styles.css'] = CSS.slice(0, i) + CSS.slice(f);
 }
+if (MODO === V_ABA) trocas['/styles.css'] = CSS.replace(ABA_NOVA, ABA_VELHA).replace('.cel-abas.muitas { padding-left: 2px; padding-right: 2px; }', '');
 if (MODO === V_LARGO) {
   trocas['/app.js'] = APP.replace(ANCORA_LARGO, ANCORA_LARGO +
     "    caixa.appendChild(el('div', { id: 'veneno-largo', style: 'width:500px;height:8px;background:#C00' }));\n");
@@ -357,6 +364,9 @@ const varrer = (pag) => pag.evaluate((isentos) => {
       falhas.push({ tipo: 'rola de lado', sel: nome(e), px: e.scrollWidth - e.clientWidth });
     const r = e.getBoundingClientRect();
     if (r.right > W + 1) falhas.push({ tipo: 'passa da borda', sel: nome(e), px: Math.round(r.right - W) });
+    // as abas de baixo: o alvo de toque de 48 px, na largura e na altura
+    if (e.matches('#cel-abas .cel-aba') && (r.width < 47.5 || r.height < 47.5))
+      falhas.push({ tipo: 'alvo menor que 48 px (' + Math.round(r.width) + 'x' + Math.round(r.height) + ')', sel: nome(e), px: Math.round(48 - Math.min(r.width, r.height)) });
   }
   /* O texto que sai da caixa: o rótulo do botão que passa da borda do botão
    * não aparece no scrollWidth do botão (o Chrome não o conta), e foi assim o
@@ -629,7 +639,7 @@ async function percorrer(pag, telas) {
   prop('o aviso diz "Versão nova pronta." e os botões são "Atualizar" e "Depois" (' + a0.texto + ' ; ' + a0.botoes + ')',
     a0.texto === 'Versão nova pronta.' && a0.botoes === 'Atualizar | Depois', V_AVISO);
   prop('o número da versão nova fica guardado no aviso (data-versao: ' + a0.versao + ')', a0.versao === '9.9.9', V_AVISO);
-  conf('a letra do aviso é a de 14 px (' + a0.tamanho + ')', a0.tamanho, '14px');
+  prop('a letra do aviso é a de 14 px (' + a0.tamanho + ')', a0.tamanho === '14px', V_AVISO);
   /* Duas linhas, e não mais: o texto (uma linha), os botões de 48 px e as
    * folgas. 100 px é o teto com a letra normal, 110 px com 130%. */
   prop('nas três larguras e nas duas letras: o texto numa linha, os dois botões juntos na linha de baixo com 48 px, os rótulos dentro dos botões, tudo dentro da tela (' +
@@ -655,9 +665,11 @@ async function percorrer(pag, telas) {
   conf('e ao menos 5 textos visíveis (o menor: ' + Math.min(...registro.map(r => r.textos)) + ')', registro.every(r => r.textos >= 5), true);
   const resumo = comFalha.map(r => r.tela + ' ' + r.janela + ' ' + Math.round(r.letra * 100) + '%: ' + r.falhas.map(f => f.sel + ' ' + f.px + ' px').join('; '));
   prop('nenhuma tela do celular transborda, em nenhuma largura nem letra (' + (resumo.slice(0, 6).join(' || ') || 'nenhuma') + (resumo.length > 6 ? ' || e mais ' + (resumo.length - 6) : '') + ')',
-    comFalha.length === 0, [V_AVISO, V_LARGO]);
+    comFalha.length === 0, [V_AVISO, V_LARGO, V_ABA]);
   if (MODO === V_LARGO) conf('o veneno foi pego pelo nome: o #veneno-largo, na tela Alunos, nas 6 combinações',
     registro.filter(r => r.tela === 'Alunos' && r.falhas.some(f => /#veneno-largo/.test(f.sel))).length >= 6, true);
+  if (MODO === V_ABA) conf('o veneno foi pego pelo alvo: uma aba do observador abaixo de 48 px',
+    comFalha.some(r => /^observador/.test(r.tela) && r.falhas.some(f => /alvo menor que 48/.test(f.tipo))), true);
   if (MODO === V_AVISO) conf('o veneno foi pego pelo aviso: a falha está no #aviso',
     comFalha.some(r => r.falhas.some(f => /#aviso/.test(f.sel))), true);
 

@@ -3362,6 +3362,9 @@ body.modo-celular .celular .cel-topo .cel-icone {
 body.modo-celular #cel-hoje { margin: 0 -16px; padding: 0 16px; }
 body.modo-celular .celular [data-form-celular] { margin: 0 -16px; padding: 0 16px; }
 /* Com cinco abas (o observador), cada uma com a largura do rótulo: o
-   "Diagnóstico" e o "Fechamento" não passam da caixa deles. */
-.cel-abas.muitas .cel-aba { flex: 1 1 auto; padding: 0 1px; }
+   "Diagnóstico" e o "Fechamento" não passam da caixa deles, e nenhuma fica
+   abaixo do alvo de 48 px (o "Hoje" ficava com 47 em 360 com a letra em
+   130%). A barra cede 2 px de cada lado para caber. */
+.cel-abas.muitas { padding-left: 2px; padding-right: 2px; }
+.cel-abas.muitas .cel-aba { flex: 1 1 auto; padding: 0; min-width: var(--alvo-celular); }
 body.modo-celular .celular .linha { flex-direction: column; }

@@ -931,7 +931,7 @@ roda "celular avisos --envenenado-mais-de-3-avisos" node "_teste/testa_celular_a
 roda "celular avisos --envenenado-lembrete-fora-da-janela" node "_teste/testa_celular_avisos.js" --envenenado-lembrete-fora-da-janela
 # (revisao do lote 4) cobrar e fechar o mes so no celular que e da dona, nunca pela falta de observador
 roda "celular avisos --envenenado-observador-sem-sessao" node "_teste/testa_celular_avisos.js" --envenenado-observador-sem-sessao
-# A trava de transbordo do celular: todas as telas e estados (entrar, Hoje com e
+# A trava de transbordo do celular (e o alvo de 48 px das abas): todas as telas e estados (entrar, Hoje com e
 # sem avisos e com o aviso de versao nova, Alunos, ficha, Fechamento, Enviar, os
 # formularios, a folha so leitura, o observador e o Diagnostico) em 360, 390 e
 # 412 px, com a letra normal e em 130%: nenhum elemento rola de lado, nenhum
@@ -940,6 +940,8 @@ roda "celular avisos --envenenado-observador-sem-sessao" node "_teste/testa_celu
 roda "celular transbordo"                           node "_teste/testa_celular_transbordo.js"
 roda "celular transbordo --envenenado-aviso-largo"  node "_teste/testa_celular_transbordo.js" --envenenado-aviso-largo
 roda "celular transbordo --envenenado-elemento-largo" node "_teste/testa_celular_transbordo.js" --envenenado-elemento-largo
+# as cinco abas do observador com a regra que deixava o "Hoje" com 47 px (alvo de 48)
+roda "celular transbordo --envenenado-aba-estreita" node "_teste/testa_celular_transbordo.js" --envenenado-aba-estreita
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
