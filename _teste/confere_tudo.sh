@@ -905,6 +905,15 @@ roda "celular dinheiro --envenenado-nome-antigo"    node "_teste/testa_celular_d
 roda "celular dinheiro --envenenado-pago-fora-da-acao" node "_teste/testa_celular_dinheiro.js" --envenenado-pago-fora-da-acao
 roda "celular dinheiro --envenenado-preco-de-hoje"  node "_teste/testa_celular_dinheiro.js" --envenenado-preco-de-hoje
 roda "celular dinheiro --envenenado-observador-paga" node "_teste/testa_celular_dinheiro.js" --envenenado-observador-paga
+# (revisao do lote 3) o proposto com a cancelada e cobrada a frente e sem a aula
+# de hoje que ainda nao acabou; o numero grande e o que falta; os meses
+# anteriores em aberto; cancelar a aula dada pergunta; pagar e desmarcar redesenham
+roda "celular dinheiro --envenenado-sem-cancelada-a-frente" node "_teste/testa_celular_dinheiro.js" --envenenado-sem-cancelada-a-frente
+roda "celular dinheiro --envenenado-cobra-hoje-nao-dada" node "_teste/testa_celular_dinheiro.js" --envenenado-cobra-hoje-nao-dada
+roda "celular dinheiro --envenenado-falta-e-o-total" node "_teste/testa_celular_dinheiro.js" --envenenado-falta-e-o-total
+roda "celular dinheiro --envenenado-sem-meses-anteriores" node "_teste/testa_celular_dinheiro.js" --envenenado-sem-meses-anteriores
+roda "celular dinheiro --envenenado-cancela-sem-confirmar" node "_teste/testa_celular_dinheiro.js" --envenenado-cancela-sem-confirmar
+roda "celular dinheiro --envenenado-sem-redesenho"  node "_teste/testa_celular_dinheiro.js" --envenenado-sem-redesenho
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"

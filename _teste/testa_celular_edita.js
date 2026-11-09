@@ -892,10 +892,16 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   const proposto = await pagC.evaluate(m => Store.carregar().then(d => {
     const f = Core.calcularMesInteiro(d, m).find(x => x.aluno.id === 'alfa');
     const campo = document.querySelector('.cel-fechamento-aluno[data-aluno="alfa"] .pagamento-valor');
-    return { campo: campo && campo.value, total: Core.fmtMoeda(f.valorFeito).replace(/^R\$\s*/, ''), soma: (document.querySelector('.cel-proposto-soma') || {}).textContent || '',
+    /* (D6c lote 3) o devido até hoje: as dadas, mais a cancelada e cobrada à
+     * frente, menos a aula de hoje que ainda não acabou */
+    const agora = new Date(), min = agora.getHours() * 60 + agora.getMinutes(), hoje = Core.hojeIso();
+    const hojeNao = f.linhas.filter(l => l.data === hoje && l.status !== 'cancelada' && l.cobravel && l.hora && Core.minutosDaHora(l.hora) + l.duracaoMin > min)
+      .reduce((c, l) => c + Math.round(l.valor * 100), 0);
+    const devido = (Math.round(f.valorFeito * 100) + Math.round((f.valorCanceladasFuturas || 0) * 100) - hojeNao) / 100;
+    return { campo: campo && campo.value, total: Core.fmtMoeda(devido).replace(/^R\$\s*/, ''), soma: (document.querySelector('.cel-proposto-soma') || {}).textContent || '',
       fechar: (document.querySelector('.cel-fechamento-aluno[data-aluno="alfa"] .btn-cancelar-pagamento') || {}).textContent }; }), MES);
-  conf('(D6c lote 3) o valor proposto é o das aulas já dadas (' + proposto.total + ')', proposto.campo, proposto.total);
-  conf('e diz o que soma: as aulas dadas (' + proposto.soma + ')', /^R\$\s?[\d.,]+ das? \d+ aulas? dadas?\./.test(proposto.soma), true);
+  conf('(D6c lote 3) o valor proposto é o devido até hoje (' + proposto.total + ')', proposto.campo, proposto.total);
+  conf('e diz o que soma (' + proposto.soma + ')', /^Devido até hoje: R\$\s?[\d.,]+ \(\d+ aulas? dadas?\)\./.test(proposto.soma.replace(/ /g, ' ')), true);
   conf('o "Cancelar" do pago em diz "Fechar sem marcar"', proposto.fechar, 'Fechar sem marcar');
   m = await medirTela(pagC);
   conf('o "pago em" aberto: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');

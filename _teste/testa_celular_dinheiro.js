@@ -36,7 +36,17 @@
  *   --envenenado-nome-antigo        a cancelada sem cobrança volta a se chamar "Cancelada com aviso";
  *   --envenenado-pago-fora-da-acao  o "Pago" grava fora da ação do celular e não sobe;
  *   --envenenado-preco-de-hoje      o valor da aula sai do valor por hora de hoje (core.js);
- *   --envenenado-observador-paga    o observador ganha o "Marcar como pago".
+ *   --envenenado-observador-paga    o observador ganha o "Marcar como pago";
+ *   (revisão do lote 3)
+ *   --envenenado-sem-cancelada-a-frente  o proposto esquece a cancelada e cobrada à frente;
+ *   --envenenado-cobra-hoje-nao-dada     o proposto cobra a aula de hoje que ainda não acabou;
+ *   --envenenado-falta-e-o-total         o número grande volta a ser o total, e não o que falta;
+ *   --envenenado-sem-meses-anteriores    os meses anteriores em aberto somem;
+ *   --envenenado-cancela-sem-confirmar   cancelar a aula dada tira o valor sem perguntar;
+ *   --envenenado-sem-redesenho           pagar ou desmarcar não redesenha o selo e o total.
+ *
+ * O relógio da página fica fixo em 15/10/2026 18:00 (a prova não depende do
+ * dia em que roda).
  *
  *   --prints <pasta>   os três prints do lote 3, em 390 x 844.
  *
@@ -53,8 +63,11 @@ const { conf, secao, pausa, esperar } = H;
 
 const MODOS = ['--envenenado-selo-pelo-mes', '--envenenado-parcial-vira-pago', '--envenenado-aberto-vira-nada', '--envenenado-total-do-mes',
   '--envenenado-proposto-do-mes', '--envenenado-cancelada-cobra', '--envenenado-nome-antigo', '--envenenado-pago-fora-da-acao',
-  '--envenenado-preco-de-hoje', '--envenenado-observador-paga'];
-const [V_SELO_MES, V_PARCIAL, V_ABERTO, V_TOTAL, V_PROPOSTO, V_CANCELA, V_NOME, V_FORA, V_PRECO, V_OBS] = MODOS;
+  '--envenenado-preco-de-hoje', '--envenenado-observador-paga',
+  '--envenenado-sem-cancelada-a-frente', '--envenenado-cobra-hoje-nao-dada', '--envenenado-falta-e-o-total', '--envenenado-sem-meses-anteriores',
+  '--envenenado-cancela-sem-confirmar', '--envenenado-sem-redesenho'];
+const [V_SELO_MES, V_PARCIAL, V_ABERTO, V_TOTAL, V_PROPOSTO, V_CANCELA, V_NOME, V_FORA, V_PRECO, V_OBS,
+  V_FRENTE, V_HOJE, V_FALTA, V_ANTERIORES, V_CONFIRMA, V_REDESENHO] = MODOS;
 const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 /* Um argumento --envenenado-... que não está na lista rodaria calado como o
@@ -91,8 +104,16 @@ const ANCORAS = {
     'var selos = fechs.map(function (f) { return Core.seloDoPagamento(db, Object.assign({}, f, { linhas: [] })); });'],
   [V_PARCIAL]: ['app.js', SELO_TEXTO, "    s = Object.assign({}, s, { selo: s.registro ? 'pago' : s.selo });\n" + SELO_TEXTO],
   [V_ABERTO]: ['app.js', SELO_TEXTO, "    s = Object.assign({}, s, { selo: s.selo === 'aberto' ? 'nada' : s.selo });\n" + SELO_TEXTO],
-  [V_TOTAL]: ['app.js', "id: 'cel-total-valor', texto: dinheiro(t.valorFeito) }", "id: 'cel-total-valor', texto: dinheiro(t.valor) }"],
-  [V_PROPOSTO]: ['app.js', 'var proposto = reg ? reg.valor : (modoCelular ? s.devido : (f.totalValor || 0));', 'var proposto = reg ? reg.valor : (f.totalValor || 0);'],
+  [V_TOTAL]: ['app.js', "'data-valor': dinheiro(t.valorFeito), texto: 'do total de ' + dinheiro(t.valorFeito) + ' do mês'",
+    "'data-valor': dinheiro(t.valor), texto: 'do total de ' + dinheiro(t.valor) + ' do mês'"],
+  [V_PROPOSTO]: ['app.js', 'var proposto = reg ? reg.valor : (modoCelular ? propostoDoCelular(f).valor : (f.totalValor || 0));', 'var proposto = reg ? reg.valor : (f.totalValor || 0);'],
+  [V_FRENTE]: ['app.js', 'var cent = Math.round(s.devido * 100) + centCanceladas - centHoje;', 'var cent = Math.round(s.devido * 100) - centHoje;'],
+  [V_HOJE]: ['app.js', 'var cent = Math.round(s.devido * 100) + centCanceladas - centHoje;', 'var cent = Math.round(s.devido * 100) + centCanceladas;'],
+  [V_FALTA]: ['app.js', "id: 'cel-total-falta', texto: dinheiro(faltaCent / 100) }", "id: 'cel-total-falta', texto: dinheiro(t.valorFeito) }"],
+  [V_ANTERIORES]: ['app.js', '.filter(function (p) { return p.mes < mesCelular; })', '.filter(function (p) { return false; })'],
+  [V_CONFIRMA]: ['app.js', "return !jaConta || confirmar('Esta aula está como '", "return true || confirmar('Esta aula está como '"],
+  [V_REDESENHO]: ['app.js', "if (modoCelular && $('#cel-fechamento') && caixa.closest && caixa.closest('#cel-fechamento')) { desenharFechamentoCelular(); return; }",
+    "if (false) { return; }"],
   [V_CANCELA]: ['core.js', "      var cobravel = (typeof au.cobravel === 'boolean') ? au.cobravel : st.cobravelPadrao;",
     "      var cobravel = au.status === 'cancelada' || ((typeof au.cobravel === 'boolean') ? au.cobravel : st.cobravelPadrao);"],
   [V_NOME]: ['core.js', "return cobravel ? 'Cancelada e cobrada' : 'Cancelada sem cobrança';", "return cobravel ? 'Cancelada e cobrada' : 'Cancelada com aviso';"],
@@ -194,7 +215,8 @@ async function prepararPagina(pag, movel) {
   pag.errosDePagina = [];
   pag.on('pageerror', e => pag.errosDePagina.push(e.message));
   pag.dialogos = [];
-  pag.on('dialog', async d => { pag.dialogos.push(d.message()); try { await d.accept(); } catch (e) { /* ok */ } });
+  // pag.recusar = true: a próxima pergunta é recusada (o "Cancelar" do diálogo)
+  pag.on('dialog', async d => { pag.dialogos.push(d.message()); try { if (pag.recusar) await d.dismiss(); else await d.accept(); } catch (e) { /* ok */ } });
   pag.commitsNaRede = 0;
   pag.on('request', r => {
     const u = r.url();
@@ -329,8 +351,11 @@ const retratoCelular = pag => pag.evaluate(() => {
     const s = c.querySelector('.cel-selo');
     selos[c.dataset.aluno] = s ? s.dataset.selo + ' | ' + s.textContent : 'sem selo';
   });
-  const t = document.querySelector('#cel-total-valor'), a = document.querySelector('#cel-total-aberto');
-  return { selos, total: t ? t.textContent : null, aberto: a ? a.textContent : null };
+  const t = document.querySelector('#cel-total-valor'), a = document.querySelector('#cel-total-aberto'), fa = document.querySelector('#cel-total-falta');
+  const an = document.querySelector('#cel-total-anteriores');
+  const m = t ? /^do total de (.*) do mês$/.exec(t.textContent) : null;
+  return { selos, total: m ? m[1] : (t ? 'texto fora do formato: ' + t.textContent : null), falta: fa ? fa.textContent : null,
+    aberto: a ? a.textContent : null, anteriores: an ? an.textContent : null };
 });
 /* O que o tablet mostra: o data-selo da linha do pagamento de cada cartão, o
  * texto dela e o número grande "Total a receber". */
@@ -387,10 +412,14 @@ const ddmm = iso => iso.slice(8, 10) + '/' + iso.slice(5, 7);
  *   aberto:   1 h dada, 1 h cancelada e cobrada, 1 h cancelada sem
  *             cobrança (R$ 200,00); nada pago                              -> em aberto
  *   celular:  1 h dada (R$ 100,00) e 1 h amanhã; o celular marca o pago    -> em aberto, depois pago
- * Total a receber do mês: 100 + 200 + 200 + 100 = R$ 600,00.
- * Em aberto: 0 + 50 + 200 + 100 = R$ 350,00; depois do pago do celular, R$ 250,00. */
-const ESPERADO = { pago: 'pago', parcial: 'parcial', aberto: 'aberto', celular: 'aberto' };
-const TOTAL_MES = 'R$ 600,00';
+ *   frente:   1 h dada (R$ 100,00) e 1 h cancelada e cobrada no dia 25     -> em aberto; propõe R$ 200,00
+ *   noite:    1 h dada às 10:00 e 1 h hoje às 19:00 (o relógio está nas
+ *             18:00); o fechamento conta as duas como dadas                 -> em aberto; propõe R$ 100,00
+ * Total do mês (o número grande do tablet): 100 + 200 + 200 + 100 + 100 + 200 = R$ 900,00.
+ * Falta receber: 0 + 50 + 200 + 100 + 100 + 200 = R$ 650,00; depois do pago do celular, R$ 550,00.
+ * Meses anteriores em aberto: junho do aluno de referência, R$ 1.050,00. */
+const ESPERADO = { pago: 'pago', parcial: 'parcial', aberto: 'aberto', celular: 'aberto', frente: 'aberto', noite: 'aberto' };
+const TOTAL_MES = 'R$ 900,00';
 const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
 const fmt = s => s.replace(/\u00a0/g, ' ');
 
@@ -410,9 +439,12 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
     const aluno = (id, nome, cor) => ({ id, nome, ativo: true, cor, responsavel: 'Responsável ' + nome, precos: preco(100), mapeamentos: [] });
     d.alunos = [
       aluno('pago', 'Aluno Pago Teste', '#1F3A5F'),
-      aluno('parcial', 'Aluno Parcial Teste', '#C9A961'),
+      // "Abel" vem antes de "Aberto": o parcial, com o "faltam", é o primeiro cartão do print
+      aluno('parcial', 'Aluno Abel Parcial Teste', '#C9A961'),
       aluno('aberto', 'Aluno Aberto Teste', '#2E7D6B'),
       aluno('celular', 'Aluno Celular Teste', '#B4453C'),
+      aluno('frente', 'Aluno Frente Teste', '#627D98'),
+      aluno('noite', 'Aluno Noite Teste', '#16314F'),
       // o de referência de junho, com o valor reajustado depois de junho (a vigência por data)
       { id: 'ref', nome: 'Aluno Referência Teste', ativo: true, cor: '#627D98', responsavel: '', mapeamentos: [],
         precos: [{ id: 'p-ref-1', inicio: '2026-01-01', fim: '2026-06-30', valorHora: 100 }, { id: 'p-ref-2', inicio: '2026-07-01', fim: null, valorHora: 140 }] }
@@ -424,7 +456,11 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
       aula('aberto-1', 'aberto', c.hoje, '11:30', 60, 'realizada', true),
       aula('aberto-cobrada', 'aberto', c.hoje, '13:00', 60, 'cancelada', true),
       aula('aberto-sem', 'aberto', c.hoje, '14:30', 60, 'cancelada', false),
-      aula('celular-1', 'celular', c.hoje, '16:00', 60, 'realizada', true)
+      aula('celular-1', 'celular', c.hoje, '16:00', 60, 'realizada', true),
+      aula('frente-1', 'frente', c.hoje, '10:00', 60, 'realizada', true),
+      aula('frente-cancelada', 'frente', c.mes + '-25', '15:00', 60, 'cancelada', true),
+      aula('noite-1', 'noite', c.hoje, '10:00', 60, 'realizada', true),
+      aula('noite-2', 'noite', c.hoje, '19:00', 60, 'realizada', true)
     ];
     if (c.temFutura) {
       d.aulas.push(aula('pago-2', 'pago', c.amanha, '08:00', 60, 'realizada', true));
@@ -476,14 +512,19 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
   seVeneno([V_SELO_MES, V_PARCIAL, V_ABERTO]);
   conf('e o tablet diz o mesmo do parcial: "faltam R$ 50,00"', /faltam R\$\s?50,00/.test(t1.selos.parcial || ''), true);
 
-  secao('4. O total a receber: o número grande do tablet, ao centavo, e o esperado à mão');
+  secao('4. Falta receber (o número grande) e o total do mês: o do tablet, ao centavo, e o esperado à mão');
   prop('(arranjo) o tablet: Total a receber ' + t1.total + ', o esperado à mão', fmt(t1.total || '') === TOTAL_MES, V_CANCELA);
-  prop('o total a receber do celular é o do tablet (' + c1.total + ')', fmt(c1.total || '') === fmt(t1.total || '') && fmt(c1.total || '') === TOTAL_MES, TEM_FUTURA ? [V_TOTAL, V_CANCELA] : V_CANCELA);
-  if (TEM_FUTURA) seVeneno(V_TOTAL);
-  prop('o "em aberto" soma o que falta: R$ 350,00 (' + c1.aberto + ')', /^Em aberto: R\$\s?350,00 · 1 paga · 1 parcial · 2 em aberto$/.test(fmt(c1.aberto || '')), V_CANCELA);
+  prop('o "do total de" do celular é o número grande do tablet (' + c1.total + ')', fmt(c1.total || '') === fmt(t1.total || '') && fmt(c1.total || '') === TOTAL_MES, [V_TOTAL, V_CANCELA]);
+  seVeneno(V_TOTAL);
+  prop('o número grande é o que falta receber neste mês: R$ 650,00 (' + c1.falta + ')', fmt(c1.falta || '') === 'R$ 650,00', [V_CANCELA, V_FALTA]);
+  seVeneno(V_FALTA);
+  conf('o rótulo diz "Falta receber neste mês"', await texto(pagC, '#cel-total-mes .cel-total-rotulo'), 'Falta receber neste mês');
+  conf('a contagem dos selos (' + c1.aberto + ')', fmt(c1.aberto || ''), '1 paga · 1 parcial · 4 em aberto');
+  prop('os meses anteriores em aberto, à parte: o junho de referência (' + c1.anteriores + ')', fmt(c1.anteriores || '') === 'Meses anteriores em aberto: R$ 1.050,00', [V_ANTERIORES, V_PRECO]);
+  seVeneno(V_ANTERIORES);
   const detalhe = fmt((await texto(pagC, '#cel-total-detalhe')) || '');
-  prop('o total diz as aulas dadas' + (TEM_FUTURA ? ' e o que ainda não foi dado à parte' : '') + ' (' + detalhe + ')',
-    detalhe === '5 aulas dadas' + (TEM_FUTURA ? ' · mais R$ 200,00 ainda não dado' : ''), V_CANCELA);
+  prop('o total diz as aulas dadas, a cancelada e cobrada à frente e o que ainda não foi dado (' + detalhe + ')',
+    detalhe === '8 aulas dadas · canceladas e cobradas à frente: R$ 100,00 · ainda não dado: R$ 200,00', V_CANCELA);
 
   secao('5. A cancelada sem cobrança não entra; a cancelada e cobrada entra, pelo valor da data dela');
   const linhas = await pagC.evaluate(() => {
@@ -525,12 +566,25 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
   conf('(arranjo) a folha da aula do Aberto abre', await clicar(pagC, '.cel-bloco[data-aula="aberto-1"]') && await existe(pagC, '#cel-folha[data-aula="aberto-1"]'), true);
   await clicar(pagC, '#cel-folha-cancelar');
   const cancela = await pagC.evaluate(() => ['#cel-cancelar-sem', '#cel-cancelar-com', '#cel-cancelar-explica'].map(s => { const e = document.querySelector(s); return e ? e.textContent : 'sem ' + s; }));
-  conf('a folha pergunta: "Cancelar sem cobrança" e "Cancelar e cobrar (em cima da hora)", com o que cada um faz', cancela.join(' | '),
-    'Cancelar sem cobrança | Cancelar e cobrar (em cima da hora) | Sem cobrança: a família avisou a tempo, e a aula sai do valor do mês. ' +
+  conf('a folha diz o efeito em dinheiro em cada botão: "sai R$ 100,00 do mês" e "cobrar R$ 100,00"', fmt(cancela.join(' | ')),
+    'Cancelar sem cobrança (sai R$ 100,00 do mês) | Cancelar e cobrar R$ 100,00 | Sem cobrança: a família avisou a tempo, e a aula sai do valor do mês. ' +
     'Cobrada: cancelamento em cima da hora, e a aula continua no valor, pelo valor por hora da data dela.');
+  conf('nenhum dos dois cancelamentos é o botão principal', await pagC.evaluate(() => ['#cel-cancelar-sem', '#cel-cancelar-com'].map(s => document.querySelector(s).classList.contains('principal')).join(',')), 'false,false');
   let m = await medirTela(pagC);
   conf('a folha de cancelar: alvos de 48 px e sem rolagem de lado', telaBoa(m), '');
   await tirarPrint(pagC, '3_folha_os_dois_cancelamentos.png');
+  /* A aula está como dada: o toque em "Cancelar sem cobrança" pergunta, com
+   * o efeito em dinheiro; ela recusa, e nada muda. */
+  const dialogosAntes = pagC.dialogos.length;
+  pagC.recusar = true;
+  await pagC.click('#cel-cancelar-sem');
+  await pausa(400);
+  pagC.recusar = false;
+  const perguntou = pagC.dialogos.slice(dialogosAntes).map(fmt);
+  const situacaoAberto1 = await pagC.evaluate(() => Store.carregar().then(b => { const a = b.aulas.find(x => x.id === 'aberto-1'); return a.status + '/' + a.cobravel; }));
+  prop('cancelar a aula dada pergunta com o efeito em dinheiro, e o "não" deixa a aula como estava (' + (perguntou.join(' ; ') || 'não perguntou') + ' ; ' + situacaoAberto1 + ')',
+    perguntou.join(' ; ') === 'Esta aula está como dada. Cancelar sem cobrança tira R$ 100,00 do mês.' && situacaoAberto1 === 'realizada/true', V_CONFIRMA);
+  seVeneno(V_CONFIRMA);
   await clicar(pagC, '#cel-folha-voltar');
   await clicar(pagC, '#cel-folha-fechar');
   conf('(arranjo) nada mudou na aula ao voltar', await pagC.evaluate(() => Store.carregar().then(b => b.aulas.find(a => a.id === 'aberto-1').status)), 'realizada');
@@ -542,6 +596,35 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
   conf('o Fechamento: os botões de edição são só os do "pago em" (' + (m.soltos.join(', ') || 'nenhum solto') + ')', m.soltos.join(', '), '');
   await pagC.evaluate(() => { const c = document.querySelector('#cel-conteudo'); if (c) c.scrollTop = 0; });
   await tirarPrint(pagC, '1_fechamento_selos_e_total.png');
+  /* (revisão) O proposto é o devido até hoje: com a cancelada e cobrada à
+   * frente (o tablet propõe o mês inteiro, R$ 200,00), e sem a aula de hoje
+   * que ainda não acabou. */
+  const propostoDe = async (id) => {
+    const S = '.cel-fechamento-aluno[data-aluno="' + id + '"] ';
+    await clicar(pagC, S + '.btn-marcar-pago');
+    const r = await pagC.evaluate(s => ({ valor: (document.querySelector(s + '.pagamento-valor') || {}).value, soma: (document.querySelector(s + '.cel-proposto-soma') || {}).textContent }), S);
+    await clicar(pagC, S + '.btn-cancelar-pagamento');
+    return r;
+  };
+  const pFrente = await propostoDe('frente');
+  console.log('   frente: ' + JSON.stringify(pFrente));
+  prop('com uma cancelada e cobrada no dia 25, o proposto é R$ 200,00 e diz por quê (' + pFrente.valor + ' ; ' + pFrente.soma + ')',
+    pFrente.valor === '200,00' && fmt(pFrente.soma || '') === 'Devido até hoje: R$ 200,00 (1 aula dada). Inclui R$ 100,00 de cancelada e cobrada à frente.', V_FRENTE);
+  seVeneno(V_FRENTE);
+  const pNoite = await propostoDe('noite');
+  console.log('   noite: ' + JSON.stringify(pNoite));
+  prop('às 18:00, a aula de hoje às 19:00 fica fora do proposto, e a frase diz (' + pNoite.valor + ' ; ' + pNoite.soma + ')',
+    pNoite.valor === '100,00' && fmt(pNoite.soma || '') === 'Devido até hoje: R$ 100,00 (1 aula dada). Ainda não dadas: 1 aula, R$ 100,00 (não entram no valor). ' +
+    'A de hoje às 19:00 ainda não acabou e fica fora até acontecer.', [V_HOJE, V_PROPOSTO]);
+  seVeneno([V_HOJE, V_PROPOSTO]);
+  conf('a linha da aula das 19:00 diz que ainda não acabou, com o valor "a dar" em cinza', await pagC.evaluate(() => {
+    const l = document.querySelector('.cel-linha[data-aula="noite-2"]'); const v = l.querySelector('.cel-valor');
+    return l.textContent.replace(/ /g, ' ') + ' | ' + v.classList.contains('cel-valor-a-dar'); }), '15/10 19:00 · 1h · Hoje, ainda não acaboua dar R$ 100,00 | true');
+  conf('(arranjo) os dois "Fechar sem marcar" não gravaram nada', await pagC.evaluate(m => Store.carregar().then(d => (d.pagamentos || []).filter(p => p.mes === m).length), MES), 2);
+  conf('o tablet propõe o mês inteiro para o Frente, R$ 200,00 (o mesmo número, pela regra dele)', await pagA.evaluate(() => {
+    const b = document.querySelector('#lista-fechamento .linha-pagamento[data-aluno="frente"] .btn-marcar-pago'); if (!b) return 'sem botão'; b.click();
+    const v = document.querySelector('#lista-fechamento .linha-pagamento[data-aluno="frente"] .pagamento-valor').value;
+    document.querySelector('#lista-fechamento .linha-pagamento[data-aluno="frente"] .btn-cancelar-pagamento').click(); return v; }), '200,00');
   const SEL = '.cel-fechamento-aluno[data-aluno="celular"] ';
   conf('toque 1: "Marcar como pago" no cartão do Celular', await clicar(pagC, SEL + '.btn-marcar-pago'), true);
   const aberto = await pagC.evaluate(s => ({
@@ -549,10 +632,12 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
     ajuda: (document.querySelector(s + '.ajuda-proposto') || {}).textContent, soma: (document.querySelector(s + '.cel-proposto-soma') || {}).textContent
   }), SEL);
   console.log('   ' + JSON.stringify(aberto));
-  prop('o "Valor pago" vem com o total das aulas JÁ DADAS, R$ 100,00, e não o do mês (' + aberto.valor + ')', aberto.valor === '100,00', TEM_FUTURA ? V_PROPOSTO : []);
-  conf('e as não dadas aparecem à parte (' + aberto.soma + ')', fmt(aberto.soma || '') === 'R$ 100,00 da 1 aula dada.' + (TEM_FUTURA ? ' Fora dele: 1 ainda não dada, R$ 100,00.' : ''), true);
-  if (MODO === V_PROPOSTO && TEM_FUTURA) fimDoVeneno();
-  conf('a ajuda diz de onde vem o valor', aberto.ajuda, 'O valor proposto é o das aulas já dadas. Troque se a família pagou outro valor.');
+  prop('o "Valor pago" vem com o devido até hoje, R$ 100,00, e não o do mês (' + aberto.valor + ')', aberto.valor === '100,00', V_PROPOSTO);
+  conf('e as não dadas aparecem à parte (' + aberto.soma + ')', fmt(aberto.soma || ''),
+    'Devido até hoje: R$ 100,00 (1 aula dada). Ainda não dadas: 1 aula, R$ 100,00 (não entram no valor).');
+  seVeneno(V_PROPOSTO);
+  conf('a ajuda diz de onde vem o valor', aberto.ajuda, 'O valor proposto é o devido até hoje. Troque se a família pagou outro valor.');
+  conf('junto do Confirmar: "Confira o valor que a família pagou."', await texto(pagC, SEL + '.cel-confira-valor'), 'Confira o valor que a família pagou.');
   conf('a data vem com hoje, dd/mm/aaaa', aberto.data, ddmmaaaa(HOJE));
   m = await medirTela(pagC);
   conf('o "Pago" aberto: alvos de 48 px e sem rolagem de lado', telaBoa(m), '');
@@ -566,9 +651,10 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
     gravou.valor === HOJE + '/100' && naFila.length === 1, V_FORA);
   seVeneno(V_FORA);
   const c2 = await retratoCelular(pagC);
-  conf('o selo do Celular virou Pago, e o "em aberto" caiu para R$ 250,00 (' + c2.selos.celular + ' ; ' + c2.aberto + ')',
-    fmt(c2.selos.celular || '') + ' ; ' + fmt(c2.aberto || ''), 'pago | Pago ; Em aberto: R$ 250,00 · 2 pagas · 1 parcial · 1 em aberto');
-  conf('o total a receber não muda com o pagamento (' + c2.total + ')', fmt(c2.total || ''), TOTAL_MES);
+  prop('o selo e o total se redesenham: o Celular virou Pago, e o que falta caiu para R$ 550,00 (' + c2.selos.celular + ' ; ' + c2.falta + ' ; ' + c2.aberto + ')',
+    fmt(c2.selos.celular || '') + ' ; ' + fmt(c2.falta || '') + ' ; ' + fmt(c2.aberto || '') === 'pago | Pago ; R$ 550,00 ; 2 pagas · 1 parcial · 3 em aberto', V_REDESENHO);
+  seVeneno(V_REDESENHO);
+  conf('o total do mês não muda com o pagamento (' + c2.total + ')', fmt(c2.total || ''), TOTAL_MES);
   conf('a linha diz "Pago em", com o valor', /Pago em \d\d\/\d\d · R\$\s?100,00/.test(fmt((await texto(pagC, SEL + '.linha-pagamento')) || '')), true);
   conf('nenhum "Este celular só lê"', pagC.dialogos.concat(await pagC.evaluate(() => (document.querySelector('#aviso-texto') || {}).textContent || '')).filter(t => /só lê/.test(t)).length, 0);
 
@@ -624,6 +710,27 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
   conf('o observador, o Fechamento: alvos de 48 px e sem rolagem de lado', telaBoa(m), '');
   await pausa(2500);
   conf('nenhuma escrita na nuvem saiu do observador', pagD.commitsNaRede, 0);
+
+  secao('10b. (revisão) Desmarcar no celular: o selo e o que falta se redesenham, e a mudança chega ao tablet');
+  await aba(pagC, 'fechamento');
+  await mesNoCelular(pagC, MES);
+  const dlgAntes = pagC.dialogos.length;
+  conf('o cartão do Celular tem "Desmarcar"', await clicar(pagC, SEL + '.btn-desmarcar-pagamento'), true);
+  conf('Desmarcar pergunta antes', pagC.dialogos.slice(dlgAntes).map(fmt).join(' ; '), 'Desmarcar o pagamento de Aluno Celular Teste em ' + (await pagC.evaluate(m => Core.mesExtenso(m), MES)) + '?');
+  const c3 = await retratoCelular(pagC);
+  conf('depois de desmarcar: Em aberto, e falta receber R$ 650,00 de novo (' + c3.selos.celular + ' ; ' + c3.falta + ' ; ' + c3.aberto + ')',
+    fmt(c3.selos.celular || '') + ' ; ' + fmt(c3.falta || '') + ' ; ' + fmt(c3.aberto || ''), 'aberto | Em aberto ; R$ 650,00 ; 1 paga · 1 parcial · 4 em aberto');
+  conf('o cartão volta a ter "Marcar como pago"', await existe(pagC, SEL + '.btn-marcar-pago'), true);
+  conf('o pagamento saiu do celular, e a mudança está na fila', await pagC.evaluate(m => Store.carregar().then(d => (d.pagamentos || []).some(p => p.alunoId === 'celular' && p.mes === m)), MES) + ' ' +
+    (await fila(pagC)).filter(id => /^pagamento:/.test(id)).length, 'false 1');
+  const sC3 = await sincronizar(pagC);
+  conf('o celular sincronizou o desmarcar', sC3.erroE === null && sC3.enviados >= 1, true);
+  await H.abrirApp(pagA, amb.ORIGEM);
+  const saiu = await esperar('o tablet recebeu o desmarcar', () => pagA.evaluate(m => Store.carregar().then(d => !(d.pagamentos || []).some(p => p.alunoId === 'celular' && p.mes === m)), MES), v => v === true, 30000);
+  conf('o desmarcar chegou ao tablet', saiu.ok, true);
+  await mesNoTablet(pagA, MES);
+  const t3 = await retratoTablet(pagA);
+  conf('e o tablet mostra o Celular em aberto, como o celular', soSelo(t3), soSelo(c3));
 
   secao('11. Sem erro de página, e o veneno pedido foi visto');
   conf('nenhum erro de página no tablet, no celular e no observador', [pagA, pagC, pagD].map(p => p.errosDePagina.join(' | ')).filter(Boolean).join(' || '), '');

@@ -3224,7 +3224,13 @@ body.modo-celular .celular .linha-pagamento .barra { flex-wrap: wrap; }
 .cel-total { border-left: 6px solid var(--navy); }
 .cel-total-rotulo { font-size: var(--letra-2); font-weight: 700; color: var(--novidades-subtitulo); text-transform: uppercase; letter-spacing: .04em; }
 .cel-total-valor { font-size: var(--letra-6); font-weight: 700; color: var(--navy); margin: 2px 0; }
+.cel-total-do-mes { font-size: var(--letra-3); color: var(--texto); margin-bottom: 4px; }
 .cel-total-aberto { margin-top: 6px; font-size: var(--letra-3); font-weight: 600; color: var(--texto); }
+.cel-total-anteriores { margin-top: 6px; font-size: var(--letra-3); font-weight: 700; color: var(--vermelho); }
+/* O valor da aula ainda não dada, em cinza e com "a dar": não é o que já se deve. */
+.cel-valor-a-dar { color: var(--novidades-subtitulo); font-style: italic; }
+/* No "pago em" do celular, junto do Confirmar: o valor já vem escrito. */
+.cel-confira-valor { flex: 1 0 100%; font-size: var(--letra-3); font-weight: 600; color: var(--aviso-texto); }
 .cel-fechamento-cabeca { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cel-fechamento-cabeca .cresce { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cel-selo {
