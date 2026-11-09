@@ -3487,7 +3487,15 @@ body.modo-celular .celular [data-form-celular] { margin: 0 -16px; padding: 0 16p
    depende da fonte do aparelho (Segoe no Windows, Roboto no Android, outra
    no CI): o peso 500 dá folga, e se ainda assim o rótulo não couber ele se
    divide em duas linhas, com hífen, dentro da caixa, em vez de sair dela. */
+/* As quatro abas da dona, pelo mesmo motivo: medidas com uma fonte larga
+   (Verdana) e a letra em 130%, o "Enviar" saía 14 px da caixa e a barra
+   passava 20 px da tela em 360. Cada aba fica com 48 px no mínimo e o rótulo
+   longo se divide dentro dela. */
+body.modo-celular .cel-aba { min-width: var(--alvo-celular); line-height: 1.15; overflow-wrap: break-word; hyphens: auto; }
 .cel-abas.muitas { padding-left: 2px; padding-right: 2px; }
+/* O código da dona nos Ajustes do observador é uma palavra só, comprida: quebra
+   onde precisar (com fonte larga e 130% ele passava 19 px da caixa). */
+#cel-obs-regra { overflow-wrap: anywhere; }
 .cel-abas.muitas .cel-aba { flex: 1 1 auto; padding: 0; min-width: var(--alvo-celular); font-weight: 500; line-height: 1.15;
   overflow-wrap: break-word; hyphens: auto; }
 body.modo-celular .celular .linha { flex-direction: column; }
