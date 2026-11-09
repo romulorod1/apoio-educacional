@@ -909,7 +909,7 @@ roda "celular dinheiro --envenenado-observador-paga" node "_teste/testa_celular_
 # de hoje que ainda nao acabou; o numero grande e o que falta; os meses
 # anteriores em aberto; cancelar a aula dada pergunta; pagar e desmarcar redesenham
 roda "celular dinheiro --envenenado-sem-cancelada-a-frente" node "_teste/testa_celular_dinheiro.js" --envenenado-sem-cancelada-a-frente
-roda "celular dinheiro --envenenado-cobra-hoje-nao-dada" node "_teste/testa_celular_dinheiro.js" --envenenado-cobra-hoje-nao-dada
+roda "celular dinheiro --envenenado-tira-hoje-do-proposto" node "_teste/testa_celular_dinheiro.js" --envenenado-tira-hoje-do-proposto
 roda "celular dinheiro --envenenado-falta-e-o-total" node "_teste/testa_celular_dinheiro.js" --envenenado-falta-e-o-total
 roda "celular dinheiro --envenenado-sem-meses-anteriores" node "_teste/testa_celular_dinheiro.js" --envenenado-sem-meses-anteriores
 roda "celular dinheiro --envenenado-cancela-sem-confirmar" node "_teste/testa_celular_dinheiro.js" --envenenado-cancela-sem-confirmar

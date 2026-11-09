@@ -892,12 +892,9 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   const proposto = await pagC.evaluate(m => Store.carregar().then(d => {
     const f = Core.calcularMesInteiro(d, m).find(x => x.aluno.id === 'alfa');
     const campo = document.querySelector('.cel-fechamento-aluno[data-aluno="alfa"] .pagamento-valor');
-    /* (D6c lote 3) o devido até hoje: as dadas, mais a cancelada e cobrada à
-     * frente, menos a aula de hoje que ainda não acabou */
-    const agora = new Date(), min = agora.getHours() * 60 + agora.getMinutes(), hoje = Core.hojeIso();
-    const hojeNao = f.linhas.filter(l => l.data === hoje && l.status !== 'cancelada' && l.cobravel && l.hora && Core.minutosDaHora(l.hora) + l.duracaoMin > min)
-      .reduce((c, l) => c + Math.round(l.valor * 100), 0);
-    const devido = (Math.round(f.valorFeito * 100) + Math.round((f.valorCanceladasFuturas || 0) * 100) - hojeNao) / 100;
+    /* (D6c lote 3) o devido até hoje: o devido do selo (as dadas, com a de
+     * hoje) mais a cancelada e cobrada à frente */
+    const devido = (Math.round(Core.seloDoPagamento(d, f).devido * 100) + Math.round((f.valorCanceladasFuturas || 0) * 100)) / 100;
     return { campo: campo && campo.value, total: Core.fmtMoeda(devido).replace(/^R\$\s*/, ''), soma: (document.querySelector('.cel-proposto-soma') || {}).textContent || '',
       fechar: (document.querySelector('.cel-fechamento-aluno[data-aluno="alfa"] .btn-cancelar-pagamento') || {}).textContent }; }), MES);
   conf('(D6c lote 3) o valor proposto é o devido até hoje (' + proposto.total + ')', proposto.campo, proposto.total);

@@ -39,7 +39,7 @@
  *   --envenenado-observador-paga    o observador ganha o "Marcar como pago";
  *   (revisão do lote 3)
  *   --envenenado-sem-cancelada-a-frente  o proposto esquece a cancelada e cobrada à frente;
- *   --envenenado-cobra-hoje-nao-dada     o proposto cobra a aula de hoje que ainda não acabou;
+ *   --envenenado-tira-hoje-do-proposto   o proposto tira a aula de hoje que ainda não acabou (o selo fica Parcial);
  *   --envenenado-falta-e-o-total         o número grande volta a ser o total, e não o que falta;
  *   --envenenado-sem-meses-anteriores    os meses anteriores em aberto somem;
  *   --envenenado-cancela-sem-confirmar   cancelar a aula dada tira o valor sem perguntar;
@@ -64,7 +64,7 @@ const { conf, secao, pausa, esperar } = H;
 const MODOS = ['--envenenado-selo-pelo-mes', '--envenenado-parcial-vira-pago', '--envenenado-aberto-vira-nada', '--envenenado-total-do-mes',
   '--envenenado-proposto-do-mes', '--envenenado-cancelada-cobra', '--envenenado-nome-antigo', '--envenenado-pago-fora-da-acao',
   '--envenenado-preco-de-hoje', '--envenenado-observador-paga',
-  '--envenenado-sem-cancelada-a-frente', '--envenenado-cobra-hoje-nao-dada', '--envenenado-falta-e-o-total', '--envenenado-sem-meses-anteriores',
+  '--envenenado-sem-cancelada-a-frente', '--envenenado-tira-hoje-do-proposto', '--envenenado-falta-e-o-total', '--envenenado-sem-meses-anteriores',
   '--envenenado-cancela-sem-confirmar', '--envenenado-sem-redesenho'];
 const [V_SELO_MES, V_PARCIAL, V_ABERTO, V_TOTAL, V_PROPOSTO, V_CANCELA, V_NOME, V_FORA, V_PRECO, V_OBS,
   V_FRENTE, V_HOJE, V_FALTA, V_ANTERIORES, V_CONFIRMA, V_REDESENHO] = MODOS;
@@ -107,8 +107,10 @@ const ANCORAS = {
   [V_TOTAL]: ['app.js', "'data-valor': dinheiro(t.valorFeito), texto: 'do total de ' + dinheiro(t.valorFeito) + ' do mês'",
     "'data-valor': dinheiro(t.valor), texto: 'do total de ' + dinheiro(t.valor) + ' do mês'"],
   [V_PROPOSTO]: ['app.js', 'var proposto = reg ? reg.valor : (modoCelular ? propostoDoCelular(f).valor : (f.totalValor || 0));', 'var proposto = reg ? reg.valor : (f.totalValor || 0);'],
-  [V_FRENTE]: ['app.js', 'var cent = Math.round(s.devido * 100) + centCanceladas - centHoje;', 'var cent = Math.round(s.devido * 100) - centHoje;'],
-  [V_HOJE]: ['app.js', 'var cent = Math.round(s.devido * 100) + centCanceladas - centHoje;', 'var cent = Math.round(s.devido * 100) + centCanceladas;'],
+  [V_FRENTE]: ['app.js', 'var cent = Math.round(s.devido * 100) + centCanceladas;', 'var cent = Math.round(s.devido * 100);'],
+  // a escolha que a segunda revisão derrubou: o proposto tira a aula de hoje que ainda não acabou
+  [V_HOJE]: ['app.js', 'var cent = Math.round(s.devido * 100) + centCanceladas;',
+    'var cent = Math.round(s.devido * 100) + centCanceladas - hojeAindaNao.reduce(function (c, l) { return c + Math.round((l.valor || 0) * 100); }, 0);'],
   [V_FALTA]: ['app.js', "id: 'cel-total-falta', texto: dinheiro(faltaCent / 100) }", "id: 'cel-total-falta', texto: dinheiro(t.valorFeito) }"],
   [V_ANTERIORES]: ['app.js', '.filter(function (p) { return p.mes < mesCelular; })', '.filter(function (p) { return false; })'],
   [V_CONFIRMA]: ['app.js', "return !jaConta || confirmar('Esta aula está como '", "return true || confirmar('Esta aula está como '"],
@@ -413,8 +415,9 @@ const ddmm = iso => iso.slice(8, 10) + '/' + iso.slice(5, 7);
  *             cobrança (R$ 200,00); nada pago                              -> em aberto
  *   celular:  1 h dada (R$ 100,00) e 1 h amanhã; o celular marca o pago    -> em aberto, depois pago
  *   frente:   1 h dada (R$ 100,00) e 1 h cancelada e cobrada no dia 25     -> em aberto; propõe R$ 200,00
- *   noite:    1 h dada às 10:00 e 1 h hoje às 19:00 (o relógio está nas
- *             18:00); o fechamento conta as duas como dadas                 -> em aberto; propõe R$ 100,00
+ *   noite:    1 h dada em 14/10 e 1 h hoje às 19:00 (o relógio está nas
+ *             18:00); o fechamento conta as duas como dadas                 -> em aberto; propõe R$ 200,00,
+ *             e pagar o proposto deixa Pago (sem pendência em 02/11)
  * Total do mês (o número grande do tablet): 100 + 200 + 200 + 100 + 100 + 200 = R$ 900,00.
  * Falta receber: 0 + 50 + 200 + 100 + 100 + 200 = R$ 650,00; depois do pago do celular, R$ 550,00.
  * Meses anteriores em aberto: junho do aluno de referência, R$ 1.050,00. */
@@ -459,7 +462,7 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
       aula('celular-1', 'celular', c.hoje, '16:00', 60, 'realizada', true),
       aula('frente-1', 'frente', c.hoje, '10:00', 60, 'realizada', true),
       aula('frente-cancelada', 'frente', c.mes + '-25', '15:00', 60, 'cancelada', true),
-      aula('noite-1', 'noite', c.hoje, '10:00', 60, 'realizada', true),
+      aula('noite-1', 'noite', c.mes + '-14', '10:00', 60, 'realizada', true),
       aula('noite-2', 'noite', c.hoje, '19:00', 60, 'realizada', true)
     ];
     if (c.temFutura) {
@@ -613,13 +616,12 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
   seVeneno(V_FRENTE);
   const pNoite = await propostoDe('noite');
   console.log('   noite: ' + JSON.stringify(pNoite));
-  prop('às 18:00, a aula de hoje às 19:00 fica fora do proposto, e a frase diz (' + pNoite.valor + ' ; ' + pNoite.soma + ')',
-    pNoite.valor === '100,00' && fmt(pNoite.soma || '') === 'Devido até hoje: R$ 100,00 (1 aula dada). Ainda não dadas: 1 aula, R$ 100,00 (não entram no valor). ' +
-    'A de hoje às 19:00 ainda não acabou e fica fora até acontecer.', [V_HOJE, V_PROPOSTO]);
-  seVeneno([V_HOJE, V_PROPOSTO]);
-  conf('a linha da aula das 19:00 diz que ainda não acabou, com o valor "a dar" em cinza', await pagC.evaluate(() => {
+  prop('às 18:00, o proposto é o devido do selo, com a aula de hoje às 19:00, e a frase diz (' + pNoite.valor + ' ; ' + pNoite.soma + ')',
+    pNoite.valor === '200,00' && fmt(pNoite.soma || '') === 'Devido até hoje: R$ 200,00 (2 aulas dadas). Inclui a aula de hoje às 19:00, como no tablet.', V_HOJE);
+  seVeneno(V_HOJE);
+  conf('a linha da aula das 19:00 diz que ainda não acabou, com o valor que já conta no mês', await pagC.evaluate(() => {
     const l = document.querySelector('.cel-linha[data-aula="noite-2"]'); const v = l.querySelector('.cel-valor');
-    return l.textContent.replace(/ /g, ' ') + ' | ' + v.classList.contains('cel-valor-a-dar'); }), '15/10 19:00 · 1h · Hoje, ainda não acaboua dar R$ 100,00 | true');
+    return l.textContent.replace(/ /g, ' ') + ' | ' + v.classList.contains('cel-valor-a-dar'); }), '15/10 19:00 · 1h · Hoje, ainda não acabouR$ 100,00 | false');
   conf('(arranjo) os dois "Fechar sem marcar" não gravaram nada', await pagC.evaluate(m => Store.carregar().then(d => (d.pagamentos || []).filter(p => p.mes === m).length), MES), 2);
   conf('o tablet propõe o mês inteiro para o Frente, R$ 200,00 (o mesmo número, pela regra dele)', await pagA.evaluate(() => {
     const b = document.querySelector('#lista-fechamento .linha-pagamento[data-aluno="frente"] .btn-marcar-pago'); if (!b) return 'sem botão'; b.click();
@@ -731,6 +733,18 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
   await mesNoTablet(pagA, MES);
   const t3 = await retratoTablet(pagA);
   conf('e o tablet mostra o Celular em aberto, como o celular', soSelo(t3), soSelo(c3));
+
+  secao('10c. (segunda revisão) Às 18:00, pagar o proposto do Noite (com a aula de hoje às 19:00) deixa Pago, e em 02/11 não sobra pendência');
+  const SN = '.cel-fechamento-aluno[data-aluno="noite"] ';
+  conf('toque 1: "Marcar como pago" no Noite, com R$ 200,00', (await clicar(pagC, SN + '.btn-marcar-pago')) + ' ' + (await pagC.evaluate(s => document.querySelector(s + '.pagamento-valor').value, SN)), 'true 200,00');
+  conf('toque 2: "Confirmar"', await clicar(pagC, SN + '.btn-confirmar-pagamento'), true);
+  await esperar('o pagamento do Noite gravou', () => pagC.evaluate(m => Store.carregar().then(d => (d.pagamentos || []).some(p => p.alunoId === 'noite' && p.mes === m)), MES), v => v === true, 10000);
+  const cN = await retratoCelular(pagC);
+  conf('o selo do Noite é Pago, já às 18:00', fmt(cN.selos.noite || ''), 'pago | Pago');
+  const pend = await pagC.evaluate(() => Store.carregar().then(d => Core.pendentesDePagamento(d, '2026-11-02').map(p => p.alunoId + ' ' + p.mes + ' ' + p.falta)));
+  console.log('   pendentes em 02/11: ' + JSON.stringify(pend));
+  conf('em 02/11, outubro fechado, o Noite não fica pendente', pend.filter(p => /^noite /.test(p)).join(' ; '), '');
+  conf('(controle) em 02/11 a lista de pendentes vê outubro: o Frente, que não pagou, está nela', pend.some(p => /^frente 2026-10 /.test(p)), true);
 
   secao('11. Sem erro de página, e o veneno pedido foi visto');
   conf('nenhum erro de página no tablet, no celular e no observador', [pagA, pagC, pagD].map(p => p.errosDePagina.join(' | ')).filter(Boolean).join(' || '), '');

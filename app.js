@@ -12359,17 +12359,15 @@
     return caixa;
   }
 
-  /* "R$ 250,00 das 2 aulas dadas. Fora dele: 2 ainda não dadas, R$ 200,00." */
   /* O que o celular propõe no "Valor pago" (D6c, lote 3): o que a família já
-   * DEVE hoje. Parte do devido do selo (Core.seloDoPagamento, a regra do
-   * tablet) e:
-   *   soma a cancelada e cobrada com data à frente, que já é devida (o tablet
-   *     a escreve como "canceladas à frente"): sem ela, ela marcaria menos e,
-   *     quando o mês fechasse, a família viraria "Parcial";
-   *   tira a aula de HOJE que ainda não acabou: o fechamento a conta como dada
-   *     desde o começo do dia, e propô-la seria cobrar uma aula que ela ainda
-   *     não deu. Ela fica com as não dadas, dita na frase.
-   * As ainda não dadas nunca entram. */
+   * DEVE hoje. É o devido do selo (Core.seloDoPagamento, a regra do tablet),
+   * mais a cancelada e cobrada com data à frente, que já é devida (o tablet a
+   * escreve como "canceladas à frente"): sem ela, ela marcaria menos e,
+   * quando o mês fechasse, a família viraria "Parcial".
+   * A aula de HOJE conta desde o começo do dia, como no selo, mesmo antes de
+   * acabar: tirá-la deixaria o selo "Parcial" para sempre depois de ela
+   * confirmar o proposto (revisão do lote 3). A frase diz que ela entra.
+   * As ainda não dadas (data à frente) nunca entram. */
   function propostoDoCelular(f) {
     var s = Core.seloDoPagamento(db, f);
     var hoje = Core.hojeIso(), agora = minutosAgoraCelular();
@@ -12378,16 +12376,15 @@
       var fim = fimDaAulaCelular({ hora: l.hora, duracaoMin: l.duracaoMin });
       return fim !== null && fim > agora;
     });
-    var centHoje = hojeAindaNao.reduce(function (c, l) { return c + Math.round((l.valor || 0) * 100); }, 0);
     var centCanceladas = Math.round((f.valorCanceladasFuturas || 0) * 100);
-    var cent = Math.round(s.devido * 100) + centCanceladas - centHoje;
+    var cent = Math.round(s.devido * 100) + centCanceladas;
     return {
       valor: Math.max(0, cent) / 100,
-      dadas: Math.max(0, (f.qtdEncontrosFeitos || 0) - hojeAindaNao.length),
+      dadas: f.qtdEncontrosFeitos || 0,
       canceladasAFrente: centCanceladas / 100,
       hojeAindaNao: hojeAindaNao,
-      aindaNao: (f.qtdEncontrosPrevistos || 0) + hojeAindaNao.length,
-      valorAindaNao: (Math.round((f.valorPrevisto || 0) * 100) + centHoje) / 100
+      aindaNao: f.qtdEncontrosPrevistos || 0,
+      valorAindaNao: f.valorPrevisto || 0
     };
   }
 
@@ -12398,7 +12395,8 @@
     var frase = 'Devido até hoje: ' + dinheiro(p.valor) + ' (' + p.dadas + ' ' + palavraPlural(p.dadas, 'aula dada', 'aulas dadas') + ').';
     if (p.canceladasAFrente) frase += ' Inclui ' + dinheiro(p.canceladasAFrente) + ' de cancelada e cobrada à frente.';
     if (p.aindaNao) frase += ' Ainda não dadas: ' + p.aindaNao + ' ' + palavraPlural(p.aindaNao, 'aula', 'aulas') + ', ' + dinheiro(p.valorAindaNao) + ' (não entram no valor).';
-    if (p.hojeAindaNao.length) frase += ' A de hoje às ' + p.hojeAindaNao.map(function (l) { return l.hora; }).join(', ') + ' ainda não acabou e fica fora até acontecer.';
+    if (p.hojeAindaNao.length) frase += ' Inclui ' + palavraPlural(p.hojeAindaNao.length, 'a aula', 'as aulas') + ' de hoje às ' +
+      p.hojeAindaNao.map(function (l) { return l.hora; }).join(', ') + ', como no tablet.';
     return frase;
   }
 
@@ -23193,7 +23191,8 @@
        * pareceria o do que já aconteceu. A de hoje que ainda não acabou diz
        * isso. A cancelada diz se foi cobrada, com o mesmo nome da folha. */
       var linha = function (l) {
-        var naoDada = (l.futura && l.status !== 'cancelada') || hojeAindaNao.indexOf(l.id) >= 0;
+        // a de hoje que ainda não acabou já conta no mês (a regra do tablet): valor normal, só a situação diz
+        var naoDada = l.futura && l.status !== 'cancelada';
         var situacao = l.status === 'cancelada' ? rotuloDeCancelamentoCelular(l.cobravel)
           : hojeAindaNao.indexOf(l.id) >= 0 ? 'Hoje, ainda não acabou' : l.statusRotulo;
         return el('li', { class: 'cel-linha' + (l.futura ? ' cel-linha-futura' : ''), 'data-aula': l.id }, [
