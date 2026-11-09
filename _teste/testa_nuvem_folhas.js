@@ -768,6 +768,7 @@ function paginaSintetica() {
   const frase13 = await esperar('a frase de Ajustes diz que ela não consegue subir', () => textoDaNuvem(pagA), v => /não consegue subir/.test(v || ''), 5000);
   conf('na terceira vez a culpada vai para a quarentena, e a frase diz que ela não consegue subir', fila13b.length === 1 && fila13b[0].quarentena === true && frase13.ok, true);
   await idb(pagA, "t.objectStore('saida').delete('folha:x9:0'); t.objectStore('controle').delete('folha:x9'); t.objectStore('notas').delete('x9');");
+  conf('(arrumação) o documento de outro tablet saiu da nuvem', (await commitRest(dona.idToken, [{ delete: RAIZ_DOCS + '/usuarios/' + dona.localId + '/folhas/folha:x9:0' }])).status, 200);
   await enviar(pagA, true);
 
   secao('14. A página grande demais para a nuvem: quarentena na hora, e a frase diz qual folha e o que fazer');
@@ -822,6 +823,38 @@ function paginaSintetica() {
   const e15 = await enviar(pagA, true);
   conf('e ela sobe', e15.erro === null && resumoDoc(await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x1:1')) === 'apagadoEm=não bytes=sim' && (await filaFolhas(pagA)).length === 0, true);
   conf('a reconciliação direta não muda nada quando tudo bate', JSON.stringify(await pagA.evaluate(() => Store.reconciliarFolhas().then(r => [r.mudadas, r.lapides]))), '[0,0]');
+
+  secao('16. "Apagar tudo" e depois "Enviar cópia agora": nenhuma página fica viva na nuvem para aula que não existe');
+  const vivasAntes16 = await pagA.evaluate(() => Store.lerFila().then(() => Store.todasAsNotas()).then(n => Object.keys(n).sort()));
+  console.log('   folhas no tablet antes do "Apagar tudo": ' + JSON.stringify(vivasAntes16));
+  await pagA.evaluate(async () => { await Store.apagarTudo(); await Store.salvar(Store.bancoVazio()); await Nuvem.desligarAutomatica(); });
+  conf('a sincronização ficou desligada', await pagA.evaluate(() => Store.sincronizacaoDesligada()), true);
+  await H.abrirApp(pagA, amb.ORIGEM);   // o documento em memória passa a ser o banco vazio
+  await H.irParaAba(pagA, 'ajustes');
+  const copiaK2 = await enviarCopiaPelaTela(pagA);
+  conf('a cópia K2 (vazia) subiu e religou', !!copiaK2 && !(await pagA.evaluate(() => Store.sincronizacaoDesligada())), true);
+  const fila16 = await filaToda(pagA);
+  const lapidesFolha16 = fila16.filter(f => f.tipo === 'folha' && f.apagada).map(f => f.id).sort();
+  console.log('   lápides de folha na fila depois do religar: ' + JSON.stringify(lapidesFolha16));
+  conf('os registros (aula x1 etc.) viraram lápide na fila', fila16.some(f => f.id === 'aula:x1' && f.apagada), true);
+  prop('o religar enfileira a lápide de toda página que este tablet conhecia na nuvem (x1, x2, x3, x4), e nenhuma viva', lapidesFolha16.join(',') === 'folha:x1:0,folha:x1:1,folha:x2:0,folha:x3:0,folha:x4:0,folha:x4:1' && fila16.filter(f => f.tipo === 'folha' && !f.apagada).length === 0, MODOS[9]);
+  const e16 = await enviarAteEsvaziar(pagA, 3);
+  conf('as lápides subiram e a fila de folhas esvaziou', e16.erro === null && e16.filaFolhas === 0, true);
+  prop('folha:x1:0 e folha:x4:0 são lápide na nuvem depois do "Apagar tudo" + "Enviar cópia agora"', resumoDoc(await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x1:0')) === 'apagadoEm=sim bytes=não' && resumoDoc(await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x4:0')) === 'apagadoEm=sim bytes=não', MODOS[9]);
+  if (MODO === MODOS[9]) throw fimDoVeneno();
+  conf('o registro aula:x1 na nuvem é lápide', !!campoTexto((await lerDoc(dona.idToken, dona.localId, 'registros/aula:x1')).json, 'apagadoEm'), true);
+  // o celular restaura a cópia vazia e recebe: nada ressuscita
+  conf('C restaurou a cópia vazia K2', await pagC.evaluate(async (uid_, id_) => {
+    const lista = await Nuvem.listarCopias(uid_);
+    const copia = lista.filter(c => c.id === id_)[0];
+    const zip = await Nuvem.baixarCopia(uid_, copia.id);
+    await Store.importarZip(zip, { daNuvem: true });
+    await Nuvem.restaurou(copia, { celular: true });
+    return copia.id;
+  }, dona.localId, copiaK2), copiaK2);
+  const rC16 = await receber(pagC);
+  console.log('   recebimento em C depois de restaurar K2: ' + JSON.stringify(rC16));
+  conf('C ficou sem aulas e sem folhas (nenhuma nota de aula que não existe)', JSON.stringify({ aulas: await pagC.evaluate(() => Store.carregar().then(d => d.aulas.length)), notas: await pagC.evaluate(() => Store.todasAsNotas().then(n => Object.keys(n).sort())) }), JSON.stringify({ aulas: 0, notas: [] }));
   conf('nenhum erro de página em A e C depois das seções da revisão', [pagA, pagC].map(p => p.errosDePagina.join(' | ')).filter(Boolean).join(' || '), '');
   await pagC.close(); await contextoC.close();
 })().then(() => derrubarEmulador().then(H.fim(amb)), e => derrubarEmulador().then(() => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e))));
