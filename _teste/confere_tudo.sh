@@ -969,6 +969,15 @@ roda "celular dinheiro --envenenado-falta-e-o-total" node "_teste/testa_celular_
 roda "celular dinheiro --envenenado-sem-meses-anteriores" node "_teste/testa_celular_dinheiro.js" --envenenado-sem-meses-anteriores
 roda "celular dinheiro --envenenado-cancela-sem-confirmar" node "_teste/testa_celular_dinheiro.js" --envenenado-cancela-sem-confirmar
 roda "celular dinheiro --envenenado-sem-redesenho"  node "_teste/testa_celular_dinheiro.js" --envenenado-sem-redesenho
+# A carga de exemplo e so das provas (09/11/2026, com o app em producao): ela
+# entra so na origem local (127.0.0.1, localhost). Nas origens de producao
+# (pages.dev e github.io, servidas do disco pela interceptacao) o banco vazio
+# abre vazio, tambem depois do "Apagar tudo"; e o aparelho novo que entra na
+# conta e liga a nuvem (no emulador) nao sobe nenhum registro de exemplo. O
+# controle positivo e a mesma carga, em 127.0.0.1, subindo numa outra conta. O
+# veneno volta a carga em qualquer origem e a nuvem tem de mostrar os registros.
+roda "carga inicial so nas provas"                  node "_teste/testa_carga_inicial.js"
+roda "carga inicial --envenenado-carga-em-producao" node "_teste/testa_carga_inicial.js" --envenenado-carga-em-producao
 # D6c (lote 4): o que o app mostra sozinho no alto de Hoje do celular. A
 # proxima aula (a mesma marca do lote 1), a aula passada sem registro (o
 # criterio do tablet, Core.aulaTemRegistro), a familia em aberto do dia 6 em
