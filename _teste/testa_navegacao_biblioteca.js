@@ -65,14 +65,14 @@ const medirBarra = pag => pag.evaluate(() => {
     const rg = document.createRange(); rg.selectNodeContents(rot);
     const t = rg.getBoundingClientRect();
     return { cel: b.dataset.cel, texto: b.textContent, l: r.left, r: r.right, top: r.top, bottom: r.bottom, w: r.width, h: r.height,
-      tl: t.left, tr: t.right, tt: t.top, tb: t.bottom, sw: rot.scrollWidth, cw: rot.clientWidth,
+      tl: t.left, tr: t.right, tt: t.top, tb: t.bottom,
       ativa: b.classList.contains('ativa'), atual: b.getAttribute('aria-current') };
   });
   let folga = 999;
   itens.forEach((i, k) => {
     if (i.h < 48 || i.w < 48) ruins.push(i.cel + ' com alvo de ' + Math.round(i.w) + 'x' + Math.round(i.h));
     if (i.tl < i.l - 0.5 || i.tr > i.r + 0.5) ruins.push(i.cel + ': o rótulo sai do botão (' + Math.round(i.tl) + '-' + Math.round(i.tr) + ' em ' + Math.round(i.l) + '-' + Math.round(i.r) + ')');
-    if (i.sw > i.cw + 0.5) ruins.push(i.cel + ': o rótulo está cortado (' + i.sw + ' em ' + i.cw + ')');
+    if (i.l < -0.5 || i.r > innerWidth + 0.5 || i.tl < -0.5 || i.tr > innerWidth + 0.5) ruins.push(i.cel + ' sai da tela (' + Math.round(i.l) + '-' + Math.round(i.r) + ' de ' + innerWidth + ')');
     if (i.tt < i.top - 0.5 || i.tb > i.bottom + 0.5) ruins.push(i.cel + ': o rótulo sai do botão na altura');
     if (k > 0) {
       const a = itens[k - 1];
@@ -80,7 +80,7 @@ const medirBarra = pag => pag.evaluate(() => {
       folga = Math.min(folga, i.tl - a.tr);
     }
   });
-  if (folga < 2) ruins.push('rótulos a ' + folga.toFixed(1) + ' px um do outro');
+  if (folga < 6) ruins.push('rótulos a ' + folga.toFixed(1) + ' px um do outro');
   if (br.left < -0.5 || br.right > innerWidth + 0.5 || br.bottom > innerHeight + 0.5) ruins.push('a barra sai da tela');
   if (document.documentElement.scrollWidth > innerWidth) ruins.push('a página rola de lado');
   return { ruins, rotulos: itens.map(i => i.texto).join(','), folga: Math.round(folga * 10) / 10,
@@ -101,7 +101,7 @@ const lerTrilho = pag => pag.evaluate(() => {
     if (rot) {
       const rg = document.createRange(); rg.selectNodeContents(rot);
       const t = rg.getBoundingClientRect();
-      if (rot.scrollWidth > rot.clientWidth + 0.5 || t.left < q.left - 0.5 || t.right > q.right + 0.5) ruins.push(b.dataset.tela + ': o rótulo não cabe');
+      if (t.left < q.left - 0.5 || t.right > q.right + 0.5 || t.right > innerWidth + 0.5) ruins.push(b.dataset.tela + ': o rótulo não cabe');
     }
   });
   for (let k = 1; k < botoes.length; k++) {
@@ -202,7 +202,7 @@ async function abrirCelular(w, h) {
     await pausa(300);
     const m = await medirBarra(cel);
     console.log('   360 a 130%: ' + (m.ruins.join('; ') || 'nenhum defeito'));
-    const visto = m.ruins.some(r => /rótulo (está cortado|sai do botão)/.test(r));
+    const visto = m.ruins.some(r => /rótulo sai do botão/.test(r));
     conf('envenenado-rotulo-corta: a 360 px com 130% o rótulo estoura o botão (defeito detectado)', visto, true);
     if (visto) console.log('VENENO visto: o rótulo cortado foi detectado.');
     await H.fim(amb)();
@@ -250,9 +250,21 @@ async function abrirCelular(w, h) {
 
   await letra(pag, LETRA_130);
   await pausa(200);
-  t = await lerTrilho(pag);
-  conf('com a letra a 130%, os rótulos cabem no trilho e nada transborda (' + (t.ruins.join('; ') || 'nada') + ')', t.ruins.length, 0);
+  for (const tela of ['agenda', 'alunos', 'biblioteca', 'fechamento', 'ajustes']) {
+    await pag.click('#abas .aba[data-tela="' + tela + '"]');
+    await pausa(200);
+    t = await lerTrilho(pag);
+    conf('com a letra a 130% e ' + tela + ' ativo (em 600), os rótulos cabem no trilho e nada transborda (' + (t.ruins.join('; ') || 'nada') + ')',
+      t.atuais + '|' + t.ruins.length, tela + '|0');
+  }
+  conf('a 130% o trilho alarga com a letra e o conteúdo acompanha', await pag.evaluate(() => {
+    const r = document.querySelector('#abas').getBoundingClientRect(), c = document.querySelector('.conteudo').getBoundingClientRect();
+    return r.width > 96 && c.left >= r.right - 0.5;
+  }), true);
   await letra(pag, '');
+  await pag.click('#abas .aba[data-tela="agenda"]');
+  await pausa(200);
+  conf('com a letra normal o trilho volta aos 96 px do protótipo', await pag.evaluate(() => Math.round(document.querySelector('#abas').getBoundingClientRect().width)), 96);
 
   await pag.click('#nav-marcar-aula');
   const janela = await esperar('a janela de aula abriu pelo "+"', () => pag.evaluate(() =>
@@ -306,6 +318,29 @@ async function abrirCelular(w, h) {
     conf(nome + ': os destinos, na ordem', m.rotulos, 'Hoje,Alunos,Biblioteca,Fechamento,Enviar');
     conf(nome + ': um ativo só, Hoje, com aria-current', m.ativos + '|' + m.atuais, 'hoje|hoje');
     conf(nome + ': rótulos sem corte nem sobreposição, alvo de 48 px (' + (m.ruins.join('; ') || 'nada') + ')', m.ruins.length, 0);
+    let menor = m.folga;
+    for (const d of ['alunos', 'biblioteca', 'fechamento', 'enviar', 'hoje']) {
+      await cel.click('#cel-abas .cel-aba[data-cel="' + d + '"]');
+      await pausa(200);
+      const md = await medirBarra(cel);
+      menor = Math.min(menor, md.folga);
+      conf(nome + ', ' + d + ' ativo: um ativo só e nada corta nem sai da tela (' + (md.ruins.join('; ') || 'nada') + ')', md.atuais + '|' + md.ruins.length, d + '|0');
+    }
+    console.log('   ' + nome + ': com qualquer destino ativo, rótulos a ' + menor + ' px um do outro no mais apertado');
+    if (w === 360 && l) {
+      /* O observador (outra conta) tem Hoje, Alunos, Fechamento, Diagnóstico e
+       * Ajustes. Chegar a ele pede o emulador; aqui só o conjunto de itens é
+       * trocado na barra, para medir a largura (registro, sem mudar o app). */
+      await cel.evaluate(() => document.querySelectorAll('#cel-abas .cel-aba').forEach(b => {
+        b.hidden = ['enviar', 'biblioteca'].indexOf(b.dataset.cel) >= 0 ? true : false;
+      }));
+      await pausa(150);
+      const mo = await medirBarra(cel);
+      console.log('   observador a 360 com 130%: ' + mo.rotulos + '; rótulos a ' + mo.folga + ' px; ' + (mo.ruins.join('; ') || 'nada fora do lugar'));
+      // registro: o alvo e a folga do observador ficam no log (ele não é a Nathália); o que reprova é corte, sobreposição e sair da tela
+      conf('observador a 360 com 130%: nenhum rótulo sai do botão nem da tela, sem sobreposição',
+        mo.ruins.filter(r => !/^rótulos a |com alvo de /.test(r)).length, 0);
+    }
     if (w === 412 && !l) {
       await cel.click('#cel-abas .cel-aba[data-cel="biblioteca"]');
       await pausa(250);

@@ -3491,7 +3491,9 @@ body.modo-celular .celular .linha { flex-direction: column; }
    pelos tokens dela sem mexer na estrutura. Os ganchos das provas ficam:
    #abas, .aba, .ativa, data-tela; #cel-abas, .cel-aba, data-cel. */
 :root {
-  --nav-trilho-largura: 96px;
+  /* 96 px como no protótipo; com a letra do aparelho maior, o trilho alarga
+     junto (6,4 vezes o rótulo cabe o "Fechamento" em 600), e o corpo acompanha. */
+  --nav-trilho-largura: max(96px, calc(var(--letra-2) * 6.4));
   --nav-superficie: #FFFFFF;
   --nav-fio: #E8E2D7;
   --nav-texto: #4A5464;
@@ -3523,6 +3525,7 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
   background: var(--nav-superficie);
   border-right: 1px solid var(--nav-fio);
   overflow-y: auto;
+  overflow-x: hidden;
 }
 #abas .nav-mais {
   width: 56px; height: 56px; flex: none; margin-bottom: 12px;
@@ -3540,7 +3543,9 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
   color: var(--nav-texto); text-align: center;
 }
 #abas .aba .nav-ind { width: 56px; height: 32px; }
-#abas .aba:hover .nav-ind { background: var(--nav-ativo-fundo); }
+@media (hover: hover) {
+  #abas .aba:hover .nav-ind { background: var(--nav-ativo-fundo); }
+}
 #abas .aba.ativa { color: var(--nav-ativo-texto); font-weight: 600; }
 #abas .aba.ativa .nav-ind { background: var(--nav-ativo-fundo); }
 /* Ajustes não é destino do desenho: fica no pé do trilho, com o mesmo item
@@ -3557,7 +3562,7 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
   display: grid; grid-auto-flow: column;
   /* nav: âncora do veneno do rótulo (a coluna nunca fica menor que o rótulo) */
   grid-auto-columns: minmax(min-content, 1fr);
-  column-gap: 4px; align-items: center;
+  column-gap: 8px; align-items: center;
   min-height: 64px;
   padding: 0 4px env(safe-area-inset-bottom, 0px);
   background: var(--nav-superficie);
