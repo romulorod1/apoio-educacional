@@ -1047,7 +1047,12 @@
              * não exista: se existir, a nuvem tem algo que este aparelho não viu,
              * a precondição falha, o recebimento decide e só então se tenta de
              * novo. */
-            var precondicao = conhecido ? { updateTime: conhecido } : (itens[k].fila.restauro ? { exists: false } : null);
+            /* A mensagem do mês sem carimbo conhecido também (um texto novo do
+             * mês, escrito sem sinal): se o outro aparelho já o criou na nuvem, a
+             * precondição falha e o recebimento decide pela hora em que cada um
+             * foi escrito, em vez de este envio cobrir o outro calado. */
+            var precondicao = conhecido ? { updateTime: conhecido }
+              : ((itens[k].fila.restauro || itens[k].registro.tipo === 'resumo') ? { exists: false } : null);
             return gravacaoCarimbada(nomeDoc(uid, p.colecao + p.doc.id), p.doc, precondicao);
           }), { keepalive: !!info.fechando }).then(function (resposta) {
             var resultados = (resposta && resposta.writeResults) || [];
