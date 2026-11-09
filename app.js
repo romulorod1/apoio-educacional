@@ -22161,17 +22161,24 @@
     if (!alvo) { conteudo.scrollTop = 0; return; }
     var linha = alvo.closest('.cel-tempo-linha') || alvo;
     var baixoDaFaixa = function () { return faixa ? faixa.getBoundingClientRect().bottom : conteudo.getBoundingClientRect().top; };
-    conteudo.scrollTop = Math.max(0, conteudo.scrollTop + linha.getBoundingClientRect().top - baixoDaFaixa() - 8);
-    /* No fim do dia a rolagem para antes do alvo: a linha que ficou meio
-     * escondida sob a faixa sobe inteira à vista, em vez de aparecer cortada. */
+    conteudo.scrollTop = Math.max(0, conteudo.scrollTop + linha.getBoundingClientRect().top - baixoDaFaixa() - FOLGA_SOB_A_FAIXA);
+    /* A linha que ficou meio escondida sob a faixa (no fim do dia, quando a
+     * rolagem para antes do alvo) sobe inteira à vista, e de novo para a de
+     * cima dela, até nenhuma ficar cortada. */
     var linhas = $$('#cel-tempo .cel-tempo-linha');
-    for (var i = 0; i < linhas.length; i++) {
-      var r = linhas[i].getBoundingClientRect(), limite = baixoDaFaixa();
-      if (r.bottom <= limite + 1) continue;
-      if (r.top < limite - 1) conteudo.scrollTop = Math.max(0, conteudo.scrollTop - (limite - r.top) - 8);
-      break;
+    for (var volta = 0; volta < linhas.length; volta++) {
+      var limite = baixoDaFaixa();
+      var cortada = linhas.filter(function (l) { var r = l.getBoundingClientRect(); return r.bottom > limite + 1 && r.top < limite - 1; })[0];
+      if (!cortada || conteudo.scrollTop <= 0) break;
+      conteudo.scrollTop = Math.max(0, conteudo.scrollTop - (limite - cortada.getBoundingClientRect().top) - FOLGA_SOB_A_FAIXA);
     }
   }
+  /* A folga entre a faixa dos dias e a linha que a rolagem mostra é MENOR que
+   * o vão de 6 px entre as linhas (.cel-tempo-linha): assim a linha de cima
+   * fica toda escondida sob a faixa. Com 8, sobravam 2 px dela à vista,
+   * cortada; de madrugada e antes das 7h era a própria linha de agora (o
+   * portão de 09/11, que roda em UTC, pegou às 00:22). */
+  var FOLGA_SOB_A_FAIXA = 4;
 
   /* A linha de agora anda sozinha: a cada minuto, com Hoje à vista e nada
    * aberto, a linha do tempo se refaz no lugar (a rolagem fica). Passada a
