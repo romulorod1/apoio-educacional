@@ -31,6 +31,16 @@
  *   folhas/{folha:aulaId:n}  { id, aulaId, n, hash, bytes, tamanho, algoritmo,
  *                              atualizadoEm, apagadoEm, aparelho, esquema, app,
  *                              servidorEm }  (N2, fatia 1)
+ *   anexos/{anexo:id|midia:id} { id, aulaId, origem, sha256, nome, tipo, tamanho,
+ *                              largura, altura, atualizadoEm, apagadoEm,
+ *                              aparelho, esquema, app, servidorEm }  (N2, fatia 2)
+ *   arquivos/{sha256}        { sha256, tamanho, tipo, partes }
+ *   arquivos/{sha256}/partes/{n} { dados: bytes, n }   até 768 KiB cada
+ * O ARQUIVO (anexo ou imagem colada na folha) sobe UMA VEZ pelo sha256 dos
+ * bytes: o mesmo conteúdo em duas aulas divide `arquivos/{sha}`; o que liga o
+ * arquivo à aula é o documento pequeno `anexos/{id}`. Só o tablet o envia. O
+ * tablet baixa o que falta na hora em que o metadado chega; o celular e o
+ * observador, quando ela abre. Quem baixa CONFERE o sha256 dos bytes.
  * A FOLHA sobe POR PÁGINA (N2): o texto canônico da página (store.js,
  * paginaCanonica: pontos arredondados a 0,1, em JSON), comprimido com
  * CompressionStream('gzip') em `bytes`, com o SHA-256 do texto em `hash`. Só
@@ -104,6 +114,7 @@
   var TETO_COMMIT_BYTES = 5 * 1024 * 1024;
   var TETO_PAGINA_BYTES = 900 * 1024;   // uma página comprimida acima disto não cabe num documento (as regras também recusam)
   var TETO_KEEPALIVE = 60 * 1024;       // o corpo que ainda cabe num fetch com keepalive (o navegador limita a 64 KiB)
+  var TETO_ARQUIVO_BYTES = 25 * 1024 * 1024; // o limite de anexo que o aplicativo já tem; as regras recusam acima disto
   var ATRASO_ENVIO_REGISTROS = 2500; // depois de uma gravação dela, espera as vizinhas antes de subir
   var NOME_BANCO = 'apoio-nuvem';
   var UM_DIA = 24 * 60 * 60 * 1000;
@@ -295,6 +306,9 @@
     LOTE_GRANDE: 'O lote passou do tamanho e vai dividido.',
     SEM_COMPRESSAO: 'Este navegador não comprime a folha para a nuvem: as folhas ficam só neste aparelho.',
     SEM_WEBCRYPTO: 'Este navegador não calcula o hash da folha para a nuvem: as folhas ficam só neste aparelho.',
+    ARQUIVO_INVALIDO: 'O arquivo que veio da nuvem não confere com o original e não foi aberto.',
+    ARQUIVO_AUSENTE: 'O arquivo ainda não chegou da nuvem. Com sinal, ele chega sozinho.',
+    ARQUIVO_GRANDE: 'Um anexo passa de 25 MB e não sobe para a nuvem; ele continua neste aparelho.',
     RESOURCE_EXHAUSTED: 'A cota da nuvem acabou por hoje; tento de novo mais tarde.',
     UNAVAILABLE: 'A nuvem está indisponível agora; tento de novo mais tarde.',
     DEADLINE_EXCEEDED: 'A nuvem demorou demais; tento de novo mais tarde.',
@@ -946,9 +960,77 @@
    * DEMAIS para um documento não derruba o lote: vem marcada (`grande`), e o
    * envio a põe direto na quarentena, com o motivo, sem tentar de novo (o
    * tamanho não muda tentando); a tela diz qual folha e o que fazer. */
+  /* O documento de um ARQUIVO (N2, fatia 2): `anexos/{id}`, pequeno, que liga o
+   * arquivo à aula, com o sha256 dos bytes. Os bytes vão à parte, em
+   * `arquivos/{sha256}` (subirArquivo). O sha256 é recalculado aqui dos bytes
+   * que sobem: o do estado pode faltar (a restauração) e os bytes são a verdade.
+   * A lápide vai sem os bytes, com o sha256 conhecido. */
+  function documentoDoArquivo(reg, versaoApp) {
+    var campo = { id: reg.id, aulaId: reg.aulaId || '', origem: reg.origem, atualizadoEm: reg.atualizadoEm, apagadoEm: reg.apagadoEm || null,
+      aparelho: idDoAparelho() || reg.aparelho || 'aparelho', esquema: 1, app: versaoApp || '' };
+    if (reg.apagadoEm || !reg.arquivo) {
+      if (reg.sha256) campo.sha256 = reg.sha256;
+      return Promise.resolve({ doc: campo, arquivo: null, hash: reg.sha256 || null });
+    }
+    return root.Store.bytesDoArquivo(reg.origem, reg.arquivo).then(function (b) {
+      if (!b) throw erro('ARQUIVO_AUSENTE');
+      if (b.bytes.length > TETO_ARQUIVO_BYTES) throw erro('ARQUIVO_GRANDE');
+      return root.Store.sha256Hex(b.bytes).then(function (sha) {
+        campo.sha256 = sha;
+        campo.tipo = String(reg.mime || b.tipo || 'application/octet-stream').slice(0, 120);
+        campo.tamanho = b.bytes.length;
+        if (reg.origem === 'anexo') campo.nome = String(reg.nome || '').slice(0, 300);
+        if (reg.origem === 'midia') {
+          if (Number.isInteger(reg.w)) campo.largura = reg.w;
+          if (Number.isInteger(reg.h)) campo.altura = reg.h;
+        }
+        return { doc: campo, arquivo: { sha256: campo.sha256, bytes: b.bytes, tipo: campo.tipo }, hash: campo.sha256 };
+      });
+    });
+  }
+  /* O ARQUIVO SOBE UMA VEZ, PELO SHA256: uma leitura do cabeçalho
+   * `arquivos/{sha}` antes; se ele já está lá, nada sobe (o mesmo arquivo em
+   * duas aulas). Senão as partes (até 768 KiB cada, oito por commit) e, POR
+   * ÚLTIMO, o cabeçalho: cabeçalho presente quer dizer arquivo inteiro. Um envio
+   * interrompido no meio deixa partes sem cabeçalho, que o próximo reescreve
+   * iguais. `jaNaNuvem` (por envio) evita a segunda leitura no mesmo envio. */
+  var arquivosSubidos = 0;   // quantos arquivos subiram por inteiro nesta abertura (para a prova e o diagnóstico)
+  function subirArquivo(uid, arq, jaNaNuvem) {
+    if (jaNaNuvem[arq.sha256]) return Promise.resolve('no envio');
+    var partes = [];
+    for (var i = 0; i < arq.bytes.length; i += TETO_PARTE) partes.push(arq.bytes.subarray(i, Math.min(i + TETO_PARTE, arq.bytes.length)));
+    if (!partes.length) partes.push(new Uint8Array(0));
+    return lerDoc(nomeDoc(uid, 'arquivos/' + arq.sha256)).then(function (cab) {
+      if (cab && cab.sha256 === arq.sha256 && Number(cab.partes) === partes.length) { jaNaNuvem[arq.sha256] = true; return 'ja estava'; }
+      var fila = Promise.resolve();
+      for (var p = 0; p < partes.length; p += PARTES_POR_PEDIDO) {
+        (function (inicio) {
+          fila = fila.then(function () {
+            var escritas = [];
+            for (var n = inicio; n < Math.min(inicio + PARTES_POR_PEDIDO, partes.length); n++) {
+              escritas.push(gravacao(nomeDoc(uid, 'arquivos/' + arq.sha256 + '/partes/' + n), { dados: partes[n], n: n }));
+            }
+            return commit(escritas);
+          });
+        })(p);
+      }
+      return fila.then(function () {
+        return commit([gravacao(nomeDoc(uid, 'arquivos/' + arq.sha256), { sha256: arq.sha256, tamanho: arq.bytes.length, tipo: arq.tipo, partes: partes.length })]);
+      }).then(function () { jaNaNuvem[arq.sha256] = true; arquivosSubidos++; return 'subiu'; });
+    });
+  }
+
   function documentosDoLote(itens, versaoApp) {
     return Promise.all(itens.map(function (i) {
       var reg = i.registro;
+      if (reg.tipo === 'anexo') {
+        return documentoDoArquivo(reg, versaoApp).then(function (r) {
+          return { colecao: 'anexos/', doc: r.doc, bytes: JSON.stringify(r.doc).length, hash: r.hash, arquivo: r.arquivo };
+        }, function (e) {
+          if (e && e.codigo === 'ARQUIVO_GRANDE') return { grande: true, id: i.fila.id, motivo: 'ARQUIVO_GRANDE' };
+          throw e;
+        });
+      }
       if (reg.tipo === 'folha') {
         return documentoDaPagina(reg, versaoApp).then(function (r) { return { colecao: 'folhas/', doc: r.doc, bytes: r.bytes, hash: r.hash }; }, function (e) {
           if (e && e.codigo === 'PAGINA_GRANDE') return { grande: true, id: i.fila.id };
@@ -1030,12 +1112,27 @@
       function subirLote(todos) {
         return documentosDoLote(todos, info.versaoApp).then(function (todosPreparados) {
           // as páginas grandes demais vão para a quarentena agora, e o resto do lote segue
-          var grandes = todosPreparados.filter(function (p) { return p.grande; }).map(function (p) { return p.id; });
+          var grandes = todosPreparados.filter(function (p) { return p.grande && !p.motivo; }).map(function (p) { return p.id; });
+          // o arquivo acima do teto (N2, fatia 2) vai para a quarentena com o motivo dele
+          var arquivosGrandes = todosPreparados.filter(function (p) { return p.grande && p.motivo === 'ARQUIVO_GRANDE'; }).map(function (p) { return p.id; });
           var itens = todos.filter(function (i, k) { return !todosPreparados[k].grande; });
           var preparados = todosPreparados.filter(function (p) { return !p.grande; });
           var quarentena = grandes.length && typeof root.Store.quarentenar === 'function'
             ? root.Store.quarentenar(grandes, 'PAGINA_GRANDE').then(function () { paginasGrandes += grandes.length; }, function () {})
             : Promise.resolve();
+          if (arquivosGrandes.length && typeof root.Store.quarentenar === 'function') {
+            quarentena = quarentena.then(function () { return root.Store.quarentenar(arquivosGrandes, 'ARQUIVO_GRANDE'); }).then(null, function () {});
+          }
+          /* Os ARQUIVOS do lote sobem antes dos documentos que apontam para eles,
+           * um de cada vez (o mesmo sha256 duas vezes no lote sobe uma). */
+          var comArquivo = preparados.filter(function (p) { return !!p.arquivo; });
+          if (comArquivo.length) {
+            quarentena = quarentena.then(function () {
+              return comArquivo.reduce(function (cadeia, p) {
+                return cadeia.then(function () { return subirArquivo(uid, p.arquivo, jaNaNuvem); });
+              }, Promise.resolve());
+            });
+          }
           if (!itens.length) return quarentena.then(function () { return 0; });
           /* O TETO DE BYTES do commit (N2): um lote com páginas de folha que
            * passe dele volta para ser dividido ao meio, sem culpa de ninguém. */
@@ -1097,6 +1194,7 @@
         });
       }
       var jaCulpados = {}; // quem levou tentativa neste envio não volta ao lote até o próximo envio
+      var jaNaNuvem = {};  // os sha256 que este envio já viu na nuvem ou subiu (N2, fatia 2)
       var recebimentos = 0; // quantas vezes a precondição mandou receber antes de insistir
       /* A LÁPIDE DA PÁGINA QUE NUNCA SUBIU (N2): não há documento a apagar na
        * nuvem, e escrever a lápide criaria um documento órfão. Ela sai da fila
@@ -1106,11 +1204,13 @@
       function descartarLapidesOrfas(itens) {
         var orfas = itens.filter(function (i) {
           var reg = i.registro;
+          // o arquivo removido que nunca subiu (N2, fatia 2) também sai sem escrever
+          if (reg.tipo === 'anexo' && reg.apagadoEm && !(reg.nuvem && (reg.nuvem.updateTime || reg.nuvem.servidorEm))) return true;
           return reg.tipo === 'folha' && reg.apagadoEm && !(reg.nuvem && (reg.nuvem.updateTime || reg.nuvem.servidorEm));
         });
         if (!orfas.length) return Promise.resolve(itens);
         return root.Store.confirmarEnvio(orfas.map(function (i) {
-          return { id: i.fila.id, tipo: 'folha', atualizadoEm: i.fila.atualizadoEm, apagadoEm: i.registro.apagadoEm, hash: null, nuvem: null };
+          return { id: i.fila.id, tipo: i.registro.tipo, atualizadoEm: i.fila.atualizadoEm, apagadoEm: i.registro.apagadoEm, hash: null, nuvem: null };
         })).then(function () {
           lapidesDescartadas += orfas.length;
           return itens.filter(function (i) { return orfas.indexOf(i) < 0; });
@@ -1129,6 +1229,12 @@
             var comFolhas = itens.length;
             itens = itens.filter(function (i) { return !(i.registro && i.registro.tipo === 'folha'); });
             folhasSemSuporte += comFolhas - itens.length;
+          }
+          // o arquivo (N2, fatia 2) também precisa do WebCrypto para o sha256: sem ele fica na fila
+          if (!(root.Store && typeof root.Store.temWebCrypto === 'function' && root.Store.temWebCrypto())) {
+            var comArquivos = itens.length;
+            itens = itens.filter(function (i) { return !(i.registro && i.registro.tipo === 'anexo'); });
+            folhasSemSuporte += comArquivos - itens.length;
           }
           itens = itens.filter(function (i) { return !!i.registro && !jaCulpados[i.fila.id]; });
           if (!itens.length || lotes >= 50) return { enviados: enviados };
@@ -1319,6 +1425,12 @@
       return receberFolhas(uidDona).then(function (f) {
         r.folhas = f.aplicados || 0;
         r.folhasInvalidas = f.invalidas || 0;
+        // e os metadados dos arquivos (N2, fatia 2), com cursor próprio
+        return receberAnexos(uidDona);
+      }).then(function (a) {
+        r.anexos = a.aplicados || 0;
+        r.arquivosBaixados = a.baixados || 0;
+        r.arquivosInvalidos = a.invalidos || 0;
         return r;
       });
     }).then(function (r) {
@@ -1408,6 +1520,108 @@
       return pagina();
     });
   }
+  /* OS ARQUIVOS QUE CHEGARAM (N2, fatia 2): a coleção `anexos`, em ordem de
+   * (servidorEm, nome), depois do cursor próprio (controle/cursorAnexos). Só os
+   * metadados vêm aqui; o Store os aplica e devolve os que faltam no disco.
+   * NO TABLET (o aparelho que escreve) o arquivo que falta é baixado na hora;
+   * no celular e no observador, só quando ela abre (baixarArquivo). */
+  function receberAnexos(uidDona) {
+    var aplicados = 0, paginas = 0, baixados = 0, invalidos = 0, faltam = [];
+    if (!root.Store || typeof root.Store.aplicarAnexosRecebidos !== 'function') return Promise.resolve({ aplicados: 0 });
+    return root.Store.lerCursorAnexos().then(function (cursor) {
+      var desde = cursor && cursor.servidorEm ? { servidorEm: cursor.servidorEm, nome: cursor.nome || null } : null;
+      function montarConsulta(c) {
+        var q = { from: [{ collectionId: 'anexos' }],
+          orderBy: [{ field: { fieldPath: 'servidorEm' }, direction: 'ASCENDING' }, { field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
+          limit: 200 };
+        if (c && c.servidorEm) {
+          var v = [{ timestampValue: c.servidorEm }];
+          if (c.nome) v.push({ referenceValue: c.nome });
+          q.startAt = { values: v, before: !c.nome };
+        }
+        return q;
+      }
+      function pagina() {
+        if (paginas++ >= 50) return { aplicados: aplicados };
+        return comToken(function (cab) {
+          return pedir(urlDoc(raizDocumentos() + '/usuarios/' + uidDona) + ':runQuery', { cabecalhos: cab, corpo: { structuredQuery: montarConsulta(desde) } });
+        }).then(function (resposta) {
+          var docs = (resposta || []).filter(function (x) { return x && x.document; }).map(function (x) { return x.document; });
+          var meuId = idDoAparelho();
+          var lote = docs.map(function (d) {
+            var v = valores(d.fields);
+            var base = { servidorEm: v.servidorEm || null, nome: d.name };
+            // forma que não é a de um arquivo: só o cursor passa por cima
+            if (typeof v.id !== 'string' || !root.Store.partesDoIdDoArquivo(v.id) || (!v.apagadoEm && !SHA256_VALIDO.test(String(v.sha256 || '')))) { invalidos++; return base; }
+            return Object.assign(base, { id: v.id, aulaId: v.aulaId || '', origem: v.origem || '', sha256: v.sha256 || null, nome: v.nome || '', tipo: v.tipo || null,
+              tamanho: v.tamanho || null, largura: v.largura || null, altura: v.altura || null, atualizadoEm: v.atualizadoEm || null,
+              apagadoEm: v.apagadoEm || null, aparelho: v.aparelho || '', updateTime: d.updateTime || null, eco: !!(meuId && v.aparelho === meuId) });
+          });
+          var ultimo = lote.length ? lote[lote.length - 1] : null;
+          var aplicar = lote.length ? root.Store.aplicarAnexosRecebidos(lote) : Promise.resolve({ aplicados: 0, faltam: [] });
+          return aplicar.then(function (contas) {
+            if (contas.pulado === 'desligada') { sincronizacaoDesligada = true; return { pulado: 'desligada', aplicados: aplicados }; }
+            aplicados += contas.aplicados || 0;
+            faltam = faltam.concat(contas.faltam || []);
+            if (docs.length < 200 || !ultimo || !ultimo.servidorEm) return { aplicados: aplicados };
+            desde = ultimo;
+            return pagina();
+          });
+        });
+      }
+      return pagina();
+    }).then(function (r) {
+      // no tablet, o que falta baixa agora, um de cada vez; a falha de um não derruba o recebimento
+      if (r.pulado || !podeEnviarCopia() || !faltam.length) return r;
+      return faltam.reduce(function (cadeia, filaId) {
+        return cadeia.then(function () {
+          return baixarArquivo(filaId).then(function (g) { if (g) baixados++; }, function (e) { if (e && e.codigo === 'ARQUIVO_INVALIDO') invalidos++; });
+        });
+      }, Promise.resolve()).then(function () { return r; });
+    }).then(function (r) { r.baixados = baixados; r.invalidos = invalidos; return r; });
+  }
+  var SHA256_VALIDO = /^[0-9a-f]{64}$/;
+  /* BAIXA UM ARQUIVO DA NUVEM e o guarda neste aparelho: o documento
+   * `anexos/{id}` (o metadado), o cabeçalho `arquivos/{sha256}` e as partes.
+   * O SHA256 DOS BYTES JUNTADOS É CONFERIDO com o do documento: o que não bate
+   * nunca é guardado nem aberto (ARQUIVO_INVALIDO, contado no estado). Lê
+   * direto da nuvem, sem depender do recebimento já ter passado: a folha que
+   * cita a imagem pode chegar antes do documento dela. Devolve o registro do
+   * depósito ({ nome, tipo, blob } ou { dataUrl, w, h }), ou null quando a nuvem
+   * não tem (ou já apagou) esse arquivo. */
+  function baixarArquivo(filaId) {
+    var uid, doc;
+    return carregarEstado().then(function () {
+      if (!sessao) throw erro('TOKEN_EXPIRED');
+      if (!online()) throw semRede();
+      uid = (marcaCelular && marcaCelular.uidDona) || sessao.uid;
+      return lerDoc(nomeDoc(uid, 'anexos/' + filaId));
+    }).then(function (d) {
+      doc = d;
+      if (!doc || doc.apagadoEm || !SHA256_VALIDO.test(String(doc.sha256 || ''))) return null;
+      return lerDoc(nomeDoc(uid, 'arquivos/' + doc.sha256)).then(function (cab) {
+        if (!cab || !(Number(cab.partes) >= 1)) return null;
+        var pedidos = [];
+        for (var n = 0; n < Number(cab.partes); n++) pedidos.push(lerDoc(nomeDoc(uid, 'arquivos/' + doc.sha256 + '/partes/' + n)));
+        return Promise.all(pedidos).then(function (partes) {
+          var total = 0;
+          if (partes.some(function (p) { return !p || !(p.dados instanceof Uint8Array); })) return null;
+          partes.forEach(function (p) { total += p.dados.length; });
+          var juntos = new Uint8Array(total), pos = 0;
+          partes.forEach(function (p) { juntos.set(p.dados, pos); pos += p.dados.length; });
+          return root.Store.sha256Hex(juntos).then(function (sha) {
+            if (sha !== doc.sha256) {
+              registros.arquivosInvalidos = (registros.arquivosInvalidos || 0) + 1;
+              throw erro('ARQUIVO_INVALIDO');
+            }
+            return root.Store.guardarArquivoRecebido(filaId, { bytes: juntos, sha256: sha, tipo: doc.tipo || cab.tipo || null, nome: doc.nome || '',
+              w: doc.largura || null, h: doc.altura || null });
+          });
+        });
+      });
+    });
+  }
+
   /* Receber e depois enviar: a ordem que faz a precondição passar na maior
    * parte das vezes. O aparelho que só lê só recebe; o celular da dona envia
    * os registros dele. */
@@ -1588,7 +1802,8 @@
       registros: { pendentes: registros.pendentes, quarentena: registros.quarentena, ultimoEnvio: registros.ultimoEnvio,
         erro: registros.erro, enviando: !!enviandoRegistros, ultimoRecebimento: registros.ultimoRecebimento || null,
         erroRecebimento: registros.erroRecebimento || null, recebendo: !!recebendo, puladosFormatoAntigo: registros.puladosFormatoAntigo || 0,
-        folhasAdiadas: registros.folhasAdiadas || 0, folhasInvalidas: registros.folhasInvalidas || 0, paginasGrandes: (registros.paginasGrandes || []).slice() },
+        folhasAdiadas: registros.folhasAdiadas || 0, folhasInvalidas: registros.folhasInvalidas || 0, paginasGrandes: (registros.paginasGrandes || []).slice(),
+        arquivosInvalidos: registros.arquivosInvalidos || 0, arquivosSubidos: arquivosSubidos },
       // a marca "este aparelho é celular"; quem edita nele é só a dona (celularDaDona)
       celular: !!marcaCelular,
       celularDaDona: celularDaDona(),
@@ -1642,6 +1857,7 @@
     fraseDoCodigo: fraseDoCodigo, rotuloDoNavegador: rotuloDoNavegador, instaladoNaTela: instaladoNaTela,
     fraseDeQuando: fraseDeQuando,
     comprimir: comprimir, descomprimir: descomprimir,
+    baixarArquivo: baixarArquivo,
     TETO_PARTE: TETO_PARTE, TETO_PAGINA_BYTES: TETO_PAGINA_BYTES
   };
 })(typeof self !== 'undefined' ? self : this);
