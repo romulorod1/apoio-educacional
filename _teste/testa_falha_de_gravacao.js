@@ -67,6 +67,12 @@ const fs = require('fs');
 const path = require('path');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
+/* O relógio da rodada (o mesmo das provas do celular): segunda, 16/11/2026, às
+ * 11:00, no processo e na página. O dia das aulas de hoje é o dia LOCAL, como o
+ * app calcula (Core.hojeIso), e não o dia em UTC: no Brasil, das 21:00 à
+ * meia-noite, o dia em UTC já é o seguinte. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
+const HOJE = RELOGIO.dia(0);
 
 const PORTA = 8873;
 const MODOS = ['--envenenado-sem-tratamento', '--envenenado-olho-espera', '--envenenado-faixa-por-cima',
@@ -211,16 +217,19 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   }
   await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   // o arnês aceita toda pergunta; aqui só se guarda o texto de cada uma
   const dialogos = [];
   pag.on('dialog', d => { dialogos.push(d.message()); });
   await H.abrirApp(pag, amb.ORIGEM);
   await pausa(1500);
+  conf('(arranjo) o relógio da rodada: o processo e o app veem hoje como ' + HOJE, HOJE === '2026-11-16' &&
+    (await pag.evaluate(() => Core.hojeIso())) === HOJE && Math.abs(Date.now() - RELOGIO.fixo) < 30 * 60 * 1000, true);
 
   /* Banco fictício, e não a carga inicial: a carga inicial traz nomes reais de
    * crianças, e esta prova tira print. Uma aluna de teste, duas aulas de hoje
    * a R$ 100, e a versão vista gravada (nenhuma janela de novidades na tela). */
-  await pag.evaluate(() => new Promise(res => {
+  await pag.evaluate(hoje => new Promise(res => {
     const r = indexedDB.open('apoio-educacional');
     r.onsuccess = () => {
       const t = r.result.transaction('dados', 'readwrite');
@@ -228,7 +237,6 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
       const g = s.get('principal');
       g.onsuccess = () => {
         const d = g.result;
-        const hoje = new Date().toISOString().slice(0, 10);
         d.alunos = [{ id: 'alfa', nome: 'Aluna Alfa Teste', ativo: true,
           precos: [{ id: 'p1', inicio: '2026-01-01', fim: null, valorHora: 100 }] }];
         d.series = [];
@@ -240,7 +248,7 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
       };
       t.oncomplete = () => res();
     };
-  }));
+  }), HOJE);
   await H.abrirApp(pag, amb.ORIGEM);
   await pausa(1500);
 
@@ -558,7 +566,7 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
    * uma pendência anterior (o olho), a faixa fica, porque a memória ainda tem
    * o olho que o disco não tem. Uma aula nova é posta no disco, por fora, e o
    * aplicativo é reaberto com ela. */
-  await pag.evaluate(() => new Promise(res => {
+  await pag.evaluate(hoje => new Promise(res => {
     const r = indexedDB.open('apoio-educacional');
     r.onsuccess = () => {
       const t = r.result.transaction('dados', 'readwrite');
@@ -566,13 +574,13 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
       const g = s.get('principal');
       g.onsuccess = () => {
         const d = g.result;
-        d.aulas.push({ id: 'a3', alunoId: 'alfa', data: new Date().toISOString().slice(0, 10), hora: '18:00',
+        d.aulas.push({ id: 'a3', alunoId: 'alfa', data: hoje, hora: '18:00',
           duracaoMin: 60, status: 'realizada', cobravel: true, temas: [], areas: [], anexos: [] });
         s.put(d, 'principal');
       };
       t.oncomplete = () => res();
     };
-  }));
+  }), HOJE);
   await H.abrirApp(pag, amb.ORIGEM);
   await pausa(1500);
   await instalarSemEspaco();
