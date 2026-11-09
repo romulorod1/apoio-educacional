@@ -291,7 +291,7 @@
     FAILED_PRECONDITION: 'Outro aparelho gravou antes; vou receber e tentar de novo.',
     ALREADY_EXISTS: 'Outro aparelho gravou antes; vou receber e tentar de novo.',
     INVALID_ARGUMENT: 'A nuvem recusou a forma de um registro.',
-    PAGINA_GRANDE: 'Uma página da folha ficou grande demais para subir inteira.',
+    PAGINA_GRANDE: 'Uma página da folha é grande demais para a nuvem e não sobe: divida a página em duas para ela subir.',
     LOTE_GRANDE: 'O lote passou do tamanho e vai dividido.',
     SEM_COMPRESSAO: 'Este navegador não comprime a folha para a nuvem: as folhas ficam só neste aparelho.',
     SEM_WEBCRYPTO: 'Este navegador não calcula o hash da folha para a nuvem: as folhas ficam só neste aparelho.',
@@ -942,12 +942,18 @@
     });
   }
   /* Os documentos de um lote, cada um com o caminho dele e o tamanho em
-   * bytes: registro em `registros/`, página em `folhas/`. */
+   * bytes: registro em `registros/`, página em `folhas/`. A página GRANDE
+   * DEMAIS para um documento não derruba o lote: vem marcada (`grande`), e o
+   * envio a põe direto na quarentena, com o motivo, sem tentar de novo (o
+   * tamanho não muda tentando); a tela diz qual folha e o que fazer. */
   function documentosDoLote(itens, versaoApp) {
     return Promise.all(itens.map(function (i) {
       var reg = i.registro;
       if (reg.tipo === 'folha') {
-        return documentoDaPagina(reg, versaoApp).then(function (r) { return { colecao: 'folhas/', doc: r.doc, bytes: r.bytes, hash: r.hash }; });
+        return documentoDaPagina(reg, versaoApp).then(function (r) { return { colecao: 'folhas/', doc: r.doc, bytes: r.bytes, hash: r.hash }; }, function (e) {
+          if (e && e.codigo === 'PAGINA_GRANDE') return { grande: true, id: i.fila.id };
+          throw e;
+        });
       }
       var doc = documentoDoRegistro(reg, versaoApp);
       return Promise.resolve({ colecao: 'registros/', doc: doc, bytes: JSON.stringify(doc).length, hash: null });
@@ -957,9 +963,13 @@
   function contarFila() {
     if (!root.Store || typeof root.Store.estadoDaFila !== 'function') return Promise.resolve(0);
     return root.Store.estadoDaFila().then(function (e) {
-      if (e.pendentes !== registros.pendentes || e.quarentena !== registros.quarentena) {
+      var grandes = e.grandes || [];
+      if (e.pendentes !== registros.pendentes || e.quarentena !== registros.quarentena || JSON.stringify(grandes) !== JSON.stringify(registros.paginasGrandes || [])) {
         registros.pendentes = e.pendentes;
         registros.quarentena = e.quarentena;
+        registros.paginasGrandes = grandes;
+        // a página grande saiu da quarentena (foi dividida e regravada): a frase sai com ela
+        if (!grandes.length && registros.erro && registros.erro.codigo === 'PAGINA_GRANDE') { registros.erro = null; guardarRegistros(); }
         avisarOuvintes();
       }
       return e.pendentes;
@@ -1002,7 +1012,7 @@
     /* O "sobe ao fechar" não se perde com um envio em curso (revisão da fatia
      * 1): fica marcado e o envio roda de novo, com `tudo`, assim que este acabar. */
     if (enviandoRegistros) { if (info.tudo) tudoPendente = true; return enviandoRegistros; }
-    var enviados = 0, lotes = 0, emQuarentenaAntes = [], adiadas = 0, folhasSemSuporte = 0;
+    var enviados = 0, lotes = 0, emQuarentenaAntes = [], adiadas = 0, folhasSemSuporte = 0, paginasGrandes = 0, lapidesDescartadas = 0;
     enviandoRegistros = carregarEstado().then(function () {
       return lerSincronizacaoDesligada();
     }).then(function () {
@@ -1017,13 +1027,21 @@
         ? root.Store.lerFila().then(function (l) { emQuarentenaAntes = (l || []).filter(function (e) { return e.quarentena && !e.retestada; }).map(function (e) { return e.id; }); }, function () {})
         : Promise.resolve();
       /* Um lote inteiro, num commit; o que subiu sai da fila. */
-      function subirLote(itens) {
-        return documentosDoLote(itens, info.versaoApp).then(function (preparados) {
+      function subirLote(todos) {
+        return documentosDoLote(todos, info.versaoApp).then(function (todosPreparados) {
+          // as páginas grandes demais vão para a quarentena agora, e o resto do lote segue
+          var grandes = todosPreparados.filter(function (p) { return p.grande; }).map(function (p) { return p.id; });
+          var itens = todos.filter(function (i, k) { return !todosPreparados[k].grande; });
+          var preparados = todosPreparados.filter(function (p) { return !p.grande; });
+          var quarentena = grandes.length && typeof root.Store.quarentenar === 'function'
+            ? root.Store.quarentenar(grandes, 'PAGINA_GRANDE').then(function () { paginasGrandes += grandes.length; }, function () {})
+            : Promise.resolve();
+          if (!itens.length) return quarentena.then(function () { return 0; });
           /* O TETO DE BYTES do commit (N2): um lote com páginas de folha que
            * passe dele volta para ser dividido ao meio, sem culpa de ninguém. */
           var total = preparados.reduce(function (s, p) { return s + p.bytes; }, 0);
           if (itens.length > 1 && total > TETO_COMMIT_BYTES) throw erro('LOTE_GRANDE');
-          return commit(preparados.map(function (p, k) {
+          return quarentena.then(function () { return commit(preparados.map(function (p, k) {
             var conhecido = itens[k].registro.nuvem && itens[k].registro.nuvem.updateTime;
             /* A entrada de RESTAURAÇÃO sem carimbo conhecido exige que o documento
              * não exista: se existir, a nuvem tem algo que este aparelho não viu,
@@ -1039,7 +1057,7 @@
               return { id: i.fila.id, tipo: i.registro.tipo, atualizadoEm: i.fila.atualizadoEm, apagadoEm: i.registro.apagadoEm || null, hash: preparados[k].hash,
                 nuvem: { updateTime: w.updateTime || null, servidorEm: transformado || w.updateTime || null } };
             }));
-          });
+          }); });
         });
       }
       /* O COMMIT É ATÔMICO: um registro que a regra ou o teto de 1 MiB recuse
@@ -1048,14 +1066,18 @@
        * (sem rede, sessão vencida) sobe na hora. Devolve o que subiu e os que
        * ficaram sozinhos sem passar (indefinidos), com o erro. Se a metade de
        * cima falhou inteira, a de baixo é tentada inteira uma vez: as duas
-       * falhando inteiras é a nuvem recusando tudo, e não se desce mais. */
-      function subir(itens) {
+       * falhando inteiras é a nuvem recusando tudo, e não se desce mais.
+       * A PRECONDIÇÃO QUE FALHA sobe inteira enquanto o recebimento pode
+       * resolvê-la (lerLote recebe e tenta de novo); esgotados os recebimentos
+       * (`isolar`), ela é culpa de uma entrada, e o lote é dividido até achar
+       * qual, para a fila não ficar presa nela (revisão do PR 133). */
+      function subir(itens, isolar) {
         return subirLote(itens).then(function (n) { return { enviados: n, indefinidos: [], erro: null }; }, function (e) {
-          if (!e || e.codigo === 'SEM_REDE' || e.codigo === 'TOKEN_EXPIRED' || e.codigo === 'FAILED_PRECONDITION') throw e;
+          if (!e || e.codigo === 'SEM_REDE' || e.codigo === 'TOKEN_EXPIRED' || (e.codigo === 'FAILED_PRECONDITION' && !isolar)) throw e;
           if (itens.length === 1) return { enviados: 0, indefinidos: itens, erro: e };
           var meio = Math.ceil(itens.length / 2), a = itens.slice(0, meio), b = itens.slice(meio);
-          return subir(a).then(function (r1) {
-            if (r1.enviados === 0 && r1.indefinidos.length === a.length && a.length > 1) {
+          return subir(a, isolar).then(function (r1) {
+            if (r1.enviados === 0 && r1.indefinidos.length === a.length && a.length > 1 && !isolar) {
               return subirLote(b).then(function (n) {
                 return { enviados: n, indefinidos: r1.indefinidos, erro: r1.erro };
               }, function (e2) {
@@ -1063,7 +1085,7 @@
                 throw r1.erro || e2;
               });
             }
-            return subir(b).then(function (r2) {
+            return subir(b, isolar).then(function (r2) {
               return { enviados: r1.enviados + r2.enviados, indefinidos: r1.indefinidos.concat(r2.indefinidos), erro: r1.erro || r2.erro };
             });
           });
@@ -1071,6 +1093,24 @@
       }
       var jaCulpados = {}; // quem levou tentativa neste envio não volta ao lote até o próximo envio
       var recebimentos = 0; // quantas vezes a precondição mandou receber antes de insistir
+      /* A LÁPIDE DA PÁGINA QUE NUNCA SUBIU (N2): não há documento a apagar na
+       * nuvem, e escrever a lápide criaria um documento órfão. Ela sai da fila
+       * sem escrever nada. A página que subiu e cuja confirmação ainda não
+       * anotou o carimbo não cai aqui: a confirmação repõe a lápide na fila
+       * quando o carimbo chega (confirmarEnvio). */
+      function descartarLapidesOrfas(itens) {
+        var orfas = itens.filter(function (i) {
+          var reg = i.registro;
+          return reg.tipo === 'folha' && reg.apagadoEm && !(reg.nuvem && (reg.nuvem.updateTime || reg.nuvem.servidorEm));
+        });
+        if (!orfas.length) return Promise.resolve(itens);
+        return root.Store.confirmarEnvio(orfas.map(function (i) {
+          return { id: i.fila.id, tipo: 'folha', atualizadoEm: i.fila.atualizadoEm, apagadoEm: i.registro.apagadoEm, hash: null, nuvem: null };
+        })).then(function () {
+          lapidesDescartadas += orfas.length;
+          return itens.filter(function (i) { return orfas.indexOf(i) < 0; });
+        });
+      }
       function proximoLote() {
         return quarentenaLida.then(lerLote);
       }
@@ -1088,7 +1128,10 @@
           itens = itens.filter(function (i) { return !!i.registro && !jaCulpados[i.fila.id]; });
           if (!itens.length || lotes >= 50) return { enviados: enviados };
           lotes++;
-          return subir(itens).then(null, function (e) {
+          return descartarLapidesOrfas(itens).then(function (itens) {
+            if (!itens.length) return { enviados: 0, indefinidos: [], erro: null };
+            return subir(itens, recebimentos >= 2);
+          }).then(null, function (e) {
             /* A PRECONDIÇÃO FALHOU: outro aparelho (ou outra aba) gravou algum
              * destes registros depois do que este aparelho viu. Recebe primeiro
              * (a regra do recebimento decide, e anota o carimbo novo), e tenta de
@@ -1110,7 +1153,7 @@
              * recusar tudo (503, regras ainda não coladas) não pode ir para a
              * quarentena sem culpa. */
             var culpados = r.indefinidos.filter(function (i) {
-              return r.enviados > 0 || (r.erro && (r.erro.codigo === 'INVALID_ARGUMENT' || r.erro.codigo === 'PAGINA_GRANDE'));
+              return r.enviados > 0 || (r.erro && (r.erro.codigo === 'INVALID_ARGUMENT' || r.erro.codigo === 'FAILED_PRECONDITION'));
             });
             if (!culpados.length) throw r.erro;
             culpados.forEach(function (i) { jaCulpados[i.fila.id] = true; });
@@ -1132,7 +1175,14 @@
           var codigoSuporte = root.Store && typeof root.Store.temWebCrypto === 'function' && !root.Store.temWebCrypto() ? 'SEM_WEBCRYPTO' : 'SEM_COMPRESSAO';
           registros.erro = { codigo: codigoSuporte, quando: new Date().toISOString(), mensagem: FRASES[codigoSuporte] };
         }
-        registros.ultimoEnvio = { quando: new Date().toISOString(), enviados: r.enviados };
+        /* A PÁGINA GRANDE DEMAIS fica na quarentena, e a frase fica aqui enquanto
+         * ela estiver lá (a deste envio ou de um anterior): Ajustes diz qual
+         * folha (pela lista em registros.paginasGrandes) e o diagnóstico leva o
+         * código e a frase. */
+        if (paginasGrandes || (registros.paginasGrandes && registros.paginasGrandes.length)) {
+          registros.erro = { codigo: 'PAGINA_GRANDE', quando: new Date().toISOString(), mensagem: FRASES.PAGINA_GRANDE };
+        }
+        registros.ultimoEnvio = { quando: new Date().toISOString(), enviados: r.enviados, lapidesDescartadas: lapidesDescartadas };
         guardarRegistros();
         /* Um envio inteiro sem recusa solta a quarentena UMA vez, como reteste:
          * quem foi parar lá por uma queda da nuvem sai no próximo envio; quem
@@ -1533,7 +1583,7 @@
       registros: { pendentes: registros.pendentes, quarentena: registros.quarentena, ultimoEnvio: registros.ultimoEnvio,
         erro: registros.erro, enviando: !!enviandoRegistros, ultimoRecebimento: registros.ultimoRecebimento || null,
         erroRecebimento: registros.erroRecebimento || null, recebendo: !!recebendo, puladosFormatoAntigo: registros.puladosFormatoAntigo || 0,
-        folhasAdiadas: registros.folhasAdiadas || 0, folhasInvalidas: registros.folhasInvalidas || 0 },
+        folhasAdiadas: registros.folhasAdiadas || 0, folhasInvalidas: registros.folhasInvalidas || 0, paginasGrandes: (registros.paginasGrandes || []).slice() },
       // a marca "este aparelho é celular"; quem edita nele é só a dona (celularDaDona)
       celular: !!marcaCelular,
       celularDaDona: celularDaDona(),

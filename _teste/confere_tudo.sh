@@ -832,6 +832,22 @@ roda "nuvem folhas --envenenado-sem-hash"           node "_teste/testa_nuvem_fol
 roda "nuvem folhas --envenenado-regrava-igual"      node "_teste/testa_nuvem_folhas.js" --envenenado-regrava-igual
 roda "nuvem folhas --envenenado-celular-edita-folha" node "_teste/testa_nuvem_folhas.js" --envenenado-celular-edita-folha
 roda "nuvem folhas --envenenado-aplica-sem-conferir-hash" node "_teste/testa_nuvem_folhas.js" --envenenado-aplica-sem-conferir-hash
+# (revisao do PR 133) a lapide da pagina que nunca subiu nao vira documento
+# orfao; a aula excluida lapida a folha (e a que volta a traz); a restauracao
+# apaga o estado por faixa (o cursor apagava os puts da propria restauracao) e
+# lapida na nuvem a pagina que a copia nao tem; a precondicao que nao se resolve
+# recebendo isola a culpada em vez de prender a fila; o "Apagar tudo" lapida as
+# folhas para o "Enviar copia agora" leva-las; a pagina grande demais vai direto
+# para a quarentena com a frase que diz qual folha; a volta de versao reconcilia
+# as folhas com estado. Os oito venenos TEM de ser vistos.
+roda "nuvem folhas --envenenado-lapide-orfa"        node "_teste/testa_nuvem_folhas.js" --envenenado-lapide-orfa
+roda "nuvem folhas --envenenado-exclui-sem-lapide"  node "_teste/testa_nuvem_folhas.js" --envenenado-exclui-sem-lapide
+roda "nuvem folhas --envenenado-limpa-por-cursor"   node "_teste/testa_nuvem_folhas.js" --envenenado-limpa-por-cursor
+roda "nuvem folhas --envenenado-restauro-sem-lapide" node "_teste/testa_nuvem_folhas.js" --envenenado-restauro-sem-lapide
+roda "nuvem folhas --envenenado-precondicao-prende" node "_teste/testa_nuvem_folhas.js" --envenenado-precondicao-prende
+roda "nuvem folhas --envenenado-apaga-estado-no-apagar-tudo" node "_teste/testa_nuvem_folhas.js" --envenenado-apaga-estado-no-apagar-tudo
+roda "nuvem folhas --envenenado-pagina-grande-tenta" node "_teste/testa_nuvem_folhas.js" --envenenado-pagina-grande-tenta
+roda "nuvem folhas --envenenado-sem-reconciliar"    node "_teste/testa_nuvem_folhas.js" --envenenado-sem-reconciliar
 # (revisao do PR 118) o "Apagar tudo" zera a fila deste aparelho e o recebimento
 # em curso confere a marca dentro da transacao; o celular nao enfileira a lapide
 # da fusao; a restauracao enfileira tambem o que e igual a copia; a confirmacao

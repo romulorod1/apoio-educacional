@@ -1132,6 +1132,13 @@
     db.ajustes = db.ajustes || {};
     var vista = db.ajustes.versaoVista;
     if (vista === VERSAO) return;
+    /* A VERSÃO MUDOU desde a última abertura (atualização ou volta de uma versão
+     * anterior): as folhas que têm estado por página são reconciliadas com o
+     * que está em `notas` (N2), porque a versão anterior grava a folha solta e
+     * não conhece o estado; o que mudou entra na fila e sobe. */
+    if (vista && self.Store && typeof Store.reconciliarFolhas === 'function') {
+      Store.reconciliarFolhas().catch(function () { /* a próxima gravação da folha acerta */ });
+    }
 
     /* Quem abre o aplicativo pela primeira vez ou sem versão anterior registrada
      * não recebe pop-up de novidades: não faz sentido contar novidades para quem
@@ -21290,6 +21297,24 @@
     if (est.sincronizacaoDesligada) {
       return 'A sincronização entre aparelhos está desligada desde o "Apagar tudo". Para voltar a sincronizar, restaure a cópia da nuvem ' +
         'ou toque em Enviar cópia agora (o que está neste aparelho passa a valer).' + (n ? ' ' + guardadas + '.' : '');
+    }
+    /* A PÁGINA GRANDE DEMAIS para a nuvem (N2): a frase diz QUAL folha (aluno e
+     * data da aula), por quê e o que fazer; ela não é tentada de novo, e as
+     * outras mudanças seguem. */
+    var grandes = r.paginasGrandes || [];
+    if (grandes.length) {
+      var quais = grandes.map(function (g) {
+        var aula = (db.aulas || []).filter(function (a) { return a.id === g.aulaId; })[0];
+        var aluno = aula ? alunoPorId(aula.alunoId) : null;
+        var quem = aluno ? aluno.nome : 'uma aula que não está mais no tablet';
+        var quando = aula && aula.data ? ' (aula de ' + formatarDataExtensa(aula.data).replace(/^[^,]+, /, '') + ')' : '';
+        return quem + quando + ', página ' + (g.n + 1);
+      });
+      var qGrandes = q - grandes.length;
+      var outras = qGrandes > 0 ? ' ' + (qGrandes === 1 ? 'Outra mudança não consegue subir' : 'Outras ' + qGrandes + ' mudanças não conseguem subir') + ' (a nuvem recusa esse registro).' : '';
+      return (grandes.length === 1 ? 'A folha de ' + quais[0] + ', é grande demais para a nuvem e não sobe: divida a página em duas para ela subir.'
+        : 'Estas folhas têm página grande demais para a nuvem e não sobem: ' + quais.join('; ') + '. Divida cada uma dessas páginas em duas para elas subirem.') +
+        (n ? ' ' + guardadas + '; as outras mudanças seguem.' : ' As outras mudanças seguem.') + outras;
     }
     if (r.erro && r.erro.codigo === 'PERMISSION_DENIED') {
       return 'A nuvem ainda não aceita as mudanças uma a uma (as regras novas não foram publicadas). ' +

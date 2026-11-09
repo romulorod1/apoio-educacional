@@ -49,7 +49,33 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
-const MODOS = ['--envenenado-sem-hash', '--envenenado-regrava-igual', '--envenenado-celular-edita-folha', '--envenenado-aplica-sem-conferir-hash'];
+/* Revisão do PR 133 (seções 10 a 15):
+ *  10. a lápide da página que nunca subiu sai da fila sem virar documento;
+ *  11. excluir a aula pela tela lapida a folha na nuvem; a aula que volta a traz;
+ *  12. a restauração não apaga o próprio estado das folhas (apaga por faixa,
+ *      não por cursor), a fila esvazia e a página que a nuvem tem e a cópia
+ *      não vira lápide: a nuvem fica igual à cópia, e o celular também;
+ *  13. a precondição que não se resolve recebendo isola a culpada em vez de
+ *      prender a fila; na terceira vez ela vai para a quarentena;
+ *  14. a página grande demais para a nuvem vai direto para a quarentena, com
+ *      a frase em Ajustes dizendo qual folha (aluna e data), por quê e o que
+ *      fazer; dividida, sobe;
+ *  15. a volta de uma versão anterior (que grava a folha solta) reconcilia a
+ *      folha com estado e a página nova sobe.
+ * Venenos dessas seções (cada um TEM de ser visto):
+ *   --envenenado-lapide-orfa             a lápide sem carimbo sobe e vira órfã;
+ *   --envenenado-exclui-sem-lapide       a aula excluída não lapida a folha;
+ *   --envenenado-limpa-por-cursor        a restauração apaga o estado por cursor
+ *                                        (e apaga os próprios puts);
+ *   --envenenado-restauro-sem-lapide     a página a mais fica viva na nuvem;
+ *   --envenenado-precondicao-prende      a precondição falha prende a fila inteira;
+ *   --envenenado-apaga-estado-no-apagar-tudo o "Apagar tudo" apaga o estado em vez
+ *                                        de lapidar (a folha fica viva na nuvem);
+ *   --envenenado-pagina-grande-tenta     a página grande derruba o lote e conta tentativa;
+ *   --envenenado-sem-reconciliar         a volta de versão não reconcilia. */
+const MODOS = ['--envenenado-sem-hash', '--envenenado-regrava-igual', '--envenenado-celular-edita-folha', '--envenenado-aplica-sem-conferir-hash',
+  '--envenenado-lapide-orfa', '--envenenado-exclui-sem-lapide', '--envenenado-limpa-por-cursor', '--envenenado-restauro-sem-lapide',
+  '--envenenado-precondicao-prende', '--envenenado-apaga-estado-no-apagar-tudo', '--envenenado-pagina-grande-tenta', '--envenenado-sem-reconciliar'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 function prop(rotulo, ok, veneno) {
   if (MODO && MODO === veneno) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
@@ -102,7 +128,32 @@ if (MODO === MODOS[0]) trocas['/nuvem.js'] = NUVEM.replace(HASH_NO_DOC, '');
 if (MODO === MODOS[1]) trocas['/store.js'] = STORE.replace(COMPARA_HASH, 'if (false) {');
 if (MODO === MODOS[2]) trocas['/store.js'] = STORE.replace(TRAVA, "if (modo === 'readwrite' && soLeitura && porta !== true && !(celularEdita && PORTAS_DO_CELULAR[porta]) && [].concat(nomes).indexOf('notas') < 0) throw erroSoLeitura();");
 if (MODO === MODOS[3]) trocas['/nuvem.js'] = NUVEM.replace(CONFERE_HASH, 'if (false) return { ok: false };');
-if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', (trocas['/store.js'] || STORE) !== STORE || (trocas['/nuvem.js'] || NUVEM) !== NUVEM, true);
+/* As âncoras da revisão do PR 133, cada uma num lugar só. */
+const LAPIDE_ORFA = "return reg.tipo === 'folha' && reg.apagadoEm && !(reg.nuvem && (reg.nuvem.updateTime || reg.nuvem.servidorEm));";
+const AULA_LEVA_FOLHA = 'if (!opcoes.semFolhas) ajustarFolhasDasAulas(t, contas.aulasApagadas, contas.aulasRevividas, agora, saida);';
+const LIMPA_POR_FAIXA = 'apagarFaixaDeControle(t, PREFIXO_FOLHA);';
+const RESTAURO_LAPIDA = 'if (!velho || !velho.nuvem) continue; // nunca subiu: nada a lapidar na nuvem';
+const ISOLA_PRECONDICAO = 'return subir(itens, recebimentos >= 2);';
+const APAGAR_TUDO_LAPIDA = 'lapidarEstadoDasFolhas(t, agora);';
+const PAGINA_GRANDE_MARCA = "if (e && e.codigo === 'PAGINA_GRANDE') return { grande: true, id: i.fila.id };";
+const RECONCILIA = 'Store.reconciliarFolhas().catch(function () { /* a próxima gravação da folha acerta */ });';
+conf('o descarte da lápide sem carimbo está num lugar só', NUVEM.split(LAPIDE_ORFA).length, 2);
+conf('a aula que vira lápide leva a folha, num lugar só (o escritor de diferença)', STORE.split(AULA_LEVA_FOLHA).length, 2);
+conf('o estado das folhas é apagado por faixa, num lugar só', STORE.split(LIMPA_POR_FAIXA).length, 2);
+conf('a restauração lapida a página que a cópia não tem, num lugar só', STORE.split(RESTAURO_LAPIDA).length, 2);
+conf('a precondição esgotada isola a culpada, num lugar só', NUVEM.split(ISOLA_PRECONDICAO).length, 2);
+conf('o "Apagar tudo" lapida o estado das folhas na transação do documento', STORE.split(APAGAR_TUDO_LAPIDA).length, 2);
+conf('a página grande é marcada no lote, num lugar só', NUVEM.split(PAGINA_GRANDE_MARCA).length, 2);
+conf('a volta de versão reconcilia as folhas, num lugar só', APP.split(RECONCILIA).length, 2);
+if (MODO === MODOS[4]) trocas['/nuvem.js'] = NUVEM.replace(LAPIDE_ORFA, 'return false;');
+if (MODO === MODOS[5]) trocas['/store.js'] = STORE.replace(AULA_LEVA_FOLHA, 'if (false) ajustarFolhasDasAulas(t, [], [], agora, saida);');
+if (MODO === MODOS[6]) trocas['/store.js'] = STORE.replace(LIMPA_POR_FAIXA, 'varrerControle(t, PREFIXO_FOLHA, function (chave, valor, cursor) { cursor.delete(); });');
+if (MODO === MODOS[7]) trocas['/store.js'] = STORE.replace(RESTAURO_LAPIDA, 'continue;');
+if (MODO === MODOS[8]) trocas['/nuvem.js'] = NUVEM.replace(ISOLA_PRECONDICAO, 'return subir(itens, false);');
+if (MODO === MODOS[9]) trocas['/store.js'] = STORE.replace(APAGAR_TUDO_LAPIDA, 'limparEstadoDasFolhas(t);');
+if (MODO === MODOS[10]) trocas['/nuvem.js'] = NUVEM.replace(PAGINA_GRANDE_MARCA, 'if (false) return null;');
+if (MODO === MODOS[11]) trocas['/app.js'] = APP.replace(RECONCILIA, '');
+if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', (trocas['/store.js'] || STORE) !== STORE || (trocas['/nuvem.js'] || NUVEM) !== NUVEM || (trocas['/app.js'] || APP) !== APP, true);
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
 const javaExe = JAVA_HOME ? path.join(JAVA_HOME, 'bin', process.platform === 'win32' ? 'java.exe' : 'java') : 'java';
@@ -246,6 +297,60 @@ const receber = pag => pag.evaluate(() => Nuvem.receberRegistros().then(r => ({ 
 /* As páginas canônicas da folha de uma aula, como texto, para comparar ponto a ponto. */
 const canonicas = (pag, aulaId) => pag.evaluate(async id => { const n = await Store.lerNota(id); return n ? n.paginas.map(p => Store.paginaCanonica(p)) : null; }, aulaId);
 const filaFolhas = pag => pag.evaluate(() => Store.lerFila().then(l => l.filter(e => e.tipo === 'folha').map(e => ({ id: e.id, apagada: !!e.apagadoEm, restauro: !!e.restauro }))));
+const filaToda = pag => pag.evaluate(() => Store.lerFila().then(l => l.map(e => ({ id: e.id, tipo: e.tipo, apagada: !!e.apagadoEm, restauro: !!e.restauro, quarentena: !!e.quarentena, motivo: e.motivo || null, tentativas: e.tentativas || 0 }))));
+const resumoDoc = r => r.status !== 200 ? 'status ' + r.status : ('apagadoEm=' + (campoTexto(r.json, 'apagadoEm') ? 'sim' : 'não') + ' bytes=' + (campoBytes(r.json, 'bytes') ? 'sim' : 'não'));
+const fimDoVeneno = () => Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
+const textoDaNuvem = pag => pag.evaluate(() => { const c = document.querySelector('#nuvem-registros'); return c ? c.textContent : ''; });
+/* Restaura no tablet pela API (o mesmo caminho do restaurarDaNuvem do app.js). */
+const restaurarPelaApi = (pag, uid, idCopia) => pag.evaluate(async (uid_, id_) => {
+  const lista = await Nuvem.listarCopias(uid_);
+  const copia = lista.filter(c => c.id === id_)[0] || lista[0];
+  const zip = await Nuvem.baixarCopia(uid_, copia.id);
+  await Store.importarZip(zip, { daNuvem: true });
+  await Nuvem.restaurou(copia, { celular: false });
+  return copia.id;
+}, uid, idCopia);
+async function enviarAteEsvaziar(pag, vezes) {
+  let r = null;
+  for (let i = 0; i < (vezes || 4); i++) {
+    r = await enviar(pag, true);
+    const f = await filaFolhas(pag);
+    if (!f.length) return Object.assign(r, { rodadas: i + 1, filaFolhas: 0 });
+  }
+  return Object.assign(r || {}, { rodadas: vezes || 4, filaFolhas: (await filaFolhas(pag)).length });
+}
+async function enviarCopiaPelaTela(pag) {
+  const antes = await pag.evaluate(() => (Nuvem.estado().ultimaCopia || {}).id || null);
+  await clicar(pag, '#nuvem-enviar');
+  const r = await esperar('a cópia subiu', () => pag.evaluate(() => (Nuvem.estado().ultimaCopia || {}).id || null), v => !!v && v !== antes, 30000);
+  return r.ok ? r.valor : null;
+}
+/* Escreve direto no banco do aplicativo (o que a versão anterior ou outro tablet fariam). */
+const idb = (pag, corpo) => pag.evaluate(c => new Promise((res, rej) => {
+  const r = indexedDB.open('apoio-educacional');
+  r.onsuccess = () => {
+    const b = r.result, t = b.transaction(['saida', 'controle', 'notas'], 'readwrite');
+    try { (new Function('t', c))(t); } catch (e) { rej(e.message); }
+    t.oncomplete = () => { b.close(); res(true); };
+    t.onerror = () => { b.close(); rej(String(t.error)); };
+  };
+  r.onerror = () => rej('não abriu o banco');
+}), corpo);
+/* Texto que não comprime (alfabeto de 64 símbolos, 6 bits por caractere, de
+ * uma cadeia de SHA-256: determinístico e sem período curto; um gerador
+ * congruente aqui repetia a cada 16 KB e o gzip o reduzia a quase nada). */
+function textoAleatorio(n) {
+  const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const partes = [];
+  let total = 0, i = 0;
+  while (total < n) {
+    const bloco = cryptoNode.createHash('sha256').update('pagina-grande-' + (i++)).digest();
+    let s = '';
+    for (const b of bloco) s += A[b & 63];
+    partes.push(s); total += s.length;
+  }
+  return partes.join('').slice(0, n);
+}
 async function restaurarPelaTela(pag, botaoRestaurar) {
   await clicar(pag, botaoRestaurar);
   await esperar('a janela lista a cópia', () => pag.evaluate(() => document.querySelectorAll('#modal-nuvem-restaurar.aberto #nuvem-copias input[type=radio]').length), v => v >= 1, 15000);
@@ -566,5 +671,157 @@ function paginaSintetica() {
   conf('o commit do observador recusa uma escrita em folhas/ antes de sair', await pagO.evaluate(() => Nuvem.enviarRegistros({ versaoApp: 'prova', tudo: true }).then(r => r.pulado || 'enviou')), 'so leitura');
   conf('nenhum erro de página em A, C e O', [pagA, pagC, pagO].map(p => p.errosDePagina.join(' | ')).filter(Boolean).join(' || '), '');
   await pagO.close(); await contextoO.close();
+
+  /* ---------- revisão do PR 133 ---------- */
+  secao('10. A lápide da página que nunca subiu sai da fila sem virar documento na nuvem');
+  await editar(pagA, "d.aulas.push({ id: 'x3', alunoId: 'alfa', serieId: null, data: d.aulas[0].data, hora: '12:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [], temNota: true });");
+  await enviar(pagA, true);
+  const contas10 = await pagA.evaluate(async () => {
+    const P = k => ({ fundo: 'pautado', itens: [{ t: 'traco', cor: '#1A1C1F', esp: 4, pontos: [[10 + k, 20, 0.5], [30 + k, 40, 0.5]] }] });
+    await Store.salvarNota('x3', { paginas: [P(0), P(1)] });
+    await Store.salvarNota('x3', { paginas: [P(0)] });
+    return (await Store.lerFila()).filter(e => e.tipo === 'folha').map(e => e.id + (e.apagadoEm ? ':lapide' : '')).sort();
+  });
+  conf('a fila tem a página 1 viva e a lápide da página 2, que nunca subiu', JSON.stringify(contas10), JSON.stringify(['folha:x3:0', 'folha:x3:1:lapide']));
+  const escritas10 = pagA.escritas.length;
+  const e10 = await enviar(pagA, true);
+  const doc10 = await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x3:1');
+  console.log('   envio: ' + JSON.stringify(e10) + '; folha:x3:1 na nuvem: ' + resumoDoc(doc10) + '; escritas em folhas/: ' + folhasEscritas(pagA, escritas10));
+  prop('a lápide da página que nunca subiu não vira documento na nuvem (404), e só a página viva foi escrita', e10.erro === null && doc10.status === 404 && folhasEscritas(pagA, escritas10) === 1, MODOS[4]);
+  if (MODO === MODOS[4]) throw fimDoVeneno();
+  conf('e a fila de folhas esvaziou (a lápide saiu sem escrever)', (await filaFolhas(pagA)).length, 0);
+  conf('o envio contou a lápide descartada', await pagA.evaluate(() => Nuvem.estado().registros.ultimoEnvio.lapidesDescartadas), 1);
+  conf('a página 1 de x3 está viva na nuvem (controle: a lápide da página que subiu vai, seção 5)', resumoDoc(await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x3:0')), 'apagadoEm=não bytes=sim');
+
+  secao('11. Excluir a aula pela tela lapida a folha dela na nuvem; a aula que volta traz a folha');
+  await editar(pagA, "Core.excluirAulas(d, 'x3', 'esta');");
+  const fila11 = await filaFolhas(pagA);
+  prop('a exclusão da aula enfileirou a lápide da página de x3', JSON.stringify(fila11) === JSON.stringify([{ id: 'folha:x3:0', apagada: true, restauro: false }]), MODOS[5]);
+  conf('a folha de x3 continua em notas (como antes da N2: o desfazer a recupera)', await pagA.evaluate(() => Store.lerNota('x3').then(n => !!n)), true);
+  const e11 = await enviar(pagA, true);
+  prop('a página de x3 é lápide na nuvem depois de a aula ser excluída', e11.erro === null && resumoDoc(await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x3:0')) === 'apagadoEm=sim bytes=não', MODOS[5]);
+  if (MODO === MODOS[5]) throw fimDoVeneno();
+  await editar(pagA, "d.aulas.push({ id: 'x3', alunoId: 'alfa', serieId: null, data: d.aulas[0].data, hora: '12:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [], temNota: true });");
+  conf('a aula que volta (desfazer) repõe a página na fila', JSON.stringify(await filaFolhas(pagA)), JSON.stringify([{ id: 'folha:x3:0', apagada: false, restauro: false }]));
+  const e11b = await enviar(pagA, true);
+  conf('e a página volta viva à nuvem', e11b.erro === null && resumoDoc(await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x3:0')) === 'apagadoEm=não bytes=sim', true);
+
+  secao('12. Restaurar a cópia: o estado das folhas fica, a fila esvazia e a nuvem fica igual à cópia');
+  // o aplicativo reabre para a cópia (feita pela tela, do documento em memória) levar a aula x3 criada por fora
+  await H.abrirApp(pagA, amb.ORIGEM);
+  await H.irParaAba(pagA, 'ajustes');
+  const copiaK1 = await enviarCopiaPelaTela(pagA);
+  conf('a cópia K1 (x1 com 1 página, x2, x3) subiu', !!copiaK1, true);
+  await pagA.evaluate(async () => { const n = await Store.lerNota('x1'); n.paginas.push({ fundo: 'branco', itens: [{ t: 'traco', cor: '#666666', esp: 4, pontos: [[50, 60, 0.5], [70, 80, 0.5]] }] }); await Store.salvarNota('x1', n); });
+  const e12a = await enviar(pagA, true);
+  conf('depois da cópia, x1 ganhou a página 2 e ela subiu', e12a.erro === null && resumoDoc(await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x1:1')) === 'apagadoEm=não bytes=sim', true);
+  const rC12 = await esperar('C recebeu a página 2 de x1', () => receber(pagC).then(() => canonicas(pagC, 'x1')).then(c => c ? c.length : 0), v => v === 2, 20000);
+  conf('C tem x1 com 2 páginas', rC12.ok, true);
+  conf('A restaurou K1', await restaurarPelaApi(pagA, dona.localId, copiaK1), copiaK1);
+  conf('A ficou com x1 de 1 página', (await canonicas(pagA, 'x1')).length, 1);
+  const estado12 = await pagA.evaluate(() => Store.estadoDaFolha('x1'));
+  console.log('   estado de x1 depois de restaurar: ' + JSON.stringify(estado12));
+  prop('o estado de x1 existe depois da restauração, com a página restaurada (a restauração não apaga o próprio estado)', !!(estado12 && estado12.paginas && estado12.paginas[0] && !estado12.paginas[0].apagadoEm), MODOS[6]);
+  if (MODO === MODOS[6]) throw fimDoVeneno();
+  conf('a página restaurada guarda o carimbo que este aparelho conhecia (a precondição passa direto)', !!(estado12.paginas[0].nuvem && estado12.paginas[0].nuvem.updateTime), true);
+  const fila12 = await filaFolhas(pagA);
+  console.log('   fila de A depois da restauração: ' + JSON.stringify(fila12));
+  prop('a restauração enfileirou a lápide da página 2 de x1 (a nuvem a tem e a cópia não)', fila12.some(f => f.id === 'folha:x1:1' && f.apagada), MODOS[7]);
+  conf('e as páginas da cópia, com restauro', fila12.filter(f => !f.apagada && f.restauro).map(f => f.id).sort().join(','), 'folha:x1:0,folha:x2:0,folha:x3:0');
+  const e12b = await enviarAteEsvaziar(pagA, 4);
+  console.log('   envio depois da restauração: ' + JSON.stringify(e12b));
+  conf('as páginas restauradas sobem e a fila esvazia (nenhuma precondição presa)', e12b.erro === null && e12b.filaFolhas === 0, true);
+  prop('folha:x1:1 é lápide na nuvem depois da restauração (a nuvem ficou igual à cópia)', resumoDoc(await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x1:1')) === 'apagadoEm=sim bytes=não', MODOS[7]);
+  if (MODO === MODOS[7]) throw fimDoVeneno();
+  conf('as páginas de x2 e x3 continuam vivas na nuvem (só a página a mais foi lapidada)', resumoDoc(await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x2:0')) + ' ' + resumoDoc(await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x3:0')), 'apagadoEm=não bytes=sim apagadoEm=não bytes=sim');
+  const rC12b = await esperar('C recebeu a lápide da página 2', () => receber(pagC).then(() => canonicas(pagC, 'x1')).then(c => c ? c.length : 0), v => v === 1, 20000);
+  conf('C ficou com x1 de 1 página, igual a A (a restauração venceu)', rC12b.ok && JSON.stringify(await canonicas(pagC, 'x1')) === JSON.stringify(await canonicas(pagA, 'x1')), true);
+  const estado12b = await pagA.evaluate(() => Store.estadoDaFolha('x1'));
+  const hash12 = await pagA.evaluate(async () => { const n = await Store.lerNota('x1'); return Promise.all(n.paginas.map(Store.hashPagina)); });
+  conf('o hash do estado de A bate com o conteúdo de A', JSON.stringify([estado12b.paginas[0].hash]), JSON.stringify(hash12));
+
+  secao('13. A precondição que não se resolve recebendo não prende a fila: a culpada é isolada');
+  const paginaX9 = JSON.stringify({ fundo: 'pautado', itens: [{ t: 'texto', x: 1, y: 1, texto: 'de outro tablet', tam: 30 }] });
+  const docX9 = await commitRest(dona.idToken, [{
+    update: { name: RAIZ_DOCS + '/usuarios/' + dona.localId + '/folhas/folha:x9:0', fields: {
+      id: { stringValue: 'folha:x9:0' }, aulaId: { stringValue: 'x9' }, n: { integerValue: '0' }, hash: { stringValue: sha256(paginaX9) },
+      bytes: { bytesValue: zlib.gzipSync(Buffer.from(paginaX9, 'utf8')).toString('base64') }, tamanho: { integerValue: String(paginaX9.length) }, algoritmo: { stringValue: 'gzip' },
+      atualizadoEm: { stringValue: new Date().toISOString() }, aparelho: { stringValue: 'apOutro' }, esquema: { integerValue: '1' } } },
+    updateTransforms: [{ fieldPath: 'servidorEm', setToServerValue: 'REQUEST_TIME' }]
+  }]);
+  conf('um documento de outro tablet (folha:x9:0) está na nuvem', docX9.status, 200);
+  const rA13 = await receber(pagA);
+  conf('A recebeu a página de x9 (o cursor passou por ela)', rA13.folhas >= 1, true);
+  /* O estado de x9 fica sem carimbo e a fila ganha a entrada de restauração
+   * dela: a precondição `exists: false` falha, e o recebimento, já passado
+   * por esse documento, não a resolve. */
+  await idb(pagA, "t.objectStore('controle').put({ paginas: [{ hash: null, atualizadoEm: '2026-01-01T00:00:00.000Z', apagadoEm: null, nuvem: null }] }, 'folha:x9'); t.objectStore('saida').put({ id: 'folha:x9:0', tipo: 'folha', atualizadoEm: '2026-01-01T00:00:00.000Z', apagadoEm: null, restauro: true });");
+  await pagA.evaluate(async () => { const n = await Store.lerNota('x1'); n.paginas[0].itens.push({ t: 'traco', cor: '#1A1C1F', esp: 4, pontos: [[11, 12, 0.5], [21, 22, 0.5]] }); await Store.salvarNota('x1', n); });
+  conf('a fila tem a boa (x1) e a presa (x9)', (await filaFolhas(pagA)).map(f => f.id).sort().join(','), 'folha:x1:0,folha:x9:0');
+  const e13 = await enviar(pagA, true);
+  const fila13 = (await filaToda(pagA)).filter(e => e.tipo === 'folha');
+  console.log('   envio com a precondição presa: ' + JSON.stringify(e13) + '; fila: ' + JSON.stringify(fila13));
+  prop('a precondição presa não prende a fila: a boa subiu e só a culpada ficou, com uma tentativa', e13.enviados >= 1 && fila13.length === 1 && fila13[0].id === 'folha:x9:0' && fila13[0].tentativas === 1, MODOS[8]);
+  if (MODO === MODOS[8]) throw fimDoVeneno();
+  await enviar(pagA, true); await enviar(pagA, true);
+  const fila13b = (await filaToda(pagA)).filter(e => e.tipo === 'folha');
+  const frase13 = await esperar('a frase de Ajustes diz que ela não consegue subir', () => textoDaNuvem(pagA), v => /não consegue subir/.test(v || ''), 5000);
+  conf('na terceira vez a culpada vai para a quarentena, e a frase diz que ela não consegue subir', fila13b.length === 1 && fila13b[0].quarentena === true && frase13.ok, true);
+  await idb(pagA, "t.objectStore('saida').delete('folha:x9:0'); t.objectStore('controle').delete('folha:x9'); t.objectStore('notas').delete('x9');");
+  await enviar(pagA, true);
+
+  secao('14. A página grande demais para a nuvem: quarentena na hora, e a frase diz qual folha e o que fazer');
+  await editar(pagA, "d.aulas.push({ id: 'x4', alunoId: 'alfa', serieId: null, data: d.aulas[0].data, hora: '13:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [], temNota: true });");
+  await H.abrirApp(pagA, amb.ORIGEM);   // a tela de Ajustes nomeia a aula pelo documento em memória: reabre com x4
+  await H.irParaAba(pagA, 'ajustes');
+  await enviar(pagA, true);
+  const bruta = textoAleatorio(1400 * 1024);   // 1,4 MB que não comprimem: acima dos 900 KiB mesmo em gzip
+  conf('o texto de prova não comprime abaixo do teto (gzip acima de 900 KiB)', zlib.gzipSync(Buffer.from(bruta, 'utf8')).length > 900 * 1024, true);
+  await pagA.evaluate(async txt => { await Store.salvarNota('x4', { paginas: [{ fundo: 'pautado', itens: [{ t: 'texto', x: 10, y: 10, texto: txt, tam: 30, cor: '#1A1C1F' }] }] }); }, bruta);
+  const escritas14 = pagA.escritas.length;
+  const e14 = await enviar(pagA, true);
+  const fila14 = (await filaToda(pagA)).filter(e => e.tipo === 'folha');
+  const est14 = await esperar('o estado da nuvem anota a página grande', () => pagA.evaluate(() => { const r = Nuvem.estado().registros; return { erro: r.erro && r.erro.codigo, grandes: r.paginasGrandes, quarentena: r.quarentena }; }), v => !!(v && v.grandes && v.grandes.length === 1), 5000);
+  console.log('   envio da página grande: ' + JSON.stringify(e14) + '; fila: ' + JSON.stringify(fila14) + '; estado: ' + JSON.stringify(est14.valor));
+  prop('a página grande vai para a quarentena no primeiro envio, com o motivo, sem escrita em folhas/ e sem derrubar o envio', e14.erro === null && fila14.length === 1 && fila14[0].quarentena === true && fila14[0].motivo === 'PAGINA_GRANDE' && folhasEscritas(pagA, escritas14) === 0 &&
+    est14.ok && est14.valor.erro === 'PAGINA_GRANDE' && est14.valor.grandes[0].aulaId === 'x4' && est14.valor.grandes[0].n === 0, MODOS[10]);
+  if (MODO === MODOS[10]) throw fimDoVeneno();
+  const frase14 = await esperar('a frase de Ajustes fala da folha grande', () => textoDaNuvem(pagA), v => /grande demais/.test(v || ''), 5000);
+  console.log('   frase: ' + frase14.valor);
+  conf('a frase diz QUAL folha (a aluna e a data da aula), por quê e o que fazer', /A folha de Aluna Alfa Teste \(aula de \d+ de \S+ de \d{4}\), página 1, é grande demais para a nuvem/.test(frase14.valor || '') && /divida a página em duas/.test(frase14.valor || ''), true);
+  const diag14 = await pagA.evaluate(() => Nuvem.diagnosticoLocal());
+  conf('o diagnóstico leva o código e a frase', diag14.erroCodigo === 'PAGINA_GRANDE' && /divida a página em duas/.test(diag14.erroFrase || ''), true);
+  await pagA.evaluate(async () => { const n = await Store.lerNota('x1'); n.paginas[0].itens.push({ t: 'traco', cor: '#1A1C1F', esp: 4, pontos: [[13, 14, 0.5], [23, 24, 0.5]] }); await Store.salvarNota('x1', n); });
+  const escritas14b = pagA.escritas.length;
+  const e14b = await enviar(pagA, true);
+  conf('o envio seguinte sobe a outra mudança e não tenta a página grande de novo (sem tentativas inúteis)', e14b.erro === null && e14b.enviados >= 1 && folhasEscritas(pagA, escritas14b) === 1 && (await filaToda(pagA)).filter(e => e.tipo === 'folha').length === 1, true);
+  await pagA.evaluate(async txt => {
+    const meio = txt.length >> 1;
+    await Store.salvarNota('x4', { paginas: [{ fundo: 'pautado', itens: [{ t: 'texto', x: 10, y: 10, texto: txt.slice(0, meio), tam: 30, cor: '#1A1C1F' }] }, { fundo: 'pautado', itens: [{ t: 'texto', x: 10, y: 10, texto: txt.slice(meio), tam: 30, cor: '#1A1C1F' }] }] });
+  }, bruta);
+  const e14c = await enviar(pagA, true);
+  conf('dividida em duas, as duas páginas sobem e a fila esvazia', e14c.erro === null && (await filaToda(pagA)).filter(e => e.tipo === 'folha').length === 0 && resumoDoc(await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x4:1')) === 'apagadoEm=não bytes=sim', true);
+  const limpou14 = await esperar('a frase da página grande saiu', () => pagA.evaluate(() => (Nuvem.estado().registros.erro || {}).codigo || null), v => v === null, 5000);
+  conf('o erro PAGINA_GRANDE saiu quando a página saiu da quarentena', limpou14.ok, true);
+
+  secao('15. A volta de uma versão anterior: a folha gravada solta é reconciliada com o estado e sobe');
+  await editar(pagA, "d.ajustes.versaoVista = '1.42.18';");
+  await enviar(pagA, true);
+  // a versão anterior grava a nota solta e não conhece o estado por página; e a folha de ANTES da N2 (sem estado) fica como está
+  await idb(pagA, "const s = t.objectStore('notas'); const g = s.get('x1'); g.onsuccess = () => { const n = g.result; n.paginas.push({ fundo: 'branco', itens: [{ t: 'traco', cor: '#777777', esp: 4, pontos: [[1, 2, 0.5], [3, 4, 0.5]] }] }); s.put(n, 'x1'); }; " +
+    "s.put({ paginas: [{ fundo: 'pautado', itens: [{ t: 'traco', cor: '#777777', esp: 4, pontos: [[5, 6, 0.5], [7, 8, 0.5]] }] }] }, 'x5');");
+  conf('a folha de x1 ganhou uma página por fora do estado (como a versão anterior grava)', await pagA.evaluate(async () => { const n = await Store.lerNota('x1'); const e = await Store.estadoDaFolha('x1'); return n.paginas.length + '/' + e.paginas.filter(p => !p.apagadoEm).length; }), '2/1');
+  await H.abrirApp(pagA, amb.ORIGEM);
+  const fila15 = await esperar('a reconciliação enfileirou a página nova', () => filaFolhas(pagA).then(l => l.map(f => f.id).join(',')), v => v === 'folha:x1:1', 8000);
+  prop('de volta à versão nova, a reconciliação pôs na fila a página gravada solta', fila15.ok, MODOS[11]);
+  if (MODO === MODOS[11]) throw fimDoVeneno();
+  /* A folha de antes da N2 (sem estado por página, como todas as dela na
+   * primeira abertura desta versão) NÃO entra na fila: nada sobe em bloco na
+   * atualização; cada folha sobe quando for editada. */
+  conf('a folha sem estado (de antes da N2) não entrou na fila nem ganhou estado na atualização', (await filaFolhas(pagA)).some(f => f.id.indexOf('folha:x5:') === 0) === false && (await pagA.evaluate(() => Store.estadoDaFolha('x5'))) === null, true);
+  const e15 = await enviar(pagA, true);
+  conf('e ela sobe', e15.erro === null && resumoDoc(await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x1:1')) === 'apagadoEm=não bytes=sim' && (await filaFolhas(pagA)).length === 0, true);
+  conf('a reconciliação direta não muda nada quando tudo bate', JSON.stringify(await pagA.evaluate(() => Store.reconciliarFolhas().then(r => [r.mudadas, r.lapides]))), '[0,0]');
+  conf('nenhum erro de página em A e C depois das seções da revisão', [pagA, pagC].map(p => p.errosDePagina.join(' | ')).filter(Boolean).join(' || '), '');
   await pagC.close(); await contextoC.close();
 })().then(() => derrubarEmulador().then(H.fim(amb)), e => derrubarEmulador().then(() => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e))));

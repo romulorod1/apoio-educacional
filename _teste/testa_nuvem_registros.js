@@ -101,10 +101,10 @@ conf('as regras velhas não têm o caminho dos registros', REGRAS_VELHAS.indexOf
 /* O critério de culpa: só quem ficou de fora enquanto outros passaram, ou erro
  * de forma. O veneno volta a contar também quem já tinha tentativa, e aí a
  * recusa total da nuvem leva um bom sozinho à quarentena. */
-const CULPA = "return r.enviados > 0 || (r.erro && (r.erro.codigo === 'INVALID_ARGUMENT' || r.erro.codigo === 'PAGINA_GRANDE'));";
+const CULPA = "return r.enviados > 0 || (r.erro && (r.erro.codigo === 'INVALID_ARGUMENT' || r.erro.codigo === 'FAILED_PRECONDITION'));";
 conf('o critério de culpa está num lugar só', NUVEM.split(CULPA).length, 2);
 const trocas = {};
-if (MODO === MODOS[1]) trocas['/nuvem.js'] = NUVEM.replace(CULPA, "return r.enviados > 0 || (r.erro && r.erro.codigo === 'INVALID_ARGUMENT') || (i.fila.tentativas || 0) > 0;");
+if (MODO === MODOS[1]) trocas['/nuvem.js'] = NUVEM.replace(CULPA, "return r.enviados > 0 || (r.erro && (r.erro.codigo === 'INVALID_ARGUMENT' || r.erro.codigo === 'FAILED_PRECONDITION')) || (i.fila.tentativas || 0) > 0;");
 if (FILA_FORA) {
   trocas['/store.js'] = STORE.replace(ENFILEIRAR,
     "function enfileirar(saida, entrada) { setTimeout(function () { escrever('saida', function (s) { return s.put(entrada); }).catch(function () {}); }, 0); }");
@@ -493,6 +493,18 @@ function textoDoServidor(docs) {
     JSON.stringify(aoVoltar.docs['aula:s1@2026-06-01'].dados) !== JSON.stringify(noServidor.docs['aula:s1@2026-06-01'].dados), true);
 
   secao('7. A gravação e a entrada na fila são atômicas');
+  /* A propriedade é LOCAL: o dado e a entrada da fila na MESMA transação. A
+   * sincronização do "voltar" da seção 6 ainda está em voo aqui (recebendo;
+   * desde a N2 o recebimento lê também a coleção `folhas`, e demora mais), e
+   * o envio que vem logo depois dela lê a entrada que o veneno grava numa
+   * transação à parte, sobe o registro e a tira da fila ao confirmar: a prova
+   * via a fila vazia por outro motivo, não pela atomicidade (a 73/1 do PR
+   * 133, medida: entrada gravada aos 5 ms, commit aos 14 ms). Sem sinal nada
+   * sai da fila, e o que o veneno gravar fica à vista. */
+  const semEnvio = await esperar('nenhum envio nem recebimento em voo antes da prova da atomicidade',
+    () => pagA.evaluate(() => { const r = Nuvem.estado().registros; return !r.enviando && !r.recebendo; }), v => v === true, 15000);
+  conf('a prova da atomicidade começa sem envio em voo', semEnvio.ok, true);
+  await pagA.setOfflineMode(true);
   const atomica = await pagA.evaluate(async () => {
     const original = IDBObjectStore.prototype.put;
     IDBObjectStore.prototype.put = function () {
@@ -510,6 +522,7 @@ function textoDoServidor(docs) {
     const reg = (await Store.lerRegistros()).find(r => r.id === 'aula:s1@2026-06-03');
     return { rejeitou, fila: f, registroIntacto: reg && reg.dados && reg.dados.notaTexto !== 'tablet sem espaço' };
   });
+  await pagA.setOfflineMode(false);
   conf('a gravação abortada rejeita', atomica.rejeitou, true);
   conf('e o registro ficou como estava', atomica.registroIntacto, true);
   prop('nenhuma entrada na fila para o dado que não foi gravado', atomica.fila.indexOf('aula:s1@2026-06-03') < 0, MODOS[0]);

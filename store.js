@@ -597,9 +597,13 @@
     var porId = {};
     existentes.forEach(function (r) { porId[r.id] = r; });
     var novo = desmontar(db);
-    var contas = { gravados: 0, lapides: 0, iguais: 0, enfileirados: 0 };
-    function gravarRegistro(reg) {
+    var contas = { gravados: 0, lapides: 0, iguais: 0, enfileirados: 0, aulasApagadas: [], aulasRevividas: [] };
+    function gravarRegistro(reg, revivida) {
       deposito.put(reg);
+      // a folha da aula acompanha o registro dela (N2): excluída, as páginas viram lápide; de volta, voltam
+      // (o id do registro é 'aula:<id da aula>'; a folha é pelo id da aula)
+      if (reg.tipo === 'aula' && reg.apagadoEm) contas.aulasApagadas.push(String(reg.id).slice('aula:'.length));
+      else if (reg.tipo === 'aula' && revivida) contas.aulasRevividas.push(String(reg.id).slice('aula:'.length));
       if (saida && sincronizavel(reg.id, reg.tipo)) {
         var entrada = { id: reg.id, tipo: reg.tipo, atualizadoEm: reg.atualizadoEm, apagadoEm: reg.apagadoEm };
         // a entrada da restauração só vence na nuvem o que for mais velho que a cópia (fatia 3)
@@ -628,7 +632,7 @@
         }
         // `nuvem` (o carimbo do servidor que este aparelho conhece, fatia 3) fica com o registro
         gravarRegistro({ id: chave, tipo: item.tipo, atualizadoEm: agora, apagadoEm: null, aparelho: aparelho,
-          esquema: ESQUEMA_REGISTRO, ordem: ordem, dados: item.dados, nuvem: antes && antes.nuvem ? antes.nuvem : null });
+          esquema: ESQUEMA_REGISTRO, ordem: ordem, dados: item.dados, nuvem: antes && antes.nuvem ? antes.nuvem : null }, !!(antes && antes.apagadoEm));
         contas.gravados++;
       });
     });
@@ -704,6 +708,10 @@
          * chamou responde: nada a fazer aqui, e nada a espalhar como erro. */
         try {
           contas = aplicarDiferenca(registros, saida, todos.result || [], db, agora, ap, !!opcoes.restauro);
+          /* As folhas das aulas que saíram viram lápide e as das que voltaram
+           * (desfazer) voltam, na mesma transação (N2). A restauração não passa
+           * por aqui: ela refaz o estado das folhas inteiro (restaurarEstadoDasFolhas). */
+          if (!opcoes.semFolhas) ajustarFolhasDasAulas(t, contas.aulasApagadas, contas.aulasRevividas, agora, saida);
           // a restauração que vem da nuvem recomeça o recebimento do zero: o cursor sai
           if (opcoes.restauro) controle.delete('cursor');
           controle.put({ quando: agora, esquema: VERSAO_BANCO, assinatura: assinatura(db) }, 'retrato');
@@ -795,6 +803,21 @@
             if (atual && atual.atualizadoEm === item.atualizadoEm) { s.delete(item.id); tiradas++; }
           };
           var pag = item.tipo === 'folha' ? partesDoIdDaPagina(item.id) : null;
+          /* A página que subiu VIVA e já é lápide aqui (apagada durante o envio):
+           * a lápide tem de ir, e se outra aba a tirou da fila como "nunca subiu"
+           * (o envio descarta a lápide sem carimbo), ela volta à fila agora que o
+           * carimbo existe. */
+          if (pag && item.nuvem && !item.apagadoEm) {
+            var repor = s.get(item.id);
+            repor.onsuccess = function () {
+              if (repor.result) return;
+              var est = t.objectStore('controle').get(PREFIXO_FOLHA + pag.aulaId);
+              est.onsuccess = function () {
+                var p = est.result && est.result.paginas && est.result.paginas[pag.n];
+                if (p && p.apagadoEm) s.put({ id: item.id, tipo: 'folha', atualizadoEm: p.atualizadoEm, apagadoEm: p.apagadoEm });
+              };
+            };
+          }
           if (pag && item.nuvem) {
             (folhasPorAula[pag.aulaId] = folhasPorAula[pag.aulaId] || []).push({ n: pag.n, item: item });
             return;
@@ -832,11 +855,44 @@
       });
     });
   }
-  /* Quantas esperam para subir e quantas estão em quarentena. */
+  /* Quantas esperam para subir e quantas estão em quarentena; e as páginas de
+   * folha grandes demais para a nuvem (N2), para a tela dizer qual folha. */
   function estadoDaFila() {
     return todosOsValores('saida').then(function (lista) {
       var q = (lista || []).filter(function (e) { return !!e.quarentena; }).length;
-      return { pendentes: (lista || []).length - q, quarentena: q };
+      var grandes = [];
+      (lista || []).forEach(function (e) {
+        if (!e.quarentena || e.motivo !== 'PAGINA_GRANDE') return;
+        var p = partesDoIdDaPagina(e.id);
+        if (p) grandes.push({ id: e.id, aulaId: p.aulaId, n: p.n });
+      });
+      return { pendentes: (lista || []).length - q, quarentena: q, grandes: grandes };
+    });
+  }
+  /* Direto para a quarentena, com o motivo, sem reteste: o erro que não muda
+   * tentando de novo (a página grande demais para um documento). Uma edição
+   * nova da página regrava a entrada (enfileirar) e a tira de lá. */
+  function quarentenar(ids, motivo) {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, 'saida', 'readwrite', 'fila');
+        var s = t.objectStore('saida'), postas = 0;
+        (ids || []).forEach(function (id) {
+          var pedido = s.get(id);
+          pedido.onsuccess = function () {
+            var e = pedido.result;
+            if (!e) return;
+            e.quarentena = true;
+            e.retestada = true;
+            e.motivo = motivo || 'RECUSADA';
+            s.put(e);
+            postas++;
+          };
+        });
+        t.oncomplete = function () { resolve(postas); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
     });
   }
   function tamanhoDaFila() {
@@ -1291,11 +1347,8 @@
           };
           t.objectStore('historico').clear();
           /* As páginas das folhas das aulas excluídas viram lápide e entram na
-           * fila (N2), na mesma transação, salvo com a sincronização desligada. */
-          var marcaReq = t.objectStore('controle').get('sincronizacao');
-          marcaReq.onsuccess = function () {
-            lapidarFolhas(t, Object.keys(aulasExcluidas), new Date().toISOString(), !(marcaReq.result && marcaReq.result.desligada));
-          };
+           * fila (N2), na mesma transação, pelo escritor de diferença (a aula que
+           * vira lápide leva a folha junto), salvo com a sincronização desligada. */
           escreverDiferenca(t, novo, null, function (c) { contas = c; });
         };
         t.oncomplete = function () { confirmarGravacao(contas); avisarMudanca('dados'); resolve(novo); };
@@ -1478,38 +1531,189 @@
     };
   }
   /* Apaga o estado das folhas (e as versões anteriores e o cursor) dentro da
-   * transação `t`: a restauração e o "Apagar tudo" refazem do zero. */
+   * transação `t`, por FAIXA, e não por cursor: o cursor apaga enquanto anda,
+   * e um `put` feito logo depois de abri-lo executa antes de ele continuar, que
+   * então o apaga também (revisão do PR 133: a restauração ficava sem estado e
+   * a fila presa). O pedido por faixa executa inteiro, na ordem em que foi
+   * feito, antes do que vier depois. */
+  function apagarFaixaDeControle(t, prefixo) {
+    t.objectStore('controle').delete(IDBKeyRange.bound(prefixo, prefixo + '￿'));
+  }
   function limparEstadoDasFolhas(t) {
-    varrerControle(t, PREFIXO_FOLHA, function (chave, valor, cursor) { cursor.delete(); });
-    varrerControle(t, PREFIXO_FOLHA_ANTERIOR, function (chave, valor, cursor) { cursor.delete(); });
+    apagarFaixaDeControle(t, PREFIXO_FOLHA);
+    apagarFaixaDeControle(t, PREFIXO_FOLHA_ANTERIOR);
     t.objectStore('controle').delete('cursorFolhas');
   }
-  /* Enfileira, dentro de `t`, toda página das notas dadas (sem hash: o envio o
-   * calcula e a confirmação o guarda). A restauração no aparelho que escreve. */
-  function enfileirarNotas(t, notas, carimbo, restauro) {
-    var controle = t.objectStore('controle'), saida = t.objectStore('saida');
-    Object.keys(notas || {}).forEach(function (aulaId) {
-      var paginas = (notas[aulaId] && notas[aulaId].paginas) || [];
-      if (!paginas.length) return;
-      var estado = [];
-      paginas.forEach(function (p, n) {
-        estado.push({ hash: null, atualizadoEm: carimbo, apagadoEm: null, nuvem: null });
-        var entrada = { id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: carimbo, apagadoEm: null };
-        if (restauro) entrada.restauro = true;
-        enfileirar(saida, entrada);
+  /* A RESTAURAÇÃO REFAZ O ESTADO DAS FOLHAS a partir do estado ANTERIOR e da
+   * cópia, dentro de `t`, no aparelho que escreve. Lê o estado anterior inteiro
+   * (um cursor, até o fim) e só então apaga por faixa e regrava:
+   *   - cada página da cópia entra na fila (com `restauro` quando a cópia veio
+   *     da nuvem: a restauração vence), sem hash (o envio o calcula) e com o
+   *     carimbo da nuvem que este aparelho conhecia para ela, se conhecia: a
+   *     precondição passa direto quando a nuvem não mudou;
+   *   - a página que este aparelho conhecia na nuvem e a cópia NÃO tem (a página
+   *     a mais de uma folha, ou a folha inteira de uma aula sem folha na cópia)
+   *     vira lápide e entra na fila: a nuvem fica igual à cópia nas folhas, e o
+   *     outro aparelho perde a página junto. Só o que este aparelho viu na
+   *     nuvem: o que ele nunca recebeu é decidido pelo recebimento, como nos
+   *     registros;
+   *   - a página que nunca subiu não deixa nada (não há o que lapidar).
+   * Com a sincronização desligada e sem ser restauração da nuvem, nada entra na
+   * fila (a regra do escritor de diferença). */
+  function restaurarEstadoDasFolhas(t, notas, carimbo, agora, opcoes) {
+    opcoes = opcoes || {};
+    var controle = t.objectStore('controle');
+    var antigos = {}, desligada = false;
+    var marcaReq = controle.get('sincronizacao');
+    marcaReq.onsuccess = function () { desligada = !!(marcaReq.result && marcaReq.result.desligada); };
+    varrerControle(t, PREFIXO_FOLHA, function (chave, valor) {
+      antigos[String(chave).slice(PREFIXO_FOLHA.length)] = valor;
+    }, function () {
+      limparEstadoDasFolhas(t);
+      var saida = (desligada && !opcoes.restauro) ? null : t.objectStore('saida');
+      var aulas = {};
+      Object.keys(notas || {}).forEach(function (id) { aulas[id] = true; });
+      Object.keys(antigos).forEach(function (id) { aulas[id] = true; });
+      Object.keys(aulas).forEach(function (aulaId) {
+        var paginas = (notas && notas[aulaId] && notas[aulaId].paginas) || [];
+        var antes = (antigos[aulaId] && antigos[aulaId].paginas) || [];
+        var estado = [];
+        paginas.forEach(function (p, n) {
+          var velho = antes[n];
+          estado.push({ hash: null, atualizadoEm: carimbo, apagadoEm: null, nuvem: velho && velho.nuvem ? velho.nuvem : null });
+          if (!saida) return;
+          var entrada = { id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: carimbo, apagadoEm: null };
+          if (opcoes.restauro) entrada.restauro = true;
+          enfileirar(saida, entrada);
+        });
+        for (var n = paginas.length; n < antes.length; n++) {
+          var velho = antes[n];
+          if (!velho || !velho.nuvem) continue; // nunca subiu: nada a lapidar na nuvem
+          if (velho.apagadoEm) {
+            estado[n] = velho;
+            if (saida && !velho.nuvem.apagado) enfileirar(saida, { id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: velho.atualizadoEm, apagadoEm: velho.apagadoEm });
+            continue;
+          }
+          estado[n] = { hash: velho.hash || null, atualizadoEm: agora, apagadoEm: agora, nuvem: velho.nuvem };
+          if (saida) enfileirar(saida, { id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: agora, apagadoEm: agora });
+        }
+        for (var k = 0; k < estado.length; k++) if (!estado[k]) estado[k] = { hash: null, atualizadoEm: agora, apagadoEm: agora, nuvem: null };
+        if (estado.length) controle.put({ paginas: estado }, PREFIXO_FOLHA + aulaId);
       });
-      controle.put({ paginas: estado }, PREFIXO_FOLHA + aulaId);
     });
   }
-  /* Lapida, dentro de `t`, as páginas das aulas dadas (a exclusão em cascata). */
-  function lapidarFolhas(t, aulaIds, agora, enfileira) {
-    var controle = t.objectStore('controle'), saida = enfileira ? t.objectStore('saida') : null;
+  /* O "APAGAR TUDO" LAPIDA O ESTADO DAS FOLHAS em vez de apagá-lo, dentro de
+   * `t`, fora da fila, como faz com os registros: toda página que este
+   * aparelho conhecia na nuvem vira lápide com o carimbo guardado, e quem a
+   * leva à nuvem é o religar ("Enviar cópia agora") ou a restauração. A página
+   * que nunca subiu sai. As versões anteriores e o cursor saem. */
+  function lapidarEstadoDasFolhas(t, agora) {
+    var controle = t.objectStore('controle');
+    var antigos = {};
+    varrerControle(t, PREFIXO_FOLHA, function (chave, valor) { antigos[chave] = valor; }, function () {
+      apagarFaixaDeControle(t, PREFIXO_FOLHA_ANTERIOR);
+      controle.delete('cursorFolhas');
+      Object.keys(antigos).forEach(function (chave) {
+        var estado = [], algum = false;
+        ((antigos[chave] && antigos[chave].paginas) || []).forEach(function (p, n) {
+          if (!p || !p.nuvem) { estado[n] = { hash: null, atualizadoEm: agora, apagadoEm: agora, nuvem: null }; return; }
+          algum = true;
+          estado[n] = p.apagadoEm ? p : { hash: p.hash || null, atualizadoEm: agora, apagadoEm: agora, nuvem: p.nuvem };
+        });
+        if (algum) controle.put({ paginas: estado }, chave);
+        else controle.delete(chave);
+      });
+    });
+  }
+  /* Lapida, dentro de `t`, as páginas das aulas dadas (a aula excluída), com a
+   * marca `pelaAula`: a aula que volta (desfazer) traz as páginas de volta. */
+  function lapidarFolhas(t, aulaIds, agora, saida) {
+    var controle = t.objectStore('controle');
     aulaIds.forEach(function (aulaId) {
       var req = controle.get(PREFIXO_FOLHA + aulaId);
       req.onsuccess = function () {
         if (!req.result) return;
+        var vivas = (req.result.paginas || []).map(function (p) { return !!(p && !p.apagadoEm); });
         sincronizarPaginas(controle, saida, aulaId, req.result, [], agora);
+        var est = controle.get(PREFIXO_FOLHA + aulaId);
+        est.onsuccess = function () {
+          if (!est.result) return;
+          (est.result.paginas || []).forEach(function (p, n) { if (p && vivas[n]) p.pelaAula = true; });
+          controle.put(est.result, PREFIXO_FOLHA + aulaId);
+        };
       };
+    });
+  }
+  /* A aula que volta a existir (desfazer): as páginas lapidadas pela exclusão
+   * dela voltam a vivas e entram na fila; a folha continua em `notas`. */
+  function reviverFolhas(t, aulaIds, agora, saida) {
+    var controle = t.objectStore('controle');
+    aulaIds.forEach(function (aulaId) {
+      var req = controle.get(PREFIXO_FOLHA + aulaId);
+      req.onsuccess = function () {
+        if (!req.result) return;
+        var mudou = false;
+        (req.result.paginas || []).forEach(function (p, n) {
+          if (!p || !p.apagadoEm || !p.pelaAula) return;
+          delete p.pelaAula;
+          p.apagadoEm = null;
+          p.atualizadoEm = agora;
+          mudou = true;
+          if (saida) enfileirar(saida, { id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: agora, apagadoEm: null });
+        });
+        if (mudou) controle.put(req.result, PREFIXO_FOLHA + aulaId);
+      };
+    });
+  }
+  function ajustarFolhasDasAulas(t, apagadas, revividas, agora, saida) {
+    if (apagadas && apagadas.length) lapidarFolhas(t, apagadas, agora, saida);
+    if (revividas && revividas.length) reviverFolhas(t, revividas, agora, saida);
+  }
+  /* A RECONCILIAÇÃO DAS FOLHAS QUE TÊM ESTADO: a folha gravada por fora do
+   * salvarNota (a versão anterior do aplicativo, que grava a nota solta e não
+   * conhece o estado por página) volta a bater com o estado, e o que mudou
+   * entra na fila. Só as folhas com estado: a folha de antes da N2, sem
+   * estado, continua subindo só quando for editada. Chamada quando a versão do
+   * aplicativo mudou desde a última abertura. Nada no aparelho que só lê. */
+  function reconciliarFolhas() {
+    if (soLeitura) return Promise.resolve({ aulas: 0, mudadas: 0, lapides: 0 });
+    return Promise.all([todasAsNotas(), abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, 'controle', 'readonly'), estados = {};
+        varrerControle(t, PREFIXO_FOLHA, function (chave, valor) { estados[String(chave).slice(PREFIXO_FOLHA.length)] = valor; });
+        t.oncomplete = function () { resolve(estados); };
+        t.onerror = function () { reject(t.error || new Error('A leitura falhou.')); };
+      });
+    })]).then(function (r) {
+      var notas = r[0] || {}, estados = r[1];
+      var aulas = Object.keys(estados);
+      return Promise.all(aulas.map(function (aulaId) {
+        var paginas = (notas[aulaId] && notas[aulaId].paginas) || [];
+        return Promise.all(paginas.map(hashPagina));
+      })).then(function (hashes) {
+        if (!aulas.length) return { aulas: 0, mudadas: 0, lapides: 0 };
+        return abrir().then(function (b) {
+          return new Promise(function (resolve, reject) {
+            var t = transacao(b, ['controle', 'saida'], 'readwrite');
+            var controle = t.objectStore('controle'), agora = new Date().toISOString();
+            var total = { aulas: aulas.length, mudadas: 0, lapides: 0 }, desligada = false;
+            var marcaReq = controle.get('sincronizacao');
+            marcaReq.onsuccess = function () { desligada = !!(marcaReq.result && marcaReq.result.desligada); };
+            aulas.forEach(function (aulaId, i) {
+              var req = controle.get(PREFIXO_FOLHA + aulaId);
+              req.onsuccess = function () {
+                if (!req.result) return;
+                var c = sincronizarPaginas(controle, desligada ? null : t.objectStore('saida'), aulaId, req.result, hashes[i], agora);
+                total.mudadas += c.mudadas;
+                total.lapides += c.lapides;
+              };
+            });
+            t.oncomplete = function () { if (total.mudadas || total.lapides) avisarMudanca('notas'); resolve(total); };
+            t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+            t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+          });
+        });
+      });
     });
   }
 
@@ -2351,14 +2555,17 @@
               t.abort();
             };
           }
-          escreverDiferenca(t, completar(pacote.dados), { carimbo: carimbo, semFila: daNuvem && soLeitura, restauro: daNuvem }, function (c) { contas = c; });
+          escreverDiferenca(t, completar(pacote.dados), { carimbo: carimbo, semFila: daNuvem && soLeitura, restauro: daNuvem, semFolhas: true }, function (c) { contas = c; });
           trocar('notas', pacote.notas, true);
-          /* As folhas (N2): o estado por página é refeito do zero e, no aparelho
-           * que escreve, toda página da cópia entra na fila (com `restauro` quando
-           * a cópia veio da nuvem: a restauração vence). O celular só leitura não
-           * enfileira. O cursor das folhas zera com o dos registros. */
-          limparEstadoDasFolhas(t);
-          if (!(daNuvem && soLeitura)) enfileirarNotas(t, pacote.notas, carimbo || new Date().toISOString(), daNuvem);
+          /* As folhas (N2): o estado por página é refeito a partir do anterior e
+           * da cópia e, no aparelho que escreve, toda página da cópia entra na
+           * fila (com `restauro` quando a cópia veio da nuvem: a restauração
+           * vence) e a página que a nuvem tem e a cópia não vira lápide. O
+           * celular só leitura não enfileira: o estado dele é refeito pelo
+           * recebimento. O cursor das folhas zera com o dos registros. */
+          var agoraIso = new Date().toISOString();
+          if (daNuvem && soLeitura) limparEstadoDasFolhas(t);
+          else restaurarEstadoDasFolhas(t, pacote.notas, carimbo || agoraIso, agoraIso, { restauro: daNuvem });
           trocar('midias', pacote.midias, true);
           trocar('anexos', anexos, true);
           t.objectStore('historico').clear();
@@ -2469,6 +2676,10 @@
           t.objectStore('controle').put({ desligada: true, desde: agora }, 'sincronizacao');
           t.objectStore('dados').delete('principal');
           t.objectStore('controle').delete('retrato');
+          /* E as páginas das folhas (N2) viram lápide aqui também, fora da fila,
+           * como os registros: o "Enviar cópia agora" as leva, e nenhuma página
+           * fica viva na nuvem para uma aula que não existe mais. */
+          lapidarEstadoDasFolhas(t, agora);
         };
         t.oncomplete = function () { avisarMudanca('dados'); resolve(); };
         t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
@@ -2522,7 +2733,8 @@
               var aulaId = String(chave).slice(PREFIXO_FOLHA.length);
               (estado && estado.paginas || []).forEach(function (p, n) {
                 if (!p) return;
-                if (p.apagadoEm) { if (!(p.nuvem && p.nuvem.apagado)) saida.put({ id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: p.atualizadoEm, apagadoEm: p.apagadoEm }); }
+                // a lápide da página que nunca subiu não vai (não há o que apagar na nuvem); a já apagada lá também não
+                if (p.apagadoEm) { if (p.nuvem && !p.nuvem.apagado) saida.put({ id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: p.atualizadoEm, apagadoEm: p.apagadoEm }); }
                 else saida.put({ id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: p.atualizadoEm, apagadoEm: null, restauro: true });
               });
             });
@@ -2534,24 +2746,12 @@
     });
   }
 
-  /* O estado das folhas (N2) sai junto com as notas no "Apagar tudo": a fila
-   * já zerou e a sincronização já desligou na transação do documento. */
-  function apagarEstadoDasFolhas() {
-    return abrir().then(function (b) {
-      return new Promise(function (resolve, reject) {
-        var t = transacao(b, 'controle', 'readwrite');
-        limparEstadoDasFolhas(t);
-        t.oncomplete = function () { resolve(); };
-        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
-        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
-      });
-    });
-  }
+  /* O estado das folhas (N2) vira lápide na transação do documento
+   * (apagarDocumento); as notas em si saem aqui. */
   function apagarTudo() {
     return Promise.all([
       apagarDocumento(),
       esvaziar('notas'),
-      apagarEstadoDasFolhas(),
       esvaziar('midias'),
       esvaziar('anexos'),
       esvaziar('historico'),
@@ -2599,7 +2799,7 @@
     AJUSTES_DO_APARELHO: AJUSTES_DO_APARELHO.slice(),
     lerRegistros: function () { return todosOsValores('registros'); },
     registrosDaFila: registrosDaFila, confirmarEnvio: confirmarEnvio, tamanhoDaFila: tamanhoDaFila,
-    estadoDaFila: estadoDaFila, marcarTentativa: marcarTentativa, soltarQuarentena: soltarQuarentena,
+    estadoDaFila: estadoDaFila, marcarTentativa: marcarTentativa, soltarQuarentena: soltarQuarentena, quarentenar: quarentenar,
     aplicarRecebidos: aplicarRecebidos, lerCursor: lerCursor, aoReceber: aoReceber, partesDoIdDeAula: partesDoIdDeAula,
     carimboNumero: carimboNumero,
     sincronizacaoDesligada: sincronizacaoDesligada, desligarSincronizacao: desligarSincronizacao, religarSincronizacao: religarSincronizacao,
@@ -2609,7 +2809,7 @@
     paginaCanonica: paginaCanonica, arredondarPagina: arredondarPagina, hashPagina: hashPagina, sha256Hex: sha256Hex,
     partesDoIdDaPagina: partesDoIdDaPagina, estadoDaFolha: estadoDaFolha, lerCursorFolhas: lerCursorFolhas,
     aplicarFolhasRecebidas: aplicarFolhasRecebidas, versoesAnterioresDeFolha: versoesAnterioresDeFolha,
-    guardarVersaoRecebida: guardarVersaoRecebida, temWebCrypto: temWebCrypto,
+    guardarVersaoRecebida: guardarVersaoRecebida, temWebCrypto: temWebCrypto, reconciliarFolhas: reconciliarFolhas,
     ultimaGravacaoDeFolha: function () { return ultimaGravacaoDeFolha; },
     ESPERA_FOLHA: ESPERA_FOLHA,
     montarRegistros: montar,
