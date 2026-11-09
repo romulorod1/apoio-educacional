@@ -110,7 +110,7 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
         doMarcelo[1].anexos = [{ id: 'x', nome: 'lista.pdf', tamanho: 1000 }];
         doMarcelo[2].notaTexto = 'Revisamos frações equivalentes e ele pegou rápido.';
         const w = banco.transaction('dados', 'readwrite').objectStore('dados').put(db, 'principal');
-        w.onsuccess = () => resolve();
+        w.transaction.oncomplete = () => resolve();
       };
     };
   }));
