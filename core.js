@@ -106,6 +106,12 @@
    * No futuro, o status normal é exibido como 'Agendada' e reposição como
    * 'Reposição agendada'. Cancelamento nunca afirma realização futura.
    */
+  /* Os dois cancelamentos, com nomes que não se confundem: o do Fechamento e
+   * do PDF do tablet e o do celular saem daqui. */
+  function rotuloDoCancelamento(cobravel) {
+    return cobravel ? 'Cancelada e cobrada' : 'Cancelada sem cobrança';
+  }
+
   function rotuloSituacao(status, data, hoje) {
     var s = status || 'realizada';
     var st = STATUS[s] || STATUS.realizada;
@@ -3124,7 +3130,11 @@
         else if (!futura) minDadosSemCobrar += dur;
       }
 
-      var rotulo = rotuloSituacao(au.status, au.data, hoje);
+      /* A cancelada diz se foi cobrada, com o nome que o celular também usa
+       * (D6c, lote 3): "Cancelada com aviso" numa aula cancelada e cobrada
+       * dizia à família o contrário do valor da linha. Só o rótulo muda; a
+       * cobrança continua sendo a de `cobravel`. */
+      var rotulo = (au.status === 'cancelada') ? rotuloDoCancelamento(cobravel) : rotuloSituacao(au.status, au.data, hoje);
       linhas.push({
         id: au.id,
         data: au.data,
@@ -5474,7 +5484,7 @@
     dadosDoCiclo: dadosDoCiclo, rascunhoDoCiclo: rascunhoDoCiclo, cicloNovo: cicloNovo,
     documentoDoCiclo: documentoDoCiclo, markdownCiclo: markdownCiclo,
     MESES: MESES, DIAS_CURTO: DIAS_CURTO, DIAS_LONGO: DIAS_LONGO, STATUS: STATUS,
-    rotuloSituacao: rotuloSituacao,
+    rotuloSituacao: rotuloSituacao, rotuloDoCancelamento: rotuloDoCancelamento,
     pad2: pad2, partesData: partesData, dataLocal: dataLocal, isoDe: isoDe, hojeIso: hojeIso,
     diaSemana: diaSemana, diaSemanaCurto: diaSemanaCurto, diaSemanaLongo: diaSemanaLongo,
     ddmm: ddmm, ddmmaaaa: ddmmaaaa, diaEMes: diaEMes, mesExtenso: mesExtenso, mesDe: mesDe,

@@ -12229,7 +12229,8 @@
           el('td', { texto: l.dia }),
           el('td', { texto: Core.fmtDuracao(l.duracaoMin) }),
           el('td', {
-            texto: l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)')
+            // a cancelada já diz a cobrança no nome ("Cancelada sem cobrança")
+            texto: l.statusRotulo + (l.cobravel || l.status === 'cancelada' ? '' : ' (não cobrada)')
           }),
           el('td', { texto: dinheiro(l.cobravel ? l.valor : 0) }),
           acoes
@@ -13644,7 +13645,7 @@
       else if (l.futura) detalhe.push(l.statusRotulo);
     } else {
       if (l.hora) detalhe.push(l.hora);
-      detalhe.push(l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)'));
+      detalhe.push(l.statusRotulo + (l.cobravel || l.status === 'cancelada' ? '' : ' (não cobrada)'));
     }
     cabeca.appendChild(el('span', { class: 'detalhe-dia', texto: detalhe.join(' · ') }));
 
@@ -23173,7 +23174,7 @@
    * no bloco da agenda e nas linhas do Fechamento do celular. A cobrança é a
    * da aula (a mesma regra do tablet, com o valor por hora vigente na data). */
   function rotuloDeCancelamentoCelular(cobra) {
-    return cobra ? 'Cancelada e cobrada' : 'Cancelada sem cobrança';
+    return Core.rotuloDoCancelamento(!!cobra);
   }
 
   // ---------- Enviar: o PDF do fechamento pelo WhatsApp, com o Pix ----------

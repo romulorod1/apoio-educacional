@@ -948,7 +948,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   await H.irParaAba(pagA, 'fechamento');
   await pausa(400);
   const linhaCancelada = await texto(pagA, 'tr[data-aula-fechamento="aula-outro"]');
-  conf('a aula cancelada no celular aparece cancelada no Fechamento do tablet (' + (linhaCancelada || 'sem linha') + ')', /Cancelada/.test(linhaCancelada || '') && /não cobrada/.test(linhaCancelada || ''), true);
+  conf('a aula cancelada no celular aparece cancelada no Fechamento do tablet (' + (linhaCancelada || 'sem linha') + ')', /Cancelada sem cobrança/.test(linhaCancelada || ''), true);
   /* O fechamento do tablet bate com o do celular: as somas do mês e a
    * situação do pagamento, calculadas pelo mesmo Core em cada aparelho. */
   const retratoFechamento = pag => pag.evaluate(mes => Store.carregar().then(d => Core.calcularMesInteiro(d, mes).map(f => {

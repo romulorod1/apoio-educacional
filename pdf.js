@@ -1058,7 +1058,8 @@
           dia: l.dia,
           hora: l.hora || '',
           dur: fmtDur(l.duracaoMin),
-          situacao: (l.statusNaFolha || l.statusRotulo) + (l.cobravel ? '' : ' (não cobrada)'),
+          // a cancelada já diz a cobrança no nome ("Cancelada sem cobrança")
+          situacao: (l.statusNaFolha || l.statusRotulo) + (l.cobravel || l.status === 'cancelada' ? '' : ' (não cobrada)'),
           vh: !l.cobravel ? '' : (l.valorHora !== null ? fmtMoedaLocal(l.valorHora) : 'sem preço'),
           valor: fmtMoedaLocal(l.cobravel ? l.valor : 0)
         }, j, false);

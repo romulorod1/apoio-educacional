@@ -95,7 +95,7 @@ const ANCORAS = {
   [V_PROPOSTO]: ['app.js', 'var proposto = reg ? reg.valor : (modoCelular ? s.devido : (f.totalValor || 0));', 'var proposto = reg ? reg.valor : (f.totalValor || 0);'],
   [V_CANCELA]: ['core.js', "      var cobravel = (typeof au.cobravel === 'boolean') ? au.cobravel : st.cobravelPadrao;",
     "      var cobravel = au.status === 'cancelada' || ((typeof au.cobravel === 'boolean') ? au.cobravel : st.cobravelPadrao);"],
-  [V_NOME]: ['app.js', "return cobra ? 'Cancelada e cobrada' : 'Cancelada sem cobrança';", "return cobra ? 'Cancelada e cobrada' : 'Cancelada com aviso';"],
+  [V_NOME]: ['core.js', "return cobravel ? 'Cancelada e cobrada' : 'Cancelada sem cobrança';", "return cobravel ? 'Cancelada e cobrada' : 'Cancelada com aviso';"],
   [V_FORA]: ['app.js', 'var bloco = blocoDeAcaoDoCelular(linhaDePagamento(f));', 'var bloco = linhaDePagamento(f);'],
   [V_PRECO]: ['core.js', '      var pv = precoVigente(aluno, au.data);', '      var pv = precoVigente(aluno, hoje);'],
   [V_OBS]: ['app.js', 'var podePagar = celularEdita();', 'var podePagar = true;']
@@ -200,6 +200,13 @@ async function prepararPagina(pag, movel) {
     const u = r.url();
     if (u.indexOf(FS) === 0 && /:commit\b/.test(u) && r.method() === 'POST') pag.commitsNaRede++;
   });
+  /* O relógio da página, fixo no meio do mês (e andando a partir dali): o
+   * "hoje" do app é RELOGIO em qualquer dia em que a prova rode. */
+  await pag.evaluateOnNewDocument(alvo => {
+    const Real = Date, desvio = new Real(alvo).getTime() - Real.now();
+    class Fixo extends Real { constructor(...a) { if (a.length) super(...a); else super(Real.now() + desvio); } static now() { return Real.now() + desvio; } }
+    window.Date = Fixo;
+  }, RELOGIO);
   await pag.evaluateOnNewDocument(cfg => { window.NUVEM_EMULADOR = cfg; }, CFG);
   if (!movel) {
     await pag.evaluateOnNewDocument(() => {
@@ -356,10 +363,17 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
 const telaBoa = m => m.pequenos.join('; ') + (m.rolaDeLado ? ' ROLA DE LADO' : '');
 
 function isoDe(d) { const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
-const AGORA = new Date();
-const HOJE = isoDe(AGORA);
+/* O dia da prova é fixo, e não o de hoje: no último dia do mês não haveria
+ * aula "ainda não dada" no mês, e quatro venenos ficariam invisíveis. O meio
+ * de outubro de 2026 tem aula dada e não dada no mesmo mês, fica depois do
+ * junho de referência e do reajuste de julho, e fica ANTES de qualquer dia em
+ * que a prova rode (o relógio da página só anda para trás: o token do
+ * emulador nunca parece vencido). */
+const HOJE = '2026-10-15';
+const RELOGIO = HOJE + 'T18:00:00';
+const AGORA = new Date(2026, 9, 15, 18, 0, 0);
 const MES = HOJE.slice(0, 7);
-const AMANHA = (() => { const d = new Date(AGORA); d.setDate(d.getDate() + 1); return isoDe(d); })();
+const AMANHA = (() => { const d = new Date(AGORA.getTime()); d.setDate(d.getDate() + 1); return isoDe(d); })();
 /* No último dia do mês não há aula "ainda não dada" no mesmo mês: o proposto
  * das aulas dadas e o do mês inteiro são o mesmo número, e a prova diz. */
 const TEM_FUTURA = AMANHA.slice(0, 7) === MES;
@@ -427,7 +441,8 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
     d.ajustes.pagamentosDesde = '2026-06';
     await Store.salvar(d);
   }, { hoje: HOJE, amanha: AMANHA, mes: MES, temFutura: TEM_FUTURA });
-  if (!TEM_FUTURA) console.log('   (hoje é o último dia do mês: sem aula "ainda não dada" no mês; o proposto do mês inteiro e o das dadas coincidem)');
+  conf('(arranjo) o relógio da página é o da prova, ' + HOJE + ', e o mês tem aula ainda não dada (relógio real do processo: ' + isoDe(new Date()) + ')',
+    (await pagA.evaluate(() => Core.hojeIso())) + ' ' + TEM_FUTURA, HOJE + ' true');
   await H.abrirApp(pagA, amb.ORIGEM);
   conf('o tablet entrou', await entrarPelaTela(pagA, DONA.email, DONA.senha), true);
   await clicar(pagA, '#nuvem-enviar');
@@ -490,6 +505,22 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
   const blocos = await pagC.evaluate(() => ['aberto-sem', 'aberto-cobrada'].map(id => {
     const b = document.querySelector('.cel-bloco[data-aula="' + id + '"] .cel-bloco-situacao'); return b ? b.textContent : 'sem bloco'; }));
   prop('os blocos da agenda: "Cancelada sem cobrança" e "Cancelada e cobrada" (' + blocos.join(' ; ') + ')', blocos.join(' ; ') === 'Cancelada sem cobrança ; Cancelada e cobrada', V_NOME);
+  /* Os mesmos nomes no tablet: a tabela do Fechamento e o PDF da família. */
+  await mesNoTablet(pagA, MES);
+  const noTablet = await pagA.evaluate(() => ['aberto-sem', 'aberto-cobrada'].map(id => {
+    const tr = document.querySelector('tr[data-aula-fechamento="' + id + '"]'); return tr ? tr.children[3].textContent + ' / ' + tr.children[4].textContent : 'sem linha'; }));
+  prop('a tabela do Fechamento do tablet: "Cancelada sem cobrança" sem valor e "Cancelada e cobrada" com R$ 100,00 (' + noTablet.join(' ; ') + ')',
+    fmt(noTablet.join(' ; ')) === 'Cancelada sem cobrança / R$ 0,00 ; Cancelada e cobrada / R$ 100,00', V_NOME);
+  const pdf = await pagA.evaluate(m => Store.carregar().then(d => {
+    const f = Core.calcularFechamento(d, 'aberto', m);
+    const t = new TextDecoder('latin1').decode(PDFGen.gerarFechamento(f, { exibirTemasEAreas: false, incluirNotasPublicas: false, incluirFolhas: false }));
+    return { sem: t.indexOf('Cancelada sem cobran') >= 0, cobrada: t.indexOf('Cancelada e cobrada') >= 0, aviso: t.indexOf('com aviso') >= 0,
+      naoCobrada: t.indexOf('o cobrada)') >= 0, valor: t.indexOf('200,00') >= 0, controle: t.indexOf('Realizada') >= 0 };
+  }), MES);
+  console.log('   PDF: ' + JSON.stringify(pdf));
+  conf('(controle) o texto do PDF é legível pela prova: "Realizada" aparece', pdf.controle, true);
+  prop('o PDF da família diz "Cancelada sem cobrança" e "Cancelada e cobrada", sem "com aviso" e sem o "(não cobrada)" repetido', pdf.sem && pdf.cobrada && !pdf.aviso && !pdf.naoCobrada, V_NOME);
+  conf('e o valor do PDF não mudou: R$ 200,00', pdf.valor, true);
   seVeneno(V_NOME);
   conf('(arranjo) a folha da aula do Aberto abre', await clicar(pagC, '.cel-bloco[data-aula="aberto-1"]') && await existe(pagC, '#cel-folha[data-aula="aberto-1"]'), true);
   await clicar(pagC, '#cel-folha-cancelar');
