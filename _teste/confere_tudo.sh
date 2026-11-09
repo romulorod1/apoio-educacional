@@ -575,9 +575,12 @@ roda "salvar --envenenado-salvar-no-pedido"     node "_teste/testa_store_grava_n
 # saida); --envenenado-nota-no-pedido o faz responder com ela aberta e tem de
 # acusar EXATAMENTE o salvarNota
 roda "salvar --envenenado-nota-no-pedido"       node "_teste/testa_store_grava_no_commit.js" --envenenado-nota-no-pedido
+# N2, anexos: o salvarArquivo tem transação própria, fora de gravar e escrever.
+# O veneno responde no pedido de metadados e tem de acusar as duas gravações.
+roda "salvar --envenenado-arquivo-no-pedido"    node "_teste/testa_store_grava_no_commit.js" --envenenado-arquivo-no-pedido
 # E o outro lado, que o conserto criou: a escrita que falha passa a REJEITAR.
-# --envenenado-nao-rejeita tira o onabort do escrever, e a transacao abortada
-# depois do sucesso do pedido tem de deixar a promessa pendurada a vista;
+# --envenenado-nao-rejeita tira os dois handlers de falha do salvarArquivo, e a
+# transacao abortada depois do sucesso do pedido tem de deixar a promessa pendurada;
 # --envenenado-nao-rele tira a releitura do disco do app.js, e uma copia que
 # rejeita no meio tem de deixar o proximo salvar gravar o estado velho.
 roda "salvar --envenenado-nao-rejeita"          node "_teste/testa_store_grava_no_commit.js" --envenenado-nao-rejeita

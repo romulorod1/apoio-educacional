@@ -95,10 +95,12 @@ const PORTA = 8812;
 const VENENO_GRAVAR = process.argv.indexOf('--envenenado-grava-no-pedido') !== -1;
 const VENENO_ESCREVER = process.argv.indexOf('--envenenado-escreve-no-pedido') !== -1;
 const VENENO_SALVAR = process.argv.indexOf('--envenenado-salvar-no-pedido') !== -1;
+/* N2 guarda anexos e folhas por caminho próprio, fora de gravar/escrever. */
+const VENENO_ARQUIVO = process.argv.indexOf('--envenenado-arquivo-no-pedido') !== -1;
 /* O quarto veneno (N2): o salvarNota, que desde a folha por página tem
  * transação própria (notas, controle e saida), responde com ela aberta. */
 const VENENO_NOTA = process.argv.indexOf('--envenenado-nota-no-pedido') !== -1;
-const VENENO = VENENO_GRAVAR || VENENO_ESCREVER || VENENO_SALVAR || VENENO_NOTA;
+const VENENO = VENENO_GRAVAR || VENENO_ESCREVER || VENENO_SALVAR || VENENO_NOTA || VENENO_ARQUIVO;
 const VENENO_REJEITA = process.argv.indexOf('--envenenado-nao-rejeita') !== -1;
 const VENENO_RELE = process.argv.indexOf('--envenenado-nao-rele') !== -1;
 const CONTROLE = process.argv.indexOf('--controle') !== -1;
@@ -129,25 +131,38 @@ const SALVAR_ANTIGO = 'escreverDiferenca(t, db, opcoes, function (c) { contas = 
  * transação, com ela ainda aberta. */
 const NOTA_CONSERTADO = "else t.objectStore('notas').put(nota, aulaId);";
 const NOTA_ANTIGO = "else t.objectStore('notas').put(nota, aulaId); resolve();";
+/* O caminho N2 dos arquivos também tem de esperar o commit da transação. */
+const ARQUIVO_CONSERTADO = 'controle.put(estado, PREFIXO_ARQUIVO + filaId);';
+const ARQUIVO_ANTIGO = 'var reqEstado = controle.put(estado, PREFIXO_ARQUIVO + filaId); reqEstado.onsuccess = function () { resolve(); };';
 const escapar = s => new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-const ANCORA = VENENO_SALVAR ? escapar(SALVAR_CONSERTADO) : VENENO_NOTA ? escapar(NOTA_CONSERTADO)
-  : VENENO_ESCREVER ? ESCREVER_CONSERTADO : GRAVAR_CONSERTADO;
+const ANCORA = VENENO_ARQUIVO ? escapar(ARQUIVO_CONSERTADO) : VENENO_SALVAR ? escapar(SALVAR_CONSERTADO)
+  : VENENO_NOTA ? escapar(NOTA_CONSERTADO) : VENENO_ESCREVER ? ESCREVER_CONSERTADO : GRAVAR_CONSERTADO;
 const trocas = {};
 let trocaFeita = false;
 if (VENENO) {
   if (ANCORA.test(STORE_REPO)) {
-    trocas['/store.js'] = STORE_REPO.replace(ANCORA, VENENO_SALVAR ? SALVAR_ANTIGO : VENENO_NOTA ? NOTA_ANTIGO : VENENO_ESCREVER ? ESCREVER_ANTIGO : GRAVAR_ANTIGO);
+    trocas['/store.js'] = STORE_REPO.replace(ANCORA, VENENO_ARQUIVO ? ARQUIVO_ANTIGO
+      : VENENO_SALVAR ? SALVAR_ANTIGO : VENENO_NOTA ? NOTA_ANTIGO : VENENO_ESCREVER ? ESCREVER_ANTIGO : GRAVAR_ANTIGO);
     trocaFeita = trocas['/store.js'] !== STORE_REPO;
   }
 }
 
-const ONABORT = "        t.onabort = function () { reject(motivo('A gravação foi interrompida.')); };";
+const ONABORT = "          t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };";
+const ONERROR_ARQUIVO = "          t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };";
+const trechoEntre = (texto, inicio, fim) => {
+  const a = texto.indexOf(inicio), b = texto.indexOf(fim, a);
+  return a >= 0 && b > a ? texto.slice(a, b) : '';
+};
 const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const RELE = '      db = lido || Store.bancoVazio();';
 let trocaNova = null;
 if (VENENO_REJEITA) {
-  trocaNova = STORE_REPO.split(ONABORT).length - 1 === 1 ? STORE_REPO.split(ONABORT).join('') : null;
-  if (trocaNova) trocas['/store.js'] = trocaNova;
+  const trechoArquivo = trechoEntre(STORE_REPO, 'function salvarArquivo(', 'function apagarArquivo(');
+  if (trechoArquivo.split(ONERROR_ARQUIVO).length === 2 && trechoArquivo.split(ONABORT).length === 2) {
+    const semTratamento = trechoArquivo.replace(ONERROR_ARQUIVO, '').replace(ONABORT, '');
+    trocaNova = STORE_REPO.replace(trechoArquivo, semTratamento);
+  }
+  if (trocaNova && trocaNova !== STORE_REPO) trocas['/store.js'] = trocaNova;
 }
 if (VENENO_RELE) {
   trocaNova = APP_REPO.split(RELE).length - 1 === 1 ? APP_REPO.split(RELE).join('      void lido;') : null;
@@ -219,14 +234,14 @@ const CAMINHOS = [
     esperado: 'depois'
   },
   {
-    nome: 'salvarMidia (imagem colada na folha)', pelo_gravar: true,
+    nome: 'salvarMidia (imagem colada na folha)', pelo_arquivo: true,
     prepara: () => Promise.resolve(),
     chama: ['salvarMidia', 'midia-prova-commit', { tipo: 'image/png', rotulo: 'depois' }],
     le: () => Store.lerMidia('midia-prova-commit').then(m => m ? m.rotulo : 'sem midia'),
     esperado: 'depois'
   },
   {
-    nome: 'salvarAnexo (o PDF anexado na aula)', pelo_gravar: true,
+    nome: 'salvarAnexo (o PDF anexado na aula)', pelo_arquivo: true,
     prepara: () => Promise.resolve(),
     chama: ['salvarAnexo', 'anexo-prova-commit', '__BLOB_2048__'],
     le: () => Store.lerAnexo('anexo-prova-commit').then(r => (r && r.blob ? r.blob.size : -1)),
@@ -287,7 +302,9 @@ async function rodaCaminho(pag, c) {
   }, c.chama);
   if (r.erro) { conf(c.nome + ': a escrita respondeu sem erro', r.erro, 'sem erro'); return; }
   const lido = await pag.evaluate('(' + c.le.toString() + ')()');
-  const morde = ESPERA_PERDA && (VENENO_ESCREVER ? !c.poda_depois && !c.pelo_salvar && !c.pelo_nota : VENENO_SALVAR ? !!c.pelo_salvar : VENENO_NOTA ? !!c.pelo_nota : c.pelo_gravar);
+  const morde = ESPERA_PERDA && (VENENO_ARQUIVO ? !!c.pelo_arquivo
+    : VENENO_ESCREVER ? !c.poda_depois && !c.pelo_salvar && !c.pelo_nota && !c.pelo_arquivo
+      : VENENO_SALVAR ? !!c.pelo_salvar : VENENO_NOTA ? !!c.pelo_nota : c.pelo_gravar);
   if (morde) {
     conf('VENENO ENXERGADO em ' + c.nome + ': respondeu com a transação ainda aberta', r.pendentes > 0, true);
     conf('VENENO ENXERGADO em ' + c.nome + ': interrompida no instante da resposta, a escrita SUMIU',
@@ -417,7 +434,8 @@ async function parteQuatro(pag) {
   console.log('MODO: ' + (VENENO_GRAVAR ? 'envenenado (gravar antigo, que responde no pedido)'
     : VENENO_ESCREVER ? 'envenenado (escrever responde no pedido)'
     : VENENO_SALVAR ? 'envenenado (o salvar do documento responde com a transação aberta)'
-    : VENENO_NOTA ? 'envenenado (o salvarNota responde com a transação aberta)' : 'normal') +
+    : VENENO_NOTA ? 'envenenado (o salvarNota responde com a transação aberta)'
+    : VENENO_ARQUIVO ? 'envenenado (o salvarArquivo responde no pedido)' : 'normal') +
     (CONTROLE ? ', COM CONTROLE: tem de reprovar' : ''));
   if (VENENO) {
     secao('O veneno é de verdade');
@@ -435,6 +453,7 @@ async function parteQuatro(pag) {
     conf('o escrever responde na transação (a âncora do segundo veneno existe)', ESCREVER_CONSERTADO.test(STORE_REPO), true);
     conf('o salvar do documento responde na transação (a âncora do terceiro veneno existe uma vez)', STORE_REPO.split(SALVAR_CONSERTADO).length, 2);
     conf('o salvarNota grava a nota dentro da transação própria (a âncora do quarto veneno existe uma vez)', STORE_REPO.split(NOTA_CONSERTADO).length, 2);
+    conf('o salvarArquivo espera o commit da transação (a âncora do veneno N2 existe uma vez)', STORE_REPO.split(ARQUIVO_CONSERTADO).length, 2);
   }
 
   await amb.subir();
@@ -444,7 +463,7 @@ async function parteQuatro(pag) {
   if (VENENO) {
     const servido = await pag.evaluate(() => fetch('/store.js').then(r => r.text()));
     conf('o /store.js que a página recebeu tem o veneno',
-      servido.indexOf(VENENO_SALVAR ? SALVAR_ANTIGO : VENENO_NOTA ? NOTA_ANTIGO : VENENO_ESCREVER ? 'if (req) req.onsuccess = function () { resolve(req.result); };'
+      servido.indexOf(VENENO_ARQUIVO ? ARQUIVO_ANTIGO : VENENO_SALVAR ? SALVAR_ANTIGO : VENENO_NOTA ? NOTA_ANTIGO : VENENO_ESCREVER ? 'if (req) req.onsuccess = function () { resolve(req.result); };'
         : "return trans(deposito, 'readwrite').then(function (s) { return comoPromessa(s.put(valor, chave)); });") >= 0, true);
   }
 
@@ -482,15 +501,7 @@ async function parteQuatro(pag) {
     conf('VENENO ENXERGADO: sem o onabort, a promessa ficou pendurada', rej, 'pendurada');
     return;
   }
-  if (ESPERA_PERDA && !VENENO_SALVAR && !VENENO_NOTA) {
-    /* Os dois venenos da perda respondem no pedido, e o pedido deu certo: a
-     * promessa diz "salvo" e nada ficou. É o defeito inteiro numa linha. (Os
-     * venenos do salvar e do salvarNota não tocam o salvarAnexo desta parte:
-     * ele rejeita.) */
-    conf('VENENO ENXERGADO: a promessa disse que salvou, e nada ficou', rej, 'resolveu');
-  } else {
-    conf('a promessa rejeitou', /^rejeitou/.test(rej), true);
-  }
+  conf('a promessa rejeitou', /^rejeitou/.test(rej), true);
 
   if (!VENENO) await parteQuatro(pag);
   if (VENENO_RELE) return;
