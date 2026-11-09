@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.17';
+  var VERSAO = '1.42.18';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.18',
+      itens: [
+        'No Hoje do celular, até três avisos no alto: a próxima aula, a aula que falta registrar e, a partir do dia 6, a família com mês anterior em aberto. Tocar no aviso leva direto ao que fazer.',
+        'O botão de cobrar abre o WhatsApp com a mensagem pronta, com o mês e o valor que falta. Nada é enviado sem você confirmar no WhatsApp.',
+        'No fim do mês e nos primeiros dias do seguinte, um lembrete de fechar o mês, enquanto houver aula sem registro ou família em aberto.'
+      ]
+    },
     {
       versao: '1.42.16',
       itens: [
@@ -22214,6 +22222,18 @@
     return el('div', { class: 'cel-livre', 'data-livre-de': horaDeMinutosCelular(linha.ini) }, filhos);
   }
 
+  /* Hoje, a aula que está acontecendo leva "Agora", e a seguinte, "Próxima":
+   * a marca do bloco na linha do tempo (lote 1) e o aviso "Próxima" do alto
+   * (lote 4) saem daqui, para os dois nunca apontarem aulas diferentes. */
+  function marcasDeAgoraCelular(dia, agora) {
+    var marcas = {};
+    var valem = aulasDoDiaCelular(dia).filter(function (a) { return a.status !== 'cancelada' && Core.minutosDaHora(a.hora) !== null; });
+    valem.forEach(function (a) { if (Core.minutosDaHora(a.hora) <= agora && fimDaAulaCelular(a) > agora) marcas[a.id] = 'agora'; });
+    var seguinte = valem.filter(function (a) { return Core.minutosDaHora(a.hora) > agora; })[0] || null;
+    if (seguinte) marcas[seguinte.id] = 'proxima';
+    return { marcas: marcas, seguinte: seguinte };
+  }
+
   /* A linha do tempo do dia: a hora à esquerda, a aula ou o buraco à direita,
    * e, hoje, a linha de agora no lugar dela. */
   function linhaDoTempoCelular(dia, edita) {
@@ -22233,14 +22253,7 @@
         el('span', { class: 'cel-agora-hora', texto: horaDeMinutosCelular(agora) })
       ]);
     };
-    /* Hoje, a aula que está acontecendo leva "Agora", e a seguinte, "Próxima". */
-    var marcas = {};
-    if (agora !== null) {
-      var valem = aulasDoDiaCelular(dia).filter(function (a) { return a.status !== 'cancelada' && Core.minutosDaHora(a.hora) !== null; });
-      valem.forEach(function (a) { if (Core.minutosDaHora(a.hora) <= agora && fimDaAulaCelular(a) > agora) marcas[a.id] = 'agora'; });
-      var seguinte = valem.filter(function (a) { return Core.minutosDaHora(a.hora) > agora; })[0];
-      if (seguinte) marcas[seguinte.id] = 'proxima';
-    }
+    var marcas = agora !== null ? marcasDeAgoraCelular(dia, agora).marcas : {};
     linhasDoDiaCelular(dia).forEach(function (l) {
       if (agora !== null && !linhaAgora && agora < l.ini) {
         linhaAgora = marcaDeAgora();
@@ -22264,6 +22277,200 @@
     return caixa;
   }
 
+  // ---------- Os avisos do alto de Hoje (D6c, lote 4) ----------
+
+  /* O que o app mostra sozinho no alto de Hoje, no máximo 3, na ordem de
+   * urgência: a próxima aula de hoje, a aula que já passou sem registro, o
+   * mês a fechar e a família a cobrar. Ficam presos com a faixa da semana,
+   * e cada um leva à ação dele. Nada aqui grava: o "falta registrar" abre o
+   * formulário de sempre, e o "Cobrar" abre o WhatsApp com o texto escrito. */
+  var MAX_AVISOS_CELULAR = 3;
+  /* "Falta registrar como foi": a aula dos últimos 7 dias (hoje e os seis
+   * de antes), dada (realizada ou reposição) e já acabada, sem registro pelo
+   * critério do tablet (Core.aulaTemRegistro, o do "Relato da aula
+   * anterior"). A falta e a cancelada não têm o que registrar. */
+  var DIAS_DO_FALTA_REGISTRAR = 7;
+  function aulaPedeRegistroCelular(a, hoje, agora) {
+    if (!a || !a.data || a.data > hoje || !alunoPorId(a.alunoId)) return false;
+    var s = a.status || 'realizada';
+    if (s !== 'realizada' && s !== 'reposicao') return false;
+    if (a.data === hoje) {
+      var fim = fimDaAulaCelular(a);
+      if (fim === null || fim > agora) return false;
+    }
+    return !Core.aulaTemRegistro(a);
+  }
+  /* As aulas sem registro entre dois dias, da mais recente para a mais antiga. */
+  function aulasSemRegistroCelular(de, ate, hoje, agora) {
+    return db.aulas.filter(function (a) { return a.data >= de && a.data <= ate && aulaPedeRegistroCelular(a, hoje, agora); })
+      .sort(function (a, b) { return (b.data + (b.hora || '')).localeCompare(a.data + (a.hora || '')); });
+  }
+  /* O selo que os avisos leem é o do Fechamento (Core.seloDoPagamento). */
+  function seloDoAvisoCelular(f) { return Core.seloDoPagamento(db, f); }
+  /* As famílias a cobrar: a lista de pendentes do tablet (a mesma dos "Meses
+   * anteriores em aberto" do Fechamento do celular), juntada por família,
+   * cada mês com o que falta pelo selo. Na ordem da lista: quem espera há
+   * mais tempo vem primeiro. */
+  function familiasACobrarCelular(hoje) {
+    var porAluno = {}, ordem = [];
+    Core.pendentesDePagamento(db, hoje).forEach(function (p) {
+      var al = alunoPorId(p.alunoId);
+      if (!al) return;
+      var s = seloDoAvisoCelular(Core.calcularFechamento(db, p.alunoId, p.mes, hoje));
+      if (Math.round(s.falta * 100) <= 0) return;
+      if (!porAluno[p.alunoId]) { porAluno[p.alunoId] = { aluno: al, meses: [] }; ordem.push(porAluno[p.alunoId]); }
+      porAluno[p.alunoId].meses.push({ mes: p.mes, falta: s.falta, selo: s.selo });
+    });
+    return ordem;
+  }
+  function faltaDaFamiliaCelular(fam) {
+    return fam.meses.reduce(function (c, m) { return c + Math.round(m.falta * 100); }, 0) / 100;
+  }
+  function mesMinusculoCelular(mes) { return Core.mesExtenso(mes).toLowerCase(); }
+  /* A mensagem de cobrança: curta, educada, com o mês e o que falta (o do
+   * selo), e sem nome nenhum. Quem envia é ela, no WhatsApp. O valor sai
+   * sempre escrito (Core.fmtMoeda): o "esconder valores" da tela não vale
+   * para a mensagem que vai à família. */
+  function mensagemDeCobrancaCelular(fam) {
+    if (fam.meses.length === 1) {
+      var m = fam.meses[0];
+      return 'Olá! Tudo bem? Passando para lembrar do pagamento das aulas de ' + mesMinusculoCelular(m.mes) + ': ' +
+        (m.selo === 'parcial' ? 'ficou faltando ' : 'ficou em aberto ') + Core.fmtMoeda(m.falta) + '. Obrigada!';
+    }
+    return 'Olá! Tudo bem? Passando para lembrar do pagamento das aulas em aberto: ' + fam.meses.map(function (x) {
+      return mesMinusculoCelular(x.mes) + ', ' + Core.fmtMoeda(x.falta);
+    }).join('; ') + ' (total de ' + Core.fmtMoeda(faltaDaFamiliaCelular(fam)) + '). Obrigada!';
+  }
+  /* O mês a fechar (Core.mesAFechar: os 3 últimos dias do mês e os 5
+   * primeiros do seguinte), enquanto ele tiver aula sem registro ou família
+   * em aberto (o selo do Fechamento). A família só conta a partir do corte
+   * dos pagamentos (Core.corteDosPagamentos), como na lista de pendentes:
+   * antes dele ela não controlava quem pagou. */
+  function mesAFecharCelular(hoje, agora) {
+    var mes = Core.mesAFechar(hoje);
+    if (!mes) return null;
+    var semRegistro = aulasSemRegistroCelular(mes + '-01', mes + '-31', hoje, agora).length;
+    var abertas = mes < Core.corteDosPagamentos(db, hoje) ? 0 : Core.calcularMesInteiro(db, mes, hoje).filter(function (f) {
+      var s = seloDoAvisoCelular(f).selo;
+      return s === 'aberto' || s === 'parcial';
+    }).length;
+    if (!semRegistro && !abertas) return null;
+    return { mes: mes, semRegistro: semRegistro, abertas: abertas };
+  }
+  function daquiACelular(min) {
+    if (min < 60) return 'daqui a ' + min + ' min';
+    var h = Math.floor(min / 60), r = min % 60;
+    return 'daqui a ' + h + ' h' + (r ? ' ' + r + ' min' : '');
+  }
+  function avisoCelular(tipo, filhos) {
+    return el('div', { class: 'cel-aviso cel-aviso-' + tipo, 'data-aviso': tipo }, filhos);
+  }
+  /* O aviso tem cara de botão: o texto à esquerda e, à direita, o que o
+   * toque faz ("Registrar", "Abrir" ou a seta). */
+  function botaoDoAvisoCelular(id, texto, seta, fazer, acao) {
+    var atributos = { class: 'cel-aviso-botao', id: id, aoClick: fazer };
+    var filhos = [el('span', { class: 'cel-aviso-texto', texto: texto }), el('span', { class: 'cel-aviso-seta', 'aria-hidden': 'true', texto: seta })];
+    if (acao) { atributos['data-acao-celular'] = acao; }
+    atributos.type = 'button';
+    return el('button', atributos, filhos);
+  }
+  /* O nome curto do aluno para o botão de cobrar: as primeiras palavras do
+   * nome que já o separam de todo outro aluno ativo ("Ana" ou, se houver
+   * duas Anas, "Ana Clara"). Fica só na tela dela, nunca na mensagem. */
+  function nomeCurtoCelular(aluno) {
+    var partes = String(aluno.nome || '').trim().split(/\s+/);
+    var outros = db.alunos.filter(function (x) { return x.id !== aluno.id && x.ativo !== false; })
+      .map(function (x) { return String(x.nome || '').trim().split(/\s+/); });
+    for (var n = 1; n <= partes.length; n++) {
+      var prefixo = partes.slice(0, n).join(' ');
+      if (!outros.some(function (o) { return o.slice(0, n).join(' ') === prefixo; })) return prefixo;
+    }
+    return partes.join(' ');
+  }
+  /* Os avisos, já na ordem e já cortados em 3: a próxima, a aula sem
+   * registro, a cobrança (o que já venceu) e o mês a fechar. A cobrança e o
+   * mês a fechar só no celular que é, comprovadamente, o da dona
+   * (celularEdita: a marca, a conta dela à vista e não a de outra), a mesma
+   * porta das ações que gravam. A falta de observador não basta: o
+   * observador que saiu da conta continua com a cópia dela no aparelho. */
+  function avisosDoHojeCelular() {
+    var hoje = Core.hojeIso(), agora = minutosAgoraCelular();
+    var edita = celularEdita(), daDona = edita;
+    var avisos = [];
+    var seguinte = marcasDeAgoraCelular(hoje, agora).seguinte;
+    if (seguinte) {
+      var quem = alunoPorId(seguinte.alunoId);
+      avisos.push(avisoCelular('proxima', [botaoDoAvisoCelular('cel-aviso-proxima',
+        'Próxima: ' + seguinte.hora + ', ' + (quem ? quem.nome : 'aluno removido') + ', ' + daquiACelular(Core.minutosDaHora(seguinte.hora) - agora), '›',
+        function () { abrirFolhaDaAulaCelular(seguinte.id); })]));
+    }
+    var semRegistro = aulasSemRegistroCelular(somarDiasCelular(hoje, -(DIAS_DO_FALTA_REGISTRAR - 1)), hoje, hoje, agora);
+    if (semRegistro.length) {
+      var a = semRegistro[0], dele = alunoPorId(a.alunoId);
+      var resto = semRegistro.length > 1 ? ' (e mais ' + (semRegistro.length - 1) + ')' : '';
+      var onde = dele.nome + ', ' + quandoCurtoCelular(a.data, a.hora) + resto;
+      /* Quem edita abre o "Registrar como foi" daquela aula; quem só lê, a
+       * folha dela, sem botão de mudar. */
+      var aviso = avisoCelular('registrar', [edita
+        ? botaoDoAvisoCelular('cel-aviso-registrar', 'Falta registrar como foi: ' + onde, 'Registrar',
+          function () { abrirFormularioCelular({ tipo: 'relato', aulaId: a.id }); }, 'registrar-como-foi')
+        : botaoDoAvisoCelular('cel-aviso-registrar', 'Ainda sem registro de como foi: ' + onde, '›',
+          function () { abrirFolhaDaAulaCelular(a.id); })]);
+      aviso.setAttribute('data-aula', a.id);
+      avisos.push(aviso);
+    }
+    if (daDona && Core.cobrancaLiberada(hoje)) {
+      var familias = familiasACobrarCelular(hoje);
+      if (familias.length) {
+        var fam = familias[0];
+        var tel = telefoneDoCampo(fam.aluno);
+        var link = linkDoWhatsapp(tel, mensagemDeCobrancaCelular(fam));
+        var outras = familias.slice(1);
+        var textoCobrar = 'Em aberto: ' + fam.aluno.nome + ', ' + fam.meses.map(function (x) { return mesMinusculoCelular(x.mes); }).join(' e ') +
+          ', ' + dinheiro(faltaDaFamiliaCelular(fam)) + (link ? '' : '. Sem celular na ficha para o WhatsApp');
+        var curto = nomeCurtoCelular(fam.aluno);
+        /* As outras famílias não entram no botão de cobrar: um toque à parte
+         * leva ao Fechamento do mês mais antigo delas, onde cada uma tem o
+         * seu selo. Os dois ficam numa coluna à direita do texto. */
+        var mais = outras.length ? botaoDoAvisoCelular('cel-aviso-mais-familias',
+          'E mais ' + outras.length + ' ' + palavraPlural(outras.length, 'família', 'famílias'), '›',
+          function () { mesCelular = outras[0].meses[0].mes; irParaTelaCelular('fechamento'); }) : null;
+        var cobrar = link ? botaoDeLinkCelular('cel-aviso-cobrar', 'Cobrar ' + curto, link, { 'aria-label': 'Cobrar a família de ' + fam.aluno.nome + ' pelo WhatsApp: abre a conversa com a mensagem escrita' }) : null;
+        var linha = el('div', { class: 'cel-aviso-linha' }, [
+          botaoDoAvisoCelular('cel-aviso-cobranca', textoCobrar, '›', function () { mesCelular = fam.meses[0].mes; irParaTelaCelular('fechamento'); }),
+          cobrar || mais ? el('div', { class: 'cel-aviso-direita' }, [cobrar, mais]) : null
+        ]);
+        var avisoCobrar = avisoCelular('cobrar', [linha]);
+        avisoCobrar.setAttribute('data-aluno', fam.aluno.id);
+        avisos.push(avisoCobrar);
+      }
+    }
+    if (daDona) {
+      var fechar = mesAFecharCelular(hoje, agora);
+      if (fechar) {
+        var falta = [
+          fechar.semRegistro ? fechar.semRegistro + ' ' + palavraPlural(fechar.semRegistro, 'aula sem registro', 'aulas sem registro') : '',
+          fechar.abertas ? fechar.abertas + ' ' + palavraPlural(fechar.abertas, 'família em aberto', 'famílias em aberto') : ''
+        ].filter(Boolean).join(' e ');
+        var avisoFechar = avisoCelular('fechar', [botaoDoAvisoCelular('cel-aviso-fechar', 'Fechar ' + mesMinusculoCelular(fechar.mes) + ': ' + falta, 'Abrir',
+          function () { mesCelular = fechar.mes; irParaTelaCelular('fechamento'); })]);
+        avisoFechar.setAttribute('data-mes', fechar.mes);
+        avisos.push(avisoFechar);
+      }
+    }
+    return avisos.slice(0, MAX_AVISOS_CELULAR);
+  }
+  function caixaDeAvisosCelular() {
+    var avisos = avisosDoHojeCelular();
+    return avisos.length ? el('div', { class: 'cel-avisos', id: 'cel-avisos', role: 'region', 'aria-label': 'Avisos de hoje' }, avisos) : null;
+  }
+  /* A cada minuto, com a linha de agora, os avisos se refazem ("daqui a"). */
+  function renovarAvisosCelular() {
+    var faixa = $('#cel-semana'), velha = $('#cel-avisos'), nova = caixaDeAvisosCelular();
+    if (velha) velha.parentNode.removeChild(velha);
+    if (faixa && nova) faixa.appendChild(nova);
+  }
+
   function desenharHojeCelular() {
     var caixa = $('#cel-hoje');
     caixa.innerHTML = '';
@@ -22274,7 +22481,10 @@
     if (hojeVistoCelular && hojeVistoCelular !== hoje && diaCelular === hojeVistoCelular) { diaCelular = hoje; diaRoladoCelular = null; }
     var dia = diaCelular || hoje;
     var edita = celularEdita();
-    caixa.appendChild(faixaDaSemanaCelular(dia));
+    var faixa = faixaDaSemanaCelular(dia);
+    // os avisos (D6c, lote 4) só no dia de hoje, presos com a faixa: a rolagem até agora não os esconde
+    if (dia === hoje) { var avisos = caixaDeAvisosCelular(); if (avisos) faixa.appendChild(avisos); }
+    caixa.appendChild(faixa);
     var aulas = aulasDoDiaCelular(dia);
     if (!aulas.length) {
       caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-sem-aula', texto: dia === hoje ? 'Nenhuma aula hoje.' : 'Nenhuma aula neste dia.' }));
@@ -22313,9 +22523,11 @@
     if (diaRoladoCelular === dia || !$('#cel-hoje.ativa') || !$('#cel-tempo')) return;
     diaRoladoCelular = dia;
     var conteudo = $('#cel-conteudo');
-    /* O alvo: a aula de agora, senão a próxima, senão a linha de agora,
-     * senão a primeira aula do dia. Ele fica logo abaixo da faixa da semana. */
-    var alvo = $('#cel-tempo .cel-bloco-agora') || $('#cel-tempo .cel-bloco-proxima') || $('#cel-agora') || $('#cel-tempo .cel-bloco');
+    /* O alvo: a aula de agora, senão a linha de agora (com a próxima logo
+     * abaixo dela; D6c, lote 4: com os avisos no alto, rolar até a próxima
+     * escondia a hora de agora), senão a primeira aula do dia. Ele fica logo
+     * abaixo da faixa da semana. */
+    var alvo = $('#cel-tempo .cel-bloco-agora') || $('#cel-agora') || $('#cel-tempo .cel-bloco-proxima') || $('#cel-tempo .cel-bloco');
     var faixa = $('#cel-semana');
     if (!conteudo) return;
     if (!alvo) { conteudo.scrollTop = 0; return; }
@@ -22359,6 +22571,7 @@
     if ((diaCelular || hoje) !== hoje) return;
     var velha = $('#cel-tempo');
     velha.parentNode.replaceChild(linhaDoTempoCelular(hoje, celularEdita()), velha);
+    renovarAvisosCelular();
   }
 
   // ---------- a folha de baixo da aula ----------

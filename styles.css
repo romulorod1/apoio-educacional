@@ -2965,6 +2965,50 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-semana-dia.ativo .cel-semana-numero { color: var(--branco); }
 .cel-semana-bolinhas { display: flex; gap: 2px; min-height: 7px; }
 .cel-bolinha { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1px var(--branco); }
+/* Os avisos do alto de Hoje (D6c, lote 4): no máximo 3, presos com a faixa
+   da semana, cada um com a altura de um toque e o texto em até duas linhas. */
+.cel-avisos { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.cel-aviso { display: flex; flex-direction: column; gap: 4px; }
+.cel-aviso-linha { display: flex; align-items: stretch; gap: 6px; }
+.cel-aviso-botao {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--alvo-celular);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  font: inherit;
+  font-size: var(--letra-3);
+  line-height: 1.3;
+  color: var(--texto);
+  background: var(--branco);
+  border: 1px solid var(--fio-claro);
+  border-left: 5px solid var(--teal);
+  border-radius: 10px;
+  padding: 4px 10px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.cel-aviso-texto { flex: 1; min-width: 0; }
+/* O que o toque faz, à direita, com cara de botão: a seta ou a palavra. */
+.cel-aviso-seta {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--navy);
+  border: 1px solid var(--fio);
+  border-radius: 8px;
+  padding: 4px 8px;
+  background: var(--fundo-leve);
+}
+.cel-aviso-registrar .cel-aviso-botao { border-left-color: var(--aviso-texto); }
+.cel-aviso-fechar .cel-aviso-botao { border-left-color: var(--navy); }
+.cel-aviso-cobrar .cel-aviso-botao { border-left-color: var(--vermelho); }
+/* A coluna da direita da cobrança: o "Cobrar" (o link do WhatsApp) e o "E
+   mais", cada um com a altura de um toque. */
+.cel-aviso-direita { flex: 0 0 132px; display: flex; flex-direction: column; gap: 4px; }
+.cel-aviso-direita .cel-aviso-botao { flex: 0 0 auto; border-left-width: 1px; padding: 4px 8px; }
+body.modo-celular .celular .cel-aviso a.cel-link-botao { flex: 0 0 auto; min-width: 84px; padding: 4px 8px; display: inline-flex; align-items: center; justify-content: center; }
 
 .cel-tempo { margin-top: 4px; }
 .cel-tempo-linha { position: relative; display: flex; gap: 8px; margin-bottom: 6px; }
