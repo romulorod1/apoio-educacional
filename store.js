@@ -109,6 +109,8 @@
    * app.js rodar: o nuvem.js já pede o banco enquanto a página carrega. Fica
    * guardado aqui, e o app.js pergunta quando entra (Store.bancoBloqueado). */
   var bancoBloqueadoAgora = false;
+  // o mesmo vale para a troca de versão por outra janela (C2a): Store.bancoTrocado
+  var bancoTrocadoAgora = false;
   function avisarBloqueio() {
     bancoBloqueadoAgora = true;
     if (typeof root.aoBancoBloqueado === 'function') root.aoBancoBloqueado();
@@ -282,6 +284,7 @@
           if (bancoAberto === conexao) bancoAberto = null;
           /* E AVISA (C2a): esta janela fica com o código de antes, e a próxima
            * gravação dela abriria o banco numa versão que não existe mais. */
+          bancoTrocadoAgora = true;
           if (typeof root.aoBancoTrocado === 'function') root.aoBancoTrocado();
         };
         bancoBloqueadoAgora = false;
@@ -2109,6 +2112,7 @@
   root.Store = {
     bancoVazio: bancoVazio,
     bancoBloqueado: function () { return bancoBloqueadoAgora; },
+    bancoTrocado: function () { return bancoTrocadoAgora; },
     carregar: carregar, salvar: salvar, excluirAlunoEmCascata: excluirAlunoEmCascata,
     lerNota: lerNota, salvarNota: salvarNota, apagarNota: apagarNota, todasAsNotas: todasAsNotas,
     salvarMidia: salvarMidia, lerMidia: lerMidia, apagarMidia: apagarMidia,

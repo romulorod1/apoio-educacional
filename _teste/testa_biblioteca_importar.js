@@ -21,6 +21,9 @@
  *      imagem do pacote nem miniatura; restaurar pela tela devolve o uso.
  *
  * Modo envenenado, no mesmo arquivo:
+ *   node _teste/testa_biblioteca_importar.js --envenenado-aviso-fica
+ *     o app.js servido não tira o aviso de banco bloqueado no aoBancoLiberado.
+ *     Roda só a 1b com o worker já controlando, e tem de ver o aviso ficar.
  *   node _teste/testa_biblioteca_importar.js --envenenado-hash
  *     o servidor entrega um biblioteca.js que NÃO compara o hash. O pacote
  *     com hash errado passa a entrar, e o teste tem de ENXERGAR isso: a
@@ -35,12 +38,16 @@ const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, pausa, esperar } = H;
 
 const VENENO_HASH = process.argv.indexOf('--envenenado-hash') !== -1;
+const VENENO_AVISO = process.argv.indexOf('--envenenado-aviso-fica') !== -1;
 const PORTA = 8791;
 
 const BIB_REPO = fs.readFileSync(path.join(H.RAIZ, 'biblioteca.js'), 'utf8');
 const LINHA_HASH = "if (h !== m[1]) throw Recusa('O arquivo ' + nome + ' do pacote não confere com o manifest.', 'defeito');";
 const trocas = {};
 if (VENENO_HASH) trocas['/biblioteca.js'] = BIB_REPO.split(LINHA_HASH).join('void h;');
+const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
+const TIRA_AVISO = 'if (faixa) faixa.remove();';
+if (VENENO_AVISO) trocas['/app.js'] = APP_REPO.split(TIRA_AVISO).join('void faixa;');
 
 const amb = H.criarAmbiente(PORTA, 'perfil_bib_importar', trocas);
 amb.extras['/vazio.html'] = { tipo: 'text/html; charset=utf-8', corpo: '<!doctype html><title>vazio</title>' };
@@ -90,6 +97,11 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
     : 'MODO NORMAL: importar, substituir, recusar venenos e levar uso e etiquetas na cópia.');
 
   secao('0. O veneno é de verdade, e o servidor é este');
+  if (VENENO_AVISO) {
+    conf('envenenado: o app.js servido ficou DIFERENTE do repositório', trocas['/app.js'] !== APP_REPO ? 'diferente' : 'IGUAL', 'diferente');
+    conf('e o veneno trocou exatamente uma ocorrência (a do aoBancoLiberado)', APP_REPO.split(TIRA_AVISO).length - 1, 1);
+    if (trocas['/app.js'] === APP_REPO) throw Object.assign(new Error('veneno não aplicado'), { jaContado: true });
+  }
   if (VENENO_HASH) {
     conf('o biblioteca.js servido ficou DIFERENTE do repositório', trocas['/biblioteca.js'] !== BIB_REPO ? 'diferente' : 'IGUAL', 'diferente');
     conf('e o veneno trocou exatamente uma ocorrência', BIB_REPO.split(LINHA_HASH).length - 1, 1);
@@ -166,33 +178,55 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
 
   // ================================================================
   secao('1b. Outra janela na versão antiga segura o banco: aviso, e depois abre');
-  /* Duas vezes. Na segunda, o app.js chega 1,5 s depois dos outros scripts:
-   * o nuvem.js já pede ao Store o banco antes de o app.js rodar, e o bloqueio
-   * cai quando ainda não há quem mostre o aviso. O navegador só avisa o
-   * bloqueio uma vez; sem o store.js guardar que bloqueou, a tela ficava em
-   * branco para sempre (medido: 1 em 20 rodadas, no tempo natural). */
-  for (const atrasarApp of [false, true]) {
-    const nome = atrasarApp ? ' (app.js atrasado)' : '';
+  /* Três vezes.
+   *   primeira visita: o contexto é novo, sem worker. O app só registra o
+   *     sw.js depois que o banco abre, o primeiro clients.claim() dispara
+   *     controllerchange e o app recarrega sozinho (app.js,
+   *     registrarServiceWorker). É do app, e é o de sempre na primeira visita;
+   *     a prova só não pode medir em cima da página que está para sumir (o
+   *     "Execution context was destroyed" da fatia 2).
+   *   app.js atrasado: o app.js chega 1,5 s depois dos outros scripts. O
+   *     nuvem.js já pede ao Store o banco antes de o app.js rodar, e o bloqueio
+   *     cai quando ainda não há quem mostre o aviso. O navegador só avisa o
+   *     bloqueio uma vez; sem o store.js guardar que bloqueou, a tela ficava em
+   *     branco para sempre (medido: 1 em 20 rodadas, no tempo natural).
+   *   worker já controla: o caso do tablet. Não há recarga, e o aviso só some
+   *     porque o aoBancoLiberado o tira, no MESMO documento que o mostrou. */
+  for (const modo of ['primeira visita', 'app.js atrasado', 'worker já controla']) {
+    const nome = modo === 'primeira visita' ? '' : ' (' + modo + ')';
+    const atrasarApp = modo === 'app.js atrasado';
+    const controlado = modo === 'worker já controla';
+    if (VENENO_AVISO && !controlado) continue;
     const ctx = await pag.browser().createBrowserContext();
+    const marcarDocumento = p => p.evaluateOnNewDocument(() => {
+      window.__nasceuControlada = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+    });
+    if (controlado) {
+      // uma visita antes, até o worker assumir; depois o banco volta a ser só o da versão 1
+      const antes = await ctx.newPage();
+      await marcarDocumento(antes);
+      await antes.goto(amb.ORIGEM + '/index.html', { waitUntil: 'domcontentloaded' });
+      const assumiu = await esperar('o worker assumiu a visita de antes', () => antes.evaluate(() =>
+        window.__nasceuControlada === true && !!document.querySelector('#abas .aba')), v => v === true, 30000);
+      conf('o worker controla o contexto antes da janela antiga abrir' + nome, assumiu.ok, true);
+      await antes.close();
+    }
     const velhaJanela = await ctx.newPage();
     await velhaJanela.goto(amb.ORIGEM + '/vazio.html', { waitUntil: 'load' });
     // a janela antiga abre o banco na versão 1 e NÃO larga (o código 1.19.1 não tem onversionchange)
-    await velhaJanela.evaluate(() => new Promise(r => {
-      const q = indexedDB.open('apoio-educacional', 1);
-      q.onupgradeneeded = () => { q.result.createObjectStore('dados'); };
-      q.onsuccess = () => { window.__con = q.result; r(); };
+    await velhaJanela.evaluate(() => new Promise((r, j) => {
+      const z = indexedDB.deleteDatabase('apoio-educacional');
+      z.onerror = () => j(z.error);
+      z.onsuccess = () => {
+        const q = indexedDB.open('apoio-educacional', 1);
+        q.onupgradeneeded = () => { q.result.createObjectStore('dados'); };
+        q.onsuccess = () => { window.__con = q.result; r(); };
+        q.onerror = () => j(q.error);
+      };
     }));
     const nova = await ctx.newPage();
     nova.on('dialog', async d => { try { await d.accept(); } catch (e) { /* ok */ } });
-    /* Cada documento anota se já nasceu sob o service worker. O contexto é
-     * novo, sem worker: o app só registra o sw.js depois que o banco abre, o
-     * primeiro clients.claim() dispara controllerchange e o app recarrega
-     * sozinho (app.js, registrarServiceWorker). É do app, e é o de sempre na
-     * primeira visita; a prova só não pode medir em cima da página que está
-     * para sumir (o "Execution context was destroyed" da fatia 2). */
-    await nova.evaluateOnNewDocument(() => {
-      window.__nasceuControlada = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
-    });
+    await marcarDocumento(nova);
     let segurando = atrasarApp, appSegurado = false;
     if (atrasarApp) {
       await nova.setRequestInterception(true);
@@ -214,18 +248,69 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
     }), v => !!v, 15000);
     conf('a janela nova avisa que outra janela antiga está aberta' + nome, aviso.valor,
       'O aplicativo está aberto em outra janela com a versão anterior. Feche as outras janelas do aplicativo; esta abre sozinha em seguida. Nada foi perdido.');
+    if (controlado) {
+      conf('esta janela já nasceu sob o worker, e não vai recarregar' + nome, await nova.evaluate(() => window.__nasceuControlada), true);
+      await nova.evaluate(() => { window.__documentoDoAviso = true; });
+    }
     await velhaJanela.evaluate(() => window.__con.close());
     const abriu = await esperar('o aplicativo abre depois que a antiga larga o banco' + nome, () => nova.evaluate(() =>
       !!document.querySelector('#abas .aba') && document.querySelector('#versao-app').textContent.length > 1), v => v === true, 20000);
     conf('e o aplicativo abre sozinho quando a janela antiga fecha' + nome, abriu.ok, true);
-    // a recarga do primeiro controle passou: o documento de agora nasceu controlado e o app abriu nele
-    const assentou = await esperar('a recarga do primeiro controle do service worker terminou' + nome, () => nova.evaluate(() =>
-      window.__nasceuControlada === true && !!document.querySelector('#abas .aba') &&
-      document.querySelector('#versao-app').textContent.length > 1), v => v === true, 30000);
-    conf('e o aplicativo abre de novo depois da recarga do primeiro controle' + nome, assentou.ok, true);
-    conf('e o aviso some quando o banco é liberado' + nome, await nova.evaluate(() => !!document.querySelector('#aviso-banco-bloqueado')), false);
+    if (controlado) {
+      /* O mesmo documento: a marca posta enquanto o aviso estava na tela
+       * continua lá. Aqui o aviso só some se o aoBancoLiberado o tirar. */
+      const fim = await nova.evaluate(() => [window.__documentoDoAviso === true, !!document.querySelector('#aviso-banco-bloqueado')]);
+      conf('é o mesmo documento que mostrou o aviso' + nome, fim[0], true);
+      if (VENENO_AVISO) conf('envenenado: o aviso fica na tela depois que o banco abre (defeito enxergado)', fim[1], true);
+      else conf('e o aviso some quando o banco é liberado' + nome, fim[1], false);
+    } else {
+      // a recarga do primeiro controle passou: o documento de agora nasceu controlado e o app abriu nele
+      const assentou = await esperar('a recarga do primeiro controle do service worker terminou' + nome, () => nova.evaluate(() =>
+        window.__nasceuControlada === true && !!document.querySelector('#abas .aba') &&
+        document.querySelector('#versao-app').textContent.length > 1), v => v === true, 30000);
+      conf('e o aplicativo abre de novo depois da recarga do primeiro controle' + nome, assentou.ok, true);
+      conf('e, recarregado, sem o aviso' + nome, await nova.evaluate(() => !!document.querySelector('#aviso-banco-bloqueado')), false);
+    }
     await ctx.close();
   }
+
+  // ================================================================
+  secao('1c. Outra janela sobe o banco antes de o app.js rodar: o aviso de troca chega');
+  if (!VENENO_AVISO) {
+    /* O nuvem.js já abre o banco pelo Store enquanto o app.js não chegou. Se
+     * outra janela sobe o banco nesse meio, o versionchange chega uma vez só,
+     * sem o aoBancoTrocado, e o aviso C2a se perdia. O app.js fica segurado
+     * até a subida acontecer, e o sw.js não é servido, para nada recarregar. */
+    const ctx = await pag.browser().createBrowserContext();
+    const janela = await ctx.newPage();
+    let appJs = null;
+    await janela.setRequestInterception(true);
+    janela.on('request', q => {
+      if (/\/sw\.js(\?|$)/.test(q.url())) { q.respond({ status: 404, body: '' }).catch(() => {}); return; }
+      if (!appJs && /\/app\.js(\?|$)/.test(q.url())) { appJs = q; return; }
+      q.continue().catch(() => {});
+    });
+    const carregou = janela.goto(amb.ORIGEM + '/index.html', { waitUntil: 'load' });
+    const abriuStore = await esperar('o Store abriu o banco antes do app.js', () => janela.evaluate(() =>
+      typeof Store === 'object' && typeof window.aoBancoTrocado !== 'function'
+        ? Store.carregar().then(() => true) : false), v => v === true, 15000);
+    conf('o Store abriu o banco com o app.js ainda segurado', abriuStore.ok && !!appJs, true);
+    const outra = await ctx.newPage();
+    await outra.goto(amb.ORIGEM + '/vazio.html', { waitUntil: 'load' });
+    const subiu = await outra.evaluate(() => new Promise(r => {
+      const q = indexedDB.open('apoio-educacional', 99);
+      q.onsuccess = () => { const v = q.result.version; q.result.close(); r(v); };
+      q.onerror = () => r('erro ' + (q.error && q.error.name));
+    }));
+    conf('a outra janela subiu o banco', subiu, 99);
+    if (appJs) await appJs.continue().catch(() => {});
+    await carregou.catch(() => {});
+    const troca = await esperar('aviso de troca na janela de antes', () => janela.evaluate(() =>
+      (document.querySelector('#aviso-banco-trocado') || {}).textContent || ''), t => /atualizado em outra janela/.test(t || ''), 10000);
+    conf('a janela de antes avisa que foi atualizado em outra janela, mesmo com o app.js chegando depois', troca.ok, true);
+    await ctx.close();
+  }
+  if (VENENO_AVISO) return;
 
   // ================================================================
   secao('2. Ajustes: o cartão Biblioteca, vazio');

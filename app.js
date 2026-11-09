@@ -62,6 +62,7 @@
   };
   // o bloqueio pode ter chegado antes deste arquivo rodar, e o navegador não repete
   if (self.Store && typeof Store.bancoBloqueado === 'function' && Store.bancoBloqueado()) self.aoBancoBloqueado();
+  if (self.Store && typeof Store.bancoTrocado === 'function' && Store.bancoTrocado()) self.aoBancoTrocado();
 
   var db = null;
   var mesAtual = Core.mesDe(Core.hojeIso());
