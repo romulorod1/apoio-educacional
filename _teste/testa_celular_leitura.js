@@ -72,6 +72,10 @@ const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e nas páginas
+ * (o mesmo do testa_celular_edita). Hoje e ontem saem dele, e o "Dados de hoje,
+ * HH:MM" é sempre de hoje: a rodada nunca depende do dia nem da hora em que roda. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 
 const MODO = ['--envenenado-envia', '--envenenado-edicao', '--envenenado-grava', '--envenenado-tela', '--envenenado-limite-640', '--envenenado-janela-640', '--envenenado-grava-abertura']
   .filter(m => process.argv.indexOf(m) !== -1)[0] || '';
@@ -245,6 +249,7 @@ const amb = H.criarAmbiente(PORTA_APP, 'nath_d6a_celular', trocas);
 
 async function prepararPagina(pag, largura, altura, movel) {
   pag.setDefaultTimeout(60000);
+  await RELOGIO.naPagina(pag);
   await pag.setViewport({ width: largura, height: altura, hasTouch: true, isMobile: movel === undefined ? largura < 640 : movel });
   pag.errosDePagina = [];
   pag.on('pageerror', e => pag.errosDePagina.push(e.message));
@@ -391,13 +396,8 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
   };
 }, RE_EDICAO);
 
-function hojeIso() {
-  const d = new Date();
-  const p = n => String(n).padStart(2, '0');
-  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
-}
-const HOJE = hojeIso();
-const ONTEM = (() => { const d = new Date(); d.setDate(d.getDate() - 1); const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); })();
+const HOJE = RELOGIO.dia(0);
+const ONTEM = RELOGIO.dia(-1);
 
 (async function () {
   secao('1. O emulador e a conta da dona');
