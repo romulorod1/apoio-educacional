@@ -159,7 +159,8 @@ jobs:
           node _teste/provas_tocadas.js --fatia ${{ matrix.fatia }}/8 --saida "$RUNNER_TEMP/provas.txt" < "$RUNNER_TEMP/tocados.txt"
       - name: Nada desta selecao cai nesta fatia
         if: steps.plano.outputs.quantas == '0'
-        run: echo "nivel 1, fatia ${{ matrix.fatia }} de 8: nenhuma prova de navegador a rodar"
+        run: |
+          echo "nivel 1, fatia ${{ matrix.fatia }} de 8: nenhuma prova de navegador a rodar"
       - uses: actions/setup-node@v4
         if: steps.plano.outputs.quantas != '0'
         with:
