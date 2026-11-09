@@ -237,6 +237,12 @@ roda "dinheiro"      node _teste/testa_dinheiro.js
 roda "cartao do mes" node _teste/testa_cartao.js
 roda "proposta"      node _teste/testa_proposta.js
 roda "textos e novidades" node _teste/testa_textos_e_novidades.js
+# todo veneno pedido por este portão existe na prova chamada (um nome errado
+# roda calado como modo normal e passa)
+roda "venenos existem" node _teste/testa_venenos_existem.js
+roda "venenos existem --envenenado-nome-falso" node _teste/testa_venenos_existem.js --envenenado-nome-falso
+roda "venenos existem --envenenado-letra-trocada" node _teste/testa_venenos_existem.js --envenenado-letra-trocada
+roda "venenos existem --envenenado-prefixo" node _teste/testa_venenos_existem.js --envenenado-prefixo
 # A tabela de materias e uma so (core.js) e as copias tem que bater com ela:
 # a do cartao.js, a do pdf.js, o banco/topicos/indice.json e a exportada para
 # o Python. Foi a divergencia entre quatro vocabularios de materia que deixou
