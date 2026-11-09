@@ -2704,22 +2704,7 @@
     numeros.appendChild(numeroComRodape('A receber', dinheiro(valorFeito), rodapesReceber));
     numeros.appendChild(numeroComRodape('Alunos', String(Object.keys(alunosNoMes).length), []));
 
-    var lembrete = $('#lembrete-copia');
-    lembrete.innerHTML = '';
-    if (copiaPronta) {
-      desenharCopiaPronta(lembrete);
-    } else if (precisaLembrarDaCopia()) {
-      var dias = diasDesdeACopia();
-      lembrete.appendChild(el('div', { class: 'faixa-aviso' }, [
-        el('strong', { texto: dias === null ? 'Você ainda não salvou uma cópia de segurança. '
-          : 'Sua última cópia de segurança tem ' + dias + ' dias. ' }),
-        document.createTextNode('Tudo fica só neste tablet. Salve uma cópia e guarde no Drive. '),
-        el('button', {
-          type: 'button', class: 'btn pequeno u-margem-esq-8', texto: 'Salvar cópia agora',
-          aoClick: function () { baixarCopia(); }
-        })
-      ]));
-    }
+    desenharLembreteDaCopia();
 
     var painelZoom = $('#painel-zoom-dia');
     if (painelZoom) {
@@ -15085,6 +15070,123 @@
     return dias === null || dias >= 14;
   }
 
+  /* O LEMBRETE DA CÓPIA considera a nuvem (pedido do dono, 09/11/2026). Antes
+   * ele olhava só o arquivo exportado e, com a nuvem ligada, dava alarme falso:
+   * "a última cópia tem 20 dias" com tudo salvo na nuvem minutos antes. Alarme
+   * falso ensina a ignorar alarme.
+   *
+   * A hora confirmada pela nuvem é a mais recente entre a cópia completa que
+   * subiu (ou foi restaurada) e o último envio da fila de registros que a
+   * nuvem aceitou; as duas só são anotadas depois da resposta dela. A regra:
+   *   - nuvem desligada (sem conta, sincronização desligada pelo "Apagar
+   *     tudo") ou nunca confirmada: o lembrete de antes, igual;
+   *   - fila vazia, sem quarentena e sem erro: nenhum alerta, e uma linha
+   *     discreta "Na nuvem, salvo às HH:MM";
+   *   - mudança parada (na fila, na quarentena ou com erro) há mais de
+   *     HORAS_NUVEM_PARADA horas desde a última confirmação: o alerta fala da
+   *     nuvem, com a ação certa (tentar de novo ou ver o que houve);
+   *   - mudança parada há menos que isso: nada, o envio ainda está a caminho;
+   *   - no celular e no observador: nada (a cópia é do tablet).
+   * Só decide o que mostrar; não grava nada. */
+  var HORAS_NUVEM_PARADA = 24;
+  function situacaoDaNuvemParaOLembrete() {
+    if (!temNuvem()) return null;
+    var est = Nuvem.estado();
+    if (!est.entrada || est.sincronizacaoDesligada) return null;
+    var r = est.registros || {};
+    var candidatas = [est.ultimaCopia && est.ultimaCopia.quando, r.ultimoEnvio && r.ultimoEnvio.quando];
+    var confirmado = null;
+    candidatas.forEach(function (q) {
+      var d = q ? new Date(q) : null;
+      if (d && !isNaN(d.getTime()) && (!confirmado || d > confirmado)) confirmado = d;
+    });
+    if (!confirmado) return null;
+    var paradas = (Number(r.pendentes) || 0) + (Number(r.quarentena) || 0);
+    /* Sem nada parado, tudo o que ela gravou já está na nuvem, mesmo com o
+     * último envio em erro (o envio sem sinal e com a fila vazia anota erro
+     * sem haver o que perder). */
+    return { confirmado: confirmado, paradas: paradas, quarentena: Number(r.quarentena) || 0, erro: r.erro || null,
+      limpo: !paradas };
+  }
+
+  function decisaoDoLembreteDaCopia() {
+    if (!db || !db.aulas.length) return { tipo: 'nenhum' };
+    // a cópia é do tablet: o celular e o observador não recebem este lembrete
+    if (modoCelular || aparelhoSoLe() || leOutraConta()) return { tipo: 'nenhum' };
+    var nuvem = situacaoDaNuvemParaOLembrete();
+    if (nuvem) {
+      if (nuvem.limpo) return { tipo: 'nuvem-em-dia', nuvem: nuvem };
+      var horas = (Date.now() - nuvem.confirmado.getTime()) / 3600000;
+      if (horas > HORAS_NUVEM_PARADA) return { tipo: 'nuvem-parada', nuvem: nuvem };
+      return { tipo: 'nenhum' };
+    }
+    return precisaLembrarDaCopia() ? { tipo: 'local', dias: diasDesdeACopia() } : { tipo: 'nenhum' };
+  }
+
+  function horaDe(d) { return Core.pad2(d.getHours()) + ':' + Core.pad2(d.getMinutes()); }
+  function diaDe(d) { return Core.pad2(d.getDate()) + '/' + Core.pad2(d.getMonth() + 1); }
+
+  function fraseDaNuvemEmDia(d) {
+    var hoje = d.toDateString() === new Date().toDateString();
+    return hoje ? 'Na nuvem, salvo às ' + horaDe(d) + '.' : 'Na nuvem, salvo em ' + diaDe(d) + ', às ' + horaDe(d) + '.';
+  }
+
+  /* Ver o que houve: o cartão da nuvem em Ajustes, com o resumo de cada
+   * aparelho aberto. */
+  function abrirNuvemEmAjustes() {
+    var aba = $$('#abas .aba').filter(function (b) { return b.dataset.tela === 'ajustes'; })[0];
+    if (aba) aba.click();
+    var det = $('#nuvem-aparelhos-detalhes');
+    if (det && !det.open) det.open = true;
+    var caixa = $('#estado-nuvem');
+    if (caixa && typeof caixa.scrollIntoView === 'function') caixa.scrollIntoView({ block: 'start' });
+  }
+
+  function tentarSubirDeNovo() {
+    if (!temNuvem()) return;
+    avisar('Tentando subir as mudanças...');
+    Nuvem.enviarRegistros({ versaoApp: VERSAO }).then(function (r) {
+      avisar(r && r.erro ? 'Ainda não subiu. Veja o cartão da nuvem em Ajustes.' : 'Mudanças enviadas para a nuvem.');
+    }, function () { avisar('Ainda não subiu. Veja o cartão da nuvem em Ajustes.'); });
+  }
+
+  function desenharLembreteDaCopia() {
+    var lembrete = $('#lembrete-copia');
+    if (!lembrete) return;
+    lembrete.innerHTML = '';
+    if (copiaPronta) { desenharCopiaPronta(lembrete); return; }
+    var decisao = decisaoDoLembreteDaCopia();
+    if (decisao.tipo === 'nuvem-em-dia') {
+      lembrete.appendChild(el('div', { class: 'ajuda lembrete-nuvem-em-dia', id: 'lembrete-nuvem-em-dia',
+        texto: fraseDaNuvemEmDia(decisao.nuvem.confirmado) }));
+    } else if (decisao.tipo === 'nuvem-parada') {
+      var n = decisao.nuvem;
+      var quantas = n.paradas === 1 ? '1 mudança não subiu' : n.paradas + ' mudanças não subiram';
+      // a recusa da nuvem (quarentena, regras) não se resolve tentando de novo: ela vê o que houve
+      var verOQueHouve = n.quarentena > 0 || (n.erro && n.erro.codigo === 'PERMISSION_DENIED');
+      lembrete.appendChild(el('div', { class: 'faixa-aviso lembrete-nuvem', id: 'lembrete-nuvem-parada' }, [
+        el('strong', { texto: quantas + ' para a nuvem desde ' + diaDe(n.confirmado) + '. ' }),
+        document.createTextNode(verOQueHouve ? 'A nuvem recusou alguma coisa. ' : 'Confira a internet e tente de novo. '),
+        el('button', {
+          type: 'button', class: 'btn pequeno u-margem-esq-8', id: 'lembrete-nuvem-acao',
+          texto: verOQueHouve ? 'Ver o que houve' : 'Tentar de novo',
+          aoClick: verOQueHouve ? abrirNuvemEmAjustes : tentarSubirDeNovo
+        })
+      ]));
+    } else if (decisao.tipo === 'local') {
+      var dias = decisao.dias;
+      lembrete.appendChild(el('div', { class: 'faixa-aviso' }, [
+        el('strong', { texto: dias === null ? 'Você ainda não salvou uma cópia de segurança. '
+          : 'Sua última cópia de segurança tem ' + dias + ' dias. ' }),
+        document.createTextNode('Tudo fica só neste tablet. Salve uma cópia e guarde no Drive. '),
+        el('button', {
+          type: 'button', class: 'btn pequeno u-margem-esq-8', texto: 'Salvar cópia agora',
+          aoClick: function () { baixarCopia(); }
+        })
+      ]));
+    }
+  }
+
   function restaurarCopia(ev) {
     var arquivo = ev.target.files && ev.target.files[0];
     if (!arquivo) return;
@@ -21049,10 +21151,13 @@
     if (!temNuvem()) { desenharNuvem(); return; }
     Nuvem.informar({ versaoApp: VERSAO, persistente: persistenciaConcedida });
     Nuvem.aoMudar(desenharNuvem);
+    // o lembrete da cópia, na agenda, acompanha a fila e o último envio confirmado
+    Nuvem.aoMudar(desenharLembreteDaCopia);
     // (guardado: o código de antes da fatia 3, servido pelas provas de subida de banco, não tem aoReceber)
     if (typeof Store.aoReceber === 'function') Store.aoReceber(registrosChegaram);
     Nuvem.pronto().then(function () {
       desenharNuvem();
+      desenharLembreteDaCopia();
       // o celular busca a cópia mais nova; quem sobe a dele é só o tablet
       if (aparelhoSoLe()) atualizarCelularDaNuvem();
       else copiaAutomaticaParaNuvem('diaria');
