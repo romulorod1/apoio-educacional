@@ -945,6 +945,10 @@ roda "celular mensagem --envenenado-vale-o-primeiro" node "_teste/testa_celular_
 # (revisao) na mensagem do mes vence a escrita mais recente: o texto escrito no
 # onibus sem sinal nao cobre a correcao feita depois no tablet
 roda "celular mensagem --envenenado-vale-quem-chega-depois" node "_teste/testa_celular_fechamento_texto.js" --envenenado-vale-quem-chega-depois
+# (lente B) K4: a mensagem nova sem carimbo sobe com a precondicao "nao existe";
+# K6: com o tablet numa versao anterior, o celular nao edita a mensagem
+roda "celular mensagem --envenenado-resumo-sem-precondicao" node "_teste/testa_celular_fechamento_texto.js" --envenenado-resumo-sem-precondicao
+roda "celular mensagem --envenenado-tablet-antigo-edita" node "_teste/testa_celular_fechamento_texto.js" --envenenado-tablet-antigo-edita
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"

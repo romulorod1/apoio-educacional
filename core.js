@@ -3906,6 +3906,25 @@
     return r;
   }
 
+  /* A versão que ficou de fora no último conflito entre os aparelhos (o store
+   * a guarda no item: { texto, aparelho, em }), quando ela ainda difere do
+   * texto salvo. null quando não há. */
+  function versaoDeForaDoMes(db, alunoId, mesIso) {
+    var r = ((db && db.resumos) || []).filter(function (x) { return x.alunoId === alunoId && x.mes === mesIso; })[0];
+    var v = r && r.versaoDeFora;
+    if (!v || typeof v.texto !== 'string' || v.texto === (r.texto || '')) return null;
+    return v;
+  }
+
+  /* Versão do aplicativo "1.42.18" antes de outra? true, false, ou null quando
+   * uma das duas não é um número de versão (não dá para saber). */
+  function versaoAntes(a, b) {
+    var re = /^(\d+)\.(\d+)\.(\d+)$/, x = re.exec(String(a || '').trim()), y = re.exec(String(b || '').trim());
+    if (!x || !y) return null;
+    for (var i = 1; i <= 3; i++) { if (Number(x[i]) !== Number(y[i])) return Number(x[i]) < Number(y[i]); }
+    return false;
+  }
+
   /* "hoje às 18:02" ou "em 14/10 às 18:02", na hora local do aparelho; vazio
    * quando o carimbo falta ou não é uma data. */
   function quandoDoCarimbo(iso, hojeRef) {
@@ -3936,7 +3955,7 @@
     if (doTablet && reg.perdeuLocalEm) {
       var dela = quandoDoCarimbo(reg.perdeuLocalEm, opcoes.hoje);
       return 'O tablet editou este texto depois de você, ' + quando + '. A sua versão' + (dela ? ', ' + dela + ',' : '') +
-        ' ficou guardada no histórico.';
+        ' está logo abaixo, em "Ver a versão que ficou de fora".';
     }
     if (doTablet) return 'O tablet editou este texto ' + quando + '. Se você salvar, a sua versão substitui a do tablet, que fica guardada no histórico.';
     if (opcoes.naFila || reg.nuvem) return 'Editado neste celular ' + quando + '.';
@@ -5611,6 +5630,7 @@
     TITULOS_FECHAMENTO: TITULOS_FECHAMENTO, titulosDoFechamento: titulosDoFechamento, tituloMaximo: tituloMaximo,
     PERGUNTAS_DO_ROTEIRO: PERGUNTAS_DO_ROTEIRO, perguntasDoRoteiro: perguntasDoRoteiro, textoDoRoteiro: textoDoRoteiro,
     textoDoMes: textoDoMes, gravarTextoDoMes: gravarTextoDoMes, quandoDoCarimbo: quandoDoCarimbo, origemDoTextoDoMes: origemDoTextoDoMes,
+    versaoDeForaDoMes: versaoDeForaDoMes, versaoAntes: versaoAntes,
     AREAS: AREAS, rotuloArea: rotuloArea, rotuloAreaFamilia: rotuloAreaFamilia, areasPara: areasPara, temasDaAula: temasDaAula,
     ultimoEncontro: ultimoEncontro,
     MAPA: MAPA, NIVEIS: NIVEIS, itemDoMapa: itemDoMapa, rotulosDoMapa: rotulosDoMapa,

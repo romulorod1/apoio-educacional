@@ -3221,6 +3221,13 @@ body.modo-celular .celular .cel-folha .cel-folha-botao { min-height: 56px; font-
   padding: 12px 16px 0;
   overflow: hidden;
 }
+/* A versão que ficou de fora no último conflito (celular e tablet). */
+.versao-de-fora { flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; margin: 0 0 8px; }
+.versao-de-fora .btn { white-space: normal; text-align: left; }
+.versao-de-fora-painel { width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+  background: var(--fundo-leve); border: 1px solid var(--fio-claro); border-radius: 10px; padding: 8px 10px; }
+.versao-de-fora-painel[hidden] { display: none; }
+.versao-de-fora-texto { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--letra-3); }
 .cel-mensagem-corpo { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 8px; }
 .cel-mensagem-cabeca { flex-shrink: 0; min-width: 0; }
 .cel-mensagem-destino { font-weight: 700; color: var(--teal); font-size: var(--letra-3); margin-top: 2px; overflow-wrap: anywhere; }

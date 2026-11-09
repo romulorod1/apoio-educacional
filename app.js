@@ -13437,6 +13437,9 @@
       corpo._roteiro = blocoDoRoteiro(area);
       corpo.appendChild(corpo._roteiro);
     }
+    // a versão do celular que ficou de fora no último conflito, se houver (o mesmo bloco do editor do celular)
+    var deFora = Core.versaoDeForaDoMes(db, alunoId, mes);
+    if (deFora) corpo.appendChild(blocoDaVersaoDeFora(deFora, area));
     corpo.appendChild(area);
     corpo._alunoId = alunoId;
     corpo._mes = mes;
@@ -23582,7 +23585,69 @@
     }, function () { return ''; });
   }
 
+  /* A versão do aplicativo no tablet da dona, pelo diagnóstico que cada
+   * aparelho sobe (D7): o do papel "tablet" com o resumo mais recente. A
+   * última lida fica neste aparelho, para quando ele estiver sem sinal. Sem
+   * diagnóstico nenhum de tablet (nunca subiu, ou a nuvem não respondeu e não
+   * há leitura guardada), devolve null e o editor abre: não dá para afirmar
+   * que o tablet é antigo, e travar aí tiraria dela o celular sem sinal. */
+  var CHAVE_VERSAO_DO_TABLET = 'versao-do-tablet-vista';
+  function versaoDoTabletCelular() {
+    var guardada = null;
+    try { guardada = JSON.parse(localStorage.getItem(CHAVE_VERSAO_DO_TABLET) || 'null'); } catch (e) { guardada = null; }
+    if (!temNuvem() || (typeof navigator !== 'undefined' && navigator.onLine === false)) return Promise.resolve(guardada);
+    var lida = Nuvem.listarDiagnosticos().then(function (lista) {
+      var t = (lista || []).filter(function (d) { return d.papel === 'tablet' && d.app; })[0] || null;
+      var v = t ? { app: String(t.app), quando: t.quando || '' } : null;
+      try { localStorage.setItem(CHAVE_VERSAO_DO_TABLET, JSON.stringify(v)); } catch (e) { /* sem armazenamento */ }
+      return v;
+    }, function () { return guardada; });
+    var espera = new Promise(function (r) { setTimeout(function () { r(guardada); }, 4000); });
+    return Promise.race([lida, espera]);
+  }
+
+  /* Um tablet numa versão anterior a esta não conhece a regra da mensagem do
+   * mês (vence a escrita mais recente) e, com uma edição dele mais velha na
+   * fila, cobriria a do celular. Enquanto o tablet não atualiza, o celular não
+   * edita a mensagem. */
   function abrirMensagemCelular(alunoId, mes) {
+    if (!podeEditarMensagemCelular()) return;
+    return versaoDoTabletCelular().then(function (v) {
+      if (v && Core.versaoAntes(v.app, VERSAO) === true) {
+        avisar('Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão ' + v.app + ', e esta é a ' + VERSAO + '.');
+        return;
+      }
+      abrirEditorDaMensagemCelular(alunoId, mes);
+    });
+  }
+
+  /* "Ver a versão que ficou de fora": a do outro aparelho que perdeu no último
+   * conflito, guardada no item. Um toque mostra, outro troca o texto do campo
+   * por ela (ela ainda salva, ou não). Serve ao editor do celular e à janela
+   * do feedback do tablet. */
+  function blocoDaVersaoDeFora(v, campo) {
+    var deste = v.aparelho && typeof Store.aparelho === 'function' && v.aparelho === Store.aparelho();
+    var quem = deste ? (modoCelular ? 'Deste celular' : 'Deste tablet') : (modoCelular ? 'Do tablet' : 'Do celular');
+    var quando = Core.quandoDoCarimbo(v.em);
+    var painel = el('div', { class: 'versao-de-fora-painel', id: 'versao-de-fora-painel', hidden: 'hidden' }, [
+      el('div', { class: 'ajuda u-margem-0', texto: quem + (quando ? ', ' + quando : '') + ':' }),
+      el('div', { class: 'versao-de-fora-texto', id: 'versao-de-fora-texto', texto: v.texto }),
+      el('button', { type: 'button', class: 'btn pequeno', id: 'versao-de-fora-usar', texto: 'Usar esta',
+        aoClick: function () {
+          campo.value = v.texto;
+          campo.dispatchEvent(new Event('input', { bubbles: true }));
+          campo.focus();
+        } })
+    ]);
+    var botao = el('button', { type: 'button', class: 'btn pequeno', id: 'versao-de-fora-ver', texto: 'Ver a versão que ficou de fora',
+      aoClick: function () {
+        painel.hidden = !painel.hidden;
+        botao.textContent = painel.hidden ? 'Ver a versão que ficou de fora' : 'Esconder a versão que ficou de fora';
+      } });
+    return el('div', { class: 'versao-de-fora', id: 'versao-de-fora' }, [botao, painel]);
+  }
+
+  function abrirEditorDaMensagemCelular(alunoId, mes) {
     if (!podeEditarMensagemCelular()) return;
     var aluno = alunoPorId(alunoId);
     var f = Core.calcularFechamento(db, alunoId, mes);
@@ -23639,6 +23704,7 @@
         origem
       ]),
       faixa,
+      Core.versaoDeForaDoMes(db, alunoId, mes) ? blocoDaVersaoDeFora(Core.versaoDeForaDoMes(db, alunoId, mes), campo) : null,
       campo
       ]),
       el('div', { class: 'cel-mensagem-rodape' }, [
