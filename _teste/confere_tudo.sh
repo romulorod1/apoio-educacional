@@ -858,6 +858,9 @@ roda "celular edita --envenenado-duracao-padrao"    node "_teste/testa_celular_e
 roda "celular edita --envenenado-cancela-sempre-sem" node "_teste/testa_celular_edita.js" --envenenado-cancela-sempre-sem
 # (revisao do lote 1) tocar na situacao que a aula ja tem nao volta a cobranca ao padrao
 roda "celular edita --envenenado-cobranca-volta"    node "_teste/testa_celular_edita.js" --envenenado-cobranca-volta
+# (portao de 09/11) a rolagem inicial com o relogio fixo em varias horas: a folga antiga deixa
+# a linha de agora cortada sob a faixa dos dias as 00:30 e as 06:00
+roda "celular edita --envenenado-rolagem-antiga"   node "_teste/testa_celular_edita.js" --envenenado-rolagem-antiga
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
