@@ -45,7 +45,7 @@
     faixa.id = 'aviso-banco-trocado';
     faixa.className = 'faixa-aviso';
     faixa.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;padding:32px;' +
-      'background:rgba(255,255,255,0.97);font-size:18px';
+      'background:rgba(255,255,255,0.97);font-size:1.25rem';
     faixa.textContent = 'O aplicativo foi atualizado em outra janela. Feche esta janela e abra o aplicativo de novo. ' +
       'O que já estava guardado continua lá.';
     (document.body || document.documentElement).appendChild(faixa);
@@ -10405,7 +10405,7 @@
       el('div', { class: 'barra u-margem-baixo-6' }, [
         el('span', {
           texto: 'Do mapeamento de ' + Core.ddmmaaaa(l.data),
-          class: 'u-letra-2 u-peso-negrito u-espaco-letras-05em u-caixa-maiusculas u-cor-teal'
+          class: 'u-letra-2 u-peso-negrito u-cor-teal'
         }),
         el('span', { class: 'cresce' }),
         el('button', {

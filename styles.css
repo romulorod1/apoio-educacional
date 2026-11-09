@@ -14,7 +14,7 @@
   --navy-escuro: #16314F;
   --teal: #2E7D6B;
   --teal-claro: #E6F1EE;
-  --gold: #C9A961;
+  --gold: #C9A75B;
   --ivory: #FBF9F5;
   --soft: #EFF3F7;
   --soft-2: #E8EEF4;
@@ -26,21 +26,31 @@
   --sombra: 0 2px 10px rgba(20, 40, 70, .08);
   --sombra-forte: 0 12px 40px rgba(20, 40, 70, .22);
   --raio: 12px;
-  --alvo: 44px;
+  --alvo: 48px;
   --alvo-celular: 48px; /* no celular (D6), folga acima dos 44 */
 
-  /* Seis tamanhos de letra (B12). Todo font-size da folha sai daqui; um
-     tamanho novo entra na escala, nunca solto numa regra. */
-  --letra-1: 11px;
-  --letra-2: 13px;
-  --letra-3: 14px;
-  --letra-4: 15px;
-  --letra-5: 16px;
-  --letra-6: 20px;
+  /* O sistema visual (F1 do redesenho, 09/11/2026). Cinco tamanhos de letra,
+     em rem para crescer com a letra do aparelho: todo font-size da folha sai
+     daqui, e um tamanho novo entra na escala, nunca solto numa regra. Dois
+     pesos só, 400 e 600; sem itálico, sem caixa alta e sem serifa. */
+  --letra-12: .75rem;
+  --letra-14: .875rem;
+  --letra-16: 1rem;
+  --letra-20: 1.25rem;
+  --letra-24: 1.5rem;
+  --peso-normal: 400;
+  --peso-forte: 600;
+
+  /* A cor de ação é uma só, o marinho: botão primário, link, segmento
+     escolhido e foco. O dourado só aparece sobre o marinho; o verde e o
+     âmbar, só como sinal pequeno de estado. */
+  --acao: var(--navy);
+  --acao-forte: var(--navy-escuro);
+  --sobre-acao: var(--branco);
+  --fundo: var(--ivory);
 
   /* As outras cores da folha (B12). Cor quase igual a uma destas (diferença
      de cor abaixo de 2, que o olho não separa) usa a mesma variável. */
-  --novidades-azul: #2563EB;
   --aviso-texto: #8A6D2F;
   --aviso-fundo: #FBF3E3;
   --fio-claro: #DDE3EA;
@@ -79,7 +89,6 @@
   --novidades-folha-borda: #E5E7EB;
   --selo-aviso-borda: #E6D5B8;
   --privacidade-fundo: #E8F5E9;
-  --azul-clarinho: #EFF6FF;
   --novidades-ligado-fundo: #F0FDF4;
   --novidades-selo-borda: #F59E0B;
   --fundo-leve: #F7F9FC;
@@ -95,12 +104,10 @@
   --navy-a08: rgba(31, 58, 95, 0.08);
   --navy-a12: rgba(31, 58, 95, 0.12);
   --navy-a18: rgba(31, 58, 95, 0.18);
-  --teal-a22: rgba(46, 125, 107, 0.22);
   --branco-a16: rgba(255, 255, 255, 0.16);
   --branco-a50: rgba(255, 255, 255, 0.5);
   --branco-a60: rgba(255, 255, 255, 0.6);
   --branco-a94: rgba(255, 255, 255, 0.94);
-  --teal-sugerido: #2E8B76;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -114,13 +121,40 @@ html, body {
 
 body {
   font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: var(--ivory);
+  background: var(--fundo);
   color: var(--texto);
-  font-size: var(--letra-5);
+  font-size: var(--letra-16);
+  font-weight: var(--peso-normal);
   line-height: 1.45;
+  /* algarismos da mesma largura: horas, valores e datas alinham em coluna */
+  font-variant-numeric: tabular-nums;
   display: flex;
   flex-direction: column;
 }
+
+/* O negrito do navegador é 700: no sistema, o forte é 600. */
+b, strong, h1, h2, h3, h4, h5, h6, th, optgroup { font-weight: var(--peso-forte); }
+em, i, cite, address, dfn { font-style: normal; }
+/* O controle de formulário não herda a letra sozinho (o navegador põe 13,33 px). */
+button, input, select, textarea { font-family: inherit; }
+/* O foco é marinho, como toda ação. */
+:focus-visible { outline: 2px solid var(--acao); outline-offset: 2px; }
+
+/* Os ícones (F1): SVG de traço 1,75 na grade de 24, pontas redondas, na cor
+   do texto. Saem do ícone() do app.js, do mesmo desenho do conjunto final. */
+.ico {
+  width: 1.25em;
+  height: 1.25em;
+  flex: none;
+  display: inline-block;
+  vertical-align: -0.25em;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ico-grande { width: 24px; height: 24px; }
 
 /* ---------- cabeçalho ---------- */
 
@@ -136,12 +170,10 @@ body {
 }
 
 .marca { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-.marca strong { color: var(--navy); font-size: var(--letra-5); font-weight: 700; white-space: nowrap; }
+.marca strong { color: var(--navy); font-size: var(--letra-16); font-weight: 600; white-space: nowrap; }
 .marca span {
-  color: var(--teal);
-  font-size: var(--letra-1);
-  letter-spacing: .18em;
-  text-transform: uppercase;
+  color: var(--acao);
+  font-size: var(--letra-12);
   white-space: nowrap;
 }
 
@@ -156,7 +188,7 @@ body {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  font-size: var(--letra-6);
+  font-size: var(--letra-20);
   line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
@@ -174,7 +206,7 @@ body {
   color: var(--muted);
   padding: 9px 16px;
   border-radius: 999px;
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
@@ -206,13 +238,13 @@ table.dados.b8-tabela th:last-child, table.dados.b8-tabela td:last-child { text-
 table.dados.b8-tabela th:nth-child(5), table.dados.b8-tabela td:nth-child(5) { text-align: right; }
 
 h2.titulo {
-  font-size: var(--letra-6);
+  font-size: var(--letra-20);
   color: var(--navy);
   margin: 0;
-  font-weight: 700;
+  font-weight: 600;
 }
 h3.subtitulo {
-  font-size: var(--letra-5);
+  font-size: var(--letra-16);
   color: var(--navy);
   margin: 22px 0 10px;
   padding-bottom: 6px;
@@ -227,7 +259,7 @@ h3.subtitulo {
   color: var(--texto);
   padding: 10px 16px;
   border-radius: 10px;
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
@@ -239,13 +271,14 @@ h3.subtitulo {
 }
 .btn:hover { background: var(--soft); }
 .btn:active { transform: translateY(1px); }
-.btn.principal { background: var(--navy); border-color: var(--navy); color: var(--branco); }
-.btn.principal:hover { background: var(--navy-escuro); }
-.btn.destaque { background: var(--teal); border-color: var(--teal); color: var(--branco); }
-.btn.destaque:hover { filter: brightness(1.07); }
+.btn.principal { background: var(--acao); border-color: var(--acao); color: var(--sobre-acao); }
+.btn.principal:hover { background: var(--acao-forte); }
+/* A segunda ação de destaque é o marinho claro, e não outra cor. */
+.btn.destaque { background: var(--acao-clara); border-color: var(--acao-clara); color: var(--acao); }
+.btn.destaque:hover { filter: brightness(.96); }
 .btn.perigo { color: var(--vermelho); border-color: var(--perigo-borda); }
 .btn.perigo:hover { background: var(--perigo-fundo); }
-.btn.pequeno { padding: 8px 14px; min-height: var(--alvo, 44px); font-size: var(--letra-3); }
+.btn.pequeno { padding: 8px 14px; min-height: var(--alvo, 44px); font-size: var(--letra-14); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 
 /* ---------- formulários ---------- */
@@ -253,8 +286,8 @@ h3.subtitulo {
 label.campo { display: block; margin-bottom: 14px; }
 label.campo > span {
   display: block;
-  font-size: var(--letra-2);
-  font-weight: 700;
+  font-size: var(--letra-14);
+  font-weight: 600;
   color: var(--navy);
   margin-bottom: 5px;
 }
@@ -263,7 +296,7 @@ input[type=text], input[type=date], input[type=time], input[type=number], input[
   padding: 11px 12px;
   border: 1px solid var(--fio);
   border-radius: 10px;
-  font-size: var(--letra-5);
+  font-size: var(--letra-16);
   font-family: inherit;
   background: var(--branco);
   color: var(--texto);
@@ -272,25 +305,25 @@ input[type=text], input[type=date], input[type=time], input[type=number], input[
 textarea { min-height: 130px; resize: vertical; line-height: 1.5; }
 input:focus, select:focus, textarea:focus {
   outline: none;
-  border-color: var(--teal);
-  box-shadow: 0 0 0 3px var(--teal-claro);
+  border-color: var(--acao);
+  box-shadow: 0 0 0 3px var(--acao-clara);
 }
 .linha { display: flex; gap: 12px; flex-wrap: wrap; }
 .linha > * { flex: 1; min-width: 130px; }
-.ajuda { font-size: var(--letra-2); line-height: 1.45; color: var(--muted); margin: -4px 0 12px; }
+.ajuda { font-size: var(--letra-14); line-height: 1.45; color: var(--muted); margin: -4px 0 12px; }
 #tela-ajustes .ajuda,
 #modal-aula .ajuda {
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
 }
 #tela-ajustes label.campo > span,
-#modal-aula label.campo > span { font-size: var(--letra-4); }
+#modal-aula label.campo > span { font-size: var(--letra-16); }
 input[type="checkbox"] {
   width: 24px !important;
   height: 24px !important;
   min-width: 24px !important;
   min-height: 24px !important;
   cursor: pointer;
-  accent-color: var(--teal);
+  accent-color: var(--acao);
   flex-shrink: 0;
 }
 label.campo:has(input[type="checkbox"]),
@@ -337,11 +370,9 @@ label.campo-checkbox {
 }
 .cab-dia {
   text-align: center;
-  font-size: var(--letra-1);
-  font-weight: 700;
+  font-size: var(--letra-12);
+  font-weight: 600;
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .06em;
   padding: 4px 0 6px;
 }
 .dia {
@@ -356,17 +387,17 @@ label.campo-checkbox {
   gap: 3px;
   overflow: hidden;
 }
-.dia:hover { border-color: var(--teal); }
+.dia:hover { border-color: var(--acao); }
 .dia.fora { background: var(--fundo-leve); opacity: .45; cursor: default; }
 .dia.hoje { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
-.dia .num { font-size: var(--letra-2); font-weight: 700; color: var(--navy); }
-.dia.fora .num { color: var(--muted); font-weight: 500; }
+.dia .num { font-size: var(--letra-14); font-weight: 600; color: var(--navy); }
+.dia.fora .num { color: var(--muted); font-weight: 400; }
 
 .dia.feriado { background: var(--ivory); }
 .marca-feriado {
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   line-height: 1.25;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--aviso-texto);
   white-space: nowrap;
   overflow: hidden;
@@ -375,7 +406,7 @@ label.campo-checkbox {
 .marca-feriado.facultativo { color: var(--muted); font-weight: 600; }
 
 .pilula {
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   min-height: 32px;
   padding: 3px 8px;
   border-radius: 6px;
@@ -433,14 +464,14 @@ label.campo-checkbox {
 }
 
 .zoom-dia-icone {
-  font-size: var(--letra-6);
+  font-size: var(--letra-20);
   line-height: 1;
 }
 
 .zoom-dia-titulo {
   margin: 0;
-  font-size: var(--letra-5);
-  font-weight: 700;
+  font-size: var(--letra-16);
+  font-weight: 600;
   color: var(--navy);
 }
 
@@ -448,10 +479,10 @@ label.campo-checkbox {
   background: var(--aviso-fundo);
   border: 1px solid var(--gold);
   color: var(--hoje-texto);
-  font-weight: 700;
+  font-weight: 600;
   padding: 2px 8px;
   border-radius: 6px;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
 }
 
 .zoom-tag-feriado {
@@ -461,7 +492,7 @@ label.campo-checkbox {
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 6px;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
 }
 
 .zoom-tag-feriado.facultativo {
@@ -495,11 +526,11 @@ label.campo-checkbox {
 
 .zoom-dia-vazio p {
   margin: 0 0 4px;
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
 }
 
 .zoom-dia-vazio-dica {
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   color: var(--muted);
   opacity: 0.85;
 }
@@ -530,13 +561,13 @@ label.campo-checkbox {
 }
 
 .card-aula-zoom:hover {
-  border-color: var(--teal);
+  border-color: var(--acao);
   background: var(--branco);
   box-shadow: 0 2px 8px var(--navy-a08);
 }
 
 .card-aula-zoom:focus-visible {
-  outline: 2px solid var(--teal);
+  outline: 2px solid var(--acao);
   outline-offset: 1px;
 }
 
@@ -568,13 +599,13 @@ label.campo-checkbox {
 }
 
 .card-aula-zoom-hora {
-  font-size: var(--letra-2);
-  font-weight: 700;
+  font-size: var(--letra-14);
+  font-weight: 600;
   color: var(--navy);
 }
 
 .card-aula-zoom-status {
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: 600;
@@ -584,7 +615,7 @@ label.campo-checkbox {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
 }
 
 .card-aula-zoom-nome {
@@ -592,13 +623,13 @@ label.campo-checkbox {
 }
 
 .card-aula-zoom-serie {
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   color: var(--muted);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .card-aula-zoom-resumo {
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
@@ -634,21 +665,19 @@ label.campo-checkbox {
 
 .dia.em-zoom .num {
   color: var(--navy);
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .selo-zoom-celula {
   position: absolute;
   top: 4px;
   right: 4px;
-  font-size: var(--letra-1);
-  font-weight: 700;
-  text-transform: uppercase;
+  font-size: var(--letra-12);
+  font-weight: 600;
   color: var(--branco);
   background: var(--navy);
   padding: 1px 4px;
   border-radius: 4px;
-  letter-spacing: 0.04em;
   pointer-events: none;
 }
 
@@ -665,7 +694,7 @@ label.campo-checkbox {
   margin-bottom: 8px;
 }
 .item-lista .cresce { flex: 1; min-width: 0; }
-.item-lista .nome { font-weight: 700; color: var(--navy); }
+.item-lista .nome { font-weight: 600; color: var(--navy); }
 /* O NOME DO ARQUIVO ANEXADO QUEBRA, e nunca encosta no Abrir. É uma palavra
    só ("Equacoes_do_Segundo_Grau_biblioteca.pdf"), sem espaço onde quebrar, e
    passava por cima do botão. Quebra em qualquer ponto e fica inteiro, porque
@@ -673,31 +702,29 @@ label.campo-checkbox {
 #lista-anexos .item-lista .nome { overflow-wrap: break-word; word-break: normal; }
 #modal-bib-selecoes .item-lista.desligada { opacity: .55; cursor: default; }
 .bib-compartilhar-item { display: flex; flex-direction: column; gap: 4px; max-width: 100%; }
-.bib-compartilhar-nome { font-size: var(--letra-2); overflow-wrap: anywhere; }
+.bib-compartilhar-nome { font-size: var(--letra-14); overflow-wrap: anywhere; }
 .bib-lp-ajuda-uso { margin: 0 0 10px; }
 .bib-lp-restam { font-weight: 600; color: var(--muted); }
 .tag.bib-lp-desafio { background: var(--branco); border: 1px solid var(--fio); color: var(--navy);
   text-transform: none; font-weight: 600; }
 #lista-anexos .item-lista > .btn { flex-shrink: 0; }
-.item-lista .detalhe { font-size: var(--letra-2); color: var(--muted); }
+.item-lista .detalhe { font-size: var(--letra-14); color: var(--muted); }
 .bolinha { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
 
 .tag {
   display: inline-block;
-  font-size: var(--letra-1);
-  font-weight: 700;
+  font-size: var(--letra-12);
+  font-weight: 600;
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--soft);
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: .04em;
 }
-.tag.serie { background: var(--teal-claro); color: var(--teal); }
+.tag.serie { background: var(--acao-clara); color: var(--acao); }
 .tag.excecao { background: var(--aviso-fundo); color: var(--aviso-texto); }
 .selo.selo-aviso, .selo-aviso {
   display: inline-block;
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 999px;
@@ -709,19 +736,19 @@ label.campo-checkbox {
 
 /* ---------- tabela ---------- */
 
-table.dados { width: 100%; border-collapse: collapse; font-size: var(--letra-3); }
+table.dados { width: 100%; border-collapse: collapse; font-size: var(--letra-14); }
 table.dados th {
   background: var(--navy);
   color: var(--branco);
   text-align: left;
   padding: 9px 10px;
-  font-size: var(--letra-2);
-  font-weight: 700;
+  font-size: var(--letra-14);
+  font-weight: 600;
 }
 table.dados th:last-child, table.dados td:last-child { text-align: right; }
 table.dados td { padding: 9px 10px; border-bottom: 1px solid var(--soft-2); }
 table.dados tr:nth-child(even) td { background: var(--soft); }
-table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(--soft-2); }
+table.dados tr.total td { font-weight: 600; color: var(--navy); background: var(--soft-2); }
 .rolagem { overflow-x: auto; border-radius: var(--raio); border: 1px solid var(--fio); }
 
 /* ---------- painel modal ---------- */
@@ -760,7 +787,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   gap: 10px;
   flex-shrink: 0;
 }
-.modal-cabecalho h3 { margin: 0; font-size: var(--letra-5); color: var(--navy); }
+.modal-cabecalho h3 { margin: 0; font-size: var(--letra-16); color: var(--navy); }
 .modal-corpo { padding: 18px; overflow-y: auto; flex: 1; }
 .modal-corpo.sem-espaco { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
 .modal-rodape {
@@ -777,7 +804,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 .fechar {
   border: none;
   background: transparent;
-  font-size: var(--letra-6);
+  font-size: var(--letra-20);
   line-height: 1;
   color: var(--muted);
   cursor: pointer;
@@ -797,11 +824,9 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 .item-tema .detalhe { margin-top: 2px; }
 
 .bloco-exercicios {
-  font-size: var(--letra-2);
-  font-weight: 700;
-  color: var(--teal);
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  font-size: var(--letra-14);
+  font-weight: 600;
+  color: var(--acao);
   margin: 14px 0 6px;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--fio);
@@ -820,11 +845,11 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   margin-bottom: 6px;
   cursor: pointer;
 }
-.item-exercicio:hover { border-color: var(--teal); background: var(--teal-claro); }
-.texto-exercicio { font-size: var(--letra-3); line-height: 1.4; }
+.item-exercicio:hover { border-color: var(--acao); background: var(--acao-clara); }
+.texto-exercicio { font-size: var(--letra-14); line-height: 1.4; }
 
 .item-lista.clicavel { cursor: pointer; }
-.item-lista.clicavel:hover { border-color: var(--teal); background: var(--teal-claro); }
+.item-lista.clicavel:hover { border-color: var(--acao); background: var(--acao-clara); }
 
 /* ---------- mapeamento do aluno ---------- */
 
@@ -834,28 +859,28 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 /* O lembrete precisa parecer um bilhete preso na aula, nao mais um bloco de
    formulario: ela le isso de relance com o aluno na frente. */
 .lembrete {
-  border: 1px solid var(--teal);
+  border: 1px solid var(--acao);
   border-left-width: 4px;
-  background: var(--teal-claro);
+  background: var(--acao-clara);
   border-radius: 10px;
   padding: 11px 13px;
   margin-bottom: 12px;
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   line-height: 1.5;
 }
 .lembrete strong { color: var(--navy); }
 
 .passo-roteiro {
   padding: 9px 12px;
-  border-left: 3px solid var(--teal);
+  border-left: 3px solid var(--acao);
   background: var(--branco);
   border-radius: 0 8px 8px 0;
   margin-bottom: 6px;
 }
-.passo-roteiro .nome { font-size: var(--letra-3); font-weight: 700; color: var(--navy); }
-.passo-roteiro .detalhe { font-size: var(--letra-2); margin-top: 2px; }
+.passo-roteiro .nome { font-size: var(--letra-14); font-weight: 600; color: var(--navy); }
+.passo-roteiro .detalhe { font-size: var(--letra-14); margin-top: 2px; }
 
-.item-area .btn.pequeno { padding: 2px 10px; font-size: var(--letra-2); min-height: 44px; }
+.item-area .btn.pequeno { padding: 2px 10px; font-size: var(--letra-14); min-height: 44px; }
 
 /* ---------- areas trabalhadas ---------- */
 
@@ -873,11 +898,11 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   border: 1px solid var(--fio);
   border-radius: 9px;
   background: var(--branco);
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   cursor: pointer;
 }
-.item-area:hover { border-color: var(--teal); background: var(--teal-claro); }
-.tag.cheia { background: var(--teal); color: var(--branco); border-color: var(--teal); }
+.item-area:hover { border-color: var(--acao); background: var(--acao-clara); }
+.tag.cheia { background: var(--acao); color: var(--branco); border-color: var(--acao); }
 
 /* ---------- abas dentro da ficha do aluno ---------- */
 
@@ -906,7 +931,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   background: transparent;
   color: var(--muted);
   padding: 10px 16px;
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
@@ -915,7 +940,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   min-height: 44px;
 }
 .aba-perfil:hover { color: var(--navy); }
-.aba-perfil.ativa { color: var(--navy); border-bottom-color: var(--teal); }
+.aba-perfil.ativa { color: var(--navy); border-bottom-color: var(--acao); }
 
 .lista-novidades { margin: 0; padding-left: 20px; }
 .lista-novidades li { margin-bottom: 7px; line-height: 1.45; }
@@ -948,10 +973,8 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 }
 .carrossel-badge {
   display: inline-block;
-  font-size: var(--letra-1);
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: var(--letra-12);
+  font-weight: 600;
   color: var(--novidades-selo-texto);
   background: var(--novidades-selo-fundo);
   padding: 3px 8px;
@@ -960,14 +983,13 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   border: 1px solid var(--novidades-selo-borda);
 }
 .carrossel-titulo {
-  font-family: Georgia, 'Playfair Display', serif;
-  font-size: var(--letra-6);
+  font-size: var(--letra-20);
   color: var(--novidades-titulo);
   margin: 0 0 4px 0;
   line-height: 1.25;
 }
 .carrossel-subtitulo {
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   color: var(--novidades-subtitulo);
   margin: 0 0 8px 0;
   line-height: 1.4;
@@ -984,7 +1006,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
 }
 .mini-barra-fech, .mini-barra-bib, .mini-barra-montagem, .mini-barra-aula {
   display: flex;
@@ -992,32 +1014,32 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   align-items: center;
   padding-bottom: 6px;
   border-bottom: 1px solid var(--fio-claro);
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   color: var(--novidades-tinta);
 }
 .mini-tag-verde {
   background: var(--novidades-tag-verde-fundo);
   color: var(--novidades-tag-verde-texto);
-  font-weight: 700;
+  font-weight: 600;
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
 }
 .mini-tag-azul {
-  background: var(--azul-clarinho);
+  background: var(--acao-clara);
   color: var(--novidades-tag-azul-texto);
-  font-weight: 700;
+  font-weight: 600;
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
 }
 .mini-tag-ouro {
   background: var(--novidades-selo-fundo);
   color: var(--novidades-tag-ouro-texto);
-  font-weight: 700;
+  font-weight: 600;
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
 }
 .mini-lista-alunos {
   display: flex;
@@ -1034,20 +1056,20 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   padding: 6px 8px;
 }
 .mini-item-aluno.ativo {
-  border-color: var(--novidades-azul);
-  background: var(--azul-clarinho);
+  border-color: var(--acao);
+  background: var(--acao-clara);
 }
 .mini-letra {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--novidades-azul);
+  background: var(--acao);
   color: var(--branco);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: var(--letra-1);
+  font-weight: 600;
+  font-size: var(--letra-12);
 }
 .mini-aluno-dados {
   display: flex;
@@ -1055,11 +1077,11 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   flex: 1;
 }
 .mini-aluno-dados span {
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   color: var(--novidades-apoio);
 }
 .mini-badge-ok {
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   color: var(--novidades-verde);
   font-weight: 600;
 }
@@ -1073,13 +1095,13 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   border: 1px solid var(--fio);
   border-radius: 4px;
   padding: 2px 6px;
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   color: var(--novidades-chip-texto);
 }
 .mini-chip.ativo {
-  background: var(--novidades-azul);
+  background: var(--acao);
   color: var(--branco);
-  border-color: var(--novidades-azul);
+  border-color: var(--acao);
   font-weight: 600;
 }
 .mini-busca-caixa {
@@ -1088,7 +1110,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   border-radius: 6px;
   padding: 5px 8px;
   color: var(--novidades-apoio);
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
 }
 .mini-modulos-grid {
   display: grid;
@@ -1104,11 +1126,11 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   flex-direction: column;
 }
 .mini-modulo-card strong {
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   color: var(--novidades-tinta);
 }
 .mini-modulo-card span {
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   color: var(--novidades-apoio);
 }
 .mini-opcoes-montagem {
@@ -1122,7 +1144,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   border-radius: 6px;
   padding: 6px;
   text-align: center;
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   color: var(--novidades-chip-texto);
 }
 .mini-toggle-box.ativo {
@@ -1144,12 +1166,12 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   color: var(--novidades-texto);
 }
 .mini-visto {
   color: var(--novidades-verde);
-  font-weight: 700;
+  font-weight: 600;
 }
 .mini-acoes-aula {
   display: flex;
@@ -1162,13 +1184,13 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   border-radius: 6px;
   padding: 6px;
   text-align: center;
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   color: var(--novidades-texto);
 }
 .mini-btn-acao.principal {
-  background: var(--novidades-azul);
+  background: var(--acao);
   color: var(--branco);
-  border-color: var(--novidades-azul);
+  border-color: var(--acao);
   font-weight: 600;
 }
 .mini-folha-preview {
@@ -1180,15 +1202,13 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   min-height: 55px;
 }
 .mini-folha-pautada {
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   color: var(--novidades-texto-2);
   line-height: 1.5;
 }
 .mini-traco-caneta {
   color: var(--novidades-caneta);
-  font-style: italic;
-  font-family: Georgia, serif;
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
 }
 .mini-ferramentas-flutuantes {
   position: absolute;
@@ -1200,7 +1220,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   padding: 2px 6px;
   display: flex;
   gap: 6px;
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   box-shadow: 0 1px 3px var(--sombra-a08);
 }
 .carrossel-destaques {
@@ -1212,7 +1232,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   position: relative;
   padding-left: 14px;
   margin-bottom: 5px;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   line-height: 1.45;
   color: var(--novidades-texto-2);
 }
@@ -1220,8 +1240,8 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   content: "•";
   position: absolute;
   left: 2px;
-  color: var(--novidades-azul);
-  font-size: var(--letra-3);
+  color: var(--acao);
+  font-size: var(--letra-14);
   line-height: 1;
 }
 .carrossel-indicadores {
@@ -1240,14 +1260,14 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   transition: all 0.2s ease;
 }
 .carrossel-ponto.ativo {
-  background: var(--novidades-azul);
+  background: var(--acao);
   width: 20px;
   border-radius: 5px;
 }
 
 .linha-historico { align-items: flex-start; }
 .anotacao-historico {
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   color: var(--texto);
   background: var(--soft);
   border-left: 3px solid var(--fio);
@@ -1270,11 +1290,11 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   margin-bottom: 10px;
   cursor: pointer;
   font-family: inherit;
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
 }
-.opcao-escopo:hover { border-color: var(--teal); background: var(--teal-claro); }
+.opcao-escopo:hover { border-color: var(--acao); background: var(--acao-clara); }
 .opcao-escopo strong { display: block; color: var(--navy); margin-bottom: 3px; }
-.opcao-escopo span { font-size: var(--letra-2); color: var(--muted); }
+.opcao-escopo span { font-size: var(--letra-14); color: var(--muted); }
 .opcao-escopo.atencao:hover { border-color: var(--vermelho); background: var(--perigo-fundo); }
 
 /* ---------- editor de folha ---------- */
@@ -1304,7 +1324,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   background: var(--branco);
   border-radius: 10px;
   cursor: pointer;
-  font-size: var(--letra-6);
+  font-size: var(--letra-20);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1322,7 +1342,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   cursor: pointer;
   padding: 0;
 }
-.cor-opcao.ativa { box-shadow: 0 0 0 3px var(--teal); }
+.cor-opcao.ativa { box-shadow: 0 0 0 3px var(--acao); }
 
 .tela-desenho { flex: 1; width: 100%; display: block; min-height: 0; background: var(--fio-claro); }
 
@@ -1338,15 +1358,15 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   flex-shrink: 0;
 }
 .rodape-editor .cresce { flex: 1; }
-.contador-pagina { font-size: var(--letra-3); color: var(--muted); font-weight: 600; padding: 0 4px; }
+.contador-pagina { font-size: var(--letra-14); color: var(--muted); font-weight: 600; padding: 0 4px; }
 
 .status-gravacao {
   border: 0;
   background: transparent;
   padding: 4px;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   font-weight: 600;
-  color: var(--teal);
+  color: var(--acao);
   margin-left: auto;
   margin-right: 12px;
   display: inline-flex;
@@ -1369,7 +1389,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   background: var(--branco);
   border-bottom: 1px solid var(--fio);
   padding: 12px 16px;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   line-height: 1.5;
   color: var(--navy);
   flex-shrink: 0;
@@ -1391,7 +1411,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 }
 .ajuda-folha-item span {
   color: var(--ajuda-folha-texto);
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
 }
 .ajuda-folha-rodape {
   display: flex;
@@ -1420,7 +1440,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   z-index: 80;
   transition: transform .22s ease;
   max-width: 92vw;
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
   /* A barra não pode roubar o toque de quem está mexendo no conteúdo atrás dela.
      Só o botão de desfazer recebe toque. */
   pointer-events: none;
@@ -1447,8 +1467,8 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   border-radius: 8px;
   cursor: pointer;
   font-family: inherit;
-  font-size: var(--letra-3);
-  font-weight: 700;
+  font-size: var(--letra-14);
+  font-weight: 600;
   white-space: nowrap;
 }
 .aviso button:hover { background: var(--branco-a16); }
@@ -1461,7 +1481,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   color: var(--faixa-aviso-texto);
   padding: 11px 14px;
   border-radius: 10px;
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   margin-bottom: 12px;
 }
 /* A gravação que falhou (B3): no alto, por cima de tudo, até uma gravação dar
@@ -1483,7 +1503,7 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   color: var(--faixa-aviso-texto);
   padding: 11px 14px;
   border-radius: 10px;
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
   box-shadow: var(--sombra-forte);
 }
 .faixa-gravacao[hidden] { display: none; }
@@ -1502,9 +1522,9 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   color: var(--texto);
   padding: 11px 14px;
   border-radius: 10px;
-  font-size: 15px;
+  font-size: var(--letra-16);
 }
-.faixa-endereco strong { color: var(--navy); font-size: 16px; }
+.faixa-endereco strong { color: var(--navy); font-size: var(--letra-16); }
 .faixa-endereco p { margin: 4px 0; }
 .faixa-endereco ol { margin: 4px 0 0; padding-left: 20px; }
 .faixa-endereco-botoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -1512,12 +1532,12 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 .faixa-endereco-botoes a.btn { display: inline-flex; align-items: center; text-decoration: none; }
 .faixa-endereco[hidden] { display: none; }
 .faixa-info {
-  background: var(--teal-claro);
+  background: var(--acao-clara);
   border: 1px solid var(--info-borda);
   color: var(--info-texto);
   padding: 11px 14px;
   border-radius: 10px;
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   margin-bottom: 12px;
 }
 
@@ -1527,19 +1547,17 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   min-width: 130px;
   background: var(--branco);
   border: 1px solid var(--fio);
-  border-left: 3px solid var(--teal);
+  border-left: 3px solid var(--acao);
   border-radius: 10px;
   padding: 13px 15px;
   box-shadow: var(--sombra);
 }
 .numero .rotulo {
-  font-size: var(--letra-1);
-  text-transform: uppercase;
-  letter-spacing: .07em;
+  font-size: var(--letra-12);
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 600;
 }
-.numero .valor { font-size: var(--letra-6); font-weight: 700; color: var(--navy); line-height: 1.25; }
+.numero .valor { font-size: var(--letra-20); font-weight: 600; color: var(--navy); line-height: 1.25; }
 
 .miniatura {
   width: 54px;
@@ -1566,19 +1584,19 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   padding: 12px 14px;
   min-height: 48px;
   font-family: inherit;
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
   line-height: 1.45;
   margin-bottom: 8px;
   cursor: pointer;
 }
-.opcao-frase:hover { border-color: var(--teal); background: var(--teal-claro); }
+.opcao-frase:hover { border-color: var(--acao); background: var(--acao-clara); }
 .opcao-frase.escolhida {
-  border-color: var(--teal);
-  background: var(--teal-claro);
-  box-shadow: inset 0 0 0 1px var(--teal);
+  border-color: var(--acao);
+  background: var(--acao-clara);
+  box-shadow: inset 0 0 0 1px var(--acao);
   font-weight: 600;
 }
-.opcao-frase.sem-frase { color: var(--muted); font-style: italic; }
+.opcao-frase.sem-frase { color: var(--muted); }
 
 /* A prévia fica presa no alto da janela enquanto ela rola a lista de frases:
    com oito frases num tablet, a imagem caía abaixo da dobra e ela mandaria sem
@@ -1633,9 +1651,9 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
 .bloco-mes.futura .data-dia { color: var(--muted); }
 
 .bloco-mes .cabeca-dia { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.bloco-mes .data-dia { font-size: var(--letra-5); font-weight: 700; color: var(--navy); }
-.bloco-mes .detalhe-dia { font-size: var(--letra-2); color: var(--muted); }
-.bloco-mes .valor-dia { margin-left: auto; font-weight: 700; color: var(--navy); }
+.bloco-mes .data-dia { font-size: var(--letra-16); font-weight: 600; color: var(--navy); }
+.bloco-mes .detalhe-dia { font-size: var(--letra-14); color: var(--muted); }
+.bloco-mes .valor-dia { margin-left: auto; font-weight: 600; color: var(--navy); }
 .tags-assunto { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 
 /* O assunto não usa a etiqueta .tag de propósito: aquela é maiúscula de 11 px,
@@ -1643,16 +1661,16 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
    a coisa que a família mais lê nesta tela. */
 .assunto-mes {
   display: inline-block;
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   font-weight: 600;
   color: var(--navy);
-  background: var(--teal-claro);
+  background: var(--acao-clara);
   border-radius: 999px;
   padding: 4px 12px;
   line-height: 1.35;
 }
 .assunto-mes.area { background: var(--aviso-fundo); color: var(--aviso-texto); }
-.texto-rendeu { margin-top: 8px; font-size: var(--letra-3); line-height: 1.55; white-space: pre-wrap; }
+.texto-rendeu { margin-top: 8px; font-size: var(--letra-14); line-height: 1.55; white-space: pre-wrap; }
 
 /* O bloco cinza com a barra é a anotação particular dela. Só existe no modo
    dela: no modo da família ele nem chega a ser criado. */
@@ -1662,28 +1680,26 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   border-left: 4px solid var(--muted);
   border-radius: 8px;
   padding: 8px 11px;
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   line-height: 1.55;
   white-space: pre-wrap;
 }
 .so-minha .rotulo-so-minha {
   display: block;
-  font-size: var(--letra-1);
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  font-weight: 700;
+  font-size: var(--letra-12);
+  font-weight: 600;
   color: var(--muted);
   margin-bottom: 3px;
 }
 
 .selo-familia {
   margin-left: auto;
-  background: var(--teal-claro);
-  color: var(--teal);
+  background: var(--acao-clara);
+  color: var(--acao);
   border-radius: 999px;
   padding: 5px 12px;
-  font-size: var(--letra-2);
-  font-weight: 700;
+  font-size: var(--letra-14);
+  font-weight: 600;
   letter-spacing: .04em;
 }
 
@@ -1692,13 +1708,13 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   flex: 1 0 100%;
   background: var(--branco);
   border: 1px solid var(--fio);
-  border-left: 4px solid var(--teal);
+  border-left: 4px solid var(--acao);
   border-radius: 10px;
   padding: 10px 12px;
   margin-bottom: 4px;
 }
 .confirma-familia strong { display: block; color: var(--navy); margin-bottom: 3px; }
-.confirma-familia span { font-size: var(--letra-2); color: var(--muted); line-height: 1.45; }
+.confirma-familia span { font-size: var(--letra-14); color: var(--muted); line-height: 1.45; }
 
 /* Sair do modo da família é segurar, não tocar: um toque perdido no meio de uma
    conversa não pode devolver a tela com os valores. A barra enche enquanto ela
@@ -1715,12 +1731,12 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
   position: absolute;
   left: 0; top: 0; bottom: 0;
   width: 0;
-  background: var(--teal-a22);
+  background: var(--navy-a18);
   pointer-events: none;
 }
 .btn.segurar.segurando .enchendo { width: 100%; transition: width 1.2s linear; }
 .btn.segurar .rotulo-segurar { position: relative; }
-.dica-segurar { font-size: var(--letra-2); color: var(--muted); flex: 1 0 100%; margin-top: 6px; }
+.dica-segurar { font-size: var(--letra-14); color: var(--muted); flex: 1 0 100%; margin-top: 6px; }
 
 /* ---------- o modo da família ---------- */
 
@@ -1746,10 +1762,10 @@ body.modo-familia #modal-mes .modal {
 }
 body.modo-familia #fechar-modal-mes { display: none; }
 body.modo-familia .bloco-mes { padding: 15px 17px; }
-body.modo-familia .bloco-mes .data-dia { font-size: var(--letra-6); }
-body.modo-familia .texto-rendeu { font-size: var(--letra-5); }
-body.modo-familia .assunto-mes { font-size: var(--letra-5); padding: 6px 14px; }
-body.modo-familia .modal-cabecalho h3 { font-size: var(--letra-6); }
+body.modo-familia .bloco-mes .data-dia { font-size: var(--letra-20); }
+body.modo-familia .texto-rendeu { font-size: var(--letra-16); }
+body.modo-familia .assunto-mes { font-size: var(--letra-16); padding: 6px 14px; }
+body.modo-familia .modal-cabecalho h3 { font-size: var(--letra-20); }
 
 /* ---------- o editor da proposta ---------- */
 
@@ -1774,7 +1790,7 @@ body.modo-familia .modal-cabecalho h3 { font-size: var(--letra-6); }
   border: none;
   background: var(--soft);
   font-family: inherit;
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
   text-align: left;
   cursor: pointer;
 }
@@ -1782,13 +1798,13 @@ body.modo-familia .modal-cabecalho h3 { font-size: var(--letra-6); }
 .cabeca-bloco .cresce { flex: 1; min-width: 0; }
 .titulo-bloco {
   display: block;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--navy);
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
 }
 .resumo-bloco {
   display: block;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   color: var(--muted);
   line-height: 1.35;
   margin-top: 2px;
@@ -1796,7 +1812,7 @@ body.modo-familia .modal-cabecalho h3 { font-size: var(--letra-6); }
 /* O que falta preencher fica em vermelho no resumo: e a unica coisa que ela
    precisa enxergar com o bloco fechado. */
 .resumo-bloco.falta { color: var(--vermelho); font-weight: 600; }
-.seta-bloco { color: var(--navy); font-size: var(--letra-6); flex-shrink: 0; width: 20px; text-align: center; }
+.seta-bloco { color: var(--navy); font-size: var(--letra-20); flex-shrink: 0; width: 20px; text-align: center; }
 .corpo-bloco { padding: 14px; }
 .corpo-bloco > .subtitulo:first-child { margin-top: 4px; }
 /* Alvo de toque de dedo, dentro do editor. A lista de marcar do mapeamento
@@ -1818,11 +1834,11 @@ body.modo-familia .modal-cabecalho h3 { font-size: var(--letra-6); }
   background: var(--branco);
   color: var(--texto);
   font-family: inherit;
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   font-weight: 600;
   cursor: pointer;
 }
-.opcao-seg:hover { border-color: var(--teal); background: var(--teal-claro); }
+.opcao-seg:hover { border-color: var(--acao); background: var(--acao-clara); }
 .opcao-seg.ativa { background: var(--navy); border-color: var(--navy); color: var(--branco); }
 
 /* A conta dos planos, do jeito que ela confere de cabeca: o valor por hora e o
@@ -1838,19 +1854,17 @@ body.modo-familia .modal-cabecalho h3 { font-size: var(--letra-6); }
 }
 .linha-plano:last-child { border-bottom: none; }
 .linha-plano .cresce { flex: 1; min-width: 0; }
-.linha-plano .nome { font-weight: 700; color: var(--navy); font-size: var(--letra-3); }
-.linha-plano .detalhe { font-size: var(--letra-2); color: var(--muted); }
+.linha-plano .nome { font-weight: 600; color: var(--navy); font-size: var(--letra-14); }
+.linha-plano .detalhe { font-size: var(--letra-14); color: var(--muted); }
 .linha-plano .valores { text-align: right; flex-shrink: 0; }
-.linha-plano .por-hora { font-size: var(--letra-2); color: var(--muted); }
-.linha-plano .total { font-weight: 700; color: var(--navy); font-size: var(--letra-4); }
-.linha-plano.recomendado { background: var(--teal-claro); }
+.linha-plano .por-hora { font-size: var(--letra-14); color: var(--muted); }
+.linha-plano .total { font-weight: 600; color: var(--navy); font-size: var(--letra-16); }
+.linha-plano.recomendado { background: var(--acao-clara); }
 .linha-plano.recomendado .nome::after {
   content: " recomendado";
-  font-size: var(--letra-1);
-  font-weight: 700;
-  color: var(--teal);
-  text-transform: uppercase;
-  letter-spacing: .04em;
+  font-size: var(--letra-12);
+  font-weight: 600;
+  color: var(--acao);
 }
 
 /* As propostas em andamento, no alto da janela da proposta.
@@ -1868,11 +1882,9 @@ body.modo-familia .modal-cabecalho h3 { font-size: var(--letra-6); }
   margin-bottom: 12px;
 }
 .titulo-rascunhos {
-  font-size: var(--letra-1);
-  text-transform: uppercase;
-  letter-spacing: .07em;
+  font-size: var(--letra-12);
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 600;
   margin-bottom: 8px;
 }
 .linha-rascunho { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
@@ -1887,18 +1899,18 @@ body.modo-familia .modal-cabecalho h3 { font-size: var(--letra-6); }
   border-radius: 10px;
   background: var(--branco);
   font-family: inherit;
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
   color: var(--texto);
 }
 button.alvo-rascunho { cursor: pointer; }
 button.alvo-rascunho:hover { background: var(--soft); }
 .linha-rascunho.aberta .alvo-rascunho {
-  background: var(--teal-claro);
+  background: var(--acao-clara);
   border-color: var(--info-borda);
 }
 .alvo-rascunho .nome {
   display: block;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--navy);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1916,7 +1928,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
   display: flex;
   align-items: baseline;
   gap: 6px;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   color: var(--muted);
 }
 /* A hora nunca encolhe: e ela que diz QUAL das duas propostas e esta. Quem cede
@@ -1927,7 +1939,6 @@ button.alvo-rascunho:hover { background: var(--soft); }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-style: italic;
 }
 .alvo-rascunho .trecho::before { content: '\00B7'; margin-right: 6px; font-style: normal; }
 .apaga-rascunho { flex-shrink: 0; min-width: 44px; padding: 10px 14px; }
@@ -1937,7 +1948,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 @media (max-width: 720px) {
   .cabecalho { flex-direction: column; align-items: stretch; gap: 8px; }
   .abas { justify-content: space-between; }
-  .aba { flex: 1; padding: 9px 8px; font-size: var(--letra-3); }
+  .aba { flex: 1; padding: 9px 8px; font-size: var(--letra-14); }
   .dia { min-height: 62px; }
   .marca span { display: none; }
   .olho { position: absolute; top: 10px; right: 12px; }
@@ -1959,7 +1970,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
     display: none;
   }
   .marca strong {
-    font-size: var(--letra-5);
+    font-size: var(--letra-16);
     letter-spacing: normal;
   }
   .abas {
@@ -1972,7 +1983,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
     align-items: center;
     justify-content: center;
     padding: 0 12px;
-    font-size: var(--letra-3);
+    font-size: var(--letra-14);
     white-space: nowrap;
   }
 }
@@ -1992,7 +2003,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
   color: var(--navy);
   border-radius: 999px;
   padding: 6px 12px;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
@@ -2010,7 +2021,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 }
 
 .bib-series { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
-.bib-seta { color: var(--muted); font-size: var(--letra-6); line-height: 1; }
+.bib-seta { color: var(--muted); font-size: var(--letra-20); line-height: 1; }
 .bib-voltar { margin-bottom: 6px; }
 .bib-titulo { margin: 6px 0 4px; }
 .bib-autoria { margin: 0 0 8px; }
@@ -2022,12 +2033,12 @@ button.alvo-rascunho:hover { background: var(--soft); }
   background: var(--branco); border: 1px solid var(--fio); border-radius: 10px;
   padding: 10px; cursor: pointer; font-family: inherit; color: inherit;
 }
-.bib-cartao:hover { border-color: var(--teal); }
+.bib-cartao:hover { border-color: var(--acao); }
 .bib-mini { width: 100%; height: auto; display: block; background: var(--soft); border: 1px solid var(--fio); border-radius: 4px; }
 .bib-mini.pronta { background: var(--branco); }
-.bib-rotulo { font-size: var(--letra-2); font-weight: 700; color: var(--navy); }
+.bib-rotulo { font-size: var(--letra-14); font-weight: 600; color: var(--navy); }
 .bib-tags { display: flex; gap: 6px; flex-wrap: wrap; }
-.bib-origem { font-size: var(--letra-1); color: var(--muted); }
+.bib-origem { font-size: var(--letra-12); color: var(--muted); }
 .bib-visor { background: var(--fio-claro); }
 .bib-cheia { width: 100%; height: auto; display: block; margin: 0 auto; background: var(--branco); box-shadow: var(--sombra); }
 /* o selo "Marcado" sobre a imagem da tela cheia: ela anda pelo Anterior e
@@ -2048,9 +2059,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
    relance e não esconde uma palavra. O contorno pinta a folha inteira, que é o
    sinal que ela pega de longe andando pelo Anterior e Próxima. */
 .bib-selo-marcado { position: absolute; right: 0; bottom: 100%; margin-bottom: 6px; z-index: 2;
-  padding: 6px 14px; border-radius: 999px; background: var(--teal); color: var(--branco);
-  font-size: var(--letra-2); font-weight: 700; letter-spacing: .02em; box-shadow: var(--sombra); }
-.bib-cheia-caixa.marcada .bib-cheia { outline: 3px solid var(--teal); }
+  padding: 6px 14px; border-radius: 999px; background: var(--acao); color: var(--branco);
+  font-size: var(--letra-14); font-weight: 600; letter-spacing: .02em; box-shadow: var(--sombra); }
+.bib-cheia-caixa.marcada .bib-cheia { outline: 3px solid var(--acao); }
 /* "Marcar os N deste módulo": fica sozinho, abaixo do título do módulo */
 .bib-marcar-modulo { display: block; margin: 0 0 12px; }
 .bib-marcar-modulo .btn { min-height: 44px; }
@@ -2064,9 +2075,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
    fica mais larga que a janela, e ela anda pela folha arrastando o dedo. */
 .leitor-pdf-barra { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
   padding: 10px 18px; border-bottom: 1px solid var(--fio); background: var(--soft); }
-.leitor-pdf-contador { min-width: 128px; text-align: center; font-size: var(--letra-4); font-weight: 700; color: var(--navy); }
+.leitor-pdf-contador { min-width: 128px; text-align: center; font-size: var(--letra-16); font-weight: 600; color: var(--navy); }
 .leitor-pdf-zoom { display: inline-flex; gap: 8px; margin-left: auto; }
-.leitor-pdf-quadrado { min-width: 44px; padding: 10px 0; font-size: var(--letra-6); line-height: 1; }
+.leitor-pdf-quadrado { min-width: 44px; padding: 10px 0; font-size: var(--letra-20); line-height: 1; }
 .leitor-pdf-corpo { background: var(--fio-claro); overflow: auto; padding: 18px; }
 /* A frase do C3 ("Escolha a página e toque em...") fica colada embaixo da
    barra, de ponta a ponta, sem rolar junto com a página. */
@@ -2080,7 +2091,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .preparando-folha { display: none; position: fixed; inset: 0; z-index: 79; align-items: center;
   justify-content: center; background: var(--veu-preparando); }
 .preparando-folha.aberto { display: flex; }
-.preparando-folha-caixa { background: var(--branco); color: var(--navy); font-weight: 700; font-size: var(--letra-5);
+.preparando-folha-caixa { background: var(--branco); color: var(--navy); font-weight: 600; font-size: var(--letra-16);
   padding: 18px 26px; border-radius: 12px; box-shadow: var(--sombra-forte); }
 .leitor-pdf-corpo canvas { display: block; margin: 0 auto; background: var(--branco); box-shadow: var(--sombra); }
 .leitor-pdf-aviso { max-width: 520px; margin: 24px auto; padding: 18px; background: var(--branco);
@@ -2091,8 +2102,8 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-sumario { flex-shrink: 0; max-height: 42vh; overflow: auto; padding: 6px 18px 10px;
   border-bottom: 1px solid var(--fio); background: var(--branco); }
 .leitor-sumario button { display: block; width: 100%; text-align: left; min-height: 44px; padding: 8px 10px;
-  border: 0; border-bottom: 1px solid var(--fio); background: none; font-size: var(--letra-4); color: var(--navy); cursor: pointer; }
-.leitor-sumario button.atual { font-weight: 700; background: var(--soft); }
+  border: 0; border-bottom: 1px solid var(--fio); background: none; font-size: var(--letra-16); color: var(--navy); cursor: pointer; }
+.leitor-sumario button.atual { font-weight: 600; background: var(--soft); }
 .leitor-sumario .pagina-do-sumario { float: right; opacity: .7; font-weight: 400; margin-left: 12px; }
 .leitor-sumario .vazio-do-sumario { margin: 8px 0; }
 /* O capítulo do EPUB rola dentro da caixa isolada, que ocupa o corpo todo. */
@@ -2102,7 +2113,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 /* C15.2: "Este capítulo cobre", uma faixa baixa embaixo da barra do leitor,
    com os dois botões a um toque; a escolha do assunto rola por dentro. */
 .leitor-cobre { flex-shrink: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-  padding: 8px 18px; border-bottom: 1px solid var(--fio); background: var(--soft); font-size: var(--letra-4); color: var(--navy); }
+  padding: 8px 18px; border-bottom: 1px solid var(--fio); background: var(--soft); font-size: var(--letra-16); color: var(--navy); }
 .leitor-cobre .cobre-texto { flex: 1 1 260px; }
 .leitor-cobre .tag { margin-left: 6px; }
 /* A sombra de rolagem: as duas primeiras camadas andam com o conteúdo e
@@ -2118,8 +2129,8 @@ button.alvo-rascunho:hover { background: var(--soft); }
   background-size: 100% 28px, 100% 28px, 100% 12px, 100% 12px;
   background-attachment: local, local, scroll, scroll; }
 .leitor-cobre .cobre-escolha button { display: block; width: 100%; text-align: left; min-height: 44px; padding: 8px 12px;
-  border: 0; border-bottom: 1px solid var(--fio); background: none; font-size: var(--letra-4); color: var(--navy); cursor: pointer; }
-.leitor-cobre .cobre-escolha button.atual { font-weight: 700; background: var(--soft); }
+  border: 0; border-bottom: 1px solid var(--fio); background: none; font-size: var(--letra-16); color: var(--navy); cursor: pointer; }
+.leitor-cobre .cobre-escolha button.atual { font-weight: 600; background: var(--soft); }
 .leitor-cobre .cobre-rolagem { flex: 1 1 100%; margin: 0; }
 .livro-linha .detalhe { margin-top: 2px; }
 #lista-livros-biblioteca .livros-total { font-weight: 600; margin: 4px 0 8px; }
@@ -2131,31 +2142,31 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-celula { display: flex; flex-direction: column; gap: 12px; }
 .bib-acoes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .bib-marcar { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 4px;
-  font-size: var(--letra-3); font-weight: 600; color: var(--navy); cursor: pointer; }
-.bib-marcar input { width: 22px; height: 22px; min-height: 0; margin: 0; accent-color: var(--teal); }
+  font-size: var(--letra-14); font-weight: 600; color: var(--navy); cursor: pointer; }
+.bib-marcar input { width: 22px; height: 22px; min-height: 0; margin: 0; accent-color: var(--acao); }
 .bib-marcar.desligada { color: var(--muted); cursor: default; }
 /* o motivo da caixa desligada, logo abaixo dela, alinhado ao texto da caixa (C13, UX08) */
-.bib-motivo { display: block; margin: -8px 0 6px 34px; font-size: var(--letra-2); color: var(--muted); }
+.bib-motivo { display: block; margin: -8px 0 6px 34px; font-size: var(--letra-14); color: var(--muted); }
 .bib-motivo[hidden] { display: none; }
 .bib-etiqueta { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.bib-etiqueta-rotulo { font-size: var(--letra-2); color: var(--navy); margin-right: 2px; }
+.bib-etiqueta-rotulo { font-size: var(--letra-14); color: var(--navy); margin-right: 2px; }
 .bib-etiqueta-botao { min-height: 44px; min-width: 44px; padding: 0 10px; border: 1px solid var(--fio);
-  border-radius: 8px; background: var(--branco); color: var(--navy); font: inherit; font-size: var(--letra-2); cursor: pointer; }
-.bib-etiqueta-botao.ativa { background: var(--teal-claro); border-color: var(--teal); color: var(--teal); font-weight: 700; }
+  border-radius: 8px; background: var(--branco); color: var(--navy); font: inherit; font-size: var(--letra-14); cursor: pointer; }
+.bib-etiqueta-botao.ativa { background: var(--acao); border-color: var(--acao); color: var(--sobre-acao); font-weight: 600; }
 .bib-carrinho { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin-bottom: 12px; padding: 10px 14px; background: var(--navy); color: var(--branco); border-radius: 10px;
   box-shadow: var(--sombra); }
 .bib-carrinho[hidden] { display: none; }
 .bib-carrinho { min-height: 64px; box-sizing: border-box; }
 .bib-carrinho.vazia { background: var(--soft); color: var(--navy); box-shadow: none; }
-.bib-carrinho.vazia .bib-carrinho-texto { font-weight: 600; font-size: var(--letra-3); }
+.bib-carrinho.vazia .bib-carrinho-texto { font-weight: 600; font-size: var(--letra-14); }
 #bib-carrinho-limpar { margin-right: 18px; }
 .bib-gerar-dica { margin: 8px 0 0; font-weight: 600; color: var(--navy); }
 .bib-contexto { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; padding: 8px 14px;
-  border: 1px solid var(--teal); border-radius: 10px; background: var(--teal-claro); color: var(--navy); font-weight: 600; }
+  border: 1px solid var(--acao); border-radius: 10px; background: var(--acao-clara); color: var(--navy); font-weight: 600; }
 .bib-contexto[hidden] { display: none; }
 .bib-filtro-uso { gap: 10px; flex-wrap: wrap; margin: 6px 0 2px; }
-.bib-filtro-rotulo { font-weight: 700; color: var(--navy); font-size: var(--letra-3); }
+.bib-filtro-rotulo { font-weight: 600; color: var(--navy); font-size: var(--letra-14); }
 #bib-filtro-aluno { min-height: 44px; max-width: 260px; }
 .bib-filtro-info { margin: 0; color: var(--navy); font-weight: 600; }
 .bib-celula[hidden] { display: none; }
@@ -2163,7 +2174,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 /* LISTA PRONTA. A linha do módulo leva duas linhas de detalhe: quanto da aula a
    lista ocupa, que é a unidade dela, e o minuto estimado embaixo, em corpo menor e colado da
    palavra estimativa. Nada aqui afirma curadoria. */
-.bib-lista-pronta .bib-lp-minutos { font-size: var(--letra-2); color: var(--muted); }
+.bib-lista-pronta .bib-lp-minutos { font-size: var(--letra-14); color: var(--muted); }
 .bib-lp-ajuda { margin: 6px 2px 10px; }
 /* A GRADE DA LISTA PRONTA TEM UMA COLUNA SÓ, e o motivo é a interação.
    Numa grade de três, o botão de descer que ela acabou de apertar muda de
@@ -2187,37 +2198,37 @@ button.alvo-rascunho:hover { background: var(--soft); }
    tapa controle nenhum. O aviso de rodapé cobria as setas e a caixa dos
    últimos cartões, que é o que esta tela existe para ela tocar. */
 .bib-lp-aviso { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  margin: 2px 0 10px; padding: 10px 14px; border: 1px solid var(--teal);
-  border-radius: 10px; background: var(--teal-claro); color: var(--navy); font-weight: 600; }
+  margin: 2px 0 10px; padding: 10px 14px; border: 1px solid var(--acao);
+  border-radius: 10px; background: var(--acao-clara); color: var(--navy); font-weight: 600; }
 .bib-lp-aviso .cresce { flex: 1; min-width: 240px; }
 .bib-lp-aviso .btn { min-height: 44px; }
 .bib-lp-cabeca { margin: 2px 0 6px; }
-.bib-lp-meia { font-weight: 700; color: var(--navy); }
+.bib-lp-meia { font-weight: 600; color: var(--navy); }
 .bib-lp-cabeca .bib-lp-minutos { margin-top: 2px; }
 .bib-lp-mudou { margin: 0 0 10px; font-weight: 600; color: var(--navy); }
 /* as setas ficam junto da caixa, no mesmo alvo de toque de 44 px do tablet */
 .bib-lp-setas { display: inline-flex; gap: 6px; }
-.bib-lp-setas button { min-height: 44px; min-width: 44px; padding: 0 12px; font-size: var(--letra-4); line-height: 1; }
+.bib-lp-setas button { min-height: 44px; min-width: 44px; padding: 0 12px; font-size: var(--letra-16); line-height: 1; }
 .bib-lp-setas button[disabled] { opacity: 0.35; cursor: default; }
 .tag.bib-lp-min-item { background: var(--branco); border: 1px solid var(--fio); color: var(--muted);
   text-transform: none; font-weight: 600; }
 .bib-lp-acrescentar { gap: 8px; flex-wrap: wrap; margin: 12px 0 4px; }
 /* de qual lista da fonte veio o exercício: sem isto, dois cartões da mesma
    tela podem se chamar os dois "Exercício 1" */
-.bib-lp-de-onde { margin: 2px 0 6px; font-size: var(--letra-2); }
+.bib-lp-de-onde { margin: 2px 0 6px; font-size: var(--letra-14); }
 /* os chips do filtro de dificuldade são alvos de toque do tablet, como os do "Para mim" */
-.bib-filtro-dif .chip-filtro { min-height: 44px; min-width: 44px; padding: 10px 16px; font-size: var(--letra-3); }
+.bib-filtro-dif .chip-filtro { min-height: 44px; min-width: 44px; padding: 10px 16px; font-size: var(--letra-14); }
 /* a dificuldade do pacote fica sem cor e em minúsculas: a colorida é a dela, no "Para mim" */
 .tag.bib-dif-fonte { background: var(--branco); border: 1px solid var(--fio); color: var(--navy);
   text-transform: none; letter-spacing: 0; font-weight: 600; }
-.bib-carrinho-texto { font-weight: 700; }
+.bib-carrinho-texto { font-weight: 600; }
 .bib-carrinho .btn:not(.principal) { background: transparent; color: var(--branco); border-color: var(--branco-a60); }
 .bib-carrinho .btn.principal { background: var(--branco); color: var(--navy); border-color: var(--branco); }
 /* na faixa vazia (fundo claro) o botão das seleções anteriores volta a ter tinta escura, senão some */
 .bib-carrinho.vazia .btn:not(.principal) { background: var(--branco); color: var(--navy); border-color: var(--fio); }
-.bib-gerar-rotulo { display: block; font-size: var(--letra-2); font-weight: 700; color: var(--navy); margin-bottom: 5px; }
+.bib-gerar-rotulo { display: block; font-size: var(--letra-14); font-weight: 600; color: var(--navy); margin-bottom: 5px; }
 .bib-gerar-caixas { display: flex; flex-direction: column; gap: 0; }
-#bib-gerar-aulas .item-lista.escolhida { border-color: var(--teal); background: var(--teal-claro); }
+#bib-gerar-aulas .item-lista.escolhida { border-color: var(--acao); background: var(--acao-clara); }
 
 /* ---------- Minhas listas (C2a) ---------- */
 .bib-abas { margin-bottom: 12px; }
@@ -2225,8 +2236,8 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-abas .chip-filtro { min-height: 44px; }
 .bib-minha-lista { margin-bottom: 12px; padding: 14px 16px; }
 .bib-minha-topo { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.bib-minha-nome { color: var(--navy); font-size: var(--letra-5); }
-.bib-minha-nivel { font-size: var(--letra-2); font-weight: 700; color: var(--teal); background: var(--teal-claro);
+.bib-minha-nome { color: var(--navy); font-size: var(--letra-16); }
+.bib-minha-nivel { font-size: var(--letra-14); font-weight: 600; color: var(--acao); background: var(--acao-clara);
   border-radius: 999px; padding: 2px 10px; }
 .bib-minha-lista .ajuda { margin: 4px 0 0; }
 .bib-minha-acoes { margin: 12px 0 0; flex-wrap: wrap; gap: 8px; }
@@ -2262,10 +2273,10 @@ button.alvo-rascunho:hover { background: var(--soft); }
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--teal);
+  background: var(--acao);
   color: var(--branco);
-  font-size: var(--letra-2);
-  font-weight: 700;
+  font-size: var(--letra-14);
+  font-weight: 600;
   flex-shrink: 0;
 }
 
@@ -2276,14 +2287,14 @@ button.alvo-rascunho:hover { background: var(--soft); }
 
 .titulo-grupo {
   margin: 0;
-  font-size: var(--letra-4);
-  font-weight: 700;
+  font-size: var(--letra-16);
+  font-weight: 600;
   color: var(--navy);
   line-height: 1.2;
 }
 
 .sub-grupo {
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   color: var(--muted);
   margin-top: 2px;
 }
@@ -2297,17 +2308,17 @@ button.alvo-rascunho:hover { background: var(--soft); }
 }
 
 .destino-publico {
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   font-weight: 600;
   color: var(--info-texto);
-  background: var(--teal-claro);
+  background: var(--acao-clara);
   padding: 2px 7px;
   border-radius: 4px;
   white-space: nowrap;
 }
 
 .destino-privado {
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   font-weight: 600;
   color: var(--privado-texto);
   background: var(--privado-fundo);
@@ -2317,7 +2328,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 }
 
 .ajuda-salvamento {
-  font-size: var(--letra-1);
+  font-size: var(--letra-12);
   color: var(--muted);
   line-height: 1.3;
   margin-right: auto;
@@ -2326,7 +2337,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 }
 
 .ajuda-exemplo-curto {
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   color: var(--muted);
   margin: 4px 0 8px;
   line-height: 1.4;
@@ -2365,9 +2376,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
 /* C11: os títulos do documento (fechado por padrão) e o roteiro do feedback */
 .doc-titulos { margin: 4px 0 0; }
 .doc-titulos summary { min-height: 44px; line-height: 44px; cursor: pointer;
-  font-size: var(--letra-2); font-weight: 700; color: var(--navy); }
+  font-size: var(--letra-14); font-weight: 600; color: var(--navy); }
 .roteiro-feedback { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
-.roteiro-feedback .roteiro-pergunta { font-weight: 700; color: var(--navy); }
+.roteiro-feedback .roteiro-pergunta { font-weight: 600; color: var(--navy); }
 .roteiro-feedback .roteiro-resposta { margin-bottom: 6px; }
 .roteiro-feedback #roteiro-montar { align-self: flex-start; }
 
@@ -2376,7 +2387,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
   border: 1px solid var(--privacidade-borda);
   border-radius: 8px;
   padding: 10px 12px;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   color: var(--privacidade-texto);
   line-height: 1.4;
 }
@@ -2408,31 +2419,31 @@ button.alvo-rascunho:hover { background: var(--soft); }
 }
 
 .previa-doc-titulo {
-  font-size: var(--letra-6);
-  font-weight: 700;
+  font-size: var(--letra-20);
+  font-weight: 600;
   color: var(--navy);
   margin: 0 0 6px 0;
 }
 
 .previa-doc-meta {
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   color: var(--muted);
   line-height: 1.5;
 }
 
 .previa-doc-secao-titulo {
-  font-size: var(--letra-3);
-  font-weight: 700;
+  font-size: var(--letra-14);
+  font-weight: 600;
   color: var(--navy);
   margin: 16px 0 8px 0;
   padding-bottom: 4px;
-  border-bottom: 1px solid var(--teal);
+  border-bottom: 1px solid var(--acao);
 }
 
 .previa-tabela {
   width: 100%;
   border-collapse: collapse;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   margin-bottom: 12px;
 }
 
@@ -2453,7 +2464,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 }
 
 .previa-totais {
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   margin: 12px 0;
   padding: 10px;
   background: var(--soft);
@@ -2463,10 +2474,10 @@ button.alvo-rascunho:hover { background: var(--soft); }
 
 .previa-feedback-box {
   background: var(--fundo-leve);
-  border-left: 3px solid var(--teal);
+  border-left: 3px solid var(--acao);
   padding: 10px 14px;
   margin: 10px 0;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   line-height: 1.5;
   white-space: pre-wrap;
   color: var(--texto);
@@ -2474,7 +2485,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 
 .previa-notas-aula-item {
   margin-bottom: 8px;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   padding: 8px 10px;
   background: var(--soft);
   border-radius: 4px;
@@ -2515,7 +2526,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 
 .select-virada-serie {
   padding: 6px 10px;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   border-radius: 6px;
   border: 1px solid var(--fio);
   background: var(--branco);
@@ -2534,7 +2545,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .input-virada-outro {
   margin-top: 6px;
   padding: 6px 10px;
-  font-size: var(--letra-2);
+  font-size: var(--letra-14);
   border-radius: 6px;
   border: 1px solid var(--fio);
   width: 100%;
@@ -2551,7 +2562,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   font-weight: 600;
   color: var(--vermelho);
   user-select: none;
@@ -2571,8 +2582,8 @@ button.alvo-rascunho:hover { background: var(--soft); }
   background: var(--soft-2);
   color: var(--navy);
   border-radius: 4px;
-  font-size: var(--letra-2);
-  font-weight: 500;
+  font-size: var(--letra-14);
+  font-weight: 400;
 }
 
 /* ---------- sondagem por ano de entrada (C5) ---------- */
@@ -2583,7 +2594,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 #modal-sondagem .btn.pequeno { min-height: 44px; }
 .opcao-correcao { min-width: 92px; }
 /* A evidência da lacuna, no tamanho do texto de ajuda, e não menor. */
-.evidencia-lacuna { display: block; font-size: var(--letra-2); color: var(--muted); margin-top: 2px; }
+.evidencia-lacuna { display: block; font-size: var(--letra-14); color: var(--muted); margin-top: 2px; }
 
 /* ---------- da janela da aula e da ficha (vinha num <style> do index.html) ---------- */
 
@@ -2622,15 +2633,13 @@ button.alvo-rascunho:hover { background: var(--soft); }
 }
 
 .ultimo-encontro .rotulo-ultimo {
-  font-size: var(--letra-2);
-  font-weight: 700;
-  letter-spacing: .05em;
-  text-transform: uppercase;
+  font-size: var(--letra-14);
+  font-weight: 600;
   color: var(--navy);
 }
 
 .ultimo-encontro .linha-ultimo {
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   line-height: 1.5;
   margin-bottom: 4px;
   white-space: pre-wrap;
@@ -2674,10 +2683,8 @@ button.alvo-rascunho:hover { background: var(--soft); }
 }
 
 .resumo-etapas .rotulo-resumo-etapas {
-  font-size: var(--letra-2);
-  font-weight: 700;
-  letter-spacing: .05em;
-  text-transform: uppercase;
+  font-size: var(--letra-14);
+  font-weight: 600;
   color: var(--navy);
 }
 
@@ -2687,18 +2694,18 @@ button.alvo-rascunho:hover { background: var(--soft); }
   display: flex;
   flex-wrap: wrap;
   gap: 4px 10px;
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   line-height: 1.5;
   padding: 3px 0;
 }
 
 .resumo-etapas .frente-etapa {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--navy);
   min-width: 132px;
 }
 
-.resumo-etapas .valor-etapa.vazia { color: var(--apoio-azulado); font-style: italic; }
+.resumo-etapas .valor-etapa.vazia { color: var(--apoio-azulado); }
 
 /* ---------- o que morava em style embutido ----------
  * Os estilos fixos que o app.js passava ao el() e o index.html escrevia em
@@ -2711,15 +2718,15 @@ button.alvo-rascunho:hover { background: var(--soft); }
 /* Estados que vinham embutidos com condição: o passo feito da trilha
    (esmaecido e riscado), a seta que não anda (invisível, mas guarda o lugar)
    e o destino que a trilha sugere. */
-.alvo-sugerido { border-color: var(--teal-sugerido) !important; border-width: 2px !important; }
+.alvo-sugerido { border-color: var(--acao) !important; border-width: 2px !important; }
 .u-esmaecido { opacity: .65 !important; }
 .u-riscado { text-decoration: line-through !important; }
 .u-invisivel { visibility: hidden !important; }
 .caixa-de-marcar { width: auto !important; min-height: auto !important; }
 .linha-de-marcar { display: flex !important; align-items: flex-start !important; gap: 8px !important; margin: 0 !important; cursor: pointer !important; }
-.rotulo-de-campo { display: block !important; font-size: var(--letra-2) !important; font-weight: 700 !important; color: var(--navy) !important; margin-bottom: 5px !important; }
-.rotulo-de-secao { font-size: var(--letra-2) !important; font-weight: 700 !important; text-transform: uppercase !important; color: var(--muted) !important; letter-spacing: 0.05em !important; margin-top: 6px !important; }
-.texto-do-relato { font-size: var(--letra-3) !important; line-height: 1.55 !important; white-space: pre-wrap !important; }
+.rotulo-de-campo { display: block !important; font-size: var(--letra-14) !important; font-weight: 600 !important; color: var(--navy) !important; margin-bottom: 5px !important; }
+.rotulo-de-secao { font-size: var(--letra-14) !important; font-weight: 600 !important; color: var(--muted) !important; margin-top: 6px !important; }
+.texto-do-relato { font-size: var(--letra-14) !important; line-height: 1.55 !important; white-space: pre-wrap !important; }
 .u-alinha-centro { align-items: center !important; }
 .u-alinha-fim { align-items: flex-end !important; }
 .u-alinha-se-centro { align-self: center !important; }
@@ -2742,10 +2749,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .u-borda-baixo-nenhum { border-bottom: none !important; }
 .u-borda-nenhum { border: none !important; }
 .u-borda-topo-1-solid-varfio { border-top: 1px solid var(--fio) !important; }
-.u-caixa-maiusculas { text-transform: uppercase !important; }
 .u-cor-muted { color: var(--muted) !important; }
 .u-cor-navy { color: var(--navy) !important; }
-.u-cor-teal { color: var(--teal) !important; }
+.u-cor-teal { color: var(--acao) !important; }
 .u-cor-info-texto { color: var(--info-texto) !important; }
 .u-cor-vermelho { color: var(--vermelho) !important; }
 .u-cursor-default { cursor: default !important; }
@@ -2755,7 +2761,6 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .u-entrelinha-13 { line-height: 1.3 !important; }
 .u-entrelinha-135 { line-height: 1.35 !important; }
 .u-entrelinha-155 { line-height: 1.55 !important; }
-.u-espaco-letras-05em { letter-spacing: .05em !important; }
 .u-espacos-normal { white-space: normal !important; }
 .u-espacos-preservado { white-space: pre-wrap !important; }
 .u-flex-1 { flex: 1 !important; }
@@ -2782,11 +2787,11 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .u-larg-min-52 { min-width: 52px !important; }
 .u-larg-min-64 { min-width: 64px !important; }
 .u-larg-min-78 { min-width: 78px !important; }
-.u-letra-2 { font-size: var(--letra-2) !important; }
-.u-letra-3 { font-size: var(--letra-3) !important; }
-.u-letra-4 { font-size: var(--letra-4) !important; }
-.u-letra-5 { font-size: var(--letra-5) !important; }
-.u-letra-6 { font-size: var(--letra-6) !important; }
+.u-letra-2 { font-size: var(--letra-14) !important; }
+.u-letra-3 { font-size: var(--letra-14) !important; }
+.u-letra-4 { font-size: var(--letra-16) !important; }
+.u-letra-5 { font-size: var(--letra-16) !important; }
+.u-letra-6 { font-size: var(--letra-20) !important; }
 .u-margem-0 { margin: 0 !important; }
 .u-margem-0-0-12 { margin: 0 0 12px !important; }
 .u-margem-0-0-14 { margin: 0 0 14px !important; }
@@ -2857,7 +2862,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .u-mostra-bloco { display: block !important; }
 .u-mostra-flex { display: flex !important; }
 .u-opacidade-75 { opacity: .75 !important; }
-.u-peso-negrito { font-weight: 700 !important; }
+.u-peso-negrito { font-weight: 600 !important; }
 .u-peso-seminegrito { font-weight: 600 !important; }
 .u-recuo-0 { padding: 0 !important; }
 .u-recuo-4-10 { padding: 4px 10px !important; }
@@ -2884,7 +2889,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .u-vao-9 { gap: 9px !important; }
 
 /* A cópia na nuvem (N0). */
-.nuvem-conta { font-size: var(--letra-2); color: var(--muted); word-break: break-all; }
+.nuvem-conta { font-size: var(--letra-14); color: var(--muted); word-break: break-all; }
 
 /* ---------- modo celular, só leitura (D6, parte 1) ----------
    Três telas e abas embaixo, nunca a grade do mês encolhida. Com a classe no
@@ -2912,10 +2917,10 @@ body.modo-celular > .celular {
   flex-shrink: 0;
 }
 .cel-marca { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.cel-marca strong { color: var(--navy); font-size: var(--letra-3); line-height: 1.35; }
+.cel-marca strong { color: var(--navy); font-size: var(--letra-14); line-height: 1.35; }
 /* O texto secundário do celular usa o cinza escuro da escala (mais de 7:1
    sobre o branco e o marfim), e não o --muted, que fica perto de 4,5:1. */
-.cel-origem { font-size: var(--letra-2); color: var(--novidades-subtitulo); overflow-wrap: anywhere; }
+.cel-origem { font-size: var(--letra-14); color: var(--novidades-subtitulo); overflow-wrap: anywhere; }
 body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-topo-acoes { flex-shrink: 0; max-width: 45%; }
 .cel-topo-acoes .btn { white-space: normal; text-align: center; line-height: 1.25; }
@@ -2929,7 +2934,7 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 }
 .cel-tela { display: none; }
 .cel-tela.ativa { display: block; }
-.cel-titulo { font-size: var(--letra-6); color: var(--navy); margin: 4px 0 12px; }
+.cel-titulo { font-size: var(--letra-20); color: var(--navy); margin: 4px 0 12px; }
 .cel-mes .cel-titulo { margin: 0; text-align: center; }
 .cel-mes .btn { min-width: var(--alvo-celular); }
 /* ---------- Hoje como linha do tempo (D6c) ----------
@@ -2949,7 +2954,7 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
    tela, também com a letra a 130% num celular de 360 (auditoria de 09/11). */
 .cel-semana-topo { flex-wrap: nowrap; align-items: center; margin-bottom: 0; }
 .cel-semana-topo .btn { min-width: var(--alvo-celular); flex-shrink: 0; }
-.cel-semana-topo .cel-titulo { margin: 0; text-align: center; font-size: var(--letra-5); line-height: 1.15; }
+.cel-semana-topo .cel-titulo { margin: 0; text-align: center; font-size: var(--letra-16); line-height: 1.15; }
 .cel-semana-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0 0 8px; }
 .cel-semana-dia {
   min-height: 56px;
@@ -2965,9 +2970,9 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
   align-items: center;
   gap: 1px;
 }
-.cel-semana-nome { font-size: var(--letra-1); color: var(--novidades-subtitulo); }
-.cel-semana-numero { font-size: var(--letra-4); font-weight: 700; }
-.cel-semana-dia.hoje .cel-semana-numero { color: var(--teal); }
+.cel-semana-nome { font-size: var(--letra-12); color: var(--novidades-subtitulo); }
+.cel-semana-numero { font-size: var(--letra-16); font-weight: 600; }
+.cel-semana-dia.hoje .cel-semana-numero { color: var(--acao); }
 .cel-semana-dia.ativo { background: var(--navy); border-color: var(--navy); }
 .cel-semana-dia.ativo .cel-semana-nome,
 .cel-semana-dia.ativo .cel-semana-numero { color: var(--branco); }
@@ -3005,7 +3010,7 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
   border-radius: 999px;
   background: var(--navy);
   color: var(--branco);
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -3031,7 +3036,7 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
   padding: 4px 8px 4px 16px;
   border-bottom: 1px solid var(--fio-claro);
 }
-.cel-avisos-titulo { margin: 0; font-size: var(--letra-5); font-weight: 600; color: var(--texto); }
+.cel-avisos-titulo { margin: 0; font-size: var(--letra-16); font-weight: 600; color: var(--texto); }
 .cel-avisos-todos {
   min-height: var(--alvo-celular);
   padding: 0 8px;
@@ -3039,7 +3044,7 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
   background: transparent;
   color: var(--navy);
   font: inherit;
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
   font-weight: 600;
   cursor: pointer;
 }
@@ -3068,8 +3073,8 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-aviso-icone svg { display: block; }
 .cel-aviso-registrar .cel-aviso-icone { background: var(--aviso-fundo); color: var(--aviso-texto); }
 .cel-aviso-corpo { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.cel-aviso-titulo { font-size: var(--letra-4); font-weight: 600; color: var(--texto); line-height: 1.3; }
-.cel-aviso-detalhe { font-size: var(--letra-3); color: var(--novidades-subtitulo); line-height: 1.35; margin-top: 2px; }
+.cel-aviso-titulo { font-size: var(--letra-16); font-weight: 600; color: var(--texto); line-height: 1.3; }
+.cel-aviso-detalhe { font-size: var(--letra-14); color: var(--novidades-subtitulo); line-height: 1.35; margin-top: 2px; }
 /* As aulas sem registro, uma por linha (aluno, dia e hora). */
 .cel-aviso-aulas { list-style: none; margin: 2px 0 0; padding: 0; }
 .cel-aviso-aulas li + li { margin-top: 2px; }
@@ -3081,7 +3086,7 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao {
   border: 0;
   background: var(--acao-clara);
   color: var(--navy);
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -3107,21 +3112,21 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
   align-items: center;
   gap: 10px;
   padding: 6px 8px 6px 16px;
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   color: var(--novidades-subtitulo);
 }
 .cel-avisos-rodape[data-tom="problema"] { color: var(--vermelho); }
 .cel-avisos-nuvem { flex: 0 0 auto; display: inline-flex; }
 .cel-avisos-sincronia-texto { flex: 1; min-width: 0; }
 /* O Desfazer do dispensar: dourado sobre o marinho, sem borda. */
-.aviso.aviso-dourado button#aviso-acao { color: var(--gold); border-color: transparent; font-size: var(--letra-4); }
+.aviso.aviso-dourado button#aviso-acao { color: var(--gold); border-color: transparent; font-size: var(--letra-16); }
 
 .cel-tempo { margin-top: 4px; }
 .cel-tempo-linha { position: relative; display: flex; gap: 8px; margin-bottom: 6px; }
 .cel-tempo-hora {
   flex: 0 0 44px;
-  font-size: var(--letra-2);
-  font-weight: 700;
+  font-size: var(--letra-14);
+  font-weight: 600;
   color: var(--novidades-subtitulo);
   padding-top: 6px;
   text-align: right;
@@ -3146,9 +3151,9 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
   padding: 6px 10px;
   cursor: pointer;
 }
-.cel-bloco-nome { font-size: var(--letra-5); font-weight: 700; color: var(--navy); overflow-wrap: anywhere; }
-.cel-bloco-hora { font-size: var(--letra-2); color: var(--novidades-subtitulo); }
-.cel-bloco-situacao { font-size: var(--letra-2); font-weight: 700; color: var(--novidades-subtitulo); }
+.cel-bloco-nome { font-size: var(--letra-16); font-weight: 600; color: var(--navy); overflow-wrap: anywhere; }
+.cel-bloco-hora { font-size: var(--letra-14); color: var(--novidades-subtitulo); }
+.cel-bloco-situacao { font-size: var(--letra-14); font-weight: 600; color: var(--novidades-subtitulo); }
 .cel-bloco-realizada .cel-bloco-situacao { color: var(--teal); }
 .cel-bloco-reposicao { border-right: 4px solid var(--novidades-selo-borda); }
 .cel-bloco-reposicao .cel-bloco-situacao { color: var(--novidades-tag-ouro-texto); }
@@ -3156,7 +3161,7 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
 .cel-bloco-cancelada { opacity: .6; background: var(--fundo-leve); }
 .cel-bloco-cancelada .cel-bloco-nome,
 .cel-bloco-cancelada .cel-bloco-hora { text-decoration: line-through; }
-.cel-bloco-choque { font-size: var(--letra-2); font-weight: 700; color: var(--aviso-texto); }
+.cel-bloco-choque { font-size: var(--letra-14); font-weight: 600; color: var(--aviso-texto); }
 .cel-bloco.com-choque { border-color: var(--etapas-borda); }
 
 /* O buraco do dia, escrito, e as horas em que se pode marcar nele. */
@@ -3172,7 +3177,7 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
   justify-content: center;
   gap: 6px;
 }
-.cel-livre-texto { font-size: var(--letra-3); color: var(--novidades-subtitulo); }
+.cel-livre-texto { font-size: var(--letra-14); color: var(--novidades-subtitulo); }
 .cel-livre-horas { display: flex; flex-wrap: wrap; gap: 6px; }
 .cel-livre-hora {
   min-height: var(--alvo-celular);
@@ -3182,8 +3187,8 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
   background: var(--branco);
   color: var(--navy);
   font: inherit;
-  font-size: var(--letra-4);
-  font-weight: 700;
+  font-size: var(--letra-16);
+  font-weight: 600;
 }
 .cel-livre-hora.escolhida { background: var(--navy); border-color: var(--navy); color: var(--branco); }
 
@@ -3205,8 +3210,8 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
   top: -9px;
   background: var(--vermelho);
   color: var(--branco);
-  font-size: var(--letra-1);
-  font-weight: 700;
+  font-size: var(--letra-12);
+  font-weight: 600;
   border-radius: 6px;
   padding: 1px 4px;
 }
@@ -3233,8 +3238,8 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
   background: var(--navy);
   color: var(--branco);
   font: inherit;
-  font-size: var(--letra-6);
-  font-weight: 700;
+  font-size: var(--letra-20);
+  font-weight: 600;
   box-shadow: var(--sombra-forte);
 }
 
@@ -3278,9 +3283,8 @@ body.modo-celular .celular .btn.principal.cel-salvar-com-choque { background: va
 /* Hoje: a aula de agora em destaque, e as marcas "Agora" e "Próxima". */
 .cel-bloco-agora { border-color: var(--cor-aluno); box-shadow: 0 0 0 2px var(--cor-aluno); }
 .cel-bloco-marca {
-  font-size: var(--letra-1);
-  font-weight: 700;
-  text-transform: uppercase;
+  font-size: var(--letra-12);
+  font-weight: 600;
   color: var(--branco);
   background: var(--navy);
   border-radius: 6px;
@@ -3299,12 +3303,12 @@ body.modo-celular .celular .btn.principal.cel-salvar-com-choque { background: va
   background: var(--aviso-texto);
   box-shadow: 0 0 0 2px var(--branco);
 }
-.cel-folha-resumo { margin-bottom: 12px; font-size: var(--letra-3); }
+.cel-folha-resumo { margin-bottom: 12px; font-size: var(--letra-14); }
 .cel-folha-acoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0 12px; }
-body.modo-celular .celular .cel-folha .cel-folha-botao { min-height: 56px; font-size: var(--letra-5); font-weight: 700; white-space: normal; }
-.cel-folha-botao.atual { border-color: var(--teal); color: var(--teal); }
+body.modo-celular .celular .cel-folha .cel-folha-botao { min-height: 56px; font-size: var(--letra-16); font-weight: 600; white-space: normal; }
+.cel-folha-botao.atual { background: var(--acao); border-color: var(--acao); color: var(--sobre-acao); }
 .cel-folha-largo { grid-column: 1 / -1; }
-.cel-folha-pergunta { font-size: var(--letra-5); font-weight: 700; color: var(--navy); margin: 4px 0 8px; }
+.cel-folha-pergunta { font-size: var(--letra-16); font-weight: 600; color: var(--navy); margin: 4px 0 8px; }
 .cel-dois-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .cel-livres { margin: 4px 0 12px; display: flex; flex-direction: column; gap: 6px; }
 .cel-choque { margin-bottom: 8px; }
@@ -3329,12 +3333,12 @@ body.modo-celular .celular .cel-folha .cel-folha-botao { min-height: 56px; font-
 .cel-nuvem[data-tom="esperando"] { color: var(--aviso-texto); }
 .cel-nuvem[data-tom="problema"] { color: var(--vermelho); }
 .cel-regra[hidden] { display: none; }
-body.modo-celular .celular .cel-icone { min-width: var(--alvo-celular); padding: 0; font-size: var(--letra-6); }
+body.modo-celular .celular .cel-icone { min-width: var(--alvo-celular); padding: 0; font-size: var(--letra-20); }
 .cel-lembrete { margin: 10px 0 0; }
-.cel-ultimo { margin-top: 10px; font-size: var(--letra-3); line-height: 1.5; }
-.cel-ultimo .rotulo-ultimo { font-weight: 700; color: var(--teal); }
+.cel-ultimo { margin-top: 10px; font-size: var(--letra-14); line-height: 1.5; }
+.cel-ultimo .rotulo-ultimo { font-weight: 600; color: var(--acao); }
 .cel-ver-nota { margin-top: 10px; }
-.cel-so-minha { margin-top: 8px; font-size: var(--letra-3); }
+.cel-so-minha { margin-top: 8px; font-size: var(--letra-14); }
 .cel-so-minha[hidden] { display: none; }
 .cel-linhas { list-style: none; margin: 8px 0 0; padding: 0; }
 .cel-linha {
@@ -3342,7 +3346,7 @@ body.modo-celular .celular .cel-icone { min-width: var(--alvo-celular); padding:
   gap: 8px;
   padding: 6px 0;
   border-top: 1px solid var(--fio-claro);
-  font-size: var(--letra-3);
+  font-size: var(--letra-14);
   color: var(--texto);
 }
 .cel-linha .cresce { flex: 1; min-width: 0; }
@@ -3365,7 +3369,7 @@ body.modo-celular .celular .cel-icone { min-width: var(--alvo-celular); padding:
   background: transparent;
   color: var(--novidades-subtitulo);
   font: inherit;
-  font-size: var(--letra-4);
+  font-size: var(--letra-16);
   font-weight: 600;
 }
 .cel-aba.ativa { background: var(--soft); color: var(--navy); }
@@ -3380,20 +3384,20 @@ body.modo-celular .celular .campo input,
 body.modo-celular .celular .campo select { width: 100%; }
 body.modo-celular .celular .linha-pagamento .barra { flex-wrap: wrap; }
 /* As aulas ainda agendadas, à parte no Fechamento do celular (D6b). */
-.cel-subtitulo { margin-top: 10px; font-size: var(--letra-2); font-weight: 700; color: var(--novidades-subtitulo); }
+.cel-subtitulo { margin-top: 10px; font-size: var(--letra-14); font-weight: 600; color: var(--novidades-subtitulo); }
 .cel-linha-futura { color: var(--novidades-subtitulo); }
 /* Dinheiro de relance (D6c, lote 3): o total a receber no alto e o selo de
    cada família. A palavra diz a situação; a cor só reforça. */
 .cel-total { border-left: 6px solid var(--navy); }
-.cel-total-rotulo { font-size: var(--letra-2); font-weight: 700; color: var(--novidades-subtitulo); text-transform: uppercase; letter-spacing: .04em; }
-.cel-total-valor { font-size: var(--letra-6); font-weight: 700; color: var(--navy); margin: 2px 0; }
-.cel-total-do-mes { font-size: var(--letra-3); color: var(--texto); margin-bottom: 4px; }
-.cel-total-aberto { margin-top: 6px; font-size: var(--letra-3); font-weight: 600; color: var(--texto); }
-.cel-total-anteriores { margin-top: 6px; font-size: var(--letra-3); font-weight: 700; color: var(--vermelho); }
+.cel-total-rotulo { font-size: var(--letra-14); font-weight: 600; color: var(--novidades-subtitulo); }
+.cel-total-valor { font-size: var(--letra-20); font-weight: 600; color: var(--navy); margin: 2px 0; }
+.cel-total-do-mes { font-size: var(--letra-14); color: var(--texto); margin-bottom: 4px; }
+.cel-total-aberto { margin-top: 6px; font-size: var(--letra-14); font-weight: 600; color: var(--texto); }
+.cel-total-anteriores { margin-top: 6px; font-size: var(--letra-14); font-weight: 600; color: var(--vermelho); }
 /* O valor da aula ainda não dada, em cinza e com "a dar": não é o que já se deve. */
-.cel-valor-a-dar { color: var(--novidades-subtitulo); font-style: italic; }
+.cel-valor-a-dar { color: var(--novidades-subtitulo); }
 /* No "pago em" do celular, junto do Confirmar: o valor já vem escrito. */
-.cel-confira-valor { flex: 1 0 100%; font-size: var(--letra-3); font-weight: 600; color: var(--aviso-texto); }
+.cel-confira-valor { flex: 1 0 100%; font-size: var(--letra-14); font-weight: 600; color: var(--aviso-texto); }
 .cel-fechamento-cabeca { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cel-fechamento-cabeca .cresce { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cel-selo {
@@ -3401,8 +3405,8 @@ body.modo-celular .celular .linha-pagamento .barra { flex-wrap: wrap; }
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid var(--fio);
-  font-size: var(--letra-2);
-  font-weight: 700;
+  font-size: var(--letra-14);
+  font-weight: 600;
   white-space: nowrap;
   background: var(--soft);
   color: var(--novidades-subtitulo);
@@ -3416,20 +3420,20 @@ body.modo-celular .celular .linha-pagamento .barra { flex-wrap: wrap; }
 .cel-folha-nome {
   display: inline-flex; align-items: center; gap: 6px; min-height: var(--alvo-celular); max-width: 100%;
   padding: 0; border: 0; background: transparent; color: var(--navy);
-  font: inherit; font-weight: 700; text-align: left; cursor: pointer;
+  font: inherit; font-weight: 600; text-align: left; cursor: pointer;
 }
 .cel-folha-nome-seta { color: var(--novidades-subtitulo); }
-.cel-ficha { font-size: var(--letra-3); }
-.cel-ficha-linha { margin: 8px 0 4px; font-size: var(--letra-4); color: var(--texto); }
+.cel-ficha { font-size: var(--letra-14); }
+.cel-ficha-linha { margin: 8px 0 4px; font-size: var(--letra-16); color: var(--texto); }
 .cel-ficha-botoes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0; }
 .cel-ficha-mensagens { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
 body.modo-celular .celular a.cel-link-botao { min-height: var(--alvo-celular); text-decoration: none; text-align: center; white-space: normal; }
 /* No toque, o :hover gruda: o link não pode ficar cinza, com cara de "já enviado". */
 body.modo-celular .celular a.cel-link-botao:hover,
 body.modo-celular .celular a.cel-link-botao:focus { background: var(--branco); }
-.cel-ficha-telefone { margin: 8px 0 4px; font-size: var(--letra-5); font-weight: 700; color: var(--texto); }
+.cel-ficha-telefone { margin: 8px 0 4px; font-size: var(--letra-16); font-weight: 600; color: var(--texto); }
 /* O alto, quando o celular pode estar atrás do tablet. */
-.cel-origem.cel-desatualizado { color: var(--vermelho); font-weight: 700; }
+.cel-origem.cel-desatualizado { color: var(--vermelho); font-weight: 600; }
 .cel-ficha-lugar { margin-top: 8px; }
 .cel-alunos-lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
 /* O fim da aba Alunos com folga: o último item e o Cadastrar não ficam sob as abas. */
@@ -3440,11 +3444,11 @@ body.modo-celular .celular a.cel-link-botao:focus { background: var(--branco); }
   border: 1px solid var(--fio-claro); border-left: 6px solid var(--cor-aluno); border-radius: 10px;
   background: var(--branco); color: var(--texto); font: inherit; text-align: left; cursor: pointer;
 }
-.cel-aluno-nome { font-size: var(--letra-5); font-weight: 700; color: var(--navy); }
-.cel-aluno-detalhe { font-size: var(--letra-2); color: var(--novidades-subtitulo); }
+.cel-aluno-nome { font-size: var(--letra-16); font-weight: 600; color: var(--navy); }
+.cel-aluno-detalhe { font-size: var(--letra-14); color: var(--novidades-subtitulo); }
 body.modo-celular .celular .campo[hidden] { display: none; }
 /* Com cinco abas (o observador), a letra desce um degrau para caber em 390 px. */
-.cel-abas.muitas .cel-aba { min-width: 0; padding: 0 2px; font-size: var(--letra-2); }
+.cel-abas.muitas .cel-aba { min-width: 0; padding: 0 2px; font-size: var(--letra-14); }
 /* O aviso no celular ocupa o seu lugar entre o conteúdo e as abas (o app.js
    o põe ali): nunca cobre o formulário nem a barra de baixo. */
 body.modo-celular .celular > .aviso { position: static; transform: none; transition: none; display: none; max-width: none;

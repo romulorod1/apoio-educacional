@@ -3,14 +3,16 @@
  * Trava do item B12 (sistema visual), sem navegador, no portão rápido:
  * 1. Nenhuma cor literal (hexadecimal, rgb(), rgba(), hsl(), white, black)
  *    fora do :root no styles.css. Cor nova entra como variável no :root.
- * 2. No máximo 6 tamanhos de letra distintos no styles.css, já resolvidas as
- *    variáveis (--letra-1 a --letra-6).
+ * 2. Toda letra do styles.css, já resolvidas as variáveis, é um dos cinco
+ *    degraus da escala do sistema visual (F1, 09/11/2026): 12, 14, 16, 20 e
+ *    24 px, escritos em rem (--letra-12 a --letra-24) para crescerem com a
+ *    letra do aparelho. Até a F1 eram seis degraus em px (--letra-1 a -6).
  *
  * A contagem é a mesma do _teste/estatisticas_css.js, que gera o relatório de
  * antes e depois: a trava e o relatório não podem medir coisas diferentes.
  *
- * Venenos: uma cópia do CSS com uma cor solta e outra com um sétimo tamanho
- * TÊM de reprovar; e do outro lado, uma regra nova que usa variável, e uma cor
+ * Venenos: uma cópia do CSS com uma cor solta e outras com um tamanho fora da
+ * escala (em px, ou o menor degrau em 11 px) TÊM de reprovar; e do outro lado, uma regra nova que usa variável, e uma cor
  * citada só em comentário, NÃO podem ser acusadas. Antes de acreditar no zero,
  * o instrumento prova que vê: as cores de dentro do :root existem e são
  * achadas quando o :root é tirado do caminho.
@@ -20,7 +22,8 @@ const fs = require('fs');
 const path = require('path');
 const E = require('./estatisticas_css.js');
 
-const TETO_TAMANHOS = 6;
+const TETO_TAMANHOS = 5;
+const ESCALA = ['.75rem', '.875rem', '1rem', '1.25rem', '1.5rem'];
 let passes = 0, falhas = 0;
 function conf(rotulo, obtido, esperado) {
   const ok = String(obtido) === String(esperado);
@@ -40,7 +43,9 @@ function avaliar(css) {
   soltas.forEach(s => motivos.push('cor solta ' + s.cor + ' (linha ' + s.linha + ' fora do :root)'));
   const tamanhos = Object.keys(E.tamanhosDeLetra(lido));
   if (tamanhos.length > TETO_TAMANHOS) motivos.push(tamanhos.length + ' tamanhos de letra: ' + tamanhos.join(', '));
-  return { motivos, soltas: soltas.length, tamanhos: tamanhos.length };
+  const fora = tamanhos.filter(t => ESCALA.indexOf(t) < 0);
+  if (fora.length) motivos.push('tamanhos de letra fora da escala: ' + fora.join(', '));
+  return { motivos, soltas: soltas.length, tamanhos: tamanhos.length, fora: fora.length };
 }
 
 const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
