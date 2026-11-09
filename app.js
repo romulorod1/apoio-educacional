@@ -1417,6 +1417,15 @@
     }
     var topo = pilhaModalHistorico[pilhaModalHistorico.length - 1];
     if (!topo) return;
+    /* B6: a tabela lado a lado por cima de uma janela (a aula) não entra no
+     * histórico: o Voltar fecha a TABELA, e a entrada da janela de baixo volta
+     * para a pilha continuar casando com o que está aberto. */
+    var ladoAberto = $('#lado-a-lado');
+    if (ladoAberto && !ladoAberto.hidden) {
+      history.pushState({ apoioModal: topo.token }, '');
+      fecharLadoALado();
+      return;
+    }
     if (topo.id === 'modal-aula' && relatoEmEdicaoAlterado()) {
       // A confirmação precisa de seu próprio Voltar. Repor a entrada da aula
       // evita que Continuar escrevendo deixe a janela sem proteção do Android.
@@ -4135,6 +4144,13 @@
         nosLivros.length ? el('button', {
           type: 'button', class: 'btn pequeno' + (podeMaterial ? ' u-margem-esq-8' : ''), texto: 'Abrir no livro', 'data-abrir-no-livro': t.id,
           aoClick: function () { abrirLivrosDoAssunto(t, nosLivros); }
+        }) : null,
+        /* B6: nenhum livro do ano tem capítulo do assunto: a tabela diz isso
+         * livro a livro ("não trata" ou "sem mapa"), no lugar do "Abrir no
+         * livro" que não existe. */
+        !nosLivros.length && t.id && livrosDoTablet && livrosDoTablet.length ? el('button', {
+          type: 'button', class: 'btn pequeno' + (podeMaterial ? ' u-margem-esq-8' : ''), texto: 'Ver em todos os livros', 'data-ver-nos-livros': t.id,
+          aoClick: function () { abrirLadoALado(t.id, { aula: { t: t, achados: [] } }); }
         }) : null,
         /* A folga sai dos 12 px da linha para 32: Tirar apaga, Material não, e
          * os dois ficavam a um dedo de distância um do outro numa tela que ela
@@ -18062,7 +18078,7 @@
    * Só lê: o mapa (com as correções dela), o índice de assuntos e a lista dos
    * livros (Store.listarLivros, referências de Blob). Nada é gravado e nenhum
    * livro é aberto para desenhar a tabela. */
-  var ladoAtual = null;   // { disciplina, serie, tema, escolhido, so, aula, deEscolha }
+  var ladoAtual = null;   // { disciplina, serie, tema, escolhido, so, aula, deEscolha, origem }
   var ladoVez = 0;
 
   /* O mapa revisado: tem capítulo, e nenhum veio do passe automático sem a
@@ -18090,8 +18106,10 @@
     var m = Core.materiaPorId(id);
     return (m && m.rotulo) || (a && a.disciplinaNome) || id;
   }
-  /* Quantos livros tratam cada assunto: um passe pelos mapas, e a conta por
-   * assunto só olha os livros do ano dele. */
+  /* Quantos livros tratam cada assunto: um passe pelos mapas. Conta todo
+   * livro cujo mapa liga o assunto, também o de ano vizinho (o gerador liga
+   * capítulo a assunto da série vizinha): é o mesmo critério das colunas da
+   * tabela, que trazem os livros do ano e os que ligam alguma linha. */
   function livrosPorAssunto(livros) {
     var porAssunto = Object.create(null);
     var correcoes = correcoesDosLivros();
@@ -18103,8 +18121,7 @@
     });
     return function (a) {
       var x = a && porAssunto[a.id];
-      if (!x) return 0;
-      return Object.keys(x).filter(function (id) { return livroDoAssunto(x[id], a); }).length;
+      return x ? Object.keys(x).length : 0;
     };
   }
   function pluralLivros(n) { return n ? plural(n, 'livro', 'livros') : 'nenhum livro'; }
@@ -18122,7 +18139,8 @@
       }
       return null;
     }
-    var doAno = assuntosDosLivros.lista.filter(function (a) { return a.disciplina === disc.id && a.eixo === 'ano' && a.serie === ano; });
+    var idDoIndice = DISCIPLINA_DA_MATERIA[disc.id] || disc.id;
+    var doAno = assuntosDosLivros.lista.filter(function (a) { return a.disciplina === idDoIndice && a.eixo === 'ano' && a.serie === ano; });
     if (!doAno.length) return null;
     var contar = livrosPorAssunto(livros);
     var mais = doAno.map(function (a, i) { return { a: a, n: contar(a), i: i }; })
@@ -18137,7 +18155,7 @@
         ]);
       }).concat([
         el('button', { type: 'button', class: 'bibl-comparar-chip', id: 'bib-comparar-todos', iconeDepois: 'chr',
-          texto: 'Todos os ' + doAno.length + ' assuntos', aoClick: function () { abrirEscolhaDoAssunto(disc.id, ano, ''); } })
+          texto: 'Todos os ' + doAno.length + ' assuntos', aoClick: function () { abrirEscolhaDoAssunto(idDoIndice, ano, ''); } })
       ]))
     ]);
   }
@@ -18173,7 +18191,7 @@
       var a = nomes && nomes.porId[assuntoId];
       if (!a) { avisar('Não consegui abrir o índice de assuntos agora. Tente de novo daqui a pouco.'); return; }
       ladoAtual = { disciplina: a.disciplina, serie: a.serie, tema: a.tema, escolhido: a.id, so: false,
-        aula: opcoes.aula || null, deEscolha: opcoes.deEscolha !== undefined ? opcoes.deEscolha : null };
+        aula: opcoes.aula || null, deEscolha: opcoes.deEscolha !== undefined ? opcoes.deEscolha : null, origem: opcoes.origem || null };
       return desenharLadoALado();
     }, function () { avisar('Não consegui abrir o índice de assuntos agora. Tente de novo daqui a pouco.'); });
   }
@@ -18199,9 +18217,18 @@
     var escolhido = nomes.porId[s.escolhido] || null;
     var visiveis = s.so && escolhido ? linhas.filter(function (a) { return a.id === escolhido.id; }) : linhas;
     var correcoes = correcoesDosLivros();
-    var colunas = livros.filter(function (l) { return l && l.meta && livroDoAssunto(l.meta, base); }).map(function (l, i) {
-      var mapa = Biblioteca.mapaDoLivro(l.meta, correcoes[l.id]);
-      return { id: l.id, meta: l.meta, mapa: mapa, revisado: mapaFoiRevisado(mapa), cor: CORES_DAS_CAPAS[i % CORES_DAS_CAPAS.length] };
+    var ligaAlguma = function (mapa, lista) {
+      return lista.some(function (a) { return mapa.some(function (e) { return e.assuntos.indexOf(a.id) >= 0; }); });
+    };
+    var mapas = livros.map(function (l) { return l && l.meta ? Biblioteca.mapaDoLivro(l.meta, correcoes[l.id]) : []; });
+    // as colunas: os livros da matéria e do ano, e os de outro ano cujo mapa liga alguma linha
+    var colunas = [];
+    livros.forEach(function (l, i) {
+      if (!l || !l.meta) return;
+      var doAno = livroDoAssunto(l.meta, base);
+      if (!doAno && !ligaAlguma(mapas[i], linhas)) return;
+      colunas.push({ id: l.id, meta: l.meta, mapa: mapas[i], revisado: mapaFoiRevisado(mapas[i]), vizinho: !doAno,
+        cor: CORES_DAS_CAPAS[colunas.length % CORES_DAS_CAPAS.length] });
     });
     var celulas = visiveis.map(function (a) {
       return colunas.map(function (c) { return celulaDoLadoALado(c.mapa, c.revisado, a.id); });
@@ -18209,9 +18236,14 @@
     var disciplinaNome = nomeDaDisciplina(s.disciplina, base);
     var serieNome = serieDoAssunto(base);
     var titulo = (base.temaNome || base.titulo) + (serieNome ? ', ' + serieNome : '');
-    var comLigacao = colunas.filter(function (c, j) {
-      return linhas.some(function (a) { return c.mapa.some(function (e) { return e.assuntos.indexOf(a.id) >= 0; }); });
-    }).length;
+    var vizinhos = colunas.filter(function (c) { return c.vizinho; }).length;
+    var aConfirmar = colunas.filter(function (c) { return !c.revisado; }).length;
+    // o resumo não afirma o que não é: diz quantos livros têm o mapa ainda não revisado
+    var resumo = !colunas.length ? 'nenhum livro no tablet' : [
+      pluralLivros(colunas.length) + (vizinhos ? '' : serieNome ? ' do ' + serieNome : ''),
+      vizinhos ? vizinhos + ' de outro ano, com capítulo ligado' : null,
+      aConfirmar ? aConfirmar + ' com o mapa ainda não revisado' : colunas.length > 1 ? 'todos com o mapa revisado' : 'com o mapa revisado'
+    ].filter(Boolean).join('; ');
 
     var tela = mostrarTelaDoLado('tabela');
     var rolagem = tela.dataset.tema === s.disciplina + '|' + s.serie + '|' + s.tema ? (tela.querySelector('.lado-rola') || {}).scrollTop || 0 : 0;
@@ -18224,20 +18256,22 @@
     if (base.eixo === 'ano') {
       nomes.lista.forEach(function (a) {
         if (a.disciplina !== s.disciplina || a.tema !== s.tema || anos.indexOf(a.serie) >= 0) return;
-        if (a.serie === s.serie || livros.some(function (l) { return l && l.meta && livroDoAssunto(l.meta, a); })) anos.push(a.serie);
+        var doTema = nomes.lista.filter(function (x) { return x.disciplina === s.disciplina && x.tema === s.tema && x.serie === a.serie; });
+        if (a.serie === s.serie || livros.some(function (l, i) { return l && l.meta && (livroDoAssunto(l.meta, a) || ligaAlguma(mapas[i], doTema)); })) anos.push(a.serie);
       });
       anos.sort(function (x, y) { return ordemDoAno(x) - ordemDoAno(y); });
     }
     var trocarAno = function (serie) {
       if (serie === s.serie) return;
-      ladoAtual = { disciplina: s.disciplina, serie: serie, tema: s.tema, escolhido: null, so: false, aula: null, deEscolha: s.deEscolha };
+      ladoAtual = { disciplina: s.disciplina, serie: serie, tema: s.tema, escolhido: null, so: false, aula: null, deEscolha: s.deEscolha, origem: s.origem };
       desenharLadoALado();
     };
     tela.appendChild(el('header', { class: 'lado-cabeca' }, [
       el('button', { type: 'button', class: 'btn bibl-voltar-livro', id: 'lado-voltar', icone: 'chl', texto: 'Voltar',
         aoClick: function () {
           var termo = s.deEscolha;
-          if (termo !== null && termo !== undefined) abrirEscolhaDoAssunto(s.disciplina, s.serie, termo);
+          var o = s.origem || { disciplina: s.disciplina, serie: s.serie };
+          if (termo !== null && termo !== undefined) abrirEscolhaDoAssunto(o.disciplina, o.serie, termo);
           else fecharLadoALado();
         } }),
       el('div', { class: 'cresce lado-nome' }, [
@@ -18245,10 +18279,7 @@
           el('h2', { class: 'bibl-titulo-livro', id: 'lado-titulo', texto: titulo }),
           el('span', { class: 'bibl-apoio', texto: disciplinaNome })
         ]),
-        el('p', { class: 'bibl-apoio', id: 'lado-resumo', texto: colunas.length ?
-          pluralLivros(colunas.length) + (serieNome ? ' do ' + serieNome : '') + ', ' +
-            (comLigacao === colunas.length && comLigacao > 1 ? 'todos' : comLigacao) + ' com capítulo ligado' :
-          'nenhum livro no tablet' })
+        el('p', { class: 'bibl-apoio', id: 'lado-resumo', texto: resumo })
       ]),
       anos.length > 1 ? el('div', { class: 'bibl-anos lado-anos', role: 'radiogroup', 'aria-label': 'Ano' }, anos.map(function (a) {
         var on = a === s.serie;
@@ -18267,9 +18298,9 @@
     tela.appendChild(el('div', { class: 'lado-filtro' }, [
       el('span', { class: 'bibl-apoio', texto: 'Mostrar' }),
       el('div', { class: 'bibl-anos lado-chips' }, chips),
-      el('p', { class: 'bibl-pequena lado-legenda', id: 'lado-legenda' }, [
-        el('span', { class: 'lado-nao', texto: 'não trata' }), ': o mapa revisado não liga. ',
-        el('span', { class: 'lado-sem', texto: 'sem mapa' }), ': o mapa do livro ainda não foi revisado.'
+      el('p', { class: 'lado-legenda', id: 'lado-legenda' }, [
+        el('span', { class: 'lado-legenda-item' }, [icone('alerta'), el('span', {}, [el('strong', { class: 'lado-nao', texto: 'não trata' }), ': o mapa revisado não liga'])]),
+        el('span', { class: 'lado-legenda-item' }, [el('span', {}, [el('strong', { class: 'lado-sem', texto: 'sem mapa' }), ': o mapa do livro ainda não foi revisado'])])
       ])
     ]));
 
@@ -18291,6 +18322,7 @@
         el('div', { class: 'lado-livro-texto' }, [
           el('span', { class: 'bibl-forte', texto: tituloDoLivro(c.meta) }),
           el('span', { class: 'bibl-apoio', texto: nTrata + ' de ' + linhas.length + (linhas.length === 1 ? ' assunto' : ' assuntos') }),
+          c.vizinho ? el('span', { class: 'bibl-apoio', 'data-vizinho': 'sim', texto: 'de outro ano' }) : null,
           !c.mapa.length ? el('span', { class: 'tag lado-tag', 'data-falta': 'mapa', texto: 'sem mapa de assuntos' }) :
             !c.revisado ? el('span', { class: 'tag lado-tag', 'data-falta': 'revisao', texto: 'mapa a confirmar' }) : null
         ])
@@ -18306,7 +18338,8 @@
         el('span', { class: 'lado-sinal' }, [falha ? icone('alerta', 'algum livro não trata') : todos ? icone('check', 'todos os livros tratam') : null]),
         el('span', { class: 'lado-rotulo-texto' }, [
           el('span', { class: 'lado-assunto', texto: a.titulo }),
-          ehEscolhido && s.aula ? el('button', { type: 'button', class: 'btn pequeno lado-abrir-no-livro', id: 'lado-abrir-no-livro', icone: 'book',
+          ehEscolhido ? el('span', { class: 'bibl-apoio lado-escolhido', texto: 'o assunto escolhido' }) : null,
+          ehEscolhido && s.aula && s.aula.achados.length ? el('button', { type: 'button', class: 'btn pequeno lado-abrir-no-livro', id: 'lado-abrir-no-livro', icone: 'book',
             texto: 'Abrir no livro', aoClick: function () { var au = s.aula; fecharLadoALado(); abrirLivrosDoAssunto(au.t, au.achados); } }) : null
         ])
       ]);
@@ -18323,7 +18356,7 @@
             return el('button', { type: 'button', class: 'lado-pg', 'data-n': String(e.n),
               'data-pagina': epub ? null : String(paginaDoArquivo(c.meta, e)),
               'aria-label': a.titulo + ', ' + tituloDoLivro(c.meta) + ', ' + cap + ', ' + paginas,
-              aoClick: function () { abrirCapitulo(c, e); } }, [
+              aoClick: function () { abrirDoLado(c, e); } }, [
               el('span', { class: 'lado-pg-texto' }, [
                 el('span', { class: 'lado-pg-cap', texto: cap }),
                 el('span', { class: 'lado-pg-p', texto: paginas })
@@ -18338,7 +18371,8 @@
         }
         linha.push(el('div', { class: 'lado-celula', role: 'cell', 'data-livro': c.id, 'data-tipo': x.tipo }, conteudo));
       });
-      grade.appendChild(el('div', { class: 'lado-linha' + (ehEscolhido ? ' escolhido' : '') + (falha ? ' com-falha' : ''), role: 'row', 'data-assunto': a.id }, linha));
+      grade.appendChild(el('div', { class: 'lado-linha' + (ehEscolhido ? ' escolhido' : '') + (falha ? ' com-falha' : ''), role: 'row', 'data-assunto': a.id,
+        'aria-current': ehEscolhido ? 'true' : null }, linha));
     });
     // o pé: abrir cada livro no primeiro capítulo ligado ao que está à vista
     var pe = [el('div', { class: 'lado-canto', role: 'cell' })];
@@ -18352,17 +18386,27 @@
         });
       });
       var epub = c.meta.formato === 'epub';
+      var rotuloPe = !primeira ? '' : primeira.obraInteira ? 'Abrir o livro' : epub ? 'Abrir o capítulo' : 'Abrir na p. ' + paginaParaMostrar(c.meta, primeira);
       pe.push(el('div', { class: 'lado-celula lado-pe', role: 'cell' }, [primeira ? el('button', { type: 'button', class: 'btn lado-abrir',
-        'data-livro': c.id, icone: 'book', texto: epub || primeira.obraInteira ? 'Abrir o capítulo' : 'Abrir na p. ' + paginaParaMostrar(c.meta, primeira),
-        aoClick: function () { abrirCapitulo(c, primeira); } }) : null]));
+        'data-livro': c.id, icone: 'book', texto: rotuloPe, 'aria-label': rotuloPe + ', ' + tituloDoLivro(c.meta),
+        aoClick: function () { abrirDoLado(c, primeira); } }) : null]));
     });
     grade.appendChild(el('div', { class: 'lado-linha lado-linha-pe', role: 'row' }, pe));
     rola.appendChild(grade);
     tela.appendChild(rola);
     rola.scrollTop = rolagem;
     // a linha escolhida à vista
-    var marcada = escolhido && !rolagem ? grade.querySelector('.lado-linha.escolhido') : null;
-    if (marcada && marcada.offsetTop + marcada.offsetHeight > rola.clientHeight) rola.scrollTop = Math.max(0, marcada.offsetTop - rola.clientHeight / 3);
+    var marcada = escolhido && !rolagem ? grade.querySelector('.lado-linha.escolhido .lado-rotulo') : null;
+    if (marcada) {
+      var rr = rola.getBoundingClientRect(), mr = marcada.getBoundingClientRect();
+      if (mr.bottom > rr.bottom) rola.scrollTop = Math.max(0, rola.scrollTop + mr.top - rr.top - rola.clientHeight / 3);
+    }
+  }
+
+  // o toque na célula: o capítulo na página do arquivo; a obra inteira, onde ela parou
+  function abrirDoLado(c, e) {
+    if (e.obraInteira) return abrirLivro(c.id, null);
+    return abrirCapitulo(c, e);
   }
 
   // "Cap. 3, Frações": o numeral do título, ou a posição do capítulo no sumário
@@ -18411,7 +18455,7 @@
           var n = contar(a);
           var onde = serieDoAssunto(a) + (a.disciplina !== disciplina ? ', ' + nomeDaDisciplina(a.disciplina, a) : '');
           lista.appendChild(el('button', { type: 'button', class: 'lado-escolha-item', role: 'listitem', 'data-comparar': a.id,
-            aoClick: function () { abrirLadoALado(a.id, { deEscolha: campo.value }); } }, [
+            aoClick: function () { abrirLadoALado(a.id, { deEscolha: campo.value, origem: { disciplina: disciplina, serie: serie } }); } }, [
             el('span', { class: 'cresce lado-escolha-texto' }, [
               el('span', { class: 'lado-assunto', texto: a.titulo }),
               el('span', { class: 'bibl-apoio', texto: [a.temaNome, onde].filter(Boolean).join(' · ') })

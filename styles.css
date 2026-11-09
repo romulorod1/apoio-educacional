@@ -3907,6 +3907,7 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 /* o atalho "3 livros" do assunto ligado, no painel do capítulo */
 .bibl-assunto { gap: 8px; }
 .bibl-n-livros {
+  margin-left: auto;
   display: inline-flex; align-items: center; gap: 6px; flex: none;
   min-height: var(--alvo); min-width: var(--alvo); padding: 0 8px; border: 0; border-radius: var(--raio);
   background: transparent; font: inherit; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--acao); cursor: pointer;
@@ -3945,8 +3946,11 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 }
 .lado-chips { margin-top: 0; }
 .lado-chips .bibl-ano { max-width: 100%; text-align: left; overflow-wrap: anywhere; }
-.lado-legenda { margin: 0 0 0 auto; display: block; }
-.lado-rola { flex: 1; min-height: 0; overflow: auto; padding: 12px 24px 16px; }
+.lado-legenda { margin: 0 0 0 auto; display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: var(--letra-14); color: var(--muted); }
+.lado-legenda-item { display: inline-flex; align-items: center; gap: 6px; }
+.lado-legenda-item strong { font-weight: var(--peso-forte); }
+.lado-legenda [data-icone-nome="alerta"] { color: var(--aviso-texto); }
+.lado-rola { flex: 1; min-height: 0; overflow: auto; padding: 12px 24px 40px; }
 .lado-vazio { margin: 12px 0; }
 /* A tabela: a coluna dos assuntos e uma coluna por livro, de largura igual.
  * Com muitos livros, só a tabela rola de lado (a página não): a coluna dos
@@ -3963,7 +3967,8 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .lado-livro { display: flex; align-items: flex-start; gap: 10px; padding: 4px 8px 12px; min-width: 0; }
 .lado-livro-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .lado-tag { align-self: flex-start; background: var(--aviso-fundo); color: var(--aviso-texto); text-transform: none; }
-.lado-rotulo { display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 0; min-width: 0; }
+.lado-rotulo { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; min-width: 0; }
+.lado-escolhido { font-size: var(--letra-12); }
 .lado-sinal { flex: none; display: inline-flex; justify-content: center; width: 1.5rem; }
 .lado-sinal [data-icone-nome="alerta"] { color: var(--aviso-texto); }
 .lado-sinal [data-icone-nome="check"] { color: var(--teal); }
@@ -4002,4 +4007,12 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .lado-escolha-texto { display: flex; flex-direction: column; min-width: 0; flex: 1 1 14rem; }
 .lado-ano { background: var(--acao-clara); color: var(--acao); text-transform: none; }
 .lado-n { flex: none; }
+/* Estreito (abaixo de 600 px): a coluna dos assuntos encolhe, e a margem e
+ * os encaixes presos acompanham a margem menor da área que rola. */
+@media (max-width: 600px) {
+  .lado-rola { padding: 12px 16px 40px; }
+  .lado-grade { grid-template-columns: minmax(8rem, 8rem) repeat(var(--lado-colunas, 3), minmax(9rem, 1fr)); }
+  .lado-rotulo, .lado-canto { left: -16px; }
+  .lado-filtro { padding: 10px 16px; }
+}
 /* ==================== B6 (fim) ==================== */
