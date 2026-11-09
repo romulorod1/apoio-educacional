@@ -906,11 +906,15 @@ const ABERTO_C = 'Escrito no celular enquanto o tablet mandava outra.';
    * no meio, e os dois lados trocam o texto. */
   const BASE = '94fa74b';
   const antigo = f => spawnSync('git', ['show', BASE + ':' + f], { cwd: H.RAIZ, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout || '';
-  /* O sw.js muda a cada versão só no comentário e no nome do CACHE: fora isso,
-   * o código dele tem de ser o da 1.42.18. */
-  const swNucleo = s => s.replace(/\r\n/g, '\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/var CACHE = '[^']*';/, '').replace(/\s+/g, ' ');
+  /* O núcleo do sw.js segue o da versão anterior fixa. CACHE e ARQUIVOS mudam
+   * entre versões; tirar a lista inteira permite qualquer asset novo sem
+   * esconder alterações no código de instalação, volta de versão ou fetch. */
+  const swNucleo = s => s.replace(/\r\n/g, '\n').replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/var CACHE = '[^']*';/, '')
+    .replace(/var ARQUIVOS = \[[\s\S]*?\];/, '')
+    .replace(/\s+/g, ' ');
   const iguais = ['sw.js'].map(f => swNucleo(antigo(f)) === swNucleo(fs.readFileSync(path.join(H.RAIZ, f), 'utf8')));
-  conf('o sw.js desta versão é o da 1.42.18, fora o comentário e o nome do CACHE', iguais.join(','), 'true');
+  conf('o núcleo do sw.js segue a 1.42.18, salvo comentário, CACHE e lista ARQUIVOS', iguais.join(','), 'true');
   const regCel = await pagC.evaluate(id => Store.lerRegistros().then(l => { const r = l.find(x => x.id === id);
     return r ? { forma: r.tipo + ' ' + Object.keys(r.dados || {}).sort().join(','), fora: r.dados && r.dados.versaoDeFora ? JSON.stringify(r.dados.versaoDeFora) : '' } : null; }), 'resumo:msg:' + MES);
   conf('o registro do celular tem a forma de sempre, mais a versão que ficou de fora (' + regCel.forma + ')', regCel.forma + ' ' + !!regCel.fora, 'resumo alunoId,mes,texto,versaoDeFora true');
