@@ -27,8 +27,19 @@
  *      (origin/main) lê os dados depois desta versão;
  *   7. o índice apagado à mão e o índice corrompido se refazem sozinhos, sem
  *      erro de página;
- *   8. o "Apagar tudo" apaga o banco do índice (os livros ficam);
- *   9. nenhum erro de página.
+ *   8. o leitor de PDF aberto pausa o índice, que volta quando ele fecha;
+ *   9. o PDF que não é PDF e o com senha saem como não lidos (permanente);
+ *      o Worker que morre sem aviso no meio de um livro é falha PASSAGEIRA:
+ *      a fila segue, e o livro termina na abertura seguinte; a consulta lista
+ *      os não lidos mesmo sem acerto, e a busca não trava a tela;
+ *  10. livro removido e livro trocado no meio da leitura;
+ *  11. duas janelas abertas: a trava deixa uma só ler cada página;
+ *  12. sem espaço (simulado pelo estimate): o índice não começa, sai e não
+ *      insiste na abertura seguinte;
+ *  13. o "Apagar tudo" com o Worker no meio de um livro e outra janela
+ *      segurando o índice: o apagar termina, o principal fica vazio, e o
+ *      índice some quando a outra janela fecha;
+ *  14. nenhum erro de página.
  *
  * Modos envenenados (cada um serve um arquivo do app com o defeito, e a prova
  * TEM de ver o defeito: "VENENO visto"):
@@ -37,7 +48,12 @@
  *   --envenenado-refaz-indexado   o indice-livros.js servido refaz o livro
  *                                 pronto (decidir não reconhece o pronto);
  *   --envenenado-com-acento       a normalização não tira o acento: "fracoes"
- *                                 não acha "Frações".
+ *                                 não acha "Frações";
+ *   --envenenado-erro-vira-pronto todo erro conta como do arquivo: o livro
+ *                                 cujo Worker morreu sai da leitura;
+ *   --envenenado-apagar-espera-indice  o "Apagar tudo" espera a remoção do
+ *                                 banco do índice, sem prazo: com outra
+ *                                 janela segurando a conexão, não termina.
  *
  * Porta 8898. Relógio fixo da rodada (relogioDaRodada).
  */
@@ -50,7 +66,8 @@ const H = require('./_bib_navegador');
 const { conf, secao, esperar, pausa } = H;
 
 const PORTA = 8898;
-const VENENOS = ['--envenenado-indice-na-copia', '--envenenado-refaz-indexado', '--envenenado-com-acento'];
+const VENENOS = ['--envenenado-indice-na-copia', '--envenenado-refaz-indexado', '--envenenado-com-acento',
+  '--envenenado-erro-vira-pronto', '--envenenado-apagar-espera-indice'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const PYTHON = process.env.PYTHON || 'python';
 const relogio = H.relogioDaRodada('2026-11-16', '10:00');
@@ -78,6 +95,12 @@ const COPIA_COM_INDICE = "pacote.biblioteca = { uso: bib[0] || [], etiquetas: bi
   "try { var g = b.transaction('paginas').objectStore('paginas').getAll(); g.onsuccess = function () { b.close(); pacote.indiceLivros = g.result; ok(pacote); }; " +
   "g.onerror = function () { b.close(); ok(pacote); }; } catch (e) { b.close(); ok(pacote); } }; q.onerror = function () { ok(pacote); }; } catch (e) { ok(pacote); } });";
 const PRONTO = "if (reg.pronto) return 'pronto';";
+// a revisão do B12: a falha passageira não pode tirar o livro da leitura; o veneno trata todo erro como do arquivo
+const PERMANENTE = 'function falhaPermanente(e) {';
+// e o "Apagar tudo" não espera o banco do índice; o veneno volta a esperar, sem prazo
+const APAGA_SEM_ESPERAR = /      indiceDosLivros\('apagar'\);\r?\n      return r;/g;
+const APAGA_ESPERANDO = "      return new Promise(function (ok) { var q = indexedDB.deleteDatabase('indice-livros'); " +
+  "q.onsuccess = function () { ok(r); }; q.onerror = function () { ok(r); }; });";
 const SEM_ACENTO = ".replace(/[\\u0300-\\u036f]/g, '')";
 
 secao('0. As âncoras e os venenos');
@@ -85,12 +108,16 @@ conf('a lista de venenos não está vazia', VENENOS.length > 0, true);
 conf('a âncora da cópia (exportarTudo fecha o pacote) aparece uma vez no store.js', (STORE.match(COPIA_FECHA) || []).length, 1);
 conf('a âncora do livro pronto (decidir) aparece uma vez no indice-livros.js', INDICE.split(PRONTO).length - 1, 1);
 conf('a âncora do acento (normalizar) aparece uma vez no indice-livros.js', INDICE.split(SEM_ACENTO).length - 1, 1);
+conf('a âncora da falha permanente aparece uma vez no indice-livros.js', INDICE.split(PERMANENTE).length - 1, 1);
+conf('a âncora do apagar sem esperar o índice aparece uma vez no store.js', (STORE.match(APAGA_SEM_ESPERAR) || []).length, 1);
 conf('o banco principal continua na versão 6 no store.js', /var VERSAO_BANCO = 6;/.test(STORE), true);
 
 const trocas = {};
 if (MODO === '--envenenado-indice-na-copia') trocas['/store.js'] = STORE.replace(COPIA_FECHA, COPIA_COM_INDICE);
 if (MODO === '--envenenado-refaz-indexado') trocas['/indice-livros.js'] = INDICE.split(PRONTO).join("if (reg.pronto) return 'refazer';");
 if (MODO === '--envenenado-com-acento') trocas['/indice-livros.js'] = INDICE.split(SEM_ACENTO).join('');
+if (MODO === '--envenenado-erro-vira-pronto') trocas['/indice-livros.js'] = INDICE.split(PERMANENTE).join(PERMANENTE + ' return true;');
+if (MODO === '--envenenado-apagar-espera-indice') trocas['/store.js'] = STORE.replace(APAGA_SEM_ESPERAR, APAGA_ESPERANDO);
 if (MODO) {
   const servido = trocas['/store.js'] || trocas['/indice-livros.js'];
   const original = trocas['/store.js'] ? STORE : INDICE;
@@ -153,7 +180,33 @@ const registrosDoIndice = pag => pag.evaluate(() => new Promise(r => {
 }));
 const bancosAbertos = pag => pag.evaluate(() => indexedDB.databases().then(l => l.map(d => d.name + '@' + d.version).sort()));
 const tudoPronto = v => !!v && v.total === 4 && v.prontos === 4 && !v.rodando && v.fila.length === 0;
+const parado = (total, prontos) => v => !!v && v.total === total && v.prontos === prontos && !v.rodando && v.fila.length === 0;
+/* Grava livros direto no banco principal (o caminho da importação, sem o
+ * pacote): os PDFs de prova servidos pelo servidor da rodada. */
+const gravarLivros = (pag, pacote, livros) => pag.evaluate((pc, ls) => Promise.all(ls.map(l => fetch(l.url).then(r => r.blob())
+  .then(blob => ({ meta: Object.assign({ formato: 'pdf', sumario: [], series: ['08'], materia: 'matematica' }, l.meta), blob }))))
+  .then(lista => Store.gravarLivros({ manifest: { pacote: pc, versao: 1 }, livros: lista })).then(() => IndiceLivros.sincronizar()), pacote, livros);
+const apagarIndiceAMao = pag => pag.evaluate(() => new Promise(r => {
+  const q = indexedDB.deleteDatabase('indice-livros');
+  q.onsuccess = () => r('apagou'); q.onerror = () => r('erro');
+}));
 const buscar = (pag, termo, filtros) => pag.evaluate((t, f) => buscarNosLivros(t, f), termo, filtros || {});
+
+/* Uma página numa JANELA à parte: uma aba nova na mesma janela põe a
+ * primeira em segundo plano, e o índice dela para de ler. */
+async function novaJanela(pag) {
+  const nav = pag.browser();
+  const antes = new Set(nav.targets());
+  const cdpNav = await nav.target().createCDPSession();
+  await cdpNav.send('Target.createTarget', { url: 'about:blank', newWindow: true });
+  const alvo = await nav.waitForTarget(t => t.type() === 'page' && !antes.has(t));
+  const nova = await alvo.page();
+  nova.setDefaultTimeout(60000);
+  nova.errosDePagina = [];
+  nova.on('pageerror', e => nova.errosDePagina.push(e.message));
+  nova.on('dialog', async d => { try { await d.accept(); } catch (e) { /* ok */ } });
+  return nova;
+}
 
 async function importar(pag, arquivo) {
   await H.irParaAba(pag, 'ajustes');
@@ -171,9 +224,39 @@ async function importar(pag, arquivo) {
   conf('o pacote sintético do índice foi gerado', !!zip, true);
   if (!zip) throw Object.assign(new Error('sem pacote'), { jaContado: true });
 
+  // os PDFs de prova servidos à parte (as seções de falha gravam livros sem pacote)
+  const raizIndice = path.join(TMP, 'Indice', 'matematica');
+  amb.extras['/b12-longo.pdf'] = { tipo: 'application/pdf', corpo: fs.readFileSync(path.join(raizIndice, 'indice-longo.pdf')) };
+  amb.extras['/b12-curto.pdf'] = { tipo: 'application/pdf', corpo: fs.readFileSync(path.join(raizIndice, 'indice-curto.pdf')) };
+  amb.extras['/b12-corrompido.pdf'] = { tipo: 'application/pdf', corpo: Buffer.from('%PDF-1.7\n' + 'isto não é um PDF de verdade. '.repeat(80)) };
+  const senha = path.join(TMP, 'com-senha.pdf');
+  const rs = spawnSync(PYTHON, ['-X', 'utf8', '-c', 'import sys, pymupdf\nd = pymupdf.open()\np = d.new_page()\n' +
+    'p.insert_text((72, 90), "Livro com senha: mediana trancada.")\n' +
+    'd.save(sys.argv[1], encryption=pymupdf.PDF_ENCRYPT_AES_256, user_pw="segredo", owner_pw="dono")', senha], { encoding: 'utf8' });
+  conf('o PDF com senha foi gerado', rs.status === 0 && fs.existsSync(senha), true);
+  const enorme = path.join(TMP, 'enorme.pdf');
+  spawnSync(PYTHON, ['-X', 'utf8', '-c', 'import sys, pymupdf\nd = pymupdf.open()\nfor n in range(2400):\n' +
+    '    d.new_page().insert_text((72, 90), "Livro enorme, pagina %d." % (n + 1))\nd.save(sys.argv[1], garbage=3, deflate=True)', enorme], { encoding: 'utf8' });
+  conf('o PDF enorme foi gerado', fs.existsSync(enorme), true);
+  amb.extras['/b12-enorme.pdf'] = { tipo: 'application/pdf', corpo: fs.existsSync(enorme) ? fs.readFileSync(enorme) : Buffer.from('') };
+  amb.extras['/b12-senha.pdf'] = { tipo: 'application/pdf', corpo: fs.existsSync(senha) ? fs.readFileSync(senha) : Buffer.from('') };
+
   await amb.subir();
   const pag = await amb.pagina();
   await relogio.naPagina(pag);
+  // prazos curtos para a prova: o Worker calado por 8 s conta como morto
+  await pag.evaluateOnNewDocument(() => { window.INDICE_LIVROS_CONFIG = { semNoticiaMs: 8000 }; });
+  /* O tablet sem espaço, simulado: com a marca da prova, o estimate da página
+   * diz que sobram só 20 MB (o override de cota do Chrome pelo protocolo não
+   * muda o que o estimate responde, medido nesta máquina). */
+  await pag.evaluateOnNewDocument(() => {
+    try {
+      if (localStorage.getItem('b12-cota-baixa') && navigator.storage && navigator.storage.estimate) {
+        const original = navigator.storage.estimate.bind(navigator.storage);
+        navigator.storage.estimate = () => original().then(e => Object.assign({}, e, { quota: (e.usage || 0) + 20 * 1048576 }));
+      }
+    } catch (e) { /* sem marca */ }
+  });
   await H.abrirApp(pag, amb.ORIGEM);
 
   secao('1. Os dados da prova e a importação');
@@ -298,6 +381,12 @@ async function importar(pag, arquivo) {
   r = await buscar(pag, 'palavra que não existe');
   conf('termo que não existe não acha nada, sem erro', (r.livros || []).length + '/' + (r.pendentes || []).length, '0/0');
 
+  const norm = await pag.evaluate(() => [IndiceLivros.normalizar('multipli-' + String.fromCharCode(10) + 'cação'),
+    IndiceLivros.normalizar('multi' + String.fromCharCode(0xAD) + 'plicação'), IndiceLivros.normalizar('Frações  EQUIVALENTES'),
+    IndiceLivros.normalizar('bem-vindo')].join('|'));
+  conf('a palavra partida no fim da linha e o hífen invisível voltam a ser uma palavra; o hífen do meio fica',
+    norm, 'multiplicacao|multiplicacao|fracoes equivalentes|bem-vindo');
+
   secao('4. A página sem texto e a linha no fim');
   const c = depois && depois.livros['indice-sem-texto'];
   conf('o Livro C ficou pronto com as 3 páginas contadas como sem texto', c ? c.pronto + '/' + c.semTexto.length + '/' + c.total : '', 'true/3/3');
@@ -339,7 +428,10 @@ async function importar(pag, arquivo) {
   if (PAI) {
     console.log('   código de antes: store.js de ' + PAI.ref);
     const velha = await amb.pagina();
+    // sem o service worker: com ele, a navegação a um endereço fora do pacote recebe o index.html do app
+    await velha.setBypassServiceWorker(true);
     await velha.goto(amb.ORIGEM + '/vazio-b12.html');
+    conf('a página do código de antes não é o aplicativo', await velha.evaluate(() => typeof window.IndiceLivros), 'undefined');
     await velha.addScriptTag({ url: amb.ORIGEM + '/store-pai-b12.js' });
     const lidoPeloPai = await velha.evaluate(() => Store.carregar().then(d => 'ok:' + d.alunos.map(x => x.nome).sort().join(','),
       e => 'erro:' + (e && (e.name || e.message))));
@@ -377,20 +469,220 @@ async function importar(pag, arquivo) {
   r = await buscar(pag, 'paralelepipedo');
   conf('e a busca acha no índice refeito', (r.livros || []).map(l => l.id).join(','), 'indice-longo');
 
-  secao('8. O "Apagar tudo"');
-  await H.irParaAba(pag, 'ajustes');
-  await pag.evaluate(() => document.querySelector('#apagar-tudo').click());
-  const sumiu = await esperar('o banco do índice sumir', () => bancosAbertos(pag), l => !!l && !l.some(n => n.indexOf('indice-livros@') === 0), 20000);
-  conf('o "Apagar tudo" apagou o banco do índice', sumiu.ok, true);
+  secao('8. O leitor aberto pausa o índice');
+  conf('o índice foi apagado à mão para ler de novo', await apagarIndiceAMao(pag), 'apagou');
+  await H.abrirApp(pag, amb.ORIGEM);
+  await pag.evaluate(() => {
+    window.__b12l = null;
+    IndiceLivros.aoMudar(e => {
+      if (window.__b12l === null && e.livro === 'indice-longo' && e.pagina >= 30) {
+        window.__b12l = e.pagina;
+        document.querySelector('[data-abrir-livro="indice-curto"]').click();
+      }
+    });
+  });
+  const pausouNoLeitor = await esperar('o índice parar com o leitor aberto', () => estado(pag), v => !!v && v.ocupado && !v.rodando, 60000);
+  conf('com o leitor de PDF aberto, o índice para no meio do livro', pausouNoLeitor.ok, true);
+  const comLeitor1 = await registrosDoIndice(pag);
+  await pausa(2500);
+  const comLeitor2 = await registrosDoIndice(pag);
+  conf('com o leitor aberto, nenhuma página nova é lida', comLeitor2 && comLeitor2.paginas, comLeitor1 && comLeitor1.paginas);
+  await pag.evaluate(() => document.querySelector('#modal-leitor-pdf [data-fechar]').click());
+  const voltou = await esperar('o índice voltar com o leitor fechado', () => estado(pag), tudoPronto, 120000);
+  conf('o leitor fechado, o índice volta sozinho e termina', voltou.ok, true);
+  conf('e o Livro B foi lido uma vez só, sem repetir página (600)', voltou.valor && voltou.valor.lidasNaSessao['indice-longo'], 600);
+
+  secao('9. Falha permanente, falha passageira e o Worker que morre');
+  /* E (não é PDF) e F (com senha) são do ARQUIVO: saem da leitura e aparecem
+   * como não lidos. G é o livro longo cujo Worker morre na página 30, sem
+   * aviso nenhum: a falha é passageira, e G continua na abertura seguinte.
+   * H vem depois e tem de ser lido mesmo assim. */
+  const aoNascerWorker = async w => {
+    try {
+      await w.evaluate(() => {
+        const original = self.postMessage.bind(self);
+        self.postMessage = function (m) {
+          original(m);
+          if (m && m.tipo === 'pagina' && m.id === 'livro-g-longo' && m.pagina >= 30 && !self.__morreu) { self.__morreu = true; self.close(); }
+        };
+      });
+    } catch (e) { /* o Worker já foi */ }
+  };
+  pag.on('workercreated', aoNascerWorker);
+  await gravarLivros(pag, 'prova-falhas', [
+    { url: '/b12-corrompido.pdf', meta: { id: 'livro-e-corrompido', hash: 'sha256:e', titulo: 'Livro E corrompido' } },
+    { url: '/b12-senha.pdf', meta: { id: 'livro-f-senha', hash: 'sha256:f', titulo: 'Livro F com senha' } },
+    { url: '/b12-longo.pdf', meta: { id: 'livro-g-longo', hash: 'sha256:g', titulo: 'Livro G longo',
+      sumario: [{ n: 1, nivel: 1, titulo: 'Parte única', pagina: 1, pagina_fim: 600 }] } },
+    { url: '/b12-curto.pdf', meta: { id: 'livro-h-normal', hash: 'sha256:h', titulo: 'Livro H normal' } }]);
+  const falhas = await esperar('a fila passar pelos quatro livros novos', () => estado(pag),
+    v => !!v && v.total === 8 && v.prontos >= 7 && !v.rodando && v.fila.length === 0, 120000);
+  pag.off('workercreated', aoNascerWorker);
+  conf('a fila passou pelos quatro livros novos', falhas.ok, true);
+  const rf = await registrosDoIndice(pag);
+  const E = rf && rf.livros['livro-e-corrompido'], F = rf && rf.livros['livro-f-senha'];
+  const G = rf && rf.livros['livro-g-longo'], Hh = rf && rf.livros['livro-h-normal'];
+  console.log('   E: ' + JSON.stringify(E && E.erro) + '; F: ' + JSON.stringify(F && F.erro) + '; G em ' + (G && G.proxima) + ', falhas ' + (G && G.falhas));
+  conf('o PDF que não é PDF saiu da leitura com erro permanente', !!(E && E.pronto && E.erro && E.erro.permanente), true);
+  conf('o PDF com senha saiu da leitura com erro permanente', !!(F && F.pronto && F.erro && F.erro.permanente && /Password/.test(F.erro.nome)), true);
+  prop('o Livro G, cujo Worker morreu no meio, NÃO saiu da leitura (falha passageira, contada uma vez)',
+    !!G && !G.pronto && !G.erro && G.falhas === 1 && G.proxima > 30 && falhas.valor.prontos === 7, '--envenenado-erro-vira-pronto');
+  conf('nenhuma página do Livro G foi marcada como sem texto pela morte do Worker', G && G.semTexto.length, 0);
+  conf('o Livro H, depois das falhas, foi lido mesmo assim', !!(Hh && Hh.pronto && !Hh.erro) + '/' + (rf && rf.porLivro['livro-h-normal']), 'true/5');
+  const rn = await buscar(pag, 'mediana');
+  const nl = {};
+  (rn.naoLidos || []).forEach(x => { nl[x.id] = x.naoLidas + '/' + x.livroInteiro + '/' + x.motivo; });
+  console.log('   não lidos: ' + JSON.stringify(nl));
+  conf('a consulta lista o livro sem texto mesmo sem acerto (C: 3 páginas)', nl['indice-sem-texto'], '3/false/sem-texto');
+  conf('e os dois livros que não abrem, como não lidos inteiros',
+    [nl['livro-e-corrompido'], nl['livro-f-senha']].map(x => String(x).split('/').slice(1).join('/')).join(','), 'true/arquivo,true/arquivo');
+  conf('e o Livro A com a página sem texto', nl['indice-curto'], '1/false/sem-texto');
+  conf('o livro com senha não aparece como acerto', (rn.livros || []).map(l => l.id).sort().join(','), 'indice-curto,livro-h-normal');
+  // a busca não trava a tela: a maior espera durante uma busca que varre todos os livros
+  const atrasoBusca = await pag.evaluate(() => new Promise(r => {
+    let maior = 0, ultimo = performance.now(), fim = false;
+    (function volta() { const a = performance.now(); maior = Math.max(maior, a - ultimo); ultimo = a; if (!fim) setTimeout(volta, 10); })();
+    buscarNosLivros('texto corrido').then(x => { fim = true; r({ maior: Math.round(maior), livros: x.livros.map(l => l.paginas.length) }); });
+  }));
+  console.log('   a busca de "texto corrido": ' + JSON.stringify(atrasoBusca));
+  conf('a busca que varre os livros longos não trava a tela (maior espera abaixo de 250 ms)', atrasoBusca.maior < 250, true);
+  await H.abrirApp(pag, amb.ORIGEM);
+  const gVolta = await esperar('o Livro G terminar na abertura seguinte', () => estado(pag), parado(8, 8), 120000);
+  conf('na abertura seguinte o Livro G continuou e terminou', gVolta.ok, true);
+  const rg = await registrosDoIndice(pag);
+  const Gv = rg && rg.livros['livro-g-longo'];
+  conf('o Livro G tem as 600 páginas, sem erro, e a conta de falhas zerou',
+    (rg && rg.porLivro['livro-g-longo']) + '/' + !!(Gv && Gv.erro) + '/' + (Gv && Gv.falhas), '600/false/0');
+  conf('na volta, E, F e H não foram lidos de novo', ['livro-e-corrompido', 'livro-f-senha', 'livro-h-normal']
+    .map(id => (gVolta.valor && gVolta.valor.lidasNaSessao[id]) || 0).join(','), '0,0,0');
+
+  secao('10. Livro removido e livro trocado no meio da leitura');
+  conf('o índice foi apagado à mão para ler de novo', await apagarIndiceAMao(pag), 'apagou');
+  await H.abrirApp(pag, amb.ORIGEM);
+  await pag.evaluate(() => {
+    window.__b12t = { trocou: false, removeu: false };
+    IndiceLivros.aoMudar(e => {
+      if (!window.__b12t.trocou && e.livro === 'indice-longo' && e.pagina >= 30) {
+        window.__b12t.trocou = true;
+        Promise.all([Store.lerLivro('indice-longo'), Store.lerLivro('indice-curto')]).then(x => Store.gravarLivros({
+          manifest: { pacote: x[0].pacote, versao: x[0].versao },
+          livros: [{ meta: Object.assign({}, x[0].meta, { hash: 'sha256:trocado', sumario: x[1].meta.sumario }), blob: x[1].blob }]
+        })).then(() => IndiceLivros.sincronizar());
+      }
+      if (!window.__b12t.removeu && e.livro === 'livro-g-longo' && e.pagina >= 30) {
+        window.__b12t.removeu = true;
+        Store.removerLivro('livro-g-longo').then(() => IndiceLivros.sincronizar());
+      }
+    });
+  });
+  const trocados = await esperar('a fila terminar com um livro trocado e um removido', () => estado(pag), parado(7, 7), 120000);
+  conf('a fila terminou (7 livros, 7 prontos)', trocados.ok, true);
+  conf('as duas trocas aconteceram no meio da leitura', JSON.stringify(await pag.evaluate(() => window.__b12t)), JSON.stringify({ trocou: true, removeu: true }));
+  const rt = await registrosDoIndice(pag);
+  const Bt = rt && rt.livros['indice-longo'];
+  conf('o livro trocado no meio foi refeito pelo arquivo novo (hash novo, 6 páginas, 5 com texto)',
+    Bt ? Bt.hash + '/' + Bt.total + '/' + rt.porLivro['indice-longo'] + '/' + Bt.pronto : '', 'sha256:trocado/6/5/true');
+  conf('o livro removido no meio saiu do índice sem deixar registro nem página',
+    !!(rt && !rt.livros['livro-g-longo'] && !rt.porLivro['livro-g-longo']), true);
+  r = await buscar(pag, 'paralelepipedo');
+  conf('o texto do arquivo velho não é mais achado', (r.livros || []).length, 0);
+  r = await buscar(pag, 'mediana');
+  conf('e o do arquivo novo é', (r.livros || []).map(l => l.id).sort().join(','), 'indice-curto,indice-longo,livro-h-normal');
+
+  secao('11. Duas janelas: a trava deixa uma só ler');
+  // um livro de 2400 páginas, para a leitura durar o bastante
+  await gravarLivros(pag, 'prova-falhas', [{ url: '/b12-enorme.pdf', meta: { id: 'livro-i-enorme', hash: 'sha256:i', titulo: 'Livro I enorme' } }]);
+  conf('o índice foi apagado à mão para ler de novo', await apagarIndiceAMao(pag), 'apagou');
+  /* As duas janelas abrem quase juntas e começam a fila a um segundo e pouco
+   * uma da outra; a leitura toda leva vários segundos (o livro enorme), então
+   * uma delas TEM de esperar a trava. A segunda numa JANELA à parte: numa aba
+   * da mesma janela, a primeira iria para segundo plano e pararia de ler. */
+  const aba2 = await novaJanela(pag);
+  await H.abrirApp(aba2, amb.ORIGEM);
+  await H.abrirApp(pag, amb.ORIGEM);
+  const esperou = await esperar('uma janela esperar a trava da outra', () => pag.evaluate(() => navigator.locks.query()
+    .then(q => q.held.some(x => x.name === 'indice-livros-trabalho') && q.pending.some(x => x.name === 'indice-livros-trabalho'))),
+  v => v === true, 30000);
+  conf('com as duas lendo, uma ficou esperando a trava da outra', esperou.ok, true);
+  const fim1 = await esperar('as duas abas pararem', () => Promise.all([estado(pag), estado(aba2)]),
+    v => !!v && v.every(x => x && !x.rodando && x.fila.length === 0 && x.prontos === x.total && x.total === 8), 120000);
+  conf('as duas abas terminaram', fim1.ok, true);
+  const rd = await registrosDoIndice(pag);
+  const somas = Object.keys(rd ? rd.livros : {}).sort().map(id => {
+    const l1 = (fim1.valor && fim1.valor[0].lidasNaSessao[id]) || 0, l2 = (fim1.valor && fim1.valor[1].lidasNaSessao[id]) || 0;
+    const total = rd.livros[id].erro ? 0 : rd.livros[id].total;
+    return id + ':' + (l1 + l2 === total ? 'ok' : 'repetiu') + ' (' + l1 + '+' + l2 + ' de ' + total + ')';
+  });
+  console.log('   leituras por livro nas duas abas: ' + somas.join(', '));
+  conf('cada página foi lida uma vez só, somando as duas janelas', somas.length === 8 && somas.every(x => /:ok /.test(x)), true);
+  conf('a segunda janela não teve erro de página', aba2.errosDePagina.join(' | '), '');
+  await aba2.close();
+  await pag.evaluate(() => Store.removerLivro('livro-i-enorme').then(() => IndiceLivros.sincronizar()));
+
+  secao('12. Sem espaço');
+  await pag.evaluate(() => localStorage.setItem('b12-cota-baixa', '1'));
+  conf('o índice foi apagado à mão para ler de novo', await apagarIndiceAMao(pag), 'apagou');
+  await H.abrirApp(pag, amb.ORIGEM);
+  const semLugar = await esperar('o índice desistir por falta de espaço', () => estado(pag), v => !!v && v.parado && v.motivo === 'sem-espaco', 20000);
+  conf('com menos que a folga livre, o índice não começa e para calado', semLugar.ok, true);
+  const linhaSem = await linhaDeProgresso(pag);
+  conf('a linha de progresso não aparece', linhaSem && linhaSem.oculta, true);
+  conf('nenhuma página foi lida', Object.keys((semLugar.valor && semLugar.valor.lidasNaSessao) || {}).length, 0);
+  conf('a decisão de não tentar ficou guardada no aparelho', await pag.evaluate(() => Number(localStorage.getItem('indice-livros-sem-espaco-ate')) > Date.now()), true);
+  await pag.evaluate(() => localStorage.removeItem('b12-cota-baixa'));
+  await H.abrirApp(pag, amb.ORIGEM);
+  await pausa(4500);
+  const aindaSem = await estado(pag);
+  conf('na abertura seguinte, com espaço de volta, ele não insiste (a decisão fica por uns dias)',
+    aindaSem.parado + '/' + aindaSem.motivo + '/' + Object.keys(aindaSem.lidasNaSessao).length, 'true/sem-espaco/0');
+  await pag.evaluate(() => localStorage.removeItem('indice-livros-sem-espaco-ate'));
+
+  secao('13. O "Apagar tudo" com a leitura em curso e outra janela segurando o índice');
+  await gravarLivros(pag, 'prova-falhas', [{ url: '/b12-longo.pdf', meta: { id: 'livro-g-longo', hash: 'sha256:g2', titulo: 'Livro G longo' } }]);
+  // do zero, para a leitura estar no meio do G quando ela apagar
+  conf('o índice foi apagado à mão para ler de novo', await apagarIndiceAMao(pag), 'apagou');
+  const segura = await novaJanela(pag);
+  await segura.setBypassServiceWorker(true);
+  await segura.goto(amb.ORIGEM + '/vazio-b12.html');
+  conf('a janela que segura o índice não é o aplicativo', await segura.evaluate(() => typeof window.IndiceLivros), 'undefined');
+  const segurou = await segura.evaluate(() => new Promise(r => {
+    // a janela "congelada": abre o índice e nunca fecha, nem quando pedem
+    const q = indexedDB.open('indice-livros', 1);
+    q.onupgradeneeded = () => { q.result.createObjectStore('livros', { keyPath: 'id' }); q.result.createObjectStore('paginas', { keyPath: ['id', 'pagina'] }); };
+    q.onsuccess = () => { window.__presa = q.result; r('segura'); };
+    q.onerror = () => r('erro');
+  }));
+  conf('outra janela segura uma conexão com o índice', segurou, 'segura');
+  await H.abrirApp(pag, amb.ORIGEM);
+  await pag.evaluate(() => {
+    window.__b12a = null;
+    IndiceLivros.aoMudar(e => {
+      if (window.__b12a === null && e.livro === 'livro-g-longo' && e.pagina >= 30) {
+        window.__b12a = e.pagina;
+        document.querySelector('#apagar-tudo').click();
+      }
+    });
+  });
+  const apagado = await esperar('o "Apagar tudo" terminar', () => pag.evaluate(() => ({
+    aviso: (document.querySelector('#aviso-texto') || {}).textContent || '', clicou: window.__b12a })),
+  v => !!v && /Todos os dados foram apagados/.test(v.aviso), 30000);
+  conf('o "Apagar tudo" foi pedido com o Worker no meio de um livro', !!(apagado.valor && apagado.valor.clicou), true);
+  prop('o "Apagar tudo" terminou, com a outra janela segurando o índice', apagado.ok, '--envenenado-apagar-espera-indice');
   const depoisDeApagar = await esperar('os alunos saírem', () => pag.evaluate(() => Promise.all([Store.carregar(), Store.listarLivros()])
-    .then(x => (x[0] ? x[0].alunos.length : '?') + '/' + x[1].length)), v => v === '0/4', 20000);
-  conf('os alunos saíram e os quatro livros ficaram', depoisDeApagar.valor, '0/4');
+    .then(x => (x[0] ? x[0].alunos.length : '?') + '/' + x[1].length)), v => v === '0/8', 20000);
+  conf('os alunos saíram e os oito livros ficaram', depoisDeApagar.valor, '0/8');
+  const parouTudo = await estado(pag);
+  conf('a leitura parou e não volta na mesma sessão', parouTudo.parado + '/' + parouTudo.rodando, 'true/false');
+  await segura.evaluate(() => window.__presa.close());
+  await segura.close();
+  const sumiu = await esperar('o banco do índice sumir', () => bancosAbertos(pag), l => !!l && !l.some(n => n.indexOf('indice-livros@') === 0), 20000);
+  conf('fechada a outra janela, o banco do índice sumiu', sumiu.ok, true);
   await pausa(1500);
   const aindaSemIndice = await bancosAbertos(pag);
   conf('o índice não volta na mesma sessão', aindaSemIndice.some(n => n.indexOf('indice-livros@') === 0), false);
   conf('o banco principal continua na versão 6 depois do "Apagar tudo"', aindaSemIndice.indexOf('apoio-educacional@6') >= 0, true);
 
-  secao('9. Erros de página');
+  secao('14. Erros de página');
   conf('nenhum erro de página', pag.errosDePagina.join(' | '), '');
   if (MODO) conf('a rodada envenenada chegou ao ponto do veneno ' + MODO, 'não chegou', 'chegou');
 })().then(() => H.fim(amb)(), e => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e)));

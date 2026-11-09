@@ -15701,7 +15701,15 @@
       atualizarBotaoLivros();
       /* B12: o índice de texto acompanha a lista (livro novo entra na fila,
        * livro removido ou trocado sai). Roda num Worker, sem segurar a tela. */
-      if (typeof IndiceLivros === 'object' && IndiceLivros) IndiceLivros.sincronizar();
+      if (typeof IndiceLivros === 'object' && IndiceLivros) {
+        /* Com o leitor de PDF ou de EPUB aberto, ou a importação correndo, o
+         * índice para e devolve a memória (o leitor pode ter o livro inteiro
+         * na memória); volta sozinho quando eles fecham. */
+        IndiceLivros.quandoOcupado(function () {
+          return importandoBiblioteca || !!document.querySelector('#modal-leitor-pdf.aberto, #modal-leitor-epub.aberto');
+        });
+        IndiceLivros.sincronizar();
+      }
       if (!caixa) return;
       caixa.innerHTML = '';
       if (!lista.length) return;

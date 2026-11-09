@@ -2096,7 +2096,25 @@
     });
   }
 
+  /* O índice de texto dos livros (B12) mora num banco à parte,
+   * 'indice-livros' (indice-livros.js), e sai inteiro: é derivado dos livros,
+   * que ficam, e se refaz na próxima abertura do aplicativo. Ele fica FORA do
+   * caminho do "Apagar tudo": a leitura para antes (parar, que não espera
+   * nada), o banco principal é apagado, e só então a remoção do índice é
+   * pedida, SEM esperar por ela. Uma conexão com o índice que não fecha (outra
+   * janela congelada) não pode deixar o apagar pela metade. */
+  function indiceDosLivros(acao) {
+    try {
+      var i = root.IndiceLivros;
+      if (i && typeof i[acao] === 'function') {
+        var p = i[acao]();
+        if (p && typeof p.catch === 'function') p.catch(function () { /* o índice é cache */ });
+      }
+    } catch (e) { /* o índice é cache: sem ele, a próxima abertura refaz */ }
+  }
+
   function apagarTudo() {
+    indiceDosLivros('parar');
     return Promise.all([
       apagarDocumento(),
       esvaziar('notas'),
@@ -2110,14 +2128,11 @@
       esvaziar('biblioteca_uso'),
       esvaziar('biblioteca_etiquetas'),
       esvaziar('biblioteca_listas'),
-      esvaziar('livros_posicoes'),
-      /* O índice de texto dos livros (B12) mora num banco à parte,
-       * 'indice-livros' (indice-livros.js), e sai inteiro: é derivado dos
-       * livros, que ficam, e se refaz na próxima abertura do aplicativo. */
-      root.IndiceLivros && typeof root.IndiceLivros.apagar === 'function'
-        ? root.IndiceLivros.apagar().catch(function () { /* o índice é cache: sem ele, a próxima abertura refaz */ })
-        : Promise.resolve()
-    ]);
+      esvaziar('livros_posicoes')
+    ]).then(function (r) {
+      indiceDosLivros('apagar');
+      return r;
+    });
   }
 
   root.Store = {

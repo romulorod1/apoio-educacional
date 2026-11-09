@@ -718,6 +718,11 @@ roda "livros indice"                              node "_teste/testa_livros_indi
 roda "livros indice --envenenado-indice-na-copia" node "_teste/testa_livros_indice.js" --envenenado-indice-na-copia
 roda "livros indice --envenenado-refaz-indexado"  node "_teste/testa_livros_indice.js" --envenenado-refaz-indexado
 roda "livros indice --envenenado-com-acento"      node "_teste/testa_livros_indice.js" --envenenado-com-acento
+# A revisao do B12 (duas lentes): a falha passageira (o Worker que morre no
+# meio) nao tira o livro da leitura, e o "Apagar tudo" nao espera o banco do
+# indice (outra janela segurando a conexao nao o deixa pela metade).
+roda "livros indice --envenenado-erro-vira-pronto"    node "_teste/testa_livros_indice.js" --envenenado-erro-vira-pronto
+roda "livros indice --envenenado-apagar-espera-indice" node "_teste/testa_livros_indice.js" --envenenado-apagar-espera-indice
 # C15.2 e C15.3: "Este capitulo cobre" no leitor, Confirmar e Corrigir (so a
 # materia e o ano do livro), a correcao depois de recarregar e na copia de
 # seguranca (os livros nao), e o "Abrir no livro" da aula na pagina do PDF e no
