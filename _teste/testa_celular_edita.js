@@ -627,7 +627,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     document.querySelector('.cel-semana-dia[data-dia="' + h + '"] .cel-semana-bolinhas').getAttribute('aria-label'), HOJE), '2 aulas: Aluno Alfa Teste às 10:30, Aluno Gama Teste às 14:00');
   conf('o "+" diz o que faz a quem lê a tela', await pagC.evaluate(() => document.querySelector('#cel-marcar-aula').getAttribute('aria-label')), 'Marcar aula neste dia');
   const semana = await pagC.evaluate(hoje => {
-    const dias = Array.from(document.querySelectorAll('#cel-semana .cel-semana-dia'));
+    const dias = Array.from(document.querySelectorAll('#cel-semana-dias .cel-semana-dia'));
     const deHoje = document.querySelector('.cel-semana-dia[data-dia="' + hoje + '"]');
     return { dias: dias.length, ativo: !!(deHoje && deHoje.classList.contains('ativo')),
       bolinhas: deHoje ? Array.from(deHoje.querySelectorAll('.cel-bolinha')).map(b => getComputedStyle(b).backgroundColor) : [],
@@ -636,7 +636,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   const ddmmHoje = HOJE.slice(8, 10) + '/' + HOJE.slice(5, 7);
   conf('a faixa da semana tem 7 dias, com hoje escolhido', semana.dias === 7 && semana.ativo, true);
   conf('hoje tem uma bolinha por aula, na cor do aluno (' + semana.bolinhas.join(' ') + ')', semana.bolinhas.join(' '), 'rgb(31, 58, 95) rgb(201, 169, 97)');
-  conf('a data aparece uma vez só, no título ("' + semana.titulo + '")', new RegExp('^Hoje, \\S+, ' + ddmmHoje + '$').test(semana.titulo) &&
+  conf('a data aparece uma vez só, no título ("' + semana.titulo + '")', new RegExp('^Hoje, \\S+ ' + ddmmHoje + '$').test(semana.titulo) &&
     semana.tudo.split(ddmmHoje).length === 2, true);
   const bloco = await pagC.evaluate(() => {
     const b = document.querySelector('.cel-bloco[data-aula="aula-hoje"]'), g = document.querySelector('.cel-bloco[data-aula="aula-hoje-gama"]');
