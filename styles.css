@@ -3219,6 +3219,28 @@ body.modo-celular .celular .linha-pagamento .barra { flex-wrap: wrap; }
 /* As aulas ainda agendadas, à parte no Fechamento do celular (D6b). */
 .cel-subtitulo { margin-top: 10px; font-size: var(--letra-2); font-weight: 700; color: var(--novidades-subtitulo); }
 .cel-linha-futura { color: var(--novidades-subtitulo); }
+/* Dinheiro de relance (D6c, lote 3): o total a receber no alto e o selo de
+   cada família. A palavra diz a situação; a cor só reforça. */
+.cel-total { border-left: 6px solid var(--navy); }
+.cel-total-rotulo { font-size: var(--letra-2); font-weight: 700; color: var(--novidades-subtitulo); text-transform: uppercase; letter-spacing: .04em; }
+.cel-total-valor { font-size: var(--letra-6); font-weight: 700; color: var(--navy); margin: 2px 0; }
+.cel-total-aberto { margin-top: 6px; font-size: var(--letra-3); font-weight: 600; color: var(--texto); }
+.cel-fechamento-cabeca { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cel-fechamento-cabeca .cresce { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cel-selo {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--fio);
+  font-size: var(--letra-2);
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--soft);
+  color: var(--novidades-subtitulo);
+}
+.cel-selo-pago { background: var(--teal-claro); color: var(--teal); border-color: var(--info-borda); }
+.cel-selo-parcial { background: var(--aviso-fundo); color: var(--aviso-texto); border-color: var(--aviso-borda); }
+.cel-selo-aberto { background: var(--perigo-fundo); color: var(--vermelho); border-color: var(--perigo-borda); }
 /* A ficha mínima do aluno e a aba Alunos (D6c, lote 2). Ligar, WhatsApp, as
    mensagens prontas, o mapa e o link são links com cara de botão: abrem fora
    do aplicativo e não gravam nada. */

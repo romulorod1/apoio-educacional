@@ -3431,6 +3431,21 @@
     };
   }
 
+  /* O selo do mês de um aluno, da situação acima e de mais nada: o
+   * Fechamento do tablet ("Pago em" e o "faltam") e o do celular (o selo e o
+   * "em aberto" do alto) leem daqui, para os dois nunca discordarem.
+   *   'pago'    há pagamento marcado e ele cobre o que se cobra do mês;
+   *   'parcial' há pagamento marcado, a menos (falta a diferença);
+   *   'aberto'  sem pagamento, com valor a cobrar;
+   *   'nada'    sem pagamento e sem nada a cobrar ainda (nenhuma aula dada
+   *             cobrável). */
+  function seloDoPagamento(db, f) {
+    var s = situacaoDoPagamento(db, f);
+    var faltaCent = centavos(s.falta);
+    s.selo = s.registro ? (faltaCent > 0 ? 'parcial' : 'pago') : (centavos(s.devido) > 0 ? 'aberto' : 'nada');
+    return s;
+  }
+
   /* Desde que mês ela controla os pagamentos: db.ajustes.pagamentosDesde,
    * 'AAAA-MM'. O app grava o mês corrente na primeira vez que desenha o
    * Fechamento sem o campo, e ela muda quando quiser.
@@ -5478,7 +5493,7 @@
     totaisDoMes: totaisDoMes, panoramaDeValores: panoramaDeValores,
     lerReais: lerReais, valorACobrarDoMes: valorACobrarDoMes, pagamentoDe: pagamentoDe,
     marcarPagamento: marcarPagamento, desmarcarPagamento: desmarcarPagamento,
-    situacaoDoPagamento: situacaoDoPagamento, pendentesDePagamento: pendentesDePagamento,
+    situacaoDoPagamento: situacaoDoPagamento, seloDoPagamento: seloDoPagamento, pendentesDePagamento: pendentesDePagamento,
     corteDosPagamentos: corteDosPagamentos,
     somaDosPendentes: somaDosPendentes,
     indicesDeReajuste: indicesDeReajuste, margemDeReajuste: margemDeReajuste,
