@@ -124,7 +124,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
 
     await new Promise(r => {
       const s = banco.transaction('dados', 'readwrite').objectStore('dados').put(atual, 'principal');
-      s.onsuccess = () => r();
+      s.transaction.oncomplete = () => r();
     });
   }, { soMinha: SO_MINHA, rendeu1: RENDEU_1, rendeu2: RENDEU_2 });
 

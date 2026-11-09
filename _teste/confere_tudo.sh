@@ -751,6 +751,23 @@ roda "livros --envenenado-zip-inteiro"            node "_teste/testa_livros.js" 
 # A revisao do C15.1 pela orquestradora: o mesmo pacote com dois PDFs trocados
 # (mesmo id, mesma versao) atualiza pelo hash; o veneno compara so o id.
 roda "livros --envenenado-so-id"                  node "_teste/testa_livros.js" --envenenado-so-id
+# B12: o indice de texto dos livros, num banco IndexedDB a parte
+# (indice-livros), lido por um Web Worker com o PDF.js do app. Acha o termo sem
+# acento e sem caixa, na pagina do arquivo e agrupado pelo capitulo; conta a
+# pagina sem texto; retoma no meio sem refazer o livro pronto; fica fora da
+# copia e sobrevive a restauracao; o "Apagar tudo" o apaga; o banco principal
+# segue na v6 e o store.js do commit pai o le. Porta 8898. Um veneno por regra.
+roda "livros indice"                              node "_teste/testa_livros_indice.js"
+roda "livros indice --envenenado-indice-na-copia" node "_teste/testa_livros_indice.js" --envenenado-indice-na-copia
+roda "livros indice --envenenado-refaz-indexado"  node "_teste/testa_livros_indice.js" --envenenado-refaz-indexado
+roda "livros indice --envenenado-com-acento"      node "_teste/testa_livros_indice.js" --envenenado-com-acento
+# A revisao do B12 (duas lentes): a falha passageira (o Worker que morre no
+# meio) nao tira o livro da leitura, e o "Apagar tudo" nao espera o banco do
+# indice (outra janela segurando a conexao nao o deixa pela metade).
+roda "livros indice --envenenado-erro-vira-pronto"    node "_teste/testa_livros_indice.js" --envenenado-erro-vira-pronto
+roda "livros indice --envenenado-apagar-espera-indice" node "_teste/testa_livros_indice.js" --envenenado-apagar-espera-indice
+# A pagina que sempre falha (de forma passageira) sai sozinha; o livro fica na busca.
+roda "livros indice --envenenado-pagina-ruim-derruba-livro" node "_teste/testa_livros_indice.js" --envenenado-pagina-ruim-derruba-livro
 # C15.2 e C15.3: "Este capitulo cobre" no leitor, Confirmar e Corrigir (so a
 # materia e o ano do livro), a correcao depois de recarregar e na copia de
 # seguranca (os livros nao), e o "Abrir no livro" da aula na pagina do PDF e no
@@ -1032,6 +1049,17 @@ roda "celular avisos --envenenado-registrada-falta-registrar" node "_teste/testa
 roda "celular avisos --envenenado-lembrete-fora-da-janela" node "_teste/testa_celular_avisos.js" --envenenado-lembrete-fora-da-janela
 # (revisao do lote 4) cobrar e fechar o mes so no celular que e da dona, nunca pela falta de observador
 roda "celular avisos --envenenado-observador-sem-sessao" node "_teste/testa_celular_avisos.js" --envenenado-observador-sem-sessao
+# A trava de transbordo do celular (e o alvo de 48 px das abas): todas as telas e estados (entrar, Hoje com e
+# sem avisos e com o aviso de versao nova, Alunos, ficha, Fechamento, Enviar, os
+# formularios, a folha so leitura, o observador e o Diagnostico) em 360, 390 e
+# 412 px, com a letra normal e em 130%: nenhum elemento rola de lado, nenhum
+# texto sai da caixa e nada passa da borda. Venenos: o aviso de versao antigo
+# ("Atualizar agora" e "Depois da aula" lado a lado) e um elemento de 500 px.
+roda "celular transbordo"                           node "_teste/testa_celular_transbordo.js"
+roda "celular transbordo --envenenado-aviso-largo"  node "_teste/testa_celular_transbordo.js" --envenenado-aviso-largo
+roda "celular transbordo --envenenado-elemento-largo" node "_teste/testa_celular_transbordo.js" --envenenado-elemento-largo
+# as cinco abas do observador com a regra que deixava o "Hoje" com 47 px (alvo de 48)
+roda "celular transbordo --envenenado-aba-estreita" node "_teste/testa_celular_transbordo.js" --envenenado-aba-estreita
 # A mensagem do mes (o feedback do fechamento) editada no celular: o mesmo
 # campo do tablet (Core.textoDoMes e Core.gravarTextoDoMes), o texto salvo sai
 # no PDF do Enviar e do Ver, sobe pela fila e chega ao tablet; a edicao do
