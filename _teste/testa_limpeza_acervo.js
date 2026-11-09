@@ -120,8 +120,8 @@ const ASSUNTO_ACERVO = { id: 'acervo-mat-funcoes', titulo: 'Funções: domínio 
   conf('e oferece importação',
     await pag.evaluate(() => (document.querySelector('#biblioteca-importar-pacote') || {}).textContent || ''),
     'Importar material');
-  conf('as abas são Agenda, Alunos, Fechamento, Biblioteca e Ajustes', await pag.evaluate(() =>
-    Array.from(document.querySelectorAll('#abas .aba')).map(a => a.textContent.trim()).join(',')), 'Agenda,Alunos,Fechamento,Biblioteca,Ajustes');
+  conf('as abas são Agenda, Alunos, Biblioteca, Fechamento e Ajustes', await pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#abas .aba')).map(a => a.textContent.trim()).join(',')), 'Agenda,Alunos,Biblioteca,Fechamento,Ajustes');
   conf('a seção antiga da aba Temas não está na página', await pag.evaluate(() => !!document.querySelector('#tela-temas')), false);
 
   // ================================================================

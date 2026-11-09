@@ -137,7 +137,7 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   // ================================================================
   secao('1. Sem pacote: Biblioteca oferece importação');
   const abas = await pag.evaluate(() => Array.from(document.querySelectorAll('#abas .aba')).map(b => b.textContent.trim() + ':' + b.dataset.tela));
-  conf('a barra tem a aba Biblioteca no lugar de Temas', abas.join(','), 'Agenda:agenda,Alunos:alunos,Fechamento:fechamento,Biblioteca:biblioteca,Ajustes:ajustes');
+  conf('a barra tem a aba Biblioteca no lugar de Temas', abas.join(','), 'Agenda:agenda,Alunos:alunos,Biblioteca:biblioteca,Fechamento:fechamento,Ajustes:ajustes');
   await H.irParaAba(pag, 'biblioteca');
   const vazia = await esperar('aba vazia desenhada', () => pag.evaluate(() => {
     const v = document.querySelector('#biblioteca-sem-pacotes');
