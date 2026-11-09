@@ -126,8 +126,10 @@
  * monta_site.sh põe icons/pages-dev/ por cima de icons/): sem o nome novo, o
  * worker do endereço novo seguiria servindo os ícones velhos do cache. O v89 (D6c lote 1) traz a agenda do dia no celular
  * (app.js, index.html e styles.css), com a lista igual. O v90 conserta a rolagem inicial da agenda do celular
- * de madrugada (app.js), com a lista igual. */
-var CACHE = 'apoio-educacional-v90';
+ * de madrugada (app.js), com a lista igual. O v91 (D6c lote 2) traz a ficha do aluno e o WhatsApp
+ * no celular e os campos opcionais no cadastro (app.js, index.html e
+ * styles.css), com a lista igual. */
+var CACHE = 'apoio-educacional-v91';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

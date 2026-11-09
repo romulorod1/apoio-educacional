@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.14';
+  var VERSAO = '1.42.15';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.15',
+      itens: [
+        'No celular, a aba Alunos mostra a lista e, com um toque no nome, uma ficha curta: ligar ou mandar WhatsApp para o responsável, o valor por hora, o último relato e o endereço (que abre o mapa) ou o link da aula online.',
+        'Mensagens prontas para a família no WhatsApp: "Estou 10 minutos atrasada", "Podemos remarcar?" e "Chegando". O texto abre no WhatsApp e quem envia é você.',
+        'No cadastro do aluno entraram, opcionais, o telefone do responsável (com DDD), se a aula é em casa ou online, o endereço e o link. Ligar e WhatsApp usam só esse telefone.'
+      ]
+    },
     {
       versao: '1.42.13',
       itens: [
