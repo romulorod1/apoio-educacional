@@ -14,7 +14,9 @@
  *   5. um pacote cortado NO COMEÇO da seleção não impede os outros: o resumo
  *      diz o que entrou, o que ficou como estava e o que não entrou, e por quê;
  *   6. a versão 2 substitui a 1 na mesma seleção (nas duas ordens) e em
- *      seleções seguidas; a mais velha depois da mais nova é pulada.
+ *      seleções seguidas; a mais velha depois da mais nova é pulada;
+ *   7. um pacote de livros no meio da série, e sozinho (a frase de sempre);
+ *      o que SAI do pacote novo também conta como gravação.
  *
  * Venenos, no mesmo arquivo (cada um TEM de ser enxergado):
  *   --envenenado-para-na-falha     o primeiro erro interrompe a série
@@ -76,6 +78,25 @@ function cortado(nome, qual) {
   const inteiro = fs.readFileSync(pacote(nome + '-inteiro', qual, 1));
   const p = path.join(TMP, nome + '.zip');
   fs.writeFileSync(p, inteiro.subarray(0, Math.floor(inteiro.length * 0.6)));
+  return p;
+}
+
+const crypto = require('crypto');
+/* Pacote de LIVROS sintético e mínimo: bytes de "PDF" que a importação nunca abre
+ * (ela só confere tamanho, CRC e hash), e o manifest no formato do contrato. */
+function pacoteDeLivros(nome, ids, versao) {
+  const livros = ids.map(id => {
+    const dados = Buffer.from('%PDF-1.4 sintetico ' + id + ' ' + 'x'.repeat(2000));
+    return { id, dados, hash: 'sha256:' + crypto.createHash('sha256').update(dados).digest('hex') };
+  });
+  const arquivos = {};
+  livros.forEach(l => { arquivos['livros/' + l.id + '.pdf'] = l.hash; });
+  const manifest = { esquema: 1, pacote: 'livros-sintetico-varios', versao, conteudo: 'livros', arquivos,
+    livros: livros.map(l => ({ id: l.id, formato: 'pdf', arquivo: 'livros/' + l.id + '.pdf', hash: l.hash,
+      titulo: 'Livro ' + l.id + ' de teste', paginas: 1, sumario: [{ titulo: 'Capítulo 1', pagina: 1 }] })) };
+  const p = path.join(TMP, nome + '.zip');
+  fs.writeFileSync(p, Sintetico.montarZip([{ nome: 'manifest.json', dados: Buffer.from(JSON.stringify(manifest)), metodo: 0 }]
+    .concat(livros.map(l => ({ nome: 'livros/' + l.id + '.pdf', dados: l.dados, metodo: 0 })))));
   return p;
 }
 
@@ -279,6 +300,30 @@ function medirOrdem(ordem, arquivos, idsDosPacotes) {
   conf('v1 e depois v2, em seleções seguidas: a v2 substitui', JSON.stringify((await lerPacotes(pag)).filter(p => p.pacote === IDS.banco).map(p => p.versao)), '[2]');
   r = await importar(pag, [bv1], 'banco v1 depois da v2');
   conf('um arquivo só, mais velho: a frase de sempre', r.texto, 'O tablet já tem a versão 2 deste pacote, mais nova que a do arquivo (versão 1). Nada foi mudado.');
+
+  // ================================================================
+  secao('7. Pacote de livros no meio da série, e sozinho');
+  await pag.evaluate(id => Store.removerPacoteBiblioteca(id), IDS.m1);
+  const livrosV1 = pacoteDeLivros('livros-v1', ['livro-a', 'livro-b'], 1);
+  r = await importar(pag, [livrosV1, m1v1], 'livros e exercícios na mesma série');
+  conf('série mista: livros e exercícios entram', r.linhas.map(l => l.estado).join(','), 'entrou,entrou');
+  conf('o resumo diz: 2 entraram', r.titulo, 'Importação terminada: 2 entraram.');
+  conf('os dois livros estão no depósito dos livros', await H.contarDeposito(pag, 'livros'), 2);
+  conf('o pacote de exercícios entrou junto', (await lerPacotes(pag)).some(p => p.pacote === IDS.m1), true);
+  conf('o livro aparece na lista de Ajustes (a tela dos livros foi refeita)', await pag.evaluate(() => document.querySelectorAll('#lista-livros-biblioteca [data-livro]').length), 2);
+  r = await importar(pag, [livrosV1, m1v1], 'os mesmos livros e exercícios de novo');
+  conf('de novo: os dois ficam como estavam', r.linhas.map(l => l.estado + ':' + /já estava no tablet/.test(l.texto)).join(','), 'pulou:true,pulou:true');
+  // a versão 2 do pacote de livros TIRA um livro: é gravação (o livro sai do tablet), e o resumo não diz "já estava"
+  const livrosV2 = pacoteDeLivros('livros-v2', ['livro-b'], 2);
+  r = await importar(pag, [livrosV2, m1v1], 'a versão 2 dos livros, sem um deles, na série');
+  conf('o pacote que só TIROU um livro conta como "entrou"', r.linhas.map(l => l.estado).join(','), 'entrou,pulou');
+  conf('o livro que saiu do pacote saiu do tablet', await H.contarDeposito(pag, 'livros'), 1);
+  const livrosV3 = pacoteDeLivros('livros-v3', ['livro-b'], 3);
+  r = await importar(pag, [livrosV3], 'a versão 3 dos livros, sozinha');
+  conf('um arquivo só de livros: a frase de sempre, sem resumo', /^Livros importados\./.test(r.texto) && !r.temResumo, true);
+  await pag.evaluate(id => Store.removerPacoteBiblioteca(id), IDS.m1);
+  r = await importar(pag, [livrosV3, m1v1], 'os mesmos livros no meio da série');
+  conf('o mesmo livro de novo fica como estava, e o de exercícios entra', r.linhas.map(l => l.estado).join(','), 'pulou,entrou');
 
   if (pag.errosDePagina.length) console.log('   erros de página: ' + pag.errosDePagina.join(' | ').slice(0, 400));
   conf('nenhum erro de JavaScript na página', pag.errosDePagina.length, 0);

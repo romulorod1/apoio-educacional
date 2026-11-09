@@ -15575,11 +15575,15 @@
     }).then(function (contas) {
       var linhas = ['Livros importados.'].concat(Biblioteca.resumoDeLivros(contas),
         ['Para ler, abra a aba Biblioteca e toque em Livros.']);
-      var entrou = contas.novos + contas.atualizados > 0;
-      return Promise.resolve(desenharLivrosAjustes()).then(function () {
+      // livro que SAIU do pacote novo também é gravação (some do tablet com a posição de leitura)
+      var entrou = contas.novos + contas.atualizados + contas.removidos > 0;
+      var deOutro = contas.deOutroPacote && contas.deOutroPacote.length > 0;
+      /* O redesenho da lista é só tela: se ele falhar com os livros já gravados,
+       * o resultado continua sendo o da gravação (nunca "não entrou"). */
+      return Promise.resolve().then(desenharLivrosAjustes).catch(function () { /* a lista se refaz na próxima abertura */ }).then(function () {
         return {
           estado: entrou ? 'entrou' : 'pulou', classe: 'faixa-info', linhas: linhas,
-          motivo: entrou ? null : contas.iguais ? 'ja-estava' : contas.maisNovos ? 'livros-mais-novos' : 'outro-pacote'
+          motivo: entrou ? null : contas.maisNovos ? 'livros-mais-novos' : deOutro ? 'outro-pacote' : 'ja-estava'
         };
       });
     });
