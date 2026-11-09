@@ -50,7 +50,10 @@
  *   --envenenado-duracao-padrao  remarcar não traz a duração da aula (vem 1 h);
  *   --envenenado-cancela-sempre-sem  "Cancelar com cobrança" grava sem cobrança;
  *   --envenenado-rolagem-antiga  a folga de 8 px da rolagem inicial: com o
- *                         relógio fixo às 00:30, a linha de agora fica cortada;
+ *                         relógio fixo às 00:30, a linha de agora ficava cortada;
+ *                         desde o lote 4 (a rolagem vai à linha de agora), quem
+ *                         corta é o dia cheio de 13/01/2027 (duas aulas acima do
+ *                         alvo e a agenda longa abaixo);
  *   --envenenado-cobranca-volta  tocar na situação que a aula já tem volta a
  *                         cobrança ao padrão (a regra de antes da revisão);
  *   --envenenado-celular-envia-copia  a trava da cópia confunde o celular da
@@ -509,6 +512,10 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     d.aulas.push({ id: 'aula-gratis', alunoId: 'gama', serieId: null, data: ontem, hora: '16:00', duracaoMin: 60, status: 'realizada', cobravel: false, notaTexto: '', anexos: [] });
     junho.forEach(([data, dur], i) => d.aulas.push({ id: 'ref-' + data, alunoId: 'ref', serieId: null, data, hora: '15:30', duracaoMin: dur, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] }));
     Core.criarSerie(d, { alunoId: 'gama', dias: [Core.diaSemana(terceiro)], hora: '16:00', duracaoMin: 60, inicio: terceiro, fim: fimGama });
+    /* (lote 4) O dia cheio da prova da rolagem, longe do mês da prova: duas
+     * aulas antes do alvo e a agenda longa depois, para a rolagem descer. */
+    ['08:00', '09:30', '11:00', '12:30', '14:00', '15:30', '17:00', '18:30'].forEach(h => d.aulas.push({ id: 'rol-' + h.replace(':', ''), alunoId: 'alfa', serieId: null,
+      data: '2027-01-13', hora: h, duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] }));
     await Store.salvar(d);
   }, HOJE, OUTRO, TERCEIRO, ONTEM, JUNHO, FIM_GAMA);
   const serieGama = await pagA.evaluate(() => Store.carregar().then(d => {
@@ -579,6 +586,36 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
       const cortada = l && l.getBoundingClientRect().top < baixo - 1 ? 'cortada:' + (l.textContent.trim().slice(0, 20) || 'linha de agora') : 'inteira';
       return cortada + (agora ? ' agora=' + agora.textContent : ' sem-agora'); }));
   }
+  /* (lote 4) Desde que a rolagem vai à linha de agora, o dia de hoje da
+   * prova não desce: a agenda dele é curta e o alvo fica no alto. O dia cheio
+   * de 13/01/2027 tem duas aulas acima do alvo e a agenda longa abaixo, nos
+   * dois caminhos do dia de hoje: a aula de agora (11:15) e a linha de agora
+   * entre as aulas (10:45). É nele que a folga e a volta seguram. */
+  const desceu = [];
+  for (const hhmm of ['10:45', '11:15']) {
+    await fixarRelogio(pagC, '2027-01-13', hhmm);
+    await clicar(pagC, '#cel-abas .cel-aba[data-cel="fechamento"]');
+    await clicar(pagC, '#cel-abas .cel-aba[data-cel="hoje"]');
+    await pausa(150);
+    const r = await pagC.evaluate(() => {
+      const baixo = document.querySelector('#cel-semana').getBoundingClientRect().bottom;
+      const agora = document.querySelector('#cel-agora');
+      const l = Array.from(document.querySelectorAll('#cel-tempo .cel-tempo-linha')).find(x => x.getBoundingClientRect().bottom > baixo + 1);
+      const cortada = l && l.getBoundingClientRect().top < baixo - 1 ? 'cortada:' + (l.textContent.trim().slice(0, 20) || 'linha de agora') : 'inteira';
+      // as linhas antes da linha do alvo, contadas na ordem da página (não dependem de onde a rolagem parou)
+      const linhas = Array.from(document.querySelectorAll('#cel-tempo .cel-tempo-linha'));
+      const doAlvo = (document.querySelector('#cel-tempo .cel-bloco-agora') || agora).closest('.cel-tempo-linha');
+      const acima = linhas.indexOf(doAlvo);
+      return { texto: cortada + (agora ? ' agora=' + agora.textContent : ' sem-agora'), rolou: Math.round(document.querySelector('#cel-conteudo').scrollTop), acima,
+        alvo: document.querySelector('#cel-tempo .cel-bloco-agora') ? 'aula de agora' : 'linha de agora' };
+    });
+    rolagens.push(hhmm + ' (13/01/2027) ' + r.texto);
+    desceu.push(hhmm + ' ' + r.alvo + ', rolou ' + r.rolou + ' px, ' + r.acima + ' linhas antes do alvo');
+  }
+  console.log('   ' + desceu.join(' | '));
+  conf('(arranjo) no dia cheio a rolagem desce, com as duas aulas da manhã antes do alvo, pelos dois caminhos (' + desceu.join(' | ') + ')',
+    desceu.map(x => /^(\d\d:\d\d) (aula|linha) de agora, rolou (\d+) px, (\d+) linhas antes do alvo$/.exec(x)).every(m => m && Number(m[3]) > 0 && Number(m[4]) >= 2) &&
+    /^10:45 linha/.test(desceu[0]) && /^11:15 aula/.test(desceu[1]), true);
   await soltarRelogio(pagC);
   await clicar(pagC, '#cel-abas .cel-aba[data-cel="fechamento"]');
   await clicar(pagC, '#cel-abas .cel-aba[data-cel="hoje"]');
