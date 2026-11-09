@@ -442,6 +442,13 @@ roda "importar varios --envenenado-livro-velho-volta" node "_teste/testa_bibliot
 # que ignora os apelidos do pacote, e "bhaskara" tem de perder as listas.
 roda "biblioteca navegar"                       node "_teste/testa_biblioteca_navegar.js"
 roda "biblioteca navegar --envenenado-apelidos" node "_teste/testa_biblioteca_navegar.js" --envenenado-apelidos
+# B1: a navegacao com a Biblioteca. O trilho lateral do tablet (o "+" no alto,
+# Agenda, Alunos, Biblioteca, Fechamento, Ajustes no pe) e a barra de baixo do
+# celular com a Biblioteca, a 360, 390 e 412 px e a 360 com a letra a 130%. O
+# veneno deixa a coluna da barra encolher abaixo do rotulo, e o "Fechamento"
+# estourado tem de ser visto.
+roda "navegacao biblioteca"                     node "_teste/testa_navegacao_biblioteca.js"
+roda "navegacao biblioteca --envenenado-rotulo-corta" node "_teste/testa_navegacao_biblioteca.js" --envenenado-rotulo-corta
 # C12: os pacotes de provas (OBMEP Mirim por nivel e ENEM) importam, as abas vao
 # do 2o ao 5o ano e os assuntos do aplicativo aparecem como modulos. O modo
 # envenenado serve o app.js que so espalhava o Banco pelas series equivalentes.

@@ -145,8 +145,6 @@ body {
   white-space: nowrap;
 }
 
-.abas { display: flex; gap: 4px; flex-wrap: wrap; }
-
 /* Botão que esconde os valores da tela. Fica no cabeçalho, ao alcance do
    polegar, porque às vezes é preciso apagar a renda da vista em um toque. */
 .olho {
@@ -167,21 +165,6 @@ body {
 }
 .olho:hover { background: var(--soft); }
 .olho.ativo { background: var(--navy); border-color: var(--navy); color: var(--branco); }
-
-.aba {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--muted);
-  padding: 9px 16px;
-  border-radius: 999px;
-  font-size: var(--letra-4);
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  min-height: 44px;
-}
-.aba:hover { background: var(--soft); }
-.aba.ativa { background: var(--navy); color: var(--branco); }
 
 /* ---------- área principal ---------- */
 
@@ -1936,8 +1919,6 @@ button.alvo-rascunho:hover { background: var(--soft); }
 
 @media (max-width: 720px) {
   .cabecalho { flex-direction: column; align-items: stretch; gap: 8px; }
-  .abas { justify-content: space-between; }
-  .aba { flex: 1; padding: 9px 8px; font-size: var(--letra-3); }
   .dia { min-height: 62px; }
   .marca span { display: none; }
   .olho { position: absolute; top: 10px; right: 12px; }
@@ -1961,19 +1942,6 @@ button.alvo-rascunho:hover { background: var(--soft); }
   .marca strong {
     font-size: var(--letra-5);
     letter-spacing: normal;
-  }
-  .abas {
-    flex-wrap: nowrap;
-    gap: 4px;
-  }
-  .aba {
-    height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 12px;
-    font-size: var(--letra-3);
-    white-space: nowrap;
   }
 }
 
@@ -3425,26 +3393,6 @@ body.modo-celular .celular .cel-icone { min-width: var(--alvo-celular); padding:
 /* O valor de cada aula, alinhado à direita e na cor do texto: a cor aqui não
    quer dizer nada (pago ou não é do tablet, na lista de pendências). */
 .cel-valor { white-space: nowrap; color: var(--texto); }
-.cel-abas {
-  display: flex;
-  flex-shrink: 0;
-  background: var(--branco);
-  border-top: 1px solid var(--fio);
-  padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
-}
-.cel-abas[hidden] { display: none; }
-.cel-aba {
-  flex: 1;
-  min-height: 52px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--novidades-subtitulo);
-  font: inherit;
-  font-size: var(--letra-4);
-  font-weight: 600;
-}
-.cel-aba.ativa { background: var(--soft); color: var(--navy); }
 body.modo-celular .celular .btn { min-height: var(--alvo-celular); }
 /* Campos e botões do celular com 48 px (D6b: as quatro ações escrevem aqui). */
 body.modo-celular .celular input,
@@ -3519,8 +3467,6 @@ body.modo-celular .celular a.cel-link-botao:focus { background: var(--branco); }
 .cel-aluno-nome { font-size: var(--letra-5); font-weight: 700; color: var(--navy); }
 .cel-aluno-detalhe { font-size: var(--letra-2); color: var(--novidades-subtitulo); }
 body.modo-celular .celular .campo[hidden] { display: none; }
-/* Com cinco abas (o observador), a letra desce um degrau para caber em 390 px. */
-.cel-abas.muitas .cel-aba { min-width: 0; padding: 0 2px; font-size: var(--letra-2); }
 /* O aviso no celular ocupa o seu lugar entre o conteúdo e as abas (o app.js
    o põe ali): nunca cobre o formulário nem a barra de baixo. */
 body.modo-celular .celular > .aviso { position: static; transform: none; transition: none; display: none; max-width: none;
@@ -3537,3 +3483,93 @@ body.modo-celular .celular .linha { flex-direction: column; }
 .resumo-importacao-texto { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .resumo-importacao-detalhe { display: block; margin-top: 2px; }
 #fechar-resumo-importacao { min-height: 48px; }
+
+/* ==================== B1: navegação (início) ====================
+   O trilho lateral do tablet e a barra de baixo do celular, copiados dos
+   protótipos da Biblioteca (tab_biblioteca.html, .rail; cel_biblioteca.html,
+   .nav4). As cores são variáveis LOCAIS com o valor do protótipo: a F1 troca
+   pelos tokens dela sem mexer na estrutura. Os ganchos das provas ficam:
+   #abas, .aba, .ativa, data-tela; #cel-abas, .cel-aba, data-cel. */
+:root {
+  --nav-trilho-largura: 96px;
+  --nav-superficie: #FFFFFF;
+  --nav-fio: #E8E2D7;
+  --nav-texto: #4A5464;
+  --nav-ativo-texto: #1F3A5F;
+  --nav-ativo-fundo: #E8EDF4;
+  --nav-mais-fundo: #1F3A5F;
+  --nav-mais-traco: #C9A75B;
+  --nav-sombra: 0 1px 2px rgba(22, 44, 73, .06), 0 1px 3px rgba(22, 44, 73, .08);
+  /* 12 px como no protótipo, e cresce com a letra do aparelho como as outras */
+  --nav-rotulo: calc(var(--letra-1) * 12 / 11);
+}
+.nav-ico {
+  width: 20px; height: 20px; flex: none;
+  stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;
+}
+.nav-ind { display: grid; place-items: center; border-radius: 999px; }
+.nav-rotulo { display: block; white-space: nowrap; }
+
+/* ---- tablet: o trilho lateral ---- */
+body { padding-left: var(--nav-trilho-largura); }
+body.modo-celular, body.modo-familia { padding-left: 0; }
+#abas {
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 30;
+  width: var(--nav-trilho-largura);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 12px 0;
+  background: var(--nav-superficie);
+  border-right: 1px solid var(--nav-fio);
+  overflow-y: auto;
+}
+#abas .nav-mais {
+  width: 56px; height: 56px; flex: none; margin-bottom: 12px;
+  display: grid; place-items: center; padding: 0;
+  border: 0; border-radius: 16px; cursor: pointer;
+  background: var(--nav-mais-fundo); color: var(--nav-mais-traco);
+  box-shadow: var(--nav-sombra);
+}
+#abas .nav-mais .nav-ico { stroke-width: 2.25; }
+#abas .aba {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  width: 100%; min-height: 56px; padding: 4px 0; flex: none;
+  border: 0; border-radius: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: var(--nav-rotulo); font-weight: 400; line-height: 1.2;
+  color: var(--nav-texto); text-align: center;
+}
+#abas .aba .nav-ind { width: 56px; height: 32px; }
+#abas .aba:hover .nav-ind { background: var(--nav-ativo-fundo); }
+#abas .aba.ativa { color: var(--nav-ativo-texto); font-weight: 600; }
+#abas .aba.ativa .nav-ind { background: var(--nav-ativo-fundo); }
+/* Ajustes não é destino do desenho: fica no pé do trilho, só com o nome. */
+#abas .aba.nav-pe { margin-top: auto; }
+#abas .aba.nav-pe .nav-ind { display: none; }
+#abas .aba.nav-pe.ativa { background: var(--nav-ativo-fundo); }
+#abas button:focus-visible { outline: 2px solid var(--nav-ativo-texto); outline-offset: -2px; }
+
+/* ---- celular: a barra de baixo ---- */
+.cel-abas {
+  flex-shrink: 0;
+  display: grid; grid-auto-flow: column;
+  /* nav: âncora do veneno do rótulo (a coluna nunca fica menor que o rótulo) */
+  grid-auto-columns: minmax(min-content, 1fr);
+  column-gap: 4px; align-items: center;
+  min-height: 64px;
+  padding: 0 4px env(safe-area-inset-bottom, 0px);
+  background: var(--nav-superficie);
+  border-top: 1px solid var(--nav-fio);
+}
+.cel-abas[hidden] { display: none; }
+.cel-aba {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-width: 0; height: 64px; padding: 0;
+  border: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: var(--nav-rotulo); font-weight: 400; line-height: 1.2;
+  color: var(--nav-texto);
+}
+.cel-aba[hidden] { display: none; }
+.cel-aba .nav-ind { width: 100%; max-width: 56px; height: 28px; }
+.cel-aba.ativa { color: var(--nav-ativo-texto); font-weight: 600; }
+.cel-aba.ativa .nav-ind { background: var(--nav-ativo-fundo); }
+.cel-aba:focus-visible { outline: 2px solid var(--nav-ativo-texto); outline-offset: -2px; border-radius: 12px; }
+/* ==================== B1: navegação (fim) ==================== */
