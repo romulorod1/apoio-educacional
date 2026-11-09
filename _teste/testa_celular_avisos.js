@@ -586,8 +586,8 @@ const REG = '#cel-avisos .cel-aviso-registrar';
   await fecharPainel(pagC);
   const lay = await leiaute(pagC);
   console.log('   ' + JSON.stringify(lay));
-  conf('a agenda continua na primeira tela: a linha de agora (14:50) e, abaixo dela, o começo do bloco da Próxima (a marca e o nome), com 200 px ou mais de agenda à vista (' + lay.livre + ' px)',
-    lay.agoraAVista && lay.agora === '14:50' && lay.comecoAVista && lay.alvo === 'alfa-1006' && lay.livre >= 200, true);
+  prop('a agenda continua na primeira tela: a linha de agora (14:50) e, abaixo dela, o começo do bloco da Próxima (a marca e o nome), com 200 px ou mais de agenda à vista (' + lay.livre + ' px)',
+    lay.agoraAVista && lay.agora === '14:50' && lay.comecoAVista && lay.alvo === 'alfa-1006' && lay.livre >= 200, V_EMPILHADOS);
   await tirarPrint(pagC, '2_tres_avisos_dia_6.png');
   conf('tocar no bloco da Próxima abre a folha daquela aula', await clicar(pagC, '#cel-tempo .cel-bloco-proxima') && await existe(pagC, '#cel-folha[data-aula="alfa-1006"]'), true);
   await clicar(pagC, '#cel-folha-fechar');
