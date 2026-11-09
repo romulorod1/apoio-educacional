@@ -57,7 +57,7 @@ async function rodar() {
     document.querySelector('#modal-nota').classList.contains('aberto')), v => v === true, 5000);
 
   const tituloNota = await pag.$eval('#titulo-modal-nota', e => e.textContent.trim());
-  conf('titulo da folha identifica Marcelo e a data', tituloNota.includes('Marcelo') && tituloNota.includes('01/06/2026'), true);
+  conf('titulo da folha identifica Marcelo e a data', tituloNota.includes('Aluno Referência Teste') && tituloNota.includes('01/06/2026'), true);
 
   const statusInicial = await pag.$eval('#status-gravacao-folha', e => e.textContent.trim());
   conf('status de gravacao inicial indica salvo no tablet', statusInicial.includes('Salvo neste tablet'), true);
@@ -213,7 +213,7 @@ async function rodar() {
   // Volta para pagina 1 com "‹"
   await pag.evaluate(() => {
     const btns = Array.from(document.querySelectorAll('#rodape-nota button'));
-    const btnAnt = btns.find(b => b.textContent.trim() === '‹');
+    const btnAnt = btns.find(b => b.getAttribute('aria-label') === 'Página anterior'); // F1: o "‹" virou ícone
     if (btnAnt) btnAnt.click();
   });
   await pausa(100);
@@ -224,7 +224,7 @@ async function rodar() {
   // Avanca para pagina 2 com "›"
   await pag.evaluate(() => {
     const btns = Array.from(document.querySelectorAll('#rodape-nota button'));
-    const btnProx = btns.find(b => b.textContent.trim() === '›');
+    const btnProx = btns.find(b => b.getAttribute('aria-label') === 'Página seguinte'); // F1: o "›" virou ícone
     if (btnProx) btnProx.click();
   });
   await pausa(100);
@@ -309,7 +309,7 @@ async function rodar() {
 
   conf('exportacao gerou arquivo PDF', interceptacaoPdf.tipo, 'application/pdf');
   conf('nome do arquivo comeca com Folha_com_anotacoes_', interceptacaoPdf.nome.startsWith('Folha_com_anotacoes_'), true);
-  conf('nome do arquivo identifica o aluno Marcelo', interceptacaoPdf.nome.includes('Marcelo'), true);
+  conf('nome do arquivo identifica o aluno Marcelo', interceptacaoPdf.nome.includes('Aluno_Referencia_Teste'), true);
   conf('assinatura valida de documento PDF (%PDF)', interceptacaoPdf.header, '%PDF-');
 
   // O caso que faltava no T09: imagem colada de exercicio. O PDF recebe bytes

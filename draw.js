@@ -412,7 +412,10 @@
     }, sinalAtivo);
   };
 
-  Editor.prototype._eDedo = function (e) { return e.pointerType === 'touch'; };
+  /* SÓ LEITURA (N2): no celular e no observador a folha abre para ler, e
+   * todo ponteiro, caneta inclusive, é tratado como dedo: arrasta e aproxima,
+   * nunca escreve. É uma porta só, aqui, e não em cada ferramenta. */
+  Editor.prototype._eDedo = function (e) { return !!this.opcoes.soLeitura || e.pointerType === 'touch'; };
 
   Editor.prototype._aoDescer = function (e) {
     if (this.destruido) return;
