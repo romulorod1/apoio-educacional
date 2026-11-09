@@ -52,6 +52,10 @@
  *
  * Portas: 8821 (app), 8823 (auth), 8824 (firestore), 8825 (hub), 8826 (log),
  * 8827 (websocket). Precisa do firebase-tools e de um JDK 21 em JAVA_HOME.
+ * NATH_PORTA_BASE desloca as seis (base, +2 a +6). Para estressar a seção 8:
+ * NATH_CPU_LENTA=4 (CPU estrangulada nas páginas) e NATH_ATRASO_COMMIT_A=300
+ * (os commits de A atrasados, em ms). Sem a espera pela fila de A, 300 ms
+ * reprovam a seção 8 em 20 de 20; com ela, 20 de 20 passam.
  */
 'use strict';
 const fs = require('fs');
@@ -70,7 +74,9 @@ function prop(rotulo, ok, veneno) {
   return conf(rotulo, ok, true);
 }
 
-const PORTA_APP = 8821, PORTA_AUTH = 8823, PORTA_FS = 8824, PORTA_HUB = 8825, PORTA_LOG = 8826, PORTA_WS = 8827;
+/* NATH_PORTA_BASE desloca as seis portas juntas (duas sessões na mesma máquina). */
+const BASE_PORTAS = Number(process.env.NATH_PORTA_BASE || 8821);
+const PORTA_APP = BASE_PORTAS, PORTA_AUTH = BASE_PORTAS + 2, PORTA_FS = BASE_PORTAS + 3, PORTA_HUB = BASE_PORTAS + 4, PORTA_LOG = BASE_PORTAS + 5, PORTA_WS = BASE_PORTAS + 6;
 const PROJETO = 'demo-nath-n1f3';
 const AUTH = 'http://127.0.0.1:' + PORTA_AUTH;
 const FS = 'http://127.0.0.1:' + PORTA_FS;
@@ -233,6 +239,7 @@ const amb = H.criarAmbiente(PORTA_APP, 'nath_n1f3_recebe', trocas);
 
 async function prepararPagina(pag, movel) {
   pag.setDefaultTimeout(60000);
+  if (process.env.NATH_CPU_LENTA) await pag.emulateCPUThrottling(Number(process.env.NATH_CPU_LENTA));
   if (movel) await pag.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true });
   pag.errosDePagina = [];
   pag.on('pageerror', e => pag.errosDePagina.push(e.message));
@@ -285,6 +292,13 @@ const retrato = pag => pag.evaluate(async () => {
   const d = await Store.carregar();
   return JSON.stringify({ aulas: d.aulas.map(a => [a.id, a.hora, a.status, a.notaTexto || '']).sort(), pix: d.ajustes.chavePix });
 });
+/* A diferença inteira entre dois retratos: as aulas que só um lado tem e a Pix. */
+function difRetrato(rotuloA, a, rotuloB, b) {
+  const pa = JSON.parse(a), pb = JSON.parse(b);
+  const ka = pa.aulas.map(x => JSON.stringify(x)), kb = pb.aulas.map(x => JSON.stringify(x));
+  const soA = ka.filter(x => kb.indexOf(x) < 0), soB = kb.filter(x => ka.indexOf(x) < 0);
+  return 'só em ' + rotuloA + ': [' + soA.join(', ') + '] | só em ' + rotuloB + ': [' + soB.join(', ') + ']' + (pa.pix !== pb.pix ? ' | pix: ' + pa.pix + ' x ' + pb.pix : '');
+}
 const aula = (pag, id) => pag.evaluate(async i => { const d = await Store.carregar(); const a = d.aulas.find(x => x.id === i); return a ? { hora: a.hora, status: a.status, nota: a.notaTexto || '' } : null; }, id);
 const historico = pag => pag.evaluate(() => Store.listarHistorico().then(l => l.filter(h => /outro aparelho/.test(h.rotulo)).map(h => ({ rotulo: h.rotulo, notas: h.estado.aulas.map(a => a.notaTexto || '') }))));
 /* Troca as regras do emulador em pleno voo (a API própria dele). */
@@ -584,6 +598,17 @@ async function restaurarPelaTela(pag, botaoRestaurar, aAnterior) {
   await editar(pagA, "d.aulas = d.aulas.filter(a => !/^s3@2026-07-02/.test(a.id));");
 
   secao('8. O celular da dona restaura e RECEBE os registros; sem editar, não envia nada');
+  /* (investigação) NATH_ATRASO_COMMIT_A atrasa os commits de A, a rede lenta do tablet. */
+  if (process.env.NATH_ATRASO_COMMIT_A) await pagA.evaluate(ms => { const o = window.fetch; window.fetch = function (u) { const a = arguments, t = this; return /:commit\b/.test(String(u)) ? new Promise(r => setTimeout(r, ms)).then(() => o.apply(t, a)) : o.apply(t, a); }; }, Number(process.env.NATH_ATRASO_COMMIT_A));
+  const inicio8 = Date.now();
+  /* A 7b editou A pelo Store e não sincronizou: a fila de A sobe sozinha 2,5 s
+   * depois da última gravação (ATRASO_ENVIO_REGISTROS). O celular só recebe o
+   * que já está no servidor; comparar a agenda dele com a de A antes disso mede
+   * a corrida da prova com o envio de A, e não o celular (no CI do PR 132 a
+   * prova ganhou por 170 ms e perdeu). A condição: a fila de A vazia e nada
+   * subindo, pelo envio automático dele. */
+  const filaA8 = await esperar('A subiu sozinho o que a 7b editou', () => pagA.evaluate(() => Store.estadoDaFila().then(f => f.pendentes === 0 && f.quarentena === 0 && !Nuvem.estado().registros.enviando)), v => v === true, 30000);
+  conf('antes do celular, a fila de A está vazia: o servidor tem a agenda de A', filaA8.ok, true);
   const contextoC = await pagA.browser().createBrowserContext();
   const pagC = await contextoC.newPage();
   await prepararPagina(pagC, true);
@@ -605,7 +630,14 @@ async function restaurarPelaTela(pag, botaoRestaurar, aAnterior) {
     (await aula(pagC, 's1@2026-06-08')).nota, 'A depois');
   conf('receber de novo no celular, em dia, não falha', rC.erro === null, true);
   conf('o celular vê "A depois" na aula de 08/06 e não vê a aula apagada', (await aula(pagC, 's1@2026-06-08')).nota + '/' + ((await aula(pagC, 'x1')) === null), 'A depois/true');
-  conf('o celular tem a mesma agenda de A', await retrato(pagC), await retrato(pagA));
+  const retratoC8 = await retrato(pagC), retratoA8 = await retrato(pagA);
+  const marcas8 = { envioA: await pagA.evaluate(() => (Nuvem.estado().registros.ultimoEnvio || {}).quando), recebeC: await pagC.evaluate(() => (Nuvem.estado().registros.ultimoRecebimento || {}).quando) };
+  console.log('   (medida) o último recebimento do celular terminou ' + (new Date(marcas8.recebeC) - new Date(marcas8.envioA)) + ' ms depois do último envio de A');
+  if (!conf('o celular tem a mesma agenda de A', retratoC8, retratoA8)) {
+    console.log('   a diferença: ' + difRetrato('C', retratoC8, 'A', retratoA8));
+    console.log('   A agora: ' + JSON.stringify(await pagA.evaluate(() => Store.estadoDaFila().then(f => ({ fila: f, envio: Nuvem.estado().registros.ultimoEnvio, enviando: Nuvem.estado().registros.enviando })))) +
+      ' | C: ' + JSON.stringify(await pagC.evaluate(() => Nuvem.estado().registros.ultimoRecebimento)) + ' | desde o começo da 8: ' + (Date.now() - inicio8) + ' ms');
+  }
   /* Desde o D6b o celular da dona envia os registros DELE (as quatro ações,
    * provadas no testa_celular_edita.js). Aqui ele não editou: o envio roda e
    * não tem o que subir. */

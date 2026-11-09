@@ -171,14 +171,90 @@ function criarAmbiente(porta, nomePerfil, trocas) {
   return amb;
 }
 
-/* Abre o aplicativo, espera as abas e tira a janela de novidades do caminho. */
+/* Abre o aplicativo, espera as abas e tira a janela de novidades do caminho.
+ *
+ * Na primeira visita de um perfil novo o worker assume (clients.claim no
+ * activate do sw.js), o controllerchange dispara e o app recarrega sozinho
+ * (app.js, registrarServiceWorker). É do app e é o esperado; a prova só não
+ * pode medir em cima do documento que está para sumir ("Execution context was
+ * destroyed", a main vermelha na 4a1c4ca). Antes, uma pausa de 1,2 s torcia
+ * para a recarga já ter passado. Agora cada documento se marca ao nascer
+ * (__nasceuControlada, o mesmo desenho do testa_biblioteca_importar) e o
+ * abrirApp só devolve a página com o app pronto num documento que JÁ nasceu
+ * sob o worker: esse não recarrega mais pelo primeiro controle.
+ *
+ * Página com o worker contornado (setBypassServiceWorker) nunca nasce
+ * controlada: nela basta o app pronto. Página sem registro de worker nenhum
+ * (a instalação falhou e o navegador apagou o registro) também não recarrega:
+ * segue, e diz isso no log. Worker registrado que não assume no prazo (preso
+ * instalando ou esperando) é erro com o estado do registro e a marca
+ * semWorker, nunca espera sem fim.
+ *
+ * O app abre as novidades 900 ms depois de pronto (app.js,
+ * setTimeout(mostrarNovidades, 900)): a página só volta quando o mesmo
+ * documento está pronto há PRAZO_NOVIDADES_MS no relógio dele, e a janela, se
+ * abriu, é fechada. Se o documento trocar no meio, a contagem recomeça no novo. */
+const PRAZO_APP_MS = 40000;
+const PRAZO_WORKER_MS = 30000;
+const PRAZO_NOVIDADES_MS = 1000;
+const PRAZO_SEM_REGISTRO_MS = 3000;
+
+async function marcarDocumentos(pag) {
+  if (pag.__marcaDoControle) return;
+  pag.__marcaDoControle = true;
+  await pag.evaluateOnNewDocument(() => {
+    window.__nasceuControlada = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+    window.__documento = Math.random().toString(36).slice(2) + '.' + Date.now();
+  });
+}
+
+const lerDocumento = pag => pag.evaluate(() => {
+  const base = {
+    pronto: !!document.querySelector('#abas .aba') && typeof Store === 'object' &&
+      !!document.querySelector('#versao-app') && document.querySelector('#versao-app').textContent.length > 1,
+    controlada: window.__nasceuControlada === true,
+    id: window.__documento || null
+  };
+  const registro = navigator.serviceWorker ? navigator.serviceWorker.getRegistration() : Promise.resolve(null);
+  return registro.then(r => Object.assign(base, { registro: !!r, agora: performance.now() }));
+});
+
 async function abrirApp(pag, origem) {
+  await marcarDocumentos(pag);
+  const contornado = pag.isServiceWorkerBypassed();
   await pag.goto(origem + '/index.html', { waitUntil: 'networkidle0' });
-  const pronto = await esperar('o aplicativo abriu', () => pag.evaluate(() =>
-    !!document.querySelector('#abas .aba') && typeof Store === 'object' && !!document.querySelector('#versao-app') &&
-    document.querySelector('#versao-app').textContent.length > 1), v => v === true, 40000);
+  const pronto = await esperar('o aplicativo abriu', () => lerDocumento(pag), v => !!v && v.pronto, PRAZO_APP_MS);
   if (!pronto.ok) throw Object.assign(new Error('o aplicativo não abriu'), { jaContado: false });
-  await pausa(1200);
+  /* candidato: o documento pronto que está sendo observado, e por qual motivo
+   * ele não vai recarregar. "sem registro" é a instalação que falhou (o
+   * navegador apaga o registro do worker que não instala, como o sw.js do
+   * 1.26.0 do testa_biblioteca_kits, que lista arquivos que não existem mais):
+   * sem worker não há recarga a esperar, mas só vale depois de
+   * PRAZO_SEM_REGISTRO_MS seguidos no mesmo documento, porque o register()
+   * leva um instante para criar o registro. Worker registrado que nunca
+   * assume (preso instalando ou esperando) cai no prazo e é erro. */
+  let candidato = null;
+  const assentou = await esperar(contornado ? 'o aplicativo assentou (worker contornado)' :
+    'o aplicativo assentou num documento que já nasceu sob o worker', () => lerDocumento(pag), v => {
+    const motivo = !v || !v.pronto || !v.id ? null :
+      (contornado ? 'contornado' : (v.controlada ? 'controlada' : (!v.registro ? 'sem registro' : null)));
+    if (!motivo) { candidato = null; return false; }
+    if (!candidato || candidato.id !== v.id || candidato.motivo !== motivo) candidato = { id: v.id, motivo, desde: v.agora };
+    return v.agora - candidato.desde >= (motivo === 'sem registro' ? PRAZO_SEM_REGISTRO_MS : PRAZO_NOVIDADES_MS);
+  }, PRAZO_WORKER_MS);
+  if (assentou.ok && candidato.motivo === 'sem registro') {
+    console.log('   (nenhum service worker registrado nesta página: a instalação falhou ou não houve; não há recarga a esperar)');
+  }
+  if (!assentou.ok) {
+    let estado = '?';
+    try {
+      estado = await pag.evaluate(() => navigator.serviceWorker.getRegistration().then(r => JSON.stringify({
+        nasceuControlada: window.__nasceuControlada, controlador: !!navigator.serviceWorker.controller,
+        registro: !!r, instalando: !!(r && r.installing), esperando: !!(r && r.waiting), ativo: !!(r && r.active) })));
+    } catch (e) { estado = 'sem leitura: ' + e.message; }
+    throw Object.assign(new Error((contornado ? 'o aplicativo não ficou de pé ' : 'o service worker não assumiu a página ') +
+      'em ' + PRAZO_WORKER_MS + ' ms; estado: ' + estado), { jaContado: false, semWorker: !contornado });
+  }
   await pag.evaluate(() => {
     const b = document.querySelector('#entendi-novidades');
     if (b && document.querySelector('#modal-novidades.aberto')) b.click();

@@ -83,7 +83,10 @@ const ASSUNTO_ACERVO = { id: 'acervo-mat-funcoes', titulo: 'Funções: domínio 
     await c.put('./banco/acervo_indice.json', new Response('[]', { headers: { 'Content-Type': 'application/json' } }));
     await c.put('./banco/serie-06.json', new Response('{"serie":"06"}', { headers: { 'Content-Type': 'application/json' } }));
   });
-  await H.abrirApp(pag, amb.ORIGEM);
+  /* Com o veneno a instalação falha e o worker nunca assume: o abrirApp segue
+   * sem registro de worker, ou, se o worker ficar preso, desiste com a marca
+   * semWorker. Nos dois casos quem confere a causa é o bloco abaixo. */
+  await H.abrirApp(pag, amb.ORIGEM).catch(e => { if (!(VENENO && e && e.semWorker)) throw e; });
 
   // o service worker instala: todo arquivo da lista existe
   const sw = await esperar('service worker ativo', () => pag.evaluate(() =>
@@ -96,6 +99,13 @@ const ASSUNTO_ACERVO = { id: 'acervo-mat-funcoes', titulo: 'Funções: domínio 
   conf('o service worker instalou com a lista nova (nenhum arquivo faltando)', sw.ok, true);
   const caixas = await esperar('cache v37 apagado na ativação', () => pag.evaluate(() => caches.keys()), v => v && v.indexOf('apoio-educacional-v37') < 0, 15000);
   conf('o cache antigo foi apagado', caixas.ok, true);
+  /* O activate termina com clients.claim(), e o primeiro controle recarrega o
+   * app: ler os baixados no documento que está para sumir dava "Execution
+   * context was destroyed". A leitura só acontece num documento que já nasceu
+   * sob o worker, que não recarrega mais por isso. */
+  const assentado = await esperar('o documento já nasceu sob o worker', () => pag.evaluate(() =>
+    window.__nasceuControlada === true && !!navigator.serviceWorker.controller), v => v === true, 30000);
+  conf('os baixados são lidos num documento que já nasceu sob o worker', assentado.ok, true);
   const baixados = await pag.evaluate(() => caches.open('apoio-educacional-baixados').then(c => c.keys()).then(k => k.map(r => new URL(r.url).pathname).sort().join(',')));
   conf('a série que ela baixou foi resgatada para o BAIXADOS, e o acervo aposentado não', baixados, '/banco/serie-06.json');
 
