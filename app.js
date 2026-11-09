@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.18';
+  var VERSAO = '1.42.22';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.22',
+      itens: [
+        'Em Ajustes, na Biblioteca, dá para escolher vários pacotes de uma vez. O aplicativo importa um por vez, mostra "Importando 5 de 17" e, no fim, uma lista do que entrou, do que já estava e do que não entrou, com o motivo.',
+        'Se um pacote falhar, os outros continuam. Se você escolher de novo os mesmos pacotes, os que já estão no tablet são pulados sem demora.'
+      ]
+    },
     {
       versao: '1.42.18',
       itens: [
