@@ -7,9 +7,20 @@
 #     nao e o que esta na main),
 #   - na main, do proprio repositorio (nunca de fork),
 #   - com conclusao success, que no push na main quer dizer portao-rapido,
-#     as oito fatias do navegador e o portao-navegador verdes (no push nenhum
-#     job do portao e pulado; veja o portao.yml).
+#     as oito fatias do navegador e o portao-navegador verdes, ou as fatias puladas
+#     de proposito pelo portao-arvore (nivel 3, abaixo; veja o portao.yml).
 # Portao vermelho, cancelado ou pulado: este job nem comeca.
+#
+# NIVEL 3 DA POLITICA DE TESTES (09/11/2026): no push da main o portao so roda a
+# bateria inteira quando a arvore (tree) do commit difere da cabeca do PR cuja
+# bateria passou (job portao-arvore). Aqui o passo "bateria" refaz essa conta
+# com a mesma _teste/arvore_da_main.js, pelo gh api com o GITHUB_TOKEN, e diz no
+# log qual caminho tomou e por que:
+#   - tree IGUAL ao da cabeca de um PR com a bateria inteira verde: publica sem
+#     rodar a bateria de novo (o portao pulou as fatias);
+#   - tree DIFERENTE (ou sem PR, ou API fora do ar): a bateria tem de ter rodado,
+#     e o passo confere, na rodada do portao que acordou este workflow, que o
+#     job portao-navegador terminou "success". Se nao, nao publica.
 #
 # E SO SE AQUELE COMMIT AINDA E A PONTA DA MAIN. Dois pushes seguidos: o portao
 # do segundo cancela o do primeiro (concurrency do portao), mas se o primeiro
@@ -41,6 +52,9 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
+  checks: read
+  actions: read
 
 jobs:
   publica:
@@ -60,13 +74,39 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
+      - name: A bateria inteira, pelo tree (nivel 3)
+        id: bateria
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RODADA: ${{ github.event.workflow_run.id }}
+        run: |
+          node _teste/arvore_da_main.js "$COMMIT"
+          if grep -q '^reaproveita=sim' "$GITHUB_OUTPUT"; then
+            echo "nivel 3: publica sem rodar a bateria de novo (o tree e o de um PR com a bateria inteira verde)"
+            echo "liberada=sim" >> "$GITHUB_OUTPUT"
+          else
+            juntador=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RODADA/jobs?per_page=100" \
+              --jq '[.jobs[] | select(.name == "portao-navegador")][0].conclusion' || echo "")
+            echo "nivel 3: o tree difere (ou nao ha PR); portao-navegador nesta rodada do portao: ${juntador:-ausente}"
+            if [ "$juntador" = "success" ]; then
+              echo "nivel 3: a bateria inteira rodou e passou: publica"
+              echo "liberada=sim" >> "$GITHUB_OUTPUT"
+            else
+              echo "nivel 3: a bateria inteira nao passou nesta rodada: NAO publica"
+              echo "liberada=nao" >> "$GITHUB_OUTPUT"
+            fi
+          fi
       - name: O commit do portao ainda e a ponta da main
         id: ponta
         run: |
           git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
           ponta=$(git rev-parse origin/main)
           echo "portao verde em $COMMIT; ponta da main: $ponta"
-          if [ "$ponta" = "$COMMIT" ]; then
+          if [ "${{ steps.bateria.outputs.liberada }}" != "sim" ]; then
+            echo "a bateria inteira nao esta liberada para este commit (passo anterior)"
+            echo "publicar=nao" >> "$GITHUB_OUTPUT"
+          elif [ "$ponta" = "$COMMIT" ]; then
             echo "publicar=sim" >> "$GITHUB_OUTPUT"
           else
             echo "a main ja andou: quem publica e o portao do commit mais novo"
