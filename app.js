@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.15';
+  var VERSAO = '1.42.16';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.16',
+      itens: [
+        'No Fechamento do celular, cada família tem um selo: Pago, "Parcial, faltam R$ X" ou Em aberto. No alto, quanto falta receber no mês e, se houver, dos meses anteriores.',
+        'Marcar como pago no celular é em dois toques, e o valor já vem com o que a família deve até hoje, como no tablet. Confira o valor que ela pagou antes de confirmar.',
+        'Os cancelamentos agora se chamam "Cancelada sem cobrança" e "Cancelada e cobrada", no celular, no tablet e no PDF da família. Os botões mostram o valor.'
+      ]
+    },
     {
       versao: '1.42.15',
       itens: [
