@@ -27,6 +27,11 @@
 const fs = require('fs');
 const path = require('path');
 const H = require('./_bib_navegador');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const amb = H.criarAmbiente(8857, 'nath_c14_leitor_pdf');
 const { conf, secao, esperar, pausa } = H;
 
@@ -34,7 +39,7 @@ const ALUNO = 'aluno_c14_teste';
 const AULA = 'aula_c14_1';
 const ANEXO_PDF = 'anexo_c14_pdf';
 const ANEXO_TXT = 'anexo_c14_txt';
-const hojeIso = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+const hojeIso = RELOGIO.dia(0);
 
 /* Um PDF de verdade, montado byte a byte: cada página tem um retângulo grande
  * de uma cor só (vermelho, azul, verde) e uma linha de texto. A cor é o que o
@@ -148,10 +153,12 @@ async function cortarRede(pag, cortar) {
 (async () => {
   const navegador = await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
   const pedidosDoLeitor = [];
   pag.on('request', r => { if (r.url().indexOf('/vendor/pdfjs') >= 0) pedidosDoLeitor.push(r.url()); });
   await H.abrirApp(pag, amb.ORIGEM);
+  await RELOGIO.conferir(pag);
   /* O sw.js precisa estar no comando antes do primeiro PDF: é ele que guarda o
    * leitor no BAIXADOS. Na primeira visita ele assume e o aplicativo recarrega. */
   await esperar('o sw.js controla a página', () => pag.evaluate(() => !!navigator.serviceWorker.controller), v => v === true, 20000);

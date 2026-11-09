@@ -50,6 +50,11 @@ const os = require('os');
 const path = require('path');
 const { execSync } = require('child_process');
 const H = require('./_bib_navegador.js');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, pausa, esperar } = H;
 
@@ -132,8 +137,8 @@ conf('o mesmo título escrito sem acento em outra aula: uma linha só', fDois.te
 
 // ---------------------------------------------------------------- navegador
 const amb = H.criarAmbiente(PORTA, 'perfil_bib_aula', trocas);
-const hojeIso = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
-const daquiA = dias => { const d = new Date(); d.setDate(d.getDate() + dias); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const hojeIso = RELOGIO.dia(0);
+const daquiA = dias => RELOGIO.dia(dias);
 const SP = '9ano:equacoes-do-segundo-grau:soma-e-produto:ex:';
 const TEO_PIT = '9ano:teorema-de-pitagoras:o-teorema:teo:p01';
 const TEO_PN = '9ano:produtos-notaveis-e-fatoracao:produtos-notaveis:teo:p02';
@@ -235,7 +240,9 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
   }
   await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   await H.abrirApp(pag, amb.ORIGEM);
+  await RELOGIO.conferir(pag);
 
   // as aulas de hoje, gravadas direto no banco, e o app aberto de novo
   const ids = await pag.evaluate(async h => {
