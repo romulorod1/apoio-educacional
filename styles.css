@@ -3612,7 +3612,7 @@ body.modo-celular .celular > .aviso button { min-height: var(--alvo-celular); mi
    linha de baixo, e com duas ações o texto fica numa linha e os dois botões na
    de baixo, cada um com a metade, 48 px de altura. Quem trava é o
    testa_celular_transbordo, a 360, 390 e 412 px e com a letra em 130%. */
-body.modo-celular .celular > .aviso { flex-wrap: wrap; gap: 6px 8px; padding: 8px 12px; font-size: var(--letra-3); }
+body.modo-celular .celular > .aviso { flex-wrap: wrap; gap: 6px 8px; padding: 8px 12px; font-size: var(--letra-14); }
 body.modo-celular .celular > .aviso #aviso-texto { flex: 1 1 10em; min-width: 0; overflow-wrap: anywhere; }
 body.modo-celular .celular > .aviso button { flex: 0 0 auto; max-width: 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.2; }
 body.modo-celular .celular > .aviso.com-duas-acoes #aviso-texto { flex-basis: 100%; }

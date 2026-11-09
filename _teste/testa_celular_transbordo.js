@@ -31,10 +31,10 @@
  * (data-versao), para quem confere qual versão espera.
  *
  * A letra em 130%: o aplicativo não tem ajuste de tamanho de letra, e toda
- * letra da folha sai da escala --letra-1 a --letra-6, em px (o font-size do
- * documentElement não mexe nela). A prova faz o que o ajuste de letra do
- * Android faz com o texto: multiplica a escala inteira por 1,3 e põe o
- * documentElement em 130%, e confere numa aba que a letra cresceu mesmo.
+ * letra da folha sai da escala da F1, --letra-12 a --letra-24, em rem: ela
+ * cresce com o font-size do documentElement. A prova faz o que o ajuste de
+ * letra do Android faz com o texto: põe o documentElement em 130%, o que leva
+ * a escala inteira junto, e confere que a letra de 16 px cresceu mesmo.
  *
  * Venenos, que TÊM de reprovar a varredura:
  *   --envenenado-aviso-largo     o aviso volta ao texto e aos botões antigos
@@ -121,8 +121,11 @@ const TRAV = new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']');
 conf('o app.js, o styles.css e esta prova não têm travessão',
   [APP, CSS, fs.readFileSync(__filename, 'utf8')].map(t => TRAV.test(t)).join(','), 'false,false,false');
 const LETRAS = {};
-CSS.replace(/--letra-(\d): (\d+)px;/g, (m, n, px) => { LETRAS[n] = Number(px); return m; });
-conf('(arranjo) a escala de letra tem os seis tamanhos (' + JSON.stringify(LETRAS) + ')', Object.keys(LETRAS).length, 6);
+/* A escala da F1 (09/11/2026): cinco tamanhos em rem, com o nome em px
+ * (--letra-12 a --letra-24), que crescem sozinhos com a letra do documento. */
+CSS.replace(/--letra-(\d+): ([\d.]+)rem;/g, (m, n, rem) => { LETRAS[n] = Number(rem) * 16; return m; });
+conf('(arranjo) a escala de letra tem os cinco tamanhos em rem (' + JSON.stringify(LETRAS) + ')', Object.keys(LETRAS).length, 5);
+conf('(arranjo) cada nome da escala é o tamanho em px', Object.keys(LETRAS).every(n => LETRAS[n] === Number(n)), true);
 
 const trocas = {};
 if (MODO === V_AVISO) {
@@ -324,13 +327,14 @@ async function aplicarLetra(pag, escala) {
   await pag.evaluate((escala, letras, fonte) => {
     let s = document.getElementById('prova-letra');
     if (!s) { s = document.createElement('style'); s.id = 'prova-letra'; document.head.appendChild(s); }
-    s.textContent = (escala === 1 ? '' : ':root { ' + Object.keys(letras).map(n => '--letra-' + n + ': ' + (letras[n] * escala) + 'px;').join(' ') +
-      ' } html { font-size: ' + Math.round(escala * 100) + '%; }') + (fonte ? ' body { font-family: ' + fonte + '; }' : '');
+    // a escala é em rem: a letra do documento em 130% leva a escala inteira junto
+    s.textContent = (escala === 1 ? '' : 'html { font-size: ' + Math.round(escala * 100) + '%; }') +
+      (fonte ? ' body { font-family: ' + fonte + '; }' : '');
   }, escala, LETRAS, FONTE_DE_FORA);
   await pausa(120);
-  // a letra de 15 px da escala, medida num elemento que a usa de verdade
+  // a letra de 16 px da escala, medida num elemento que a usa de verdade
   return pag.evaluate(() => {
-    const p = document.createElement('span'); p.style.fontSize = 'var(--letra-4)'; p.textContent = 'x';
+    const p = document.createElement('span'); p.style.fontSize = 'var(--letra-16)'; p.textContent = 'x';
     document.body.appendChild(p); const t = getComputedStyle(p).fontSize; p.remove(); return t;
   });
 }
@@ -427,7 +431,7 @@ async function percorrer(pag, telas) {
       janelaAtual = l + 'x' + a;
       letraAtual = esc;
       const tam = await aplicarLetra(pag, esc);
-      if (tam !== (15 * esc) + 'px') conf('a letra em ' + Math.round(esc * 100) + '% pegou (a --letra-4 com ' + tam + ')', tam, (15 * esc) + 'px');
+      if (tam !== (16 * esc) + 'px') conf('a letra em ' + Math.round(esc * 100) + '% pegou (a --letra-16 com ' + tam + ')', tam, (16 * esc) + 'px');
       for (const [tela, abrir] of telas) {
         await esconderAviso(pag);
         await estado(pag, tela, abrir);
