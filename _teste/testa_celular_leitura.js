@@ -380,10 +380,12 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
    * à vista. */
   const campos = Array.from(raiz.querySelectorAll('input, select, textarea, [contenteditable=true]')).filter(visivel)
     .filter(e => !e.closest('#cel-entrada') && !e.hasAttribute('data-consulta')).map(e => e.id || e.tagName);
+  /* F1: o "+" agora é um ícone; ele conta como o "+" de antes */
+  const tx = b => (b.querySelector('svg[data-icone-nome="plus"]') ? '+' : '') + b.textContent;
   const deEdicao = Array.from(document.querySelectorAll('button')).filter(visivel)
-    .filter(b => !b.closest('.fundo-modal')).filter(b => re.test(b.textContent));
-  const botoesEdicao = deEdicao.filter(b => !b.closest('[data-acao-celular]')).map(b => b.textContent.trim());
-  const dasAcoes = deEdicao.filter(b => b.closest('[data-acao-celular]')).map(b => b.textContent.trim());
+    .filter(b => !b.closest('.fundo-modal')).filter(b => re.test(tx(b)));
+  const botoesEdicao = deEdicao.filter(b => !b.closest('[data-acao-celular]')).map(b => tx(b).trim());
+  const dasAcoes = deEdicao.filter(b => b.closest('[data-acao-celular]')).map(b => tx(b).trim());
   const doTablet = ['#nova-aula', '#novo-aluno', '#proposta-nova', '#grade-mes', '#abas', '#nuvem-enviar']
     .filter(s => { const e = document.querySelector(s); return e && visivel(e); });
   const conteudo = document.querySelector('#cel-conteudo');

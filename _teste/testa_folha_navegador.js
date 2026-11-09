@@ -213,7 +213,7 @@ async function rodar() {
   // Volta para pagina 1 com "‹"
   await pag.evaluate(() => {
     const btns = Array.from(document.querySelectorAll('#rodape-nota button'));
-    const btnAnt = btns.find(b => b.textContent.trim() === '‹');
+    const btnAnt = btns.find(b => b.getAttribute('aria-label') === 'Página anterior'); // F1: o "‹" virou ícone
     if (btnAnt) btnAnt.click();
   });
   await pausa(100);
@@ -224,7 +224,7 @@ async function rodar() {
   // Avanca para pagina 2 com "›"
   await pag.evaluate(() => {
     const btns = Array.from(document.querySelectorAll('#rodape-nota button'));
-    const btnProx = btns.find(b => b.textContent.trim() === '›');
+    const btnProx = btns.find(b => b.getAttribute('aria-label') === 'Página seguinte'); // F1: o "›" virou ícone
     if (btnProx) btnProx.click();
   });
   await pausa(100);
