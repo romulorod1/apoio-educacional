@@ -108,8 +108,12 @@ const ANCORAS = {
 };
 /* O app servido leva a VERSAO desta entrega (a que o portão sobe ao juntar):
  * é com ela que o celular compara a versão do tablet (K6). */
-const VERSAO_SERVIDA = '1.42.19';
-const APP_SERVIDO = APP.replace("var VERSAO = '1.42.18';", "var VERSAO = '" + VERSAO_SERVIDA + "';");
+/* A VERSAO vem do próprio app.js: depois do merge com a main e da subida de
+ * versão ao juntar, ela já é maior que a 1.42.18; só no ramo ainda na 1.42.18
+ * a prova serve uma versão acima, para o K6 ter o que comparar. */
+const VERSAO_DO_APP = (APP.match(/var VERSAO = '([0-9.]+)';/) || [])[1] || '';
+const VERSAO_SERVIDA = VERSAO_DO_APP === '1.42.18' ? '1.42.19' : VERSAO_DO_APP;
+const APP_SERVIDO = VERSAO_DO_APP === '1.42.18' ? APP.replace("var VERSAO = '1.42.18';", "var VERSAO = '" + VERSAO_SERVIDA + "';") : APP;
 const NUVEM = fs.readFileSync(path.join(H.RAIZ, 'nuvem.js'), 'utf8');
 const FONTES = { 'app.js': APP_SERVIDO, 'store.js': STORE, 'nuvem.js': NUVEM };
 conf('cada âncora de veneno está no arquivo dela uma vez só', MODOS.map(m => FONTES[ANCORAS[m][0]].split(ANCORAS[m][1]).length - 1).join(','), MODOS.map(() => 1).join(','));
@@ -121,7 +125,8 @@ conf('o app.js, o core.js e o styles.css não têm travessão', [APP, CORE, CSS]
 conf('o tablet e o celular gravam a mensagem pela mesma função (Core.gravarTextoDoMes: no feedback do tablet e no editor do celular)',
   [APP.split('Core.gravarTextoDoMes(').length - 1, APP.split('db.resumos.push(').length - 1, /function gravarTextoDoMes\(db, alunoId, mesIso, texto\)/.test(CORE)].join(','), '2,1,true');
 const trocas = { '/app.js': APP_SERVIDO };
-conf('(arranjo) o app servido leva a VERSAO ' + VERSAO_SERVIDA, APP_SERVIDO !== APP && APP_SERVIDO.indexOf("var VERSAO = '" + VERSAO_SERVIDA + "';") >= 0, true);
+const numVersao = v => v.split('.').map(Number).reduce((a, n) => a * 1000 + n, 0);
+conf('(arranjo) o app servido leva a VERSAO ' + VERSAO_SERVIDA + ', acima da 1.42.18', APP_SERVIDO.indexOf("var VERSAO = '" + VERSAO_SERVIDA + "';") >= 0 && numVersao(VERSAO_SERVIDA) > numVersao('1.42.18'), true);
 if (MODO) {
   const [arq, de, para] = ANCORAS[MODO];
   trocas['/' + arq] = FONTES[arq].replace(de, para);
@@ -901,8 +906,11 @@ const ABERTO_C = 'Escrito no celular enquanto o tablet mandava outra.';
    * no meio, e os dois lados trocam o texto. */
   const BASE = '94fa74b';
   const antigo = f => spawnSync('git', ['show', BASE + ':' + f], { cwd: H.RAIZ, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout || '';
-  const iguais = ['sw.js'].map(f => antigo(f).replace(/\r\n/g, '\n') === fs.readFileSync(path.join(H.RAIZ, f), 'utf8').replace(/\r\n/g, '\n'));
-  conf('o sw.js desta versão é o da 1.42.18', iguais.join(','), 'true');
+  /* O sw.js muda a cada versão só no comentário e no nome do CACHE: fora isso,
+   * o código dele tem de ser o da 1.42.18. */
+  const swNucleo = s => s.replace(/\r\n/g, '\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/var CACHE = '[^']*';/, '').replace(/\s+/g, ' ');
+  const iguais = ['sw.js'].map(f => swNucleo(antigo(f)) === swNucleo(fs.readFileSync(path.join(H.RAIZ, f), 'utf8')));
+  conf('o sw.js desta versão é o da 1.42.18, fora o comentário e o nome do CACHE', iguais.join(','), 'true');
   const regCel = await pagC.evaluate(id => Store.lerRegistros().then(l => { const r = l.find(x => x.id === id);
     return r ? { forma: r.tipo + ' ' + Object.keys(r.dados || {}).sort().join(','), fora: r.dados && r.dados.versaoDeFora ? JSON.stringify(r.dados.versaoDeFora) : '' } : null; }), 'resumo:msg:' + MES);
   conf('o registro do celular tem a forma de sempre, mais a versão que ficou de fora (' + regCel.forma + ')', regCel.forma + ' ' + !!regCel.fora, 'resumo alunoId,mes,texto,versaoDeFora true');
