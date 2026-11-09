@@ -21,9 +21,13 @@
  *   2. o check portao-rapido verde, e nenhum check vermelho ou em andamento
  *      (de cada nome vale a rodada mais nova: abrir e rotular o PR disparam
  *      duas, e a mais velha sai cancelada);
- *   3. o portao inteiro verde: o check portao-navegador verde, OU um comentario
- *      com a linha propria "Portão inteiro <sha7 da cabeca>: TUDO PASSOU" e
- *      sem "HA FALHA" em linha nenhuma;
+ *   3. o portao inteiro verde: o check portao-navegador (o juntador das oito
+ *      fatias) VERDE na cabeca, e so ele. A bateria inteira roda no CI quando o
+ *      PR leva o rotulo "pronto" (politica de testes por checkpoint, 09/11/2026):
+ *      sem o rotulo o juntador nao roda, e check AUSENTE ou PULADO (skipped) nao
+ *      e verde, entao o merge e recusado. Nao ha mais atalho por comentario
+ *      "Portão inteiro ... TUDO PASSOU": rodar o portao inteiro na maquina de
+ *      quem trabalha deixou de ser o caminho;
  *   4. revisao adversarial do commit da cabeca: comentario que COMECA por
  *      "Revisão adversarial", cita o sha7 da cabeca, foi postado depois do
  *      ultimo commit e TERMINA na linha "veredito: aprova", sem nenhuma linha
@@ -36,7 +40,7 @@
  * testados contra mains diferentes, entrariam juntos sem o CI ver a juncao. Se
  * a API falhar, recusa tambem: nunca passa por nao conseguir conferir.
  *
- * Comentarios (de portao e de revisao) so valem de dono, membro ou
+ * Comentarios (de revisao) so valem de dono, membro ou
  * colaborador do repositorio (authorAssociation), porque o repositorio e
  * publico e qualquer conta pode comentar.
  *
@@ -96,7 +100,17 @@ function decidir(pr) {
     const terminou = c.__typename === 'StatusContext' ? !/PENDING|EXPECTED/i.test(c.state || '') : c.status === 'COMPLETED';
     let quando = valida(c.startedAt) || valida(c.createdAt) || valida(c.completedAt);
     if (quando === null) quando = terminou ? 0 : Infinity;
-    if (!porNome[nome] || quando >= porNome[nome].quando) porNome[nome] = { quando, c };
+    // Rodada PULADA nao e evidencia de nada: um evento que o workflow ignora
+    // (rotulo que nao e o "pronto") deixa jobs pulados, mais novos que a rodada
+    // que valeu. Para o MESMO commit, a pulada nao desbanca uma rodada que
+    // terminou verde, vermelha ou em andamento; se so ha pulada, vale a pulada
+    // (e ela nao e verde).
+    const pulada = x => x.c.__typename !== 'StatusContext' && x.c.status === 'COMPLETED' && String(x.c.conclusion || '').toUpperCase() === 'SKIPPED';
+    const novo = { quando, c };
+    const atual = porNome[nome];
+    if (!atual) porNome[nome] = novo;
+    else if (pulada(novo) && !pulada(atual)) { /* mantem a que valeu */ }
+    else if ((pulada(atual) && !pulada(novo)) || quando >= atual.quando) porNome[nome] = novo;
   });
   const estado = nome => {
     const r = porNome[nome];
@@ -130,17 +144,11 @@ function decidir(pr) {
    * Casa como palavra: "abc1234" nao vale dentro de "xabc12345". */
   const sha7 = cabeca.slice(0, 7);
   const citaCabeca = corpo => new RegExp('(^|[^0-9a-f])' + sha7 + '([^0-9a-f]|$)', 'i').test(corpo);
-  /* Formato fixo, em linha propria: "Portão inteiro <sha>: TUDO PASSOU" (o sha
-   * pode vir com mais de sete caracteres). Tres pedacos soltos no comentario
-   * eram satisfeitos por um texto que so cite a regra. E o comentario nao pode
-   * dizer HA FALHA em linha nenhuma. */
-  const linhaInteiro = new RegExp('^\\s*Port[aã]o inteiro ' + sha7 + '[0-9a-f]*: TUDO PASSOU\\.?\\s*$', 'im');
-  const inteiroNoCi = estado('portao-navegador') === 'SUCCESS';
-  const inteiroLocal = comentarios.some(c => linhaInteiro.test(c.corpo) && !/HA FALHA/.test(c.corpo));
-  // (o filtro de autor de casa, la em cima, vale para este comentario tambem)
-  if (!inteiroNoCi && !inteiroLocal) {
+  const estadoInteiro = estado('portao-navegador');
+  if (estadoInteiro !== 'SUCCESS') {
     motivos.push('falta o portao inteiro verde no commit ' + sha7 +
-      ' (check portao-navegador, ou comentario com a linha "Portão inteiro ' + sha7 + ': TUDO PASSOU")');
+      ': o check portao-navegador esta ' + estadoInteiro +
+      ' (a bateria inteira roda no CI quando o PR leva o rotulo "pronto"; ausente ou pulado nao vale)');
   }
 
   // 4. revisao adversarial do commit da cabeca.
