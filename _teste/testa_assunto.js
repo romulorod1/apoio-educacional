@@ -239,7 +239,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await abrirAulaDoDia10();
 
   let banco = await bd();
-  const marcelo = banco.alunos.filter(a => /Marcelo/i.test(a.nome))[0];
+  const marcelo = banco.alunos.filter(a => /Aluno Referência Teste/i.test(a.nome))[0];
   conf('a aula do dia 10 de junho abriu', await visivel('#modal-aula'), true);
 
   // ================================================================

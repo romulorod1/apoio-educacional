@@ -19,7 +19,7 @@ const puppeteer = require('puppeteer-core');
       const t = banco.transaction('dados','readonly').objectStore('dados').get('principal');
       t.onsuccess = () => {
         const db = t.result;
-        const m = db.alunos.find(a => a.nome === 'Marcelo');
+        const m = db.alunos.find(a => a.nome === 'Aluno Referência Teste');
         m.desde = '2026-03-02';
         m.obsPedagogicas = 'Trava em enunciado longo. Vai bem quando le em voz alta.';
         const aulas = db.aulas.filter(a => a.data.startsWith('2026-06')).sort((x,y)=>y.data.localeCompare(x.data));
@@ -38,7 +38,7 @@ const puppeteer = require('puppeteer-core');
   await p.evaluate(() => Array.from(document.querySelectorAll('#abas .aba')).find(x => x.dataset.tela === 'alunos').click());
   await new Promise(r => setTimeout(r, 400));
   await p.evaluate(() => {
-    const i = Array.from(document.querySelectorAll('#lista-alunos .item-lista')).find(x => x.textContent.includes('Marcelo'));
+    const i = Array.from(document.querySelectorAll('#lista-alunos .item-lista')).find(x => x.textContent.includes('Aluno Referência Teste'));
     i.querySelector('button').click();
   });
   await new Promise(r => setTimeout(r, 600));

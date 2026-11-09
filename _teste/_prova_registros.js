@@ -34,7 +34,7 @@ const ANCORAS = {
   lacoDoVetor: '(Array.isArray(db[vetor]) ? db[vetor] : []).forEach(function (item) {',
   igual: 'if (antes && !antes.apagadoEm && antes.ordem === ordem && JSON.stringify(antes.dados) === texto) {',
   apagadoPorFora: 'return apagarDocumento().then(function () { return null; });',
-  restauroSemFila: 'semFila: daNuvem && soLeitura, restauro: daNuvem }',
+  restauroSemFila: 'semFila: daNuvem && soLeitura, restauro: daNuvem, semFolhas: true }',
   principalFica: "if (!opcoes.semPrincipal) t.objectStore('dados').put(db, 'principal');",
   respondeNoCommit: "t.oncomplete = function () { confirmarGravacao(contas); avisarMudanca('dados'); resolve(); };"
 };
@@ -49,7 +49,7 @@ const VENENOS = {
   '--envenenado-registros-ressuscitam': ['apagadoPorFora', 'return completar(montar(lido.registros));'],
   /* a restauração vinda da nuvem não enfileira em aparelho nenhum (nem no
    * tablet dono, que então nunca subiria o que restaurou) */
-  '--envenenado-restauro-sem-fila': ['restauroSemFila', 'semFila: daNuvem, restauro: daNuvem }']
+  '--envenenado-restauro-sem-fila': ['restauroSemFila', 'semFila: daNuvem, restauro: daNuvem, semFolhas: true }']
 };
 
 function conferirAncoras(conf) {

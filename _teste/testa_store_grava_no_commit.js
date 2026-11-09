@@ -50,10 +50,13 @@
  *   node _teste/testa_store_grava_no_commit.js --envenenado-grava-no-pedido
  *     o store.js servido volta a ter o `gravar` antigo, que responde no
  *     `onsuccess` do pedido. Os outros caminhos continuam consertados, de
- *     propósito: a prova tem de acusar EXATAMENTE os três caminhos que passam
- *     pelo `gravar` (salvarNota, salvarMidia, salvarAnexo), e deixar os outros
- *     seis verdes. (Até a N1 o `salvar` também passava pelo `gravar`; desde o
- *     banco por registro ele tem transação própria, e veneno próprio, abaixo.)
+ *     propósito: a prova tem de acusar EXATAMENTE os dois caminhos que passam
+ *     pelo `gravar` (salvarMidia, salvarAnexo), e deixar os outros sete
+ *     verdes. (Até a N1 o `salvar` também passava pelo `gravar`; desde o
+ *     banco por registro ele tem transação própria, e veneno próprio, abaixo.
+ *     Até a N2 o `salvarNota` também passava; desde a folha por página ele tem
+ *     transação própria, com --envenenado-nota-no-pedido, que tem de acusar
+ *     EXATAMENTE o salvarNota.)
  *   node _teste/testa_store_grava_no_commit.js --envenenado-salvar-no-pedido
  *     o `salvar` (gravarDocumento) responde assim que os pedidos foram feitos,
  *     com a transação ainda aberta: a prova tem de acusar EXATAMENTE o salvar. Quem DECIDE é essa acusação da parte 1, que é
@@ -92,7 +95,10 @@ const PORTA = 8812;
 const VENENO_GRAVAR = process.argv.indexOf('--envenenado-grava-no-pedido') !== -1;
 const VENENO_ESCREVER = process.argv.indexOf('--envenenado-escreve-no-pedido') !== -1;
 const VENENO_SALVAR = process.argv.indexOf('--envenenado-salvar-no-pedido') !== -1;
-const VENENO = VENENO_GRAVAR || VENENO_ESCREVER || VENENO_SALVAR;
+/* O quarto veneno (N2): o salvarNota, que desde a folha por página tem
+ * transação própria (notas, controle e saida), responde com ela aberta. */
+const VENENO_NOTA = process.argv.indexOf('--envenenado-nota-no-pedido') !== -1;
+const VENENO = VENENO_GRAVAR || VENENO_ESCREVER || VENENO_SALVAR || VENENO_NOTA;
 const VENENO_REJEITA = process.argv.indexOf('--envenenado-nao-rejeita') !== -1;
 const VENENO_RELE = process.argv.indexOf('--envenenado-nao-rele') !== -1;
 const CONTROLE = process.argv.indexOf('--controle') !== -1;
@@ -119,13 +125,18 @@ const ESCREVER_ANTIGO = 'if (req) req.onsuccess = function () { resolve(req.resu
 /* O terceiro veneno (N1): o salvar do documento responde com a transação aberta. */
 const SALVAR_CONSERTADO = 'escreverDiferenca(t, db, opcoes, function (c) { contas = c; });';
 const SALVAR_ANTIGO = 'escreverDiferenca(t, db, opcoes, function (c) { contas = c; resolve(); });';
-const ANCORA = VENENO_SALVAR ? new RegExp(SALVAR_CONSERTADO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+/* O quarto veneno (N2): o salvarNota responde assim que a nota foi posta na
+ * transação, com ela ainda aberta. */
+const NOTA_CONSERTADO = "else t.objectStore('notas').put(nota, aulaId);";
+const NOTA_ANTIGO = "else t.objectStore('notas').put(nota, aulaId); resolve();";
+const escapar = s => new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+const ANCORA = VENENO_SALVAR ? escapar(SALVAR_CONSERTADO) : VENENO_NOTA ? escapar(NOTA_CONSERTADO)
   : VENENO_ESCREVER ? ESCREVER_CONSERTADO : GRAVAR_CONSERTADO;
 const trocas = {};
 let trocaFeita = false;
 if (VENENO) {
   if (ANCORA.test(STORE_REPO)) {
-    trocas['/store.js'] = STORE_REPO.replace(ANCORA, VENENO_SALVAR ? SALVAR_ANTIGO : VENENO_ESCREVER ? ESCREVER_ANTIGO : GRAVAR_ANTIGO);
+    trocas['/store.js'] = STORE_REPO.replace(ANCORA, VENENO_SALVAR ? SALVAR_ANTIGO : VENENO_NOTA ? NOTA_ANTIGO : VENENO_ESCREVER ? ESCREVER_ANTIGO : GRAVAR_ANTIGO);
     trocaFeita = trocas['/store.js'] !== STORE_REPO;
   }
 }
@@ -199,7 +210,9 @@ const CAMINHOS = [
     esperado: 'depois'
   },
   {
-    nome: 'salvarNota (a folha da aula)', pelo_gravar: true,
+    /* Desde a N2 (folha por página) o salvarNota tem transação própria, como o
+     * salvar: não passa pelo `gravar` nem pelo `escrever`, e tem veneno próprio. */
+    nome: 'salvarNota (a folha da aula)', pelo_gravar: false, pelo_nota: true,
     prepara: () => Store.salvarNota('aula-prova-commit', { paginas: [{ itens: [], rotulo: 'antes' }] }),
     chama: ['salvarNota', 'aula-prova-commit', { paginas: [{ itens: [], rotulo: 'depois' }] }],
     le: () => Store.lerNota('aula-prova-commit').then(n => n ? n.paginas[0].rotulo : 'sem nota'),
@@ -274,7 +287,7 @@ async function rodaCaminho(pag, c) {
   }, c.chama);
   if (r.erro) { conf(c.nome + ': a escrita respondeu sem erro', r.erro, 'sem erro'); return; }
   const lido = await pag.evaluate('(' + c.le.toString() + ')()');
-  const morde = ESPERA_PERDA && (VENENO_ESCREVER ? !c.poda_depois && !c.pelo_salvar : VENENO_SALVAR ? !!c.pelo_salvar : c.pelo_gravar);
+  const morde = ESPERA_PERDA && (VENENO_ESCREVER ? !c.poda_depois && !c.pelo_salvar && !c.pelo_nota : VENENO_SALVAR ? !!c.pelo_salvar : VENENO_NOTA ? !!c.pelo_nota : c.pelo_gravar);
   if (morde) {
     conf('VENENO ENXERGADO em ' + c.nome + ': respondeu com a transação ainda aberta', r.pendentes > 0, true);
     conf('VENENO ENXERGADO em ' + c.nome + ': interrompida no instante da resposta, a escrita SUMIU',
@@ -403,7 +416,8 @@ async function parteQuatro(pag) {
 (async () => {
   console.log('MODO: ' + (VENENO_GRAVAR ? 'envenenado (gravar antigo, que responde no pedido)'
     : VENENO_ESCREVER ? 'envenenado (escrever responde no pedido)'
-    : VENENO_SALVAR ? 'envenenado (o salvar do documento responde com a transação aberta)' : 'normal') +
+    : VENENO_SALVAR ? 'envenenado (o salvar do documento responde com a transação aberta)'
+    : VENENO_NOTA ? 'envenenado (o salvarNota responde com a transação aberta)' : 'normal') +
     (CONTROLE ? ', COM CONTROLE: tem de reprovar' : ''));
   if (VENENO) {
     secao('O veneno é de verdade');
@@ -420,6 +434,7 @@ async function parteQuatro(pag) {
     conf('o gravar do store.js passa pelo escrever (a âncora do primeiro veneno existe)', GRAVAR_CONSERTADO.test(STORE_REPO), true);
     conf('o escrever responde na transação (a âncora do segundo veneno existe)', ESCREVER_CONSERTADO.test(STORE_REPO), true);
     conf('o salvar do documento responde na transação (a âncora do terceiro veneno existe uma vez)', STORE_REPO.split(SALVAR_CONSERTADO).length, 2);
+    conf('o salvarNota grava a nota dentro da transação própria (a âncora do quarto veneno existe uma vez)', STORE_REPO.split(NOTA_CONSERTADO).length, 2);
   }
 
   await amb.subir();
@@ -429,7 +444,7 @@ async function parteQuatro(pag) {
   if (VENENO) {
     const servido = await pag.evaluate(() => fetch('/store.js').then(r => r.text()));
     conf('o /store.js que a página recebeu tem o veneno',
-      servido.indexOf(VENENO_SALVAR ? SALVAR_ANTIGO : VENENO_ESCREVER ? 'if (req) req.onsuccess = function () { resolve(req.result); };'
+      servido.indexOf(VENENO_SALVAR ? SALVAR_ANTIGO : VENENO_NOTA ? NOTA_ANTIGO : VENENO_ESCREVER ? 'if (req) req.onsuccess = function () { resolve(req.result); };'
         : "return trans(deposito, 'readwrite').then(function (s) { return comoPromessa(s.put(valor, chave)); });") >= 0, true);
   }
 
@@ -467,10 +482,11 @@ async function parteQuatro(pag) {
     conf('VENENO ENXERGADO: sem o onabort, a promessa ficou pendurada', rej, 'pendurada');
     return;
   }
-  if (ESPERA_PERDA && !VENENO_SALVAR) {
+  if (ESPERA_PERDA && !VENENO_SALVAR && !VENENO_NOTA) {
     /* Os dois venenos da perda respondem no pedido, e o pedido deu certo: a
-     * promessa diz "salvo" e nada ficou. É o defeito inteiro numa linha. (O
-     * veneno do salvar não toca o salvarAnexo desta parte: ele rejeita.) */
+     * promessa diz "salvo" e nada ficou. É o defeito inteiro numa linha. (Os
+     * venenos do salvar e do salvarNota não tocam o salvarAnexo desta parte:
+     * ele rejeita.) */
     conf('VENENO ENXERGADO: a promessa disse que salvou, e nada ficou', rej, 'resolveu');
   } else {
     conf('a promessa rejeitou', /^rejeitou/.test(rej), true);

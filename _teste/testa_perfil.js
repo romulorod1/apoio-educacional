@@ -63,7 +63,7 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
   conf('não aparece de novo na próxima abertura', await visivel('#modal-novidades'), false);
 
   console.log('\n=== a ficha do aluno tem abas ===');
-  await abrirAluno('Marcelo');
+  await abrirAluno('Aluno Referência Teste');
   const nomesAbas = await pag.$$eval('.aba-perfil', es => es.map(e => e.textContent.trim()));
   /* Cinco desde a proposta de acompanhamento: a quinta aba é o mesmo editor da
    * janela Proposta, para quem já está cadastrado. */
@@ -88,7 +88,7 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
   await pag.$eval('#salvar-aluno', e => e.click());
   await esp(700);
   banco = await bd();
-  const marcelo = banco.alunos.find(a => a.nome === 'Marcelo');
+  const marcelo = banco.alunos.find(a => a.nome === 'Aluno Referência Teste');
   conf('a data de início foi gravada', marcelo.desde, '2026-03-02');
   conf('as observações pedagógicas foram gravadas', marcelo.obsPedagogicas.includes('voz alta'), true);
   conf('as observações gerais continuam separadas', marcelo.obs.includes('Julho de 2026'), true);
@@ -116,7 +116,7 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
   }));
   await pag.reload({ waitUntil: 'networkidle0' });
   await esp(1800);
-  await abrirAluno('Marcelo');
+  await abrirAluno('Aluno Referência Teste');
   await aba('Histórico');
   const hist = await pag.$eval('#corpo-modal-aluno', e => e.textContent);
   conf('mostra quantos encontros', hist.includes('Aulas'), true);
@@ -155,7 +155,7 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
     document.querySelectorAll('.fundo-modal').forEach(m => m.classList.remove('aberto'));
   });
   await esp(300);
-  await abrirAluno('Theo');
+  await abrirAluno('Aluno Zeta Teste');
   await aba('Histórico');
   const vazio = await pag.$eval('#corpo-modal-aluno', e => e.textContent);
   conf('avisa que não há aulas', vazio.includes('Nenhuma aula registrada'), true);
