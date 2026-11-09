@@ -2966,10 +2966,13 @@ body.modo-celular > .celular {
 .cel-marca strong { color: var(--navy); font-size: var(--letra-14); line-height: 1.35; }
 /* O texto secundário do celular usa o cinza escuro da escala (mais de 7:1
    sobre o branco e o marfim), e não o --muted, que fica perto de 4,5:1. */
-.cel-origem { font-size: var(--letra-14); color: var(--novidades-subtitulo); overflow-wrap: anywhere; }
+.cel-origem { font-size: var(--letra-14); line-height: 1.35; color: var(--novidades-subtitulo); overflow-wrap: anywhere; }
 body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-topo-acoes { flex-shrink: 0; max-width: 45%; }
 .cel-topo-acoes .btn { white-space: normal; text-align: center; line-height: 1.25; }
+/* o botão só com ícone não tem linha de texto: sem isto, a linha ganha o espaço
+   de baixo das letras e a barra cresce 1 px (F1) */
+.cel-topo-acoes .cel-icone { vertical-align: top; }
 .cel-conteudo {
   flex: 1;
   min-height: 0;
