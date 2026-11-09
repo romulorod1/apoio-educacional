@@ -94,7 +94,9 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
 (async () => {
   console.log(VENENO_HASH
     ? 'MODO ENVENENADO (hash): o biblioteca.js servido não confere o hash; o teste tem que enxergar o pacote errado entrando.'
-    : 'MODO NORMAL: importar, substituir, recusar venenos e levar uso e etiquetas na cópia.');
+    : VENENO_AVISO
+      ? 'MODO ENVENENADO (aviso fica): o app.js servido não tira o aviso de banco bloqueado; o teste tem que ver o aviso ficar.'
+      : 'MODO NORMAL: importar, substituir, recusar venenos e levar uso e etiquetas na cópia.');
 
   secao('0. O veneno é de verdade, e o servidor é este');
   if (VENENO_AVISO) {
@@ -212,7 +214,14 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
       await antes.close();
     }
     const velhaJanela = await ctx.newPage();
+    /* Sem o worker: com ele controlando, toda navegação cai no index.html do
+     * cache (sw.js, fetch), e a "janela antiga" virava o app de hoje, que pedia
+     * a versão 6 atrás da própria conexão de versão 1. A janela nova esperava
+     * na fila desse pedido, sem bloqueio para avisar (medido: 12 em 20). */
+    await velhaJanela.setBypassServiceWorker(true);
     await velhaJanela.goto(amb.ORIGEM + '/vazio.html', { waitUntil: 'load' });
+    conf('a janela antiga é a página vazia, e não o aplicativo' + nome,
+      await velhaJanela.evaluate(() => document.title + '/' + typeof window.Store), 'vazio/undefined');
     // a janela antiga abre o banco na versão 1 e NÃO larga (o código 1.19.1 não tem onversionchange)
     await velhaJanela.evaluate(() => new Promise((r, j) => {
       const z = indexedDB.deleteDatabase('apoio-educacional');
@@ -261,8 +270,9 @@ const versoesDeposito = (pag, nome) => pag.evaluate(n => new Promise(r => {
        * continua lá. Aqui o aviso só some se o aoBancoLiberado o tirar. */
       const fim = await nova.evaluate(() => [window.__documentoDoAviso === true, !!document.querySelector('#aviso-banco-bloqueado')]);
       conf('é o mesmo documento que mostrou o aviso' + nome, fim[0], true);
-      if (VENENO_AVISO) conf('envenenado: o aviso fica na tela depois que o banco abre (defeito enxergado)', fim[1], true);
-      else conf('e o aviso some quando o banco é liberado' + nome, fim[1], false);
+      // sumir só vale se apareceu: sem aviso antes, "não há aviso" não prova nada
+      if (VENENO_AVISO) conf('envenenado: o aviso fica na tela depois que o banco abre (defeito enxergado)', aviso.ok && fim[1], true);
+      else conf('e o aviso, que apareceu, some quando o banco é liberado' + nome, aviso.ok && !fim[1], true);
     } else {
       // a recarga do primeiro controle passou: o documento de agora nasceu controlado e o app abriu nele
       const assentou = await esperar('a recarga do primeiro controle do service worker terminou' + nome, () => nova.evaluate(() =>
