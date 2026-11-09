@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.27';
+  var VERSAO = '1.42.28';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -82,9 +82,24 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.27',
+      versao: '1.42.28',
       itens: [
         'A Biblioteca agora prepara, em segundo plano, a busca no texto dos livros. Uma linha discreta mostra o andamento (por exemplo, "Preparando a busca: 12 de 65 livros") e some quando termina. Você pode usar o aplicativo normalmente enquanto isso. A busca em si chega numa próxima versão.'
+      ]
+    },
+    {
+      versao: '1.42.26',
+      itens: [
+        'O lembrete da cópia de segurança agora considera a nuvem. Com a nuvem ligada e tudo salvo, ele não aparece e mostra só "Na nuvem, salvo às" e a hora.',
+        'Se alguma mudança ficar parada e não subir para a nuvem por mais de um dia, o aviso fala da nuvem e traz o botão certo: "Tentar de novo" ou "Ver o que houve". Com a nuvem desligada, o lembrete é o de sempre.'
+      ]
+    },
+    {
+      versao: '1.42.25',
+      itens: [
+        'No celular, a mensagem do mês de cada aluno pode ser editada: no Fechamento, toque em "Editar a mensagem do mês". É o mesmo texto do tablet, e ele vai para a família no PDF do mês.',
+        'Se o tablet e o celular mexerem na mesma mensagem, fica a escrita mais recente, e a outra versão fica guardada em "Ver a versão que ficou de fora", para você usar se quiser.',
+        'Para editar pelo celular, o tablet precisa estar nesta versão: se não estiver, o celular avisa.'
       ]
     },
     {
@@ -2741,22 +2756,7 @@
     numeros.appendChild(numeroComRodape('A receber', dinheiro(valorFeito), rodapesReceber));
     numeros.appendChild(numeroComRodape('Alunos', String(Object.keys(alunosNoMes).length), []));
 
-    var lembrete = $('#lembrete-copia');
-    lembrete.innerHTML = '';
-    if (copiaPronta) {
-      desenharCopiaPronta(lembrete);
-    } else if (precisaLembrarDaCopia()) {
-      var dias = diasDesdeACopia();
-      lembrete.appendChild(el('div', { class: 'faixa-aviso' }, [
-        el('strong', { texto: dias === null ? 'Você ainda não salvou uma cópia de segurança. '
-          : 'Sua última cópia de segurança tem ' + dias + ' dias. ' }),
-        document.createTextNode('Tudo fica só neste tablet. Salve uma cópia e guarde no Drive. '),
-        el('button', {
-          type: 'button', class: 'btn pequeno u-margem-esq-8', texto: 'Salvar cópia agora',
-          aoClick: function () { baixarCopia(); }
-        })
-      ]));
-    }
+    desenharLembreteDaCopia();
 
     var painelZoom = $('#painel-zoom-dia');
     if (painelZoom) {
@@ -13455,7 +13455,6 @@
 
   function abrirResumo(alunoId, mes) {
     var aluno = alunoPorId(alunoId);
-    var registro = db.resumos.filter(function (r) { return r.alunoId === alunoId && r.mes === mes; })[0];
     $('#titulo-modal-resumo').textContent = 'Feedback de ' + aluno.nome + ', ' + Core.mesExtenso(mes);
     var corpo = $('#corpo-modal-resumo');
     corpo.innerHTML = '';
@@ -13466,7 +13465,7 @@
       id: 'campo-resumo', class: 'u-alt-min-280',
       placeholder: 'Como foi o mês, o que evoluiu, o que merece atenção e o que vem a seguir.'
     });
-    area.value = registro ? registro.texto : '';
+    area.value = Core.textoDoMes(db, alunoId, mes);
     corpo._roteiro = null;
     if (roteiroLigado()) {
       corpo.appendChild(el('div', {
@@ -13475,6 +13474,9 @@
       corpo._roteiro = blocoDoRoteiro(area);
       corpo.appendChild(corpo._roteiro);
     }
+    // a versão do celular que ficou de fora no último conflito, se houver (o mesmo bloco do editor do celular)
+    var deFora = Core.versaoDeForaDoMes(db, alunoId, mes);
+    if (deFora) corpo.appendChild(blocoDaVersaoDeFora(deFora, area));
     corpo.appendChild(area);
     corpo._alunoId = alunoId;
     corpo._mes = mes;
@@ -13491,11 +13493,8 @@
       texto = texto.trim() ? texto.replace(/\s+$/, '') + '\n\n' + pendente : pendente;
       $('#campo-resumo').value = texto;
     }
-    var registro = db.resumos.filter(function (r) {
-      return r.alunoId === corpo._alunoId && r.mes === corpo._mes;
-    })[0];
-    if (registro) registro.texto = texto;
-    else db.resumos.push({ alunoId: corpo._alunoId, mes: corpo._mes, texto: texto });
+    // o mesmo campo e a mesma função que o editor do celular usa
+    Core.gravarTextoDoMes(db, corpo._alunoId, corpo._mes, texto);
     // as perguntas que ela reescreveu ficam para os próximos meses (C11)
     if (corpo._roteiro) corpo._roteiro.guardarPerguntas();
     salvarEDepois(function (gravou) {
@@ -14318,7 +14317,7 @@
       new Blob([bytes], { type: 'application/pdf' }), 'Fechamento do mês');
   }
 
-  function exportarAlunoEmPdf(f, comFolhas, extraOpcoes) {
+  function exportarAlunoEmPdf(f, comFolhas, extraOpcoes, entrega) {
     /* Feedback em branco não sai no PDF, nem o título dele. Ela confirma antes,
      * porque esquecer de escrever é mais comum do que decidir mandar sem. */
     /* Devolve uma promessa de verdadeiro quando o PDF saiu para o compartilhar,
@@ -14365,7 +14364,8 @@
       };
       var opts = opcoesDoDocumento(Object.assign(baseOpts, extraOpcoes || {}));
       var bytes = gen.gerarFechamento(f, opts);
-      entregarArquivo(nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf',
+      // `entrega`: o "Ver o PDF" do celular baixa (abre no leitor) em vez de compartilhar
+      (entrega || entregarArquivo)(nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf',
         new Blob([bytes], { type: 'application/pdf' }),
         'Fechamento de ' + f.alunoNome);
       return true;
@@ -15120,6 +15120,196 @@
     if (!db.aulas.length) return false;
     var dias = diasDesdeACopia();
     return dias === null || dias >= 14;
+  }
+
+  /* O LEMBRETE DA CÓPIA considera a nuvem (pedido do dono, 09/11/2026). Antes
+   * ele olhava só o arquivo exportado e, com a nuvem ligada, dava alarme falso:
+   * "a última cópia tem 20 dias" com tudo salvo na nuvem minutos antes. Alarme
+   * falso ensina a ignorar alarme.
+   *
+   * A hora confirmada pela nuvem é a mais recente entre a cópia completa que
+   * subiu (ou foi restaurada) e o último envio da fila de registros que a
+   * nuvem aceitou; as duas só são anotadas depois da resposta dela. A IDADE
+   * DO QUE ESTÁ PARADO sai da própria fila (Store.lerFila, só leitura): o
+   * atualizadoEm da entrada pendente mais antiga, que entra na fila na mesma
+   * transação da gravação dela. Medir pela última confirmação deixava a
+   * quarentena calada para sempre, porque todo envio bom renova a confirmação.
+   * A regra:
+   *   - nuvem desligada (sem conta, sincronização desligada pelo "Apagar
+   *     tudo") ou nunca confirmada e sem nada parado: o lembrete de antes;
+   *   - quarentena (a nuvem recusou o registro três vezes): alerta na hora,
+   *     com "Ver o que houve"; ela não se resolve sozinha;
+   *   - mudança na fila há mais de HORAS_NUVEM_PARADA horas: alerta da nuvem,
+   *     com "Tentar de novo" (ou "Ver o que houve", com a nuvem recusando);
+   *   - fila vazia: nenhum alerta, e a linha discreta "Na nuvem, salvo às
+   *     HH:MM" (vale para os registros; anexo e foto só sobem na cópia
+   *     completa);
+   *   - mudança na fila há menos que isso: nada, o envio está a caminho;
+   *   - antes de a nuvem e a fila serem lidas: nada (nem o lembrete antigo);
+   *   - no celular e no observador: nada (a cópia é do tablet).
+   * Data inválida ou adiantada (mais de 5 min à frente do relógio) não conta.
+   * Só decide o que mostrar; não grava nada. */
+  var HORAS_NUVEM_PARADA = 24;
+  var FOLGA_DO_RELOGIO_MS = 5 * 60 * 1000;
+  var lembreteNuvemPronta = false;  // Nuvem.pronto() respondeu
+  var filaDoLembrete = null;        // a última leitura da fila, ou { falhou: true }
+  var leituraDaFilaDoLembrete = 0;
+  var tentandoSubir = false;
+
+  function dataConfiavel(q) {
+    if (!q) return null;
+    var d = new Date(q);
+    if (isNaN(d.getTime()) || d.getTime() > Date.now() + FOLGA_DO_RELOGIO_MS) return null;
+    return d;
+  }
+
+  /* Lê a fila (só leitura) e redesenha o lembrete. Uma leitura mais nova
+   * vence a que chega atrasada. */
+  function relerFilaDoLembrete() {
+    var minha = ++leituraDaFilaDoLembrete;
+    if (!temNuvem() || typeof Store.lerFila !== 'function') {
+      filaDoLembrete = { falhou: true };
+      desenharLembreteDaCopia();
+      return Promise.resolve();
+    }
+    return Store.lerFila().then(function (lista) {
+      if (minha !== leituraDaFilaDoLembrete) return;
+      var f = { pendentes: 0, quarentena: 0, pendenteMaisAntiga: null, quarentenaMaisAntiga: null };
+      (lista || []).forEach(function (e) {
+        var q = !!(e && e.quarentena);
+        if (q) f.quarentena++; else f.pendentes++;
+        // a entrada da restauração leva a data do registro, e não a hora em que entrou na fila
+        var d = e && !e.restauro ? dataConfiavel(e.atualizadoEm) : null;
+        if (!d) return;
+        var campo = q ? 'quarentenaMaisAntiga' : 'pendenteMaisAntiga';
+        if (!f[campo] || d < f[campo]) f[campo] = d;
+      });
+      filaDoLembrete = f;
+      desenharLembreteDaCopia();
+    }, function () {
+      if (minha !== leituraDaFilaDoLembrete) return;
+      filaDoLembrete = { falhou: true };
+      desenharLembreteDaCopia();
+    });
+  }
+
+  function situacaoDaNuvemParaOLembrete() {
+    if (!temNuvem()) return null;
+    var est = Nuvem.estado();
+    if (!est.entrada || est.sincronizacaoDesligada) return null;
+    // sem a fila lida (ou com a leitura recusada), nada se declara: nem em dia, nem parado
+    if (!filaDoLembrete || filaDoLembrete.falhou) return { aguardando: true };
+    var f = filaDoLembrete;
+    var r = est.registros || {};
+    var confirmado = null;
+    [est.ultimaCopia && est.ultimaCopia.quando, r.ultimoEnvio && r.ultimoEnvio.quando].forEach(function (q) {
+      var d = dataConfiavel(q);
+      if (d && (!confirmado || d > confirmado)) confirmado = d;
+    });
+    var limite = HORAS_NUVEM_PARADA * 3600000;
+    // sem data confiável na entrada (só restauração), a referência é a última confirmação
+    var inicioPendente = f.pendentes ? (f.pendenteMaisAntiga || confirmado) : null;
+    var quarentenaAlerta = f.quarentena > 0;
+    var pendenteParada = !!(inicioPendente && Date.now() - inicioPendente.getTime() > limite);
+    var desde = null;
+    [quarentenaAlerta ? f.quarentenaMaisAntiga : null, pendenteParada ? inicioPendente : null].forEach(function (d) {
+      if (d && (!desde || d < desde)) desde = d;
+    });
+    return { confirmado: confirmado, parada: quarentenaAlerta || pendenteParada,
+      paradas: (quarentenaAlerta ? f.quarentena : 0) + (pendenteParada ? f.pendentes : 0),
+      quarentena: f.quarentena, desde: desde, erro: r.erro || null,
+      // sem nada na fila, tudo o que ela gravou está na nuvem, mesmo com o último envio em erro
+      limpo: !(f.pendentes + f.quarentena) };
+  }
+
+  function decisaoDoLembreteDaCopia() {
+    if (!db || !db.aulas.length) return { tipo: 'nenhum' };
+    // a cópia é do tablet: o celular e o observador não recebem este lembrete
+    if (modoCelular || aparelhoSoLe() || leOutraConta()) return { tipo: 'nenhum' };
+    // na partida, antes de a nuvem responder, nada pisca (nem o lembrete antigo)
+    if (temNuvem() && !lembreteNuvemPronta) return { tipo: 'nenhum' };
+    var nuvem = situacaoDaNuvemParaOLembrete();
+    if (nuvem && nuvem.aguardando) return { tipo: 'nenhum' };
+    if (nuvem && nuvem.parada) return { tipo: 'nuvem-parada', nuvem: nuvem };
+    if (nuvem && nuvem.confirmado) return nuvem.limpo ? { tipo: 'nuvem-em-dia', nuvem: nuvem } : { tipo: 'nenhum' };
+    return precisaLembrarDaCopia() ? { tipo: 'local', dias: diasDesdeACopia() } : { tipo: 'nenhum' };
+  }
+
+  function horaDe(d) { return Core.pad2(d.getHours()) + ':' + Core.pad2(d.getMinutes()); }
+  function diaDe(d) { return Core.pad2(d.getDate()) + '/' + Core.pad2(d.getMonth() + 1); }
+
+  function fraseDaNuvemEmDia(d) {
+    var hoje = d.toDateString() === new Date().toDateString();
+    return hoje ? 'Na nuvem, salvo às ' + horaDe(d) + '.' : 'Na nuvem, salvo em ' + diaDe(d) + ', às ' + horaDe(d) + '.';
+  }
+
+  /* Ver o que houve: o cartão da nuvem em Ajustes, com o resumo de cada
+   * aparelho aberto. */
+  function abrirNuvemEmAjustes() {
+    var aba = $$('#abas .aba').filter(function (b) { return b.dataset.tela === 'ajustes'; })[0];
+    if (aba) aba.click();
+    var det = $('#nuvem-aparelhos-detalhes');
+    if (det && !det.open) det.open = true;
+    var caixa = $('#estado-nuvem');
+    if (caixa && typeof caixa.scrollIntoView === 'function') caixa.scrollIntoView({ block: 'start' });
+  }
+
+  /* "Tentar de novo": sobe a fila e, depois, conta o que ficou (só leitura).
+   * "Enviadas" só com a fila vazia; o envio pulado (sem conta, só leitura,
+   * sincronização desligada) ou com algo na quarentena não é sucesso. */
+  function tentarSubirDeNovo() {
+    if (!temNuvem() || tentandoSubir) return;
+    tentandoSubir = true;
+    desenharLembreteDaCopia();
+    avisar('Tentando subir as mudanças...');
+    var naoSubiu = 'Ainda não subiu. Veja o cartão da nuvem em Ajustes.';
+    Nuvem.enviarRegistros({ versaoApp: VERSAO }).then(function (r) {
+      return Store.estadoDaFila().then(function (e) {
+        var resta = (Number(e && e.pendentes) || 0) + (Number(e && e.quarentena) || 0);
+        avisar(r && !r.pulado && !r.erro && !resta ? 'Mudanças enviadas para a nuvem.' : naoSubiu);
+      });
+    }).then(null, function () { avisar(naoSubiu); }).then(function () {
+      tentandoSubir = false;
+      return relerFilaDoLembrete();
+    });
+  }
+
+  function desenharLembreteDaCopia() {
+    var lembrete = $('#lembrete-copia');
+    if (!lembrete) return;
+    lembrete.innerHTML = '';
+    if (copiaPronta) { desenharCopiaPronta(lembrete); return; }
+    var decisao = decisaoDoLembreteDaCopia();
+    if (decisao.tipo === 'nuvem-em-dia') {
+      lembrete.appendChild(el('div', { class: 'ajuda lembrete-nuvem-em-dia', id: 'lembrete-nuvem-em-dia',
+        texto: fraseDaNuvemEmDia(decisao.nuvem.confirmado) }));
+    } else if (decisao.tipo === 'nuvem-parada') {
+      var n = decisao.nuvem;
+      var quantas = n.paradas === 1 ? '1 mudança não subiu' : n.paradas + ' mudanças não subiram';
+      // a recusa da nuvem (quarentena, regras) não se resolve tentando de novo: ela vê o que houve
+      var verOQueHouve = n.quarentena > 0 || (n.erro && n.erro.codigo === 'PERMISSION_DENIED');
+      lembrete.appendChild(el('div', { class: 'faixa-aviso lembrete-nuvem', id: 'lembrete-nuvem-parada' }, [
+        el('strong', { texto: quantas + ' para a nuvem' + (n.desde ? ' desde ' + diaDe(n.desde) : '') + '. ' }),
+        document.createTextNode(verOQueHouve ? 'A nuvem recusou alguma coisa. ' : 'Confira a internet e tente de novo. '),
+        el('button', {
+          type: 'button', class: 'btn pequeno u-margem-esq-8', id: 'lembrete-nuvem-acao',
+          texto: verOQueHouve ? 'Ver o que houve' : 'Tentar de novo',
+          disabled: !verOQueHouve && tentandoSubir,
+          aoClick: verOQueHouve ? abrirNuvemEmAjustes : tentarSubirDeNovo
+        })
+      ]));
+    } else if (decisao.tipo === 'local') {
+      var dias = decisao.dias;
+      lembrete.appendChild(el('div', { class: 'faixa-aviso' }, [
+        el('strong', { texto: dias === null ? 'Você ainda não salvou uma cópia de segurança. '
+          : 'Sua última cópia de segurança tem ' + dias + ' dias. ' }),
+        document.createTextNode('Tudo fica só neste tablet. Salve uma cópia e guarde no Drive. '),
+        el('button', {
+          type: 'button', class: 'btn pequeno u-margem-esq-8', texto: 'Salvar cópia agora',
+          aoClick: function () { baixarCopia(); }
+        })
+      ]));
+    }
   }
 
   function restaurarCopia(ev) {
@@ -21305,8 +21495,12 @@
     if (!temNuvem()) { desenharNuvem(); return; }
     Nuvem.informar({ versaoApp: VERSAO, persistente: persistenciaConcedida });
     Nuvem.aoMudar(desenharNuvem);
+    // o lembrete da cópia, na agenda, acompanha a fila (relida) e o último envio confirmado
+    Nuvem.aoMudar(function () { if (lembreteNuvemPronta) relerFilaDoLembrete(); });
     // (guardado: o código de antes da fatia 3, servido pelas provas de subida de banco, não tem aoReceber)
     if (typeof Store.aoReceber === 'function') Store.aoReceber(registrosChegaram);
+    var lembretePronto = function () { lembreteNuvemPronta = true; relerFilaDoLembrete(); };
+    Nuvem.pronto().then(lembretePronto, lembretePronto);
     Nuvem.pronto().then(function () {
       desenharNuvem();
       // o celular busca a cópia mais nova; quem sobe a dele é só o tablet
@@ -21979,6 +22173,7 @@
     celularPedeEntrada = false;
     formCelular = null;
     folhaCelular = null;
+    fecharMensagemCelular(); // o que ela escreveu já está no rascunho
     alunoCelular = null; // a aba Alunos volta à lista
     diaRoladoCelular = null; // voltando a Hoje, a linha do tempo rola até agora
     painelDosAvisosAberto = PAINEL_ABERTO_AO_CHEGAR; // e os avisos chegam recolhidos
@@ -22127,6 +22322,7 @@
   function formularioAbertoNoCelular() {
     if (telaCelular === 'hoje') return !!(formCelular && $('#cel-hoje [data-form-celular]')) ||
       !!(folhaCelular && folhaCelular.passo === 'remarcar' && $('#cel-folha [data-form-celular]'));
+    if ($('#cel-mensagem')) return true; // o editor da mensagem do mês, em qualquer tela
     if (telaCelular === 'fechamento') return !!$('#cel-fechamento .pagamento-valor');
     return false;
   }
@@ -23965,6 +24161,7 @@
         bloco.setAttribute('data-acao-celular', 'pago-em');
         filhos.push(bloco);
       }
+      if (podeEditarMensagemCelular()) filhos.push(botaoDaMensagemCelular(f.aluno.id, mesCelular));
       caixa.appendChild(el('div', { class: 'cartao cel-fechamento-aluno', 'data-aluno': f.aluno.id, 'data-selo': selo.selo }, filhos));
     });
   }
@@ -24026,15 +24223,275 @@
         } })
     ]));
     fechs.forEach(function (f) {
-      caixa.appendChild(el('div', { class: 'cartao cel-familia' }, [
+      var alunoId = f.aluno.id;
+      /* O PDF é calculado no toque, e não no desenho da tela: a mensagem do
+       * mês que ela acabou de salvar (aqui ou no Fechamento) entra nele. */
+      var pdfAgora = function (entrega) { return exportarAlunoEmPdf(Core.calcularFechamento(db, alunoId, mesCelular), false, null, entrega); };
+      caixa.appendChild(el('div', { class: 'cartao cel-familia', 'data-aluno': alunoId }, [
         el('strong', { texto: f.alunoNome }),
         el('div', { class: 'ajuda u-margem-0', texto: f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula', 'aulas') +
           ' · ' + dinheiro(f.valorFeito) }),
         el('div', { class: 'barra u-margem-baixo-0 u-margem-topo-8' }, [
-          el('button', { type: 'button', class: 'btn', texto: 'Enviar o PDF', aoClick: function () { exportarAlunoEmPdf(f, false); } })
-        ])
+          el('button', { type: 'button', class: 'btn cel-ver-pdf', texto: 'Ver o PDF', aoClick: function () { pdfAgora(baixar); } }),
+          el('button', { type: 'button', class: 'btn cel-enviar-pdf', texto: 'Enviar o PDF', aoClick: function () { pdfAgora(); } })
+        ]),
+        podeEditarMensagemCelular() ? botaoDaMensagemCelular(alunoId, mesCelular) : null
       ]));
     });
+  }
+
+  // ---------- a mensagem do mês, editada no celular ----------
+
+  /* É o MESMO texto que o tablet edita na janela do feedback: o mesmo campo
+   * (db.resumos, pelo Core.textoDoMes e Core.gravarTextoDoMes) e o mesmo
+   * caminho até o PDF (calcularFechamento lê dali). Gravar é uma das ações do
+   * celular da dona: passa pelo comoAcaoDoCelular, entra na fila de registros
+   * como `resumo:<aluno>:<mês>` e sobe. Quem só lê, e o observador, não têm o
+   * botão. O roteiro de perguntas do tablet fica no tablet: aqui é o texto.
+   *
+   * O editor ocupa a tela, com Salvar e Cancelar num rodapé que acompanha a
+   * parte visível (visualViewport): com o teclado aberto, os dois continuam à
+   * vista. Sair sem salvar guarda um rascunho neste aparelho (localStorage,
+   * como o relato da aula), oferecido ao reabrir. */
+  var editorMensagemCelular = null; // { alunoId, mes, base, soltar }
+
+  function podeEditarMensagemCelular() { return celularEdita(); }
+
+  function botaoDaMensagemCelular(alunoId, mes) {
+    /* Mais leve que o "Marcar como pago" e separado dele por um respiro e um
+     * fio: são decisões diferentes, e a do dinheiro é a que pesa. */
+    return el('div', { class: 'cel-mensagem-acesso', 'data-acao-celular': 'mensagem-do-mes' }, [
+      el('button', { type: 'button', class: 'cel-editar-mensagem', 'data-aluno': alunoId, texto: 'Editar a mensagem do mês',
+        aoClick: function () { abrirMensagemCelular(alunoId, mes); } })
+    ]);
+  }
+
+  function chaveRascunhoMensagem(alunoId, mes) { return 'rascunho-mensagem-mes:' + alunoId + ':' + mes; }
+  function lerRascunhoMensagem(alunoId, mes) {
+    try {
+      var r = JSON.parse(localStorage.getItem(chaveRascunhoMensagem(alunoId, mes)) || 'null');
+      if (!r || typeof r.texto !== 'string' || typeof r.base !== 'string') return null;
+      return r;
+    } catch (e) { return null; }
+  }
+  function guardarRascunhoMensagem(ed, texto) {
+    try {
+      if (texto === ed.base) localStorage.removeItem(chaveRascunhoMensagem(ed.alunoId, ed.mes));
+      else localStorage.setItem(chaveRascunhoMensagem(ed.alunoId, ed.mes), JSON.stringify({ texto: texto, base: ed.base, quando: Date.now() }));
+    } catch (e) { /* sem armazenamento: o texto continua na tela até ela sair */ }
+  }
+  function limparRascunhoMensagem(alunoId, mes) {
+    try { localStorage.removeItem(chaveRascunhoMensagem(alunoId, mes)); } catch (e) { /* sem armazenamento */ }
+  }
+
+  /* De onde veio o texto salvo, pelo registro dele (Core.origemDoTextoDoMes):
+   * o aparelho que gravou e a hora, e o que faltar no registro. */
+  function origemDaMensagemCelular(alunoId, mes, temTexto) {
+    var id = 'resumo:' + alunoId + ':' + mes;
+    return Promise.all([Store.lerRegistros(), Store.lerFila()]).then(function (v) {
+      var reg = (v[0] || []).filter(function (r) { return r.id === id; })[0] || null;
+      var naFila = (v[1] || []).some(function (e) { return e.id === id; });
+      return Core.origemDoTextoDoMes(reg, { naFila: naFila, meuAparelho: Store.aparelho(), temTexto: temTexto });
+    }, function () { return ''; });
+  }
+
+  /* A versão do aplicativo no tablet da dona, pelo diagnóstico que cada
+   * aparelho sobe (D7): o do papel "tablet" com o resumo mais recente. A
+   * última lida fica neste aparelho, para quando ele estiver sem sinal. Sem
+   * diagnóstico nenhum de tablet (nunca subiu, ou a nuvem não respondeu e não
+   * há leitura guardada), devolve null e o editor abre: não dá para afirmar
+   * que o tablet é antigo, e travar aí tiraria dela o celular sem sinal. */
+  var CHAVE_VERSAO_DO_TABLET = 'versao-do-tablet-vista';
+  function versaoDoTabletCelular() {
+    var guardada = null;
+    try { guardada = JSON.parse(localStorage.getItem(CHAVE_VERSAO_DO_TABLET) || 'null'); } catch (e) { guardada = null; }
+    if (!temNuvem() || (typeof navigator !== 'undefined' && navigator.onLine === false)) return Promise.resolve(guardada);
+    var lida = Nuvem.listarDiagnosticos().then(function (lista) {
+      var t = (lista || []).filter(function (d) { return d.papel === 'tablet' && d.app; })[0] || null;
+      var v = t ? { app: String(t.app), quando: t.quando || '' } : null;
+      try { localStorage.setItem(CHAVE_VERSAO_DO_TABLET, JSON.stringify(v)); } catch (e) { /* sem armazenamento */ }
+      return v;
+    }, function () { return guardada; });
+    var espera = new Promise(function (r) { setTimeout(function () { r(guardada); }, 4000); });
+    return Promise.race([lida, espera]);
+  }
+
+  /* Um tablet numa versão anterior a esta não conhece a regra da mensagem do
+   * mês (vence a escrita mais recente) e, com uma edição dele mais velha na
+   * fila, cobriria a do celular. Enquanto o tablet não atualiza, o celular não
+   * edita a mensagem. */
+  function abrirMensagemCelular(alunoId, mes) {
+    if (!podeEditarMensagemCelular()) return;
+    return versaoDoTabletCelular().then(function (v) {
+      if (v && Core.versaoAntes(v.app, VERSAO) === true) {
+        avisar('Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão ' + v.app + ', e esta é a ' + VERSAO + '.');
+        return;
+      }
+      abrirEditorDaMensagemCelular(alunoId, mes);
+    });
+  }
+
+  /* "Ver a versão que ficou de fora": a do outro aparelho que perdeu no último
+   * conflito, guardada no item. Um toque mostra, outro troca o texto do campo
+   * por ela (ela ainda salva, ou não). Serve ao editor do celular e à janela
+   * do feedback do tablet. */
+  function blocoDaVersaoDeFora(v, campo) {
+    var deste = v.aparelho && typeof Store.aparelho === 'function' && v.aparelho === Store.aparelho();
+    var quem = deste ? (modoCelular ? 'Deste celular' : 'Deste tablet') : (modoCelular ? 'Do tablet' : 'Do celular');
+    var quando = Core.quandoDoCarimbo(v.em);
+    var painel = el('div', { class: 'versao-de-fora-painel', id: 'versao-de-fora-painel', hidden: 'hidden' }, [
+      el('div', { class: 'ajuda u-margem-0', texto: quem + (quando ? ', ' + quando : '') + ':' }),
+      el('div', { class: 'versao-de-fora-texto', id: 'versao-de-fora-texto', texto: v.texto }),
+      el('button', { type: 'button', class: 'btn pequeno', id: 'versao-de-fora-usar', texto: 'Usar esta',
+        aoClick: function () {
+          campo.value = v.texto;
+          campo.dispatchEvent(new Event('input', { bubbles: true }));
+          campo.focus();
+        } })
+    ]);
+    var botao = el('button', { type: 'button', class: 'btn pequeno', id: 'versao-de-fora-ver', texto: 'Ver a versão que ficou de fora',
+      aoClick: function () {
+        painel.hidden = !painel.hidden;
+        botao.textContent = painel.hidden ? 'Ver a versão que ficou de fora' : 'Esconder a versão que ficou de fora';
+      } });
+    return el('div', { class: 'versao-de-fora', id: 'versao-de-fora' }, [botao, painel]);
+  }
+
+  function abrirEditorDaMensagemCelular(alunoId, mes) {
+    if (!podeEditarMensagemCelular()) return;
+    var aluno = alunoPorId(alunoId);
+    var f = Core.calcularFechamento(db, alunoId, mes);
+    if (!aluno || !f) { avisar('Este aluno não tem aulas neste mês.'); return; }
+    fecharMensagemCelular();
+    esconderAviso();
+    var base = Core.textoDoMes(db, alunoId, mes);
+    var ed = editorMensagemCelular = { alunoId: alunoId, mes: mes, base: base, soltar: null };
+    var rascunho = lerRascunhoMensagem(alunoId, mes);
+    if (rascunho && rascunho.texto === base) { limparRascunhoMensagem(alunoId, mes); rascunho = null; }
+
+    var campo = el('textarea', { id: 'cel-mensagem-texto', class: 'cel-mensagem-texto', 'aria-labelledby': 'cel-mensagem-titulo',
+      placeholder: 'Como foi o mês, o que evoluiu, o que merece atenção e o que vem a seguir.' });
+    campo.value = base;
+    var faixa = null;
+    if (rascunho) {
+      var hora = Core.quandoDoCarimbo(new Date(rascunho.quando).toISOString());
+      /* O rascunho volta sozinho quando o texto salvo é o mesmo de quando ela
+       * começou. Se o texto mudou depois (no tablet, por exemplo), o salvo fica
+       * na tela e o rascunho é oferecido: um toque troca. */
+      var mudou = rascunho.base !== base;
+      if (!mudou) campo.value = rascunho.texto;
+      var botaoRascunho = el('button', { type: 'button', class: 'btn pequeno', id: mudou ? 'cel-mensagem-usar-rascunho' : 'cel-mensagem-descartar',
+        texto: mudou ? 'Usar o rascunho' : 'Descartar o rascunho',
+        aoClick: function () {
+          if (mudou) { campo.value = rascunho.texto; ed.base = base; guardarRascunhoMensagem(ed, campo.value); }
+          else { campo.value = base; limparRascunhoMensagem(alunoId, mes); }
+          if (faixa && faixa.parentNode) faixa.parentNode.removeChild(faixa);
+          campo.focus();
+        } });
+      faixa = el('div', { class: 'faixa-info cel-mensagem-rascunho', id: 'cel-mensagem-rascunho' }, [
+        el('div', { texto: mudou
+          ? 'Há um rascunho deste aparelho, de ' + hora.replace(/^em /, '') + ', mas o texto salvo mudou depois dele. Abaixo está o texto salvo.'
+          : 'Rascunho recuperado, de ' + hora.replace(/^em /, '') + '. Ainda não foi salvo.' }),
+        botaoRascunho
+      ]);
+    }
+    campo.addEventListener('input', function () { guardarRascunhoMensagem(ed, campo.value); });
+
+    var contas = f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula dada', 'aulas dadas') +
+      ' · ' + f.horasFeitas + ' h · ' + dinheiro(f.valorFeito);
+    var origem = el('div', { class: 'ajuda u-margem-0 cel-mensagem-origem', id: 'cel-mensagem-origem' });
+    var editor = el('div', { class: 'cel-mensagem', id: 'cel-mensagem', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'cel-mensagem-titulo',
+      'data-acao-celular': 'mensagem-do-mes', 'data-aluno': alunoId, 'data-mes': mes }, [
+      /* O alto, a faixa e o texto rolam juntos quando não cabem (teclado aberto
+       * com a letra grande); o rodapé fica sempre à vista. */
+      el('div', { class: 'cel-mensagem-corpo' }, [
+      el('div', { class: 'cel-mensagem-cabeca' }, [
+        el('h2', { class: 'cel-titulo', id: 'cel-mensagem-titulo', texto: 'Mensagem do mês' }),
+        el('div', { class: 'cel-mensagem-quem', texto: aluno.nome + ' · ' + Core.mesExtenso(mes) }),
+        // o texto não é anotação dela: vai para a família, no PDF do mês
+        el('div', { class: 'cel-mensagem-destino', id: 'cel-mensagem-destino', texto: 'Vai para a família no PDF de ' + Core.mesExtenso(mes).toLowerCase() + '.' }),
+        el('div', { class: 'ajuda u-margem-0', id: 'cel-mensagem-contas', texto: contas }),
+        origem
+      ]),
+      faixa,
+      Core.versaoDeForaDoMes(db, alunoId, mes) ? blocoDaVersaoDeFora(Core.versaoDeForaDoMes(db, alunoId, mes), campo) : null,
+      campo
+      ]),
+      el('div', { class: 'cel-mensagem-rodape' }, [
+        el('button', { type: 'button', class: 'btn', id: 'cel-mensagem-cancelar', texto: 'Cancelar', aoClick: cancelarMensagemCelular }),
+        el('button', { type: 'button', class: 'btn principal', id: 'cel-mensagem-salvar', texto: 'Salvar', aoClick: salvarMensagemCelular })
+      ])
+    ]);
+    ($('#modo-celular') || document.body).appendChild(editor);
+    ed.soltar = acompanharTecladoCelular(editor);
+    origemDaMensagemCelular(alunoId, mes, !!base.trim()).then(function (frase) {
+      if (editorMensagemCelular !== ed) return;
+      origem.textContent = frase;
+      origem.hidden = !frase;
+    });
+    setTimeout(function () { if (editorMensagemCelular === ed) campo.focus(); }, 60);
+  }
+
+  /* O editor fica do tamanho da parte visível da tela: quando o teclado abre,
+   * a parte visível encolhe e o rodapé sobe junto. Devolve quem solta. */
+  function acompanharTecladoCelular(editor) {
+    var vv = window.visualViewport;
+    function ajustar() {
+      var altura = vv ? vv.height : window.innerHeight;
+      editor.style.height = Math.round(altura) + 'px';
+      editor.style.top = Math.round(vv ? vv.offsetTop : 0) + 'px';
+    }
+    ajustar();
+    if (vv) { vv.addEventListener('resize', ajustar); vv.addEventListener('scroll', ajustar); }
+    window.addEventListener('resize', ajustar);
+    return function () {
+      if (vv) { vv.removeEventListener('resize', ajustar); vv.removeEventListener('scroll', ajustar); }
+      window.removeEventListener('resize', ajustar);
+    };
+  }
+
+  function fecharMensagemCelular() {
+    var ed = editorMensagemCelular;
+    editorMensagemCelular = null;
+    if (ed && ed.soltar) ed.soltar();
+    var velho = $('#cel-mensagem');
+    if (velho) velho.parentNode.removeChild(velho);
+  }
+
+  /* Cancelar fecha sem gravar nada no banco; o que ela escreveu fica no
+   * rascunho deste aparelho, e ela é avisada. */
+  function cancelarMensagemCelular() {
+    var ed = editorMensagemCelular, campo = $('#cel-mensagem-texto');
+    var ficou = !!(ed && campo && campo.value !== ed.base);
+    if (ed && campo) guardarRascunhoMensagem(ed, campo.value);
+    fecharMensagemCelular();
+    if (ficou) avisar('A mensagem não foi salva. O rascunho ficou neste aparelho.');
+  }
+
+  function salvarMensagemCelular() {
+    var ed = editorMensagemCelular, campo = $('#cel-mensagem-texto');
+    if (!ed || !campo || !podeEditarMensagemCelular()) return;
+    var texto = campo.value;
+    var aluno = alunoPorId(ed.alunoId);
+    var salvoAgora = Core.textoDoMes(db, ed.alunoId, ed.mes);
+    if (texto === salvoAgora) {
+      limparRascunhoMensagem(ed.alunoId, ed.mes);
+      fecharMensagemCelular();
+      avisar('A mensagem já estava assim. Nada mudou.');
+      return;
+    }
+    /* O texto salvo mudou com o editor aberto (chegou do tablet): ela decide
+     * antes de passar por cima. Com o "não", o editor fica como está. */
+    if (salvoAgora !== ed.base && !confirmar('Chegou uma versão nova do tablet enquanto você escrevia. ' +
+      'Salvar a sua por cima? A do tablet fica guardada no histórico.')) return;
+    var rotuloMensagem = 'Mensagem do mês de ' + (aluno ? aluno.nome : 'aluno') + ' salva.';
+    fecharMensagemCelular();
+    return comoAcaoDoCelular(function () { return comDesfazer(rotuloMensagem, function () {
+      Core.gravarTextoDoMes(db, ed.alunoId, ed.mes, texto);
+    }); }).then(function () {
+      limparRascunhoMensagem(ed.alunoId, ed.mes);
+      desenharCelular();
+    }, function () { desenharCelular(); });
   }
 
   // ---------- o aparelho observador (D7): diagnóstico e ajustes ----------
