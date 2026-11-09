@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.19';
+  var VERSAO = '1.42.21';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.21',
+      itens: [
+        'No celular, a mensagem do mês de cada aluno pode ser editada: no Fechamento, toque em "Editar a mensagem do mês". É o mesmo texto do tablet, e ele vai para a família no PDF do mês.',
+        'Se o tablet e o celular mexerem na mesma mensagem, fica a escrita mais recente, e a outra versão fica guardada em "Ver a versão que ficou de fora", para você usar se quiser.',
+        'Para editar pelo celular, o tablet precisa estar nesta versão: se não estiver, o celular avisa.'
+      ]
+    },
     {
       versao: '1.42.19',
       itens: [
