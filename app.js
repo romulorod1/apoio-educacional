@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.27';
+  var VERSAO = '1.42.29';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -82,7 +82,7 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.27',
+      versao: '1.42.29',
       itens: [
         'A folha escrita à mão de cada aula agora vai para a nuvem junto com o resto, página por página, e só sobe o que mudou.',
         'No celular, o registro da aula tem "Ver a folha escrita à mão": a folha aparece do jeito que você escreveu no tablet, só para ler.',
@@ -1991,31 +1991,42 @@
 
   // ================= dados de exemplo =================
 
-  /* Carga inicial, montada só com o que está documentado.
+  /* Carga de exemplo, SÓ PARA AS PROVAS (desde 09/11/2026, com o app em
+   * produção). Os nomes são de teste: nenhum é de aluno de verdade, e o repo é
+   * público. A conta do junho de referência é a que as provas conferem desde
+   * sempre: 10 encontros, 10:30 e R$ 1.050,00 para o aluno de referência, o
+   * único com valor por hora (R$ 100). Os demais ficam sem valor, e sem aula.
    *
-   * Os doze nomes e as horas vêm do fechamento de julho de 2026, que é dado real.
-   * O valor por hora NÃO é preenchido, porque não está registrado quem paga
-   * R$ 100 e quem paga R$ 150: inventar isso estragaria todos os fechamentos.
-   * A única exceção é o Marcelo, cujo valor de R$ 100 por hora está documentado
-   * no fechamento de junho (10:30 de aula e R$ 1.050,00).
-   *
-   * As aulas de junho do Marcelo também são reais, tiradas daquele mesmo
-   * fechamento. Nenhuma outra aula é criada: as datas dos demais não existem
-   * em lugar nenhum, e chutar datas geraria cobrança errada. */
+   * Ela só entra pela cargaDeExemploPedida(), logo abaixo. A ordem alfabética
+   * dos nomes de teste é a mesma dos nomes antigos, e a ordem da lista (que
+   * decide a cor de cada um) também. */
   var ALUNOS_INICIAIS = [
-    { nome: 'Daniel', horasJulho: 11, nota: 'Em julho houve aulas de 1 hora e de 2 horas.' },
-    { nome: 'Marcelo', horasJulho: 7, nota: 'Em julho foram 7 encontros de 1 hora.' },
-    { nome: 'Guilherme', horasJulho: 5, nota: '' },
-    { nome: 'Lucas', horasJulho: 5, nota: '' },
-    { nome: 'Cecília', horasJulho: 5, nota: 'Em julho houve aulas de 1 hora e meia.' },
-    { nome: 'Mariah', horasJulho: 3, nota: '' },
-    { nome: 'Paula', horasJulho: 3, nota: '' },
-    { nome: 'Marina', horasJulho: 3, nota: '' },
-    { nome: 'Mateus', horasJulho: 2, nota: '' },
-    { nome: 'Eduardo', horasJulho: 2, nota: '' },
-    { nome: 'Rafael', horasJulho: 1, nota: '' },
-    { nome: 'Theo', horasJulho: 1, nota: '' }
+    { nome: 'Aluno Beta Teste', horasJulho: 11, nota: 'Nota de exemplo da carga de teste.' },
+    { nome: 'Aluno Referência Teste', horasJulho: 7, nota: 'Nota de exemplo da carga de teste.', referencia: true },
+    { nome: 'Aluno Gama Teste', horasJulho: 5, nota: '' },
+    { nome: 'Aluno Lambda Teste', horasJulho: 5, nota: '' },
+    { nome: 'Aluno Alfa Teste', horasJulho: 5, nota: 'Nota de exemplo da carga de teste.' },
+    { nome: 'Aluno Sigma Teste', horasJulho: 3, nota: '' },
+    { nome: 'Aluno Upsilon Teste', horasJulho: 3, nota: '' },
+    { nome: 'Aluno Tau Teste', horasJulho: 3, nota: '' },
+    { nome: 'Aluno Teta Teste', horasJulho: 2, nota: '' },
+    { nome: 'Aluno Delta Teste', horasJulho: 2, nota: '' },
+    { nome: 'Aluno Xi Teste', horasJulho: 1, nota: '' },
+    { nome: 'Aluno Zeta Teste', horasJulho: 1, nota: '' }
   ];
+
+  /* QUANDO a carga de exemplo entra: só na origem local das provas
+   * (127.0.0.1 ou localhost), nunca em produção. O nome da origem vem do
+   * navegador, pelo endereço que abriu a página: em apoio-educacional.pages.dev
+   * e em romulorod1.github.io ele nunca é um destes dois, e nenhum parâmetro,
+   * link ou dado gravado muda isso. Em produção o banco vazio abre vazio, no
+   * primeiro uso, depois do "Apagar tudo" e com a nuvem ligada; e, num
+   * aparelho novo, nada de exemplo entra na fila que sobe para a nuvem.
+   * Prova: _teste/testa_carga_inicial.js (veneno --envenenado-carga-em-producao). */
+  function cargaDeExemploPedida() {
+    var nome = String(location.hostname || '');
+    return nome === '127.0.0.1' || nome === 'localhost';
+  }
 
   function cargaInicial() {
     var novo = Store.bancoVazio();
@@ -2035,21 +2046,21 @@
           ' de aula.' + (base.nota ? ' ' + base.nota : ''),
         precos: []
       };
-      if (base.nome === 'Marcelo') {
-        // único valor por hora que está documentado
+      if (base.referencia) {
+        // o único com valor por hora
         aluno.precos.push({ id: Core.uid(), inicio: '2026-01-01', fim: null, valorHora: 100 });
         marcelo = aluno;
       }
       novo.alunos.push(aluno);
     });
 
-    // Junho do Marcelo, exatamente como no fechamento que ela já escreveu.
+    // O junho de referência: 10 encontros, 10:30 e R$ 1.050,00.
     Core.criarSerie(novo, {
       alunoId: marcelo.id, dias: [1, 3, 5], hora: '15:30', duracaoMin: 60,
       inicio: '2026-06-01', fim: '2026-06-30'
     });
 
-    // No mês real ela não deu aula em 03, 12 e 29.
+    // Sem aula em 03, 12 e 29.
     ['2026-06-03', '2026-06-12', '2026-06-29'].forEach(function (d) {
       var a = Core.achaAula(novo, marcelo.id, d);
       if (a) Core.excluirAulas(novo, a.id, 'esta');
@@ -2060,14 +2071,12 @@
 
     novo.resumos.push({
       alunoId: marcelo.id, mes: '2026-06',
-      texto: 'Marcelo está se tornando um homenzinho. Muito legal acompanhar o crescimento dele de perto.\n' +
-        'Marcelo já consegue identificar o que ele quer fazer e está começando a se posicionar quanto a isso. ' +
-        'Vale lembrar, no entanto, que a vida não é feita apenas do que queremos fazer, mas também das coisas ' +
-        'que devem ser feitas.\n' +
+      texto: 'Resumo de exemplo do mês de junho, escrito para a carga de teste. O mês teve bom rendimento.\n' +
+        'O aluno já consegue dizer o que quer estudar e está começando a se posicionar quanto a isso. ' +
+        'Vale lembrar que o mês também tem as tarefas que precisam ser feitas.\n' +
         'Como combinado, estamos praticando a interpretação de textos e as respostas discursivas mais elaboradas, ' +
         'mas sem deixar de lado o conteúdo e as tarefas de casa.\n' +
-        'Marcelo tem se distraído um pouco mais durante as aulas e me cobrou, no nosso último encontro, ' +
-        'uma aula mais “legal”. Vou levar umas propostas diferentes para atrair mais a atenção dele.'
+        'Na próxima etapa vou levar propostas diferentes para manter a atenção nas aulas.'
     });
 
     return novo;
@@ -2089,10 +2098,15 @@
         db = carregado;
       } else if (modoCelular) {
         db = Store.bancoVazio(); // só na memória: os dados vêm da cópia do tablet
-      } else {
+      } else if (cargaDeExemploPedida()) {
+        // só nas provas, na origem local (ver cargaDeExemploPedida)
         db = cargaInicial();
         mesAtual = '2026-06';
         return Store.salvar(db);
+      } else {
+        /* Em produção o banco vazio abre vazio: nada é gravado aqui, e o que
+         * já estava no banco (os ajustes que sobram do "Apagar tudo") fica. */
+        db = carregado || Store.bancoVazio();
       }
     }).then(function () {
       if (db.alunos.some(function (a) { return a.daCargaInicial; }) && db.aulas.length) {

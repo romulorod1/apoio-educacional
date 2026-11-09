@@ -16,6 +16,17 @@
 #                                        nao roda nada: diz, uma por linha, que
 #                                        prova de navegador rodaria (a prova das
 #                                        fatias e o testa_pedacos_do_portao)
+#   sh _teste/confere_tudo.sh --provas ARQUIVO
+#                                        so as provas de navegador cujos
+#                                        arquivos estao em ARQUIVO (um caminho
+#                                        por linha, como diz o --listar na
+#                                        linha "arq"). E o nivel 1 do CI: as
+#                                        provas mapeadas pelos arquivos tocados
+#                                        no PR (_teste/provas_tocadas.js). Caminho
+#                                        da lista que nao casa prova nenhuma e
+#                                        HA FALHA, nao pulo calado. Combina com
+#                                        --pedaco K/N: so as da lista que caem
+#                                        na fatia K (o nivel 1 em oito maquinas).
 #
 # O --rapido e o que o GitHub roda em todo PR (.github/workflows/portao.yml),
 # porque o inteiro passa de dez minutos e quase todo esse tempo e Chrome. Ele
@@ -35,11 +46,13 @@ pulada=0
 rapido=0
 listar=0
 pedaco=""
+provas_arq=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --rapido) rapido=1 ;;
     --listar) listar=1 ;;
     --pedaco) pedaco_dado=1; pedaco="${2:-}"; if [ "$#" -gt 1 ]; then shift; fi ;;
+    --provas) provas_arq="${2:-}"; if [ "$#" -gt 1 ]; then shift; fi; [ -n "$provas_arq" ] || { printf -- '--provas pede o arquivo com a lista\n'; exit 2; } ;;
     *) printf 'opcao desconhecida: %s\n' "$1"; exit 2 ;;
   esac
   shift
@@ -74,6 +87,16 @@ if [ "${pedaco_dado:-0}" = "1" ]; then
   # "nenhuma prova" calada (nem o portao inteiro): sai com 2.
   minhas_provas=$(node _teste/divide_portao.js "$pk" "$pn") || { printf 'nao consegui dividir o portao em fatias (divide_portao.js)\n'; exit 2; }
 fi
+# Nivel 1 do CI: so as provas de navegador da lista. Lista ilegivel ou vazia
+# nao vira "nenhuma prova" calada nem o portao inteiro: sai com 2.
+provas_lista=""
+if [ -n "$provas_arq" ]; then
+  if [ "$rapido" = "1" ]; then printf -- '--provas nao combina com --rapido\n'; exit 2; fi
+  [ -f "$provas_arq" ] || { printf 'lista de provas nao existe: %s\n' "$provas_arq"; exit 2; }
+  provas_lista=$(tr -d '\r' < "$provas_arq" | grep . || true)
+  [ -n "$provas_lista" ] || { printf 'a lista de provas esta vazia: %s\n' "$provas_arq"; exit 2; }
+fi
+provas_vistas=""
 numero_navegador=0
 rodadas_aqui=0
 
@@ -152,15 +175,20 @@ roda() {
   # de um teste falso derrubaria o portao inteiro na primeira prova)
   if [ "$na_secao_navegador" = "1" ]; then
     numero_navegador=$((numero_navegador + 1))
+    provas_vistas="$provas_vistas
+${2:-}"
     if [ -n "$pn" ] && ! printf '%s\n' "$minhas_provas" | grep -Fxq -- "$nome"; then
       return 0
     fi
-  elif [ -n "$pn" ]; then
+    if [ -n "$provas_lista" ] && ! printf '%s\n' "$provas_lista" | grep -Fxq -- "${2:-}"; then
+      return 0
+    fi
+  elif [ -n "$pn" ] || [ -n "$provas_lista" ]; then
     # o que nao abre navegador roda no portao-rapido, em todo PR
     return 0
   fi
   if [ "$listar" = "1" ]; then
-    if [ "$na_secao_navegador" = "1" ]; then printf '  vai     %s %s\n' "$numero_navegador" "$nome"; fi
+    if [ "$na_secao_navegador" = "1" ]; then printf '  vai     %s %s\n  arq     %s %s\n' "$numero_navegador" "$nome" "$numero_navegador" "${2:-}"; fi
     return 0
   fi
   if [ "$na_secao_navegador" = "1" ]; then rodadas_aqui=$((rodadas_aqui + 1)); fi
@@ -280,6 +308,12 @@ roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
 # B4: o deploy no Cloudflare Pages so depois do portao inteiro verde na main,
 # com venenos, e o site montado com tudo o que o aplicativo pede.
 roda "publica cloudflare (B4)" node _teste/testa_publica_cloudflare.js
+# Politica de testes por checkpoint (09/11/2026): o nivel 1 (quais provas de
+# navegador rodam pelos arquivos tocados, com o mapa em mapa_provas.tsv) e o
+# nivel 3 (a main reaproveita a bateria inteira se o tree for igual ao da cabeca
+# do PR que passou). Sem navegador.
+roda "provas tocadas (nivel 1)" node _teste/testa_provas_tocadas.js
+roda "arvore da main (nivel 3)" node _teste/testa_arvore_da_main.js
 # Oito que moravam no laco "com navegador" sem abrir navegador nenhum (nem
 # puppeteer, nem a porta 8777). La, o --rapido os pulava; aqui o GitHub os roda
 # em todo PR.
@@ -969,6 +1003,15 @@ roda "celular dinheiro --envenenado-falta-e-o-total" node "_teste/testa_celular_
 roda "celular dinheiro --envenenado-sem-meses-anteriores" node "_teste/testa_celular_dinheiro.js" --envenenado-sem-meses-anteriores
 roda "celular dinheiro --envenenado-cancela-sem-confirmar" node "_teste/testa_celular_dinheiro.js" --envenenado-cancela-sem-confirmar
 roda "celular dinheiro --envenenado-sem-redesenho"  node "_teste/testa_celular_dinheiro.js" --envenenado-sem-redesenho
+# A carga de exemplo e so das provas (09/11/2026, com o app em producao): ela
+# entra so na origem local (127.0.0.1, localhost). Nas origens de producao
+# (pages.dev e github.io, servidas do disco pela interceptacao) o banco vazio
+# abre vazio, tambem depois do "Apagar tudo"; e o aparelho novo que entra na
+# conta e liga a nuvem (no emulador) nao sobe nenhum registro de exemplo. O
+# controle positivo e a mesma carga, em 127.0.0.1, subindo numa outra conta. O
+# veneno volta a carga em qualquer origem e a nuvem tem de mostrar os registros.
+roda "carga inicial so nas provas"                  node "_teste/testa_carga_inicial.js"
+roda "carga inicial --envenenado-carga-em-producao" node "_teste/testa_carga_inicial.js" --envenenado-carga-em-producao
 # D6c (lote 4): o que o app mostra sozinho no alto de Hoje do celular. A
 # proxima aula (a mesma marca do lote 1), a aula passada sem registro (o
 # criterio do tablet, Core.aulaTemRegistro), a familia em aberto do dia 6 em
@@ -1533,7 +1576,24 @@ else
   fi
 fi
 
+if [ -n "$provas_lista" ]; then
+  # caminho da lista que nenhuma prova de navegador tem: erro de quem montou a
+  # lista, e prova que nao rodou nao pode sair como verde
+  sem_prova=$(printf '%s\n' "$provas_lista" | while IFS= read -r a; do
+    printf '%s\n' "$provas_vistas" | grep -Fxq -- "$a" || printf '%s ' "$a"
+  done)
+  if [ -n "$sem_prova" ]; then
+    printf '  FALHOU  %-24s caminho da lista sem prova de navegador: %s\n' "provas mapeadas" "$sem_prova"
+    falhou=1
+  fi
+fi
+
 printf '\n'
+if [ -n "$pn" ] && [ -n "$provas_lista" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
+  # o nivel 1 em fatias: a fatia pode nao ter prova da lista, e isso e verde
+  printf 'FATIA %s DE %s: nenhuma prova da lista cai nesta fatia; nada a rodar.\n' "$pk" "$pn"
+  exit 0
+fi
 if [ -n "$pn" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
   # fatia vazia nao e fatia verde: com mais fatias que provas, a conta esta errada
   printf 'HA FALHA. A fatia %s de %s nao rodou prova nenhuma.\n' "$pk" "$pn"
@@ -1541,6 +1601,11 @@ if [ -n "$pn" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
 fi
 if [ "$falhou" != "0" ]; then
   printf 'HA FALHA. Nao faca o merge antes de resolver.\n'
+elif [ -n "$provas_lista" ]; then
+  # So o nivel 1 (com --pedaco, so a parte dele que cai nesta fatia): o verde dele nao e o portao inteiro, e diz isso.
+  printf 'PROVAS MAPEADAS PASSARAM: %s das %s provas de navegador rodaram aqui (nivel 1). A bateria inteira so roda com o rotulo pronto.\n' \
+    "$rodadas_aqui" "$numero_navegador"
+  if [ "$instavel" != "0" ]; then printf 'Algum teste so passou na segunda vez (INSTAVEL acima).\n'; fi
 elif [ -n "$pn" ]; then
   # So a fatia: o verde dela nao e o portao inteiro, e diz isso. O inteiro e o
   # job portao-navegador do CI, que so fica verde com todas as fatias verdes.

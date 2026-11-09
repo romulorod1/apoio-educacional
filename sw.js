@@ -135,9 +135,10 @@
  * dele (app.js e store.js), com a lista igual. Versão silenciosa. O v94 (D6c lote 4) traz os avisos no Hoje do celular
  * (app.js, core.js e styles.css), com a lista igual. O v95 (F4 do redesenho) traz os avisos do Hoje do celular
  * num sininho com painel (app.js e styles.css), com a lista igual. O v98 (importar vários pacotes) traz a importação em série e o resumo (app.js, index.html e styles.css), com a lista igual. O v101 traz a mensagem do mês editada no celular (app.js,
- * core.js, store.js, nuvem.js e styles.css), com a lista igual. O v102 (lembrete da cópia com a nuvem) traz o aviso novo e a linha "Na nuvem, salvo às" (app.js e styles.css), com a lista igual. O v103 (N2 fatia 1) traz as folhas por página na nuvem
+ * core.js, store.js, nuvem.js e styles.css), com a lista igual. O v102 (lembrete da cópia com a nuvem) traz o aviso novo e a linha "Na nuvem, salvo às" (app.js e styles.css), com a lista igual. O v104 deixa a carga de exemplo só nas provas e troca os nomes do exemplo por nomes de teste (app.js e index.html), com a lista igual.
+ * Versão silenciosa. O v105 (N2 fatia 1) traz as folhas por página na nuvem
  * (app.js, nuvem.js, store.js, draw.js e styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v103';
+var CACHE = 'apoio-educacional-v105';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

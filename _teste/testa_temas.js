@@ -232,14 +232,14 @@ const porValor = (sel, valor) => `(() => {
    *
    * Ler de volta o valor que o próprio teste acabou de escrever no select não
    * afirma nada. O que prova que o ano trocou é a LISTA ter trocado. */
-  const anoAntes = ((await bd()).alunos.find(a => /Marcelo/i.test(a.nome)) || {}).anoEscolar;
+  const anoAntes = ((await bd()).alunos.find(a => /Aluno Referência Teste/i.test(a.nome)) || {}).anoEscolar;
   const temas06 = await pag.$$eval('#lista-temas .item-tema .nome', es => es.map(e => e.textContent));
   await pag.select('#corpo-modal-tema select', '08');
   await espera(900);
   const temas08 = await pag.$$eval('#lista-temas .item-tema .nome', es => es.map(e => e.textContent));
   conf('trocar o ano trocou a lista', temas08.length > 0 && temas08.join('|') !== temas06.join('|'), true);
   let banco = await bd();
-  const marcelo = banco.alunos.find(a => /Marcelo/i.test(a.nome));
+  const marcelo = banco.alunos.find(a => /Aluno Referência Teste/i.test(a.nome));
   conf('o aluno da aula é o Marcelo', !!marcelo, true);
   conf('o ano da lista é outro que o do cadastro', String(anoAntes || '') !== '08', true);
   conf('e o ano escolar dele continua o do cadastro', String(marcelo.anoEscolar || ''), String(anoAntes || ''));
@@ -403,7 +403,7 @@ const porValor = (sel, valor) => `(() => {
   const aula3 = banco.aulas.find(a => a.data === '2026-06-10' && a.alunoId === marcelo.id);
   conf('o assunto continua depois de recarregar', (aula3.temas || []).length, 1);
   conf('e o ano escolar continua o do cadastro',
-    String(banco.alunos.find(a => /Marcelo/i.test(a.nome)).anoEscolar || ''), String(anoAntes || ''));
+    String(banco.alunos.find(a => /Aluno Referência Teste/i.test(a.nome)).anoEscolar || ''), String(anoAntes || ''));
 
   await irParaJunho();
   await abrirAulaDoDia10();

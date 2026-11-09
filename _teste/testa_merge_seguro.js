@@ -30,12 +30,13 @@ const CABECA = 'abc1234def5678abc1234def5678abc1234def56';
 function prBom() {
   return {
     number: 9, state: 'OPEN', isDraft: false, baseRefName: 'main', headRefOid: CABECA,
+    labels: [{ name: 'navegador' }, { name: 'risco' }],
     commits: [{ oid: 'velho', committedDate: '2026-10-26T10:00:00Z' },
               { oid: CABECA, committedDate: '2026-10-26T12:00:00Z' }],
     statusCheckRollup: [
       { __typename: 'CheckRun', name: 'portao-rapido', status: 'COMPLETED', conclusion: 'CANCELLED', startedAt: '2026-10-26T12:01:00Z' },
       { __typename: 'CheckRun', name: 'portao-rapido', status: 'COMPLETED', conclusion: 'SUCCESS', startedAt: '2026-10-26T12:02:00Z' },
-      { __typename: 'CheckRun', name: 'portao-navegador', status: 'COMPLETED', conclusion: 'SKIPPED', startedAt: '2026-10-26T12:02:00Z' }
+      { __typename: 'CheckRun', name: 'portao-navegador', status: 'COMPLETED', conclusion: 'SUCCESS', startedAt: '2026-10-26T12:02:00Z' }
     ],
     comments: [
       { body: 'Rodado nesta máquina, porta 8777.\nPortão inteiro abc1234: TUDO PASSOU.\nPode seguir para o merge.', createdAt: '2026-10-26T12:30:00Z', authorAssociation: 'OWNER' },
@@ -65,35 +66,55 @@ conf('rodada nova cancelada vence a velha verde', motivo(p, 'CANCELLED'), true);
 p = prBom(); p.statusCheckRollup[2] = { __typename: 'CheckRun', name: 'portao-navegador', status: 'IN_PROGRESS', conclusion: '', startedAt: '2026-10-26T12:02:00Z' };
 conf('check em andamento recusa', motivo(p, 'portao-navegador esta EM_ANDAMENTO'), true);
 
-p = prBom(); p.comments = p.comments.filter(c => !/Port/.test(c.body));
-conf('sem portao inteiro recusa', motivo(p, 'falta o portao inteiro'), true);
-p = prBom(); p.comments[0].body = 'Portão inteiro 9999999: TUDO PASSOU.';
-conf('portao inteiro de OUTRO commit recusa', motivo(p, 'falta o portao inteiro'), true);
-p = prBom(); p.comments[0].body = 'Portão inteiro abc1234: HA FALHA.';
-conf('portao inteiro vermelho recusa', motivo(p, 'falta o portao inteiro'), true);
-// Venenos das duas revisoes de 26/10: os dois textos no mesmo comentario, e o
-// comentario que so CITA a regra no meio de uma frase.
-p = prBom(); p.comments[0].body = 'Portão inteiro abc1234: TUDO PASSOU.\nHA FALHA no testa_x na segunda rodada.';
-conf('portao com HA FALHA e TUDO PASSOU juntos recusa', motivo(p, 'falta o portao inteiro'), true);
-p = prBom(); p.comments[0].body = 'Falta a linha Portão inteiro abc1234: TUDO PASSOU neste PR.';
-conf('comentario que so cita o formato recusa', motivo(p, 'falta o portao inteiro'), true);
-p = prBom(); p.comments[0].body = 'Portão inteiro xabc12345: TUDO PASSOU.';
-conf('sha7 dentro de outro hexadecimal nao vale', motivo(p, 'falta o portao inteiro'), true);
-p = prBom(); p.comments[0].body = 'Portão inteiro abc1234def5678: TUDO PASSOU';
-conf('sha mais longo que sete caracteres vale', decidir(p).ok, true);
-p = prBom(); p.comments = p.comments.filter(c => !/Port/.test(c.body));
-p.statusCheckRollup[2].conclusion = 'SUCCESS';
-conf('portao-navegador verde no CI basta sem o comentario', decidir(p).ok, true);
-// O portao em fatias (A4b, PR #80), os dois casos que faltavam (A4c):
-// uma fatia vermelha recusa, mesmo com a juncao verde por engano;
-p = prBom(); p.comments = p.comments.filter(c => !/Port/.test(c.body));
-p.statusCheckRollup[2].conclusion = 'SUCCESS';
+// POLITICA DE TESTES POR CHECKPOINT (09/11/2026): a bateria inteira roda no CI
+// quando o PR leva o rotulo "pronto", e o merge exige o juntador portao-navegador
+// VERDE na cabeca. Sem o rotulo o juntador nao roda: ausente ou pulado recusa.
+// O comentario "Portão inteiro ... TUDO PASSOU" (rodado na maquina de quem
+// trabalha) deixou de valer: o prBom ainda o traz, de proposito, e os casos
+// abaixo tiram o check e provam que o comentario nao o substitui.
+const semCheckInteiro = () => { const q = prBom(); q.statusCheckRollup = q.statusCheckRollup.filter(c => c.name !== 'portao-navegador'); return q; };
+p = semCheckInteiro();
+conf('PR sem a bateria inteira (check portao-navegador AUSENTE) e RECUSADO', decidir(p).ok, false);
+conf('e o motivo diz ausente', motivo(p, 'portao-navegador esta AUSENTE'), true);
+p = prBom(); p.statusCheckRollup[2].conclusion = 'SKIPPED';
+conf('PR sem a bateria inteira (juncao PULADA) e RECUSADO', decidir(p).ok, false);
+conf('e o motivo diz SKIPPED', motivo(p, 'portao-navegador esta SKIPPED'), true);
+p = semCheckInteiro(); p.comments[0].body = 'Portão inteiro abc1234def5678: TUDO PASSOU';
+conf('comentario "Portão inteiro ... TUDO PASSOU" nao substitui o check (ausente)', motivo(p, 'falta o portao inteiro'), true);
+p = prBom(); p.statusCheckRollup[2].conclusion = 'SKIPPED';
+conf('comentario "Portão inteiro ... TUDO PASSOU" nao substitui o check (pulado)', motivo(p, 'falta o portao inteiro'), true);
+p = prBom(); p.statusCheckRollup[2].conclusion = 'NEUTRAL';
+conf('juncao neutra nao e verde', decidir(p).ok, false);
+p = prBom(); p.statusCheckRollup[2].conclusion = 'FAILURE';
+conf('juncao vermelha recusa', decidir(p).ok, false);
+conf('o PR com a juncao verde e a revisao passa', decidir(prBom()).ok, true);
+// Rodada pulada mais nova (evento de rotulo que o workflow ignora) nao
+// desbanca a rodada que terminou verde no mesmo commit...
+p = prBom(); p.statusCheckRollup.push({ __typename: 'CheckRun', name: 'portao-navegador', status: 'COMPLETED', conclusion: 'SKIPPED', startedAt: '2026-10-26T12:20:00Z' });
+conf('pulada mais nova nao desbanca a juncao verde do mesmo commit', decidir(p).ok, true);
+// ...mas nao faz o contrario: pulada mais nova que uma VERMELHA nao a apaga,
+p = prBom(); p.statusCheckRollup[2].conclusion = 'FAILURE';
+p.statusCheckRollup.push({ __typename: 'CheckRun', name: 'portao-navegador', status: 'COMPLETED', conclusion: 'SKIPPED', startedAt: '2026-10-26T12:20:00Z' });
+conf('pulada mais nova nao apaga a juncao vermelha', motivo(p, 'portao-navegador esta FAILURE'), true);
+// e a verde mais nova vence a pulada mais velha.
+p = prBom(); p.statusCheckRollup[2].conclusion = 'SKIPPED'; p.statusCheckRollup[2].startedAt = '2026-10-26T12:00:30Z';
+p.statusCheckRollup.push({ __typename: 'CheckRun', name: 'portao-navegador', status: 'COMPLETED', conclusion: 'SUCCESS', startedAt: '2026-10-26T12:30:00Z' });
+conf('verde mais nova vence a pulada mais velha', decidir(p).ok, true);
+// So pulada, em todas as rodadas: continua pulada, e recusa.
+p = prBom(); p.statusCheckRollup[2].conclusion = 'SKIPPED';
+p.statusCheckRollup.push({ __typename: 'CheckRun', name: 'portao-navegador', status: 'COMPLETED', conclusion: 'SKIPPED', startedAt: '2026-10-26T12:20:00Z' });
+conf('so rodadas puladas continuam recusando', decidir(p).ok, false);
+// O portao em fatias (A4b, PR #80): uma fatia vermelha recusa, mesmo com a
+// juncao verde por engano.
+p = prBom();
 p.statusCheckRollup.push({ __typename: 'CheckRun', name: 'portao-navegador (fatia 2 de 4)', status: 'COMPLETED', conclusion: 'FAILURE', startedAt: '2026-10-26T12:02:00Z' });
 conf('uma fatia vermelha recusa', motivo(p, 'portao-navegador (fatia 2 de 4)'), true);
-// e a juncao PULADA (o job que junta nao rodou) nao e portao verde.
-p = prBom(); p.comments = p.comments.filter(c => !/Port/.test(c.body));
-p.statusCheckRollup[2].conclusion = 'SKIPPED';
-conf('juncao pulada, sem o comentario, recusa', motivo(p, 'falta o portao inteiro'), true);
+// O check do nivel 1 (provas mapeadas) pulado ou ausente nao atrapalha: quem
+// vale e o juntador da bateria inteira.
+p = prBom(); p.statusCheckRollup.push({ __typename: 'CheckRun', name: 'portao-tocadas', status: 'COMPLETED', conclusion: 'SKIPPED', startedAt: '2026-10-26T12:02:00Z' });
+conf('o check do nivel 1 pulado nao recusa', decidir(p).ok, true);
+p = prBom(); p.statusCheckRollup.push({ __typename: 'CheckRun', name: 'portao-tocadas', status: 'COMPLETED', conclusion: 'FAILURE', startedAt: '2026-10-26T12:02:00Z' });
+conf('o check do nivel 1 vermelho recusa', motivo(p, 'portao-tocadas esta FAILURE'), true);
 
 p = prBom(); p.comments = p.comments.filter(c => !/Revis/.test(c.body));
 conf('sem revisao recusa', motivo(p, 'falta revisao adversarial'), true);
@@ -130,8 +151,6 @@ p = prBom(); p.comments[1].authorAssociation = 'CONTRIBUTOR';
 conf('revisao de quem so contribuiu um dia recusa', motivo(p, 'falta revisao adversarial'), true);
 p = prBom(); delete p.comments[1].authorAssociation;
 conf('revisao sem o campo de autor recusa', motivo(p, 'falta revisao adversarial'), true);
-p = prBom(); p.comments[0].authorAssociation = 'NONE';
-conf('portao inteiro comentado por conta de fora recusa', motivo(p, 'falta o portao inteiro'), true);
 p = prBom(); p.comments[1].authorAssociation = 'COLLABORATOR';
 conf('revisao de colaborador vale', decidir(p).ok, true);
 // O veredito e a ULTIMA linha nao vazia, e uma reprova no corpo nao se desfaz.
@@ -170,18 +189,37 @@ fs.writeFileSync(falso,
   "} else if (a[0] === 'pr' && a[1] === 'view') process.stdout.write(fs.readFileSync(process.env.FALSO_PR, 'utf8'));\n" +
   "else if (a[0] === 'pr' && a[1] === 'merge') process.stdout.write('merged\\n');\n" +
   "else { process.stderr.write('chamada inesperada'); process.exit(3); }\n");
+// O git FALSO (GIT=<arquivo .js>): o fetch ok ou com erro, e o show devolve o
+// arquivo que a prova diz ser o da main. Caminho absoluto, sem rede.
+const gitFalso = path.join(tmp, 'git_falso.js');
+const logGit = path.join(tmp, 'git_chamadas.txt');
+fs.writeFileSync(gitFalso,
+  "const fs = require('fs');\n" +
+  "const a = process.argv.slice(2);\n" +
+  "fs.appendFileSync(process.env.FALSO_GIT_LOG, a.join(' ') + '\\n');\n" +
+  "if (a[0] === 'fetch') {\n" +
+  "  if (process.env.FALSO_FETCH === 'erro') { process.stderr.write('fatal: unable to access origin'); process.exit(128); }\n" +
+  "} else if (a[0] === 'show' && a[1] === 'origin/main:_teste/merge_seguro.js') {\n" +
+  "  if (process.env.FALSO_SHOW === 'erro') { process.stderr.write('fatal: path not in origin/main'); process.exit(128); }\n" +
+  "  process.stdout.write(fs.readFileSync(process.env.FALSO_MAIN, 'utf8'));\n" +
+  "} else { process.stderr.write('git: chamada inesperada'); process.exit(3); }\n");
 const script = path.join(__dirname, 'merge_seguro.js');
-function rodar(pr, extra, behind, scriptAlvo) {
+function rodar(pr, extra, behind, scriptAlvo, git) {
+  git = git || {};
   fs.writeFileSync(json, JSON.stringify(pr));
   fs.writeFileSync(log, '');
+  fs.writeFileSync(logGit, '');
   let codigo = 0, saida = '';
   try {
     saida = execFileSync(process.execPath, [scriptAlvo || script, '9'].concat(extra || []), {
       encoding: 'utf8',
-      env: Object.assign({}, process.env, { GH: falso, FALSO_LOG: log, FALSO_PR: json, FALSO_BEHIND: String(behind === undefined ? 0 : behind) })
+      env: Object.assign({}, process.env, { GH: falso, FALSO_LOG: log, FALSO_PR: json, FALSO_BEHIND: String(behind === undefined ? 0 : behind),
+        GIT: gitFalso, FALSO_GIT_LOG: logGit, FALSO_MAIN: git.main || scriptAlvo || script,
+        FALSO_FETCH: git.fetch || '', FALSO_SHOW: git.show || '' })
     });
   } catch (e) { codigo = e.status; saida = String(e.stdout || ''); }
-  return { codigo, saida, chamadas: fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean) };
+  return { codigo, saida, chamadas: fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean),
+    chamadasGit: fs.readFileSync(logGit, 'utf8').trim().split('\n').filter(Boolean) };
 }
 let r = rodar(prBom());
 conf('aprovado sai 0', r.codigo, 0);
@@ -193,6 +231,17 @@ r = rodar(p);
 conf('recusado sai 1', r.codigo, 1);
 conf('e NAO chama o merge', r.chamadas.some(c => /^pr merge/.test(c)), false);
 conf('e diz por que', /falta revisao adversarial/.test(r.saida), true);
+// Ponta a ponta, o caso da politica de checkpoint: PR sem a bateria inteira
+// (juncao pulada, ou ausente) e RECUSADO e o merge nao e chamado.
+['SKIPPED', 'AUSENTE'].forEach(estadoJuncao => {
+  p = prBom();
+  if (estadoJuncao === 'AUSENTE') p.statusCheckRollup = p.statusCheckRollup.filter(c => c.name !== 'portao-navegador');
+  else p.statusCheckRollup[2].conclusion = 'SKIPPED';
+  r = rodar(p);
+  conf('PR com a juncao ' + estadoJuncao + ' sai 1', r.codigo, 1);
+  conf('PR com a juncao ' + estadoJuncao + ' NAO chama o merge', r.chamadas.some(c => /^pr merge/.test(c)), false);
+  conf('PR com a juncao ' + estadoJuncao + ': a saida e RECUSADO e cita o portao inteiro', /RECUSADO/.test(r.saida) && /falta o portao inteiro/.test(r.saida), true);
+});
 r = rodar(prBom(), ['--conferir']);
 conf('--conferir aprovado sai 0', r.codigo, 0);
 conf('--conferir nunca chama o merge', r.chamadas.some(c => /^pr merge/.test(c)), false);
@@ -211,6 +260,23 @@ r = rodar(prBom(), [], 'erro');
 conf('API que falha recusa, sai 1', r.codigo, 1);
 conf('mostra a mensagem do erro', /HTTP 403: sem permissao/.test(r.saida), true);
 conf('API que falha NAO chama o merge', r.chamadas.some(c => /^pr merge/.test(c)), false);
+// Sem o rótulo risco (PR de tela, prova ou CI): atrás da main passa e nem mede.
+function semRisco() { const q = prBom(); q.labels = [{ name: 'navegador' }]; return q; }
+r = rodar(semRisco(), [], 3);
+conf('sem risco, 3 atras passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge 9 /.test(c)).length === 1, true);
+conf('sem risco nem chama o compare', r.chamadas.some(c => /^api/.test(c)), false);
+conf('sem risco avisa que nao conferiu', /sem o rótulo risco: não confiro se está atrás da main/.test(r.saida), true);
+r = rodar(semRisco(), [], 'erro');
+conf('sem risco, API quebrada nao importa: passa', r.codigo, 0);
+p = semRisco(); delete p.labels;
+r = rodar(p, ['--conferir'], 3);
+conf('sem campo labels conta como sem risco', r.codigo, 0);
+p = prBom(); p.labels = [{ name: 'RISCO' }];
+r = rodar(p, [], 3);
+conf('rotulo RISCO em maiuscula tambem recusa atras', r.codigo, 1);
+p = prBom(); p.labels = [{ name: 'risco-baixo' }];
+r = rodar(p, [], 3);
+conf('rotulo parecido (risco-baixo) NAO e risco: passa', r.codigo, 0);
 // A checagem vem depois das outras: PR recusado por outro motivo nem chama o compare.
 p = prBom(); p.comments = [];
 r = rodar(p, [], 3);
@@ -224,6 +290,54 @@ const semBloco = path.join(tmp, 'merge_seguro_sem_atras.js');
 fs.writeFileSync(semBloco, sem);
 r = rodar(prBom(), [], 3, semBloco);
 conf('controle: sem a checagem, o caso ATRAS passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge/.test(c)).length === 1, true);
+// Controle do rótulo: com ehRisco sempre falso, o PR de risco atrás passaria.
+const semRotulo = fonte.replace(/function ehRisco\(pr\) \{\r?\n  return /, 'function ehRisco(pr) {\n  return false && ');
+conf('controle: achei o ehRisco para envenenar', semRotulo !== fonte, true);
+const arqSemRotulo = path.join(tmp, 'merge_seguro_sem_rotulo.js');
+fs.writeFileSync(arqSemRotulo, semRotulo);
+r = rodar(prBom(), [], 3, arqSemRotulo);
+conf('controle: ignorando o rotulo, o risco ATRAS passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge/.test(c)).length === 1, true);
+
+console.log('\n=== 4. O merge_seguro e o da main? (cópia velha recusa) ===');
+r = rodar(prBom(), ['--conferir']);
+conf('cópia igual à da main passa para as checagens seguintes', r.codigo === 0 && /^ok /m.test(r.saida), true);
+conf('fez o fetch da origin main e o show do arquivo', r.chamadasGit.join('|'), 'fetch origin main|show origin/main:_teste/merge_seguro.js');
+// Fim de linha: a main em CRLF e a cópia em LF (e o inverso) são o mesmo conteúdo.
+const principalMain = path.join(tmp, 'main_crlf.js');
+fs.writeFileSync(principalMain, fonte.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n'));
+r = rodar(prBom(), ['--conferir'], 0, undefined, { main: principalMain });
+conf('só o fim de linha diferente (CRLF x LF) passa', r.codigo, 0);
+// A cópia de antes do #137: sem o bloco BEHIND. Aqui, com a checagem de versão
+// (a que a main passa a ter), mas desatualizada em relação à main.
+const FRASE = 'este merge_seguro não é o da main atualizada: rode-o de uma pasta com a main em dia (git pull) e tente de novo';
+const velha = path.join(tmp, 'merge_seguro.js');
+fs.writeFileSync(velha, sem.replace(/\r\n/g, '\n').replace("const GIT = ", "const GIT = /* copia antiga */ "));
+// A velha precisa achar os módulos como a main: __dirname é a tmp, sem dependências.
+r = rodar(prBom(), ['--conferir'], 0, velha, { main: script });
+conf('cópia DIFERENTE da main recusa, sai 1', r.codigo, 1);
+conf('com a frase da regra', r.saida.indexOf(FRASE) >= 0, true);
+conf('e sem dizer ok', /^ok /m.test(r.saida), false);
+r = rodar(prBom(), [], 0, velha, { main: script });
+conf('cópia diferente recusa também sem --conferir e NAO chama o merge', r.codigo === 1 && !r.chamadas.some(c => /^pr merge/.test(c)), true);
+r = rodar(prBom(), ['--conferir'], 0, script, { fetch: 'erro' });
+conf('fetch que falha recusa, sai 1', r.codigo, 1);
+conf('mostra o erro do fetch', /unable to access origin/.test(r.saida), true);
+conf('fetch que falha não vira ok', /^ok /m.test(r.saida), false);
+r = rodar(prBom(), ['--conferir'], 0, script, { show: 'erro' });
+conf('git show que falha recusa, sai 1', r.codigo, 1);
+conf('mostra o erro do show', /path not in origin\/main/.test(r.saida), true);
+// O CASO REAL: cópia velha, PR atrasado 9 commits por merge de outro PR.
+r = rodar(prBom(), ['--conferir'], 9, velha, { main: script });
+conf('CASO REAL: cópia velha + PR 9 atrás recusa, sai 1', r.codigo, 1);
+conf('CASO REAL: a recusa é a da versão, na primeira checagem', r.saida.indexOf(FRASE) >= 0, true);
+conf('CASO REAL: nunca diz ok nem "cumpre o processo"', /^ok |cumpre o processo/m.test(r.saida), false);
+conf('CASO REAL: nem chegou a ler o PR no gh', r.chamadas.length, 0);
+// Controle: a mesma cópia velha, se a checagem de versão não existisse, diria ok.
+const semVersao = path.join(tmp, 'sem_versao', 'merge_seguro.js');
+fs.mkdirSync(path.dirname(semVersao));
+fs.writeFileSync(semVersao, sem.replace("  const velho = conferirVersao();", "  const velho = null;"));
+r = rodar(prBom(), ['--conferir'], 9, semVersao, { main: script });
+conf('controle: sem a checagem de versão e sem BEHIND, o PR 9 atrás diz ok', r.codigo === 0 && /^ok /m.test(r.saida), true);
 
 fs.rmSync(tmp, { recursive: true, force: true });
 
