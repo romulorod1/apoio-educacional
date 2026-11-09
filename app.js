@@ -15134,44 +15134,60 @@
     })));
   }
 
-  function importarBiblioteca(ev) {
-    var arquivo = ev.target.files && ev.target.files[0];
-    ev.target.value = '';
-    if (!arquivo) return;
-    if (typeof Zip === 'undefined' || !Zip.suportado()) {
-      mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa({ recusa: true, tipo: 'navegador' }));
-      return;
+  /* O nome que a tela dá ao pacote: o do manifest, quando ele diz, e senão o
+   * do arquivo. Só texto; nada daqui grava. */
+  function nomeDoPacote(manifest, arquivo) {
+    var doArquivo = String((arquivo && arquivo.name) || 'pacote').replace(/\.zip$/i, '');
+    if (!manifest || typeof manifest !== 'object') return doArquivo;
+    if (typeof manifest.titulo === 'string' && manifest.titulo.trim()) return manifest.titulo.trim();
+    if (typeof manifest.nome === 'string' && manifest.nome.trim()) return manifest.nome.trim();
+    if (manifest.conteudo !== 'livros') {
+      try {
+        var t = Biblioteca.resumo(manifest)[0];
+        if (t && t !== 'Pacote da biblioteca') return t;
+      } catch (e) { /* o nome do arquivo serve */ }
     }
-    var botao = $('#importar-biblioteca');
-    if (botao) botao.disabled = true;
-    mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...']);
+    return doArquivo;
+  }
+
+  /* Um pacote, do arquivo ao banco. É a unidade que o seletor chama uma vez
+   * (um arquivo) ou em série (vários). NUNCA rejeita: devolve sempre
+   *   { estado: 'entrou' | 'pulou' | 'falhou', classe, linhas, ... }
+   * onde `classe` e `linhas` são o que a tela mostra quando o pacote vem
+   * sozinho (as frases de sempre). Nada é gravado antes de o pacote inteiro ser
+   * conferido, e a gravação é uma transação só: uma falha aqui deixa o tablet
+   * como estava. `ctx.nome` recebe o nome do manifest assim que ele é lido, e
+   * `andamento(linhas)` mostra o que está acontecendo. */
+  function importarUmPacote(arquivo, ctx, andamento) {
     var aberto = null;
+    var saidaLivros = null;
+    andamento(['Conferindo o pacote ' + arquivo.name + '...']);
     /* O pacote de livros (C15.1) NUNCA é lido inteiro: a espiada lê só o
      * diretório do zip e o manifest, e os livros vêm um por vez, direto do
      * arquivo (Biblioteca.abrirLivrosDoArquivo). O de exercícios segue como
      * sempre, inteiro, porque são milhares de SVG pequenos. */
-    Biblioteca.espiarPacote(arquivo).then(function (espiado) {
+    return Biblioteca.espiarPacote(arquivo).then(function (espiado) {
+      if (espiado) ctx.nome = nomeDoPacote(espiado.manifest, arquivo);
       if (espiado && espiado.manifest.conteudo === 'livros') {
         return Biblioteca.abrirLivrosDoArquivo(espiado, function (feitos, total) {
-          mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...',
-            feitos + ' de ' + total + ' livros conferidos.']);
+          andamento(['Conferindo o pacote ' + arquivo.name + '...', feitos + ' de ' + total + ' livros conferidos.']);
         });
       }
       return arquivo.arrayBuffer().then(function (conteudo) {
         return Biblioteca.abrirPacote(conteudo, function (feitos, total) {
           if (feitos % 50 === 0 || feitos === total) {
-            mostrarEstadoImportacao('faixa-info', ['Conferindo o pacote ' + arquivo.name + '...',
-              feitos + ' de ' + total + ' arquivos conferidos.']);
+            andamento(['Conferindo o pacote ' + arquivo.name + '...', feitos + ' de ' + total + ' arquivos conferidos.']);
           }
         });
       });
     }).then(function (a) {
       aberto = a;
+      ctx.nome = nomeDoPacote(a.manifest, arquivo);
       /* Pacote de livros (C15.1): outro depósito e outra conta (livro a
        * livro, store.gravarLivros). Sai daqui pelo catch, com a marca
        * LIVROS_IMPORTADOS, para não passar pelos passos dos exercícios. */
       if (a.livros) {
-        return importarLivros(a).then(function () { throw LIVROS_IMPORTADOS; });
+        return importarLivros(a, andamento).then(function (r) { saidaLivros = r; throw LIVROS_IMPORTADOS; });
       }
       return Promise.all([Store.itensDaBiblioteca(), Store.teoriaDaBiblioteca()]);
     }).then(function (r) {
@@ -15213,28 +15229,153 @@
       }
       return Store.tornarPersistente();
     }).then(function () {
-      mostrarEstadoImportacao('faixa-info', ['Gravando a biblioteca no tablet...']);
+      andamento(['Gravando a biblioteca no tablet...']);
       return Store.gravarPacoteBiblioteca(aberto);
     }).then(function (registro) {
-      temPacoteBiblioteca = true;
-      mostrarEstadoImportacao('faixa-info',
-        ['Biblioteca importada.'].concat(Biblioteca.resumo(registro.manifest, registro.bytes)));
-      desenharPacotesBiblioteca();
-      bibliotecaMudou();
+      return {
+        estado: 'entrou', exercicios: true, classe: 'faixa-info',
+        linhas: ['Biblioteca importada.'].concat(Biblioteca.resumo(registro.manifest, registro.bytes))
+      };
     }).catch(function (e) {
-      if (e === LIVROS_IMPORTADOS) return;
+      if (e === LIVROS_IMPORTADOS) return saidaLivros;
       if (e && e.versaoAtual != null) {
         var nova = aberto.manifest.versao;
-        mostrarEstadoImportacao('faixa-aviso', [e.versaoAtual === nova
-          ? 'Esta versão do pacote já está no tablet. Nada foi mudado.'
-          : 'O tablet já tem a versão ' + e.versaoAtual + ' deste pacote, mais nova que a do arquivo (versão ' +
-            nova + '). Nada foi mudado.']);
-        return;
+        var igual = e.versaoAtual === nova;
+        return {
+          estado: 'pulou', motivo: igual ? 'ja-estava' : 'mais-nova', versaoAtual: e.versaoAtual, versaoNova: nova,
+          classe: 'faixa-aviso',
+          linhas: [igual
+            ? 'Esta versão do pacote já está no tablet. Nada foi mudado.'
+            : 'O tablet já tem a versão ' + e.versaoAtual + ' deste pacote, mais nova que a do arquivo (versão ' +
+              nova + '). Nada foi mudado.']
+        };
       }
-      mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa(e));
-    }).then(function () {
-      if (botao) botao.disabled = false;
+      var linhas = linhasDaRecusa(e);
+      return { estado: 'falhou', classe: 'faixa-aviso', linhas: linhas, porque: porqueDaRecusa(linhas) };
     });
+  }
+
+  /* Do que a tela diz para um pacote que não entrou, a parte que vale numa
+   * lista: o que ela pode fazer, e o detalhe em letra pequena. Sem a frase de
+   * abertura nem a de "o que já estava continua igual", que o resumo diz uma
+   * vez só. */
+  function porqueDaRecusa(linhas) {
+    var texto = [], detalhe = '';
+    linhas.slice(1).forEach(function (l) {
+      if (l && l.detalhe) detalhe = l.detalhe;
+      else if (typeof l === 'string' && l !== 'O que já estava no tablet continua igual.') texto.push(l);
+    });
+    return { texto: texto.join(' '), detalhe: detalhe };
+  }
+
+  function pausaCurta() { return new Promise(function (resolve) { setTimeout(resolve, 0); }); }
+
+  function importarBiblioteca(ev) {
+    /* Copia a lista antes de limpar o seletor: limpar esvazia a FileList. Os
+     * File são só referências para o disco; nenhum é lido aqui. */
+    var arquivos = Array.prototype.slice.call(ev.target.files || []);
+    ev.target.value = '';
+    if (!arquivos.length) return;
+    if (typeof Zip === 'undefined' || !Zip.suportado()) {
+      mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa({ recusa: true, tipo: 'navegador' }));
+      return;
+    }
+    var botao = $('#importar-biblioteca');
+    if (botao) botao.disabled = true;
+    var terminou = arquivos.length === 1 ? importarUmArquivoSozinho(arquivos[0]) : importarEmSerie(arquivos);
+    // o botão volta mesmo se algo inesperado derrubar a série: ela nunca fica sem poder tentar de novo
+    var libera = function () { if (botao) botao.disabled = false; };
+    terminou.then(libera, libera);
+  }
+
+  /* Um arquivo só: igual a antes de existir a seleção múltipla. */
+  function importarUmArquivoSozinho(arquivo) {
+    return importarUmPacote(arquivo, { nome: nomeDoPacote(null, arquivo) }, function (linhas) {
+      mostrarEstadoImportacao('faixa-info', linhas);
+    }).then(function (r) {
+      mostrarEstadoImportacao(r.classe, r.linhas);
+      if (r.exercicios) {
+        temPacoteBiblioteca = true;
+        desenharPacotesBiblioteca();
+        bibliotecaMudou();
+      }
+    });
+  }
+
+  /* Vários arquivos: UM PACOTE POR VEZ, na ordem em que ela escolheu. O
+   * próximo só começa depois que o anterior foi gravado e solto: nenhum File é
+   * lido antes da sua vez, e do resultado de cada pacote fica só o texto do
+   * resumo, nunca o pacote. Uma falha vira linha do resumo, e a série segue. */
+  function importarEmSerie(arquivos) {
+    var total = arquivos.length, resultados = [], i = 0;
+    function proximo() {
+      if (i >= total) return Promise.resolve();
+      var arquivo = arquivos[i++], n = i;
+      var ctx = { nome: nomeDoPacote(null, arquivo) };
+      return importarUmPacote(arquivo, ctx, function (linhas) {
+        mostrarEstadoImportacao('faixa-info', ['Importando ' + n + ' de ' + total + ': ' + ctx.nome].concat(linhas));
+        var caixa = $('#estado-importacao-biblioteca');
+        if (caixa) caixa.setAttribute('data-progresso', n + '/' + total);
+      }).then(function (r) {
+        resultados.push({ nome: ctx.nome, arquivo: arquivo.name, estado: r.estado, motivo: r.motivo,
+          versaoAtual: r.versaoAtual, versaoNova: r.versaoNova, porque: r.porque || null, exercicios: !!r.exercicios });
+        return pausaCurta().then(proximo);
+      });
+    }
+    return proximo().then(function () {
+      if (resultados.some(function (r) { return r.exercicios && r.estado === 'entrou'; })) {
+        temPacoteBiblioteca = true;
+        desenharPacotesBiblioteca();
+        bibliotecaMudou();
+      }
+      mostrarResumoDaSerie(resultados);
+    });
+  }
+
+  /* O resumo: uma folha na própria tela de Ajustes, com o que entrou, o que
+   * ficou como estava e o que não entrou (e por quê), e o botão que a fecha. */
+  function mostrarResumoDaSerie(resultados) {
+    var caixa = $('#estado-importacao-biblioteca');
+    if (!caixa) return;
+    var entraram = resultados.filter(function (r) { return r.estado === 'entrou'; }).length;
+    var pularam = resultados.filter(function (r) { return r.estado === 'pulou'; }).length;
+    var falharam = resultados.filter(function (r) { return r.estado === 'falhou'; }).length;
+    var partes = [];
+    if (entraram) partes.push(entraram === 1 ? '1 entrou' : entraram + ' entraram');
+    if (pularam) partes.push(pularam === 1 ? '1 ficou como estava' : pularam + ' ficaram como estavam');
+    if (falharam) partes.push(falharam === 1 ? '1 não entrou' : falharam + ' não entraram');
+    var sinal = { entrou: ['✓', 'Entrou'], pulou: ['↺', 'Ficou como estava'], falhou: ['✕', 'Não entrou'] };
+    var linhas = resultados.map(function (r) {
+      var motivo = '', detalhe = '';
+      if (r.estado === 'pulou') {
+        motivo = r.motivo === 'ja-estava' ? 'já estava no tablet.'
+          : r.motivo === 'mais-nova' ? 'o tablet já tem uma versão mais nova (versão ' + r.versaoAtual + ', e o arquivo é a ' + r.versaoNova + ').'
+          : r.motivo === 'livros-mais-novos' ? 'o tablet já tem livros mais novos, e eles ficaram como estavam.'
+          : 'os livros já vieram de outro pacote e ficaram como estavam.';
+      } else if (r.estado === 'falhou' && r.porque) {
+        motivo = r.porque.texto;
+        detalhe = r.porque.detalhe;
+      }
+      return el('li', { class: 'resumo-importacao-linha', 'data-estado': r.estado, 'data-arquivo': r.arquivo }, [
+        el('span', { class: 'resumo-importacao-sinal', role: 'img', 'aria-label': sinal[r.estado][1], texto: sinal[r.estado][0] }),
+        el('span', { class: 'resumo-importacao-texto' }, [
+          el('span', { class: 'u-peso-seminegrito', texto: r.nome }),
+          motivo ? el('span', { texto: ': ' + motivo }) : null,
+          detalhe ? el('span', { class: 'u-letra-2 u-opacidade-75 resumo-importacao-detalhe', texto: detalhe }) : null
+        ])
+      ]);
+    });
+    caixa.innerHTML = '';
+    caixa.removeAttribute('data-progresso');
+    caixa.appendChild(el('div', { class: (falharam ? 'faixa-aviso' : 'faixa-info') + ' u-margem-baixo-10', id: 'resumo-importacao-biblioteca' }, [
+      el('div', { class: 'u-peso-seminegrito', texto: 'Importação terminada: ' + partes.join(', ') + '.' }),
+      falharam ? el('div', { texto: 'O que já estava no tablet continua igual.' }) : null,
+      el('ul', { class: 'resumo-importacao-lista' }, linhas),
+      el('div', { class: 'barra u-margem-8-0-0' }, [
+        el('button', { type: 'button', class: 'btn pequeno', id: 'fechar-resumo-importacao', texto: 'Fechar',
+          aoClick: function () { caixa.innerHTML = ''; } })
+      ])
+    ]));
   }
 
   /* O que a tela diz quando o pacote não entra: o que aconteceu, o que ela
@@ -15413,7 +15554,7 @@
     });
   }
 
-  function importarLivros(aberto) {
+  function importarLivros(aberto, andamento) {
     return Store.estimarEspaco().then(function (espaco) {
       // os livros vão como estão: a folga de 10% cobre o registro de cada um
       if (espaco && espaco.quota) {
@@ -15429,12 +15570,18 @@
       }
       return Store.tornarPersistente();
     }).then(function () {
-      mostrarEstadoImportacao('faixa-info', ['Gravando os livros no tablet...']);
+      andamento(['Gravando os livros no tablet...']);
       return Store.gravarLivros(aberto);
     }).then(function (contas) {
-      mostrarEstadoImportacao('faixa-info', ['Livros importados.'].concat(Biblioteca.resumoDeLivros(contas),
-        ['Para ler, abra a aba Biblioteca e toque em Livros.']));
-      return desenharLivrosAjustes();
+      var linhas = ['Livros importados.'].concat(Biblioteca.resumoDeLivros(contas),
+        ['Para ler, abra a aba Biblioteca e toque em Livros.']);
+      var entrou = contas.novos + contas.atualizados > 0;
+      return Promise.resolve(desenharLivrosAjustes()).then(function () {
+        return {
+          estado: entrou ? 'entrou' : 'pulou', classe: 'faixa-info', linhas: linhas,
+          motivo: entrou ? null : contas.iguais ? 'ja-estava' : contas.maisNovos ? 'livros-mais-novos' : 'outro-pacote'
+        };
+      });
     });
   }
 

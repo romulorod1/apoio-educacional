@@ -431,6 +431,10 @@ roda "atualizacao --rede-lenta"                 node "_teste/testa_atualizacao_a
 roda "biblioteca importar"                      node "_teste/testa_biblioteca_importar.js"
 roda "biblioteca importar --envenenado-hash"    node "_teste/testa_biblioteca_importar.js" --envenenado-hash
 roda "biblioteca importar --envenenado-aviso-fica" node "_teste/testa_biblioteca_importar.js" --envenenado-aviso-fica
+roda "importar varios"                           node "_teste/testa_biblioteca_importar_varios.js"
+roda "importar varios --envenenado-para-na-falha"   node "_teste/testa_biblioteca_importar_varios.js" --envenenado-para-na-falha
+roda "importar varios --envenenado-reimporta-igual" node "_teste/testa_biblioteca_importar_varios.js" --envenenado-reimporta-igual
+roda "importar varios --envenenado-le-todos-antes"  node "_teste/testa_biblioteca_importar_varios.js" --envenenado-le-todos-antes
 # FRENTE B: a aba Biblioteca (sem pacote, "Em construcao"; com pacote, serie,
 # modulo, aula, miniaturas sob demanda, lista de 40 abaixo de 2 s, tela cheia,
 # busca "bhaskara" agrupada, abrir como folha). O modo envenenado serve um app.js
