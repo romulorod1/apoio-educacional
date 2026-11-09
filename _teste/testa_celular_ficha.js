@@ -599,16 +599,18 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
     ['+55 11 98765-4321', cel('11987654321')], ['11987654321', cel('11987654321')], ['avó 11 98765-4321', nada], ['11 3456-7890', fixo('1134567890')],
     ['5511987654321', nada], ['(11)98765-4321', cel('11987654321')], ['11 9 8765-4321', cel('11987654321')], ['(11) 9 8765-4321', cel('11987654321')],
     ['11 9.8765.4321', cel('11987654321')], ['apto 1203 9876-5432', nada], ['apto 12 98765-4321', nada], ['21 99876 5432', cel('21998765432')],
-    ['+5511987654321', cel('11987654321')], ['0 11 98765-4321', cel('11987654321')], ['casa 3 11 98765-4321', nada], ['(021) 98765-4321', cel('21987654321')]
+    ['+5511987654321', cel('11987654321')], ['0 11 98765-4321', cel('11987654321')], ['casa 3 11 98765-4321', nada], ['(021) 98765-4321', cel('21987654321')],
+    // revisão da 3cc25bd: o celular com um dígito a menos não passa como fixo
+    ['11 98765-432', nada], ['11 8765-4321', nada]
   ];
-  conf('(arranjo) a tabela tem os 28 casos dela', TABELA.length, 28);
+  conf('(arranjo) a tabela tem os 28 casos dela e os 2 da última revisão', TABELA.length, 30);
   const erradosCampo = TABELA.filter(([c, esp]) => links({ telefone: c }) !== esp).map(([c, esp]) => c + ' => ' + links({ telefone: c }) + ' (esperado ' + esp + ')');
   const erradosObs = TABELA.filter(([c]) => links({ obs: 'Contato: ' + c }) !== nada).map(([c]) => 'Contato: ' + c + ' => ' + links({ obs: 'Contato: ' + c }));
   console.log('   no campo: ' + TABELA.filter(x => x[1] !== nada).length + ' ligam (' + TABELA.filter(x => / -$/.test(x[1]) && x[1] !== nada).length + ' fixo), ' + TABELA.filter(x => x[1] === nada).length + ' sem link');
-  prop('no campo telefone, cada um dos 28 dá o link certo, só Ligar ou nenhum (' + (erradosCampo.join(' ; ') || 'todos certos') + ')', erradosCampo.length === 0, V_EXTRACAO);
-  prop('nas observações ("Contato: ..."), nenhum dos 28 vira link (' + (erradosObs.slice(0, 4).join(' ; ') || 'nenhum') + ')', erradosObs.length === 0, V_EXTRACAO);
+  prop('no campo telefone, cada um dos 30 dá o link certo, só Ligar ou nenhum (' + (erradosCampo.join(' ; ') || 'todos certos') + ')', erradosCampo.length === 0, V_EXTRACAO);
+  prop('nas observações ("Contato: ..."), nenhum dos 30 vira link (' + (erradosObs.slice(0, 4).join(' ; ') || 'nenhum') + ')', erradosObs.length === 0, V_EXTRACAO);
   if (MODO === V_EXTRACAO) fimDoVeneno();
-  conf('ao salvar, o campo que não é um telefone com DDD é recusado (a mesma regra): ' + TABELA.filter(([c]) => !F.telefoneValidado(c)).length + ' dos 28',
+  conf('ao salvar, o campo que não é um telefone com DDD é recusado (a mesma regra): ' + TABELA.filter(([c]) => !F.telefoneValidado(c)).length + ' dos 30',
     TABELA.filter(([c, esp]) => !F.telefoneValidado(c) !== (esp === nada)).length, 0);
 
   secao('7. O cadastro do celular com os campos opcionais, e eles chegam ao tablet pela fila');

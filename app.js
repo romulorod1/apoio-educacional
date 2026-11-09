@@ -22859,7 +22859,10 @@
     var t = String(texto || '').trim().replace(/[\s().-]/g, '');
     if (/^\+55/.test(t)) t = t.slice(3);
     if (/^0/.test(t)) t = t.slice(1);
-    return /^[1-9][1-9]\d{8,9}$/.test(t) ? t : '';
+    /* Celular: DDD mais 9 e oito dígitos. Fixo: DDD mais um dígito de 2 a 5 e
+     * sete. Um celular digitado com um dígito a menos ("11 98765-432") não
+     * passa como fixo. */
+    return /^[1-9][1-9](9\d{8}|[2-5]\d{7})$/.test(t) ? t : '';
   }
   var FRASE_TELEFONE_INVALIDO = 'Escreva o telefone com DDD, por exemplo (11) 98765-4321';
   /* O telefone que liga: o do campo, se ele passa na regra. As observações
