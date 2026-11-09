@@ -1571,6 +1571,12 @@
     }, function () {
       limparEstadoDasFolhas(t);
       var saida = (desligada && !opcoes.restauro) ? null : t.objectStore('saida');
+      /* A fila de folhas recomeça pela cópia: as entradas de antes (inclusive a
+       * página grande na quarentena, que a cópia pode não ter) saem por faixa
+       * ANTES de qualquer put; as páginas da cópia e as lápides do que este
+       * aparelho conhecia na nuvem voltam abaixo. O prefixo 'folha:' não pega
+       * 'folha-anterior:' (o '-' vem antes do ':'). */
+      if (saida) saida.delete(IDBKeyRange.bound(PREFIXO_FOLHA, PREFIXO_FOLHA + '\uffff'));
       var aulas = {};
       Object.keys(notas || {}).forEach(function (id) { aulas[id] = true; });
       Object.keys(antigos).forEach(function (id) { aulas[id] = true; });

@@ -848,6 +848,8 @@ roda "nuvem folhas --envenenado-precondicao-prende" node "_teste/testa_nuvem_fol
 roda "nuvem folhas --envenenado-apaga-estado-no-apagar-tudo" node "_teste/testa_nuvem_folhas.js" --envenenado-apaga-estado-no-apagar-tudo
 roda "nuvem folhas --envenenado-pagina-grande-tenta" node "_teste/testa_nuvem_folhas.js" --envenenado-pagina-grande-tenta
 roda "nuvem folhas --envenenado-sem-reconciliar"    node "_teste/testa_nuvem_folhas.js" --envenenado-sem-reconciliar
+# (lente B, 2a rodada) a pagina grande na quarentena que a copia restaurada nao tem sai da fila
+roda "nuvem folhas --envenenado-quarentena-sobrevive-ao-restauro" node "_teste/testa_nuvem_folhas.js" --envenenado-quarentena-sobrevive-ao-restauro
 # (revisao do PR 118) o "Apagar tudo" zera a fila deste aparelho e o recebimento
 # em curso confere a marca dentro da transacao; o celular nao enfileira a lapide
 # da fusao; a restauracao enfileira tambem o que e igual a copia; a confirmacao

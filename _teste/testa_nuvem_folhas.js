@@ -75,7 +75,8 @@ const { conf, secao, pausa, esperar } = H;
  *   --envenenado-sem-reconciliar         a volta de versão não reconcilia. */
 const MODOS = ['--envenenado-sem-hash', '--envenenado-regrava-igual', '--envenenado-celular-edita-folha', '--envenenado-aplica-sem-conferir-hash',
   '--envenenado-lapide-orfa', '--envenenado-exclui-sem-lapide', '--envenenado-limpa-por-cursor', '--envenenado-restauro-sem-lapide',
-  '--envenenado-precondicao-prende', '--envenenado-apaga-estado-no-apagar-tudo', '--envenenado-pagina-grande-tenta', '--envenenado-sem-reconciliar'];
+  '--envenenado-precondicao-prende', '--envenenado-apaga-estado-no-apagar-tudo', '--envenenado-pagina-grande-tenta', '--envenenado-sem-reconciliar',
+  '--envenenado-quarentena-sobrevive-ao-restauro'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 function prop(rotulo, ok, veneno) {
   if (MODO && MODO === veneno) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
@@ -137,6 +138,7 @@ const ISOLA_PRECONDICAO = 'return subir(itens, recebimentos >= 2);';
 const APAGAR_TUDO_LAPIDA = 'lapidarEstadoDasFolhas(t, agora);';
 const PAGINA_GRANDE_MARCA = "if (e && e.codigo === 'PAGINA_GRANDE') return { grande: true, id: i.fila.id };";
 const RECONCILIA = 'Store.reconciliarFolhas().catch(function () { /* a próxima gravação da folha acerta */ });';
+const FILA_FOLHAS_RECOMECA = "if (saida) saida.delete(IDBKeyRange.bound(PREFIXO_FOLHA, PREFIXO_FOLHA + '\\uffff'));";
 conf('o descarte da lápide sem carimbo está num lugar só', NUVEM.split(LAPIDE_ORFA).length, 2);
 conf('a aula que vira lápide leva a folha, num lugar só (o escritor de diferença)', STORE.split(AULA_LEVA_FOLHA).length, 2);
 conf('o estado das folhas é apagado por faixa, num lugar só', STORE.split(LIMPA_POR_FAIXA).length, 2);
@@ -145,6 +147,7 @@ conf('a precondição esgotada isola a culpada, num lugar só', NUVEM.split(ISOL
 conf('o "Apagar tudo" lapida o estado das folhas na transação do documento', STORE.split(APAGAR_TUDO_LAPIDA).length, 2);
 conf('a página grande é marcada no lote, num lugar só', NUVEM.split(PAGINA_GRANDE_MARCA).length, 2);
 conf('a volta de versão reconcilia as folhas, num lugar só', APP.split(RECONCILIA).length, 2);
+conf('a restauração recomeça a fila de folhas por faixa, num lugar só', STORE.split(FILA_FOLHAS_RECOMECA).length, 2);
 if (MODO === MODOS[4]) trocas['/nuvem.js'] = NUVEM.replace(LAPIDE_ORFA, 'return false;');
 if (MODO === MODOS[5]) trocas['/store.js'] = STORE.replace(AULA_LEVA_FOLHA, 'if (false) ajustarFolhasDasAulas(t, [], [], agora, saida);');
 if (MODO === MODOS[6]) trocas['/store.js'] = STORE.replace(LIMPA_POR_FAIXA, 'varrerControle(t, PREFIXO_FOLHA, function (chave, valor, cursor) { cursor.delete(); });');
@@ -153,6 +156,7 @@ if (MODO === MODOS[8]) trocas['/nuvem.js'] = NUVEM.replace(ISOLA_PRECONDICAO, 'r
 if (MODO === MODOS[9]) trocas['/store.js'] = STORE.replace(APAGAR_TUDO_LAPIDA, 'limparEstadoDasFolhas(t);');
 if (MODO === MODOS[10]) trocas['/nuvem.js'] = NUVEM.replace(PAGINA_GRANDE_MARCA, 'if (false) return null;');
 if (MODO === MODOS[11]) trocas['/app.js'] = APP.replace(RECONCILIA, '');
+if (MODO === MODOS[12]) trocas['/store.js'] = STORE.replace(FILA_FOLHAS_RECOMECA, '');
 if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', (trocas['/store.js'] || STORE) !== STORE || (trocas['/nuvem.js'] || NUVEM) !== NUVEM || (trocas['/app.js'] || APP) !== APP, true);
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
@@ -804,6 +808,26 @@ function paginaSintetica() {
   conf('dividida em duas, as duas páginas sobem e a fila esvazia', e14c.erro === null && (await filaToda(pagA)).filter(e => e.tipo === 'folha').length === 0 && resumoDoc(await lerDoc(dona.idToken, dona.localId, 'folhas/folha:x4:1')) === 'apagadoEm=não bytes=sim', true);
   const limpou14 = await esperar('a frase da página grande saiu', () => pagA.evaluate(() => (Nuvem.estado().registros.erro || {}).codigo || null), v => v === null, 5000);
   conf('o erro PAGINA_GRANDE saiu quando a página saiu da quarentena', limpou14.ok, true);
+
+  secao('14b. A página grande na quarentena que a cópia restaurada não tem sai da fila (lente B do PR 133)');
+  await H.abrirApp(pagA, amb.ORIGEM);
+  await H.irParaAba(pagA, 'ajustes');
+  const copiaK14 = await enviarCopiaPelaTela(pagA);
+  conf('a cópia K14 (ainda sem a aula x5) subiu', !!copiaK14, true);
+  await editar(pagA, "d.aulas.push({ id: 'x5', alunoId: 'alfa', serieId: null, data: d.aulas[0].data, hora: '15:00', duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', anexos: [], temNota: true });");
+  await pagA.evaluate(async txt => { await Store.salvarNota('x5', { paginas: [{ fundo: 'pautado', itens: [{ t: 'texto', x: 10, y: 10, texto: txt, tam: 30, cor: '#1A1C1F' }] }] }); }, bruta);
+  await enviar(pagA, true);
+  const fila14b = (await filaToda(pagA)).filter(e => e.tipo === 'folha');
+  conf('antes de restaurar, a página grande de x5 está na quarentena', fila14b.some(e => e.id === 'folha:x5:0' && e.quarentena && e.motivo === 'PAGINA_GRANDE'), true);
+  conf('A restaurou K14', await restaurarPelaApi(pagA, dona.localId, copiaK14), copiaK14);
+  const fila14c = (await filaToda(pagA)).filter(e => e.tipo === 'folha');
+  console.log('   fila de folhas depois de restaurar K14: ' + JSON.stringify(fila14c));
+  prop('restaurada uma cópia sem x5, a página grande sai da fila e nenhuma quarentena de folha sobra', !fila14c.some(e => e.id.indexOf('folha:x5:') === 0) && !fila14c.some(e => e.quarentena), MODOS[12]);
+  if (MODO === MODOS[12]) throw fimDoVeneno();
+  const e14d = await enviarAteEsvaziar(pagA, 4);
+  conf('o envio seguinte esvazia a fila de folhas', e14d.erro === null && e14d.filaFolhas === 0, true);
+  const limpou14b = await esperar('o aviso de página grande saiu depois da restauração', () => pagA.evaluate(() => (Nuvem.estado().registros.erro || {}).codigo || null), v => v !== 'PAGINA_GRANDE', 8000);
+  conf('Ajustes não fala mais da página grande depois da restauração', limpou14b.ok, true);
 
   secao('15. A volta de uma versão anterior: a folha gravada solta é reconciliada com o estado e sobe');
   await editar(pagA, "d.ajustes.versaoVista = '1.42.18';");
