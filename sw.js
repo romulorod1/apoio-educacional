@@ -134,10 +134,10 @@
  * versão guardados no Store, para o app.js não perder o aviso que chega antes
  * dele (app.js e store.js), com a lista igual. Versão silenciosa. O v94 (D6c lote 4) traz os avisos no Hoje do celular
  * (app.js, core.js e styles.css), com a lista igual. O v95 (F4 do redesenho) traz os avisos do Hoje do celular
- * num sininho com painel (app.js e styles.css), com a lista igual. O v96 traz o celular sem transbordo: o aviso de versão em
+ * num sininho com painel (app.js e styles.css), com a lista igual. O v98 (importar vários pacotes) traz a importação em série e o resumo (app.js, index.html e styles.css), com a lista igual. O v100 traz o celular sem transbordo: o aviso de versão em
  * duas linhas, a barra de cima menor e a trava de transbordo (app.js e
  * styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v96';
+var CACHE = 'apoio-educacional-v100';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
