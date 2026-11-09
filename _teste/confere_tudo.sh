@@ -431,6 +431,11 @@ roda "atualizacao --rede-lenta"                 node "_teste/testa_atualizacao_a
 roda "biblioteca importar"                      node "_teste/testa_biblioteca_importar.js"
 roda "biblioteca importar --envenenado-hash"    node "_teste/testa_biblioteca_importar.js" --envenenado-hash
 roda "biblioteca importar --envenenado-aviso-fica" node "_teste/testa_biblioteca_importar.js" --envenenado-aviso-fica
+roda "importar varios"                           node "_teste/testa_biblioteca_importar_varios.js"
+roda "importar varios --envenenado-para-na-falha"   node "_teste/testa_biblioteca_importar_varios.js" --envenenado-para-na-falha
+roda "importar varios --envenenado-reimporta-igual" node "_teste/testa_biblioteca_importar_varios.js" --envenenado-reimporta-igual
+roda "importar varios --envenenado-le-todos-antes"  node "_teste/testa_biblioteca_importar_varios.js" --envenenado-le-todos-antes
+roda "importar varios --envenenado-livro-velho-volta" node "_teste/testa_biblioteca_importar_varios.js" --envenenado-livro-velho-volta
 # FRENTE B: a aba Biblioteca (sem pacote, "Em construcao"; com pacote, serie,
 # modulo, aula, miniaturas sob demanda, lista de 40 abaixo de 2 s, tela cheia,
 # busca "bhaskara" agrupada, abrir como folha). O modo envenenado serve um app.js
@@ -936,6 +941,24 @@ roda "celular avisos --envenenado-registrada-falta-registrar" node "_teste/testa
 roda "celular avisos --envenenado-lembrete-fora-da-janela" node "_teste/testa_celular_avisos.js" --envenenado-lembrete-fora-da-janela
 # (revisao do lote 4) cobrar e fechar o mes so no celular que e da dona, nunca pela falta de observador
 roda "celular avisos --envenenado-observador-sem-sessao" node "_teste/testa_celular_avisos.js" --envenenado-observador-sem-sessao
+# A mensagem do mes (o feedback do fechamento) editada no celular: o mesmo
+# campo do tablet (Core.textoDoMes e Core.gravarTextoDoMes), o texto salvo sai
+# no PDF do Enviar e do Ver, sobe pela fila e chega ao tablet; a edicao do
+# tablet chega com "Editado no tablet hoje as HH:MM"; nos dois lados vale a
+# ultima gravacao; o observador nao ve; o rascunho volta; junho de referencia
+# igual quando o texto nao muda. Um veneno para cada propriedade.
+roda "celular mensagem do mes"                      node "_teste/testa_celular_fechamento_texto.js"
+roda "celular mensagem --envenenado-texto-fora-do-pdf" node "_teste/testa_celular_fechamento_texto.js" --envenenado-texto-fora-do-pdf
+roda "celular mensagem --envenenado-texto-nao-sobe" node "_teste/testa_celular_fechamento_texto.js" --envenenado-texto-nao-sobe
+roda "celular mensagem --envenenado-observador-edita-texto" node "_teste/testa_celular_fechamento_texto.js" --envenenado-observador-edita-texto
+roda "celular mensagem --envenenado-vale-o-primeiro" node "_teste/testa_celular_fechamento_texto.js" --envenenado-vale-o-primeiro
+# (revisao) na mensagem do mes vence a escrita mais recente: o texto escrito no
+# onibus sem sinal nao cobre a correcao feita depois no tablet
+roda "celular mensagem --envenenado-vale-quem-chega-depois" node "_teste/testa_celular_fechamento_texto.js" --envenenado-vale-quem-chega-depois
+# (lente B) K4: a mensagem nova sem carimbo sobe com a precondicao "nao existe";
+# K6: com o tablet numa versao anterior, o celular nao edita a mensagem
+roda "celular mensagem --envenenado-resumo-sem-precondicao" node "_teste/testa_celular_fechamento_texto.js" --envenenado-resumo-sem-precondicao
+roda "celular mensagem --envenenado-tablet-antigo-edita" node "_teste/testa_celular_fechamento_texto.js" --envenenado-tablet-antigo-edita
 # (avisos compactos, 09/11, desenho final base C) recolhidos num selinho na linha
 # da data, o painel por cima da agenda (uma linha por tipo, Dispensar todos, a
 # sincronia no rodape), o ponto no bloco da aula sem registro pela mesma lista, e o

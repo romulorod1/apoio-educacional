@@ -25,6 +25,12 @@
  *      "veredito: reprova" no corpo; e nenhuma reprova mais recente. Revisao
  *      de outro commit nao vale: ela leu outro codigo.
  *
+ * Depois dessas, e antes do merge, o ramo nao pode estar atras da main: a API
+ * compare do GitHub (main...<cabeca>) diz behind_by, e se for maior que zero o
+ * merge e recusado ("traga a main e espere o CI"), porque dois PRs verdes,
+ * testados contra mains diferentes, entrariam juntos sem o CI ver a juncao. Se
+ * a API falhar, recusa tambem: nunca passa por nao conseguir conferir.
+ *
  * Comentarios (de portao e de revisao) so valem de dono, membro ou
  * colaborador do repositorio (authorAssociation), porque o repositorio e
  * publico e qualquer conta pode comentar.
@@ -158,6 +164,14 @@ function decidir(pr) {
   return { ok: motivos.length === 0, motivos, cabeca };
 }
 
+/* Quantos commits a cabeca esta atras da main. Lanca se nao conseguir medir. */
+function commitsAtras(cabeca) {
+  const saida = gh(['api', 'repos/' + REPO + '/compare/main...' + cabeca]);
+  const n = JSON.parse(saida).behind_by;
+  if (!Number.isInteger(n) || n < 0) throw new Error('a resposta nao traz behind_by');
+  return n;
+}
+
 /* GH terminado em .js roda pelo node: e a costura da prova, que troca o gh
  * por um falso de caminho absoluto, sem PATH sombreado e sem rede. */
 function gh(args) {
@@ -185,6 +199,19 @@ function principal(argv) {
     r.motivos.forEach(m => console.log('  - ' + m));
     return 1;
   }
+  // BEHIND-INICIO
+  try {
+    const atras = commitsAtras(r.cabeca);
+    if (atras > 0) {
+      console.log('RECUSADO  PR #' + numero + ':');
+      console.log('  - o ramo está ' + atras + ' commits atrás da main: traga a main e espere o CI');
+      return 1;
+    }
+  } catch (e) {
+    console.log('RECUSADO  nao consegui conferir se o ramo esta atras da main: ' + String(e.stderr || e.message).split('\n')[0]);
+    return 1;
+  }
+  // BEHIND-FIM
   console.log('ok        PR #' + numero + ' cumpre o processo no commit ' + r.cabeca.slice(0, 7));
   if (soConferir) return 0;
   try {
