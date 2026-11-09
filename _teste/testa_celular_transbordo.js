@@ -98,13 +98,14 @@ const ISENTOS = [];
 secao('0. As âncoras dos venenos e o ambiente');
 conf('nenhum --envenenado- desconhecido foi pedido (' + (desconhecidos.join(' ') || 'nenhum') + ')', desconhecidos.length, 0);
 /* O aviso como era antes deste conserto: o texto com o número, "Atualizar
- * agora" e "Depois da aula" lado a lado, e o estilo de antes. */
-const AVISO_NOVO_APP = "    if (modoCelular) {\n" +
-  "      avisar('Versão nova pronta.', 'Atualizar', aplicarAtualizacao, 'Depois', atualizarDepoisDaAula);\n" +
-  "      $('#aviso-texto').setAttribute('data-versao', versao || '');\n" +
-  "      desenharAjustes();\n" +
-  "      return;\n" +
-  "    }\n";
+ * agora" e "Depois da aula" lado a lado, e o estilo de antes. O veneno troca
+ * só a barra do aviso: o aviso de versão no painel de Hoje (#135) fica. */
+const AVISO_NOVO_APP = "      avisar('Versão nova pronta.', 'Atualizar', aplicarAtualizacao, 'Depois', atualizarDepoisDaAula);\n" +
+  "      $('#aviso-texto').setAttribute('data-versao', versao || '');\n";
+const AVISO_VELHO_APP = "      avisar('Versão nova pronta' + (versao ? ' (' + versao + ')' : ''),\n" +
+  "        'Atualizar agora', aplicarAtualizacao, 'Depois da aula', atualizarDepoisDaAula);\n";
+conf('o aviso curto do celular também vira aviso do painel de Hoje (renovarAvisosCelular logo depois)',
+  APP.indexOf(AVISO_NOVO_APP + "      desenharAjustes();\n      renovarAvisosCelular();") >= 0, true);
 const AVISO_NOVO_CSS_INICIO = '/* O aviso de versão nova no celular (o dono viu quebrado):';
 const AVISO_NOVO_CSS_FIM = '/* fim do aviso de versão nova no celular */';
 const ANCORA_LARGO = "    caixa.appendChild(el('h2', { class: 'cel-titulo', texto: 'Alunos' }));\n";
@@ -112,7 +113,7 @@ conf('a âncora do aviso novo está no app.js uma vez só', APP.split(AVISO_NOVO
 conf('o estilo do aviso novo está no styles.css uma vez só, com começo e fim',
   [CSS.split(AVISO_NOVO_CSS_INICIO).length - 1, CSS.split(AVISO_NOVO_CSS_FIM).length - 1].join(','), '1,1');
 conf('a âncora do elemento largo (o título da lista de Alunos) está no app.js uma vez só', APP.split(ANCORA_LARGO).length - 1, 1);
-const ABA_NOVA = '.cel-abas.muitas .cel-aba { flex: 1 1 auto; padding: 0; min-width: var(--alvo-celular); }';
+const ABA_NOVA = '.cel-abas.muitas .cel-aba { flex: 1 1 auto; padding: 0; min-width: var(--alvo-celular); font-weight: 500; line-height: 1.15;\n  overflow-wrap: break-word; hyphens: auto; }';
 const ABA_VELHA = '.cel-abas.muitas .cel-aba { flex: 1 1 auto; padding: 0 1px; }';
 conf('a regra das cinco abas está no styles.css uma vez só', CSS.split(ABA_NOVA).length - 1, 1);
 conf('o sw.js tem o nome do cache onde a prova o troca', /var CACHE = '[^']+';/.test(SW), true);
@@ -126,7 +127,7 @@ conf('(arranjo) a escala de letra tem os seis tamanhos (' + JSON.stringify(LETRA
 const trocas = {};
 if (MODO === V_AVISO) {
   const i = CSS.indexOf(AVISO_NOVO_CSS_INICIO), f = CSS.indexOf(AVISO_NOVO_CSS_FIM) + AVISO_NOVO_CSS_FIM.length;
-  trocas['/app.js'] = APP.replace(AVISO_NOVO_APP, '');
+  trocas['/app.js'] = APP.replace(AVISO_NOVO_APP, AVISO_VELHO_APP);
   trocas['/styles.css'] = CSS.slice(0, i) + CSS.slice(f);
 }
 if (MODO === V_ABA) trocas['/styles.css'] = CSS.replace(ABA_NOVA, ABA_VELHA).replace('.cel-abas.muitas { padding-left: 2px; padding-right: 2px; }', '');
@@ -314,14 +315,18 @@ async function fecharTudo(pag) {
   }
 }
 
-/* A letra: 1 é a da folha; 1,3 multiplica a escala inteira e o documento. */
+/* A letra: 1 é a da folha; 1,3 multiplica a escala inteira e o documento.
+ * PROVA_FONTE="Verdana" mede com outra fonte, mais larga que a do aparelho:
+ * a largura dos rótulos muda de máquina para máquina (Segoe, Roboto, a do CI). */
+const FONTE_DE_FORA = process.env.PROVA_FONTE || '';
+if (FONTE_DE_FORA) console.log('   (arranjo) a fonte da rodada: ' + FONTE_DE_FORA);
 async function aplicarLetra(pag, escala) {
-  await pag.evaluate((escala, letras) => {
+  await pag.evaluate((escala, letras, fonte) => {
     let s = document.getElementById('prova-letra');
     if (!s) { s = document.createElement('style'); s.id = 'prova-letra'; document.head.appendChild(s); }
-    s.textContent = escala === 1 ? '' : ':root { ' + Object.keys(letras).map(n => '--letra-' + n + ': ' + (letras[n] * escala) + 'px;').join(' ') +
-      ' } html { font-size: ' + Math.round(escala * 100) + '%; }';
-  }, escala, LETRAS);
+    s.textContent = (escala === 1 ? '' : ':root { ' + Object.keys(letras).map(n => '--letra-' + n + ': ' + (letras[n] * escala) + 'px;').join(' ') +
+      ' } html { font-size: ' + Math.round(escala * 100) + '%; }') + (fonte ? ' body { font-family: ' + fonte + '; }' : '');
+  }, escala, LETRAS, FONTE_DE_FORA);
   await pausa(120);
   // a letra de 15 px da escala, medida num elemento que a usa de verdade
   return pag.evaluate(() => {
@@ -603,7 +608,16 @@ async function percorrer(pag, telas) {
     };
   });
   const avisos = [];
-  const TELAS_AVISO = ['Hoje com os avisos do alto', 'Hoje sem aviso', 'Alunos', 'Fechamento'].map(n => TELAS_DONA.find(t => t[0] === n));
+  /* Com a versão nova pronta, ela vira também um aviso do painel de Hoje
+   * (#135): no dia sem aviso, o painel tem exatamente um, e é o de versão. */
+  const soOAvisoDeVersao = async () => {
+    await momento(pagC, '2026-10-03', '20:00');
+    const tipos = await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-semana #cel-avisos .cel-aviso')).map(a => a.dataset.aviso).join(','));
+    if (tipos !== 'versao') console.log('   o painel do dia sem aviso, com a versão nova, mostrou: "' + tipos + '"');
+    return tipos === 'versao' && existe(pagC, '#cel-hoje.ativa');
+  };
+  const TELAS_AVISO = [TELAS_DONA.find(t => t[0] === 'Hoje com os avisos do alto'), ['Hoje sem aviso', soOAvisoDeVersao],
+    TELAS_DONA.find(t => t[0] === 'Alunos'), TELAS_DONA.find(t => t[0] === 'Fechamento')];
   for (const [l, a] of TELAS_DE_CELULAR) {
     for (const esc of ESCALAS) {
       await janela(pagC, l, a);
