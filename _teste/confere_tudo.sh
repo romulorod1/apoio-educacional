@@ -379,9 +379,16 @@ for t in testa_temas testa_busca testa_mapa_e2e \
          testa_zoom_calendario_navegador \
          testa_dominio_navegador \
          testa_sondagem_navegador \
+         testa_relogio_padrao \
          e2e e2e_correcoes; do
   roda "$t" node "_teste/$t.js"
 done
+# O RELOGIO FIXO PADRAO do _bib_navegador (a bomba-relogio de 01/01/2027: o app
+# abre a virada anual sozinho num relogio de 2027 em diante). A prova simula o
+# mundo em 02/01/2027 e confere que a virada NAO abre com o padrao e ABRE com
+# { relogioReal: true }; o veneno serve o helper sem o padrao e a virada tem de
+# abrir ("VENENO visto").
+roda "relogio padrao --envenenado-sem-padrao"   node "_teste/testa_relogio_padrao.js" --envenenado-sem-padrao
 
 # D2: o service worker com cache primeiro. Fechar o aplicativo sem tocar no
 # aviso nao troca a versao (o navegador ativa o worker em espera sozinho, e a
