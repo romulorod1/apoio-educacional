@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.18';
+  var VERSAO = '1.42.21';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.21',
+      itens: [
+        'O lembrete da cópia de segurança agora considera a nuvem. Com a nuvem ligada e tudo salvo, ele não aparece e mostra só "Na nuvem, salvo às" e a hora.',
+        'Se alguma mudança ficar parada e não subir para a nuvem por mais de um dia, o aviso fala da nuvem e traz o botão certo: "Tentar de novo" ou "Ver o que houve". Com a nuvem desligada, o lembrete é o de sempre.'
+      ]
+    },
     {
       versao: '1.42.18',
       itens: [
