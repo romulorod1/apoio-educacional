@@ -1385,6 +1385,7 @@
   function avisar(texto, rotuloAcao, aoAgir, rotulo2, aoAgir2) {
     var caixa = $('#aviso');
     $('#aviso-texto').textContent = texto;
+    $('#aviso-texto').removeAttribute('data-versao'); // só o aviso de versão nova o põe
     var botao = $('#aviso-acao');
     if (aoAgir) {
       botao.style.display = '';
@@ -1401,6 +1402,8 @@
       botao2.textContent = aoAgir2 ? rotulo2 : '';
       botao2.onclick = aoAgir2 ? function () { esconderAviso(); aoAgir2(); } : null;
     }
+    // com duas ações, o celular põe o texto numa linha e os botões na de baixo
+    caixa.classList.toggle('com-duas-acoes', !!(aoAgir && aoAgir2));
     /* Medido no momento de mostrar: a janela pode ter mudado de altura depois
      * de aberta, e é agora que o aviso precisa caber. */
     posicionarAviso();
@@ -2176,6 +2179,16 @@
    * abertura seguinte e fica em Ajustes. */
   function mostrarAvisoDeVersao() {
     var versao = versaoPendenteAtiva && versaoPendenteAtiva.versao;
+    /* No celular, curto (o dono viu o texto maior que o botão e o "Atualizar
+     * agora" saindo da tela em 360 px): o texto numa linha e os dois botões
+     * na de baixo, lado a lado (styles.css, .aviso.com-duas-acoes). O número
+     * fica no aviso (data-versao) e no Diagnóstico. */
+    if (modoCelular) {
+      avisar('Versão nova pronta.', 'Atualizar', aplicarAtualizacao, 'Depois', atualizarDepoisDaAula);
+      $('#aviso-texto').setAttribute('data-versao', versao || '');
+      desenharAjustes();
+      return;
+    }
     avisar('Versão nova pronta' + (versao ? ' (' + versao + ')' : ''),
       'Atualizar agora', aplicarAtualizacao, 'Depois da aula', atualizarDepoisDaAula);
     desenharAjustes();
@@ -21835,6 +21848,12 @@
     origem.classList.toggle('cel-desatualizado', !!estado.destaque);
     var nuvem = $('#cel-nuvem');
     if (nuvem) nuvem.setAttribute('data-tom', estado.tom);
+    /* A barra do alto some no celular da dona quando está tudo em dia (nada
+     * esperando sinal, nada com erro, recebido há pouco) e volta quando há
+     * pendência ou erro: o estado continua no #cel-origem, para quem lê a tela. */
+    var celular = $('#modo-celular');
+    if (celular) celular.classList.toggle('topo-recolhido', edita && estado.tom === 'em-dia' && !estado.destaque &&
+      temDadosNoCelular() && !celularPedeEntrada);
     var acoes = $('#cel-acoes');
     acoes.innerHTML = '';
     if (!temDadosNoCelular() || celularPedeEntrada) return;
