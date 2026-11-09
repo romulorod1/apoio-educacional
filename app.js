@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.31';
+  var VERSAO = '1.42.32';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -82,7 +82,7 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.31',
+      versao: '1.42.32',
       itens: [
         'No tablet, as abas do alto passaram para uma coluna à esquerda, com o botão + no alto para marcar uma aula. Agenda, Alunos, Biblioteca e Fechamento ficam na coluna, e Ajustes no pé dela.',
         'No celular, a barra de baixo ganhou ícones e a Biblioteca. Por enquanto, a Biblioteca do celular avisa que os livros e as questões ficam no tablet.'
