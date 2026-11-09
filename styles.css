@@ -429,9 +429,13 @@ label.campo-checkbox {
   line-height: 1.25;
   font-weight: 600;
   color: var(--aviso-texto);
-  white-space: nowrap;
+  /* F1: com 12 px (antes 11) "Proclamação da República" não cabe numa linha
+     da célula; vai em até duas, inteiro, em vez de cortado com reticências */
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .marca-feriado.facultativo { color: var(--muted); font-weight: 600; }
 
@@ -3201,8 +3205,8 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
   cursor: pointer;
 }
 .cel-bloco-nome { font-size: var(--letra-16); font-weight: 600; color: var(--navy); overflow-wrap: anywhere; }
-.cel-bloco-hora { font-size: var(--letra-14); color: var(--novidades-subtitulo); }
-.cel-bloco-situacao { font-size: var(--letra-14); font-weight: 600; color: var(--novidades-subtitulo); }
+.cel-bloco-hora { font-size: var(--letra-14); line-height: 1.35; color: var(--novidades-subtitulo); }
+.cel-bloco-situacao { font-size: var(--letra-14); line-height: 1.35; font-weight: 600; color: var(--novidades-subtitulo); }
 .cel-bloco-realizada .cel-bloco-situacao { color: var(--teal); }
 .cel-bloco-reposicao { border-right: 4px solid var(--novidades-selo-borda); }
 .cel-bloco-reposicao .cel-bloco-situacao { color: var(--novidades-tag-ouro-texto); }
@@ -3210,7 +3214,7 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
 .cel-bloco-cancelada { opacity: .6; background: var(--fundo-leve); }
 .cel-bloco-cancelada .cel-bloco-nome,
 .cel-bloco-cancelada .cel-bloco-hora { text-decoration: line-through; }
-.cel-bloco-choque { font-size: var(--letra-14); font-weight: 600; color: var(--aviso-texto); }
+.cel-bloco-choque { font-size: var(--letra-14); line-height: 1.35; font-weight: 600; color: var(--aviso-texto); }
 .cel-bloco.com-choque { border-color: var(--etapas-borda); }
 
 /* O buraco do dia, escrito, e as horas em que se pode marcar nele. */
@@ -3333,6 +3337,9 @@ body.modo-celular .celular .btn.principal.cel-salvar-com-choque { background: va
 .cel-bloco-agora { border-color: var(--cor-aluno); box-shadow: 0 0 0 2px var(--cor-aluno); }
 .cel-bloco-marca {
   font-size: var(--letra-12);
+  /* F1: a letra subiu de 11 e 13 para 12 e 14 px; a entrelinha menor mantém
+     a altura do bloco (e a rolagem de Hoje) como antes */
+  line-height: 1.33;
   font-weight: 600;
   color: var(--branco);
   background: var(--navy);
