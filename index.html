@@ -117,6 +117,7 @@
     <section class="tela" id="tela-biblioteca">
       <div class="barra u-margem-baixo-12">
         <h2 class="titulo">Biblioteca</h2>
+        <span class="bibl-contagem" id="bib-livros-contagem"></span>
         <span class="cresce"></span>
         <button class="btn pequeno u-margem-dir-8" id="btn-guia-listas" type="button">Como usar as listas</button>
         <div id="bib-contagem" class="ajuda u-margem-0 u-peso-seminegrito"></div>
@@ -127,9 +128,15 @@
           <button class="btn pequeno" id="limpar-busca-biblioteca" type="button" style="display:none">Limpar</button>
         </div>
       </div>
+      <!-- B2: os livros do tablet por disciplina e ano, com o Continuar lendo.
+           Só aparece com livro no tablet; sem livro, a aba fica como era. -->
+      <div class="bibl" id="bib-livros" hidden></div>
+      <h3 class="subtitulo bibl-exercicios-titulo" id="bib-exercicios-titulo" hidden>Exercícios e listas</h3>
       <div class="bib-contexto" id="bib-contexto" hidden></div>
       <div class="bib-carrinho" id="bib-carrinho" hidden></div>
       <div id="bib-corpo"></div>
+      <!-- B2: o livro aberto, com o sumário clicável, em tela cheia com Voltar -->
+      <section class="bibl-livro" id="bib-livro" hidden aria-label="Livro"></section>
     </section>
 
     <!-- ---------------- ajustes ---------------- -->

@@ -114,12 +114,29 @@ const cobre = (pag, qual) => pag.evaluate(id => {
     confirmar: !!c.querySelector('#cobre-confirmar'), corrigir: !!c.querySelector('#cobre-corrigir') };
 }, qual === 'epub' ? '#epub-cobre' : '#leitor-cobre');
 
+/* B2: a estante virou a seção de livros da própria aba Biblioteca. O livro é
+ * achado pela disciplina e pelo ano dele, e o botão do alto da tela do livro
+ * abre o leitor onde ela parou, como o toque na estante fazia. */
 async function abrirPelaEstante(pag, id) {
   await H.irParaAba(pag, 'biblioteca');
-  await esperar('o botão Livros', () => pag.evaluate(() => !!document.querySelector('#btn-livros')), v => v, 10000);
-  await pag.evaluate(() => document.querySelector('#btn-livros').click());
-  await esperar('a estante com ' + id, () => pag.evaluate(i => !!document.querySelector('#corpo-modal-livros [data-livro="' + i + '"]'), id), v => v, 10000);
-  await pag.evaluate(i => document.querySelector('#corpo-modal-livros [data-livro="' + i + '"]').click(), id);
+  await esperar('o livro ' + id + ' na aba Biblioteca', () => pag.evaluate(i => {
+    const sel = '#bib-livros [data-livro="' + i + '"]';
+    if (document.querySelector(sel)) return true;
+    for (const d of Array.from(document.querySelectorAll('#bib-livros .bibl-disciplina')).map(b => b.dataset.disciplina)) {
+      document.querySelector('#bib-livros .bibl-disciplina[data-disciplina="' + d + '"]').click();
+      if (document.querySelector(sel)) return true;
+      for (const a of Array.from(document.querySelectorAll('#bib-livros .bibl-ano')).map(b => b.dataset.ano)) {
+        document.querySelector('#bib-livros .bibl-ano[data-ano="' + a + '"]').click();
+        if (document.querySelector(sel)) return true;
+      }
+    }
+    return false;
+  }, id), v => v, 10000);
+  await pag.evaluate(i => document.querySelector('#bib-livros [data-livro="' + i + '"]').click(), id);
+  await esperar('a tela do livro ' + id, () => pag.evaluate(i => {
+    const t = document.querySelector('#bib-livro'); return !!t && !t.hidden && t.dataset.livro === i;
+  }, id), v => v, 10000);
+  await pag.evaluate(() => document.querySelector('#bib-livro-continuar').click());
 }
 async function fecharModal(pag, id) {
   await pag.evaluate(i => {
