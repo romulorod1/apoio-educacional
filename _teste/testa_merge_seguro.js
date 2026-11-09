@@ -170,18 +170,37 @@ fs.writeFileSync(falso,
   "} else if (a[0] === 'pr' && a[1] === 'view') process.stdout.write(fs.readFileSync(process.env.FALSO_PR, 'utf8'));\n" +
   "else if (a[0] === 'pr' && a[1] === 'merge') process.stdout.write('merged\\n');\n" +
   "else { process.stderr.write('chamada inesperada'); process.exit(3); }\n");
+// O git FALSO (GIT=<arquivo .js>): o fetch ok ou com erro, e o show devolve o
+// arquivo que a prova diz ser o da main. Caminho absoluto, sem rede.
+const gitFalso = path.join(tmp, 'git_falso.js');
+const logGit = path.join(tmp, 'git_chamadas.txt');
+fs.writeFileSync(gitFalso,
+  "const fs = require('fs');\n" +
+  "const a = process.argv.slice(2);\n" +
+  "fs.appendFileSync(process.env.FALSO_GIT_LOG, a.join(' ') + '\\n');\n" +
+  "if (a[0] === 'fetch') {\n" +
+  "  if (process.env.FALSO_FETCH === 'erro') { process.stderr.write('fatal: unable to access origin'); process.exit(128); }\n" +
+  "} else if (a[0] === 'show' && a[1] === 'origin/main:_teste/merge_seguro.js') {\n" +
+  "  if (process.env.FALSO_SHOW === 'erro') { process.stderr.write('fatal: path not in origin/main'); process.exit(128); }\n" +
+  "  process.stdout.write(fs.readFileSync(process.env.FALSO_MAIN, 'utf8'));\n" +
+  "} else { process.stderr.write('git: chamada inesperada'); process.exit(3); }\n");
 const script = path.join(__dirname, 'merge_seguro.js');
-function rodar(pr, extra, behind, scriptAlvo) {
+function rodar(pr, extra, behind, scriptAlvo, git) {
+  git = git || {};
   fs.writeFileSync(json, JSON.stringify(pr));
   fs.writeFileSync(log, '');
+  fs.writeFileSync(logGit, '');
   let codigo = 0, saida = '';
   try {
     saida = execFileSync(process.execPath, [scriptAlvo || script, '9'].concat(extra || []), {
       encoding: 'utf8',
-      env: Object.assign({}, process.env, { GH: falso, FALSO_LOG: log, FALSO_PR: json, FALSO_BEHIND: String(behind === undefined ? 0 : behind) })
+      env: Object.assign({}, process.env, { GH: falso, FALSO_LOG: log, FALSO_PR: json, FALSO_BEHIND: String(behind === undefined ? 0 : behind),
+        GIT: gitFalso, FALSO_GIT_LOG: logGit, FALSO_MAIN: git.main || scriptAlvo || script,
+        FALSO_FETCH: git.fetch || '', FALSO_SHOW: git.show || '' })
     });
   } catch (e) { codigo = e.status; saida = String(e.stdout || ''); }
-  return { codigo, saida, chamadas: fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean) };
+  return { codigo, saida, chamadas: fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean),
+    chamadasGit: fs.readFileSync(logGit, 'utf8').trim().split('\n').filter(Boolean) };
 }
 let r = rodar(prBom());
 conf('aprovado sai 0', r.codigo, 0);
@@ -224,6 +243,47 @@ const semBloco = path.join(tmp, 'merge_seguro_sem_atras.js');
 fs.writeFileSync(semBloco, sem);
 r = rodar(prBom(), [], 3, semBloco);
 conf('controle: sem a checagem, o caso ATRAS passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge/.test(c)).length === 1, true);
+
+console.log('\n=== 4. O merge_seguro e o da main? (cópia velha recusa) ===');
+r = rodar(prBom(), ['--conferir']);
+conf('cópia igual à da main passa para as checagens seguintes', r.codigo === 0 && /^ok /m.test(r.saida), true);
+conf('fez o fetch da origin main e o show do arquivo', r.chamadasGit.join('|'), 'fetch origin main|show origin/main:_teste/merge_seguro.js');
+// Fim de linha: a main em CRLF e a cópia em LF (e o inverso) são o mesmo conteúdo.
+const principalMain = path.join(tmp, 'main_crlf.js');
+fs.writeFileSync(principalMain, fonte.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n'));
+r = rodar(prBom(), ['--conferir'], 0, undefined, { main: principalMain });
+conf('só o fim de linha diferente (CRLF x LF) passa', r.codigo, 0);
+// A cópia de antes do #137: sem o bloco BEHIND. Aqui, com a checagem de versão
+// (a que a main passa a ter), mas desatualizada em relação à main.
+const FRASE = 'este merge_seguro não é o da main atualizada: rode-o de uma pasta com a main em dia (git pull) e tente de novo';
+const velha = path.join(tmp, 'merge_seguro.js');
+fs.writeFileSync(velha, sem.replace(/\r\n/g, '\n').replace("const GIT = ", "const GIT = /* copia antiga */ "));
+// A velha precisa achar os módulos como a main: __dirname é a tmp, sem dependências.
+r = rodar(prBom(), ['--conferir'], 0, velha, { main: script });
+conf('cópia DIFERENTE da main recusa, sai 1', r.codigo, 1);
+conf('com a frase da regra', r.saida.indexOf(FRASE) >= 0, true);
+conf('e sem dizer ok', /^ok /m.test(r.saida), false);
+r = rodar(prBom(), [], 0, velha, { main: script });
+conf('cópia diferente recusa também sem --conferir e NAO chama o merge', r.codigo === 1 && !r.chamadas.some(c => /^pr merge/.test(c)), true);
+r = rodar(prBom(), ['--conferir'], 0, script, { fetch: 'erro' });
+conf('fetch que falha recusa, sai 1', r.codigo, 1);
+conf('mostra o erro do fetch', /unable to access origin/.test(r.saida), true);
+conf('fetch que falha não vira ok', /^ok /m.test(r.saida), false);
+r = rodar(prBom(), ['--conferir'], 0, script, { show: 'erro' });
+conf('git show que falha recusa, sai 1', r.codigo, 1);
+conf('mostra o erro do show', /path not in origin\/main/.test(r.saida), true);
+// O CASO REAL: cópia velha, PR atrasado 9 commits por merge de outro PR.
+r = rodar(prBom(), ['--conferir'], 9, velha, { main: script });
+conf('CASO REAL: cópia velha + PR 9 atrás recusa, sai 1', r.codigo, 1);
+conf('CASO REAL: a recusa é a da versão, na primeira checagem', r.saida.indexOf(FRASE) >= 0, true);
+conf('CASO REAL: nunca diz ok nem "cumpre o processo"', /^ok |cumpre o processo/m.test(r.saida), false);
+conf('CASO REAL: nem chegou a ler o PR no gh', r.chamadas.length, 0);
+// Controle: a mesma cópia velha, se a checagem de versão não existisse, diria ok.
+const semVersao = path.join(tmp, 'sem_versao', 'merge_seguro.js');
+fs.mkdirSync(path.dirname(semVersao));
+fs.writeFileSync(semVersao, sem.replace("  const velho = conferirVersao();", "  const velho = null;"));
+r = rodar(prBom(), ['--conferir'], 9, semVersao, { main: script });
+conf('controle: sem a checagem de versão e sem BEHIND, o PR 9 atrás diz ok', r.codigo === 0 && /^ok /m.test(r.saida), true);
 
 fs.rmSync(tmp, { recursive: true, force: true });
 

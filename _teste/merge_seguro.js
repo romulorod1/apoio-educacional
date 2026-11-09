@@ -11,6 +11,11 @@
  * por toda sessao no lugar de `gh pr merge` direto (secao 8, item 16, das
  * instrucoes de 26/10/2026).
  *
+ * Antes de tudo, inclusive no --conferir, ele confere que ELE MESMO e o da main:
+ * git fetch origin main e compara este arquivo com origin/main:_teste/merge_seguro.js
+ * (so o fim de linha e normalizado). Diferente, ou fetch que falha, recusa: uma
+ * copia velha nao tem as guardas novas e diria "ok" onde a main recusaria.
+ *
  * Exige, todas para o MESMO commit da cabeca do PR:
  *   1. PR aberto, fora de rascunho, contra a main;
  *   2. o check portao-rapido verde, e nenhum check vermelho ou em andamento
@@ -44,10 +49,12 @@
  * conferiu.
  */
 'use strict';
+const fs = require('fs');
 const { execFileSync } = require('child_process');
 
 const REPO = process.env.REPO_MERGE_SEGURO || 'romulorod1/apoio-educacional';
 const GH = process.env.GH || 'gh';
+const GIT = process.env.GIT || 'git';
 const CAMPOS = 'number,state,isDraft,baseRefName,headRefOid,commits,comments,statusCheckRollup';
 
 /* Decide sobre o JSON do `gh pr view --json`. Pura: devolve { ok, motivos }. */
@@ -179,9 +186,35 @@ function gh(args) {
   return execFileSync(bin, pre.concat(args), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
+/* Mesma costura do gh: GIT terminado em .js roda pelo node (git falso da prova). */
+function git(args) {
+  const [bin, pre] = /\.js$/.test(GIT) ? [process.execPath, [GIT]] : [GIT, []];
+  return execFileSync(bin, pre.concat(args), { encoding: 'utf8', cwd: __dirname, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 });
+}
+
+/* Devolve null se este arquivo e o da main; senao, a frase da recusa. */
+function conferirVersao() {
+  try {
+    git(['fetch', 'origin', 'main']);
+    const main = git(['show', 'origin/main:_teste/merge_seguro.js']);
+    const eu = fs.readFileSync(__filename, 'utf8');
+    if (main.replace(/\r\n/g, '\n') !== eu.replace(/\r\n/g, '\n')) {
+      return 'este merge_seguro não é o da main atualizada: rode-o de uma pasta com a main em dia (git pull) e tente de novo';
+    }
+    return null;
+  } catch (e) {
+    return 'não consegui conferir se este merge_seguro é o da main: ' + String(e.stderr || e.message).split('\n')[0];
+  }
+}
+
 function principal(argv) {
   const numero = argv[0];
   const soConferir = argv.indexOf('--conferir') >= 0;
+  const velho = conferirVersao();
+  if (velho) {
+    console.log('RECUSADO  ' + velho);
+    return 1;
+  }
   if (!/^[0-9]+$/.test(numero || '')) {
     console.log('uso: sh _teste/merge_seguro.sh <numero do PR> [--conferir]');
     return 2;
