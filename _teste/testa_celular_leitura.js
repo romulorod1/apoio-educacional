@@ -122,7 +122,7 @@ const TRAVA_BANCO = "if (modo === 'readwrite' && soLeitura && porta !== true && 
 const SALVAR_GUARDA = '    if (aparelhoSoLe() && !(gravacaoDoCelular > 0 && celularEdita())) {';
 const SEM_CARGA = '} else if (modoCelular) {';
 conf('a trava de envio do nuvem.js está num lugar só', NUVEM.split(PODE_ENVIAR).length, 2);
-conf('o commit e a automática do nuvem.js passam pela trava da cópia', /function commit\(escritas\) \{\r?\n    if \(!podeEnviarCopia\(\) && /.test(NUVEM) &&
+conf('o commit e a automática do nuvem.js passam pela trava da cópia', /function commit\(escritas, opcoes\) \{\r?\n    if \(!podeEnviarCopia\(\) && /.test(NUVEM) &&
   NUVEM.indexOf('return !!(podeEnviarCopia() && sessao') > 0, true);
 conf('a automática do app.js recusa no aparelho que só lê, num lugar só', (APP.match(new RegExp(GUARDA_AUTO_RE.source, 'g')) || []).length, 1);
 conf('a automática do app.js recusa em tela de celular, num lugar só', (APP.match(new RegExp(GUARDA_TELA_RE.source, 'g')) || []).length, 1);
