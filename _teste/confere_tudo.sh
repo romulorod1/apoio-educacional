@@ -790,6 +790,15 @@ roda "pago em"                                    node "_teste/testa_pago_em.js"
 # A2a: a cópia preparada e o compartilhamento cancelado não atualizam a data;
 # download pede confirmação, e share resolvido marca a data.
 roda "copia confirmada"                           node "_teste/testa_copia_confirmada.js"
+# Item 7: o lembrete da copia considera a nuvem (estado da nuvem simulado na
+# pagina, sem conta e sem emulador). Em dia: so a linha "Na nuvem, salvo as";
+# fila parada ha mais de 24 h: o alerta fala da nuvem; desligada: o de antes;
+# celular e observador: nada. O veneno volta ao lembrete so pela copia local.
+roda "alerta da copia com a nuvem"                node "_teste/testa_alerta_copia_nuvem.js"
+roda "alerta da copia --envenenado-alerta-so-local" node "_teste/testa_alerta_copia_nuvem.js" --envenenado-alerta-so-local
+# a idade do que parou sai da fila, e nao do ultimo envio: o veneno volta a
+# medir pelo envio e a quarentena com envio recente fica calada
+roda "alerta da copia --envenenado-idade-do-envio" node "_teste/testa_alerta_copia_nuvem.js" --envenenado-idade-do-envio
 roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_aluno_cascata.js"
 roda "relato e Voltar"                            node "_teste/testa_relato_voltar.js"
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
@@ -975,6 +984,24 @@ roda "celular avisos --envenenado-registrada-falta-registrar" node "_teste/testa
 roda "celular avisos --envenenado-lembrete-fora-da-janela" node "_teste/testa_celular_avisos.js" --envenenado-lembrete-fora-da-janela
 # (revisao do lote 4) cobrar e fechar o mes so no celular que e da dona, nunca pela falta de observador
 roda "celular avisos --envenenado-observador-sem-sessao" node "_teste/testa_celular_avisos.js" --envenenado-observador-sem-sessao
+# A mensagem do mes (o feedback do fechamento) editada no celular: o mesmo
+# campo do tablet (Core.textoDoMes e Core.gravarTextoDoMes), o texto salvo sai
+# no PDF do Enviar e do Ver, sobe pela fila e chega ao tablet; a edicao do
+# tablet chega com "Editado no tablet hoje as HH:MM"; nos dois lados vale a
+# ultima gravacao; o observador nao ve; o rascunho volta; junho de referencia
+# igual quando o texto nao muda. Um veneno para cada propriedade.
+roda "celular mensagem do mes"                      node "_teste/testa_celular_fechamento_texto.js"
+roda "celular mensagem --envenenado-texto-fora-do-pdf" node "_teste/testa_celular_fechamento_texto.js" --envenenado-texto-fora-do-pdf
+roda "celular mensagem --envenenado-texto-nao-sobe" node "_teste/testa_celular_fechamento_texto.js" --envenenado-texto-nao-sobe
+roda "celular mensagem --envenenado-observador-edita-texto" node "_teste/testa_celular_fechamento_texto.js" --envenenado-observador-edita-texto
+roda "celular mensagem --envenenado-vale-o-primeiro" node "_teste/testa_celular_fechamento_texto.js" --envenenado-vale-o-primeiro
+# (revisao) na mensagem do mes vence a escrita mais recente: o texto escrito no
+# onibus sem sinal nao cobre a correcao feita depois no tablet
+roda "celular mensagem --envenenado-vale-quem-chega-depois" node "_teste/testa_celular_fechamento_texto.js" --envenenado-vale-quem-chega-depois
+# (lente B) K4: a mensagem nova sem carimbo sobe com a precondicao "nao existe";
+# K6: com o tablet numa versao anterior, o celular nao edita a mensagem
+roda "celular mensagem --envenenado-resumo-sem-precondicao" node "_teste/testa_celular_fechamento_texto.js" --envenenado-resumo-sem-precondicao
+roda "celular mensagem --envenenado-tablet-antigo-edita" node "_teste/testa_celular_fechamento_texto.js" --envenenado-tablet-antigo-edita
 # (avisos compactos, 09/11, desenho final base C) recolhidos num selinho na linha
 # da data, o painel por cima da agenda (uma linha por tipo, Dispensar todos, a
 # sincronia no rodape), o ponto no bloco da aula sem registro pela mesma lista, e o
