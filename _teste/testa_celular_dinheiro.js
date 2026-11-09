@@ -129,7 +129,8 @@ const TRAV = new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']');
 conf('o app.js, o core.js e o styles.css não têm travessão', [APP, CORE, CSS].map(t => TRAV.test(t)).join(','), 'false,false,false');
 conf('o selo do tablet e o do celular saem da mesma conta (Core.seloDoPagamento, e nenhuma outra regra de selo)',
   [/var s = Core\.seloDoPagamento\(db, f\);\s*var reg = s\.registro;\s*caixa\.setAttribute\('data-selo', s\.selo\);/.test(APP),
-    APP.split('Core.seloDoPagamento(').length - 1, APP.split('Core.situacaoDoPagamento(').length - 1].join(','), 'true,3,0');
+    // 4: o proposto, o tablet, o Fechamento do celular e os avisos do Hoje (lote 4, seloDoAvisoCelular)
+    APP.split('Core.seloDoPagamento(').length - 1, APP.split('Core.situacaoDoPagamento(').length - 1].join(','), 'true,4,0');
 const trocas = {};
 if (MODO) {
   const [arq, de, para] = ANCORAS[MODO];

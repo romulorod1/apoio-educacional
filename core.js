@@ -960,6 +960,19 @@
    * simplesmente não desenha o bloco: primeira aula de um aluno novo não pode
    * abrir com uma caixa vazia dizendo que não há nada.
    */
+  /* A aula tem registro de como foi: assunto, área, relato, nota só minha,
+   * folha ou anexo. É o critério com que o ultimoEncontro pula a aula vazia
+   * (o "Relato da aula anterior" do tablet e da folha do celular), e o
+   * mesmo que diz, no Hoje do celular (D6c, lote 4), "falta registrar como
+   * foi". */
+  function aulaTemRegistro(au) {
+    if (!au) return false;
+    var assuntos = temasDaAula(au).map(function (t) { return t.titulo || t.id || ''; }).filter(Boolean);
+    var areas = (au.areas || []).map(rotuloArea).filter(Boolean);
+    return !!(assuntos.length || areas.length || (au.notaTexto || '').trim() || (au.notaPrivada || '').trim() ||
+      au.temNota || (au.anexos || []).length);
+  }
+
   function ultimoEncontro(db, alunoId, aulaAtual) {
     /* "Antes" é por data E horário, e não só por data: quando ela divide um
      * encontro em dois, as duas metades ficam no mesmo dia, e a primeira é
@@ -986,7 +999,7 @@
       var soMinha = (au.notaPrivada || '').trim();
       var folha = !!au.temNota;
       var anexos = (au.anexos || []).length;
-      if (!assuntos.length && !areas.length && !rendeu && !soMinha && !folha && !anexos) continue;
+      if (!aulaTemRegistro(au)) continue;
       return {
         aulaId: au.id,
         data: au.data,
@@ -3517,6 +3530,33 @@
     return saida;
   }
 
+  /* Os avisos do Hoje do celular (D6c, lote 4) que dependem do dia do mês.
+   *
+   * A cobrança: a família em aberto vira aviso de cobrar do dia 6 em diante.
+   * Até o dia 5 o mês que acabou de fechar ainda está no prazo de pagar, e
+   * cobrar seria antes da hora. O que se cobra é a lista de pendentes acima
+   * (os meses anteriores em aberto, a mesma do Fechamento do celular). */
+  var DIA_DE_COBRAR = 6;
+  function cobrancaLiberada(hojeRef) {
+    var p = partesData(hojeRef || hojeIso());
+    return p.d >= DIA_DE_COBRAR;
+  }
+  /* O lembrete de fechar o mês: nos 3 últimos dias do mês (o mês que está
+   * acabando) e nos 5 primeiros do seguinte (o mês que acabou). Fora dessa
+   * janela, nenhum mês a fechar. Devolve o mês 'AAAA-MM', ou null. Quem
+   * mostra decide se ainda falta alguma coisa nele (aula sem registro ou
+   * família em aberto). O tablet não tem lembrete de fechar o mês: a regra
+   * nasce aqui. */
+  var LEMBRETE_FIM_DO_MES_DIAS = 3, LEMBRETE_INICIO_DO_MES_DIAS = 5;
+  function mesAFechar(hojeRef) {
+    var hoje = hojeRef || hojeIso();
+    var p = partesData(hoje);
+    var mes = mesDe(hoje);
+    if (p.d > diasDoMes(mes) - LEMBRETE_FIM_DO_MES_DIAS) return mes;
+    if (p.d <= LEMBRETE_INICIO_DO_MES_DIAS) return mesAdjacente(mes, -1);
+    return null;
+  }
+
   /* A soma da lista de pendentes, em centavos inteiros e devolvida em reais. */
   function somaDosPendentes(lista) {
     var cent = 0, meses = Object.create(null), alunos = Object.create(null);
@@ -5504,6 +5544,7 @@
     lerReais: lerReais, valorACobrarDoMes: valorACobrarDoMes, pagamentoDe: pagamentoDe,
     marcarPagamento: marcarPagamento, desmarcarPagamento: desmarcarPagamento,
     situacaoDoPagamento: situacaoDoPagamento, seloDoPagamento: seloDoPagamento, pendentesDePagamento: pendentesDePagamento,
+    cobrancaLiberada: cobrancaLiberada, mesAFechar: mesAFechar, aulaTemRegistro: aulaTemRegistro,
     corteDosPagamentos: corteDosPagamentos,
     somaDosPendentes: somaDosPendentes,
     indicesDeReajuste: indicesDeReajuste, margemDeReajuste: margemDeReajuste,
