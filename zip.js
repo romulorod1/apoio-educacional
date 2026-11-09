@@ -234,8 +234,8 @@
     }).then(function (cru) {
       if (entrada.metodo === 0) return cru;
       if (!suportado()) throw ErroZip('SEM_DESCOMPRESSAO');
-      return inflar(cru).catch(function () {
-        throw ErroZip('O arquivo ' + entrada.nome + ' do pacote está corrompido.');
+      return inflar(cru).catch(function (e) {
+        throw comoFalhaDeInflar(entrada, e);
       });
     }).then(function (saida) {
       if (saida.length !== entrada.tamanho || crc32(saida) !== entrada.crc) {
@@ -251,6 +251,15 @@
     return inicioNoArquivo(zipArq, entrada).then(function (inicio) {
       return zipArq.arquivo.slice(inicio, inicio + entrada.tamanho, tipo || '');
     });
+  }
+
+  /* A descompressão que falha. Dado inválido é corrupção de verdade; falta de
+   * memória (RangeError) é do momento, e leva a marca `passageira` (o índice
+   * dos livros tenta de novo; o importador diz a mesma frase de sempre). */
+  function comoFalhaDeInflar(entrada, e) {
+    var erro = ErroZip('O arquivo ' + entrada.nome + ' do pacote está corrompido.');
+    if (e && e.name === 'RangeError') erro.passageira = true;
+    return erro;
   }
 
   function nomeDe(bytes) {
@@ -277,8 +286,8 @@
       passo = Promise.resolve(cru);
     } else {
       if (!suportado()) return Promise.reject(ErroZip('SEM_DESCOMPRESSAO'));
-      passo = inflar(cru).catch(function () {
-        throw ErroZip('O arquivo ' + entrada.nome + ' do pacote está corrompido.');
+      passo = inflar(cru).catch(function (e) {
+        throw comoFalhaDeInflar(entrada, e);
       });
     }
     return passo.then(function (saida) {

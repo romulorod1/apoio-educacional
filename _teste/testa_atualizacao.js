@@ -205,7 +205,7 @@ async function tocarNoAviso(p, sel) {
         { fundo: 'pontilhado', itens: [{ t: 'traco', cor: '#2E7D6B', pontos: [[200, 200, 3], [400, 300, 5], [600, 250, 4]] }] }
       ] };
       const w = q.result.transaction('notas', 'readwrite').objectStore('notas').put(nota, id);
-      w.onsuccess = () => resolve();
+      w.transaction.oncomplete = () => resolve();
     };
   }), construiu.idPrimeira);
 
@@ -216,7 +216,7 @@ async function tocarNoAviso(p, sel) {
       const blob = new Blob([new TextEncoder().encode('%PDF-1.4 conteudo de teste')], { type: 'application/pdf' });
       const w = q.result.transaction('anexos', 'readwrite').objectStore('anexos')
         .put({ nome: 'aula_samsung_notes.pdf', tipo: 'application/pdf', blob: blob }, 'anexo-teste');
-      w.onsuccess = () => resolve();
+      w.transaction.oncomplete = () => resolve();
     };
   }));
 

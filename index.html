@@ -121,6 +121,8 @@
         <button class="btn pequeno u-margem-dir-8" id="btn-guia-listas" type="button">Como usar as listas</button>
         <div id="bib-contagem" class="ajuda u-margem-0 u-peso-seminegrito"></div>
       </div>
+      <!-- B12: o índice de texto dos livros sendo preparado; some quando termina -->
+      <p id="indice-livros-progresso" class="ajuda indice-livros-progresso" role="status" aria-live="polite" hidden></p>
       <div class="cartao u-margem-baixo-14 u-recuo-12-14" id="bib-busca-cartao" style="display:none">
         <div class="barra u-margem-baixo-0 u-vao-8">
           <input class="u-flex-1 u-larg-min-200" type="text" id="busca-biblioteca" placeholder="Buscar na biblioteca: assunto, fórmula ou nome (bhaskara, pitágoras...)" autocomplete="off">
@@ -855,6 +857,7 @@
   <script src="store.js"></script>
   <script src="zip.js"></script>
   <script src="biblioteca.js"></script>
+  <script src="indice-livros.js"></script>
   <!-- N0: o motor da nuvem, depois do store.js, de quem ele ouve as mudanças. -->
   <script src="nuvem.js"></script>
   <script src="draw.js"></script>

@@ -328,6 +328,78 @@ def fazer_varios(pasta, n=10, lado=1150):
     return {'livros': raiz, 'planilha': planilha}
 
 
+# B12: os livros da prova do indice de texto (_teste/testa_livros_indice.js).
+# Texto conhecido em pagina conhecida, com acento e maiuscula, para a prova
+# conferir a normalizacao; uma pagina sem texto num livro com texto; um livro
+# inteiro sem texto (so desenho, como o livro escaneado sem OCR); e um livro
+# mais longo, para a prova interromper no meio dele.
+CAPITULOS_INDICE = ['Capítulo 1: Números naturais', 'Capítulo 2: Frações', 'Capítulo 3: Estatística']
+PAGINAS_LONGO = 600
+
+
+def pdf_indice_curto(caminho):
+    """Seis paginas, tres capitulos com marcadores (1, 3 e 5). A pagina 3 diz
+    FRAÇÕES EQUIVALENTES em maiuscula; a 5, "A mediana é o valor central"; a 6
+    e so um retangulo, sem texto nenhum."""
+    doc = pymupdf.open()
+    textos = {
+        1: ['Números naturais', 'Contar, comparar e ordenar.'],
+        2: ['Números naturais', 'Sucessor e antecessor.'],
+        3: ['FRAÇÕES EQUIVALENTES', 'Duas frações que representam a mesma parte do todo.'],
+        4: ['Frações', 'Comparação de frações com o mesmo denominador.'],
+        5: ['Medidas de tendência central', 'A mediana é o valor central de uma lista ordenada.'],
+    }
+    for n in range(1, 7):
+        pg = doc.new_page(width=W, height=H)
+        pg.draw_rect(pymupdf.Rect(72, 300, 523, 700), color=CORES[(n - 1) // 2], fill=CORES[(n - 1) // 2])
+        for i, t in enumerate(textos.get(n, [])):
+            pg.insert_text((72, 90 + 26 * i), t, fontname='helv', fontsize=18 if i == 0 else 12)
+    doc.set_toc([[1, CAPITULOS_INDICE[0], 1], [1, CAPITULOS_INDICE[1], 3], [1, CAPITULOS_INDICE[2], 5]])
+    return salvar(doc, caminho)
+
+
+def pdf_indice_longo(caminho):
+    """PAGINAS_LONGO paginas de texto, dois capitulos (1 e 121). So a pagina
+    200 tem a palavra "paralelepípedo"."""
+    doc = pymupdf.open()
+    for n in range(1, PAGINAS_LONGO + 1):
+        pg = doc.new_page(width=W, height=H)
+        linhas = ['Livro longo, página %d.' % n, 'Texto corrido de prova, sempre igual, para encher a página.']
+        if n == 200:
+            linhas.append('O paralelepípedo tem seis faces.')
+        for i, t in enumerate(linhas):
+            pg.insert_text((72, 90 + 26 * i), t, fontname='helv', fontsize=12)
+    doc.set_toc([[1, 'Parte 1: Plano', 1], [1, 'Parte 2: Espaço', 121]])
+    return salvar(doc, caminho)
+
+
+def pdf_sem_texto(caminho, paginas=3):
+    """So desenho, nenhuma letra: como o livro escaneado sem OCR."""
+    doc = pymupdf.open()
+    for i in range(paginas):
+        pg = doc.new_page(width=W, height=H)
+        pg.draw_rect(pymupdf.Rect(72, 100 + 20 * i, 523, 700), color=CORES[i % 3], fill=CORES[i % 3])
+    return salvar(doc, caminho)
+
+
+def fazer_indice(pasta):
+    raiz = os.path.join(pasta, 'Indice')
+    pdf_indice_curto(os.path.join(raiz, 'matematica', 'indice-curto.pdf'))
+    pdf_indice_longo(os.path.join(raiz, 'matematica', 'indice-longo.pdf'))
+    pdf_sem_texto(os.path.join(raiz, 'matematica', 'indice-sem-texto.pdf'))
+    epub(os.path.join(raiz, 'literatura', 'livro-de-prova.epub'))
+    linhas = [linha('matematica', 'Livro A curto', 'matematica/indice-curto.pdf'),
+              linha('matematica', 'Livro B longo', 'matematica/indice-longo.pdf'),
+              linha('matematica', 'Livro C sem texto', 'matematica/indice-sem-texto.pdf'),
+              linha('literatura', 'Livro D em EPUB', 'literatura/livro-de-prova.epub', Segmento='Ensino médio')]
+    planilha = os.path.join(raiz, 'livros_indice.csv')
+    with open(planilha, 'w', encoding='utf-8-sig', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=CABECALHO)
+        w.writeheader()
+        w.writerows(linhas)
+    return {'livros': raiz, 'planilha': planilha}
+
+
 def principal():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     if len(args) != 1:
@@ -349,6 +421,15 @@ def principal():
                                         trabalho=os.path.join(pasta, 'trabalho-gabarito'),
                                         gerado_em='2026-10-30T10:00:00-03:00', commit='prova')
         print('%d livros no pacote do gabarito' % manifest['contagens']['livros'])
+        print(rel['zip']['caminho'])
+        return
+    if '--indice' in sys.argv:
+        import livros
+        c = fazer_indice(pasta)
+        manifest, rel, _ = livros.gerar(c['planilha'], 'prova-indice', 1, os.path.join(pasta, 'pacotes'),
+                                        trabalho=os.path.join(pasta, 'trabalho-indice'),
+                                        gerado_em='2026-10-30T10:00:00-03:00', commit='prova')
+        print('%d livros no pacote do indice' % manifest['contagens']['livros'])
         print(rel['zip']['caminho'])
         return
     if '--trocado' in sys.argv:
