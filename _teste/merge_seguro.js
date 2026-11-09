@@ -55,7 +55,14 @@ const { execFileSync } = require('child_process');
 const REPO = process.env.REPO_MERGE_SEGURO || 'romulorod1/apoio-educacional';
 const GH = process.env.GH || 'gh';
 const GIT = process.env.GIT || 'git';
-const CAMPOS = 'number,state,isDraft,baseRefName,headRefOid,commits,comments,statusCheckRollup';
+const CAMPOS = 'number,state,isDraft,baseRefName,headRefOid,commits,comments,statusCheckRollup,labels';
+// Ramo atrás da main só recusa PR de RISCO de dado (gravação, banco, cópia,
+// restauração, nuvem, dinheiro, cache do sw.js), marcado com o rótulo `risco`.
+// PR de tela, de prova e de CI entra com a bateria verde na própria cabeça,
+// mesmo atrás; a main roda a bateria depois do merge (decisão de 09/11/2026).
+function ehRisco(pr) {
+  return (pr.labels || []).some(l => String(l && l.name).toLowerCase() === 'risco');
+}
 
 /* Decide sobre o JSON do `gh pr view --json`. Pura: devolve { ok, motivos }. */
 function decidir(pr) {
@@ -233,7 +240,9 @@ function principal(argv) {
     return 1;
   }
   // BEHIND-INICIO
-  try {
+  if (!ehRisco(pr)) {
+    console.log('aviso     PR #' + numero + ' sem o rótulo risco: não confiro se está atrás da main');
+  } else try {
     const atras = commitsAtras(r.cabeca);
     if (atras > 0) {
       console.log('RECUSADO  PR #' + numero + ':');

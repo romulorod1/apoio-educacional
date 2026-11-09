@@ -30,6 +30,7 @@ const CABECA = 'abc1234def5678abc1234def5678abc1234def56';
 function prBom() {
   return {
     number: 9, state: 'OPEN', isDraft: false, baseRefName: 'main', headRefOid: CABECA,
+    labels: [{ name: 'navegador' }, { name: 'risco' }],
     commits: [{ oid: 'velho', committedDate: '2026-10-26T10:00:00Z' },
               { oid: CABECA, committedDate: '2026-10-26T12:00:00Z' }],
     statusCheckRollup: [
@@ -230,6 +231,23 @@ r = rodar(prBom(), [], 'erro');
 conf('API que falha recusa, sai 1', r.codigo, 1);
 conf('mostra a mensagem do erro', /HTTP 403: sem permissao/.test(r.saida), true);
 conf('API que falha NAO chama o merge', r.chamadas.some(c => /^pr merge/.test(c)), false);
+// Sem o rótulo risco (PR de tela, prova ou CI): atrás da main passa e nem mede.
+function semRisco() { const q = prBom(); q.labels = [{ name: 'navegador' }]; return q; }
+r = rodar(semRisco(), [], 3);
+conf('sem risco, 3 atras passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge 9 /.test(c)).length === 1, true);
+conf('sem risco nem chama o compare', r.chamadas.some(c => /^api/.test(c)), false);
+conf('sem risco avisa que nao conferiu', /sem o rótulo risco: não confiro se está atrás da main/.test(r.saida), true);
+r = rodar(semRisco(), [], 'erro');
+conf('sem risco, API quebrada nao importa: passa', r.codigo, 0);
+p = semRisco(); delete p.labels;
+r = rodar(p, ['--conferir'], 3);
+conf('sem campo labels conta como sem risco', r.codigo, 0);
+p = prBom(); p.labels = [{ name: 'RISCO' }];
+r = rodar(p, [], 3);
+conf('rotulo RISCO em maiuscula tambem recusa atras', r.codigo, 1);
+p = prBom(); p.labels = [{ name: 'risco-baixo' }];
+r = rodar(p, [], 3);
+conf('rotulo parecido (risco-baixo) NAO e risco: passa', r.codigo, 0);
 // A checagem vem depois das outras: PR recusado por outro motivo nem chama o compare.
 p = prBom(); p.comments = [];
 r = rodar(p, [], 3);
@@ -243,6 +261,13 @@ const semBloco = path.join(tmp, 'merge_seguro_sem_atras.js');
 fs.writeFileSync(semBloco, sem);
 r = rodar(prBom(), [], 3, semBloco);
 conf('controle: sem a checagem, o caso ATRAS passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge/.test(c)).length === 1, true);
+// Controle do rótulo: com ehRisco sempre falso, o PR de risco atrás passaria.
+const semRotulo = fonte.replace(/function ehRisco\(pr\) \{\r?\n  return /, 'function ehRisco(pr) {\n  return false && ');
+conf('controle: achei o ehRisco para envenenar', semRotulo !== fonte, true);
+const arqSemRotulo = path.join(tmp, 'merge_seguro_sem_rotulo.js');
+fs.writeFileSync(arqSemRotulo, semRotulo);
+r = rodar(prBom(), [], 3, arqSemRotulo);
+conf('controle: ignorando o rotulo, o risco ATRAS passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge/.test(c)).length === 1, true);
 
 console.log('\n=== 4. O merge_seguro e o da main? (cópia velha recusa) ===');
 r = rodar(prBom(), ['--conferir']);
