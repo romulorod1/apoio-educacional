@@ -126,6 +126,8 @@
           <button class="btn pequeno" id="limpar-busca-biblioteca" type="button" style="display:none">Limpar</button>
         </div>
       </div>
+      <!-- B12: o índice de texto dos livros sendo preparado; some quando termina -->
+      <p id="indice-livros-progresso" class="ajuda indice-livros-progresso" role="status" aria-live="polite" hidden></p>
       <!-- B2: os livros do tablet por disciplina e ano, com o Continuar lendo.
            Só aparece com livro no tablet; sem livro, a aba fica como era. -->
       <div class="bibl" id="bib-livros" hidden></div>
@@ -866,6 +868,7 @@
   <script src="store.js"></script>
   <script src="zip.js"></script>
   <script src="biblioteca.js"></script>
+  <script src="indice-livros.js"></script>
   <!-- N0: o motor da nuvem, depois do store.js, de quem ele ouve as mudanças. -->
   <script src="nuvem.js"></script>
   <script src="draw.js"></script>

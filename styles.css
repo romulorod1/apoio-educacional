@@ -3554,6 +3554,53 @@ body.modo-celular .celular > .aviso { position: static; transform: none; transit
   margin: 0; border-radius: 0; box-shadow: none; padding: 8px 16px; flex-shrink: 0; pointer-events: auto; }
 body.modo-celular .celular > .aviso.aberto { display: flex; }
 body.modo-celular .celular > .aviso button { min-height: var(--alvo-celular); min-width: var(--alvo-celular); }
+/* O aviso de versão nova no celular (o dono viu quebrado): o texto maior que o
+   botão e o "Atualizar agora" saindo da tela em 360 px, e com a letra em 130%
+   os rótulos uns sobre os outros. Agora a letra é a de 14 px, nada fica preso
+   numa linha (sem nowrap): o botão que não cabe ao lado do texto desce para a
+   linha de baixo, e com duas ações o texto fica numa linha e os dois botões na
+   de baixo, cada um com a metade, 48 px de altura. Quem trava é o
+   testa_celular_transbordo, a 360, 390 e 412 px e com a letra em 130%. */
+body.modo-celular .celular > .aviso { flex-wrap: wrap; gap: 6px 8px; padding: 8px 12px; font-size: var(--letra-14); }
+body.modo-celular .celular > .aviso #aviso-texto { flex: 1 1 10em; min-width: 0; overflow-wrap: anywhere; }
+body.modo-celular .celular > .aviso button { flex: 0 0 auto; max-width: 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.2; }
+body.modo-celular .celular > .aviso.com-duas-acoes #aviso-texto { flex-basis: 100%; }
+body.modo-celular .celular > .aviso.com-duas-acoes button { flex: 1 1 0; }
+/* fim do aviso de versão nova no celular */
+/* A barra do alto do celular, pequena (padrão 7 dos PRINCIPIOS): 40 px, o ↻
+   sem borda com o alvo de 48 px (que passa da barra para cima e para baixo,
+   sem empurrá-la), e recolhida quando a dona está em dia (app.js,
+   desenharTopoCelular). */
+body.modo-celular .celular > .cel-topo { min-height: 40px; padding: 0 4px 0 16px; box-sizing: border-box; }
+body.modo-celular .celular.topo-recolhido > .cel-topo { display: none; }
+body.modo-celular .celular .cel-topo .cel-icone {
+  border: 0; background: transparent; color: var(--navy); min-height: var(--alvo-celular); min-width: var(--alvo-celular);
+  margin: -5px 0; box-shadow: none;
+}
+/* Hoje e os formulários vão de borda a borda do conteúdo, com o recuo por
+   dentro: a faixa da semana e o rodapé preso dos formulários, que encostam
+   nas bordas com margem negativa de 16 px, cabem na caixa deles e não passam
+   16 px para fora dela (medido em 360, 390 e 412 px). */
+body.modo-celular #cel-hoje { margin: 0 -16px; padding: 0 16px; }
+body.modo-celular .celular [data-form-celular] { margin: 0 -16px; padding: 0 16px; }
+/* Com cinco abas (o observador), cada uma com a largura do rótulo: o
+   "Diagnóstico" e o "Fechamento" não passam da caixa deles, e nenhuma fica
+   abaixo do alvo de 48 px (o "Hoje" ficava com 47 em 360 com a letra em
+   130%). A barra cede 2 px de cada lado para caber. A largura do rótulo
+   depende da fonte do aparelho (Segoe no Windows, Roboto no Android, outra
+   no CI): o peso 500 dá folga, e se ainda assim o rótulo não couber ele se
+   divide em duas linhas, com hífen, dentro da caixa, em vez de sair dela. */
+/* As quatro abas da dona, pelo mesmo motivo: medidas com uma fonte larga
+   (Verdana) e a letra em 130%, o "Enviar" saía 14 px da caixa e a barra
+   passava 20 px da tela em 360. Cada aba fica com 48 px no mínimo e o rótulo
+   longo se divide dentro dela. */
+body.modo-celular .cel-aba { min-width: var(--alvo-celular); line-height: 1.15; overflow-wrap: break-word; hyphens: auto; }
+.cel-abas.muitas { padding-left: 2px; padding-right: 2px; }
+/* O código da dona nos Ajustes do observador é uma palavra só, comprida: quebra
+   onde precisar (com fonte larga e 130% ele passava 19 px da caixa). */
+#cel-obs-regra { overflow-wrap: anywhere; }
+.cel-abas.muitas .cel-aba { flex: 1 1 auto; padding: 0; min-width: var(--alvo-celular); font-weight: 400; line-height: 1.15;
+  overflow-wrap: break-word; hyphens: auto; }
 body.modo-celular .celular .linha { flex-direction: column; }
 
 /* Resumo de quando ela importa vários pacotes de uma vez (Ajustes, Biblioteca):

@@ -137,8 +137,10 @@
  * num sininho com painel (app.js e styles.css), com a lista igual. O v98 (importar vários pacotes) traz a importação em série e o resumo (app.js, index.html e styles.css), com a lista igual. O v101 traz a mensagem do mês editada no celular (app.js,
  * core.js, store.js, nuvem.js e styles.css), com a lista igual. O v102 (lembrete da cópia com a nuvem) traz o aviso novo e a linha "Na nuvem, salvo às" (app.js e styles.css), com a lista igual. O v104 deixa a carga de exemplo só nas provas e troca os nomes do exemplo por nomes de teste (app.js e index.html), com a lista igual.
  * Versão silenciosa. O v105 (N2 fatia 1) traz as folhas por página na nuvem
- * (app.js, nuvem.js, store.js, draw.js e styles.css), com a lista igual. O v106 (sistema visual) traz os tokens, a escala de letras e o conjunto de ícones (app.js, index.html e styles.css), com a lista igual. O v108 (navegação com a Biblioteca) traz o trilho lateral do tablet e a barra de baixo do celular (app.js, index.html e styles.css), com a lista igual. O v109 (Biblioteca por disciplina e ano) traz a tela dos livros, o sumário clicável e o Continuar lendo (app.js, index.html e styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v109';
+ * (app.js, nuvem.js, store.js, draw.js e styles.css), com a lista igual. O v106 (sistema visual) traz os tokens, a escala de letras e o conjunto de ícones (app.js, index.html e styles.css), com a lista igual. O v107 traz o celular sem transbordo: o aviso de versão em
+ * duas linhas, a barra de cima menor e a trava de transbordo (app.js e
+ * styles.css), com a lista igual. O v108 (índice dos livros) traz o indexador em segundo plano, indice-livros.js, na lista de arquivos (app.js, index.html, store.js e sw.js). O v109 (navegação com a Biblioteca) traz o trilho lateral do tablet e a barra de baixo do celular (app.js, index.html e styles.css), com a lista igual. O v110 (Biblioteca por disciplina e ano) traz a tela dos livros, o sumário clicável e o Continuar lendo (app.js, index.html e styles.css), com a lista igual. */
+var CACHE = 'apoio-educacional-v110';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -154,6 +156,10 @@ var ARQUIVOS = [
    * nunca passa por aqui: ele vai para o IndexedDB ao ser importado. */
   './zip.js',
   './biblioteca.js',
+  /* O índice de texto dos livros (B12): o mesmo arquivo é o script da página
+   * e o Web Worker que lê os livros. Os livros e o índice nunca passam por
+   * aqui: ficam no IndexedDB. */
+  './indice-livros.js',
   /* O cartao do mes: ela toca uma vez no fechamento e manda a imagem por
    * WhatsApp. Se ficasse de fora da lista, o app.js novo rodaria contra o
    * cartao.js velho servido do cache de sobra, depois de uma atualizacao. */
