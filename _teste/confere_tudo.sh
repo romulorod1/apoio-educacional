@@ -763,6 +763,15 @@ roda "pago em"                                    node "_teste/testa_pago_em.js"
 # A2a: a cópia preparada e o compartilhamento cancelado não atualizam a data;
 # download pede confirmação, e share resolvido marca a data.
 roda "copia confirmada"                           node "_teste/testa_copia_confirmada.js"
+# Item 7: o lembrete da copia considera a nuvem (estado da nuvem simulado na
+# pagina, sem conta e sem emulador). Em dia: so a linha "Na nuvem, salvo as";
+# fila parada ha mais de 24 h: o alerta fala da nuvem; desligada: o de antes;
+# celular e observador: nada. O veneno volta ao lembrete so pela copia local.
+roda "alerta da copia com a nuvem"                node "_teste/testa_alerta_copia_nuvem.js"
+roda "alerta da copia --envenenado-alerta-so-local" node "_teste/testa_alerta_copia_nuvem.js" --envenenado-alerta-so-local
+# a idade do que parou sai da fila, e nao do ultimo envio: o veneno volta a
+# medir pelo envio e a quarentena com envio recente fica calada
+roda "alerta da copia --envenenado-idade-do-envio" node "_teste/testa_alerta_copia_nuvem.js" --envenenado-idade-do-envio
 roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_aluno_cascata.js"
 roda "relato e Voltar"                            node "_teste/testa_relato_voltar.js"
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
