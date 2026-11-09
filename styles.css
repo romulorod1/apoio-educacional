@@ -1421,6 +1421,9 @@ table.dados tr.total td { font-weight: 700; color: var(--navy); background: var(
    todo, sem aviso nenhum no ar. Visto no print. No transform, o estado fechado
    continua o de sempre e a animacao continua sendo uma so. */
 .aviso.aberto { transform: translateX(-50%) translateY(calc(var(--sobe, 0px) * -1)); }
+/* Fechado, o aviso fica só escondido por baixo da tela (translateY): a sombra forte dele, de 40 px de
+   desfoque, aparecia como uma mancha cinza na base. Sem sombra enquanto não está aberto. */
+.aviso:not(.aberto) { box-shadow: none; }
 .aviso button {
   pointer-events: auto;
   background: transparent;
