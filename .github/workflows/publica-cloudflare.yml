@@ -7,7 +7,7 @@
 #     nao e o que esta na main),
 #   - na main, do proprio repositorio (nunca de fork),
 #   - com conclusao success, que no push na main quer dizer portao-rapido,
-#     as quatro fatias do navegador e o portao-navegador verdes (no push nenhum
+#     as oito fatias do navegador e o portao-navegador verdes (no push nenhum
 #     job do portao e pulado; veja o portao.yml).
 # Portao vermelho, cancelado ou pulado: este job nem comeca.
 #

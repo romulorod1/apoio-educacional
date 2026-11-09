@@ -1,0 +1,282 @@
+# Tempo medido de cada prova de navegador no CI, em segundos: mediana das rodadas verdes
+# 42583672865, 42585060687, 42594429339 e da 42602346664 (09/11/2026), tirada do carimbo de
+# tempo entre uma linha de resultado e a anterior no log de cada fatia. Nome<TAB>segundos.
+# Prova que nao esta aqui recebe a mediana da tabela (divide_portao.js). Para remedir:
+# gh run view <id> --log e a mesma conta; o testa_pedacos_do_portao imprime o desequilibrio.
+testa_temas	49
+testa_busca	28
+testa_mapa_e2e	47
+testa_perfil	23
+testa_olho	15
+testa_atualizacao	22
+testa_atualizacao_real	30
+testa_assunto	46
+testa_familia	20
+testa_proposta_tela	67
+testa_novidades_navegador	11
+testa_modal_aula_navegador	4
+testa_folha_navegador	8
+testa_folha_resiliencia_navegador	6
+testa_desenho_incremental	3
+testa_documento_familia_navegador	14
+testa_tabela_no_app	78
+testa_ano_cadastro	6
+testa_sugestoes_matematica_navegador	6
+testa_virada_anual_navegador	6
+testa_zoom_calendario_navegador	5
+testa_dominio_navegador	22
+testa_sondagem_navegador	17
+e2e	59
+e2e_correcoes	35
+atualizacao apos fechar	4
+atualizacao --migracao	4
+atualizacao --corte-sobre-a-main	3
+atualizacao corte --envenenado-apaga-ativo	3
+atualizacao --lista-encolhe	8
+atualizacao lista --envenenado-lista-do-worker	8
+atualizacao --troca-atomica	15
+atualizacao --abre-no-meio-do-install	11
+atualizacao meio --envenenado-sem-marca	11
+atualizacao --falha-instalacao	3
+atualizacao --duas-janelas	5
+atualizacao --rede-lenta	2
+biblioteca importar	17
+biblioteca importar --envenenado-hash	8
+biblioteca importar --envenenado-aviso-fica	4
+biblioteca navegar	17
+biblioteca navegar --envenenado-apelidos	7
+biblioteca mirim	9
+biblioteca mirim --envenenado-equivalentes	4
+biblioteca mirim --envenenado-diversos	9
+biblioteca compor	11
+biblioteca compor --envenenado-sem-solucao	11
+biblioteca aula	78
+biblioteca aula --envenenado-aluno	8
+biblioteca aula --envenenado-acento	11
+biblioteca dificuldade	13
+biblioteca dificuldade --envenenado-etiqueta	8
+limpeza do acervo	6
+limpeza do acervo --envenenado-lista	34
+mudou de endereco (B4)	17
+sem material autoral	14
+biblioteca caminho curto	37
+caminho curto --envenenado-cheio	9
+caminho curto --envenenado-visor	29
+caminho curto --envenenado-modulo	35
+caminho curto --envenenado-volta	9
+biblioteca remover pacote	9
+remover pacote --envenenado-dela	7
+salvar grava no commit	30
+salvar --envenenado-grava-no-pedido	26
+salvar --envenenado-escreve-no-pedido	27
+salvar --envenenado-salvar-no-pedido	27
+salvar --envenenado-nao-rejeita	7
+salvar --envenenado-nao-rele	6
+falha de gravacao	56
+falha --envenenado-sem-tratamento	8
+falha --envenenado-olho-espera	9
+falha --envenenado-faixa-por-cima	9
+falha --envenenado-rele-grava	41
+falha --envenenado-rele-calado	41
+falha --envenenado-desfazer-trava	47
+falha --envenenado-ponto-segura	48
+falha --envenenado-confirma-calado	25
+falha --envenenado-nada-descarta	42
+falha --envenenado-atualiza-calado	48
+falha --envenenado-desfeita-calada	55
+falha --envenenado-desfeita-apaga	56
+biblioteca kits (aditivo)	6
+biblioteca kits --envenenado-app-recusa	5
+biblioteca listas prontas	267
+biblioteca listas --envenenado-ordem	8
+biblioteca listas --envenenado-seta	9
+biblioteca listas --envenenado-curadoria	4
+biblioteca listas --envenenado-camadas	257
+biblioteca listas --envenenado-coluna	8
+biblioteca listas --envenenado-flutua	8
+biblioteca listas --envenenado-frase	8
+biblioteca listas --envenenado-dificuldade	8
+biblioteca listas --envenenado-agrupa	8
+biblioteca listas --envenenado-aviso-velho	25
+biblioteca listas --envenenado-sairam	24
+biblioteca listas --envenenado-recarrega	15
+biblioteca listas --envenenado-volta	14
+biblioteca listas --envenenado-lixeira	264
+biblioteca listas --envenenado-redesenho	26
+biblioteca listas --envenenado-uma-aula	33
+biblioteca listas --envenenado-anexada	40
+biblioteca listas --envenenado-nome-anexo	45
+biblioteca listas --envenenado-gabarito-junto	41
+biblioteca listas --envenenado-troca-ao-ver	12
+biblioteca listas --envenenado-desfazer-apaga	69
+biblioteca listas --envenenado-anexar-apaga	81
+biblioteca listas --envenenado-intacta-entra	68
+biblioteca listas --envenenado-quarta-fica	130
+biblioteca listas --envenenado-heranca	217
+biblioteca listas --envenenado-restam	29
+biblioteca listas --envenenado-porta-usar	63
+biblioteca listas --envenenado-porta-carregar	204
+biblioteca listas --envenenado-porta-aula	160
+biblioteca listas --envenenado-porta-anexar	186
+biblioteca listas --envenenado-porta-desmarcar	225
+biblioteca listas --envenenado-recencia	205
+biblioteca listas --envenenado-grava-falha	232
+biblioteca listas --envenenado-atribuicao-solta	0
+biblioteca listas --envenenado-sem-etiqueta	53
+biblioteca listas --envenenado-orfao	249
+minhas listas	31
+minhas listas --envenenado-sem-espelho	11
+minhas listas --envenenado-copia-sem-listas	22
+minhas listas --envenenado-uso-sem-lista	21
+minhas listas --envenenado-ordem-velha	18
+minhas listas --envenenado-diario-antes	10
+minhas listas --envenenado-memoria-velha	28
+minhas listas --envenenado-uso-por-conteudo	22
+minhas listas --envenenado-nomear-duplica	26
+banco v3	13
+banco v3 --envenenado-versao-tecnica	8
+banco v3 --envenenado-troca-calada	18
+banco v5 (N1)	7
+banco v5 --envenenado-perde-registro	3
+banco v5 --envenenado-regrava-tudo	3
+banco v5 --envenenado-restauro-sem-fila	4
+rollback v4 (N1)	7
+rollback v4 --envenenado-registros-ressuscitam	7
+banco cura (N1)	6
+banco cura --envenenado-sem-cura	4
+livros	19
+livros --envenenado-copia-com-livros	8
+livros --envenenado-epub-com-scripts	13
+livros --envenenado-sem-posicao	9
+livros --envenenado-destroy	39
+livros --envenenado-zip-inteiro	19
+livros --envenenado-so-id	16
+livros mapa	12
+livros mapa --envenenado-correcao-so-na-memoria	11
+livros mapa --envenenado-sem-ano-na-tela	11
+livros mapa --envenenado-faixa-refeita	9
+livros exportar	12
+livros exportar --envenenado-gabarito-do-outro	6
+livros exportar --envenenado-sem-fonte	6
+livros exportar --envenenado-travessao	7
+livros exportar --envenenado-pdf-na-copia	7
+lista de base	6
+lista de base --envenenado-base-recusada	3
+lista de base --envenenado-sem-etiqueta	4
+titulos e roteiro do fechamento	21
+preparar e enviar	8
+leitor de pdf	34
+anexo como folha	16
+pago em	26
+copia confirmada	7
+exclusao de aluno em cascata	6
+relato e Voltar	13
+copia ZIP e restauracao atomica	3
+nuvem fase 0	54
+nuvem fase 0 --envenenado-regra-aberta	53
+nuvem fase 0 --envenenado-leitor-escreve	54
+nuvem fase 0 --envenenado-observador-edita	52
+nuvem fase 0 --envenenado-sobe-vazio	42
+nuvem fase 0 --envenenado-anterior-cega	65
+nuvem fase 0 --envenenado-pendente-zerado	48
+nuvem registros (N1 fatia 2)	22
+nuvem registros --envenenado-fila-fora-da-transacao	17
+nuvem registros --envenenado-culpa-na-recusa-total	15
+nuvem recebe (N1 fatia 3)	35
+nuvem recebe --envenenado-ignora-lapide	19
+nuvem recebe --envenenado-velho-por-cima	18
+nuvem recebe --envenenado-pagina-so-carimbo	31
+nuvem recebe --envenenado-sem-already-exists	19
+nuvem recebe --envenenado-fusao-pelo-prefixo	22
+nuvem recebe --envenenado-eco-so-sem-carimbo	18
+nuvem diagnostico (D7)	31
+nuvem diagnostico --envenenado-diagnostico-aberto	32
+nuvem diagnostico --envenenado-observador-grava	32
+nuvem recebe --envenenado-fila-sobrevive-ao-apagar	26
+nuvem recebe --envenenado-aplica-desligado	26
+nuvem recebe --envenenado-celular-enfileira-fusao	28
+nuvem recebe --envenenado-restauro-sem-iguais	30
+nuvem recebe --envenenado-confirma-sem-apagado	18
+nuvem recebe --envenenado-religar-sem-enfileirar	27
+nuvem recebe --envenenado-sem-pulo	28
+celular so leitura	75
+celular so leitura --envenenado-envia	51
+celular so leitura --envenenado-edicao	20
+celular so leitura --envenenado-grava	17
+celular so leitura --envenenado-tela	57
+celular so leitura --envenenado-limite-640	56
+celular so leitura --envenenado-janela-640	56
+celular so leitura --envenenado-grava-abertura	20
+celular edita (D6b)	60
+celular edita --envenenado-celular-envia-copia	52
+celular edita --envenenado-observador-edita	55
+celular edita --envenenado-corte-sobe	45
+celular edita --envenenado-remarca-todas	24
+celular edita --envenenado-remarca-solta	22
+celular edita --envenenado-sem-choque	21
+celular edita --envenenado-duracao-padrao	24
+celular edita --envenenado-cancela-sempre-sem	33
+celular edita --envenenado-cobranca-volta	19
+celular edita --envenenado-rolagem-antiga	18
+celular ficha (D6c lote 2)	37
+celular ficha --envenenado-sem-55	18
+celular ficha --envenenado-texto-errado	17
+celular ficha --envenenado-abre-sozinho	17
+celular ficha --envenenado-campo-obrigatorio	19
+celular ficha --envenenado-campos-nao-sobem	24
+celular ficha --envenenado-cobranca-retrato	27
+celular ficha --envenenado-observador-cadastra	32
+celular ficha --envenenado-extracao-antiga	21
+celular ficha --envenenado-aceita-http	21
+celular ficha --envenenado-nunca-desatualizado	27
+celular dinheiro (D6c lote 3)	31
+celular dinheiro --envenenado-selo-pelo-mes	19
+celular dinheiro --envenenado-parcial-vira-pago	19
+celular dinheiro --envenenado-aberto-vira-nada	18
+celular dinheiro --envenenado-total-do-mes	18
+celular dinheiro --envenenado-proposto-do-mes	20
+celular dinheiro --envenenado-cancelada-cobra	19
+celular dinheiro --envenenado-nome-antigo	18
+celular dinheiro --envenenado-pago-fora-da-acao	23
+celular dinheiro --envenenado-preco-de-hoje	24
+celular dinheiro --envenenado-observador-paga	27
+celular dinheiro --envenenado-sem-cancelada-a-frente	19
+celular dinheiro --envenenado-tira-hoje-do-proposto	19
+celular dinheiro --envenenado-falta-e-o-total	19
+celular dinheiro --envenenado-sem-meses-anteriores	19
+celular dinheiro --envenenado-cancela-sem-confirmar	19
+celular dinheiro --envenenado-sem-redesenho	19
+celular avisos (D6c lote 4)	39
+celular avisos --envenenado-cobra-antes-do-dia-6	21
+celular avisos --envenenado-observador-cobra	28
+celular avisos --envenenado-telefone-de-texto-vira-link	33
+celular avisos --envenenado-valor-fora-do-selo	19
+celular avisos --envenenado-registrada-falta-registrar	19
+celular avisos --envenenado-mais-de-3-avisos	24
+celular avisos --envenenado-lembrete-fora-da-janela	24
+celular avisos --envenenado-observador-sem-sessao	33
+cabecalho tablet em pe	5
+alvos de toque tablet (B6)	7
+trilha vinculos corrigidos	8
+preço descartado não vaza	5
+ações de aula no fechamento	6
+documento do ciclo (tela)	31
+biblioteca lerKits	15
+biblioteca lerKits --envenenado-guarda	4
+biblioteca lerKits --envenenado-empate	8
+biblioteca lerKits --envenenado-ajuda	6
+folha avisa mudancas	3
+folha --envenenado-cancela	3
+folha --envenenado-lixeira-muda	3
+folha --envenenado-alca	3
+folha --envenenado-traco-cancelado	3
+biblioteca listas --envenenado-palma	257
+biblioteca listas --envenenado-contorno	258
+biblioteca listas --envenenado-apara	257
+biblioteca listas --envenenado-lembra	20
+painel de valores	16
+painel de valores --envenenado-aberto	14
+painel de valores --envenenado-esquece	16
+gerador da biblioteca	82
+banco da biblioteca	3
+provas da biblioteca	6
