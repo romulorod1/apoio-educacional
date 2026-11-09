@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.29';
+  var VERSAO = '1.42.30';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -82,10 +82,18 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.29',
+      versao: '1.42.30',
       itens: [
         'O aplicativo ganhou uma aparência nova e mais limpa: uma só cor para as ações (o azul-marinho), letras um pouco maiores e mais fáceis de ler, e ícones desenhados no lugar das setas e marcas.',
         'Os botões ficaram mais altos, para o toque ficar mais confortável. Nada mudou de lugar e nenhum dado seu foi alterado.'
+      ]
+    },
+    {
+      versao: '1.42.29',
+      itens: [
+        'A folha escrita à mão de cada aula agora vai para a nuvem junto com o resto, página por página, e só sobe o que mudou.',
+        'No celular, o registro da aula tem "Ver a folha escrita à mão": a folha aparece do jeito que você escreveu no tablet, só para ler.',
+        'Uma página apagada no tablet sai também da nuvem.'
       ]
     },
     {
@@ -1162,6 +1170,13 @@
     db.ajustes = db.ajustes || {};
     var vista = db.ajustes.versaoVista;
     if (vista === VERSAO) return;
+    /* A VERSÃO MUDOU desde a última abertura (atualização ou volta de uma versão
+     * anterior): as folhas que têm estado por página são reconciliadas com o
+     * que está em `notas` (N2), porque a versão anterior grava a folha solta e
+     * não conhece o estado; o que mudou entra na fila e sobe. */
+    if (vista && self.Store && typeof Store.reconciliarFolhas === 'function') {
+      Store.reconciliarFolhas().catch(function () { /* a próxima gravação da folha acerta */ });
+    }
 
     /* Quem abre o aplicativo pela primeira vez ou sem versão anterior registrada
      * não recebe pop-up de novidades: não faz sentido contar novidades para quem
@@ -2087,31 +2102,42 @@
 
   // ================= dados de exemplo =================
 
-  /* Carga inicial, montada só com o que está documentado.
+  /* Carga de exemplo, SÓ PARA AS PROVAS (desde 09/11/2026, com o app em
+   * produção). Os nomes são de teste: nenhum é de aluno de verdade, e o repo é
+   * público. A conta do junho de referência é a que as provas conferem desde
+   * sempre: 10 encontros, 10:30 e R$ 1.050,00 para o aluno de referência, o
+   * único com valor por hora (R$ 100). Os demais ficam sem valor, e sem aula.
    *
-   * Os doze nomes e as horas vêm do fechamento de julho de 2026, que é dado real.
-   * O valor por hora NÃO é preenchido, porque não está registrado quem paga
-   * R$ 100 e quem paga R$ 150: inventar isso estragaria todos os fechamentos.
-   * A única exceção é o Marcelo, cujo valor de R$ 100 por hora está documentado
-   * no fechamento de junho (10:30 de aula e R$ 1.050,00).
-   *
-   * As aulas de junho do Marcelo também são reais, tiradas daquele mesmo
-   * fechamento. Nenhuma outra aula é criada: as datas dos demais não existem
-   * em lugar nenhum, e chutar datas geraria cobrança errada. */
+   * Ela só entra pela cargaDeExemploPedida(), logo abaixo. A ordem alfabética
+   * dos nomes de teste é a mesma dos nomes antigos, e a ordem da lista (que
+   * decide a cor de cada um) também. */
   var ALUNOS_INICIAIS = [
-    { nome: 'Daniel', horasJulho: 11, nota: 'Em julho houve aulas de 1 hora e de 2 horas.' },
-    { nome: 'Marcelo', horasJulho: 7, nota: 'Em julho foram 7 encontros de 1 hora.' },
-    { nome: 'Guilherme', horasJulho: 5, nota: '' },
-    { nome: 'Lucas', horasJulho: 5, nota: '' },
-    { nome: 'Cecília', horasJulho: 5, nota: 'Em julho houve aulas de 1 hora e meia.' },
-    { nome: 'Mariah', horasJulho: 3, nota: '' },
-    { nome: 'Paula', horasJulho: 3, nota: '' },
-    { nome: 'Marina', horasJulho: 3, nota: '' },
-    { nome: 'Mateus', horasJulho: 2, nota: '' },
-    { nome: 'Eduardo', horasJulho: 2, nota: '' },
-    { nome: 'Rafael', horasJulho: 1, nota: '' },
-    { nome: 'Theo', horasJulho: 1, nota: '' }
+    { nome: 'Aluno Beta Teste', horasJulho: 11, nota: 'Nota de exemplo da carga de teste.' },
+    { nome: 'Aluno Referência Teste', horasJulho: 7, nota: 'Nota de exemplo da carga de teste.', referencia: true },
+    { nome: 'Aluno Gama Teste', horasJulho: 5, nota: '' },
+    { nome: 'Aluno Lambda Teste', horasJulho: 5, nota: '' },
+    { nome: 'Aluno Alfa Teste', horasJulho: 5, nota: 'Nota de exemplo da carga de teste.' },
+    { nome: 'Aluno Sigma Teste', horasJulho: 3, nota: '' },
+    { nome: 'Aluno Upsilon Teste', horasJulho: 3, nota: '' },
+    { nome: 'Aluno Tau Teste', horasJulho: 3, nota: '' },
+    { nome: 'Aluno Teta Teste', horasJulho: 2, nota: '' },
+    { nome: 'Aluno Delta Teste', horasJulho: 2, nota: '' },
+    { nome: 'Aluno Xi Teste', horasJulho: 1, nota: '' },
+    { nome: 'Aluno Zeta Teste', horasJulho: 1, nota: '' }
   ];
+
+  /* QUANDO a carga de exemplo entra: só na origem local das provas
+   * (127.0.0.1 ou localhost), nunca em produção. O nome da origem vem do
+   * navegador, pelo endereço que abriu a página: em apoio-educacional.pages.dev
+   * e em romulorod1.github.io ele nunca é um destes dois, e nenhum parâmetro,
+   * link ou dado gravado muda isso. Em produção o banco vazio abre vazio, no
+   * primeiro uso, depois do "Apagar tudo" e com a nuvem ligada; e, num
+   * aparelho novo, nada de exemplo entra na fila que sobe para a nuvem.
+   * Prova: _teste/testa_carga_inicial.js (veneno --envenenado-carga-em-producao). */
+  function cargaDeExemploPedida() {
+    var nome = String(location.hostname || '');
+    return nome === '127.0.0.1' || nome === 'localhost';
+  }
 
   function cargaInicial() {
     var novo = Store.bancoVazio();
@@ -2131,21 +2157,21 @@
           ' de aula.' + (base.nota ? ' ' + base.nota : ''),
         precos: []
       };
-      if (base.nome === 'Marcelo') {
-        // único valor por hora que está documentado
+      if (base.referencia) {
+        // o único com valor por hora
         aluno.precos.push({ id: Core.uid(), inicio: '2026-01-01', fim: null, valorHora: 100 });
         marcelo = aluno;
       }
       novo.alunos.push(aluno);
     });
 
-    // Junho do Marcelo, exatamente como no fechamento que ela já escreveu.
+    // O junho de referência: 10 encontros, 10:30 e R$ 1.050,00.
     Core.criarSerie(novo, {
       alunoId: marcelo.id, dias: [1, 3, 5], hora: '15:30', duracaoMin: 60,
       inicio: '2026-06-01', fim: '2026-06-30'
     });
 
-    // No mês real ela não deu aula em 03, 12 e 29.
+    // Sem aula em 03, 12 e 29.
     ['2026-06-03', '2026-06-12', '2026-06-29'].forEach(function (d) {
       var a = Core.achaAula(novo, marcelo.id, d);
       if (a) Core.excluirAulas(novo, a.id, 'esta');
@@ -2156,14 +2182,12 @@
 
     novo.resumos.push({
       alunoId: marcelo.id, mes: '2026-06',
-      texto: 'Marcelo está se tornando um homenzinho. Muito legal acompanhar o crescimento dele de perto.\n' +
-        'Marcelo já consegue identificar o que ele quer fazer e está começando a se posicionar quanto a isso. ' +
-        'Vale lembrar, no entanto, que a vida não é feita apenas do que queremos fazer, mas também das coisas ' +
-        'que devem ser feitas.\n' +
+      texto: 'Resumo de exemplo do mês de junho, escrito para a carga de teste. O mês teve bom rendimento.\n' +
+        'O aluno já consegue dizer o que quer estudar e está começando a se posicionar quanto a isso. ' +
+        'Vale lembrar que o mês também tem as tarefas que precisam ser feitas.\n' +
         'Como combinado, estamos praticando a interpretação de textos e as respostas discursivas mais elaboradas, ' +
         'mas sem deixar de lado o conteúdo e as tarefas de casa.\n' +
-        'Marcelo tem se distraído um pouco mais durante as aulas e me cobrou, no nosso último encontro, ' +
-        'uma aula mais “legal”. Vou levar umas propostas diferentes para atrair mais a atenção dele.'
+        'Na próxima etapa vou levar propostas diferentes para manter a atenção nas aulas.'
     });
 
     return novo;
@@ -2187,10 +2211,15 @@
         db = carregado;
       } else if (modoCelular) {
         db = Store.bancoVazio(); // só na memória: os dados vêm da cópia do tablet
-      } else {
+      } else if (cargaDeExemploPedida()) {
+        // só nas provas, na origem local (ver cargaDeExemploPedida)
         db = cargaInicial();
         mesAtual = '2026-06';
         return Store.salvar(db);
+      } else {
+        /* Em produção o banco vazio abre vazio: nada é gravado aqui, e o que
+         * já estava no banco (os ajustes que sobram do "Apagar tudo") fica. */
+        db = carregado || Store.bancoVazio();
       }
     }).then(function () {
       if (db.alunos.some(function (a) { return a.daCargaInicial; }) && db.aulas.length) {
@@ -8006,6 +8035,81 @@
     atualizarStatusGravacaoFolha('salvo');
   }
 
+  /* A FOLHA SÓ PARA LER (N2): no celular da dona e no observador, a folha que
+   * o tablet escreveu abre na mesma janela, sem barra de ferramentas, sem
+   * "Salvo" e sem botão de salvar; o rodapé só passa de página e ajusta à
+   * tela. O editor nasce com `soLeitura`: todo ponteiro arrasta, nenhum
+   * escreve, e nada daqui grava (o fechar não passa pelo gravarNota). */
+  var leitorDeFolha = null;
+  function abrirFolhaParaLer(aulaId) {
+    var aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
+    if (!aula) return Promise.resolve(false);
+    var aluno = alunoPorId(aula.alunoId);
+    return Store.lerNota(aulaId).then(function (nota) {
+      if (!nota || !nota.paginas || !nota.paginas.length) {
+        avisar(aula.temNota ? 'A folha ainda não chegou da nuvem. Com sinal, ela chega sozinha.' : 'Esta aula não tem folha.');
+        return false;
+      }
+      var refs = [];
+      nota.paginas.forEach(function (p) {
+        (p.itens || []).forEach(function (it) { if (it.t === 'imagem' && it.ref) refs.push(it.ref); });
+      });
+      return Promise.all(refs.map(function (r) {
+        return Store.lerMidia(r).then(function (m) { return { ref: r, midia: m }; }, function () { return { ref: r, midia: null }; });
+      })).then(function (lista) {
+        var midias = {};
+        lista.forEach(function (x) {
+          if (!x.midia) return;
+          var img = new Image();
+          img.src = x.midia.dataUrl;
+          midias[x.ref] = { dataUrl: x.midia.dataUrl, w: x.midia.w, h: x.midia.h, img: img };
+        });
+        $('#titulo-modal-nota').textContent = 'Folha de aula, ' + (aluno ? aluno.nome : '') + ', ' + Core.ddmmaaaa(aula.data) + ' (só para ler)';
+        abrirModal('modal-nota');
+        if (leitorDeFolha) { leitorDeFolha.destruir(); leitorDeFolha = null; }
+        if (editorAtual) { editorAtual.destruir(); editorAtual = null; }
+        document.body.classList.add('folha-so-leitura');
+        $('#ferramentas-nota').innerHTML = '';
+        $('#ferramentas-nota').hidden = true;
+        $('#status-gravacao-folha').hidden = true;
+        $('#ajuda-folha-painel').style.display = 'none';
+        leitorDeFolha = new Draw.Editor($('#tela-desenho'), { nota: nota, midias: midias, soLeitura: true });
+        leitorDeFolha._aulaId = aulaId;
+        setTimeout(function () { if (leitorDeFolha) { leitorDeFolha.ajustarTamanho(); leitorDeFolha.ajustarNaTela(); } }, 30);
+        desenharRodapeLeitura();
+        return true;
+      });
+    });
+  }
+  function desenharRodapeLeitura() {
+    var rodape = $('#rodape-nota');
+    rodape.innerHTML = '';
+    if (!leitorDeFolha) return;
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn pequeno', texto: '‹', 'aria-label': 'Página anterior',
+      aoClick: function () { leitorDeFolha.irParaPagina(leitorDeFolha.indicePagina - 1); desenharRodapeLeitura(); }
+    }));
+    rodape.appendChild(el('span', { class: 'contador-pagina', id: 'folha-leitura-pagina',
+      texto: 'Página ' + (leitorDeFolha.indicePagina + 1) + ' de ' + leitorDeFolha.nota.paginas.length }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn pequeno', texto: '›', 'aria-label': 'Próxima página',
+      aoClick: function () { leitorDeFolha.irParaPagina(leitorDeFolha.indicePagina + 1); desenharRodapeLeitura(); }
+    }));
+    rodape.appendChild(el('span', { class: 'cresce' }));
+    rodape.appendChild(el('span', { class: 'ajuda u-margem-0', id: 'folha-leitura-aviso', texto: 'Só para ler. A folha se escreve no tablet.' }));
+    rodape.appendChild(el('button', {
+      type: 'button', class: 'btn pequeno', texto: 'Ajustar à tela',
+      aoClick: function () { leitorDeFolha.ajustarNaTela(); }
+    }));
+  }
+  function fecharLeitorDeFolha() {
+    if (leitorDeFolha) { leitorDeFolha.destruir(); leitorDeFolha = null; }
+    document.body.classList.remove('folha-so-leitura');
+    $('#ferramentas-nota').hidden = false;
+    $('#status-gravacao-folha').hidden = false;
+    fecharModal('modal-nota');
+  }
+
   var painelAjudaFolhaAberto = false;
 
   function atualizarStatusGravacaoFolha(estado, msg) {
@@ -8135,6 +8239,8 @@
 
   var fechandoEditorNota = false;
   function fecharEditorNota() {
+    // a folha aberta só para ler (N2) fecha sem gravar nada
+    if (leitorDeFolha) { fecharLeitorDeFolha(); return; }
     if (fechandoEditorNota) return;
     fechandoEditorNota = true;
     var aulaId = editorAtual && editorAtual._aulaId;
@@ -8153,6 +8259,8 @@
       if (editorAtual) { editorAtual.destruir(); editorAtual = null; }
       fecharModal('modal-nota');
       desenharAgenda();
+      // N2: a folha fechada sobe agora, sem esperar os 30 segundos da página recém-gravada
+      if (temNuvem()) Nuvem.enviarRegistrosSeDevido({ versaoApp: VERSAO, tudo: true });
     }).catch(function () {
       /* A folha fica ABERTA: fechar agora jogaria fora o que ela escreveu, que
        * ainda está só na tela. */
@@ -21573,6 +21681,32 @@
    * uma frase diz quantas mudanças chegaram. */
   function registrosChegaram(contas) {
     if (!contas || !contas.mudou) return;
+    /* Páginas de folha (N2): o documento dela não mudou; a folha aberta para
+     * ler, se for de uma aula que chegou, recarrega; a tela do celular
+     * redesenha (o "Ver a folha" segue o temNota, que vem pelo registro). */
+    if (contas.folhas) {
+      if (leitorDeFolha && leitorDeFolha._aulaId && (contas.aulas || []).indexOf(leitorDeFolha._aulaId) >= 0) {
+        var aulaAberta = leitorDeFolha._aulaId;
+        fecharLeitorDeFolha();
+        abrirFolhaParaLer(aulaAberta);
+      }
+      /* DOIS TABLETS com o EDITOR ABERTO na aula que chegou: a gravação seguinte
+       * deste editor cobriria a página recebida. Antes dela, a versão recebida
+       * fica guardada (folha-anterior) e ela é avisada. A guarda entra na fila
+       * das gravações da folha, para a próxima gravação esperar por ela. */
+      if (editorAtual && editorAtual._aulaId && (contas.aulas || []).indexOf(editorAtual._aulaId) >= 0) {
+        var aulaNoEditor = editorAtual._aulaId;
+        filaGravacaoNota = filaGravacaoNota.then(function () {
+          return Store.guardarVersaoRecebida(aulaNoEditor);
+        }).then(function () {
+          avisar('Esta folha mudou no outro tablet; a versão de lá ficou guardada.');
+        }, function () { /* sem guarda, a frase não é dita */ });
+      }
+      if (modoCelular) desenharCelular();
+      var np = contas.aplicados;
+      avisar(np === 1 ? 'Chegou 1 página de folha do tablet.' : 'Chegaram ' + np + ' páginas de folha do tablet.');
+      return;
+    }
     Store.carregar().then(function (lido) {
       if (!lido) return;
       db = lido;
@@ -21619,7 +21753,9 @@
     /* N1 (fatia 2): os registros que esperam na fila sobem nos mesmos momentos
      * da cópia (fechar, abrir, voltar), pelas mesmas guardas acima. A recusa da
      * nuvem fica guardada em Nuvem.estado().registros.erro e a fila fica. */
-    Nuvem.sincronizarSeDevido({ versaoApp: VERSAO });
+    // `tudo` (N2): ao fechar, abrir e voltar, as páginas de folha recém-gravadas sobem sem esperar;
+    // `fechando`: o pedido vai com keepalive quando couber, para sobreviver à página fechando
+    Nuvem.sincronizarSeDevido({ versaoApp: VERSAO, tudo: true, fechando: motivo === 'fechar' });
     var devida = motivo === 'diaria' ? Nuvem.copiaDiariaDevida() : Nuvem.copiaAutomaticaDevida();
     if (!devida) return;
     enviarCopiaParaNuvem(motivo);
@@ -21719,6 +21855,24 @@
     if (est.sincronizacaoDesligada) {
       return 'A sincronização entre aparelhos está desligada desde o "Apagar tudo". Para voltar a sincronizar, restaure a cópia da nuvem ' +
         'ou toque em Enviar cópia agora (o que está neste aparelho passa a valer).' + (n ? ' ' + guardadas + '.' : '');
+    }
+    /* A PÁGINA GRANDE DEMAIS para a nuvem (N2): a frase diz QUAL folha (aluno e
+     * data da aula), por quê e o que fazer; ela não é tentada de novo, e as
+     * outras mudanças seguem. */
+    var grandes = r.paginasGrandes || [];
+    if (grandes.length) {
+      var quais = grandes.map(function (g) {
+        var aula = (db.aulas || []).filter(function (a) { return a.id === g.aulaId; })[0];
+        var aluno = aula ? alunoPorId(aula.alunoId) : null;
+        var quem = aluno ? aluno.nome : 'uma aula que não está mais no tablet';
+        var quando = aula && aula.data ? ' (aula de ' + formatarDataExtensa(aula.data).replace(/^[^,]+, /, '') + ')' : '';
+        return quem + quando + ', página ' + (g.n + 1);
+      });
+      var qGrandes = q - grandes.length;
+      var outras = qGrandes > 0 ? ' ' + (qGrandes === 1 ? 'Outra mudança não consegue subir' : 'Outras ' + qGrandes + ' mudanças não conseguem subir') + ' (a nuvem recusa esse registro).' : '';
+      return (grandes.length === 1 ? 'A folha de ' + quais[0] + ', é grande demais para a nuvem e não sobe: divida a página em duas para ela subir.'
+        : 'Estas folhas têm página grande demais para a nuvem e não sobem: ' + quais.join('; ') + '. Divida cada uma dessas páginas em duas para elas subirem.') +
+        (n ? ' ' + guardadas + '; as outras mudanças seguem.' : ' As outras mudanças seguem.') + outras;
     }
     if (r.erro && r.erro.codigo === 'PERMISSION_DENIED') {
       return 'A nuvem ainda não aceita as mudanças uma a uma (as regras novas não foram publicadas). ' +
@@ -23494,6 +23648,15 @@
 
   function desenharAcoesNaFolha(folha, a, aluno, edita) {
     folha.appendChild(resumoDaAulaNaFolha(a, aluno));
+    /* A FOLHA ESCRITA À MÃO (N2): a que o tablet escreveu abre daqui só para
+     * ler, para a dona e para o observador. É leitura, não ação de edição:
+     * nada grava, e por isso não passa por botaoDeAcaoCelular. */
+    if (a.temNota) {
+      folha.appendChild(el('div', { class: 'barra u-margem-baixo-0' }, [
+        el('button', { type: 'button', class: 'btn cel-folha-botao cel-folha-largo cel-ver-folha', id: 'cel-folha-ver-folha', 'data-ver-folha': a.id, texto: 'Ver a folha escrita à mão',
+          aoClick: function () { abrirFolhaParaLer(a.id); } })
+      ]));
+    }
     if (edita) {
       var futura = a.data > Core.hojeIso();
       var s = a.status || 'realizada';

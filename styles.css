@@ -1371,6 +1371,8 @@ table.dados tr.total td { font-weight: 600; color: var(--navy); background: var(
   flex-shrink: 0;
 }
 .ferramentas .separador { width: 1px; height: 26px; background: var(--fio); margin: 0 3px; }
+/* a folha aberta só para ler (N2): sem barra de ferramentas e sem "Salvo" */
+.ferramentas[hidden], .status-gravacao[hidden] { display: none; }
 .ferramentas .cresce { flex: 1; }
 
 .ferr {
