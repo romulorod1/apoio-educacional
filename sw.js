@@ -151,6 +151,10 @@ var ARQUIVOS = [
    * nunca passa por aqui: ele vai para o IndexedDB ao ser importado. */
   './zip.js',
   './biblioteca.js',
+  /* O índice de texto dos livros (B12): o mesmo arquivo é o script da página
+   * e o Web Worker que lê os livros. Os livros e o índice nunca passam por
+   * aqui: ficam no IndexedDB. */
+  './indice-livros.js',
   /* O cartao do mes: ela toca uma vez no fechamento e manda a imagem por
    * WhatsApp. Se ficasse de fora da lista, o app.js novo rodaria contra o
    * cartao.js velho servido do cache de sobra, depois de uma atualizacao. */

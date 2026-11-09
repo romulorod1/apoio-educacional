@@ -15693,6 +15693,9 @@
       quantosLivros = lista.length;
       livrosDoTablet = lista.map(function (l) { return { id: l.id, meta: l.meta }; });
       atualizarBotaoLivros();
+      /* B12: o índice de texto acompanha a lista (livro novo entra na fila,
+       * livro removido ou trocado sai). Roda num Worker, sem segurar a tela. */
+      if (typeof IndiceLivros === 'object' && IndiceLivros) IndiceLivros.sincronizar();
       if (!caixa) return;
       caixa.innerHTML = '';
       if (!lista.length) return;

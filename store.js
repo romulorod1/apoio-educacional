@@ -35,6 +35,11 @@
  * para o Drive continua do tamanho de antes. A fase 1 da nuvem (N1, versão 5
  * do banco) respeita a lista SO_DESTE_TABLET, lá embaixo.
  *
+ * O índice de texto dos livros (B12) NÃO mora aqui: fica num banco à parte,
+ * 'indice-livros' (indice-livros.js), para este banco continuar na versão 6.
+ * Por isso ele fica fora da cópia de segurança e da nuvem sem precisar de
+ * lista nenhuma, e só o "Apagar tudo" o toca (apagarTudo, lá embaixo).
+ *
  * E os da fase 1 da nuvem (versão 5 do banco, N1 fatia 1):
  *   registros : UM REGISTRO POR ITEM do documento principal (aluno, série,
  *               aula, resumo, pagamento, chave de ajuste), com atualizadoEm,
@@ -2105,7 +2110,13 @@
       esvaziar('biblioteca_uso'),
       esvaziar('biblioteca_etiquetas'),
       esvaziar('biblioteca_listas'),
-      esvaziar('livros_posicoes')
+      esvaziar('livros_posicoes'),
+      /* O índice de texto dos livros (B12) mora num banco à parte,
+       * 'indice-livros' (indice-livros.js), e sai inteiro: é derivado dos
+       * livros, que ficam, e se refaz na próxima abertura do aplicativo. */
+      root.IndiceLivros && typeof root.IndiceLivros.apagar === 'function'
+        ? root.IndiceLivros.apagar().catch(function () { /* o índice é cache: sem ele, a próxima abertura refaz */ })
+        : Promise.resolve()
     ]);
   }
 
