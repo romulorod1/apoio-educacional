@@ -575,6 +575,10 @@ roda "salvar --envenenado-salvar-no-pedido"     node "_teste/testa_store_grava_n
 # saida); --envenenado-nota-no-pedido o faz responder com ela aberta e tem de
 # acusar EXATAMENTE o salvarNota
 roda "salvar --envenenado-nota-no-pedido"       node "_teste/testa_store_grava_no_commit.js" --envenenado-nota-no-pedido
+# N2 (fatia 2, anexos na nuvem): o salvarMidia, o salvarAnexo e o apagarAnexo
+# tem transacao propria (deposito, estado e fila); --envenenado-arquivo-no-pedido
+# os faz responder com ela aberta e tem de acusar EXATAMENTE os tres
+roda "salvar --envenenado-arquivo-no-pedido"    node "_teste/testa_store_grava_no_commit.js" --envenenado-arquivo-no-pedido
 # E o outro lado, que o conserto criou: a escrita que falha passa a REJEITAR.
 # --envenenado-nao-rejeita tira o onabort do escrever, e a transacao abortada
 # depois do sucesso do pedido tem de deixar a promessa pendurada a vista;
@@ -915,6 +919,12 @@ roda "nuvem folhas --envenenado-quarentena-sobrevive-ao-restauro" node "_teste/t
 roda "nuvem anexos (N2 fatia 2)"                    node "_teste/testa_nuvem_anexos.js"
 roda "nuvem anexos --envenenado-sha-errado"         node "_teste/testa_nuvem_anexos.js" --envenenado-sha-errado
 roda "nuvem anexos --envenenado-sobe-duas-vezes"    node "_teste/testa_nuvem_anexos.js" --envenenado-sobe-duas-vezes
+# (lente B da fatia 2) o download que falha no segundo tablet fica "a baixar" e
+# nunca vira lapide; a lapide de anexo que a aula viva ainda cita nao apaga o
+# arquivo. Venenos: a reconciliacao que lapida o recebido TEM de apagar o PDF
+# do tablet A; sem a defesa, a lapide TEM de apagar o PDF.
+roda "nuvem anexos --envenenado-lapida-o-recebido"  node "_teste/testa_nuvem_anexos.js" --envenenado-lapida-o-recebido
+roda "nuvem anexos --envenenado-sem-defesa"         node "_teste/testa_nuvem_anexos.js" --envenenado-sem-defesa
 # (revisao do PR 118) o "Apagar tudo" zera a fila deste aparelho e o recebimento
 # em curso confere a marca dentro da transacao; o celular nao enfileira a lapide
 # da fusao; a restauracao enfileira tambem o que e igual a copia; a confirmacao

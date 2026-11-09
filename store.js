@@ -2242,7 +2242,13 @@
   /* A RECONCILIAÇÃO DOS ARQUIVOS QUE TÊM ESTADO, na abertura de uma versão
    * nova: o arquivo removido pela versão anterior (que apaga solto, sem
    * lápide) vira lápide e entra na fila; o gravado por ela (sem estado) fica
-   * como está, como a folha. Nada no aparelho que só lê. */
+   * como está, como a folha. Nada no aparelho que só lê.
+   * SÓ O QUE ESTE APARELHO GRAVOU (o estado nascido aqui, no salvarArquivo ou
+   * na restauração) pode virar lápide: o estado que veio DA NUVEM (`recebido`)
+   * sem o arquivo no disco é um download que falhou ("a baixar"), não uma
+   * remoção, e lapidá-lo apagaria o arquivo do tablet que o enviou (achado da
+   * lente B, 09/11/2026). */
+  function lapidavelNaReconciliacao(e) { return !!e && !e.apagadoEm && !e.recebido; }
   function reconciliarArquivos() {
     if (soLeitura) return Promise.resolve({ lapides: 0 });
     return abrir().then(function (b) {
@@ -2253,7 +2259,7 @@
           lerEstadosDosArquivos(t, function (estados) {
             Object.keys(estados).forEach(function (filaId) {
               var e = estados[filaId], p = partesDoIdDoArquivo(filaId);
-              if (!e || e.apagadoEm || !p) return;
+              if (!lapidavelNaReconciliacao(e) || !p) return;
               t.objectStore(depositoDaOrigem(p.origem)).count(p.id).onsuccess = function (ev) {
                 if (ev.target.result) return;
                 contas.lapides++;
@@ -2276,13 +2282,52 @@
    * arquivo do aparelho; o vivo vira estado, e o que falta no disco volta em
    * `faltam`, para o tablet baixar na hora (o celular e o observador baixam
    * quando ela abre). Item sem id só avança o cursor. */
+  /* A aula viva ainda cita o arquivo? O anexo, pela lista `anexos` do registro
+   * da aula; a imagem, pela folha da aula. Sem aula conhecida, não. */
+  function aindaCitado(t, p, aulaId, depois) {
+    if (!aulaId) { depois(false); return; }
+    if (p.origem === 'midia') {
+      t.objectStore('notas').get(aulaId).onsuccess = function (ev) {
+        var n = ev.target.result;
+        depois(!!(n && (n.paginas || []).some(function (pg) {
+          return pg && (pg.itens || []).some(function (it) { return it && it.t === 'imagem' && it.ref === p.id; });
+        })));
+      };
+      return;
+    }
+    t.objectStore('registros').get('aula:' + aulaId).onsuccess = function (ev) {
+      var r = ev.target.result;
+      depois(!!(r && !r.apagadoEm && r.dados && (r.dados.anexos || []).some(function (an) { return an && (an.id || an) === p.id; })));
+    };
+  }
+  /* Os arquivos "a baixar" (o download que falhou), que o tablet pede de novo
+   * a cada recebimento: o estado vivo que veio da nuvem e ainda não está no
+   * disco. */
+  function arquivosABaixar() {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, ['anexos', 'midias', 'controle'], 'readonly');
+        var lista = [];
+        lerEstadosDosArquivos(t, function (estados) {
+          Object.keys(estados).forEach(function (filaId) {
+            var e = estados[filaId], p = partesDoIdDoArquivo(filaId);
+            if (!p || !e || e.apagadoEm || !e.aBaixar) return;
+            t.objectStore(depositoDaOrigem(p.origem)).count(p.id).onsuccess = function (ev) { if (!ev.target.result) lista.push(filaId); };
+          });
+        });
+        t.oncomplete = function () { resolve(lista.sort()); };
+        t.onerror = function () { reject(t.error || new Error('A leitura falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A leitura foi interrompida.')); };
+      });
+    });
+  }
   function aplicarAnexosRecebidos(lista) {
     var agora = new Date().toISOString();
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = transacao(b, ['anexos', 'midias', 'controle', 'saida'], 'readwrite', true);
+        var t = transacao(b, ['anexos', 'midias', 'controle', 'saida', 'registros', 'notas'], 'readwrite', true);
         var controle = t.objectStore('controle'), saida = t.objectStore('saida');
-        var contas = { aplicados: 0, ignorados: 0, apagados: 0, faltam: [], invalidos: 0 };
+        var contas = { aplicados: 0, ignorados: 0, apagados: 0, faltam: [], invalidos: 0, preservados: 0 };
         var fila = {}, cursorAntes = null, desligada = false;
         saida.getAll().onsuccess = function (e) { (e.target.result || []).forEach(function (f) { fila[f.id] = f; }); };
         controle.get('cursorAnexos').onsuccess = function (e) { cursorAntes = e.target.result || null; };
@@ -2318,18 +2363,36 @@
                 return;
               }
               var deposito = t.objectStore(depositoDaOrigem(p.origem));
+              /* O estado nascido aqui continua daqui (este aparelho teve o
+               * arquivo); o resto nasce da nuvem (`recebido`). */
+              var recebido = !(local && !local.recebido && !local.apagadoEm);
               if (c.apagadoEm) {
-                deposito.delete(p.id);
-                controle.put(Object.assign({}, local || {}, { origem: p.origem, aulaId: c.aulaId || (local && local.aulaId) || '',
-                  sha256: c.sha256 || (local && local.sha256) || null, atualizadoEm: c.atualizadoEm || agora, apagadoEm: c.apagadoEm, nuvem: carimbo }), chave);
+                var aulaDaLapide = c.aulaId || (local && local.aulaId) || '';
+                /* A DEFESA: a lápide de um arquivo que uma aula viva (ou a folha
+                 * dela) ainda cita não tira o arquivo do aparelho; o estado vira
+                 * lápide mesmo assim. O "Remover" legítimo tira o anexo da aula
+                 * antes, e os registros e as folhas chegam antes dos anexos no
+                 * mesmo recebimento. */
+                aindaCitado(t, p, aulaDaLapide, function (citado) {
+                  if (citado) contas.preservados = (contas.preservados || 0) + 1; else deposito.delete(p.id);
+                  controle.put(Object.assign({}, local || {}, { origem: p.origem, aulaId: aulaDaLapide,
+                    sha256: c.sha256 || (local && local.sha256) || null, atualizadoEm: c.atualizadoEm || agora, apagadoEm: c.apagadoEm, nuvem: carimbo,
+                    recebido: recebido, aBaixar: false }), chave);
+                });
                 contas.apagados++;
                 contas.aplicados++;
                 return;
               }
-              controle.put({ sha256: c.sha256, tamanho: c.tamanho || null, tipo: c.tipo || null, origem: p.origem, aulaId: c.aulaId || '',
-                nome: c.nomeArquivo || '', w: c.largura || null, h: c.altura || null, atualizadoEm: c.atualizadoEm || agora, apagadoEm: null, nuvem: carimbo }, chave);
+              var vivo = { sha256: c.sha256, tamanho: c.tamanho || null, tipo: c.tipo || null, origem: p.origem, aulaId: c.aulaId || '',
+                nome: c.nomeArquivo || '', w: c.largura || null, h: c.altura || null, atualizadoEm: c.atualizadoEm || agora, apagadoEm: null, nuvem: carimbo,
+                recebido: recebido, aBaixar: false };
               contas.aplicados++;
-              deposito.count(p.id).onsuccess = function (ev) { if (!ev.target.result) contas.faltam.push(c.id); };
+              /* O que falta no disco fica "a baixar": é pedido de novo (no tablet,
+               * a cada recebimento) e nunca vira lápide na reconciliação. */
+              deposito.count(p.id).onsuccess = function (ev) {
+                if (!ev.target.result) { vivo.aBaixar = true; contas.faltam.push(c.id); }
+                controle.put(vivo, chave);
+              };
             };
           });
           if (cursorMaior && (!cursorAntes || cursorMaior.servidorEm !== cursorAntes.servidorEm || cursorMaior.nome !== (cursorAntes.nome || ''))) {
@@ -2362,7 +2425,11 @@
           var e = req.result;
           if (e && e.apagadoEm) return;
           t.objectStore(depositoDaOrigem(p.origem)).put(registro, p.id);
-          if (e && !e.sha256 && conteudo.sha256) { e.sha256 = conteudo.sha256; t.objectStore('controle').put(e, PREFIXO_ARQUIVO + filaId); }
+          if (e && (e.aBaixar || (!e.sha256 && conteudo.sha256))) {
+            if (!e.sha256 && conteudo.sha256) e.sha256 = conteudo.sha256;
+            e.aBaixar = false;
+            t.objectStore('controle').put(e, PREFIXO_ARQUIVO + filaId);
+          }
           gravado = registro;
         };
         t.oncomplete = function () { resolve(gravado); };
@@ -3206,7 +3273,8 @@
             // e os arquivos deste aparelho (N2, fatia 2): os vivos com restauro, as lápides do que subiu como lápide
             varrerControle(t, PREFIXO_ARQUIVO, function (chave, e) {
               var filaId = String(chave).slice(PREFIXO_ARQUIVO.length);
-              if (!e || !partesDoIdDoArquivo(filaId)) return;
+              // o "a baixar" não está no disco: não há o que levar
+              if (!e || !partesDoIdDoArquivo(filaId) || (!e.apagadoEm && e.aBaixar)) return;
               if (e.apagadoEm) { if (e.nuvem && !e.nuvem.apagado) saida.put({ id: filaId, tipo: 'anexo', atualizadoEm: e.atualizadoEm, apagadoEm: e.apagadoEm, aulaId: e.aulaId || '', origem: e.origem }); }
               else saida.put({ id: filaId, tipo: 'anexo', atualizadoEm: e.atualizadoEm, apagadoEm: null, aulaId: e.aulaId || '', origem: e.origem, restauro: true });
             });
@@ -3286,7 +3354,7 @@
     /* Anexos e mídias pelo sha256 (N2, fatia 2). */
     idDoArquivo: idDoArquivo, partesDoIdDoArquivo: partesDoIdDoArquivo, bytesDoArquivo: bytesDoArquivo,
     estadoDoArquivo: estadoDoArquivo, lerCursorAnexos: lerCursorAnexos, aplicarAnexosRecebidos: aplicarAnexosRecebidos,
-    guardarArquivoRecebido: guardarArquivoRecebido, reconciliarArquivos: reconciliarArquivos,
+    guardarArquivoRecebido: guardarArquivoRecebido, reconciliarArquivos: reconciliarArquivos, arquivosABaixar: arquivosABaixar,
     ESPERA_FOLHA: ESPERA_FOLHA,
     montarRegistros: montar,
     aparelho: function () { return aparelhoId; },

@@ -141,7 +141,13 @@ const RESTAURO_IGUAL = "if (restauro && saida && sincronizavel(chave, item.tipo)
 const CONFIRMA_APAGADO = "apagadoEm: i.registro.apagadoEm || null,";
 conf('o "Apagar tudo" zera a fila na mesma transação, num lugar só', STORE.split(FILA_ZERA).length, 2);
 conf('o "Apagar tudo" grava a marca da sincronização desligada na mesma transação', STORE.indexOf("t.objectStore('controle').put({ desligada: true, desde: agora }, 'sincronizacao');") > 0, true);
-conf('o aplicar confere a marca dentro da transação, num lugar só', STORE.split(APLICA_DESLIGADO).length, 2);
+/* Dois lugares legítimos (N2, fatia 2): o aplicarRecebidos (os registros) e o
+ * aplicarAnexosRecebidos (a coleção `anexos`), que é outra transação e confere
+ * a mesma marca. O das folhas termina em "return undefined;". O veneno abaixo
+ * troca o PRIMEIRO, que tem de ser o dos registros. */
+conf('o aplicar dos registros e o dos anexos conferem a marca dentro da transação, um lugar cada', STORE.split(APLICA_DESLIGADO).length, 3);
+conf('a primeira conferência da marca é a do aplicarRecebidos (a que o veneno tira)', STORE.indexOf('function aplicarRecebidos(') < STORE.indexOf(APLICA_DESLIGADO) &&
+  STORE.indexOf(APLICA_DESLIGADO) < STORE.indexOf('function aplicarAnexosRecebidos('), true);
 conf('a lápide da fusão só entra na fila fora do aparelho que só lê, num lugar só', STORE.split(FUSAO_SO_LEITURA).length, 2);
 conf('a restauração enfileira também o item igual à cópia, num lugar só', STORE.split(RESTAURO_IGUAL).length, 2);
 conf('a confirmação do envio leva apagadoEm, num lugar só', NUVEM.split(CONFIRMA_APAGADO).length, 2);
