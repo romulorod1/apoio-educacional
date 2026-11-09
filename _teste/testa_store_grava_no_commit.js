@@ -148,11 +148,13 @@ if (VENENO) {
 }
 
 const ONABORT = "          t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };";
+const ONABORT_ESCREVER = "        t.onabort = function () { reject(motivo('A gravação foi interrompida.')); };";
 const ONERROR_ARQUIVO = "          t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };";
 const trechoEntre = (texto, inicio, fim) => {
   const a = texto.indexOf(inicio), b = texto.indexOf(fim, a);
   return a >= 0 && b > a ? texto.slice(a, b) : '';
 };
+const TRECHO_ESCREVER = trechoEntre(STORE_REPO, 'function escrever(', 'function gravar(');
 const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const RELE = '      db = lido || Store.bancoVazio();';
 let trocaNova = null;
@@ -248,7 +250,8 @@ const CAMINHOS = [
     esperado: 2048
   },
   {
-    nome: 'apagarAnexo', pelo_gravar: false,
+    /* apagarAnexo também usa transação própria, fora de escrever. */
+    nome: 'apagarAnexo', pelo_gravar: false, fora_escrever: true,
     prepara: () => Store.salvarAnexo('anexo-prova-apagar', { nome: 'a.pdf', tipo: 'application/pdf', blob: new Blob([new Uint8Array(16)]) }),
     chama: ['apagarAnexo', 'anexo-prova-apagar'],
     le: () => Store.lerAnexo('anexo-prova-apagar').then(r => (r ? 'ainda la' : 'apagado')),
@@ -303,7 +306,7 @@ async function rodaCaminho(pag, c) {
   if (r.erro) { conf(c.nome + ': a escrita respondeu sem erro', r.erro, 'sem erro'); return; }
   const lido = await pag.evaluate('(' + c.le.toString() + ')()');
   const morde = ESPERA_PERDA && (VENENO_ARQUIVO ? !!c.pelo_arquivo
-    : VENENO_ESCREVER ? !c.poda_depois && !c.pelo_salvar && !c.pelo_nota && !c.pelo_arquivo
+    : VENENO_ESCREVER ? !c.poda_depois && !c.pelo_salvar && !c.pelo_nota && !c.pelo_arquivo && !c.fora_escrever
       : VENENO_SALVAR ? !!c.pelo_salvar : VENENO_NOTA ? !!c.pelo_nota : c.pelo_gravar);
   if (morde) {
     conf('VENENO ENXERGADO em ' + c.nome + ': respondeu com a transação ainda aberta', r.pendentes > 0, true);
@@ -447,7 +450,7 @@ async function parteQuatro(pag) {
     conf('a linha que o veneno tira casa exatamente uma vez, e a troca aconteceu', !!trocaNova, true);
     if (!trocaNova) throw Object.assign(new Error('a troca do veneno não aconteceu; nada a medir'), { jaContado: true });
   } else {
-    conf('o `onabort` do escrever existe (a âncora do veneno da rejeição)', STORE_REPO.split(ONABORT).length - 1, 1);
+    conf('o `onabort` do escrever existe (a âncora do veneno da rejeição)', TRECHO_ESCREVER.split(ONABORT_ESCREVER).length - 1, 1);
     conf('a releitura do disco existe (a âncora do veneno do app)', APP_REPO.split(RELE).length - 1, 1);
     conf('o gravar do store.js passa pelo escrever (a âncora do primeiro veneno existe)', GRAVAR_CONSERTADO.test(STORE_REPO), true);
     conf('o escrever responde na transação (a âncora do segundo veneno existe)', ESCREVER_CONSERTADO.test(STORE_REPO), true);
