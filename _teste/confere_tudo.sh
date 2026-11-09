@@ -926,17 +926,36 @@ roda "celular dinheiro --envenenado-sem-redesenho"  node "_teste/testa_celular_d
 # criterio do tablet, Core.aulaTemRegistro), a familia em aberto do dia 6 em
 # diante com o WhatsApp so do telefone validado e o valor do selo, e o
 # lembrete de fechar o mes (3 ultimos dias e 5 primeiros do seguinte). No
-# maximo 3, a agenda na primeira tela de 360 x 740; o observador sem cobrar.
+# a agenda na primeira tela de 360 x 740; o observador sem cobrar.
 roda "celular avisos (D6c lote 4)"                  node "_teste/testa_celular_avisos.js"
 roda "celular avisos --envenenado-cobra-antes-do-dia-6" node "_teste/testa_celular_avisos.js" --envenenado-cobra-antes-do-dia-6
 roda "celular avisos --envenenado-observador-cobra" node "_teste/testa_celular_avisos.js" --envenenado-observador-cobra
 roda "celular avisos --envenenado-telefone-de-texto-vira-link" node "_teste/testa_celular_avisos.js" --envenenado-telefone-de-texto-vira-link
 roda "celular avisos --envenenado-valor-fora-do-selo" node "_teste/testa_celular_avisos.js" --envenenado-valor-fora-do-selo
 roda "celular avisos --envenenado-registrada-falta-registrar" node "_teste/testa_celular_avisos.js" --envenenado-registrada-falta-registrar
-roda "celular avisos --envenenado-mais-de-3-avisos" node "_teste/testa_celular_avisos.js" --envenenado-mais-de-3-avisos
 roda "celular avisos --envenenado-lembrete-fora-da-janela" node "_teste/testa_celular_avisos.js" --envenenado-lembrete-fora-da-janela
 # (revisao do lote 4) cobrar e fechar o mes so no celular que e da dona, nunca pela falta de observador
 roda "celular avisos --envenenado-observador-sem-sessao" node "_teste/testa_celular_avisos.js" --envenenado-observador-sem-sessao
+# (avisos compactos, 09/11, desenho final base C) recolhidos num selinho na linha
+# da data, o painel por cima da agenda (uma linha por tipo, Dispensar todos, a
+# sincronia no rodape), o ponto no bloco da aula sem registro pela mesma lista, e o
+# deslizar que dispensa ate o dia seguinte, guardado so no aparelho. Venenos: o
+# painel aberto sem toque, o ponto na aula registrada, o ponto por outro
+# criterio, os avisos empilhados de antes (a agenda desce dos 422 px), o selinho
+# numa linha so dele, o dispensado que nao volta no dia seguinte, o arrasto que
+# nao tira o aviso e o dispensado que entra na fila de registros
+roda "celular avisos --envenenado-lista-aberta-por-padrao" node "_teste/testa_celular_avisos.js" --envenenado-lista-aberta-por-padrao
+roda "celular avisos --envenenado-marca-em-registrada" node "_teste/testa_celular_avisos.js" --envenenado-marca-em-registrada
+roda "celular avisos --envenenado-marca-e-lista-discordam" node "_teste/testa_celular_avisos.js" --envenenado-marca-e-lista-discordam
+roda "celular avisos --envenenado-avisos-empilhados" node "_teste/testa_celular_avisos.js" --envenenado-avisos-empilhados
+roda "celular avisos --envenenado-recolhido-empurra" node "_teste/testa_celular_avisos.js" --envenenado-recolhido-empurra
+roda "celular avisos --envenenado-dispensa-para-sempre" node "_teste/testa_celular_avisos.js" --envenenado-dispensa-para-sempre
+roda "celular avisos --envenenado-dispensa-nao-some" node "_teste/testa_celular_avisos.js" --envenenado-dispensa-nao-some
+roda "celular avisos --envenenado-dispensa-na-nuvem" node "_teste/testa_celular_avisos.js" --envenenado-dispensa-na-nuvem
+# (auditoria de 09/11) o topo fixo do Hoje em no maximo 20% da altura (360 x 780,
+# 390 x 844 e 412 x 915, letra normal e a 130%): os avisos abertos e os dias da
+# semana de volta no alto preso TEM de reprovar
+roda "celular avisos --envenenado-topo-alto"        node "_teste/testa_celular_avisos.js" --envenenado-topo-alto
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
