@@ -47,6 +47,11 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const H = require('./_bib_navegador');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const { conf, secao, esperar, pausa } = H;
 
 const PORTA = 8863;
@@ -74,7 +79,7 @@ const amb = H.criarAmbiente(PORTA, 'nath_c15b_mapa', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'c15b_mapa_'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
 
-const hojeIso = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+const hojeIso = RELOGIO.dia(0);
 
 function gerarPacote() {
   const r = spawnSync(PYTHON, ['-X', 'utf8', path.join(H.RAIZ, 'biblioteca', '_amostra', 'fazer_amostra_livros.py'), TMP, '--pacote'],
@@ -189,8 +194,10 @@ async function printar(pag, nome) {
 
   await amb.subir();
   const p = await amb.pagina();
+  await RELOGIO.naPagina(p);
   await p.setBypassServiceWorker(true);
   await H.abrirApp(p, amb.ORIGEM);
+  await RELOGIO.conferir(p);
   const estado = await importar(p, ZIP);
   conf('os quatro livros entraram', /4 livros novos/.test(estado), true);
   // alunos e aulas fictícios: um do 6º, um do 7º e um da 2ª série do médio, todos com aula hoje
