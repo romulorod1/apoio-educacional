@@ -146,7 +146,7 @@ const gravar = (p, banco) => p.evaluate(b => new Promise(resolve => {
   const req = indexedDB.open('apoio-educacional');
   req.onsuccess = () => {
     const s = req.result.transaction('dados', 'readwrite').objectStore('dados').put(b, 'principal');
-    s.onsuccess = () => resolve(true);
+    s.transaction.oncomplete = () => resolve(true);
     s.onerror = () => resolve(false);
   };
   req.onerror = () => resolve(false);

@@ -908,7 +908,9 @@ const ABERTO_C = 'Escrito no celular enquanto o tablet mandava outra.';
   const antigo = f => spawnSync('git', ['show', BASE + ':' + f], { cwd: H.RAIZ, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout || '';
   /* O sw.js muda a cada versão só no comentário e no nome do CACHE: fora isso,
    * o código dele tem de ser o da 1.42.18. */
-  const swNucleo = s => s.replace(/\r\n/g, '\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/var CACHE = '[^']*';/, '').replace(/\s+/g, ' ');
+  /* Arquivo NOVO na lista ARQUIVOS (um asset que o aplicativo passa a servir) não muda o código do
+   * worker nem a volta de versão: o indice-livros.js (B12) é conhecido e sai da comparação. */
+  const swNucleo = s => s.replace(/\r\n/g, '\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/var CACHE = '[^']*';/, '').replace(/\s*'\.\/indice-livros\.js',/, '').replace(/\s+/g, ' ');
   const iguais = ['sw.js'].map(f => swNucleo(antigo(f)) === swNucleo(fs.readFileSync(path.join(H.RAIZ, f), 'utf8')));
   conf('o sw.js desta versão é o da 1.42.18, fora o comentário e o nome do CACHE', iguais.join(','), 'true');
   const regCel = await pagC.evaluate(id => Store.lerRegistros().then(l => { const r = l.find(x => x.id === id);
