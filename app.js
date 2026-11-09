@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.31';
+  var VERSAO = '1.42.32';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -82,9 +82,16 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.31',
+      versao: '1.42.32',
       itens: [
         'A Biblioteca agora prepara, em segundo plano, a busca no texto dos livros. Uma linha discreta mostra o andamento (por exemplo, "Preparando a busca: 12 de 65 livros") e some quando termina. Você pode usar o aplicativo normalmente enquanto isso. A busca em si chega numa próxima versão.'
+      ]
+    },
+    {
+      versao: '1.42.31',
+      itens: [
+        'No celular, o aviso de versão nova cabe na tela: "Versão nova pronta." com os botões Atualizar e Depois logo abaixo, mesmo com a letra maior.',
+        'A barra de cima do celular ficou menor e some quando está tudo salvo; ela volta quando há algo esperando a nuvem.'
       ]
     },
     {
@@ -1547,6 +1554,7 @@
     var caixa = $('#aviso');
     caixa.classList.remove('aviso-dourado'); // só o Desfazer do dispensar (D6c) é dourado
     $('#aviso-texto').textContent = texto;
+    $('#aviso-texto').removeAttribute('data-versao'); // só o aviso de versão nova o põe
     var botao = $('#aviso-acao');
     if (aoAgir) {
       botao.style.display = '';
@@ -1563,6 +1571,8 @@
       botao2.textContent = aoAgir2 ? rotulo2 : '';
       botao2.onclick = aoAgir2 ? function () { esconderAviso(); aoAgir2(); } : null;
     }
+    // com duas ações, o celular põe o texto numa linha e os botões na de baixo
+    caixa.classList.toggle('com-duas-acoes', !!(aoAgir && aoAgir2));
     /* Medido no momento de mostrar: a janela pode ter mudado de altura depois
      * de aberta, e é agora que o aviso precisa caber. */
     posicionarAviso();
@@ -2358,10 +2368,20 @@
   function mostrarAvisoDeVersao() {
     var versao = versaoPendenteAtiva && versaoPendenteAtiva.versao;
     versaoProntaParaOPainel = versao || 'nova';
+    /* No celular, curto (o dono viu o texto maior que o botão e o "Atualizar
+     * agora" saindo da tela em 360 px): o texto numa linha e os dois botões
+     * na de baixo, lado a lado (styles.css, .aviso.com-duas-acoes). O número
+     * fica no aviso (data-versao) e no Diagnóstico. */
+    if (modoCelular) {
+      avisar('Versão nova pronta.', 'Atualizar', aplicarAtualizacao, 'Depois', atualizarDepoisDaAula);
+      $('#aviso-texto').setAttribute('data-versao', versao || '');
+      desenharAjustes();
+      renovarAvisosCelular(); // e vira aviso do painel de Hoje do celular
+      return;
+    }
     avisar('Versão nova pronta' + (versao ? ' (' + versao + ')' : ''),
       'Atualizar agora', aplicarAtualizacao, 'Depois da aula', atualizarDepoisDaAula);
     desenharAjustes();
-    if (modoCelular) renovarAvisosCelular(); // e vira aviso do painel de Hoje do celular
   }
 
   function atualizarDepoisDaAula() {
@@ -22552,6 +22572,12 @@
     origem.classList.toggle('cel-desatualizado', !!estado.destaque);
     var nuvem = $('#cel-nuvem');
     if (nuvem) nuvem.setAttribute('data-tom', estado.tom);
+    /* A barra do alto some no celular da dona quando está tudo em dia (nada
+     * esperando sinal, nada com erro, recebido há pouco) e volta quando há
+     * pendência ou erro: o estado continua no #cel-origem, para quem lê a tela. */
+    var celular = $('#modo-celular');
+    if (celular) celular.classList.toggle('topo-recolhido', edita && estado.tom === 'em-dia' && !estado.destaque &&
+      temDadosNoCelular() && !celularPedeEntrada);
     var acoes = $('#cel-acoes');
     acoes.innerHTML = '';
     if (!temDadosNoCelular() || celularPedeEntrada) return;
