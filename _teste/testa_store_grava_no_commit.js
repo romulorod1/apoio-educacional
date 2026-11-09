@@ -83,8 +83,9 @@
  *     salvarMidia, o salvarAnexo e o apagarAnexo, e a parte 1b tem de ver o
  *     salvarAnexo dizer que salvou sem nada ter ficado.
  *   node _teste/testa_store_grava_no_commit.js --envenenado-nao-rejeita
- *     o `escrever` perde o `t.onabort`: a transação abortada depois do sucesso
- *     do pedido deixa a promessa pendurada, e a parte 1b tem de ver isso.
+ *     o `escrever` perde o `t.onabort`, e o salvarArquivo perde o onerror e o
+ *     onabort dele: a transação abortada depois do sucesso do pedido deixa a
+ *     promessa pendurada, e a parte 1b tem de ver isso nos dois caminhos.
  *   node _teste/testa_store_grava_no_commit.js --envenenado-nao-rele
  *     o app.js servido não relê o disco depois de uma gravação que rejeitou no
  *     meio: a parte 4 tem de ver o próximo salvar gravar o estado velho.
@@ -172,8 +173,20 @@ const ONABORT = "        t.onabort = function () { reject(motivo('A gravação f
 const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const RELE = '      db = lido || Store.bancoVazio();';
 let trocaNova = null;
+/* Do 2835f47 (a ferramenta parceira): o mesmo veneno tira também os dois
+ * tratamentos de falha da transação própria do salvarArquivo, e a parte 1b vê
+ * as DUAS promessas penduradas (a do escrever e a do arquivo). */
+const ONABORT_ARQUIVO = "          t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };";
+const ONERROR_ARQUIVO = "          t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };";
+const trechoEntre = (texto, inicio, fim) => {
+  const a = texto.indexOf(inicio), b = texto.indexOf(fim, a);
+  return a >= 0 && b > a ? texto.slice(a, b) : '';
+};
+const TRECHO_ARQUIVO = trechoEntre(STORE_REPO, 'function salvarArquivo(', 'function lapidarArquivo(');
 if (VENENO_REJEITA) {
-  trocaNova = STORE_REPO.split(ONABORT).length - 1 === 1 ? STORE_REPO.split(ONABORT).join('') : null;
+  const arquivoOk = TRECHO_ARQUIVO.split(ONERROR_ARQUIVO).length === 2 && TRECHO_ARQUIVO.split(ONABORT_ARQUIVO).length === 2;
+  const base = arquivoOk ? STORE_REPO.replace(TRECHO_ARQUIVO, TRECHO_ARQUIVO.replace(ONERROR_ARQUIVO, '').replace(ONABORT_ARQUIVO, '')) : null;
+  trocaNova = base && base.split(ONABORT).length - 1 === 1 ? base.split(ONABORT).join('') : null;
   if (trocaNova) trocas['/store.js'] = trocaNova;
 }
 if (VENENO_RELE) {
@@ -470,6 +483,8 @@ async function parteQuatro(pag) {
     if (!trocaNova) throw Object.assign(new Error('a troca do veneno não aconteceu; nada a medir'), { jaContado: true });
   } else {
     conf('o `onabort` do escrever existe (a âncora do veneno da rejeição)', STORE_REPO.split(ONABORT).length - 1, 1);
+    conf('o onerror e o onabort do salvarArquivo existem uma vez cada (a outra âncora do veneno da rejeição)',
+      [TRECHO_ARQUIVO.split(ONERROR_ARQUIVO).length, TRECHO_ARQUIVO.split(ONABORT_ARQUIVO).length].join(','), '2,2');
     conf('a releitura do disco existe (a âncora do veneno do app)', APP_REPO.split(RELE).length - 1, 1);
     conf('o gravar do store.js passa pelo escrever (a âncora do primeiro veneno existe)', GRAVAR_CONSERTADO.test(STORE_REPO), true);
     conf('o escrever responde na transação (a âncora do segundo veneno existe)', ESCREVER_CONSERTADO.test(STORE_REPO), true);
@@ -531,6 +546,7 @@ async function parteQuatro(pag) {
   conf('e nada ficou gravado no anexo (o abort valeu)', ficou, -1);
   if (VENENO_REJEITA && !CONTROLE) {
     conf('VENENO ENXERGADO: sem o onabort, a promessa ficou pendurada', rej, 'pendurada');
+    conf('VENENO ENXERGADO: sem o onerror e o onabort do salvarArquivo, a promessa do salvarAnexo ficou pendurada', rejArq, 'pendurada');
     return;
   }
   if (ESPERA_PERDA && (VENENO_GRAVAR || VENENO_ESCREVER)) {

@@ -581,8 +581,8 @@ roda "salvar --envenenado-nota-no-pedido"       node "_teste/testa_store_grava_n
 roda "salvar --envenenado-arquivo-no-pedido"    node "_teste/testa_store_grava_no_commit.js" --envenenado-arquivo-no-pedido
 # E o outro lado, que o conserto criou: a escrita que falha passa a REJEITAR.
 # --envenenado-nao-rejeita tira o onabort do escrever (a miniatura 'bib:' passa
-# por ele), e a transacao abortada depois do sucesso do pedido tem de deixar a
-# promessa pendurada a vista;
+# por ele) e os dois tratamentos de falha do salvarArquivo, e a transacao
+# abortada depois do sucesso do pedido tem de deixar as duas promessas penduradas;
 # --envenenado-nao-rele tira a releitura do disco do app.js, e uma copia que
 # rejeita no meio tem de deixar o proximo salvar gravar o estado velho.
 roda "salvar --envenenado-nao-rejeita"          node "_teste/testa_store_grava_no_commit.js" --envenenado-nao-rejeita
