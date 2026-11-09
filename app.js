@@ -17337,10 +17337,20 @@
   var bibLivrosVez = 0;
   var bibLivrosCache = Object.create(null);   // id -> { id, meta, pos, cor }, do último desenho
   var bibLivroAberto = null;                   // o id do livro na tela do livro
-  var CORES_DAS_CAPAS = ['var(--navy)', 'var(--teal)', 'var(--hoje-texto)', 'var(--apoio-azulado)'];
+  // as cores das capas são as do protótipo (styles.css, --capa-*), todas com letra branca a 4,5:1 ou mais
+  var CORES_DAS_CAPAS = ['var(--capa-alfa)', 'var(--capa-beta)', 'var(--capa-gama)', 'var(--capa-delta)', 'var(--capa-zeta)'];
   var SEM_ANO = 'sem-ano';
-  // o título que já traz o número ("Capítulo 2: Frações", "Unidade 4") dispensa a coluna do número
-  var ROTULO_COM_NUMERO = /^(cap[ií]tulo|unidade|parte|m[oó]dulo)\s+\d+/i;
+  /* O título que já traz o número ("Capítulo 2: Frações", "Unidade 4: Leitura"):
+   * o número vai para a coluna do numeral e o título fica limpo ("Frações"). */
+  var ROTULO_COM_NUMERO = /^(cap[ií]tulo|unidade|parte|m[oó]dulo)\s+(\d+)\s*[:.,-]?\s*(.*)$/i;
+  function partesDoCapitulo(titulo, k) {
+    var m = ROTULO_COM_NUMERO.exec(titulo || '');
+    if (m && m[3]) {
+      return { numero: m[2], titulo: m[3],
+        palavra: /^cap/i.test(m[1]) ? 'Capítulo' : m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase() };
+    }
+    return { numero: String(k), titulo: titulo, palavra: 'Capítulo' };
+  }
 
   /* A PÁGINA QUE O SUMÁRIO MOSTRA. Hoje é a página do ARQUIVO (a do PDF), a
    * mesma que o leitor conta. A fatia B3 do redesenho traz a página impressa
@@ -17377,7 +17387,10 @@
   function disciplinaDoLivro(meta) {
     var id = (meta && meta.materia) || 'outra';
     var m = Core.materiaPorId(id);
-    return { id: id, nome: (m && m.rotulo) || (meta && meta.materia_nome) || 'Outros livros' };
+    // a matéria que o app não conhece fica com o nome dela, e cada uma no seu grupo
+    var nome = (m && m.rotulo) || (meta && meta.materia_nome) ||
+      (id === 'outra' ? 'Outros livros' : id.charAt(0).toUpperCase() + id.slice(1).replace(/[-_]+/g, ' '));
+    return { id: id, nome: nome };
   }
   function anosDoLivro(meta) {
     var s = Array.isArray(meta && meta.series) ? meta.series.filter(function (x) { return typeof x === 'string' && x; }) : [];
@@ -17421,12 +17434,17 @@
   function ondeParou(l) {
     var pos = l.pos, meta = l.meta;
     if (!pos) return '';
-    if (meta.formato === 'epub') {
-      var e = entradaAtualDoSumario(meta.sumario, 'capitulo', pos.capitulo || 1);
-      return e ? e.titulo : 'Parte ' + (pos.capitulo || 1);
+    var epub = meta.formato === 'epub';
+    // os dois formatos contam pelos capítulos do sumário (o nível de cima), e não pelas seções
+    var caps = capitulosDoSumario(meta.sumario);
+    var ent = entradaAtualDoSumario(caps, epub ? 'capitulo' : 'pagina', epub ? (pos.capitulo || 1) : (pos.pagina || 1));
+    var cap = '';
+    if (ent) {
+      var p = partesDoCapitulo(ent.titulo, caps.indexOf(ent) + 1);
+      cap = (p.palavra === 'Capítulo' ? 'Cap. ' : p.palavra + ' ') + p.numero + ', ' + p.titulo;
     }
-    var ent = entradaAtualDoSumario(capitulosDoSumario(meta.sumario), 'pagina', pos.pagina || 1);
-    return [ent ? ent.titulo : '', 'p. ' + (pos.pagina || 1)].filter(Boolean).join(' · ');
+    if (epub) return cap || 'Parte ' + (pos.capitulo || 1);
+    return [cap, 'p. ' + (pos.pagina || 1)].filter(Boolean).join(' · ');
   }
   function progressoDoLivro(l) {
     var pos = l.pos, meta = l.meta;
@@ -17442,16 +17460,30 @@
     var caixa = $('#bib-livros'), titulo = $('#bib-exercicios-titulo'), cont = $('#bib-livros-contagem');
     if (caixa) caixa.hidden = !sim;
     if (titulo) titulo.hidden = !sim;
-    if (!sim && cont) cont.textContent = '';
+    if (cont) { cont.hidden = !sim; if (!sim) cont.textContent = ''; }
+  }
+
+  /* A NAVEGAÇÃO DOS EXERCÍCIOS CAI NOS EXERCÍCIOS. Com os livros à vista, o
+   * alto da aba é a seção de livros, e a série, o módulo, a aula, o Voltar e
+   * o Material da aula levariam ela para cima deles, com o que pediu abaixo
+   * da dobra. Sem livros (ou com a busca, que tira os livros do caminho), o
+   * alto da aba é o próprio começo dos exercícios, como sempre foi. */
+  function rolarParaOsExercicios() {
+    var cont = $('.conteudo');
+    if (!cont) return;
+    var livros = $('#bib-livros');
+    if (!livros || livros.hidden || livros.classList.contains('bibl-na-busca')) { cont.scrollTop = 0; return; }
+    var ctx = $('#bib-contexto');
+    var alvo = ctx && !ctx.hidden ? ctx : $('#bib-exercicios-cabeca');
+    if (!alvo) { cont.scrollTop = 0; return; }
+    cont.scrollTop = Math.max(0, alvo.getBoundingClientRect().top - cont.getBoundingClientRect().top + cont.scrollTop);
   }
 
   /* A busca dos exercícios mostra o resultado logo abaixo dela: enquanto há
    * termo, os livros saem do caminho. */
   function livrosNaBusca(buscando) {
-    ['#bib-livros', '#bib-exercicios-titulo'].forEach(function (s) {
-      var x = $(s);
-      if (x) x.classList.toggle('bibl-na-busca', !!buscando);
-    });
+    var x = $('#bib-livros');
+    if (x) x.classList.toggle('bibl-na-busca', !!buscando);
   }
 
   function desenharLivrosDaBiblioteca() {
@@ -17531,7 +17563,9 @@
     var ids = disciplinas.map(function (d) { return d.id; });
     if (ids.indexOf(bibLivrosNav.disciplina) < 0) {
       var ultimo = recentes[0];
-      bibLivrosNav.disciplina = ultimo ? disciplinaDoLivro(ultimo.meta).id : ids[0];
+      // sem leitura, a primeira disciplina COM livro (a Matemática dos exercícios pode não ter livro)
+      var primeira = disciplinas.filter(function (d) { return d.livros.length; })[0] || disciplinas[0];
+      bibLivrosNav.disciplina = ultimo ? disciplinaDoLivro(ultimo.meta).id : primeira.id;
       bibLivrosNav.ano = ultimo ? anosDoLivro(ultimo.meta)[0] : null;
     }
     var disc = disciplinas[ids.indexOf(bibLivrosNav.disciplina)];
@@ -17586,12 +17620,28 @@
       el('span', { class: 'bibl-apoio', texto: disc.livros.length ? plural(disc.livros.length, 'livro', 'livros') + faixa : 'nenhum livro no tablet' })
     ]));
     if (disc.listaAnos.some(function (a) { return a !== SEM_ANO; })) {
-      var chips = el('div', { class: 'bibl-anos', role: 'radiogroup', 'aria-label': 'Ano' });
+      /* Grupo de rádio de verdade: um só na ordem do Tab (o escolhido), e as
+       * setas trocam o ano, como no rádio do sistema. */
+      var escolherAno = function (a, focar) {
+        bibLivrosNav.ano = a;
+        redesenhar();
+        if (focar) { var b = caixa.querySelector('.bibl-ano[data-ano="' + a + '"]'); if (b) b.focus(); }
+      };
+      var chips = el('div', { class: 'bibl-anos', role: 'radiogroup', 'aria-label': 'Ano',
+        aoKeydown: function (ev) {
+          var passo = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
+          if (!passo) return;
+          ev.preventDefault();
+          var i = disc.listaAnos.indexOf(bibLivrosNav.ano) + passo;
+          i = (i + disc.listaAnos.length) % disc.listaAnos.length;
+          escolherAno(disc.listaAnos[i], true);
+        } });
       disc.listaAnos.forEach(function (a) {
         var on = a === bibLivrosNav.ano;
         chips.appendChild(el('button', { type: 'button', class: 'bibl-ano' + (on ? ' ativo' : ''), role: 'radio',
-          'aria-checked': on ? 'true' : 'false', 'data-ano': a, 'aria-label': a === SEM_ANO ? 'Sem ano' : nomeDoAno(a),
-          texto: rotuloDoChipDoAno(a), aoClick: function () { bibLivrosNav.ano = a; redesenhar(); } }));
+          'aria-checked': on ? 'true' : 'false', tabindex: on ? '0' : '-1', 'data-ano': a,
+          'aria-label': a === SEM_ANO ? 'Sem ano' : nomeDoAno(a),
+          texto: rotuloDoChipDoAno(a), aoClick: function () { escolherAno(a, false); } }));
       });
       painel.appendChild(chips);
     }
@@ -17640,9 +17690,8 @@
   }
 
   function irParaExerciciosDoAno(serie) {
+    // o irNaBiblioteca já rola até os exercícios
     irNaBiblioteca({ serie: serie, modulo: null, aula: null });
-    var alvo = $('#bib-exercicios-titulo');
-    if (alvo && alvo.scrollIntoView) alvo.scrollIntoView({ block: 'start' });
   }
 
   /* ---- a tela do livro: o sumário clicável e o capítulo onde ela está ---- */
@@ -17713,6 +17762,8 @@
     atual = atual || capitulos[0] || null;
     var continuar = l.pos ? (epub ? 'Continuar no capítulo ' + (l.pos.capitulo || 1) : 'Continuar na p. ' + (l.pos.pagina || 1)) : 'Abrir o livro';
 
+    // redesenhar o MESMO livro (o leitor fechou, os nomes dos assuntos chegaram) mantém a rolagem do sumário
+    var rolagem = !tela.hidden && tela.dataset.livro === l.id ? tela.scrollTop : 0;
     tela.innerHTML = '';
     tela.dataset.livro = l.id;
     tela.appendChild(el('header', { class: 'bibl-livro-cabeca' }, [
@@ -17741,11 +17792,13 @@
       lista.appendChild(el('p', { class: 'bibl-falta-texto bibl-sem-sumario', id: 'bib-livro-sem-sumario',
         texto: 'Este livro não tem sumário nem mapa de assuntos. Abra o livro e use Anterior e Próxima.' }));
     }
-    var k = 0, j = 0;
+    var k = 0, j = 0, numeroDoCapitulo = '';
     sumario.forEach(function (e) {
       var ehCapitulo = (e.nivel || nivel) === nivel;
       if (ehCapitulo) { k++; j = 0; } else j++;
-      var numero = ehCapitulo ? (ROTULO_COM_NUMERO.test(e.titulo) ? '' : String(k)) : (k ? k + '.' + j : '');
+      var partes = ehCapitulo ? partesDoCapitulo(e.titulo, k) : null;
+      if (ehCapitulo) numeroDoCapitulo = partes.numero;
+      var numero = ehCapitulo ? partes.numero : (numeroDoCapitulo ? numeroDoCapitulo + '.' + j : '');
       var pagina = epub ? null : paginaParaMostrar(meta, e);
       var linhaAssuntos = null;
       if (ehCapitulo && mapa.length) {
@@ -17758,10 +17811,11 @@
       lista.appendChild(el('button', { type: 'button', class: (ehCapitulo ? 'bibl-cap' : 'bibl-sec') + (on ? ' atual' : ''),
         'data-n': String(e.n), 'data-pagina': epub ? null : String(paginaDoArquivo(meta, e)),
         'data-capitulo': epub ? String(e.capitulo) : null, 'aria-current': on ? 'true' : null,
-        'aria-label': (ehCapitulo ? 'Capítulo ' + k : 'Seção ' + numero) + ', ' + e.titulo + (pagina != null ? ', página ' + pagina : ''),
+        'aria-label': (ehCapitulo ? partes.palavra + ' ' + numero + ', ' + partes.titulo : 'Seção ' + numero + ', ' + e.titulo) +
+          (pagina != null ? ', página ' + pagina : ''),
         aoClick: function () { abrirCapitulo(l, e); } }, [
         el('span', { class: 'bibl-cap-n', texto: numero }),
-        el('span', { class: 'bibl-cap-titulo', texto: e.titulo }),
+        el('span', { class: 'bibl-cap-titulo', texto: ehCapitulo ? partes.titulo : e.titulo }),
         el('span', { class: 'bibl-cap-p', texto: pagina != null ? String(pagina) : '' }),
         linhaAssuntos
       ]));
@@ -17770,7 +17824,7 @@
     var corpo = el('div', { class: 'bibl-livro-corpo' + (atual ? '' : ' sem-painel') }, [lista]);
     if (atual) {
       var ma = mapa.length ? entradaDoMapaDoCapitulo(mapa, meta, atual) : null;
-      var nAtual = capitulos.indexOf(atual) + 1;
+      var pAtual = partesDoCapitulo(atual.titulo, capitulos.indexOf(atual) + 1);
       var fim = atual.pagina_fim;
       var paginas = epub || !atual.pagina ? '' : fim && fim >= atual.pagina ?
         'Páginas do arquivo ' + paginaParaMostrar(meta, atual) + ' a ' + fim + ' · ' + plural(fim - atual.pagina + 1, 'página', 'páginas') :
@@ -17779,11 +17833,11 @@
       if (!mapa.length) assuntos = [el('p', { class: 'bibl-falta-texto', texto: 'Este livro ainda não tem mapa de assuntos.' })];
       else if (!ma || !ma.assuntos.length) assuntos = [el('p', { class: 'bibl-falta-texto', texto: 'Nenhum assunto ligado ainda.' })];
       else assuntos = ma.assuntos.map(function (id) { return el('div', { class: 'bibl-assunto', 'data-assunto': id, texto: nomeDoAssunto(id) }); });
-      corpo.appendChild(el('aside', { class: 'bibl-livro-painel', 'aria-label': 'Capítulo ' + nAtual }, [
+      corpo.appendChild(el('aside', { class: 'bibl-livro-painel', 'aria-label': pAtual.palavra + ' ' + pAtual.numero }, [
         el('div', { class: 'bibl-livro-painel-corpo' }, [
-          // o "Capítulo 3" fica de fora quando o título já diz o número
-          ROTULO_COM_NUMERO.test(atual.titulo) ? null : el('p', { class: 'bibl-apoio', texto: 'Capítulo ' + nAtual }),
-          el('h3', { class: 'bibl-titulo-livro', texto: atual.titulo }),
+          // o rótulo pequeno em cima e o título limpo embaixo, como no desenho
+          el('p', { class: 'bibl-apoio bibl-painel-rotulo', texto: pAtual.palavra + ' ' + pAtual.numero }),
+          el('h3', { class: 'bibl-titulo-livro', texto: pAtual.titulo }),
           paginas ? el('p', { class: 'bibl-apoio', texto: paginas }) : null,
           el('h4', { class: 'bibl-rotulo', texto: 'Assuntos ligados' })
         ].concat(assuntos)),
@@ -17796,7 +17850,7 @@
     }
     tela.appendChild(corpo);
     tela.hidden = false;
-    tela.scrollTop = 0;
+    tela.scrollTop = rolagem;
     // os nomes dos assuntos chegam do índice: sem ele, a tela mostra os ids e se refaz quando ele abre
     if (!nomes && nLigados) {
       carregarAssuntosDosLivros().then(function (v) {
@@ -17885,7 +17939,10 @@
       return (minhasListasLidas ? Promise.resolve() : carregarMinhasListas()).then(function () {
         desenharCarrinho();
         desenharCorpoBiblioteca();
-        return desenharLivrosDaBiblioteca();
+        return desenharLivrosDaBiblioteca().then(function () {
+          // vindo do Material de uma aula, o que ela pediu está nos exercícios, abaixo dos livros
+          if (bibContexto) rolarParaOsExercicios();
+        });
       });
     }).catch(function () {
       corpo.innerHTML = '';
@@ -17937,8 +17994,7 @@
     // a volta para a lista pronta vale só enquanto ela estiver na lista cheia que a abriu
     if (bibVoltarPara && !(bibNav.aula && bibNav.aula.slug === bibVoltarPara.slug)) bibVoltarPara = null;
     desenharCorpoBiblioteca();
-    var cont = $('.conteudo');
-    if (cont) cont.scrollTop = 0;
+    rolarParaOsExercicios();
   }
 
   function linhaBib(titulo, detalhe, aoTocar, extra) {

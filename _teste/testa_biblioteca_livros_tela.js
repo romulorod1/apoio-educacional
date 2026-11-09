@@ -29,6 +29,12 @@
  *   6. o livro sem sumário diz isso na tela dele;
  *   7. tablet 1280x800, com a letra a 100% e a 130%: nada transborda, alvo de
  *      48 px, sem travessão, e nenhum erro de página;
+ *   7b. o topo é o do desenho (título, contagem e a busca dos exercícios numa
+ *      linha, o Continuar lendo logo abaixo), o guia das listas e a contagem
+ *      dos exercícios ficam na cabeça de "Exercícios e listas", e a navegação
+ *      dos exercícios (módulo aberto, Material da aula) rola até eles em vez
+ *      de cair em cima dos livros; numa largura estreita (800 px, tablet em
+ *      pé) com a letra a 100% e a 130%, nada transborda;
  *   8. nada novo gravado: os depósitos têm, no fim, as mesmas chaves de antes
  *      dos toques, fora a posição de leitura que os leitores já guardavam.
  *
@@ -153,6 +159,27 @@ async function fecharModal(pag, id) {
   await esperar('a janela ' + id + ' fechou', () => pag.evaluate(i => !document.querySelector('#' + i + '.aberto'), id), v => v, 5000);
   await pausa(400);
 }
+/* A posição de um elemento na área que rola (.conteudo), em px a partir do alto dela. */
+const altoNaArea = (pag, sel) => pag.evaluate(s => {
+  const e = document.querySelector(s); const c = document.querySelector('.conteudo');
+  if (!e || !c) return null;
+  return Math.round(e.getBoundingClientRect().top - c.getBoundingClientRect().top);
+}, sel);
+let hojeIso = '';
+async function abrirAulaDeHoje(pag, hora) {
+  await H.irParaAba(pag, 'agenda');
+  for (let i = 0; i < 24; i++) {
+    if (await pag.evaluate(h => !!document.querySelector('[data-dia="' + h + '"]'), hojeIso)) break;
+    await pag.click(i < 12 ? '#mes-seguinte' : '#mes-anterior');
+    await pausa(120);
+  }
+  const ok = await pag.evaluate((h, hr) => {
+    const alvo = Array.from(document.querySelectorAll('[data-dia="' + h + '"] .pilula')).find(p => p.textContent.indexOf(hr) === 0);
+    if (!alvo) return false; alvo.click(); return true;
+  }, hojeIso, hora);
+  await esperar('aula das ' + hora + ' aberta', () => pag.evaluate(() => document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
+  return ok;
+}
 const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelector(s); if (!b) return false; b.click(); return true; }, sel);
 
 /* A trava de transbordo no que a fatia desenha: botão e texto dentro da
@@ -199,11 +226,16 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   pag.on('console', m => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) errosDePagina.push(m.text()); });
   await pag.setViewport({ width: 1280, height: 800, hasTouch: true, deviceScaleFactor: PRINTS ? 2 : 1 });
   await H.abrirApp(pag, amb.ORIGEM);
-  await pag.evaluate(async () => {
+  hojeIso = await pag.evaluate(() => Core.hojeIso());
+  await pag.evaluate(async h => {
     const d = await Store.carregar();
-    d.alunos = [{ id: 'al_alfa', nome: 'Aluno Alfa Teste', ano: '6', anoEscolar: '6º ano do Ensino Fundamental', responsavel: 'Responsável Alfa' }];
+    d.alunos = [{ id: 'al_alfa', nome: 'Aluno Alfa Teste', ano: '6', anoEscolar: '6º ano do Ensino Fundamental', responsavel: 'Responsável Alfa',
+      grade: 'quarta-feira, 10:00', vigencias: [{ id: 'v1', inicio: '2026-01-01', fim: '2027-12-31', valorHora: 100 }] }];
+    // a aula de hoje com um assunto que o pacote do 9º tem: o Material dela leva aos exercícios
+    d.aulas = [{ id: 'au_material', alunoId: 'al_alfa', serieId: null, data: h, hora: '10:00', duracaoMin: 60, status: 'agendada',
+      cobravel: true, notaTexto: '', notaPrivada: '', temNota: false, anexos: [], temas: [{ titulo: 'Bhaskara', fonte: 'livre' }] }];
     await Store.salvar(d);
-  });
+  }, hojeIso);
   await H.abrirApp(pag, amb.ORIGEM);
 
   // ================================================================
@@ -214,7 +246,12 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   let s = await lerSecao(pag);
   conf('sem livro, a seção de livros não aparece', s.visivel, false);
   conf('nem o título "Exercícios e listas"', s.tituloExercicios, false);
-  conf('e a contagem de livros fica vazia', s.contagem, '');
+  conf('e a contagem de livros fica vazia e escondida', s.contagem + '|' + await pag.evaluate(() => document.querySelector('#bib-livros-contagem').hidden), '|true');
+  conf('o guia das listas e a contagem dos exercícios continuam na aba, na cabeça dos exercícios', await pag.evaluate(() =>
+    !!document.querySelector('#bib-exercicios-cabeca #btn-guia-listas') && /exercícios/.test(document.querySelector('#bib-exercicios-cabeca #bib-contagem').textContent)), true);
+  conf('a busca diz que é dos exercícios', await pag.evaluate(() => {
+    const i = document.querySelector('#busca-biblioteca'); return i.getAttribute('aria-label') + ' | ' + i.placeholder;
+  }), 'Buscar nos exercícios | Buscar nos exercícios (bhaskara, pitágoras...)');
   const modulosAntes = await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .item-lista .nome')).map(n => n.textContent.trim()).join(' | '));
   conf('os módulos do 9º ano estão à vista, como antes', modulosAntes, 'Equações do Segundo Grau | Produtos Notáveis e Fatoração | Teorema de Pitágoras');
 
@@ -237,6 +274,14 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('cada livro diz o que tem e o que falta', s.faltas,
     'livro-com-marcadores=mapa,livro-sem-marcadores=mapa,livro-sem-sumario=sumario:sem sumário nem mapa de assuntos');
   conf('sem leitura ainda, sem Continuar lendo', s.continuar, '');
+  // os anos são um grupo de rádio: a seta para a direita leva ao 7º
+  await pag.focus('#bib-livros .bibl-ano[data-ano="06"]');
+  await pag.keyboard.press('ArrowRight');
+  s = await lerSecao(pag);
+  conf('a seta troca o ano e o foco vai junto', s.anoAtivo + '|' + await pag.evaluate(() => (document.activeElement || { dataset: {} }).dataset.ano),
+    '07|07');
+  conf('só o ano escolhido entra no Tab', await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-livros .bibl-ano'))
+    .map(b => b.dataset.ano + ':' + b.getAttribute('tabindex')).join(',')), '06:-1,07:0,08:-1,09:-1');
   await clicar(pag, '#bib-livros .bibl-ano[data-ano="09"]');
   s = await lerSecao(pag);
   conf('o 9º ano mostra só os livros do 9º (o do mapa é só do 6º)', s.livros, 'livro-com-marcadores,livro-sem-sumario');
@@ -255,8 +300,11 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   const serieAtiva = await pag.evaluate(() => (document.querySelector('#bib-corpo .bib-series .chip-filtro.ativo, #bib-corpo .chip-filtro.ativo') || {}).textContent || '');
   const modulos = await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .item-lista .nome')).map(n => n.textContent.trim()).join(' | '));
   conf('o cartão leva aos módulos do 9º ano', modulos, 'Equações do Segundo Grau | Produtos Notáveis e Fatoração | Teorema de Pitágoras');
-  const tituloVisivel = await pag.evaluate(() => { const r = document.querySelector('#bib-exercicios-titulo').getBoundingClientRect(); return r.top >= -1 && r.top < innerHeight; });
-  conf('e rola até "Exercícios e listas"', tituloVisivel, true);
+  const altoCartao = await altoNaArea(pag, '#bib-exercicios-cabeca');
+  // a área rola até o título; se a página acaba antes, ela fica no fim (não dá para subir mais), com o título à vista
+  const noFim = await pag.evaluate(() => { const c = document.querySelector('.conteudo'); return c.scrollTop > 0 && c.scrollTop >= c.scrollHeight - c.clientHeight - 1; });
+  conf('e rola até "Exercícios e listas" (no alto da área, ou no fim dela)', altoCartao !== null && altoCartao >= -2 && (altoCartao <= 40 || noFim), true);
+  console.log('   "Exercícios e listas" a ' + altoCartao + ' px do alto');
   console.log('   série ativa: ' + serieAtiva);
   conf('Minhas listas continua na aba', await pag.evaluate(() => !!document.querySelector('#bib-corpo #bib-abas [data-aba="minhas"]')), true);
   const abriu = await pag.evaluate(() => {
@@ -268,6 +316,9 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     texto: (document.querySelector('#bib-corpo') || {}).innerText || '' }));
   conf('o módulo abre, com a teoria e os exercícios dele', abriu && dentro.titulo === 'Equações do Segundo Grau' &&
     /Teoria/.test(dentro.texto) && /Exercícios/.test(dentro.texto), true);
+  const altoModulo = await altoNaArea(pag, '#bib-exercicios-cabeca');
+  conf('o módulo aberto não cai em cima dos livros: "Exercícios e listas" no alto', altoModulo !== null && altoModulo >= -2 && altoModulo <= 40, true);
+  console.log('   módulo aberto: "Exercícios e listas" a ' + altoModulo + ' px do alto');
   await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = 'bhaskara'; i.dispatchEvent(new Event('input', { bubbles: true })); });
   const busca = await esperar('o resultado da busca', () => pag.evaluate(() => [document.querySelector('#bib-corpo').innerText,
     !!document.querySelector('#bib-corpo .bib-titulo')]), v => !v[1] && /Equações do Segundo Grau/.test(v[0]), 5000);
@@ -291,7 +342,10 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('a tela cobre o trilho (tela cheia)', lv.cobreOTrilho, true);
   conf('o resumo: páginas, capítulos e assuntos ligados', lv.resumo, '6 páginas · 3 capítulos · 2 assuntos ligados');
   conf('a coluna diz que a página é a do arquivo', lv.rotulo, 'página do arquivo');
-  conf('capítulos e seção, com a página do arquivo de cada um (o primeiro marcado)', lv.linhas, 'cap1@1[]*,cap2@3[],sec3@4[2.1],cap4@5[]');
+  conf('o sumário tem a coluna do numeral e o título limpo', await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-livro .bibl-cap'))
+    .map(b => b.querySelector('.bibl-cap-n').textContent + ' ' + b.querySelector('.bibl-cap-titulo').textContent).join(' | ')),
+  '1 Números naturais | 2 Frações | 3 Geometria plana');
+  conf('capítulos e seção, com a página do arquivo de cada um (o primeiro marcado)', lv.linhas, 'cap1@1[1]*,cap2@3[2],sec3@4[2.1],cap4@5[3]');
   conf('o capítulo sem assunto diz isso', /nenhum assunto ligado ainda$/.test(lv.assuntosDosCapitulos), true);
   conf('sem leitura, o botão do alto é "Abrir o livro"', lv.continuar, 'Abrir o livro');
   await clicar(pag, '#bib-livro .bibl-cap[data-n="2"]');
@@ -317,14 +371,14 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await esperar('a tela do livro com a página 4', () => lerLivro(pag), v => v.visivel && /p\. 4/.test(v.continuar), 5000);
   lv = await lerLivro(pag);
   conf('depois de ler, o botão do alto diz onde ela parou', lv.continuar, 'Continuar na p. 4');
-  conf('e o capítulo onde ela está fica marcado', lv.linhas, 'cap1@1[],cap2@3[]*,sec3@4[2.1],cap4@5[]');
-  conf('o painel mostra o capítulo 2, as páginas e o assunto', /Capítulo 2: Frações[\s\S]*Páginas do arquivo 3 a 4 · 2 páginas[\s\S]*Assuntos ligados[\s\S]*Abrir na p\. 3/.test(lv.painel), true);
+  conf('e o capítulo onde ela está fica marcado', lv.linhas, 'cap1@1[1],cap2@3[2]*,sec3@4[2.1],cap4@5[3]');
+  conf('o painel mostra o capítulo 2, as páginas e o assunto', /^Capítulo 2\s+Frações\s+Páginas do arquivo 3 a 4 · 2 páginas[\s\S]*Assuntos ligados[\s\S]*Abrir na p\. 3/.test(lv.painel), true);
   await clicar(pag, '#bib-livro-voltar');
   await esperar('a aba de volta', () => lerSecao(pag), v => v.visivel && !!v.continuar, 5000);
   lv = await lerLivro(pag);
   conf('o Voltar fecha a tela do livro', lv.visivel, false);
   s = await lerSecao(pag);
-  conf('o Continuar lendo aponta o livro e a posição', s.continuar, 'livro-com-marcadores|Capítulo 2: Frações · p. 4');
+  conf('o Continuar lendo aponta o livro e a posição', s.continuar, 'livro-com-marcadores|Cap. 2, Frações · p. 4');
   await clicar(pag, '#bib-livros [data-continuar="livro-com-marcadores"]');
   const r4 = await esperar('o leitor pelo Continuar lendo', () => paginaDesenhada(pag), v => v !== 'fechado' && v !== '', 20000);
   conf('o toque no Continuar lendo reabre na página 4', r4.valor, '4');
@@ -333,7 +387,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await clicar(pag, '#bib-livros [data-livro="livro-de-prova"]');
   await esperar('a tela do EPUB', () => lerLivro(pag), v => v.visivel && v.livro === 'livro-de-prova', 5000);
   lv = await lerLivro(pag);
-  conf('o EPUB: os capítulos levam à parte do livro', lv.linhas, 'cap1@1[]*,cap2@2[],sec3@2[2.1],cap4@3[]');
+  conf('o EPUB: os capítulos levam à parte do livro', lv.linhas, 'cap1@1[1]*,cap2@2[2],sec3@2[2.1],cap4@3[3]');
   await clicar(pag, '#bib-livro .bibl-cap[data-n="4"]');
   const e3 = await esperar('o EPUB no capítulo 3', () => epubAberto(pag), v => v !== 'fechado' && v !== '', 20000);
   conf('tocar no capítulo 3 abre o EPUB nele', e3.valor, '3');
@@ -343,7 +397,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await clicar(pag, '#bib-livro-voltar');
   await esperar('a aba de volta', () => lerSecao(pag), v => v.visivel && /livro-de-prova/.test(v.continuar), 5000);
   s = await lerSecao(pag);
-  conf('o Continuar lendo põe o último lido primeiro', s.continuar, 'livro-de-prova|Capítulo 3: O fim,livro-com-marcadores|Capítulo 2: Frações · p. 4');
+  conf('o Continuar lendo põe o último lido primeiro', s.continuar, 'livro-de-prova|Cap. 3, O fim,livro-com-marcadores|Cap. 2, Frações · p. 4');
 
   // ================================================================
   secao('6. O livro sem sumário diz isso');
@@ -378,6 +432,59 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     await pausa(300);
   }
   await letra(pag, '');
+
+  // ================================================================
+  secao('7b. O topo do desenho, a largura estreita e o Material da aula');
+  await H.irParaAba(pag, 'biblioteca');
+  await pausa(400);
+  const topo = await pag.evaluate(() => {
+    const t = document.querySelector('.bibl-topo .titulo').getBoundingClientRect();
+    const c = document.querySelector('#bib-livros-contagem').getBoundingClientRect();
+    const b = document.querySelector('#bib-busca-cartao').getBoundingClientRect();
+    const cont = document.querySelector('.bibl-continuar').getBoundingClientRect();
+    const area = document.querySelector('.conteudo').getBoundingClientRect();
+    const meio = r => r.top + r.height / 2;
+    return { umaLinha: Math.abs(meio(t) - meio(c)) < 12 && Math.abs(meio(t) - meio(b)) < 12,
+      lupa: !!document.querySelector('#bib-busca-cartao svg[data-icone-nome="search"]'),
+      continuar: Math.round(cont.top - area.top) };
+  });
+  conf('título, contagem e busca (com a lupa) numa linha só', topo.umaLinha && topo.lupa, true);
+  conf('o Continuar lendo logo abaixo do topo (a menos de 120 px do alto)', topo.continuar < 120, true);
+  console.log('   Continuar lendo a ' + topo.continuar + ' px do alto');
+  ruins = await medir(pag, '.bibl-topo');
+  conf('o topo não transborda', ruins.join('; '), '');
+  await pag.setViewport({ width: 800, height: 1280, hasTouch: true });
+  for (const [rot, css] of [['100%', ''], ['130%', LETRA_130]]) {
+    await letra(pag, css);
+    await pausa(300);
+    ruins = (await medir(pag, '#bib-livros')).concat(await medir(pag, '.bibl-topo'));
+    conf('800 px de largura a ' + rot + ': a aba não transborda', ruins.join('; '), '');
+    await clicar(pag, '#bib-livros [data-livro="livro-com-marcadores"]');
+    await esperar('a tela do livro', () => lerLivro(pag), v => v.visivel, 5000);
+    await pausa(200);
+    ruins = await medir(pag, '#bib-livro');
+    conf('800 px de largura a ' + rot + ': a tela do livro não transborda', ruins.join('; '), '');
+    await clicar(pag, '#bib-livro-voltar');
+    await pausa(300);
+  }
+  await letra(pag, '');
+  await pag.setViewport({ width: 1280, height: 800, hasTouch: true, deviceScaleFactor: PRINTS ? 2 : 1 });
+  await pausa(300);
+  conf('a aula de hoje abriu', await abrirAulaDeHoje(pag, '10:00'), true);
+  const material = await esperar('o botão Material do assunto', () => pag.evaluate(() => {
+    const b = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula button')).find(x => x.textContent.trim() === 'Material');
+    if (!b) return false; b.click(); return true;
+  }), v => v === true, 10000);
+  conf('o Material do assunto foi tocado', material.ok, true);
+  await esperar('a Biblioteca com a faixa da aula', () => pag.evaluate(() => {
+    const c = document.querySelector('#bib-contexto'); return !!c && !c.hidden && document.querySelector('#tela-biblioteca').classList.contains('ativa');
+  }), v => v, 10000);
+  await pausa(600);
+  const altoContexto = await altoNaArea(pag, '#bib-contexto');
+  const tituloDoModulo = await pag.evaluate(() => (document.querySelector('#bib-corpo .bib-titulo') || {}).textContent || '');
+  conf('vindo do Material, a aba abre no módulo do assunto', tituloDoModulo, 'Equações do Segundo Grau');
+  conf('e a faixa da aula fica no alto da área, e não abaixo dos livros', altoContexto !== null && altoContexto >= -2 && altoContexto <= 40, true);
+  console.log('   vindo do Material: a faixa da aula a ' + altoContexto + ' px do alto');
   // a tela do livro fecha ao trocar de aba (o trilho por baixo dela não fica preso)
   await clicar(pag, '#bib-livros [data-livro="livro-com-marcadores"]');
   await esperar('a tela do livro', () => lerLivro(pag), v => v.visivel, 5000);
