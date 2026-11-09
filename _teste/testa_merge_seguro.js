@@ -182,18 +182,21 @@ fs.writeFileSync(falso,
   "const fs = require('fs');\n" +
   "const a = process.argv.slice(2);\n" +
   "fs.appendFileSync(process.env.FALSO_LOG, a.join(' ') + '\\n');\n" +
-  "if (a[0] === 'pr' && a[1] === 'view') process.stdout.write(fs.readFileSync(process.env.FALSO_PR, 'utf8'));\n" +
+  "if (a[0] === 'api') {\n" +
+  "  if (process.env.FALSO_BEHIND === 'erro') { process.stderr.write('HTTP 403: sem permissao'); process.exit(1); }\n" +
+  "  process.stdout.write(JSON.stringify({ behind_by: Number(process.env.FALSO_BEHIND || 0), ahead_by: 1 }));\n" +
+  "} else if (a[0] === 'pr' && a[1] === 'view') process.stdout.write(fs.readFileSync(process.env.FALSO_PR, 'utf8'));\n" +
   "else if (a[0] === 'pr' && a[1] === 'merge') process.stdout.write('merged\\n');\n" +
   "else { process.stderr.write('chamada inesperada'); process.exit(3); }\n");
 const script = path.join(__dirname, 'merge_seguro.js');
-function rodar(pr, extra) {
+function rodar(pr, extra, behind, scriptAlvo) {
   fs.writeFileSync(json, JSON.stringify(pr));
   fs.writeFileSync(log, '');
   let codigo = 0, saida = '';
   try {
-    saida = execFileSync(process.execPath, [script, '9'].concat(extra || []), {
+    saida = execFileSync(process.execPath, [scriptAlvo || script, '9'].concat(extra || []), {
       encoding: 'utf8',
-      env: Object.assign({}, process.env, { GH: falso, FALSO_LOG: log, FALSO_PR: json })
+      env: Object.assign({}, process.env, { GH: falso, FALSO_LOG: log, FALSO_PR: json, FALSO_BEHIND: String(behind === undefined ? 0 : behind) })
     });
   } catch (e) { codigo = e.status; saida = String(e.stdout || ''); }
   return { codigo, saida, chamadas: fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean) };
@@ -222,6 +225,35 @@ conf('e diz por que', /falta revisao adversarial/.test(r.saida), true);
 r = rodar(prBom(), ['--conferir']);
 conf('--conferir aprovado sai 0', r.codigo, 0);
 conf('--conferir nunca chama o merge', r.chamadas.some(c => /^pr merge/.test(c)), false);
+console.log('\n=== 3. Ramo atras da main (compare behind_by) ===');
+r = rodar(prBom(), [], 3);
+conf('atras recusa, sai 1', r.codigo, 1);
+conf('com a mensagem e o N', /o ramo está 3 commits atrás da main: traga a main e espere o CI/.test(r.saida), true);
+conf('atras NAO chama o merge', r.chamadas.some(c => /^pr merge/.test(c)), false);
+conf('a medida usou o compare main...cabeca', r.chamadas.some(c => c.indexOf('api repos/') === 0 && c.indexOf('/compare/main...' + CABECA) >= 0), true);
+r = rodar(prBom(), ['--conferir'], 3);
+conf('atras recusa tambem no --conferir', r.codigo, 1);
+r = rodar(prBom(), [], 0);
+conf('em dia passa, sai 0', r.codigo, 0);
+conf('em dia chama o merge', r.chamadas.filter(c => /^pr merge 9 /.test(c)).length, 1);
+r = rodar(prBom(), [], 'erro');
+conf('API que falha recusa, sai 1', r.codigo, 1);
+conf('mostra a mensagem do erro', /HTTP 403: sem permissao/.test(r.saida), true);
+conf('API que falha NAO chama o merge', r.chamadas.some(c => /^pr merge/.test(c)), false);
+// A checagem vem depois das outras: PR recusado por outro motivo nem chama o compare.
+p = prBom(); p.comments = [];
+r = rodar(p, [], 3);
+conf('recusa anterior vem antes e nao chama o compare', r.chamadas.some(c => /^api/.test(c)), false);
+// Controle (veneno com nome): o mesmo caso ATRAS, num merge_seguro.js sem o
+// bloco da checagem, PASSA e faz o merge. Prova que e a checagem que recusa.
+const fonte = fs.readFileSync(script, 'utf8');
+const sem = fonte.replace(/ *\/\/ BEHIND-INICIO[\s\S]*?\/\/ BEHIND-FIM\r?\n/, '');
+conf('controle: achei o bloco da checagem para tirar', sem !== fonte, true);
+const semBloco = path.join(tmp, 'merge_seguro_sem_atras.js');
+fs.writeFileSync(semBloco, sem);
+r = rodar(prBom(), [], 3, semBloco);
+conf('controle: sem a checagem, o caso ATRAS passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge/.test(c)).length === 1, true);
+
 fs.rmSync(tmp, { recursive: true, force: true });
 
 console.log('\n' + passes + ' passaram, ' + falhas + ' falharam.');
