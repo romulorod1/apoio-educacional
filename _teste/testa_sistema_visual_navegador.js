@@ -148,7 +148,7 @@ function medir(raizSel, escala) {
       const pseudos = deDentro.map(x => [getComputedStyle(x, '::before').content, getComputedStyle(x, '::after').content])
         .flat().filter(c => c && c !== 'none' && c !== 'normal').join(' ');
       if (GLIFOS.test(texto) || GLIFOS.test(pseudos) || texto === '+') out.push('GLIFO ' + desc(el) + (GLIFOS.test(pseudos) ? ' (no ::before/::after: ' + pseudos.slice(0, 20) + ')' : ''));
-      const primario = el.matches('.principal,.destaque,.primario');
+      const primario = el.matches('.principal,.destaque,.secundaria,.primario');
       const escolhido = el.matches(ESCOLHIDO);
       const link = el.matches('a[href]');
       if ((primario || escolhido || link) && !desabilitado) {

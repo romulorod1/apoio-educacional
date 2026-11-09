@@ -995,9 +995,9 @@
           '<div class="mini-btn-acao">Editar exercícios antes</div>' +
         '</div>' +
         '<div class="mini-checks-montagem">' +
-          '<div class="mini-check-label"><span class="mini-visto">✓</span> Teoria antes dos exercícios</div>' +
-          '<div class="mini-check-label"><span class="mini-visto">✓</span> Lista de exercícios selecionados</div>' +
-          '<div class="mini-check-label"><span class="mini-visto">✓</span> Gabarito com resolução comentada</div>' +
+          '<div class="mini-check-label"><span class="mini-visto">' + icone('check').outerHTML + '</span> Teoria antes dos exercícios</div>' +
+          '<div class="mini-check-label"><span class="mini-visto">' + icone('check').outerHTML + '</span> Lista de exercícios selecionados</div>' +
+          '<div class="mini-check-label"><span class="mini-visto">' + icone('check').outerHTML + '</span> Gabarito com resolução comentada</div>' +
         '</div>' +
       '</div>';
     } else if (tipo === 'aula') {
@@ -1007,7 +1007,7 @@
           '<span class="mini-tag-verde">Na tela ou papel</span>' +
         '</div>' +
         '<div class="mini-checks-montagem" style="margin-bottom:6px">' +
-          '<div class="mini-check-label"><span class="mini-visto">✓</span> Abrir a lista como folha da aula</div>' +
+          '<div class="mini-check-label"><span class="mini-visto">' + icone('check').outerHTML + '</span> Abrir a lista como folha da aula</div>' +
         '</div>' +
         '<div class="mini-acoes-aula">' +
           '<div class="mini-btn-acao principal">Gerar e anexar</div>' +
@@ -1109,7 +1109,8 @@
           btnAvancar.textContent = 'Entendi e começar a usar';
           btnAvancar.classList.add('destaque');
         } else {
-          btnAvancar.textContent = 'Avançar →';
+          trocarComIcone(btnAvancar, '', 'Avançar');
+          btnAvancar.appendChild(icone('chr'));
           btnAvancar.classList.remove('destaque');
         }
       }
@@ -1307,7 +1308,10 @@
     painel: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/>',
     // do app: buscar de novo (seta em roda) e o alerta da gravação que falhou
     atualizar: '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/>',
-    alerta: '<path d="M12 4.5l8.5 15h-17z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/>'
+    alerta: '<path d="M12 4.5l8.5 15h-17z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/>',
+    // o olho de esconder os valores: aberto (à mostra) e riscado (escondidos)
+    olho: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+    olho_fechado: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>'
   };
   function icone(nome, rotulo, classe) {
     var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -1573,7 +1577,8 @@
   function atualizarBotaoOlho() {
     var b = $('#alternar-valores');
     if (!b) return;
-    b.textContent = valoresOcultos ? '●̸' : '◉';
+    trocarComIcone(b, valoresOcultos ? 'olho_fechado' : 'olho');
+    b.firstChild.setAttribute('class', 'ico ico-so');
     b.setAttribute('title', valoresOcultos ? 'Mostrar os valores' : 'Esconder os valores');
     b.setAttribute('aria-label', b.getAttribute('title'));
     b.classList.toggle('ativo', valoresOcultos);
@@ -2701,7 +2706,7 @@
 
     var cabecalho = el('div', { class: 'zoom-dia-cabecalho' }, [
       el('div', { class: 'zoom-dia-info' }, [
-        el('span', { class: 'zoom-dia-icone', texto: '🔍' }),
+        el('span', { class: 'zoom-dia-icone', 'aria-hidden': 'true', icone: 'search' }),
         el('h3', { class: 'zoom-dia-titulo', texto: formatarDataExtensa(dia) }),
         hoje ? el('span', { class: 'tag zoom-tag-hoje', texto: 'Hoje' }) : null,
         feriado ? el('span', {
@@ -3294,7 +3299,7 @@
 
     var linhaFolha = el('div', { id: 'linha-folha', class: 'barra u-margem-baixo-6' });
     linhaFolha.appendChild(el('button', {
-      type: 'button', class: 'btn destaque',
+      type: 'button', class: 'btn secundaria',
       texto: aulaEmEdicao.temNota ? 'Abrir folha de aula' : 'Escrever à mão na folha',
       aoClick: function () { abrirEditorNota(aulaEmEdicao.id); }
     }));
@@ -3711,7 +3716,7 @@
       bloco.appendChild(el('div', { class: 'barra u-margem-0' }, [
         el('button', {
           type: 'button', id: 'escolher-assunto',
-          class: quantos ? 'btn pequeno' : (passoAOferecer ? 'btn u-flex-1' : 'btn destaque u-flex-1'),
+          class: quantos ? 'btn pequeno' : (passoAOferecer ? 'btn u-flex-1' : 'btn destaque u-flex-1'), icone: 'plus',
           texto: quantos ? 'Mais um assunto' : (passoAOferecer
             ? 'Escolher outro assunto' : 'Escolher o assunto da aula'),
           aoClick: function () { abrirAssunto(aula.id); }
@@ -12457,7 +12462,7 @@
 
       cartao.appendChild(el('div', { class: 'barra u-margem-8-0-0' }, [
         el('button', {
-          type: 'button', class: 'btn' + (temResumo ? '' : ' destaque'),
+          type: 'button', class: 'btn' + (temResumo ? '' : ' secundaria'),
           texto: temResumo ? 'Editar o feedback' : 'Escrever o feedback',
           aoClick: function () { abrirResumo(f.aluno.id, mesAtual); }
         })

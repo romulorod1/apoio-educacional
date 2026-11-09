@@ -998,6 +998,7 @@ roda "sistema visual na tela (F1)"                 node "_teste/testa_sistema_vi
 roda "sistema visual --envenenado-botao-verde"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-botao-verde
 roda "sistema visual --envenenado-fonte-11px"      node "_teste/testa_sistema_visual_navegador.js" --envenenado-fonte-11px
 roda "sistema visual --envenenado-glifo-solto"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-glifo-solto
+roda "sistema visual --envenenado-icone-vazio"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-icone-vazio
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
 roda "preço descartado não vaza"                  node "_teste/testa_preco_cancelado.js"
 roda "ações de aula no fechamento"                node "_teste/testa_acoes_fechamento.js"
