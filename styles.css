@@ -5,6 +5,12 @@
 
 :root {
   --navy: #1F3A5F;
+  /* o painel de avisos do celular (D6c, desenho final de 09/11): a ação
+     secundária em marinho claro, o trilho que o deslize revela e o fundo
+     escurecido por trás do painel */
+  --acao-clara: #E8EDF4;
+  --trilho-do-deslize: #ECEEF1;
+  --fundo-escurecido: rgba(15, 23, 42, .35);
   --navy-escuro: #16314F;
   --teal: #2E7D6B;
   --teal-claro: #E6F1EE;
@@ -3006,7 +3012,7 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-avisos-selo-sino svg { width: 18px; height: 18px; display: block; }
 /* Aberto, o painel fica por cima de tudo o que rola, o "+" também. */
 .cel-semana:has(.cel-avisos-sobre:not([hidden])) { z-index: 6; }
-.cel-avisos-fundo { position: fixed; inset: 0; z-index: 1; background: rgba(15, 23, 42, 0.35); }
+.cel-avisos-fundo { position: fixed; inset: 0; z-index: 1; background: var(--fundo-escurecido); }
 .cel-avisos-fundo[hidden], .cel-avisos[hidden] { display: none; }
 .cel-avisos { display: flex; flex-direction: column; margin-top: 6px; background: var(--branco); border-radius: 16px; overflow: hidden; }
 .cel-avisos-sobre {
@@ -3015,7 +3021,7 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
   right: 12px;
   z-index: 2;
   margin: 0;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.25);
+  box-shadow: var(--sombra-forte);
 }
 .cel-avisos-cabeca {
   display: flex;
@@ -3038,7 +3044,7 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
   cursor: pointer;
 }
 .cel-avisos-lista { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.cel-aviso-trilho { background: #ECEEF1; border-bottom: 1px solid var(--fio-claro); }
+.cel-aviso-trilho { background: var(--trilho-do-deslize); border-bottom: 1px solid var(--fio-claro); }
 .cel-aviso {
   display: flex;
   align-items: flex-start;
@@ -3056,7 +3062,7 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #EAEEF4;
+  background: var(--acao-clara);
   color: var(--navy);
 }
 .cel-aviso-icone svg { display: block; }
@@ -3070,7 +3076,7 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao {
   padding: 0 12px;
   border-radius: 10px;
   border: 0;
-  background: #E8EDF4;
+  background: var(--acao-clara);
   color: var(--navy);
   font-size: var(--letra-4);
   font-weight: 600;
