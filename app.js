@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.17';
+  var VERSAO = '1.42.18';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.18',
+      itens: [
+        'No Hoje do celular, até três avisos no alto: a próxima aula, a aula que falta registrar e, a partir do dia 6, a família com mês anterior em aberto. Tocar no aviso leva direto ao que fazer.',
+        'O botão de cobrar abre o WhatsApp com a mensagem pronta, com o mês e o valor que falta. Nada é enviado sem você confirmar no WhatsApp.',
+        'No fim do mês e nos primeiros dias do seguinte, um lembrete de fechar o mês, enquanto houver aula sem registro ou família em aberto.'
+      ]
+    },
     {
       versao: '1.42.16',
       itens: [
