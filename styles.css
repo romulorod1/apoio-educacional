@@ -3353,7 +3353,7 @@ body.modo-celular .celular > .cel-topo { min-height: 40px; padding: 0 4px 0 16px
 body.modo-celular .celular.topo-recolhido > .cel-topo { display: none; }
 body.modo-celular .celular .cel-topo .cel-icone {
   border: 0; background: transparent; color: var(--navy); min-height: var(--alvo-celular); min-width: var(--alvo-celular);
-  margin: -4px 0; box-shadow: none;
+  margin: -5px 0; box-shadow: none;
 }
 /* Hoje e os formulários vão de borda a borda do conteúdo, com o recuo por
    dentro: a faixa da semana e o rodapé preso dos formulários, que encostam

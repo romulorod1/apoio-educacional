@@ -358,11 +358,30 @@ const varrer = (pag) => pag.evaluate((isentos) => {
     const r = e.getBoundingClientRect();
     if (r.right > W + 1) falhas.push({ tipo: 'passa da borda', sel: nome(e), px: Math.round(r.right - W) });
   }
+  /* O texto que sai da caixa: o rótulo do botão que passa da borda do botão
+   * não aparece no scrollWidth do botão (o Chrome não o conta), e foi assim o
+   * aviso que o dono viu. Cada texto visível tem de caber, na largura, na
+   * caixa de quem o contém, e na tela. */
+  const andar = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let textos = 0;
+  for (let n = andar.nextNode(); n; n = andar.nextNode()) {
+    if (!n.nodeValue.trim()) continue;
+    const pai = n.parentElement;
+    if (!pai || /^(SCRIPT|STYLE|NOSCRIPT|OPTION)$/.test(pai.tagName) || pai.closest('svg') || !visivel(pai)) continue;
+    if (isento(pai)) continue;
+    const g = document.createRange(); g.selectNodeContents(n);
+    const rt = g.getBoundingClientRect();
+    if (rt.width <= 0) continue;
+    textos++;
+    const rp = pai.getBoundingClientRect();
+    const sai = Math.max(rt.right - rp.right, rp.left - rt.left, rt.right - W);
+    if (sai > 1) falhas.push({ tipo: 'o texto "' + n.nodeValue.trim().slice(0, 24) + '" sai da caixa', sel: nome(pai), px: Math.round(sai) });
+  }
   const doc = document.documentElement.scrollWidth - W;
   if (doc > 1) falhas.push({ tipo: 'a página rola de lado', sel: 'html', px: doc });
   const topo = document.querySelector('#modo-celular .cel-topo');
   const hoje = document.querySelector('#cel-hoje');
-  return { olhados, falhas, W, topo: topo ? Math.round(topo.getBoundingClientRect().height) : -1,
+  return { olhados, textos, falhas, W, topo: topo ? Math.round(topo.getBoundingClientRect().height) : -1,
     hojeDentro: hoje && hoje.clientWidth ? hoje.scrollWidth - hoje.clientWidth : null };
 }, ISENTOS);
 
@@ -370,7 +389,7 @@ const registro = []; // { tela, janela, letra, olhados, falhas }
 let letraAtual = 1, janelaAtual = '360x740';
 async function medir(pag, tela) {
   const v = await varrer(pag);
-  registro.push({ tela, janela: janelaAtual, letra: letraAtual, olhados: v.olhados, falhas: v.falhas, topo: v.topo });
+  registro.push({ tela, janela: janelaAtual, letra: letraAtual, olhados: v.olhados, textos: v.textos, falhas: v.falhas, topo: v.topo });
   console.log('   medida ' + tela + ' | ' + janelaAtual + ' | letra ' + Math.round(letraAtual * 100) + '% | barra do alto ' + v.topo + ' px' +
     (v.hojeDentro !== null ? ' | #cel-hoje por dentro ' + v.hojeDentro + ' px' : ''));
   v.falhas.forEach(f => console.log('   TRANSBORDA  ' + tela + ' | ' + janelaAtual + ' | letra ' + Math.round(letraAtual * 100) + '% | ' +
@@ -623,8 +642,8 @@ async function percorrer(pag, telas) {
   const barra = nome => registro.filter(r => r.tela === nome).map(r => r.janela + '/' + Math.round(r.letra * 100) + '%: ' + r.topo + ' px');
   conf('em dia, a barra do alto da dona some (Hoje com os avisos do alto: ' + barra('Hoje com os avisos do alto').join(', ') + ')',
     registro.filter(r => r.tela === 'Hoje com os avisos do alto').every(r => r.topo === 0), true);
-  conf('com pendência, a barra volta com 48 px ou menos na letra normal (' + barra('Hoje com a barra do alto à vista').join(', ') + ')',
-    registro.filter(r => r.tela === 'Hoje com a barra do alto à vista').every(r => r.topo > 0 && (r.letra !== 1 || r.topo <= 48)), true);
+  conf('com pendência, a barra volta com 40 px na letra normal (' + barra('Hoje com a barra do alto à vista').join(', ') + ')',
+    registro.filter(r => r.tela === 'Hoje com a barra do alto à vista').every(r => r.topo > 0 && (r.letra !== 1 || r.topo <= 40)), true);
 
   secao('6. O resumo da varredura');
   const comFalha = registro.filter(r => r.falhas.length);
@@ -633,6 +652,7 @@ async function percorrer(pag, telas) {
     comFalha.length + ' com transbordo');
   conf('a varredura olhou as 24 telas, cada uma nas 3 larguras e nas 2 letras (' + registro.length + ' varreduras)', registro.length, 24 * 6);
   conf('toda varredura olhou ao menos 20 elementos visíveis (a menor: ' + Math.min(...registro.map(r => r.olhados)) + ')', registro.every(r => r.olhados >= 20), true);
+  conf('e ao menos 5 textos visíveis (o menor: ' + Math.min(...registro.map(r => r.textos)) + ')', registro.every(r => r.textos >= 5), true);
   const resumo = comFalha.map(r => r.tela + ' ' + r.janela + ' ' + Math.round(r.letra * 100) + '%: ' + r.falhas.map(f => f.sel + ' ' + f.px + ' px').join('; '));
   prop('nenhuma tela do celular transborda, em nenhuma largura nem letra (' + (resumo.slice(0, 6).join(' || ') || 'nenhuma') + (resumo.length > 6 ? ' || e mais ' + (resumo.length - 6) : '') + ')',
     comFalha.length === 0, [V_AVISO, V_LARGO]);
