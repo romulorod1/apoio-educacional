@@ -24,6 +24,11 @@ let portao = fs.readFileSync(path.join(RAIZ, '_teste', 'confere_tudo.sh'), 'utf8
 if (process.argv.indexOf('--envenenado-letra-trocada') >= 0) {
   portao = portao.replace('node "_teste/testa_biblioteca_listas.js" --envenenado-seta', 'node "_teste/testa_biblioteca_listas.js" --envenenado-setta');
 }
+/* O terceiro veneno é o buraco do prefixo (revisão do PR): "camadas" vira
+ * "camada", que é prefixo de um nome real e aparece em comentário. */
+if (process.argv.indexOf('--envenenado-prefixo') >= 0) {
+  portao = portao.replace('node "_teste/testa_biblioteca_listas.js" --envenenado-camadas', 'node "_teste/testa_biblioteca_listas.js" --envenenado-camada');
+}
 if (process.argv.indexOf('--envenenado-nome-falso') >= 0) {
   portao += '\nroda "veneno de mentira" node "_teste/testa_nuvem.js" --envenenado-que-nao-existe\n';
 }
@@ -34,6 +39,15 @@ function conf(rotulo, ok, detalhe) {
   else { falhas++; console.log('  FALHA ' + rotulo + (detalhe ? '  [' + detalhe + ']' : '')); }
 }
 
+/* Tira os comentários de bloco e as linhas de comentário (// ou # ou * no
+ * começo), para um nome citado só na documentação da prova não contar. O //
+ * dentro de uma string, como "https://", fica, porque só sai a linha que
+ * COMEÇA com //. */
+function semComentarios(t) {
+  return t.replace(/\/\*[\s\S]*?\*\//g, '')
+    .split(/\r?\n/).filter(l => !/^\s*(\/\/|#|\*)/.test(l)).join('\n');
+}
+
 const linhas = portao.split(/\r?\n/).filter(l => /^\s*roda\s/.test(l) && /--envenenado-[A-Za-z0-9-]+/.test(l));
 conf('o portão tem linhas de veneno (controle: mais de 50)', linhas.length > 50, String(linhas.length));
 
@@ -41,16 +55,23 @@ const faltam = [];
 const cache = {};
 linhas.forEach(l => {
   const arq = (l.match(/(_teste\/[A-Za-z0-9_.-]+\.(?:js|py|sh))/) || [])[1];
-  const venenos = l.match(/--envenenado-[A-Za-z0-9-]+/g) || [];
+  /* Só as flags passadas à prova, DEPOIS do caminho do arquivo: o rótulo entre
+   * aspas, antes dele, pode citar um nome abreviado ("folha impressa
+   * --envenenado-contorno" roda --envenenado-contorno-no-papel). */
+  const depois = arq ? l.slice(l.indexOf(arq) + arq.length) : l;
+  const venenos = depois.match(/--envenenado-[A-Za-z0-9-]+/g) || [];
   if (!arq) { faltam.push('sem arquivo: ' + l.trim().slice(0, 80)); return; }
   const p = path.join(RAIZ, arq);
   if (!fs.existsSync(p)) { faltam.push(arq + ' não existe'); return; }
-  const texto = cache[p] || (cache[p] = fs.readFileSync(p, 'utf8'));
+  const texto = cache[p] || (cache[p] = semComentarios(fs.readFileSync(p, 'utf8')));
   venenos.forEach(v => {
-    // o arquivo da prova tem de citar o nome do veneno (com ou sem os dois hífens)...
-    if (texto.indexOf(v) >= 0 || texto.indexOf(v.slice(2)) >= 0) return;
-    // ...ou montá-lo de uma tabela: "'--envenenado-' + n" e a chave com o nome exato
     const nome = v.slice('--envenenado-'.length).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    /* O arquivo da prova tem de citar o nome do veneno INTEIRO, fora de
+     * comentário: com fronteira depois do nome, para "camada" não passar por
+     * "camadas" nem "a" por qualquer nome que comece com a. */
+    const inteiro = new RegExp('envenenado-' + nome + '(?![A-Za-z0-9-])');
+    if (inteiro.test(texto)) return;
+    // ...ou montá-lo de uma tabela: "'--envenenado-' + n" e a chave com o nome exato
     const monta = /['"]--envenenado-['"]\s*\+/.test(texto);
     const chave = new RegExp('(^|[\\s{,])([\'"]?)' + nome + '\\2\\s*:', 'm').test(texto);
     if (!(monta && chave)) faltam.push(arq + ' não conhece ' + v);
