@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.15';
+  var VERSAO = '1.42.16';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -78,6 +78,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.16',
+      itens: [
+        'No Fechamento do celular, cada família tem um selo: Pago, "Parcial, faltam R$ X" ou Em aberto. No alto, quanto falta receber no mês e, se houver, dos meses anteriores.',
+        'Marcar como pago no celular é em dois toques, e o valor já vem com o que a família deve até hoje, como no tablet. Confira o valor que ela pagou antes de confirmar.',
+        'Os cancelamentos agora se chamam "Cancelada sem cobrança" e "Cancelada e cobrada", no celular, no tablet e no PDF da família. Os botões mostram o valor.'
+      ]
+    },
     {
       versao: '1.42.15',
       itens: [
@@ -12229,7 +12237,8 @@
           el('td', { texto: l.dia }),
           el('td', { texto: Core.fmtDuracao(l.duracaoMin) }),
           el('td', {
-            texto: l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)')
+            // a cancelada já diz a cobrança no nome ("Cancelada sem cobrança")
+            texto: l.statusRotulo + (l.cobravel || l.status === 'cancelada' ? '' : ' (não cobrada)')
           }),
           el('td', { texto: dinheiro(l.cobravel ? l.valor : 0) }),
           acoes
@@ -12358,12 +12367,54 @@
     return caixa;
   }
 
-  /* "R$ 450,00 do mês: R$ 250,00 das 2 aulas dadas e R$ 200,00 das 2 ainda não dadas." */
-  function fraseDaSomaDoMes(f) {
-    var dadas = f.qtdEncontrosFeitos || 0, previstas = f.qtdEncontrosPrevistos || 0;
-    var frase = dinheiro(f.totalValor || 0) + ' do mês: ' + dinheiro(f.valorFeito || 0) + ' ' + palavraPlural(dadas, 'da ' + dadas + ' aula dada', 'das ' + dadas + ' aulas dadas');
-    if (previstas) frase += ' e ' + dinheiro(f.valorPrevisto || 0) + ' ' + palavraPlural(previstas, 'da ' + previstas + ' ainda não dada', 'das ' + previstas + ' ainda não dadas');
-    return frase + '.';
+  /* O que o celular propõe no "Valor pago" (D6c, lote 3): o que a família já
+   * DEVE hoje. É o devido do selo (Core.seloDoPagamento, a regra do tablet),
+   * mais a cancelada e cobrada com data à frente, que já é devida (o tablet a
+   * escreve como "canceladas à frente"): sem ela, ela marcaria menos e,
+   * quando o mês fechasse, a família viraria "Parcial".
+   * A aula de HOJE conta desde o começo do dia, como no selo, mesmo antes de
+   * acabar: tirá-la deixaria o selo "Parcial" para sempre depois de ela
+   * confirmar o proposto (revisão do lote 3). A frase diz que ela entra.
+   * As ainda não dadas (data à frente) nunca entram. */
+  function propostoDoCelular(f) {
+    var s = Core.seloDoPagamento(db, f);
+    var hoje = Core.hojeIso(), agora = minutosAgoraCelular();
+    var hojeAindaNao = (f.linhas || []).filter(function (l) {
+      if (l.data !== hoje || l.status === 'cancelada' || !l.cobravel) return false;
+      var fim = fimDaAulaCelular({ hora: l.hora, duracaoMin: l.duracaoMin });
+      return fim !== null && fim > agora;
+    });
+    var centCanceladas = Math.round((f.valorCanceladasFuturas || 0) * 100);
+    var cent = Math.round(s.devido * 100) + centCanceladas;
+    return {
+      valor: Math.max(0, cent) / 100,
+      dadas: f.qtdEncontrosFeitos || 0,
+      canceladasAFrente: centCanceladas / 100,
+      hojeAindaNao: hojeAindaNao,
+      aindaNao: f.qtdEncontrosPrevistos || 0,
+      valorAindaNao: f.valorPrevisto || 0
+    };
+  }
+
+  /* "Devido até hoje: R$ 200,00 (1 aula dada). Inclui R$ 100,00 de cancelada
+   * e cobrada à frente. Ainda não dadas: 1 aula, R$ 100,00 (não entram no valor)." */
+  function fraseDoPropostoCelular(f) {
+    var p = propostoDoCelular(f);
+    var frase = 'Devido até hoje: ' + dinheiro(p.valor) + ' (' + p.dadas + ' ' + palavraPlural(p.dadas, 'aula dada', 'aulas dadas') + ').';
+    if (p.canceladasAFrente) frase += ' Inclui ' + dinheiro(p.canceladasAFrente) + ' de cancelada e cobrada à frente.';
+    if (p.aindaNao) frase += ' Ainda não dadas: ' + p.aindaNao + ' ' + palavraPlural(p.aindaNao, 'aula', 'aulas') + ', ' + dinheiro(p.valorAindaNao) + ' (não entram no valor).';
+    if (p.hojeAindaNao.length) frase += ' Inclui ' + palavraPlural(p.hojeAindaNao.length, 'a aula', 'as aulas') + ' de hoje às ' +
+      p.hojeAindaNao.map(function (l) { return l.hora; }).join(', ') + ', como no tablet.';
+    return frase;
+  }
+
+  /* No tablet, só a linha e a lista de pendentes (a rolagem fica onde está).
+   * No celular, o Fechamento inteiro, porque o selo da família e o total do
+   * alto mudam com o pagamento. */
+  function depoisDeMudarPagamento(caixa, f) {
+    if (modoCelular && $('#cel-fechamento') && caixa.closest && caixa.closest('#cel-fechamento')) { desenharFechamentoCelular(); return; }
+    desenharLinhaDePagamento(caixa, f, false);
+    desenharPendentesDePagamento();
   }
 
   // "1.250,00": o número como ela escreve, sem o R$, para o campo de digitar
@@ -12371,8 +12422,11 @@
 
   function desenharLinhaDePagamento(caixa, f, editando) {
     caixa.innerHTML = '';
-    var s = Core.situacaoDoPagamento(db, f);
+    /* A situação e o selo (pago, parcial, em aberto) vêm da mesma conta que o
+     * Fechamento do celular lê (Core.seloDoPagamento). */
+    var s = Core.seloDoPagamento(db, f);
     var reg = s.registro;
+    caixa.setAttribute('data-selo', s.selo);
 
     if (editando) {
       /* O proposto é o total do MÊS INTEIRO (f.totalValor), já contando as
@@ -12383,7 +12437,11 @@
        * menor e, quando o mês fechasse, o cartão dizer "faltam" sem a família
        * dever nada. Com o mês vencido as duas somas são a mesma. Ela troca
        * quando a família pagou outro valor. */
-      var proposto = reg ? reg.valor : (f.totalValor || 0);
+      /* No celular (D6c, lote 3) o proposto é o que a família já deve hoje
+       * (propostoDoCelular: as aulas dadas e a cancelada e cobrada à frente),
+       * e as ainda não dadas aparecem à parte: na rua, ela marca o que a
+       * família pagou pelo que já é devido. */
+      var proposto = reg ? reg.valor : (modoCelular ? propostoDoCelular(f).valor : (f.totalValor || 0));
       var comMarcadas = (f.linhas || []).some(function (l) { return l.futura && l.status !== 'cancelada'; });
       var campoValor = el('input', {
         type: 'text', inputmode: 'decimal', autocomplete: 'off', class: 'pagamento-valor u-larg-max-150',
@@ -12406,12 +12464,13 @@
         }
         // a memória é a verdade; a faixa do salvar() avisa se não deu para guardar
         salvar();
-        desenharLinhaDePagamento(caixa, f, false);
-        desenharPendentesDePagamento();
+        depoisDeMudarPagamento(caixa, f);
       };
       caixa.appendChild(el('div', { class: 'barra u-vao-10 u-alinha-fim u-flex-quebra-sim u-margem-0' }, [
         el('label', { class: 'campo u-margem-0' }, [el('span', { texto: 'Valor pago (R$)' }), campoValor]),
         el('label', { class: 'campo u-margem-0' }, [el('span', { texto: 'Pago em' }), campoData]),
+        // no celular o valor já vem escrito: o aviso fica junto do Confirmar
+        modoCelular ? el('div', { class: 'cel-confira-valor', texto: 'Confira o valor que a família pagou.' }) : null,
         el('button', { type: 'button', class: 'btn principal btn-confirmar-pagamento', texto: 'Confirmar', aoClick: gravarPagamento }),
         el('button', {
           type: 'button', class: 'btn btn-cancelar-pagamento', texto: modoCelular ? 'Fechar sem marcar' : 'Cancelar',
@@ -12420,15 +12479,16 @@
       ]));
       caixa.appendChild(el('div', {
         class: 'ajuda ajuda-proposto u-margem-6-0-0', texto: (reg ? 'O campo traz o valor que você marcou.'
+          : modoCelular
+            ? 'O valor proposto é o devido até hoje.'
           : comMarcadas
             ? 'O valor proposto é o total do mês, já contando as datas ainda marcadas, como no documento da família.'
             : 'O valor proposto é o total do mês, como no documento da família.') +
           ' Troque se a família pagou outro valor.'
       }));
-      /* No celular (D6b), o que o total soma, pelos números do próprio
-       * fechamento: as aulas dadas e as ainda não dadas. A regra do proposto é
-       * a do tablet; aqui só a conta à vista. */
-      if (modoCelular) caixa.appendChild(el('div', { class: 'ajuda cel-proposto-soma', texto: fraseDaSomaDoMes(f) }));
+      /* No celular, o que o proposto soma, pelos números do próprio
+       * fechamento: as aulas dadas, e as ainda não dadas à parte, fora dele. */
+      if (modoCelular) caixa.appendChild(el('div', { class: 'ajuda cel-proposto-soma', texto: fraseDoPropostoCelular(f) }));
       return;
     }
 
@@ -12436,7 +12496,7 @@
       var filhos = [el('strong', { class: 'pagamento-feito', texto: 'Pago em ' + Core.ddmm(reg.pagoEm) + ' · ' + dinheiro(reg.valor) })];
       /* Pago a menos fica dito, com a diferença: esconder a diferença porque
        * existe uma marca de pagamento seria a lista dizer que está tudo certo. */
-      if (s.falta > 0) {
+      if (s.selo === 'parcial') {
         filhos.push(el('span', { class: 'pagamento-falta u-cor-vermelho', texto: 'faltam ' + dinheiro(s.falta) }));
       }
       filhos.push(el('span', { class: 'cresce' }));
@@ -12450,8 +12510,7 @@
           if (!confirmar('Desmarcar o pagamento de ' + f.alunoNome + ' em ' + f.mesExtenso + '?')) return;
           Core.desmarcarPagamento(db, f.aluno.id, f.mes);
           salvar();
-          desenharLinhaDePagamento(caixa, f, false);
-          desenharPendentesDePagamento();
+          depoisDeMudarPagamento(caixa, f);
         }
       }));
       caixa.appendChild(el('div', { class: 'barra u-vao-10 u-margem-0 u-flex-quebra-sim' }, filhos));
@@ -13630,7 +13689,7 @@
       else if (l.futura) detalhe.push(l.statusRotulo);
     } else {
       if (l.hora) detalhe.push(l.hora);
-      detalhe.push(l.statusRotulo + (l.cobravel ? '' : ' (não cobrada)'));
+      detalhe.push(l.statusRotulo + (l.cobravel || l.status === 'cancelada' ? '' : ' (não cobrada)'));
     }
     cabeca.appendChild(el('span', { class: 'detalhe-dia', texto: detalhe.join(' · ') }));
 
@@ -21988,7 +22047,7 @@
     var hoje = Core.hojeIso();
     var s = a.status || 'realizada';
     var cobra = cobravelDaAula(a);
-    if (s === 'cancelada') return { classe: 'cancelada', icone: '', texto: cobra ? 'Cancelada, com cobrança' : 'Cancelada, sem cobrança' };
+    if (s === 'cancelada') return { classe: 'cancelada', icone: '', texto: rotuloDeCancelamentoCelular(cobra) };
     if (s === 'falta') return { classe: 'falta', icone: '✕', texto: cobra ? 'Faltou' : 'Faltou, sem cobrança' };
     var fim = fimDaAulaCelular(a);
     var aindaNao = a.data > hoje || (a.data === hoje && fim !== null && fim > minutosAgoraCelular());
@@ -22461,14 +22520,37 @@
    * com a cobrança que ela escolher. */
   function desenharCancelarNaFolha(folha, a) {
     folha.appendChild(el('p', { class: 'cel-folha-pergunta', id: 'cel-cancelar-pergunta', texto: 'Cancelar a aula de ' + quandoCurtoCelular(a.data, a.hora) + '?' }));
-    folha.appendChild(el('p', { class: 'ajuda', texto: 'Sem cobrança, a aula sai do valor do mês. Com cobrança, ela continua no valor, como cancelamento em cima da hora.' }));
+    folha.appendChild(el('p', { class: 'ajuda', id: 'cel-cancelar-explica', texto: 'Sem cobrança: a família avisou a tempo, e a aula sai do valor do mês. ' +
+      'Cobrada: cancelamento em cima da hora, e a aula continua no valor, pelo valor por hora da data dela.' }));
     var serie = Core.serieDe(db, a);
     if (serie) folha.appendChild(el('p', { class: 'ajuda', texto: 'Vale só para esta aula: as outras da repetição continuam.' }));
+    /* Os dois botões dizem o efeito em dinheiro (o valor por hora da data da
+     * aula), e nenhum é o principal: os dois mudam a cobrança. Na aula que já
+     * conta como dada (ou falta cobrada), cancelar pede confirmação com o
+     * efeito escrito. */
+    var aluno = alunoPorId(a.alunoId);
+    var pv = aluno ? Core.precoVigente(aluno, a.data) : null;
+    var valor = pv ? Math.round((Number(a.duracaoMin) || 60) / 60 * pv.valorHora * 100) / 100 : null;
+    var cobraHoje = cobravelDaAula(a) && a.status !== 'cancelada';
+    var sit = situacaoNoCelular(a);
+    var jaConta = cobraHoje && (sit.classe === 'realizada' || sit.classe === 'falta' || (sit.classe === 'reposicao' && sit.texto === 'Reposição'));
+    var comoEsta = sit.classe === 'falta' ? 'falta cobrada' : 'dada';
+    var confirmado = function (efeito) {
+      return !jaConta || confirmar('Esta aula está como ' + comoEsta + '. ' + efeito);
+    };
+    var textoSem = 'Cancelar sem cobrança' + (cobraHoje && valor ? ' (sai ' + dinheiro(valor) + ' do mês)' : '');
+    var textoCom = 'Cancelar e cobrar' + (valor ? ' ' + dinheiro(valor) : '');
     folha.appendChild(el('div', { class: 'cel-folha-acoes' }, [
-      botaoDeAcaoCelular('cancelar-aula', { class: 'btn principal cel-folha-botao cel-folha-largo', id: 'cel-cancelar-sem', texto: 'Cancelar sem cobrança',
-        aoClick: function () { mudarAulaNoCelular(a, { status: 'cancelada', cobravel: false }, 'Aula cancelada sem cobrança.'); } }),
-      botaoDeAcaoCelular('cancelar-aula', { class: 'btn cel-folha-botao cel-folha-largo', id: 'cel-cancelar-com', texto: 'Cancelar com cobrança',
-        aoClick: function () { mudarAulaNoCelular(a, { status: 'cancelada', cobravel: true }, 'Aula cancelada com cobrança.'); } })
+      botaoDeAcaoCelular('cancelar-aula', { class: 'btn cel-folha-botao cel-folha-largo', id: 'cel-cancelar-sem', texto: textoSem,
+        aoClick: function () {
+          if (!confirmado('Cancelar sem cobrança tira ' + (valor ? dinheiro(valor) : 'o valor dela') + ' do mês.')) return;
+          mudarAulaNoCelular(a, { status: 'cancelada', cobravel: false }, 'Aula cancelada sem cobrança.');
+        } }),
+      botaoDeAcaoCelular('cancelar-aula', { class: 'btn cel-folha-botao cel-folha-largo', id: 'cel-cancelar-com', texto: textoCom,
+        aoClick: function () {
+          if (!confirmado('Cancelar e cobrar mantém ' + (valor ? dinheiro(valor) : 'o valor dela') + ' no mês.')) return;
+          mudarAulaNoCelular(a, { status: 'cancelada', cobravel: true }, 'Aula cancelada e cobrada.');
+        } })
     ]));
     folha.appendChild(el('div', { class: 'barra u-margem-baixo-0' }, [
       el('button', { type: 'button', class: 'btn', id: 'cel-folha-voltar', texto: 'Voltar', aoClick: function () { irAoPassoDaFolha('acoes'); } })
@@ -22726,7 +22808,11 @@
     caixa.appendChild(el('h2', { class: 'cel-titulo', texto: 'Registrar como foi' }));
     caixa.appendChild(el('p', { class: 'ajuda u-margem-topo-0', texto: aluno.nome + ', ' + Core.ddmmaaaa(aula.data) + (aula.hora ? ', ' + aula.hora : '') }));
     var situacao = el('select', { id: 'cel-relato-situacao' }, Object.keys(Core.STATUS).map(function (k) {
-      return el('option', { value: k, texto: Core.rotuloSituacao(k, aula.data), selected: k === (aula.status || 'realizada') ? 'selected' : null });
+      /* A cancelada leva o nome do celular: a cobrança dela, se já está
+       * cancelada; senão, a do padrão, que é sem cobrança. */
+      var rotulo = k === 'cancelada' ? rotuloDeCancelamentoCelular(aula.status === 'cancelada' ? cobravelDaAula(aula) : Core.STATUS.cancelada.cobravelPadrao)
+        : Core.rotuloSituacao(k, aula.data);
+      return el('option', { value: k, texto: rotulo, selected: k === (aula.status || 'realizada') ? 'selected' : null });
     }));
     var relato = el('textarea', { id: 'cel-relato-texto', placeholder: 'O que foi trabalhado nesta aula. Este texto entra no fechamento quando você pedir.' });
     relato.value = aula.notaTexto || '';
@@ -23078,24 +23164,57 @@
       caixa.appendChild(el('p', { class: 'ajuda', texto: 'Não há aulas neste mês.' }));
       return;
     }
-    var edita = celularEdita();
-    var aulas = 0, valor = 0;
-    fechs.forEach(function (f) { aulas += f.qtdEncontrosFeitos; valor += f.valorFeito; });
-    caixa.appendChild(el('div', { class: 'faixa-info', id: 'cel-total-mes', texto: aulas + ' ' + palavraPlural(aulas, 'aula dada', 'aulas dadas') +
-      ' · ' + dinheiro(Math.round(valor * 100) / 100) }));
-    fechs.forEach(function (f) {
+    var podePagar = celularEdita(); // o observador vê o selo e o total, sem marcar pago
+    /* O número grande é o que FALTA receber neste mês: a soma do que falta de
+     * cada família, pelo mesmo selo do tablet. Embaixo, menor, o total do mês,
+     * que é o número grande do Fechamento do tablet (Core.totaisDoMes: o que
+     * já aconteceu, pago ou não). Os meses anteriores em aberto vêm à parte,
+     * pela mesma lista de pendentes do tablet. */
+    var t = Core.totaisDoMes(fechs);
+    var anteriores = Core.somaDosPendentes(Core.pendentesDePagamento(db).filter(function (p) { return p.mes < mesCelular; }));
+    var selos = fechs.map(function (f) { return Core.seloDoPagamento(db, f); });
+    var faltaCent = 0, conta = { pago: 0, parcial: 0, aberto: 0 };
+    selos.forEach(function (s) { faltaCent += Math.round(s.falta * 100); if (conta[s.selo] !== undefined) conta[s.selo] += 1; });
+    var resumoSelos = [
+      conta.pago ? conta.pago + ' ' + palavraPlural(conta.pago, 'paga', 'pagas') : '',
+      conta.parcial ? conta.parcial + ' ' + palavraPlural(conta.parcial, 'parcial', 'parciais') : '',
+      conta.aberto ? conta.aberto + ' em aberto' : ''
+    ].filter(Boolean).join(' · ');
+    var detalhe = [t.encontrosFeitos + ' ' + palavraPlural(t.encontrosFeitos, 'aula dada', 'aulas dadas')];
+    if (t.valorCanceladasFuturas) detalhe.push('canceladas e cobradas à frente: ' + dinheiro(t.valorCanceladasFuturas));
+    if (t.valorPrevisto) detalhe.push('ainda não dado: ' + dinheiro(t.valorPrevisto));
+    caixa.appendChild(el('div', { class: 'cartao cel-total', id: 'cel-total-mes' }, [
+      el('div', { class: 'cel-total-rotulo', texto: 'Falta receber neste mês' }),
+      el('div', { class: 'cel-total-valor', id: 'cel-total-falta', texto: dinheiro(faltaCent / 100) }),
+      el('div', { class: 'cel-total-do-mes', id: 'cel-total-valor', 'data-valor': dinheiro(t.valorFeito), texto: 'do total de ' + dinheiro(t.valorFeito) + ' do mês' }),
+      el('div', { class: 'ajuda u-margem-0', id: 'cel-total-detalhe', texto: detalhe.join(' · ') }),
+      resumoSelos ? el('div', { class: 'cel-total-aberto', id: 'cel-total-aberto', texto: resumoSelos }) : null,
+      anteriores.falta > 0 ? el('div', { class: 'cel-total-anteriores', id: 'cel-total-anteriores', texto: 'Meses anteriores em aberto: ' + dinheiro(anteriores.falta) }) : null
+    ]));
+    fechs.forEach(function (f, i) {
+      var selo = selos[i];
+      var hojeAindaNao = propostoDoCelular(f).hojeAindaNao.map(function (l) { return l.id; });
       /* As aulas ainda AGENDADAS (data à frente) ficam à parte, marcadas "ainda
-       * não dada": misturadas às dadas, o total pareceria o do que já aconteceu. */
+       * não dada", com o valor em cinza: misturadas às dadas, o total
+       * pareceria o do que já aconteceu. A de hoje que ainda não acabou diz
+       * isso. A cancelada diz se foi cobrada, com o mesmo nome da folha. */
       var linha = function (l) {
-        return el('li', { class: 'cel-linha' + (l.futura ? ' cel-linha-futura' : '') }, [
-          el('span', { class: 'cresce', texto: Core.ddmm(l.data) + (l.hora ? ' ' + l.hora : '') + ' · ' + Core.fmtDuracao(l.duracaoMin) + ' · ' + l.statusRotulo +
+        // a de hoje que ainda não acabou já conta no mês (a regra do tablet): valor normal, só a situação diz
+        var naoDada = l.futura && l.status !== 'cancelada';
+        var situacao = l.status === 'cancelada' ? rotuloDeCancelamentoCelular(l.cobravel)
+          : hojeAindaNao.indexOf(l.id) >= 0 ? 'Hoje, ainda não acabou' : l.statusRotulo;
+        return el('li', { class: 'cel-linha' + (l.futura ? ' cel-linha-futura' : ''), 'data-aula': l.id }, [
+          el('span', { class: 'cresce', texto: Core.ddmm(l.data) + (l.hora ? ' ' + l.hora : '') + ' · ' + Core.fmtDuracao(l.duracaoMin) + ' · ' + situacao +
             (l.futura && l.status !== 'cancelada' ? ' · ainda não dada' : '') }),
-          el('span', { class: 'cel-valor', texto: l.cobravel ? dinheiro(l.valor) : '' })
+          el('span', { class: 'cel-valor' + (naoDada ? ' cel-valor-a-dar' : ''), texto: l.cobravel ? (naoDada ? 'a dar ' : '') + dinheiro(l.valor) : '' })
         ]);
       };
       var dadas = f.linhas.filter(function (l) { return !l.futura; }), aindaNao = f.linhas.filter(function (l) { return l.futura; });
       var filhos = [
-        el('strong', { texto: f.alunoNome }),
+        el('div', { class: 'cel-fechamento-cabeca' }, [
+          el('strong', { class: 'cresce', texto: f.alunoNome }),
+          seloDoPagamentoCelular(selo)
+        ]),
         el('div', { class: 'ajuda u-margem-0', texto: f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula dada', 'aulas dadas') +
           ' · ' + f.horasFeitas + ' h · ' + dinheiro(f.valorFeito) }),
         el('ul', { class: 'cel-linhas' }, dadas.map(linha))
@@ -23105,14 +23224,35 @@
         filhos.push(el('ul', { class: 'cel-linhas cel-linhas-futuras' }, aindaNao.map(linha)));
       }
       /* "Pago em", por aluno e por mês: a mesma linha do Fechamento do tablet
-       * (Core.marcarPagamento e o Desmarcar), no pé do cartão. */
-      if (edita) {
-        var linha = blocoDeAcaoDoCelular(linhaDePagamento(f));
-        linha.setAttribute('data-acao-celular', 'pago-em');
-        filhos.push(linha);
+       * (Core.marcarPagamento e o Desmarcar), no pé do cartão. "Marcar como
+       * pago" abre a linha com o valor das aulas dadas e a data de hoje, e
+       * "Confirmar" grava: dois toques. Ao gravar, o selo e o total se
+       * redesenham. */
+      if (podePagar) {
+        var bloco = blocoDeAcaoDoCelular(linhaDePagamento(f));
+        bloco.setAttribute('data-acao-celular', 'pago-em');
+        filhos.push(bloco);
       }
-      caixa.appendChild(el('div', { class: 'cartao cel-fechamento-aluno', 'data-aluno': f.aluno.id }, filhos));
+      caixa.appendChild(el('div', { class: 'cartao cel-fechamento-aluno', 'data-aluno': f.aluno.id, 'data-selo': selo.selo }, filhos));
     });
+  }
+
+  var SELOS_DO_PAGAMENTO = {
+    pago: 'Pago', parcial: 'Parcial', aberto: 'Em aberto', nada: 'Nada a cobrar'
+  };
+  /* O selo da família no Fechamento do celular: a palavra e, no parcial, o que
+   * falta. A cor só reforça: a palavra diz. */
+  function seloDoPagamentoCelular(s) {
+    var texto = SELOS_DO_PAGAMENTO[s.selo] || '';
+    if (s.selo === 'parcial') texto += ', faltam ' + dinheiro(s.falta);
+    return el('span', { class: 'cel-selo cel-selo-' + s.selo, 'data-selo': s.selo, texto: texto });
+  }
+
+  /* Os dois cancelamentos, com nomes que não se confundem, na folha da aula,
+   * no bloco da agenda e nas linhas do Fechamento do celular. A cobrança é a
+   * da aula (a mesma regra do tablet, com o valor por hora vigente na data). */
+  function rotuloDeCancelamentoCelular(cobra) {
+    return Core.rotuloDoCancelamento(!!cobra);
   }
 
   // ---------- Enviar: o PDF do fechamento pelo WhatsApp, com o Pix ----------

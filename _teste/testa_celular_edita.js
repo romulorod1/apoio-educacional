@@ -140,7 +140,7 @@ const REMARCA = 'mudarAulaNoCelular(a, { data: v.data, hora: v.hora, duracaoMin:
 const CHOQUE = '    return Core.conflitosDe(db, provisoria);';
 const DURACAO = 'duracaoMin: Number(a.duracaoMin) || 60 }, a.id, a.status,';
 const MESMA_SITUACAO = "    if (atual && (atual.status || 'realizada') === status) {";
-const CANCELA_COM = "{ status: 'cancelada', cobravel: true }, 'Aula cancelada com cobrança.'";
+const CANCELA_COM = "{ status: 'cancelada', cobravel: true }, 'Aula cancelada e cobrada.'";
 conf('(D6c) remarcar, o choque, a duração do remarcar e o cancelar com cobrança estão cada um num lugar só',
   [REMARCA, CHOQUE, DURACAO, CANCELA_COM, MESMA_SITUACAO].map(a => APP.split(a).length).join(','), '2,2,2,2,2');
 conf('(D6c) remarcar e cancelar usam o núcleo do tablet (alterarAulaComDesfazer, que é Core.aplicarEdicaoAula só nesta aula)',
@@ -163,7 +163,7 @@ const FOLGA = '  var FOLGA_SOB_A_FAIXA = 4;';
 const VOLTAS = '    for (var volta = 0; volta < linhas.length; volta++) {';
 conf('a folga e a volta da rolagem inicial estão cada uma num lugar só', APP.split(FOLGA).length + ',' + APP.split(VOLTAS).length, '2,2');
 if (MODO === V_ROLAGEM) comNuvemIgual(APP.replace(FOLGA, '  var FOLGA_SOB_A_FAIXA = 8;').replace(VOLTAS, '    for (var volta = 0; volta < 1; volta++) {'));
-if (MODO === V_CANCELA) comNuvemIgual(APP.replace(CANCELA_COM, "{ status: 'cancelada', cobravel: false }, 'Aula cancelada com cobrança.'"));
+if (MODO === V_CANCELA) comNuvemIgual(APP.replace(CANCELA_COM, "{ status: 'cancelada', cobravel: false }, 'Aula cancelada e cobrada.'"));
 if (MODO) conf('os arquivos servidos ficaram diferentes do repositório (' + MODO + ')', trocas['/nuvem.js'] !== NUVEM && trocas['/app.js'] !== APP, true);
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
@@ -737,7 +737,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('cancelada de novo, sem cobrança (o mesmo "Cancelar aula" do Fechamento do tablet)', cancelada.ok, true);
   conf('a aula cancelada fica esmaecida e riscada, e o bloco diz sem cobrança', await pagC.evaluate(() => {
     const b = document.querySelector('.cel-bloco[data-aula="aula-outro"]');
-    return Number(getComputedStyle(b).opacity) < 1 && /line-through/.test(getComputedStyle(b.querySelector('.cel-bloco-nome')).textDecorationLine) && /Cancelada, sem cobrança/.test(b.textContent); }), true);
+    return Number(getComputedStyle(b).opacity) < 1 && /line-through/.test(getComputedStyle(b.querySelector('.cel-bloco-nome')).textDecorationLine) && /Cancelada sem cobrança/.test(b.textContent); }), true);
 
   secao('5b. Cancelar a aula de HOJE, sem e com cobrança: bate com o fechamento');
   await irParaDia(pagC, HOJE);
@@ -753,7 +753,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   prop('cancelada COM cobrança, a aula continua cancelada e o mês volta ao de antes (' + comF.feito + ', antes ' + antesF.feito + ')',
     (await situacao('aula-hoje')) === 'cancelada/true' && comF.feito === antesF.feito, V_CANCELA);
   if (MODO === V_CANCELA) fimDoVeneno();
-  conf('o bloco diz "Cancelada, com cobrança"', /Cancelada, com cobrança/.test((await texto(pagC, '.cel-bloco[data-aula="aula-hoje"]')) || ''), true);
+  conf('(D6c lote 3) o bloco diz "Cancelada e cobrada"', /Cancelada e cobrada/.test((await texto(pagC, '.cel-bloco[data-aula="aula-hoje"]')) || ''), true);
   await clicar(pagC, '#cel-abas .cel-aba[data-cel="fechamento"]');
   await pausa(200);
   conf('o Fechamento do celular mostra o mesmo valor feito (' + comF.feito + ')', ((await texto(pagC, '.cel-fechamento-aluno[data-aluno="alfa"]')) || '').indexOf(comF.feito) >= 0, true);
@@ -892,10 +892,13 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   const proposto = await pagC.evaluate(m => Store.carregar().then(d => {
     const f = Core.calcularMesInteiro(d, m).find(x => x.aluno.id === 'alfa');
     const campo = document.querySelector('.cel-fechamento-aluno[data-aluno="alfa"] .pagamento-valor');
-    return { campo: campo && campo.value, total: Core.fmtMoeda(f.totalValor).replace(/^R\$\s*/, ''), soma: (document.querySelector('.cel-proposto-soma') || {}).textContent || '',
+    /* (D6c lote 3) o devido até hoje: o devido do selo (as dadas, com a de
+     * hoje) mais a cancelada e cobrada à frente */
+    const devido = (Math.round(Core.seloDoPagamento(d, f).devido * 100) + Math.round((f.valorCanceladasFuturas || 0) * 100)) / 100;
+    return { campo: campo && campo.value, total: Core.fmtMoeda(devido).replace(/^R\$\s*/, ''), soma: (document.querySelector('.cel-proposto-soma') || {}).textContent || '',
       fechar: (document.querySelector('.cel-fechamento-aluno[data-aluno="alfa"] .btn-cancelar-pagamento') || {}).textContent }; }), MES);
-  conf('o valor proposto é o do tablet, o total do mês (' + proposto.total + ')', proposto.campo, proposto.total);
-  conf('e diz o que soma: as aulas dadas e as ainda não dadas (' + proposto.soma + ')', /do mês: R\$\s?[\d.,]+ das? \d+ aulas? dadas?/.test(proposto.soma), true);
+  conf('(D6c lote 3) o valor proposto é o devido até hoje (' + proposto.total + ')', proposto.campo, proposto.total);
+  conf('e diz o que soma (' + proposto.soma + ')', /^Devido até hoje: R\$\s?[\d.,]+ \(\d+ aulas? dadas?\)\./.test(proposto.soma.replace(/ /g, ' ')), true);
   conf('o "Cancelar" do pago em diz "Fechar sem marcar"', proposto.fechar, 'Fechar sem marcar');
   m = await medirTela(pagC);
   conf('o "pago em" aberto: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
@@ -948,7 +951,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   await H.irParaAba(pagA, 'fechamento');
   await pausa(400);
   const linhaCancelada = await texto(pagA, 'tr[data-aula-fechamento="aula-outro"]');
-  conf('a aula cancelada no celular aparece cancelada no Fechamento do tablet (' + (linhaCancelada || 'sem linha') + ')', /Cancelada/.test(linhaCancelada || '') && /não cobrada/.test(linhaCancelada || ''), true);
+  conf('a aula cancelada no celular aparece cancelada no Fechamento do tablet (' + (linhaCancelada || 'sem linha') + ')', /Cancelada sem cobrança/.test(linhaCancelada || ''), true);
   /* O fechamento do tablet bate com o do celular: as somas do mês e a
    * situação do pagamento, calculadas pelo mesmo Core em cada aparelho. */
   const retratoFechamento = pag => pag.evaluate(mes => Store.carregar().then(d => Core.calcularMesInteiro(d, mes).map(f => {

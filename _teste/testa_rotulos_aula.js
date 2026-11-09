@@ -90,8 +90,10 @@ conf('a4 reposição futura: statusNaFolha é Reposição agendada', linhas[3].s
 
 // a5: cancelada futura
 conf('a5 cancelada futura: futura é true', linhas[4].futura, true);
-conf('a5 cancelada futura: statusRotulo é Cancelada com aviso', linhas[4].statusRotulo, 'Cancelada com aviso');
-conf('a5 cancelada futura: statusNaFolha é Cancelada com aviso', linhas[4].statusNaFolha, 'Cancelada com aviso');
+// (D6c, lote 3) no fechamento e no PDF a cancelada diz a cobrança, com o nome do celular
+conf('a5 cancelada futura: statusRotulo é Cancelada sem cobrança', linhas[4].statusRotulo, 'Cancelada sem cobrança');
+conf('a5 cancelada futura: statusNaFolha é Cancelada sem cobrança', linhas[4].statusNaFolha, 'Cancelada sem cobrança');
+conf('a cancelada e cobrada se chama Cancelada e cobrada', Core.rotuloDoCancelamento(true), 'Cancelada e cobrada');
 conf('a5 cancelada futura: cobravel é false', linhas[4].cobravel, false);
 
 secao('3. Preservação financeira invariante');
