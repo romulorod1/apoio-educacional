@@ -44,10 +44,9 @@ const amb = H.criarAmbiente(PORTA, 'perfil_navegacao_biblioteca', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'nav_bib_'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
 
-/* A letra a 130%: as variáveis de letra do app multiplicadas, como as outras
- * provas do celular fazem (testa_celular_avisos, testa_celular_fechamento_texto). */
-const LETRA_130 = ':root{' + [11, 13, 14, 15, 16, 20].map((px, i) => '--letra-' + (i + 1) + ':' + Math.round(px * 13) / 10 + 'px').join(';') +
-  '} body{font-size:20.8px}';
+/* A letra a 130%: desde a F1 a escala é em rem (--letra-12/14/16/20/24), então a fonte do
+ * aparelho a 130% é a raiz a 130%, e as letras crescem sozinhas. */
+const LETRA_130 = 'html{font-size:130%} body{font-size:20.8px}';
 const letra = (pag, css) => pag.evaluate(c => {
   const v = document.querySelector('#prova-letra'); if (v) v.remove();
   if (c) { const s = document.createElement('style'); s.id = 'prova-letra'; s.textContent = c; document.head.appendChild(s); }
@@ -287,7 +286,7 @@ async function abrirCelular(w, h) {
   conf('o módulo abre', await tocarLinha(pag, 'Equações do Segundo Grau'), true);
   await esperar('as listas do módulo', () => linhasDaBiblioteca(pag), v => /Soma e Produto/.test(v || ''), 10000);
   // o voltar da Biblioteca diz para onde volta ("‹ 9º ano"), como já dizia antes desta fatia
-  conf('o módulo tem o botão de voltar escrito', await pag.evaluate(() => (document.querySelector('.bib-voltar') || {}).textContent || ''), '‹ 9º ano');
+  conf('o módulo tem o botão de voltar escrito', await pag.evaluate(() => ((document.querySelector('.bib-voltar') || {}).textContent || '').trim()), '9º ano');
   conf('a lista do módulo abre', await tocarLinha(pag, 'Soma e Produto'), true);
   await esperar('os exercícios da lista', () => pag.evaluate(() => document.querySelectorAll('#bib-corpo .bib-cartao').length), v => v > 0, 10000);
   await pag.evaluate(() => document.querySelector('#bib-corpo .bib-cartao').click());
@@ -307,7 +306,7 @@ async function abrirCelular(w, h) {
   // ================================================================
   secao('3. Celular: a barra de baixo com a Biblioteca');
   conf('o "+" de Hoje no celular é o de antes ("Marcar aula neste dia")',
-    fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').split("botaoDeAcaoCelular('marcar-aula', { class: 'cel-fab', id: 'cel-marcar-aula', 'aria-label': 'Marcar aula neste dia', texto: '+'").length - 1, 1);
+    fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').split("botaoDeAcaoCelular('marcar-aula', { class: 'cel-fab', id: 'cel-marcar-aula', 'aria-label': 'Marcar aula neste dia', icone: 'plus'").length - 1, 1);
   for (const [w, h, l] of [[360, 780, ''], [390, 844, ''], [412, 915, ''], [360, 780, LETRA_130], [390, 844, LETRA_130]]) {
     const nome = w + ' px' + (l ? ' com a letra a 130%' : '');
     const cel = await abrirCelular(w, h);

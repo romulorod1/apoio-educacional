@@ -1031,6 +1031,15 @@ roda "celular avisos --envenenado-dispensa-na-nuvem" node "_teste/testa_celular_
 roda "celular avisos --envenenado-topo-alto"        node "_teste/testa_celular_avisos.js" --envenenado-topo-alto
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
+# F1 (sistema visual do redesenho): no celular a 412 px e no tablet a 1280 x 800,
+# pelo estilo computado, a cor de acao so marinho, letra de 12 px para cima e na
+# escala de 5, pesos 400 e 600, sem caixa alta nem italico, nenhum glifo solto
+# nos botoes e contraste de 4,5:1. Os tres venenos TEM de ser vistos. Porta 8934.
+roda "sistema visual na tela (F1)"                 node "_teste/testa_sistema_visual_navegador.js"
+roda "sistema visual --envenenado-botao-verde"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-botao-verde
+roda "sistema visual --envenenado-fonte-11px"      node "_teste/testa_sistema_visual_navegador.js" --envenenado-fonte-11px
+roda "sistema visual --envenenado-glifo-solto"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-glifo-solto
+roda "sistema visual --envenenado-icone-vazio"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-icone-vazio
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
 roda "preço descartado não vaza"                  node "_teste/testa_preco_cancelado.js"
 roda "ações de aula no fechamento"                node "_teste/testa_acoes_fechamento.js"

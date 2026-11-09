@@ -3,14 +3,16 @@
  * Trava do item B12 (sistema visual), sem navegador, no portão rápido:
  * 1. Nenhuma cor literal (hexadecimal, rgb(), rgba(), hsl(), white, black)
  *    fora do :root no styles.css. Cor nova entra como variável no :root.
- * 2. No máximo 6 tamanhos de letra distintos no styles.css, já resolvidas as
- *    variáveis (--letra-1 a --letra-6).
+ * 2. Toda letra do styles.css, já resolvidas as variáveis, é um dos cinco
+ *    degraus da escala do sistema visual (F1, 09/11/2026): 12, 14, 16, 20 e
+ *    24 px, escritos em rem (--letra-12 a --letra-24) para crescerem com a
+ *    letra do aparelho. Até a F1 eram seis degraus em px (--letra-1 a -6).
  *
  * A contagem é a mesma do _teste/estatisticas_css.js, que gera o relatório de
  * antes e depois: a trava e o relatório não podem medir coisas diferentes.
  *
- * Venenos: uma cópia do CSS com uma cor solta e outra com um sétimo tamanho
- * TÊM de reprovar; e do outro lado, uma regra nova que usa variável, e uma cor
+ * Venenos: uma cópia do CSS com uma cor solta e outras com um tamanho fora da
+ * escala (em px, ou o menor degrau em 11 px) TÊM de reprovar; e do outro lado, uma regra nova que usa variável, e uma cor
  * citada só em comentário, NÃO podem ser acusadas. Antes de acreditar no zero,
  * o instrumento prova que vê: as cores de dentro do :root existem e são
  * achadas quando o :root é tirado do caminho.
@@ -20,7 +22,8 @@ const fs = require('fs');
 const path = require('path');
 const E = require('./estatisticas_css.js');
 
-const TETO_TAMANHOS = 6;
+const TETO_TAMANHOS = 5;
+const ESCALA = ['.75rem', '.875rem', '1rem', '1.25rem', '1.5rem'];
 let passes = 0, falhas = 0;
 function conf(rotulo, obtido, esperado) {
   const ok = String(obtido) === String(esperado);
@@ -40,7 +43,9 @@ function avaliar(css) {
   soltas.forEach(s => motivos.push('cor solta ' + s.cor + ' (linha ' + s.linha + ' fora do :root)'));
   const tamanhos = Object.keys(E.tamanhosDeLetra(lido));
   if (tamanhos.length > TETO_TAMANHOS) motivos.push(tamanhos.length + ' tamanhos de letra: ' + tamanhos.join(', '));
-  return { motivos, soltas: soltas.length, tamanhos: tamanhos.length };
+  const fora = tamanhos.filter(t => ESCALA.indexOf(t) < 0);
+  if (fora.length) motivos.push('tamanhos de letra fora da escala: ' + fora.join(', '));
+  return { motivos, soltas: soltas.length, tamanhos: tamanhos.length, fora: fora.length };
 }
 
 const css = fs.readFileSync(path.join(__dirname, '..', 'styles.css'), 'utf8');
@@ -53,14 +58,15 @@ const semRaiz = E.coresSoltas({ fora: lido.root.join('\n').replace(/:root\s*\{/,
 conf('tirado o :root do caminho, as mesmas cores são achadas', semRaiz.length >= coresNaRaiz.length, true);
 const tam = E.tamanhosDeLetra(lido);
 conf('os tamanhos usados são achados (há font-size na folha)', Object.keys(tam).length > 0, true);
-conf('os tamanhos saem resolvidos das variáveis, em px',
-  Object.keys(tam).every(t => /^\d+(\.\d+)?px$/.test(t)), true);
+conf('os tamanhos saem resolvidos das variáveis, em rem',
+  Object.keys(tam).every(t => /^\d*\.?\d+rem$/.test(t)), true);
 
 secao('2. O styles.css de agora');
 const real = avaliar(css);
 real.motivos.slice(0, 10).forEach(m => console.log('    ' + m));
 conf('nenhuma cor literal fora do :root', real.soltas, 0);
 conf('tamanhos de letra distintos dentro do teto de ' + TETO_TAMANHOS, real.tamanhos <= TETO_TAMANHOS, true);
+conf('todo tamanho de letra é um degrau da escala (12, 14, 16, 20 e 24 px, em rem)', real.fora, 0);
 
 secao('3. Venenos que TÊM de reprovar');
 const vCor = avaliar(css + '\n.veneno-cor { color: #123456; }\n');
@@ -70,12 +76,14 @@ conf('cópia com um rgba() solto numa sombra reprova', vRgba.soltas, 1);
 const vNome = avaliar(css + '\n.veneno-nome { background: white; }\n');
 conf('cópia com um nome de cor solto reprova', vNome.soltas, 1);
 const vTam = avaliar(css + '\n.veneno-tamanho { font-size: 27px; }\n');
-conf('cópia com um sétimo tamanho de letra reprova', vTam.motivos.some(m => /tamanhos de letra/.test(m)), true);
+conf('cópia com um tamanho fora da escala (27 px) reprova', vTam.motivos.some(m => /tamanhos de letra/.test(m)), true);
+const v11 = avaliar(css + '\n.veneno-11 { font-size: .6875rem; }\n');
+conf('cópia com letra de 11 px em rem (abaixo do menor degrau) reprova', v11.motivos.some(m => /\.6875rem/.test(m)), true);
 const vVar = avaliar(css.replace(/(:root\s*\{)/, '$1\n  --veneno-letra: 27px;') + '\n.veneno-var { font-size: var(--veneno-letra); }\n');
-conf('cópia com um sétimo tamanho escondido numa variável nova reprova', vVar.motivos.some(m => /27px/.test(m)), true);
+conf('cópia com um tamanho fora da escala escondido numa variável nova reprova', vVar.motivos.some(m => /27px/.test(m)), true);
 
 secao('4. Do outro lado: o que NÃO pode ser acusado');
-const okVar = avaliar(css + '\n.nova { color: var(--navy); font-size: var(--letra-3); }\n');
+const okVar = avaliar(css + '\n.nova { color: var(--navy); font-size: var(--letra-14); }\n');
 conf('regra nova que usa variável de cor e degrau da escala passa', okVar.motivos.length, 0);
 const okComent = avaliar(css + '\n/* antes era #ABCDEF e font-size: 27px */\n.nova { color: var(--teal); }\n');
 conf('cor e tamanho citados só em comentário não são acusados', okComent.motivos.length, 0);

@@ -24,7 +24,7 @@
       <strong>Nathália Wajsenzon</strong>
       <span>Apoio Educacional</span>
     </div>
-    <button class="olho" id="alternar-valores" type="button" title="Esconder os valores">&#9673;</button>
+    <button class="olho" id="alternar-valores" type="button" title="Esconder os valores" aria-label="Esconder os valores" data-icone="olho"></button>
     <!-- B1: o trilho lateral do tablet (o "+" no alto, os quatro destinos e Ajustes no pé).
          Os ganchos das provas ficam: #abas, .aba, .ativa e data-tela.
          O ícone de Ajustes (controles deslizantes) foi desenhado aqui, no traço 1,75 da grade 24,
@@ -44,9 +44,9 @@
     <!-- ---------------- agenda ---------------- -->
     <section class="tela ativa" id="tela-agenda">
       <div class="barra">
-        <button class="btn pequeno" id="mes-anterior" type="button">‹ Anterior</button>
+        <button class="btn pequeno" id="mes-anterior" type="button" data-icone="chl">Anterior</button>
         <h2 class="titulo" id="rotulo-mes">.</h2>
-        <button class="btn pequeno" id="mes-seguinte" type="button">Seguinte ›</button>
+        <button class="btn pequeno" id="mes-seguinte" type="button" data-icone-depois="chr">Seguinte</button>
         <span class="cresce"></span>
         <button class="btn pequeno" id="ir-para-hoje" type="button">Hoje</button>
         <button class="btn principal" id="nova-aula" type="button">+ Nova aula</button>
@@ -302,7 +302,7 @@
     <div class="modal u-larg-max-460">
       <div class="modal-cabecalho">
         <h3>Restaurar neste aparelho</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo">
         <label class="campo" id="nuvem-conta-dona-campo">
@@ -327,7 +327,7 @@
     <div class="modal u-larg-max-460">
       <div class="modal-cabecalho">
         <h3>Trocar senha</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo">
         <label class="campo">
@@ -355,7 +355,7 @@
     <div class="modal">
       <div class="modal-cabecalho">
         <h3 id="titulo-modal-aula">Aula</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo" id="corpo-modal-aula"></div>
       <div class="modal-rodape" id="rodape-modal-aula">
@@ -364,7 +364,7 @@
           Assuntos, domínio, habilidades e arquivos salvam na hora neste tablet. Horário e situação gravam ao clicar em Salvar. O relato tem rascunho automático e entra na aula quando você salva.
         </span>
         <button class="btn" data-fechar type="button" id="cancelar-aula">Cancelar</button>
-        <button class="btn destaque" id="salvar-preparar-aula" type="button" style="display:none">Salvar e preparar</button>
+        <button class="btn secundaria" id="salvar-preparar-aula" type="button" style="display:none">Salvar e preparar</button>
         <button class="btn principal" id="salvar-aula" type="button">Salvar</button>
       </div>
     </div>
@@ -388,7 +388,7 @@
     <div class="modal">
       <div class="modal-cabecalho">
         <h3 id="titulo-modal-aluno">Aluno</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo" id="corpo-modal-aluno"></div>
       <!-- O rodape segue a aba aberta. Na aba Proposta o que ela precisa e
@@ -409,7 +409,7 @@
     <div class="modal">
       <div class="modal-cabecalho">
         <h3>Excluir aluno e seus dados</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo" id="resumo-excluir-aluno"></div>
       <div class="modal-rodape">
@@ -444,7 +444,7 @@
     <div class="modal u-larg-max-460">
       <div class="modal-cabecalho">
         <h3 id="titulo-modal-escopo">Esta aula se repete</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo" id="corpo-modal-escopo"></div>
     </div>
@@ -455,12 +455,12 @@
     <div class="modal largo">
       <div class="modal-cabecalho">
         <h3 id="titulo-modal-biblioteca">Biblioteca</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo bib-visor" id="corpo-modal-biblioteca"></div>
       <div class="modal-rodape">
-        <button class="btn esquerda" id="bib-anterior" type="button">‹ Anterior</button>
-        <button class="btn" id="bib-proxima" type="button">Próxima ›</button>
+        <button class="btn esquerda" id="bib-anterior" type="button" data-icone="chl">Anterior</button>
+        <button class="btn" id="bib-proxima" type="button" data-icone-depois="chr">Próxima</button>
         <button class="btn" id="bib-solucao" type="button">Ver solução</button>
         <!-- marcar sem sair da tela cheia: ela lia, fechava, marcava e abria a
              próxima. Agora o mesmo botão marca e tira, e o selo sobre a imagem
@@ -477,7 +477,7 @@
     <div class="modal">
       <div class="modal-cabecalho">
         <h3>Abrir como folha de qual aula?</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo" id="corpo-modal-bib-folha"></div>
       <div class="modal-rodape">
@@ -493,12 +493,12 @@
     <div class="modal largo">
       <div class="modal-cabecalho">
         <h3 id="titulo-modal-leitor-pdf">PDF</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="leitor-pdf-barra" id="barra-leitor-pdf">
-        <button class="btn" id="leitor-anterior" type="button">‹ Anterior</button>
+        <button class="btn" id="leitor-anterior" type="button" data-icone="chl">Anterior</button>
         <span class="leitor-pdf-contador" id="leitor-contador" aria-live="polite"></span>
-        <button class="btn" id="leitor-proxima" type="button">Próxima ›</button>
+        <button class="btn" id="leitor-proxima" type="button" data-icone-depois="chr">Próxima</button>
         <!-- C15.1: o sumário do livro; some no anexo da aula, que não tem -->
         <button class="btn" id="leitor-sumario" type="button" hidden aria-expanded="false">Sumário</button>
         <span class="leitor-pdf-zoom">
@@ -529,7 +529,7 @@
     <div class="modal">
       <div class="modal-cabecalho">
         <h3 id="titulo-modal-livros">Livros</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo" id="corpo-modal-livros"></div>
       <div class="modal-rodape">
@@ -544,12 +544,12 @@
     <div class="modal largo">
       <div class="modal-cabecalho">
         <h3 id="titulo-modal-leitor-epub">Livro</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="leitor-pdf-barra" id="barra-leitor-epub">
-        <button class="btn" id="epub-anterior" type="button">‹ Anterior</button>
+        <button class="btn" id="epub-anterior" type="button" data-icone="chl">Anterior</button>
         <span class="leitor-pdf-contador" id="epub-contador" aria-live="polite"></span>
-        <button class="btn" id="epub-proximo" type="button">Próximo ›</button>
+        <button class="btn" id="epub-proximo" type="button" data-icone-depois="chr">Próximo</button>
         <button class="btn" id="epub-sumario" type="button" aria-expanded="false">Sumário</button>
       </div>
       <div class="leitor-cobre" id="epub-cobre" hidden></div>
@@ -568,7 +568,7 @@
     <div class="modal">
       <div class="modal-cabecalho">
         <h3>Exportar em PDF</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo" id="corpo-modal-livro-exportar"></div>
       <div class="modal-rodape" id="rodape-modal-livro-exportar"></div>
@@ -580,7 +580,7 @@
     <div class="modal">
       <div class="modal-cabecalho">
         <h3>Gerar material</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo" id="corpo-modal-bib-gerar"></div>
       <div class="modal-rodape" id="rodape-modal-bib-gerar"></div>
@@ -591,7 +591,7 @@
     <div class="modal">
       <div class="modal-cabecalho">
         <h3>Compartilhar o material</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo" id="corpo-modal-bib-compartilhar"></div>
     </div>
@@ -601,8 +601,8 @@
     <div class="modal largo">
       <div class="modal-cabecalho">
         <h3 id="titulo-modal-nota">Folha de aula</h3>
-        <button class="status-gravacao" id="status-gravacao-folha" type="button" title="Todas as anotações estão guardadas no tablet" aria-live="polite" disabled>✓ Salvo neste tablet</button>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="status-gravacao" id="status-gravacao-folha" type="button" title="Todas as anotações estão guardadas no tablet" aria-live="polite" disabled data-icone="check">Salvo neste tablet</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo sem-espaco">
         <div class="editor-envolve">
@@ -685,7 +685,7 @@
     <div class="modal u-larg-max-500">
       <div class="modal-cabecalho">
         <h3>Repetir para trás</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo" id="corpo-modal-retroativo"></div>
       <div class="modal-rodape">
@@ -699,7 +699,7 @@
     <div class="modal u-larg-max-460">
       <div class="modal-cabecalho">
         <h3>Texto na folha</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo">
         <label class="campo">
@@ -728,7 +728,7 @@
     <div class="modal">
       <div class="modal-cabecalho">
         <h3 id="titulo-modal-resumo">Feedback</h3>
-        <button class="fechar" data-fechar type="button" aria-label="Fechar">×</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo" id="corpo-modal-resumo"></div>
       <div class="modal-rodape">
