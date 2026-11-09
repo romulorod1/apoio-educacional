@@ -34,11 +34,13 @@ instavel=0
 pulada=0
 rapido=0
 listar=0
+so_fc=0
 pedaco=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --rapido) rapido=1 ;;
     --listar) listar=1 ;;
+    --so-falhas-conhecidas) so_fc=1 ;;
     --pedaco) pedaco_dado=1; pedaco="${2:-}"; if [ "$#" -gt 1 ]; then shift; fi ;;
     *) printf 'opcao desconhecida: %s\n' "$1"; exit 2 ;;
   esac
@@ -216,6 +218,170 @@ roda() {
     instavel=1
   fi
 }
+
+# ---------- FALHAS CONHECIDAS (nao bloqueiam o merge) ----------
+#
+# Defeito achado e ainda sem conserto: a prova que o mostra fica ESCRITA e roda
+# no portao, mas o vermelho esperado dela nao bloqueia o merge. E xfail
+# ESTRITO, para nao virar o lugar onde qualquer coisa fica verde:
+#   - neutra SO se a prova falhar exatamente pelas verificacoes esperadas, pelo
+#     rotulo (cada linha "  FALHA <rotulo>..." comeca por um rotulo da lista);
+#   - VERMELHO quando: a prova nao imprime o placar (erro de script, prova que
+#     nao rodou), levanta excecao ("erro:"), tem zero verificacoes, tem FALHA
+#     de outro rotulo, ou falta algum rotulo esperado (a falha conhecida tem de
+#     ser VISTA falhando);
+#   - VERMELHO, com "falha conhecida passou: remova da lista", quando a prova
+#     passa inteira: quem conserta tira a linha daqui conscientemente.
+# Uma linha por falha conhecida:
+#   nome | prova | rotulos esperados separados por ; | argumentos (opcional)
+# A prova anota como chamada (conta em "toda prova no portao"), e abre
+# navegador: roda no portao inteiro e na fatia 1; no --rapido e nas outras
+# fatias ela diz que nao rodou, pelo nome.
+# Exemplo de linha (a de 09/11, se o diagnostico tivesse confirmado o defeito):
+#   ressurreição de aulas nos registros|_teste/testa_registros_ressurreicao.js|ressurreição (a);ressurreição (c)|
+# Em 09/11/2026 a lista ficou VAZIA: a prova da ressurreicao passou nos cinco
+# caminhos na 1.42.18 (as 10 aulas da secao 16 das folhas sao a carga inicial
+# regravada ao reabrir o app), e ela roda no portao comum, na secao da nuvem.
+FALHAS_CONHECIDAS=''
+fc_listadas=0; fc_vistas=0; fc_rodaram=0; fc_nomes=""
+
+# Le a saida de uma prova e decide: fc_veredito=neutra|vermelha, fc_motivo.
+fc_avalia() {
+  fc_saida="$1"; fc_esperados="$2"
+  fc_veredito=vermelha; fc_motivo=""
+  fc_placar=$(printf '%s\n' "$fc_saida" | grep -E '^[0-9]+ passaram, [0-9]+ falharam\.$' | tail -1 || true)
+  if [ -z "$fc_placar" ]; then
+    fc_motivo="a prova nao disse o placar (erro de script ou prova que nao rodou): $(printf '%s\n' "$fc_saida" | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-90)"
+    return 0
+  fi
+  fc_p=$(printf '%s' "$fc_placar" | sed 's/ passaram.*//')
+  fc_f=$(printf '%s' "$fc_placar" | sed 's/.*passaram, \([0-9]*\) falharam.*/\1/')
+  if [ $((fc_p + fc_f)) -eq 0 ]; then fc_motivo="zero verificacoes"; return 0; fi
+  if printf '%s\n' "$fc_saida" | grep -q '^erro:'; then
+    fc_motivo="a prova levantou excecao: $(printf '%s\n' "$fc_saida" | grep '^erro:' | head -1 | cut -c1-90)"
+    return 0
+  fi
+  fc_linhas=$(printf '%s\n' "$fc_saida" | grep '^  FALHA ' | sed 's/^  FALHA //' || true)
+  fc_nl=$(printf '%s\n' "$fc_linhas" | grep -c . || true)
+  if [ "$fc_f" = "0" ]; then fc_motivo="falha conhecida passou: remova da lista"; return 0; fi
+  if [ "$fc_nl" != "$fc_f" ]; then fc_motivo="o placar diz $fc_f falhas e ha $fc_nl linhas FALHA"; return 0; fi
+  # (awk com index()==1: o rotulo e texto literal, com parenteses, e nao padrao)
+  fc_outra=$(printf '%s\n' "$fc_linhas" | awk -v lista="$fc_esperados" 'BEGIN { n = split(lista, r, ";") }
+    $0 != "" { ok = 0; for (i = 1; i <= n; i++) if (r[i] != "" && index($0, r[i]) == 1) ok = 1; if (!ok) { print; exit } }')
+  if [ -n "$fc_outra" ]; then fc_motivo="FALHA de outro rotulo: $(printf '%s' "$fc_outra" | cut -c1-90)"; return 0; fi
+  fc_resto="$fc_esperados;"
+  while [ -n "$fc_resto" ]; do
+    r="${fc_resto%%;*}"; fc_resto="${fc_resto#*;}"
+    [ -n "$r" ] || continue
+    if ! printf '%s\n' "$fc_linhas" | awk -v r="$r" 'index($0, r) == 1 { achou = 1 } END { exit !achou }'; then
+      fc_motivo="falha conhecida nao foi vista falhando: $r"; return 0
+    fi
+  done
+  fc_veredito=neutra
+  fc_motivo="$fc_f falha(s), todas pelos rotulos esperados"
+}
+
+# A PROVA DA AVALIACAO VEM ANTES DELA, com saidas de mentira: uma neutra e
+# cada jeito de ficar vermelho. Roda em todo modo (sem navegador).
+p_fc=0; f_fc=0
+afere_fc() {
+  fc_avalia "$1" "$2"
+  case "$fc_motivo" in "$4"*) ok_m=1 ;; *) ok_m=0 ;; esac
+  if [ "$fc_veredito" = "$3" ] && [ "$ok_m" = "1" ]; then p_fc=$((p_fc + 1)); else
+    f_fc=$((f_fc + 1))
+    printf '    prova das falhas conhecidas: deu [%s: %s], esperado [%s: %s]\n' "$fc_veredito" "$fc_motivo" "$3" "$4"
+  fi
+}
+fc_prova_da_secao() {
+  afere_fc "  OK   x
+  FALHA rot (a): um  [obtido: 1 | esperado: 0]
+  FALHA rot (b): dois
+3 passaram, 2 falharam." "rot (a);rot (b)" neutra "2 falha"
+  afere_fc "  FALHA rot (a): um
+  FALHA outra coisa
+1 passaram, 2 falharam." "rot (a)" vermelha "FALHA de outro rotulo: outra coisa"
+  afere_fc "  FALHA rot (a): um
+1 passaram, 1 falharam." "rot (a);rot (b)" vermelha "falha conhecida nao foi vista falhando: rot (b)"
+  afere_fc "  OK   x
+5 passaram, 0 falharam." "rot (a)" vermelha "falha conhecida passou: remova da lista"
+  afere_fc "SyntaxError: Unexpected token" "rot (a)" vermelha "a prova nao disse o placar"
+  afere_fc "0 passaram, 0 falharam." "rot (a)" vermelha "zero verificacoes"
+  afere_fc "  FALHA rot (a): um
+erro: o aplicativo nao abriu
+1 passaram, 2 falharam." "rot (a)" vermelha "a prova levantou excecao"
+  afere_fc "  FALHA rot (a): um
+1 passaram, 3 falharam." "rot (a)" vermelha "o placar diz 3 falhas"
+}
+
+# Roda cada falha conhecida da lista (uma segunda vez se der vermelho, como o roda).
+fc_roda_todas() {
+  fc_listadas=0; fc_vistas=0; fc_rodaram=0; fc_nomes=""
+  fc_prova_da_secao
+  if [ "$f_fc" != "0" ]; then
+    printf '  FALHOU  %-24s a prova da avaliacao nao passou: %s de %s\n' "falhas conhecidas" "$p_fc" "$((p_fc + f_fc))"
+    falhou=1
+  elif [ "$p_fc" -lt 8 ]; then
+    printf '  FALHOU  %-24s a prova da avaliacao so julgou %s saidas; esperava 8\n' "falhas conhecidas" "$p_fc"
+    falhou=1
+  else
+    printf '  ok      %-24s a avaliacao julgou certo as %s saidas de mentira (1 neutra, 7 vermelhas)\n' "prova das conhecidas" "$p_fc"
+  fi
+  fc_lista=$(printf '%s\n' "$FALHAS_CONHECIDAS" | grep -v '^[[:space:]]*$' || true)
+  while IFS='|' read -r fc_nome fc_prova fc_rotulos fc_args; do
+    [ -n "$fc_nome" ] || continue
+    fc_listadas=$((fc_listadas + 1))
+    fc_nomes="${fc_nomes:+$fc_nomes; }$fc_nome"
+    anota "$fc_prova"
+    if [ "$rapido" = "1" ]; then
+      printf '  nao rodou %-22s abre navegador; so o portao inteiro roda\n' "$fc_nome"
+      continue
+    fi
+    if [ -n "$pn" ] && [ "$pk" != "1" ]; then
+      printf '  nao rodou %-22s fica com a fatia 1\n' "$fc_nome"
+      continue
+    fi
+    fc_rodaram=$((fc_rodaram + 1))
+    # shellcheck disable=SC2086
+    fc_s=$(node "$fc_prova" $fc_args 2>&1 </dev/null) || true
+    fc_avalia "$fc_s" "$fc_rotulos"
+    if [ "$fc_veredito" != "neutra" ]; then
+      fc_s=$(node "$fc_prova" $fc_args 2>&1 </dev/null) || true
+      fc_m1="$fc_motivo"
+      fc_avalia "$fc_s" "$fc_rotulos"
+      if [ "$fc_veredito" = "neutra" ]; then
+        printf '  INSTAVEL %-23s so na segunda vez falhou como esperado (antes: %s)\n' "$fc_nome" "$fc_m1"
+        instavel=1
+      fi
+    fi
+    if [ "$fc_veredito" = "neutra" ]; then
+      fc_vistas=$((fc_vistas + 1))
+      printf '  conhecida %-22s %s (nao bloqueia o merge)\n' "$fc_nome" "$fc_motivo"
+      printf '%s\n' "$fc_s" | grep '^  FALHA ' | sed 's/^  FALHA /            FALHA /'
+    else
+      printf '  FALHOU  %-24s %s\n' "$fc_nome" "$fc_motivo"
+      guarda_saida "falha conhecida $fc_nome" "$fc_s"
+      falhou=1
+    fi
+  done <<FIM_FC
+$fc_lista
+FIM_FC
+}
+fc_resumo() {
+  if [ "$fc_listadas" = "0" ]; then
+    printf 'falhas conhecidas: 0 (nenhuma listada)\n'
+  elif [ "$fc_rodaram" -gt 0 ]; then
+    printf 'falhas conhecidas: %s (%s)\n' "$fc_vistas" "$fc_nomes"
+  else
+    printf 'falhas conhecidas: %s listada(s), nao rodaram aqui (%s)\n' "$fc_listadas" "$fc_nomes"
+  fi
+}
+if [ "$so_fc" = "1" ]; then
+  titulo "FALHAS CONHECIDAS (nao bloqueiam o merge)"
+  fc_roda_todas
+  printf '\n'; fc_resumo
+  if [ "$falhou" != "0" ]; then printf 'HA FALHA nas falhas conhecidas.\n'; fi
+  exit "$falhou"
+fi
 
 # A secao do banco de temas (o verificar.py dos 148 temas, a prova do
 # verificador e a das fontes de portugues) saiu no B14 com o material autoral.
@@ -786,6 +952,12 @@ roda "nuvem registros --envenenado-fila-fora-da-transacao" node "_teste/testa_nu
 # (revisao) recusa total da nuvem nunca conta tentativa: o veneno que culpa quem ja
 # tinha tentativa leva um bom sozinho a quarentena, e TEM de ser visto.
 roda "nuvem registros --envenenado-culpa-na-recusa-total" node "_teste/testa_nuvem_registros.js" --envenenado-culpa-na-recusa-total
+# (09/11) a aula excluida nao volta da nuvem: exclusao pelo app, aluno em cascata,
+# celular que so recebe, exclusao sem sinal e "Apagar tudo" + "Enviar copia agora",
+# num tablet novo e num celular novo que restauram a copia mais nova e recebem.
+# Veneno: a lapide que nao entra na fila TEM de fazer a aula voltar.
+roda "nuvem ressurreicao"                           node "_teste/testa_registros_ressurreicao.js"
+roda "nuvem ressurreicao --envenenado-lapide-nao-sobe" node "_teste/testa_registros_ressurreicao.js" --envenenado-lapide-nao-sobe
 # N1 fatia 3: o recebimento. Dois tablets e um celular contra o emulador: cursor por
 # servidorEm, ultima escrita vence por registro pelo carimbo do servidor, a versao
 # que perde vai ao historico, lapide de um nao volta pelo outro, duas abas em ordem
@@ -1329,6 +1501,10 @@ fi
 # matematica) saiu no B14: o carregarSerie e as series sairam com o material
 # autoral, e nao ha mais chave de cache de serie que um app novo possa perder.
 
+titulo "FALHAS CONHECIDAS (nao bloqueiam o merge)"
+# A lista e a regra estao no alto, em FALHAS_CONHECIDAS e fc_avalia.
+fc_roda_todas
+
 # A PROVA VEM ANTES DA CONFERENCIA que ela prova.
 #
 # As duas travas de privacidade passaram meses imprimindo ok sem olhar arquivo
@@ -1443,6 +1619,8 @@ else
 fi
 
 printf '\n'
+# Em toda rodada, verde ou vermelha: quantas falhas conhecidas, e quais.
+fc_resumo
 if [ -n "$pn" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
   # fatia vazia nao e fatia verde: com mais fatias que provas, a conta esta errada
   printf 'HA FALHA. A fatia %s de %s nao rodou prova nenhuma.\n' "$pk" "$pn"
