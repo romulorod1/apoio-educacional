@@ -3887,6 +3887,55 @@
     return partes.join('\n\n');
   }
 
+  /* A MENSAGEM DO MÊS (o feedback do fechamento) mora num lugar só:
+   * db.resumos, um item por aluno e mês, com o texto em `texto`. É dele que
+   * calcularFechamento tira o resumoTexto, e o PDF, o texto e o cartão leem
+   * dali. O tablet (a janela do feedback) e o celular (o editor da mensagem do
+   * mês) gravam pelas duas funções abaixo, e nenhum dos dois guarda o texto
+   * em outro campo: a sincronização leva o item como registro
+   * `resumo:<aluno>:<mês>`. */
+  function textoDoMes(db, alunoId, mesIso) {
+    var r = ((db && db.resumos) || []).filter(function (x) { return x.alunoId === alunoId && x.mes === mesIso; })[0];
+    return r ? (r.texto || '') : '';
+  }
+  function gravarTextoDoMes(db, alunoId, mesIso, texto) {
+    db.resumos = db.resumos || [];
+    var r = db.resumos.filter(function (x) { return x.alunoId === alunoId && x.mes === mesIso; })[0];
+    if (r) r.texto = texto;
+    else { r = { alunoId: alunoId, mes: mesIso, texto: texto }; db.resumos.push(r); }
+    return r;
+  }
+
+  /* "hoje às 18:02" ou "em 14/10 às 18:02", na hora local do aparelho; vazio
+   * quando o carimbo falta ou não é uma data. */
+  function quandoDoCarimbo(iso, hojeRef) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    var dia = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    var hora = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    return (dia === (hojeRef || hojeIso()) ? 'hoje' : 'em ' + ddmm(dia)) + ' às ' + hora;
+  }
+
+  /* De onde veio a mensagem do mês que está salva, pelo registro da
+   * sincronização (`resumo:<aluno>:<mês>`): o aparelho que gravou e a hora.
+   * O aparelho que não é este é o tablet (o observador nunca grava). O
+   * registro que este aparelho tem sem ter gravado (nem na fila, nem enviado)
+   * é o que veio na cópia do tablet. O que faltar no registro é dito, e não
+   * adivinhado. opcoes: { naFila, meuAparelho, temTexto, hoje }. */
+  function origemDoTextoDoMes(reg, opcoes) {
+    opcoes = opcoes || {};
+    if (!reg || reg.apagadoEm) return opcoes.temTexto ? 'O registro deste texto não diz o aparelho nem a hora.' : '';
+    var quando = quandoDoCarimbo(reg.atualizadoEm, opcoes.hoje);
+    if (!reg.aparelho && !quando) return 'O registro deste texto não diz o aparelho nem a hora.';
+    if (!reg.aparelho) return 'Gravado ' + quando + '. O registro não diz em que aparelho.';
+    var doTablet = reg.aparelho !== opcoes.meuAparelho;
+    if (!quando) return (doTablet ? 'Editado no tablet' : 'Editado neste celular') + '. O registro não diz a hora.';
+    if (doTablet) return 'Editado no tablet ' + quando + '.';
+    if (opcoes.naFila || reg.nuvem) return 'Editado neste celular ' + quando + '.';
+    return 'Veio na cópia do tablet feita ' + quando + '.';
+  }
+
   function markdownFechamento(f, opcoes) {
     opcoes = opcoes || {};
     var T = titulosDoFechamento(opcoes.titulos);
@@ -5554,6 +5603,7 @@
     markdownFechamento: markdownFechamento, markdownMesInteiro: markdownMesInteiro,
     TITULOS_FECHAMENTO: TITULOS_FECHAMENTO, titulosDoFechamento: titulosDoFechamento, tituloMaximo: tituloMaximo,
     PERGUNTAS_DO_ROTEIRO: PERGUNTAS_DO_ROTEIRO, perguntasDoRoteiro: perguntasDoRoteiro, textoDoRoteiro: textoDoRoteiro,
+    textoDoMes: textoDoMes, gravarTextoDoMes: gravarTextoDoMes, quandoDoCarimbo: quandoDoCarimbo, origemDoTextoDoMes: origemDoTextoDoMes,
     AREAS: AREAS, rotuloArea: rotuloArea, rotuloAreaFamilia: rotuloAreaFamilia, areasPara: areasPara, temasDaAula: temasDaAula,
     ultimoEncontro: ultimoEncontro,
     MAPA: MAPA, NIVEIS: NIVEIS, itemDoMapa: itemDoMapa, rotulosDoMapa: rotulosDoMapa,

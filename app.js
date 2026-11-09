@@ -13418,7 +13418,6 @@
 
   function abrirResumo(alunoId, mes) {
     var aluno = alunoPorId(alunoId);
-    var registro = db.resumos.filter(function (r) { return r.alunoId === alunoId && r.mes === mes; })[0];
     $('#titulo-modal-resumo').textContent = 'Feedback de ' + aluno.nome + ', ' + Core.mesExtenso(mes);
     var corpo = $('#corpo-modal-resumo');
     corpo.innerHTML = '';
@@ -13429,7 +13428,7 @@
       id: 'campo-resumo', class: 'u-alt-min-280',
       placeholder: 'Como foi o mês, o que evoluiu, o que merece atenção e o que vem a seguir.'
     });
-    area.value = registro ? registro.texto : '';
+    area.value = Core.textoDoMes(db, alunoId, mes);
     corpo._roteiro = null;
     if (roteiroLigado()) {
       corpo.appendChild(el('div', {
@@ -13454,11 +13453,8 @@
       texto = texto.trim() ? texto.replace(/\s+$/, '') + '\n\n' + pendente : pendente;
       $('#campo-resumo').value = texto;
     }
-    var registro = db.resumos.filter(function (r) {
-      return r.alunoId === corpo._alunoId && r.mes === corpo._mes;
-    })[0];
-    if (registro) registro.texto = texto;
-    else db.resumos.push({ alunoId: corpo._alunoId, mes: corpo._mes, texto: texto });
+    // o mesmo campo e a mesma função que o editor do celular usa
+    Core.gravarTextoDoMes(db, corpo._alunoId, corpo._mes, texto);
     // as perguntas que ela reescreveu ficam para os próximos meses (C11)
     if (corpo._roteiro) corpo._roteiro.guardarPerguntas();
     salvarEDepois(function (gravou) {
@@ -14281,7 +14277,7 @@
       new Blob([bytes], { type: 'application/pdf' }), 'Fechamento do mês');
   }
 
-  function exportarAlunoEmPdf(f, comFolhas, extraOpcoes) {
+  function exportarAlunoEmPdf(f, comFolhas, extraOpcoes, entrega) {
     /* Feedback em branco não sai no PDF, nem o título dele. Ela confirma antes,
      * porque esquecer de escrever é mais comum do que decidir mandar sem. */
     /* Devolve uma promessa de verdadeiro quando o PDF saiu para o compartilhar,
@@ -14328,7 +14324,8 @@
       };
       var opts = opcoesDoDocumento(Object.assign(baseOpts, extraOpcoes || {}));
       var bytes = gen.gerarFechamento(f, opts);
-      entregarArquivo(nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf',
+      // `entrega`: o "Ver o PDF" do celular baixa (abre no leitor) em vez de compartilhar
+      (entrega || entregarArquivo)(nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf',
         new Blob([bytes], { type: 'application/pdf' }),
         'Fechamento de ' + f.alunoNome);
       return true;
@@ -21723,6 +21720,7 @@
     celularPedeEntrada = false;
     formCelular = null;
     folhaCelular = null;
+    fecharMensagemCelular(); // o que ela escreveu já está no rascunho
     alunoCelular = null; // a aba Alunos volta à lista
     diaRoladoCelular = null; // voltando a Hoje, a linha do tempo rola até agora
     esconderAviso(); // o aviso de uma ação não segue para outra tela
@@ -21870,6 +21868,7 @@
   function formularioAbertoNoCelular() {
     if (telaCelular === 'hoje') return !!(formCelular && $('#cel-hoje [data-form-celular]')) ||
       !!(folhaCelular && folhaCelular.passo === 'remarcar' && $('#cel-folha [data-form-celular]'));
+    if ($('#cel-mensagem')) return true; // o editor da mensagem do mês, em qualquer tela
     if (telaCelular === 'fechamento') return !!$('#cel-fechamento .pagamento-valor');
     return false;
   }
@@ -23449,6 +23448,7 @@
         bloco.setAttribute('data-acao-celular', 'pago-em');
         filhos.push(bloco);
       }
+      if (podeEditarMensagemCelular()) filhos.push(botaoDaMensagemCelular(f.aluno.id, mesCelular));
       caixa.appendChild(el('div', { class: 'cartao cel-fechamento-aluno', 'data-aluno': f.aluno.id, 'data-selo': selo.selo }, filhos));
     });
   }
@@ -23510,15 +23510,199 @@
         } })
     ]));
     fechs.forEach(function (f) {
-      caixa.appendChild(el('div', { class: 'cartao cel-familia' }, [
+      var alunoId = f.aluno.id;
+      /* O PDF é calculado no toque, e não no desenho da tela: a mensagem do
+       * mês que ela acabou de salvar (aqui ou no Fechamento) entra nele. */
+      var pdfAgora = function (entrega) { return exportarAlunoEmPdf(Core.calcularFechamento(db, alunoId, mesCelular), false, null, entrega); };
+      caixa.appendChild(el('div', { class: 'cartao cel-familia', 'data-aluno': alunoId }, [
         el('strong', { texto: f.alunoNome }),
         el('div', { class: 'ajuda u-margem-0', texto: f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula', 'aulas') +
           ' · ' + dinheiro(f.valorFeito) }),
         el('div', { class: 'barra u-margem-baixo-0 u-margem-topo-8' }, [
-          el('button', { type: 'button', class: 'btn', texto: 'Enviar o PDF', aoClick: function () { exportarAlunoEmPdf(f, false); } })
-        ])
+          el('button', { type: 'button', class: 'btn cel-ver-pdf', texto: 'Ver o PDF', aoClick: function () { pdfAgora(baixar); } }),
+          el('button', { type: 'button', class: 'btn cel-enviar-pdf', texto: 'Enviar o PDF', aoClick: function () { pdfAgora(); } })
+        ]),
+        podeEditarMensagemCelular() ? botaoDaMensagemCelular(alunoId, mesCelular) : null
       ]));
     });
+  }
+
+  // ---------- a mensagem do mês, editada no celular ----------
+
+  /* É o MESMO texto que o tablet edita na janela do feedback: o mesmo campo
+   * (db.resumos, pelo Core.textoDoMes e Core.gravarTextoDoMes) e o mesmo
+   * caminho até o PDF (calcularFechamento lê dali). Gravar é uma das ações do
+   * celular da dona: passa pelo comoAcaoDoCelular, entra na fila de registros
+   * como `resumo:<aluno>:<mês>` e sobe. Quem só lê, e o observador, não têm o
+   * botão. O roteiro de perguntas do tablet fica no tablet: aqui é o texto.
+   *
+   * O editor ocupa a tela, com Salvar e Cancelar num rodapé que acompanha a
+   * parte visível (visualViewport): com o teclado aberto, os dois continuam à
+   * vista. Sair sem salvar guarda um rascunho neste aparelho (localStorage,
+   * como o relato da aula), oferecido ao reabrir. */
+  var editorMensagemCelular = null; // { alunoId, mes, base, soltar }
+
+  function podeEditarMensagemCelular() { return celularEdita(); }
+
+  function botaoDaMensagemCelular(alunoId, mes) {
+    return el('div', { class: 'barra u-margem-baixo-0 u-margem-topo-8', 'data-acao-celular': 'mensagem-do-mes' }, [
+      el('button', { type: 'button', class: 'btn cel-editar-mensagem', 'data-aluno': alunoId, texto: 'Editar a mensagem do mês',
+        aoClick: function () { abrirMensagemCelular(alunoId, mes); } })
+    ]);
+  }
+
+  function chaveRascunhoMensagem(alunoId, mes) { return 'rascunho-mensagem-mes:' + alunoId + ':' + mes; }
+  function lerRascunhoMensagem(alunoId, mes) {
+    try {
+      var r = JSON.parse(localStorage.getItem(chaveRascunhoMensagem(alunoId, mes)) || 'null');
+      if (!r || typeof r.texto !== 'string' || typeof r.base !== 'string') return null;
+      return r;
+    } catch (e) { return null; }
+  }
+  function guardarRascunhoMensagem(ed, texto) {
+    try {
+      if (texto === ed.base) localStorage.removeItem(chaveRascunhoMensagem(ed.alunoId, ed.mes));
+      else localStorage.setItem(chaveRascunhoMensagem(ed.alunoId, ed.mes), JSON.stringify({ texto: texto, base: ed.base, quando: Date.now() }));
+    } catch (e) { /* sem armazenamento: o texto continua na tela até ela sair */ }
+  }
+  function limparRascunhoMensagem(alunoId, mes) {
+    try { localStorage.removeItem(chaveRascunhoMensagem(alunoId, mes)); } catch (e) { /* sem armazenamento */ }
+  }
+
+  /* De onde veio o texto salvo, pelo registro dele (Core.origemDoTextoDoMes):
+   * o aparelho que gravou e a hora, e o que faltar no registro. */
+  function origemDaMensagemCelular(alunoId, mes, temTexto) {
+    var id = 'resumo:' + alunoId + ':' + mes;
+    return Promise.all([Store.lerRegistros(), Store.lerFila()]).then(function (v) {
+      var reg = (v[0] || []).filter(function (r) { return r.id === id; })[0] || null;
+      var naFila = (v[1] || []).some(function (e) { return e.id === id; });
+      return Core.origemDoTextoDoMes(reg, { naFila: naFila, meuAparelho: Store.aparelho(), temTexto: temTexto });
+    }, function () { return ''; });
+  }
+
+  function abrirMensagemCelular(alunoId, mes) {
+    if (!podeEditarMensagemCelular()) return;
+    var aluno = alunoPorId(alunoId);
+    var f = Core.calcularFechamento(db, alunoId, mes);
+    if (!aluno || !f) { avisar('Este aluno não tem aulas neste mês.'); return; }
+    fecharMensagemCelular();
+    esconderAviso();
+    var base = Core.textoDoMes(db, alunoId, mes);
+    var ed = editorMensagemCelular = { alunoId: alunoId, mes: mes, base: base, soltar: null };
+    var rascunho = lerRascunhoMensagem(alunoId, mes);
+    if (rascunho && rascunho.texto === base) { limparRascunhoMensagem(alunoId, mes); rascunho = null; }
+
+    var campo = el('textarea', { id: 'cel-mensagem-texto', class: 'cel-mensagem-texto', 'aria-labelledby': 'cel-mensagem-titulo',
+      placeholder: 'Como foi o mês, o que evoluiu, o que merece atenção e o que vem a seguir.' });
+    campo.value = base;
+    var faixa = null;
+    if (rascunho) {
+      var hora = Core.quandoDoCarimbo(new Date(rascunho.quando).toISOString());
+      /* O rascunho volta sozinho quando o texto salvo é o mesmo de quando ela
+       * começou. Se o texto mudou depois (no tablet, por exemplo), o salvo fica
+       * na tela e o rascunho é oferecido: um toque troca. */
+      var mudou = rascunho.base !== base;
+      if (!mudou) campo.value = rascunho.texto;
+      var botaoRascunho = el('button', { type: 'button', class: 'btn pequeno', id: mudou ? 'cel-mensagem-usar-rascunho' : 'cel-mensagem-descartar',
+        texto: mudou ? 'Usar o rascunho' : 'Descartar o rascunho',
+        aoClick: function () {
+          if (mudou) { campo.value = rascunho.texto; ed.base = base; guardarRascunhoMensagem(ed, campo.value); }
+          else { campo.value = base; limparRascunhoMensagem(alunoId, mes); }
+          if (faixa && faixa.parentNode) faixa.parentNode.removeChild(faixa);
+          campo.focus();
+        } });
+      faixa = el('div', { class: 'faixa-info cel-mensagem-rascunho', id: 'cel-mensagem-rascunho' }, [
+        el('div', { texto: mudou
+          ? 'Há um rascunho deste aparelho, de ' + hora.replace(/^em /, '') + ', mas o texto salvo mudou depois dele. Abaixo está o texto salvo.'
+          : 'Rascunho recuperado, de ' + hora.replace(/^em /, '') + '. Ainda não foi salvo.' }),
+        botaoRascunho
+      ]);
+    }
+    campo.addEventListener('input', function () { guardarRascunhoMensagem(ed, campo.value); });
+
+    var contas = f.qtdEncontrosFeitos + ' ' + palavraPlural(f.qtdEncontrosFeitos, 'aula dada', 'aulas dadas') +
+      ' · ' + f.horasFeitas + ' h · ' + dinheiro(f.valorFeito);
+    var origem = el('div', { class: 'ajuda u-margem-0 cel-mensagem-origem', id: 'cel-mensagem-origem' });
+    var editor = el('div', { class: 'cel-mensagem', id: 'cel-mensagem', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'cel-mensagem-titulo',
+      'data-acao-celular': 'mensagem-do-mes', 'data-aluno': alunoId, 'data-mes': mes }, [
+      el('div', { class: 'cel-mensagem-cabeca' }, [
+        el('h2', { class: 'cel-titulo', id: 'cel-mensagem-titulo', texto: 'Mensagem do mês' }),
+        el('div', { class: 'cel-mensagem-quem', texto: aluno.nome + ' · ' + Core.mesExtenso(mes) }),
+        el('div', { class: 'ajuda u-margem-0', id: 'cel-mensagem-contas', texto: contas }),
+        origem
+      ]),
+      faixa,
+      campo,
+      el('div', { class: 'cel-mensagem-rodape' }, [
+        el('button', { type: 'button', class: 'btn', id: 'cel-mensagem-cancelar', texto: 'Cancelar', aoClick: cancelarMensagemCelular }),
+        el('button', { type: 'button', class: 'btn principal', id: 'cel-mensagem-salvar', texto: 'Salvar', aoClick: salvarMensagemCelular })
+      ])
+    ]);
+    ($('#modo-celular') || document.body).appendChild(editor);
+    ed.soltar = acompanharTecladoCelular(editor);
+    origemDaMensagemCelular(alunoId, mes, !!base.trim()).then(function (frase) {
+      if (editorMensagemCelular !== ed) return;
+      origem.textContent = frase;
+      origem.hidden = !frase;
+    });
+    setTimeout(function () { if (editorMensagemCelular === ed) campo.focus(); }, 60);
+  }
+
+  /* O editor fica do tamanho da parte visível da tela: quando o teclado abre,
+   * a parte visível encolhe e o rodapé sobe junto. Devolve quem solta. */
+  function acompanharTecladoCelular(editor) {
+    var vv = window.visualViewport;
+    function ajustar() {
+      var altura = vv ? vv.height : window.innerHeight;
+      editor.style.height = Math.round(altura) + 'px';
+      editor.style.top = Math.round(vv ? vv.offsetTop : 0) + 'px';
+    }
+    ajustar();
+    if (vv) { vv.addEventListener('resize', ajustar); vv.addEventListener('scroll', ajustar); }
+    window.addEventListener('resize', ajustar);
+    return function () {
+      if (vv) { vv.removeEventListener('resize', ajustar); vv.removeEventListener('scroll', ajustar); }
+      window.removeEventListener('resize', ajustar);
+    };
+  }
+
+  function fecharMensagemCelular() {
+    var ed = editorMensagemCelular;
+    editorMensagemCelular = null;
+    if (ed && ed.soltar) ed.soltar();
+    var velho = $('#cel-mensagem');
+    if (velho) velho.parentNode.removeChild(velho);
+  }
+
+  /* Cancelar fecha sem gravar nada no banco; o que ela escreveu fica no
+   * rascunho deste aparelho, e ela é avisada. */
+  function cancelarMensagemCelular() {
+    var ed = editorMensagemCelular, campo = $('#cel-mensagem-texto');
+    var ficou = !!(ed && campo && campo.value !== ed.base);
+    if (ed && campo) guardarRascunhoMensagem(ed, campo.value);
+    fecharMensagemCelular();
+    if (ficou) avisar('A mensagem não foi salva. O rascunho ficou neste aparelho.');
+  }
+
+  function salvarMensagemCelular() {
+    var ed = editorMensagemCelular, campo = $('#cel-mensagem-texto');
+    if (!ed || !campo || !podeEditarMensagemCelular()) return;
+    var texto = campo.value;
+    var aluno = alunoPorId(ed.alunoId);
+    if (texto === Core.textoDoMes(db, ed.alunoId, ed.mes)) {
+      limparRascunhoMensagem(ed.alunoId, ed.mes);
+      fecharMensagemCelular();
+      avisar('A mensagem já estava assim. Nada mudou.');
+      return;
+    }
+    var rotuloMensagem = 'Mensagem do mês de ' + (aluno ? aluno.nome : 'aluno') + ' salva.';
+    fecharMensagemCelular();
+    return comoAcaoDoCelular(function () { return comDesfazer(rotuloMensagem, function () {
+      Core.gravarTextoDoMes(db, ed.alunoId, ed.mes, texto);
+    }); }).then(function () {
+      limparRascunhoMensagem(ed.alunoId, ed.mes);
+      desenharCelular();
+    }, function () { desenharCelular(); });
   }
 
   // ---------- o aparelho observador (D7): diagnóstico e ajustes ----------

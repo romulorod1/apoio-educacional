@@ -931,6 +931,17 @@ roda "celular avisos --envenenado-mais-de-3-avisos" node "_teste/testa_celular_a
 roda "celular avisos --envenenado-lembrete-fora-da-janela" node "_teste/testa_celular_avisos.js" --envenenado-lembrete-fora-da-janela
 # (revisao do lote 4) cobrar e fechar o mes so no celular que e da dona, nunca pela falta de observador
 roda "celular avisos --envenenado-observador-sem-sessao" node "_teste/testa_celular_avisos.js" --envenenado-observador-sem-sessao
+# A mensagem do mes (o feedback do fechamento) editada no celular: o mesmo
+# campo do tablet (Core.textoDoMes e Core.gravarTextoDoMes), o texto salvo sai
+# no PDF do Enviar e do Ver, sobe pela fila e chega ao tablet; a edicao do
+# tablet chega com "Editado no tablet hoje as HH:MM"; nos dois lados vale a
+# ultima gravacao; o observador nao ve; o rascunho volta; junho de referencia
+# igual quando o texto nao muda. Um veneno para cada propriedade.
+roda "celular mensagem do mes"                      node "_teste/testa_celular_fechamento_texto.js"
+roda "celular mensagem --envenenado-texto-fora-do-pdf" node "_teste/testa_celular_fechamento_texto.js" --envenenado-texto-fora-do-pdf
+roda "celular mensagem --envenenado-texto-nao-sobe" node "_teste/testa_celular_fechamento_texto.js" --envenenado-texto-nao-sobe
+roda "celular mensagem --envenenado-observador-edita-texto" node "_teste/testa_celular_fechamento_texto.js" --envenenado-observador-edita-texto
+roda "celular mensagem --envenenado-vale-o-primeiro" node "_teste/testa_celular_fechamento_texto.js" --envenenado-vale-o-primeiro
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
