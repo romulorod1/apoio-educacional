@@ -69,6 +69,12 @@ const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e nas páginas.
+ * No meio do mês (ontem, amanhã, depois e o quarto dia caem no mesmo mês, e o
+ * Fechamento do tablet é conferido sempre) e no meio da aula das 10:30 (ela
+ * leva "Agora", a reposição das 14:00 leva "Próxima"). A rodada nunca depende
+ * do dia nem da hora em que roda. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 
 const MODOS = ['--envenenado-celular-envia-copia', '--envenenado-observador-edita', '--envenenado-corte-sobe',
   '--envenenado-remarca-todas', '--envenenado-remarca-solta', '--envenenado-sem-choque', '--envenenado-duracao-padrao', '--envenenado-cancela-sempre-sem',
@@ -240,6 +246,7 @@ const amb = H.criarAmbiente(PORTA_APP, 'nath_d6b_celular_edita', trocas);
  * no banco e os avisos. */
 async function prepararPagina(pag, movel) {
   pag.setDefaultTimeout(60000);
+  await RELOGIO.naPagina(pag);
   if (movel) await pag.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true });
   pag.errosDePagina = [];
   pag.on('pageerror', e => pag.errosDePagina.push(e.message));
@@ -447,21 +454,18 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
   };
 }, RE_EDICAO);
 
-function isoDe(d) { const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
-const AGORA = new Date();
-const HOJE = isoDe(AGORA);
+/* Todas as datas saem do dia fixo do relógio da rodada, nunca do dia real. */
+const HOJE = RELOGIO.dia(0);
 const MES = HOJE.slice(0, 7);
-/* Um outro dia do MESMO mês (o Fechamento do tablet é o do mês corrente). */
-/* Aulas AGENDADAS (data à frente): só elas se cancelam no celular. Perto do
- * fim do mês caem no seguinte, e a linha do Fechamento do tablet (o mês
- * corrente) só é conferida quando a data é deste mês. */
-const OUTRO = (() => { const d = new Date(AGORA); d.setDate(d.getDate() + 1); return isoDe(d); })();
-const TERCEIRO = (() => { const d = new Date(AGORA); d.setDate(d.getDate() + 2); return isoDe(d); })();
-const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); return isoDe(d); })();
+/* Aulas AGENDADAS (data à frente): só elas se cancelam no celular. Ficam no
+ * MESMO mês de hoje (o Fechamento do tablet é o do mês corrente). */
+const OUTRO = RELOGIO.dia(1);
+const TERCEIRO = RELOGIO.dia(2);
+const ONTEM = RELOGIO.dia(-1);
 /* (D6c) A repetição semanal do aluno Gama: quatro aulas, de TERCEIRO em
  * diante, às 16:00; a primeira se remarca para QUARTO, às 17:00. */
-const QUARTO = (() => { const d = new Date(AGORA); d.setDate(d.getDate() + 3); return isoDe(d); })();
-const FIM_GAMA = (() => { const d = new Date(AGORA); d.setDate(d.getDate() + 2 + 21); return isoDe(d); })();
+const QUARTO = RELOGIO.dia(3);
+const FIM_GAMA = RELOGIO.dia(2 + 21);
 /* O fechamento de referência de junho (o do Marcelo, conferido à mão): 10
  * encontros, 10:30 e R$ 1.050,00, com um aluno fictício. A aula de 1h30 (10/06)
  * se remarca no celular para 12/06. */
@@ -471,6 +475,9 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
 
 (async function () {
   secao('1. O tablet da dona cria a agenda fictícia, sobe a cópia e os registros, e permite o observador');
+  conf('(arranjo) o relógio da rodada: hoje é ' + HOJE + ' (o dia fixo), e ontem, amanhã, depois e o quarto dia ficam no mês ' + MES,
+    HOJE === '2026-11-16' && [ONTEM, OUTRO, TERCEIRO, QUARTO].every(d => d.slice(0, 7) === MES) && ONTEM < HOJE && HOJE < OUTRO && OUTRO < TERCEIRO && TERCEIRO < QUARTO, true);
+  conf('(arranjo) o relógio do processo é o da rodada (' + new Date().toString().slice(0, 21) + ')', Math.abs(Date.now() - RELOGIO.fixo) < 30 * 60 * 1000, true);
   await subirEmulador();
   const dona = (await criarUsuario(DONA)).json;
   const obs = (await criarUsuario(OBS)).json;
@@ -479,6 +486,8 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   const pagA = await amb.pagina();
   await prepararPagina(pagA, false);
   await H.abrirApp(pagA, amb.ORIGEM);
+  conf('(arranjo) o relógio da página é o da rodada: o app vê hoje como ' + HOJE + ', a menos de meia hora das 11:00',
+    await pagA.evaluate(h => Core.hojeIso() === h && Math.abs(Date.now() - new Date(h + 'T11:00:00').getTime()) < 30 * 60 * 1000, HOJE), true);
   await pagA.evaluate(async (hoje, outro, terceiro, ontem, junho, fimGama) => {
     const d = Store.bancoVazio();
     d.alunos = [{ id: 'alfa', nome: 'Aluno Alfa Teste', ativo: true, cor: '#1F3A5F', responsavel: 'Responsável Alfa Teste',
@@ -618,6 +627,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   });
   conf('hoje, nenhum horário que já passou aparece como livre (' + hojeLivre.textos.join('; ') + ')', hojeLivre.passado, 0);
   conf('a aula de agora leva "Agora" e a seguinte "Próxima" (' + hojeLivre.marcas + ')', hojeLivre.marcas, hojeLivre.esperadas);
+  conf('(arranjo) na hora da rodada, as duas marcas aparecem: a das 10:30 é a de agora, a das 14:00 a próxima', hojeLivre.esperadas, 'aula-hoje=Agora aula-hoje-gama=Próxima');
   conf('a linha de agora está na linha do tempo de hoje', await existe(pagC, '#cel-tempo #cel-agora'), true);
   conf('nenhum "Enviar cópia agora" no celular', await pagC.evaluate(() => { const b = document.querySelector('#nuvem-enviar'); return !!(b && b.getBoundingClientRect().height); }), false);
   await tirarPrint(pagC, '1_hoje_linha_do_tempo.png');
@@ -875,11 +885,9 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   m = await medirTela(pagC);
   conf('Fechamento: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
   conf('Fechamento: os botões de edição são só os do "pago em" (' + m.dasAcoes.join(', ') + ')', m.soltos.join(', '), '');
-  if (TERCEIRO.slice(0, 7) === MES) {
-    const futuras = (await texto(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .cel-linhas-futuras')) || '';
-    conf('as aulas agendadas ficam à parte, marcadas "ainda não dada" (' + futuras + ')', /ainda não dada/.test(futuras) && !/Realizada/.test(futuras), true);
-    conf('e as dadas, na lista de cima, não levam a marca', /ainda não dada/.test((await texto(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .cel-linhas:not(.cel-linhas-futuras)')) || ''), false);
-  }
+  const futuras = (await texto(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .cel-linhas-futuras')) || '';
+  conf('as aulas agendadas ficam à parte, marcadas "ainda não dada" (' + futuras + ')', /ainda não dada/.test(futuras) && !/Realizada/.test(futuras), true);
+  conf('e as dadas, na lista de cima, não levam a marca', /ainda não dada/.test((await texto(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .cel-linhas:not(.cel-linhas-futuras)')) || ''), false);
   await clicar(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .btn-marcar-pago');
   const proposto = await pagC.evaluate(m => Store.carregar().then(d => {
     const f = Core.calcularMesInteiro(d, m).find(x => x.aluno.id === 'alfa');
@@ -939,10 +947,8 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('(D6c) e a aula de 1h30 está em 12/06 no tablet', await pagA.evaluate(() => Store.carregar().then(b => { const a = b.aulas.find(x => x.id === 'ref-2026-06-10'); return a.data + ' ' + a.duracaoMin; })), '2026-06-12 90');
   await H.irParaAba(pagA, 'fechamento');
   await pausa(400);
-  if (OUTRO.slice(0, 7) === MES) {
-    const linhaCancelada = await texto(pagA, 'tr[data-aula-fechamento="aula-outro"]');
-    conf('a aula cancelada no celular aparece cancelada no Fechamento do tablet (' + (linhaCancelada || 'sem linha') + ')', /Cancelada/.test(linhaCancelada || '') && /não cobrada/.test(linhaCancelada || ''), true);
-  } else console.log('   (a aula de amanhã é do mês seguinte: a linha do Fechamento do tablet não é conferida hoje; o dado, sim)');
+  const linhaCancelada = await texto(pagA, 'tr[data-aula-fechamento="aula-outro"]');
+  conf('a aula cancelada no celular aparece cancelada no Fechamento do tablet (' + (linhaCancelada || 'sem linha') + ')', /Cancelada/.test(linhaCancelada || '') && /não cobrada/.test(linhaCancelada || ''), true);
   /* O fechamento do tablet bate com o do celular: as somas do mês e a
    * situação do pagamento, calculadas pelo mesmo Core em cada aparelho. */
   const retratoFechamento = pag => pag.evaluate(mes => Store.carregar().then(d => Core.calcularMesInteiro(d, mes).map(f => {
