@@ -161,7 +161,7 @@ async function abrirAulaDeHoje(pag, hora) {
 }
 // as opções marcadas como atuais na lista do Corrigir: id e o visto do começo do texto
 const marcados = pag => pag.evaluate(() => Array.from(document.querySelectorAll('#leitor-cobre .cobre-escolha [aria-current="true"]'))
-  .map(b => b.getAttribute('data-assunto') + ' ' + (b.classList.contains('atual') ? b.textContent.charAt(0) : '?')).join(' | '));
+  .map(b => b.getAttribute('data-assunto') + ' ' + (b.classList.contains('atual') && b.querySelector('svg[data-icone-nome="check"]') ? '✓' : '?')).join(' | '));
 // os botões "Abrir no livro" da aula aberta, pelo id do assunto
 const botoesDoLivro = pag => pag.evaluate(() => Array.from(document.querySelectorAll('#corpo-modal-aula [data-abrir-no-livro]'))
   .map(b => b.getAttribute('data-abrir-no-livro')).join(','));

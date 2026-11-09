@@ -37,7 +37,9 @@ function validarCss(css) {
   const erros = [];
 
   // 1. Token --alvo: 44px
-  if (!/--alvo:\s*44px/i.test(css)) {
+  // desde a F1 (sistema visual) o alvo é de 48 px; 44 é o piso desta prova
+  const alvo = css.match(/--alvo:\s*(\d+)px/i);
+  if (!alvo || Number(alvo[1]) < 44) {
     erros.push('Token --alvo: 44px nao encontrado no :root');
   }
 
@@ -83,8 +85,10 @@ function validarCss(css) {
   }
 
   // 8. Piso de 15 px em Ajustes e Janela da aula
-  const temAjuda15 = /#tela-ajustes\s+\.ajuda[\s\S]*?font-size:\s*15px/i.test(css) &&
-    /#modal-aula\s+\.ajuda[\s\S]*?font-size:\s*15px/i.test(css);
+  // piso de 15 px (desde a F1 a escala vai de 14 a 16, e a ajuda daqui é 16)
+  const pisoAjuda = re => { const m = css.match(re); return !!m && Number(m[1]) >= 15; };
+  const temAjuda15 = pisoAjuda(/#tela-ajustes\s+\.ajuda[\s\S]*?font-size:\s*([\d.]+)px/i) &&
+    pisoAjuda(/#modal-aula\s+\.ajuda[\s\S]*?font-size:\s*([\d.]+)px/i);
   if (!temAjuda15) {
     erros.push('Ajustes ou modal de aula sem piso tipografico de 15px na ajuda');
   }
@@ -100,7 +104,11 @@ console.log('=== Prova estatica do Item B6 (Alvos de toque e tipografia) ===');
 function resolverLetras(css) {
   const raiz = (css.match(/:root\s*\{([\s\S]*?)\}/) || [])[1] || '';
   const valor = {};
-  raiz.replace(/(--letra-\d+)\s*:\s*([^;]+);/g, (_, n, v) => { valor[n] = v.trim(); });
+  // desde a F1 a escala é em rem (para crescer com a letra do aparelho): 1rem = 16 px
+  raiz.replace(/(--letra-\d+)\s*:\s*([^;]+);/g, (_, n, v) => {
+    const rem = v.trim().match(/^(\d*\.?\d+)rem$/);
+    valor[n] = rem ? (Number(rem[1]) * 16) + 'px' : v.trim();
+  });
   return css.replace(/var\((--letra-\d+)\)/g, (tudo, n) => valor[n] || tudo);
 }
 const cssReal = resolverLetras(fs.readFileSync(ARQ_CSS, 'utf8'));
@@ -133,7 +141,7 @@ const e3 = validarCss(v3);
 afirme('veneno 3 (.pilula baixa) e detectado', e3.some(e => e.includes('.pilula')));
 
 // Veneno 4: Ajustes e modal da aula com 13 px antigo
-const v4 = cssReal.replace(/#tela-ajustes\s+\.ajuda[\s\S]*?font-size:\s*15px/i, '#tela-ajustes .ajuda { font-size: 13px;');
+const v4 = cssReal.replace(/#tela-ajustes\s+\.ajuda[\s\S]*?font-size:\s*[\d.]+px/i, '#tela-ajustes .ajuda { font-size: 13px;');
 const e4 = validarCss(v4);
 afirme('veneno 4 (ajuda miuda 13px em ajustes e aula) e detectado', e4.some(e => e.includes('piso tipografico de 15px')));
 
