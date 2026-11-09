@@ -399,7 +399,7 @@ async function printDe(pag, seletor, nome, folga) {
     };
   });
   conf('o chip "trilha" tem alvo de toque de 44 px', mapa.trilha44, true);
-  conf('a evidência no tamanho do texto de ajuda', [mapa.fonteEvidencia, mapa.fonteEvidencia === mapa.fonteAjuda], ['13px', true]);
+  conf('a evidência no tamanho do texto de ajuda', [mapa.fonteEvidencia, mapa.fonteEvidencia === mapa.fonteAjuda], ['14px', true]);
   conf('a lacuna nova aparece marcada', mapa.eq2 && mapa.eq2.marcada, true);
   conf('com a evidência escrita embaixo', mapa.eq2 && mapa.eq2.evidencia, 'errou 1 de 1 item de equação do segundo grau na sondagem de ' + ddmm(HOJE));
   conf('Pitágoras continua marcada, agora com evidência', [mapa.pit.marcada, /^errou 2 de 2 itens de teorema de Pitágoras/.test(mapa.pit.evidencia)], [true, true]);

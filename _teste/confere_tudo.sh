@@ -571,6 +571,10 @@ roda "salvar --envenenado-escreve-no-pedido"    node "_teste/testa_store_grava_n
 # registros) e veneno proprio: --envenenado-salvar-no-pedido faz o salvar responder
 # com a transacao aberta e tem de acusar exatamente o salvar.
 roda "salvar --envenenado-salvar-no-pedido"     node "_teste/testa_store_grava_no_commit.js" --envenenado-salvar-no-pedido
+# N2 (folha por pagina): o salvarNota tem transacao propria (notas, controle e
+# saida); --envenenado-nota-no-pedido o faz responder com ela aberta e tem de
+# acusar EXATAMENTE o salvarNota
+roda "salvar --envenenado-nota-no-pedido"       node "_teste/testa_store_grava_no_commit.js" --envenenado-nota-no-pedido
 # E o outro lado, que o conserto criou: a escrita que falha passa a REJEITAR.
 # --envenenado-nao-rejeita tira o onabort do escrever, e a transacao abortada
 # depois do sucesso do pedido tem de deixar a promessa pendurada a vista;
@@ -870,6 +874,36 @@ roda "nuvem recebe --envenenado-eco-so-sem-carimbo" node "_teste/testa_nuvem_rec
 roda "nuvem diagnostico (D7)"                       node "_teste/testa_nuvem_diagnostico.js"
 roda "nuvem diagnostico --envenenado-diagnostico-aberto" node "_teste/testa_nuvem_diagnostico.js" --envenenado-diagnostico-aberto
 roda "nuvem diagnostico --envenenado-observador-grava" node "_teste/testa_nuvem_diagnostico.js" --envenenado-observador-grava
+# N2 (fase 2 da nuvem, fatia 1): a folha sobe POR PAGINA (hash SHA-256 do texto
+# canonico, pontos a 0,1, gzip pelo CompressionStream) em usuarios/{uid}/folhas,
+# so do tablet; o celular da dona e o observador recebem e abrem so para ler;
+# a pagina igual nao sobe de novo; a lapide apaga a pagina no outro; quem recebe
+# confere o hash. Venenos: a pagina sem hash TEM de ser recusada pelas regras; a
+# regravacao da pagina igual TEM de ser vista; a folha editada no celular TEM de
+# ser vista; o documento adulterado aplicado sem conferir o hash TEM de ser visto.
+roda "nuvem folhas (N2 fatia 1)"                    node "_teste/testa_nuvem_folhas.js"
+roda "nuvem folhas --envenenado-sem-hash"           node "_teste/testa_nuvem_folhas.js" --envenenado-sem-hash
+roda "nuvem folhas --envenenado-regrava-igual"      node "_teste/testa_nuvem_folhas.js" --envenenado-regrava-igual
+roda "nuvem folhas --envenenado-celular-edita-folha" node "_teste/testa_nuvem_folhas.js" --envenenado-celular-edita-folha
+roda "nuvem folhas --envenenado-aplica-sem-conferir-hash" node "_teste/testa_nuvem_folhas.js" --envenenado-aplica-sem-conferir-hash
+# (revisao do PR 133) a lapide da pagina que nunca subiu nao vira documento
+# orfao; a aula excluida lapida a folha (e a que volta a traz); a restauracao
+# apaga o estado por faixa (o cursor apagava os puts da propria restauracao) e
+# lapida na nuvem a pagina que a copia nao tem; a precondicao que nao se resolve
+# recebendo isola a culpada em vez de prender a fila; o "Apagar tudo" lapida as
+# folhas para o "Enviar copia agora" leva-las; a pagina grande demais vai direto
+# para a quarentena com a frase que diz qual folha; a volta de versao reconcilia
+# as folhas com estado. Os oito venenos TEM de ser vistos.
+roda "nuvem folhas --envenenado-lapide-orfa"        node "_teste/testa_nuvem_folhas.js" --envenenado-lapide-orfa
+roda "nuvem folhas --envenenado-exclui-sem-lapide"  node "_teste/testa_nuvem_folhas.js" --envenenado-exclui-sem-lapide
+roda "nuvem folhas --envenenado-limpa-por-cursor"   node "_teste/testa_nuvem_folhas.js" --envenenado-limpa-por-cursor
+roda "nuvem folhas --envenenado-restauro-sem-lapide" node "_teste/testa_nuvem_folhas.js" --envenenado-restauro-sem-lapide
+roda "nuvem folhas --envenenado-precondicao-prende" node "_teste/testa_nuvem_folhas.js" --envenenado-precondicao-prende
+roda "nuvem folhas --envenenado-apaga-estado-no-apagar-tudo" node "_teste/testa_nuvem_folhas.js" --envenenado-apaga-estado-no-apagar-tudo
+roda "nuvem folhas --envenenado-pagina-grande-tenta" node "_teste/testa_nuvem_folhas.js" --envenenado-pagina-grande-tenta
+roda "nuvem folhas --envenenado-sem-reconciliar"    node "_teste/testa_nuvem_folhas.js" --envenenado-sem-reconciliar
+# (lente B, 2a rodada) a pagina grande na quarentena que a copia restaurada nao tem sai da fila
+roda "nuvem folhas --envenenado-quarentena-sobrevive-ao-restauro" node "_teste/testa_nuvem_folhas.js" --envenenado-quarentena-sobrevive-ao-restauro
 # (revisao do PR 118) o "Apagar tudo" zera a fila deste aparelho e o recebimento
 # em curso confere a marca dentro da transacao; o celular nao enfileira a lapide
 # da fusao; a restauracao enfileira tambem o que e igual a copia; a confirmacao
@@ -969,6 +1003,15 @@ roda "celular dinheiro --envenenado-falta-e-o-total" node "_teste/testa_celular_
 roda "celular dinheiro --envenenado-sem-meses-anteriores" node "_teste/testa_celular_dinheiro.js" --envenenado-sem-meses-anteriores
 roda "celular dinheiro --envenenado-cancela-sem-confirmar" node "_teste/testa_celular_dinheiro.js" --envenenado-cancela-sem-confirmar
 roda "celular dinheiro --envenenado-sem-redesenho"  node "_teste/testa_celular_dinheiro.js" --envenenado-sem-redesenho
+# A carga de exemplo e so das provas (09/11/2026, com o app em producao): ela
+# entra so na origem local (127.0.0.1, localhost). Nas origens de producao
+# (pages.dev e github.io, servidas do disco pela interceptacao) o banco vazio
+# abre vazio, tambem depois do "Apagar tudo"; e o aparelho novo que entra na
+# conta e liga a nuvem (no emulador) nao sobe nenhum registro de exemplo. O
+# controle positivo e a mesma carga, em 127.0.0.1, subindo numa outra conta. O
+# veneno volta a carga em qualquer origem e a nuvem tem de mostrar os registros.
+roda "carga inicial so nas provas"                  node "_teste/testa_carga_inicial.js"
+roda "carga inicial --envenenado-carga-em-producao" node "_teste/testa_carga_inicial.js" --envenenado-carga-em-producao
 # D6c (lote 4): o que o app mostra sozinho no alto de Hoje do celular. A
 # proxima aula (a mesma marca do lote 1), a aula passada sem registro (o
 # criterio do tablet, Core.aulaTemRegistro), a familia em aberto do dia 6 em
@@ -984,6 +1027,17 @@ roda "celular avisos --envenenado-registrada-falta-registrar" node "_teste/testa
 roda "celular avisos --envenenado-lembrete-fora-da-janela" node "_teste/testa_celular_avisos.js" --envenenado-lembrete-fora-da-janela
 # (revisao do lote 4) cobrar e fechar o mes so no celular que e da dona, nunca pela falta de observador
 roda "celular avisos --envenenado-observador-sem-sessao" node "_teste/testa_celular_avisos.js" --envenenado-observador-sem-sessao
+# A trava de transbordo do celular (e o alvo de 48 px das abas): todas as telas e estados (entrar, Hoje com e
+# sem avisos e com o aviso de versao nova, Alunos, ficha, Fechamento, Enviar, os
+# formularios, a folha so leitura, o observador e o Diagnostico) em 360, 390 e
+# 412 px, com a letra normal e em 130%: nenhum elemento rola de lado, nenhum
+# texto sai da caixa e nada passa da borda. Venenos: o aviso de versao antigo
+# ("Atualizar agora" e "Depois da aula" lado a lado) e um elemento de 500 px.
+roda "celular transbordo"                           node "_teste/testa_celular_transbordo.js"
+roda "celular transbordo --envenenado-aviso-largo"  node "_teste/testa_celular_transbordo.js" --envenenado-aviso-largo
+roda "celular transbordo --envenenado-elemento-largo" node "_teste/testa_celular_transbordo.js" --envenenado-elemento-largo
+# as cinco abas do observador com a regra que deixava o "Hoje" com 47 px (alvo de 48)
+roda "celular transbordo --envenenado-aba-estreita" node "_teste/testa_celular_transbordo.js" --envenenado-aba-estreita
 # A mensagem do mes (o feedback do fechamento) editada no celular: o mesmo
 # campo do tablet (Core.textoDoMes e Core.gravarTextoDoMes), o texto salvo sai
 # no PDF do Enviar e do Ver, sobe pela fila e chega ao tablet; a edicao do
@@ -1024,6 +1078,15 @@ roda "celular avisos --envenenado-dispensa-na-nuvem" node "_teste/testa_celular_
 roda "celular avisos --envenenado-topo-alto"        node "_teste/testa_celular_avisos.js" --envenenado-topo-alto
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
+# F1 (sistema visual do redesenho): no celular a 412 px e no tablet a 1280 x 800,
+# pelo estilo computado, a cor de acao so marinho, letra de 12 px para cima e na
+# escala de 5, pesos 400 e 600, sem caixa alta nem italico, nenhum glifo solto
+# nos botoes e contraste de 4,5:1. Os tres venenos TEM de ser vistos. Porta 8934.
+roda "sistema visual na tela (F1)"                 node "_teste/testa_sistema_visual_navegador.js"
+roda "sistema visual --envenenado-botao-verde"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-botao-verde
+roda "sistema visual --envenenado-fonte-11px"      node "_teste/testa_sistema_visual_navegador.js" --envenenado-fonte-11px
+roda "sistema visual --envenenado-glifo-solto"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-glifo-solto
+roda "sistema visual --envenenado-icone-vazio"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-icone-vazio
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
 roda "preço descartado não vaza"                  node "_teste/testa_preco_cancelado.js"
 roda "ações de aula no fechamento"                node "_teste/testa_acoes_fechamento.js"
