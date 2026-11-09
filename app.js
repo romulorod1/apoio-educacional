@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.32';
+  var VERSAO = '1.42.33';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.33',
+      itens: [
+        'A aba Biblioteca do tablet ficou organizada por disciplina e ano, com os livros de cada um e, no alto, o "Continuar lendo": o livro e o lugar onde você parou. Os exercícios e listas continuam logo abaixo.',
+        'Cada livro tem agora uma tela própria, com o sumário: toque num capítulo para abrir o livro nele. O botão "Livros" e a janela da estante saíram: tudo isso passa pela aba Biblioteca.'
+      ]
+    },
     {
       versao: '1.42.32',
       itens: [
