@@ -952,6 +952,24 @@ roda "celular transbordo --envenenado-aviso-largo"  node "_teste/testa_celular_t
 roda "celular transbordo --envenenado-elemento-largo" node "_teste/testa_celular_transbordo.js" --envenenado-elemento-largo
 # as cinco abas do observador com a regra que deixava o "Hoje" com 47 px (alvo de 48)
 roda "celular transbordo --envenenado-aba-estreita" node "_teste/testa_celular_transbordo.js" --envenenado-aba-estreita
+# A mensagem do mes (o feedback do fechamento) editada no celular: o mesmo
+# campo do tablet (Core.textoDoMes e Core.gravarTextoDoMes), o texto salvo sai
+# no PDF do Enviar e do Ver, sobe pela fila e chega ao tablet; a edicao do
+# tablet chega com "Editado no tablet hoje as HH:MM"; nos dois lados vale a
+# ultima gravacao; o observador nao ve; o rascunho volta; junho de referencia
+# igual quando o texto nao muda. Um veneno para cada propriedade.
+roda "celular mensagem do mes"                      node "_teste/testa_celular_fechamento_texto.js"
+roda "celular mensagem --envenenado-texto-fora-do-pdf" node "_teste/testa_celular_fechamento_texto.js" --envenenado-texto-fora-do-pdf
+roda "celular mensagem --envenenado-texto-nao-sobe" node "_teste/testa_celular_fechamento_texto.js" --envenenado-texto-nao-sobe
+roda "celular mensagem --envenenado-observador-edita-texto" node "_teste/testa_celular_fechamento_texto.js" --envenenado-observador-edita-texto
+roda "celular mensagem --envenenado-vale-o-primeiro" node "_teste/testa_celular_fechamento_texto.js" --envenenado-vale-o-primeiro
+# (revisao) na mensagem do mes vence a escrita mais recente: o texto escrito no
+# onibus sem sinal nao cobre a correcao feita depois no tablet
+roda "celular mensagem --envenenado-vale-quem-chega-depois" node "_teste/testa_celular_fechamento_texto.js" --envenenado-vale-quem-chega-depois
+# (lente B) K4: a mensagem nova sem carimbo sobe com a precondicao "nao existe";
+# K6: com o tablet numa versao anterior, o celular nao edita a mensagem
+roda "celular mensagem --envenenado-resumo-sem-precondicao" node "_teste/testa_celular_fechamento_texto.js" --envenenado-resumo-sem-precondicao
+roda "celular mensagem --envenenado-tablet-antigo-edita" node "_teste/testa_celular_fechamento_texto.js" --envenenado-tablet-antigo-edita
 # (avisos compactos, 09/11, desenho final base C) recolhidos num selinho na linha
 # da data, o painel por cima da agenda (uma linha por tipo, Dispensar todos, a
 # sincronia no rodape), o ponto no bloco da aula sem registro pela mesma lista, e o
