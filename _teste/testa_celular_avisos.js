@@ -21,8 +21,8 @@
  *   4. o lembrete de fechar o mês nos 3 últimos dias do mês e nos 5 primeiros
  *      do seguinte (Core.mesAFechar), enquanto o mês tiver aula sem registro
  *      ou família em aberto; a regra conferida dia a dia de 2026 e 2027;
- *   5. no máximo 3 avisos, na ordem: próxima, falta registrar, fechar o mês,
- *      cobrar; em 360 x 740 a agenda continua na primeira tela;
+ *   5. no máximo 3 avisos, na ordem: próxima, falta registrar, cobrar, fechar
+ *      o mês; em 360 x 740 a linha de agora e a próxima ficam na primeira tela;
  *   6. o observador vê a próxima e a aula sem registro, sem cobrar e sem o
  *      mês a fechar, e nada sobe dele;
  *   7. o tablet não muda: nenhum aviso nele, e junho continua 10 encontros,
@@ -35,7 +35,9 @@
  *   --envenenado-valor-fora-do-selo       a cobrança leva o devido do mês, e não o que falta pelo selo;
  *   --envenenado-registrada-falta-registrar   a aula registrada aparece como "falta registrar";
  *   --envenenado-mais-de-3-avisos         os avisos passam de 3;
- *   --envenenado-lembrete-fora-da-janela  o lembrete de fechar o mês sai da janela (core.js).
+ *   --envenenado-lembrete-fora-da-janela  o lembrete de fechar o mês sai da janela (core.js);
+ *   --envenenado-observador-sem-sessao    a cobrança e o mês a fechar abrem pela falta de observador, e o
+ *                                         observador que sai da conta passa a vê-los (a revisão do lote 4).
  *
  * O relógio: a página começa em 06/10/2026 14:50 (e anda); cada momento da
  * prova para o relógio da página num dia e numa hora (fixarRelogio), e o
@@ -55,8 +57,9 @@ const H = require('./_bib_navegador.js');
 const { conf, secao, pausa, esperar } = H;
 
 const MODOS = ['--envenenado-cobra-antes-do-dia-6', '--envenenado-observador-cobra', '--envenenado-telefone-de-texto-vira-link',
-  '--envenenado-valor-fora-do-selo', '--envenenado-registrada-falta-registrar', '--envenenado-mais-de-3-avisos', '--envenenado-lembrete-fora-da-janela'];
-const [V_DIA5, V_OBS, V_TELEFONE, V_VALOR, V_REGISTRADA, V_MAIS3, V_JANELA] = MODOS;
+  '--envenenado-valor-fora-do-selo', '--envenenado-registrada-falta-registrar', '--envenenado-mais-de-3-avisos', '--envenenado-lembrete-fora-da-janela',
+  '--envenenado-observador-sem-sessao'];
+const [V_DIA5, V_OBS, V_TELEFONE, V_VALOR, V_REGISTRADA, V_MAIS3, V_JANELA, V_SAIR] = MODOS;
 const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && MODOS.indexOf(a) < 0);
@@ -88,7 +91,9 @@ conf('nenhum --envenenado- desconhecido foi pedido (' + (desconhecidos.join(' ')
 const LINK_COBRAR = 'var link = linkDoWhatsapp(tel, mensagemDeCobrancaCelular(fam));';
 const ANCORAS = {
   [V_DIA5]: ['core.js', 'return p.d >= DIA_DE_COBRAR;', 'return p.d >= DIA_DE_COBRAR - 1;'],
-  [V_OBS]: ['app.js', 'var edita = celularEdita(), daDona = !leOutraConta();', 'var edita = celularEdita(), daDona = true;'],
+  [V_OBS]: ['app.js', 'var edita = celularEdita(), daDona = edita;', 'var edita = celularEdita(), daDona = true;'],
+  // a porta da primeira versão (revisão do lote 4): "não é observador" em vez de "é a dona"; o observador que sai da conta passa a cobrar
+  [V_SAIR]: ['app.js', 'var edita = celularEdita(), daDona = edita;', 'var edita = celularEdita(), daDona = !leOutraConta();'],
   // o atalho que o dono recusou no lote 2: os dígitos de qualquer texto do contato viram o número
   [V_TELEFONE]: ['app.js', LINK_COBRAR,
     "var link = 'https://wa.me/55' + telefoneDoAluno(fam.aluno).replace(/\\D/g, '').replace(/^55/, '') + '?text=' + encodeURIComponent(mensagemDeCobrancaCelular(fam));"],
@@ -107,8 +112,7 @@ conf('o app.js, o core.js, o styles.css e esta prova não têm travessão',
 conf('a Próxima do bloco e a do aviso saem de marcasDeAgoraCelular (a definição e dois usos)', APP.split('marcasDeAgoraCelular(').length - 1, 3);
 conf('o ultimoEncontro do tablet e o aviso usam o mesmo critério de registro (Core.aulaTemRegistro)',
   [/if \(!aulaTemRegistro\(au\)\) continue;/.test(CORE), APP.split('Core.aulaTemRegistro(').length - 1].join(','), 'true,1');
-conf('o link de cobrar é o linkDoWhatsapp do lote 2, com o telefoneDoCampo', APP.indexOf('var tel = telefoneDoCampo(fam.aluno);\r\n          ' + LINK_COBRAR) >= 0 ||
-  APP.indexOf('var tel = telefoneDoCampo(fam.aluno);\n          ' + LINK_COBRAR) >= 0, true);
+conf('o link de cobrar é o linkDoWhatsapp do lote 2, com o telefoneDoCampo', /var tel = telefoneDoCampo\(fam\.aluno\);\s+var link = linkDoWhatsapp\(tel, mensagemDeCobrancaCelular\(fam\)\);/.test(APP), true);
 const trocas = {};
 if (MODO) {
   const [arq, de, para] = ANCORAS[MODO];
@@ -322,10 +326,11 @@ async function momento(pag, iso, hhmm) {
 /* O que o alto de Hoje mostra: cada aviso com o tipo, o texto, a aula, o
  * mês, o aluno e o link (se houver). */
 const avisos = pag => pag.evaluate(() => Array.from(document.querySelectorAll('#cel-semana #cel-avisos .cel-aviso')).map(a => {
-  const l = a.querySelector('a[href]'), ac = a.querySelector('[data-acao-celular]');
-  return { tipo: a.dataset.aviso, texto: a.querySelector('.cel-aviso-botao').textContent.replace(/\u00a0/g, ' '),
-    aula: a.dataset.aula || '', mes: a.dataset.mes || '', aluno: a.dataset.aluno || '', link: l ? l.getAttribute('href') : '',
-    acao: ac ? ac.getAttribute('data-acao-celular') : '' };
+  const l = a.querySelector('a[href]'), ac = a.querySelector('[data-acao-celular]'), mais = a.querySelector('#cel-aviso-mais-familias .cel-aviso-texto');
+  return { tipo: a.dataset.aviso, texto: a.querySelector('.cel-aviso-botao .cel-aviso-texto').textContent.replace(/\u00a0/g, ' '),
+    seta: a.querySelector('.cel-aviso-botao .cel-aviso-seta').textContent,
+    aula: a.dataset.aula || '', mes: a.dataset.mes || '', aluno: a.dataset.aluno || '', link: l ? l.getAttribute('href') : '', rotuloLink: l ? l.textContent : '',
+    mais: mais ? mais.textContent : '', acao: ac ? ac.getAttribute('data-acao-celular') : '' };
 }));
 const tipos = l => l.map(a => a.tipo).join(',');
 const textos = l => l.map(a => a.texto).join(' | ');
@@ -351,14 +356,18 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
 }, RE_EDICAO);
 const telaBoa = m => m.pequenos.join('; ') + (m.rolaDeLado ? ' ROLA DE LADO' : '');
 /* A agenda na primeira tela: o espaço entre o pé da faixa presa (com os
- * avisos) e o pé da área que rola, e se o bloco marcado (Próxima) cabe
- * inteiro nele. */
+ * avisos) e o pé da área que rola, se o bloco marcado (Próxima) cabe
+ * inteiro nele e se a linha de agora está à vista. */
 const leiaute = pag => pag.evaluate(() => {
   const c = document.querySelector('#cel-conteudo').getBoundingClientRect();
   const f = document.querySelector('#cel-semana').getBoundingClientRect();
   const b = document.querySelector('#cel-tempo .cel-bloco-proxima') || document.querySelector('#cel-tempo .cel-bloco');
   const r = b ? b.getBoundingClientRect() : null;
+  const ag = document.querySelector('#cel-agora'), ra = ag ? ag.getBoundingClientRect() : null;
   return { livre: Math.round(c.bottom - f.bottom), alvoInteiro: !!r && r.top >= f.bottom - 1 && r.bottom <= c.bottom + 1, alvo: b ? b.dataset.aula : '',
+    agoraAVista: !!ra && ra.top >= f.bottom - 1 && ra.top <= c.bottom + 1, agora: ag ? ag.textContent : '',
+    // o começo do bloco (a marca Próxima e o nome) à vista
+    comecoAVista: !!r && r.top >= f.bottom - 1 && r.top + 48 <= c.bottom + 1,
     janela: window.innerWidth + 'x' + window.innerHeight };
 });
 /* A mensagem que o link de cobrar leva, decodificada. */
@@ -486,7 +495,10 @@ const WA_ALFA = '5511987654321';
   console.log('   selo de julho do Alfa: ' + JSON.stringify(seloJulho) + ' ; mensagem: ' + msg);
   conf('(arranjo) o selo de julho do Alfa é parcial, faltam R$ 150,00', seloJulho.selo + ' ' + seloJulho.texto, 'parcial R$ 150,00');
   prop('o aviso de cobrar: o Alfa (julho, o que espera há mais tempo) com o que falta pelo selo, e mais uma família (' + cob.texto + ')',
-    cob.texto === 'Em aberto: Aluno Alfa Teste, julho de 2026, ' + seloJulho.texto + '. E mais 1 família' && cob.aluno === 'alfa', V_VALOR);
+    cob.texto === 'Em aberto: Aluno Alfa Teste, julho de 2026, ' + seloJulho.texto && cob.aluno === 'alfa', V_VALOR);
+  conf('o botão diz quem ele cobra ("Cobrar" e o nome curto que separa o Alfa dos outros alunos), e as outras famílias ficam num toque à parte',
+    cob.rotuloLink + ' | ' + cob.mais, 'Cobrar Aluno Alfa | E mais 1 família');
+  conf('cada aviso mostra à direita o que o toque faz', av.map(a => a.seta).join(' '), '› Registrar ›');
   prop('o link abre o WhatsApp do Alfa com o texto escrito: o mês e o valor do selo, sem nome nenhum (' + msg + ')',
     cob.link.indexOf('https://wa.me/' + WA_ALFA + '?text=') === 0 &&
     msg === 'Olá! Tudo bem? Passando para lembrar do pagamento das aulas de julho de 2026: ficou faltando ' + seloJulho.texto + '. Obrigada!' &&
@@ -498,13 +510,16 @@ const WA_ALFA = '5511987654321';
   conf('Hoje com 3 avisos: nenhum botão de edição fora das ações do celular (' + (m.soltos.join(', ') || 'nenhum') + ')', m.soltos.join(', '), '');
   const lay = await leiaute(pagC);
   console.log('   ' + JSON.stringify(lay));
-  conf('a agenda continua na primeira tela: o bloco da Próxima inteiro abaixo dos avisos, com 200 px ou mais de agenda à vista (' + lay.livre + ' px)',
-    lay.alvoInteiro && lay.alvo === 'alfa-1006' && lay.livre >= 200, true);
+  conf('a agenda continua na primeira tela: a linha de agora (14:50) e, abaixo dela, o começo do bloco da Próxima (a marca e o nome), com 200 px ou mais de agenda à vista (' + lay.livre + ' px)',
+    lay.agoraAVista && lay.agora === '14:50' && lay.comecoAVista && lay.alvo === 'alfa-1006' && lay.livre >= 200, true);
   await tirarPrint(pagC, '2_tres_avisos_dia_6.png');
   conf('tocar na próxima abre a folha daquela aula', await clicar(pagC, '#cel-aviso-proxima') && await existe(pagC, '#cel-folha[data-aula="alfa-1006"]'), true);
   await clicar(pagC, '#cel-folha-fechar');
   conf('tocar no aviso de cobrar leva ao Fechamento de julho', (await clicar(pagC, '#cel-aviso-cobranca')) + ' ' + (await pagC.evaluate(() => !!document.querySelector('#cel-fechamento.ativa'))) + ' ' +
     (await texto(pagC, '#cel-fechamento .cel-mes .cel-titulo')), 'true true Julho de 2026');
+  av = await momento(pagC, '2026-10-06', '14:50');
+  conf('o "E mais 1 família" leva ao Fechamento de agosto, o do Beta', (await clicar(pagC, '#cel-aviso-mais-familias')) + ' ' +
+    (await texto(pagC, '#cel-fechamento .cel-mes .cel-titulo')), 'true Agosto de 2026');
   av = await momento(pagC, '2026-10-06', '14:50');
 
   secao('5. Dia 5, 14:50: sem cobrança');
@@ -523,20 +538,25 @@ const WA_ALFA = '5511987654321';
 
   secao('7. O fim do mês, a virada e o máximo de 3');
   const janela = {};
-  for (const [iso, hhmm] of [['2026-10-28', '12:00'], ['2026-10-29', '12:00'], ['2026-10-31', '12:00'], ['2026-11-01', '09:00'], ['2026-11-05', '09:00'], ['2026-11-06', '09:00']]) {
-    janela[iso] = await momento(pagC, iso, hhmm);
-    console.log('   ' + iso + ' ' + JSON.stringify(janela[iso].map(a => a.tipo + ': ' + a.texto)));
+  /* 29/10 duas vezes: ao meio-dia há os quatro avisos (o máximo de 3), e
+   * às 18:00, sem próxima, o lembrete aparece no primeiro dia da janela. */
+  for (const [iso, hhmm, chave] of [['2026-10-28', '12:00'], ['2026-10-29', '12:00'], ['2026-10-29', '18:00', '2026-10-29 18h'], ['2026-10-31', '12:00'],
+    ['2026-11-01', '09:00'], ['2026-11-05', '09:00'], ['2026-11-06', '09:00']]) {
+    janela[chave || iso] = await momento(pagC, iso, hhmm);
+    console.log('   ' + (chave || iso) + ' ' + JSON.stringify(janela[chave || iso].map(a => a.tipo + ': ' + a.texto)));
   }
   const fechar = iso => (janela[iso].find(a => a.tipo === 'fechar') || {});
   prop('28/10 (o 4º dia antes do fim) e 06/11 (o 6º do mês seguinte): sem lembrete de fechar (' + tipos(janela['2026-10-28']) + ' ; ' + tipos(janela['2026-11-06']) + ')',
     !fechar('2026-10-28').tipo && !fechar('2026-11-06').tipo, V_JANELA);
   seVeneno(V_JANELA);
-  conf('29/10, 31/10, 01/11 e 05/11: o lembrete de fechar outubro (' + ['2026-10-29', '2026-10-31', '2026-11-01', '2026-11-05'].map(d => fechar(d).mes || '-').join(',') + ')',
-    ['2026-10-29', '2026-10-31', '2026-11-01', '2026-11-05'].map(d => fechar(d).mes || '-').join(','), '2026-10,2026-10,2026-10,2026-10');
-  conf('29/10: "Fechar outubro de 2026: 3 aulas sem registro e 3 famílias em aberto"', fechar('2026-10-29').texto, 'Fechar outubro de 2026: 3 aulas sem registro e 3 famílias em aberto');
+  conf('29/10, 31/10, 01/11 e 05/11: o lembrete de fechar outubro (' + ['2026-10-29 18h', '2026-10-31', '2026-11-01', '2026-11-05'].map(d => fechar(d).mes || '-').join(',') + ')',
+    ['2026-10-29 18h', '2026-10-31', '2026-11-01', '2026-11-05'].map(d => fechar(d).mes || '-').join(','), '2026-10,2026-10,2026-10,2026-10');
+  conf('29/10 às 18:00: "Fechar outubro de 2026: 4 aulas sem registro e 3 famílias em aberto", com a seta "Abrir"', fechar('2026-10-29 18h').texto + ' | ' + fechar('2026-10-29 18h').seta,
+    'Fechar outubro de 2026: 4 aulas sem registro e 3 famílias em aberto | Abrir');
+  conf('31/10: a ordem é falta registrar, cobrar (o que já venceu) e fechar', tipos(janela['2026-10-31']), 'registrar,cobrar,fechar');
   conf('05/11: o mesmo outubro, com as 4 aulas sem registro', fechar('2026-11-05').texto, 'Fechar outubro de 2026: 4 aulas sem registro e 3 famílias em aberto');
-  prop('29/10 tem quatro avisos possíveis e mostra três, sem o de cobrar (o último na urgência) (' + tipos(janela['2026-10-29']) + ')',
-    tipos(janela['2026-10-29']) === 'proxima,registrar,fechar', V_MAIS3);
+  prop('29/10 ao meio-dia tem quatro avisos possíveis e mostra três, sem o de fechar (o último na urgência) (' + tipos(janela['2026-10-29']) + ')',
+    tipos(janela['2026-10-29']) === 'proxima,registrar,cobrar', V_MAIS3);
   prop('nenhum momento passa de 3 avisos (' + Object.keys(janela).map(d => janela[d].length).join(',') + ')', Object.keys(janela).every(d => janela[d].length <= 3), V_MAIS3);
   seVeneno(V_MAIS3);
   conf('29/10: "Próxima: 16:00, Aluno Alfa Teste, daqui a 4 h" e a aula do Gama de terça', textos(janela['2026-10-29'].slice(0, 2)),
@@ -549,7 +569,7 @@ const WA_ALFA = '5511987654321';
   console.log('   selos do Alfa em 06/11: ' + JSON.stringify(selos6) + ' ; ' + msg6);
   conf('(arranjo) os selos do Alfa em 06/11: julho faltam 150, outubro 300', selos6.join(','), '150,300');
   prop('06/11: o Alfa com julho e outubro, R$ 450,00 (a soma do que falta pelos selos), e mais 2 famílias (' + cob6.texto + ')',
-    cob6.texto === 'Em aberto: Aluno Alfa Teste, julho de 2026 e outubro de 2026, R$ 450,00. E mais 2 famílias', V_VALOR);
+    cob6.texto + ' | ' + cob6.mais === 'Em aberto: Aluno Alfa Teste, julho de 2026 e outubro de 2026, R$ 450,00 | E mais 2 famílias', V_VALOR);
   conf('06/11: a mensagem diz cada mês com o que falta e o total', msg6,
     'Olá! Tudo bem? Passando para lembrar do pagamento das aulas em aberto: julho de 2026, R$ 150,00; outubro de 2026, R$ 300,00 (total de R$ 450,00). Obrigada!');
 
@@ -579,6 +599,23 @@ const WA_ALFA = '5511987654321';
   await clicar(pagD, '#cel-folha-fechar');
   await pausa(2500);
   conf('nenhuma escrita na nuvem saiu do observador', pagD.commitsNaRede, 0);
+  /* (revisão) O observador sai da conta: a cópia da dona fica no aparelho,
+   * e nada do que é dela abre por isso. */
+  await aba(pagD, 'ajustes');
+  conf('(arranjo) o observador toca em Sair, nos Ajustes dele', await clicar(pagD, '#cel-obs-sair'), true);
+  const saiu = await esperar('a conta saiu', () => pagD.evaluate(() => !Nuvem.estado().entrada), v => v === true, 10000);
+  conf('(arranjo) sem conta, e com os dados da dona ainda no aparelho', saiu.ok + ' ' + (await pagD.evaluate(() => Store.carregar().then(d => d.alunos.some(a => a.id === 'alfa')))), 'true true');
+  const sai6 = await momento(pagD, '2026-10-06', '14:50'), sai29 = await momento(pagD, '2026-10-29', '18:00');
+  const sai29Acoes = await pagD.evaluate(() => document.querySelectorAll('#cel-hoje [data-acao-celular]').length);
+  console.log('   depois de sair: ' + JSON.stringify(sai6.map(a => a.tipo)) + ' ; 29/10 18h: ' + JSON.stringify(sai29.map(a => a.tipo + ': ' + a.texto)));
+  prop('depois de sair, nem cobrar nem fechar o mês, e nenhum link de WhatsApp no alto (' + tipos(sai6) + ' ; ' + tipos(sai29) + ')',
+    tipos(sai6) === 'proxima,registrar' && tipos(sai29) === 'registrar' && !(await pagD.evaluate(() => /wa\.me/.test((document.querySelector('#cel-avisos') || {}).innerHTML || ''))), V_SAIR);
+  seVeneno(V_SAIR);
+  await aba(pagD, 'fechamento');
+  const pagarDepois = await pagD.evaluate(() => document.querySelectorAll('#cel-fechamento .btn-marcar-pago, #cel-fechamento .btn-alterar-pagamento, #cel-fechamento .btn-desmarcar-pagamento, #cel-fechamento [data-acao-celular]').length);
+  conf('e as ações que gravam (pago, cancelar, remarcar, registrar) continuam fechadas: nenhuma ação no Hoje nem no Fechamento (' + sai29Acoes + ' ; ' + pagarDepois + ')',
+    sai29Acoes + ' ' + pagarDepois, '0 0');
+  await aba(pagD, 'hoje');
 
   secao('9. O telefone que não passa na regra do lote 2 não vira link');
   /* O dado antigo: o tablet de hoje recusa o telefone que não é telefone,
@@ -595,7 +632,7 @@ const WA_ALFA = '5511987654321';
   const cobT = avT.find(a => a.tipo === 'cobrar') || {};
   console.log('   ' + JSON.stringify(cobT));
   prop('sem telefone válido no campo, o aviso de cobrar não tem link e diz por quê (' + cobT.texto + ' ; ' + (cobT.link || 'sem link') + ')',
-    !cobT.link && !(await existe(pagC, '#cel-aviso-cobrar')) && cobT.texto === 'Em aberto: Aluno Alfa Teste, julho de 2026, R$ 150,00. Sem celular na ficha para o WhatsApp. E mais 1 família', V_TELEFONE);
+    !cobT.link && !(await existe(pagC, '#cel-aviso-cobrar')) && cobT.texto === 'Em aberto: Aluno Alfa Teste, julho de 2026, R$ 150,00. Sem celular na ficha para o WhatsApp', V_TELEFONE);
   seVeneno(V_TELEFONE);
 
   secao('10. O toque em "falta registrar" abre o registro daquela aula, e salvar tira o aviso');
@@ -621,6 +658,21 @@ const WA_ALFA = '5511987654321';
     return [f.linhas.length, Core.fmtHoras(f.totalMin), Core.fmtMoeda(f.totalValor).replace(/\u00a0/g, ' ')].join(' | '); }));
   conf('junho de referência: 10 encontros, 10:30, R$ 1.050,00 no núcleo, no celular e no tablet (' + dadoJ + ' ; ' + cartaoJ + ' ; ' + totalJ + ')',
     dadoJ + ' ; ' + cartaoJ + ' ; ' + totalJ, '10 | 10:30 | R$ 1.050,00 ; 10 aulas dadas · 10:30 h · R$ 1.050,00 ; R$ 1.050,00');
+
+  secao('11b. (revisão) O lembrete conta a família em aberto só a partir do corte dos pagamentos');
+  const antesCorte = await momento(pagC, '2026-11-01', '09:00');
+  conf('(controle) 01/11, com o corte em junho: outubro tem 3 aulas sem registro e 3 famílias em aberto', (antesCorte.find(a => a.tipo === 'fechar') || {}).texto,
+    'Fechar outubro de 2026: 3 aulas sem registro e 3 famílias em aberto');
+  await soltarRelogio(pagC);
+  await pagA.evaluate(() => Store.carregar().then(d => { d.ajustes.pagamentosDesde = '2026-11'; return Store.salvar(d); }));
+  const sA3 = await sincronizar(pagA);
+  conf('o tablet subiu o corte novo', sA3.erroE === null && sA3.enviados > 0, true);
+  await pagC.evaluate(() => Nuvem.receberRegistros());
+  const corteChegou = await esperar('o corte chegou ao celular', () => pagC.evaluate(() => Store.carregar().then(d => d.ajustes.pagamentosDesde)), v => v === '2026-11', 15000);
+  conf('(arranjo) o corte de novembro chegou ao celular', corteChegou.ok, true);
+  const depoisCorte = await momento(pagC, '2026-11-01', '09:00');
+  conf('com o corte em novembro, outubro não conta família em aberto, como a lista de pendentes', (depoisCorte.find(a => a.tipo === 'fechar') || {}).texto,
+    'Fechar outubro de 2026: 3 aulas sem registro');
 
   secao('12. Sem erro de página, e o veneno pedido foi visto');
   conf('nenhum erro de página no tablet, no celular e no observador', [pagA, pagC, pagD].map(p => p.errosDePagina.join(' | ')).filter(Boolean).join(' || '), '');

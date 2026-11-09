@@ -928,6 +928,8 @@ roda "celular avisos --envenenado-valor-fora-do-selo" node "_teste/testa_celular
 roda "celular avisos --envenenado-registrada-falta-registrar" node "_teste/testa_celular_avisos.js" --envenenado-registrada-falta-registrar
 roda "celular avisos --envenenado-mais-de-3-avisos" node "_teste/testa_celular_avisos.js" --envenenado-mais-de-3-avisos
 roda "celular avisos --envenenado-lembrete-fora-da-janela" node "_teste/testa_celular_avisos.js" --envenenado-lembrete-fora-da-janela
+# (revisao do lote 4) cobrar e fechar o mes so no celular que e da dona, nunca pela falta de observador
+roda "celular avisos --envenenado-observador-sem-sessao" node "_teste/testa_celular_avisos.js" --envenenado-observador-sem-sessao
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
