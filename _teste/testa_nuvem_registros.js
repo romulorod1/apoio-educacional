@@ -72,13 +72,14 @@ secao('0. As âncoras, o veneno e o ambiente');
 const DADOS_LEGIVEIS = 'if (!reg.apagadoEm && reg.dados !== null && reg.dados !== undefined) campo.dados = reg.dados;';
 const ENFILEIRAR = 'function enfileirar(saida, entrada) { saida.put(entrada); }';
 const SAIDA_NA_TRANSACAO = "var saida = opcoes.semFila ? null : t.objectStore('saida');";
-const GATILHO = 'Nuvem.sincronizarSeDevido({ versaoApp: VERSAO, tudo: true });'; // desde a fatia 3: recebe e envia; `tudo` (N2) leva as páginas de folha sem esperar
+// desde a fatia 3: recebe e envia; `tudo` (N2) leva as páginas de folha sem esperar; `fechando` manda o commit com keepalive
+const GATILHO = "Nuvem.sincronizarSeDevido({ versaoApp: VERSAO, tudo: true, fechando: motivo === 'fechar' });";
 // desde o D6b: o celular da dona passa, e só com escritas de registro
 /* (D7) no celular da dona, além do registro, só passa o diagnóstico do PRÓPRIO
  * aparelho (soDiagnosticoProprio). Desde a N2 a primeira guarda do commit
  * recusa `folhas/` fora do tablet: a âncora aceita essa linha antes da guarda
  * dos registros. */
-const COMMIT_TRAVADO = /function commit\(escritas\) \{[\s\S]{0,400}?if \(!podeEnviarCopia\(\) && !\(celularDaDona\(\) && \(soRegistros\(escritas\) \|\| soDiagnosticoProprio\(escritas\)\)\)\)/;
+const COMMIT_TRAVADO = /function commit\(escritas, opcoes\) \{[\s\S]{0,400}?if \(!podeEnviarCopia\(\) && !\(celularDaDona\(\) && \(soRegistros\(escritas\) \|\| soDiagnosticoProprio\(escritas\)\)\)\)/;
 const REGISTROS_NAS_REGRAS = 'match /registros/{registro} {';
 conf('o conteúdo do registro vai em dados, como dado legível, num lugar só (sem cifra)', NUVEM.split(DADOS_LEGIVEIS).length === 2 && !/subtle\.|AES-GCM/.test(NUVEM), true);
 conf('o store.js enfileira num lugar só, na transação de quem chamou', STORE.split(ENFILEIRAR).length, 2);

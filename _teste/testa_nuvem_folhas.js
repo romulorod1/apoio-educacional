@@ -365,15 +365,27 @@ function paginaSintetica() {
   conf('o cursor das folhas ficou em C', await pagC.evaluate(() => Store.lerCursorFolhas().then(c => !!(c && c.servidorEm))), true);
   const rC2 = await receber(pagC);
   conf('receber de novo não aplica nada (o cursor vale)', rC2.folhas, 0);
-  // a tela: o cartão da aula de hoje tem "Ver a folha", que abre a janela só para ler
+  /* A tela (D6c): o bloco da aula na linha do tempo abre a FOLHA DA AULA, e é
+   * nela que fica "Ver a folha escrita à mão", que abre a janela só para ler. */
   await pagC.evaluate(() => { const b = document.querySelector('.cel-aba[data-cel="hoje"]'); if (b) b.click(); });
-  const botaoVer = await esperar('o cartão da aula mostra "Ver a folha"', () => existe(pagC, '[data-ver-folha="x1"]'), v => v === true, 15000);
-  conf('o cartão da aula com folha mostra "Ver a folha" no celular', botaoVer.ok, true);
-  conf('a aula sem folha não mostra o botão', await existe(pagC, '[data-ver-folha="x2"]'), false);
+  const blocoX2 = await esperar('a linha do tempo mostra a aula sem folha', () => existe(pagC, '#cel-tempo .cel-bloco[data-aula="x2"]'), v => v === true, 15000);
+  conf('a linha do tempo mostra as aulas de hoje', blocoX2.ok, true);
+  await clicar(pagC, '#cel-tempo .cel-bloco[data-aula="x2"]');
+  await esperar('a folha da aula x2 abriu', () => existe(pagC, '#cel-folha[data-aula="x2"]'), v => v === true, 10000);
+  conf('a aula sem folha não mostra o botão na folha da aula', await existe(pagC, '[data-ver-folha]'), false);
+  await clicar(pagC, '#cel-folha-fechar');
+  await clicar(pagC, '#cel-tempo .cel-bloco[data-aula="x1"]');
+  const botaoVer = await esperar('a folha da aula x1 mostra "Ver a folha"', () => existe(pagC, '#cel-folha[data-aula="x1"] [data-ver-folha="x1"]'), v => v === true, 10000);
+  conf('a folha da aula com folha escrita mostra "Ver a folha escrita à mão" no celular', botaoVer.ok, true);
+  if (process.env.N2_PRINT_DIR) {
+    fs.mkdirSync(process.env.N2_PRINT_DIR, { recursive: true });
+    await pagC.screenshot({ path: path.join(process.env.N2_PRINT_DIR, 'ver_folha.png') });
+  }
   const escritasC0 = pagC.escritas.length;
   await clicar(pagC, '[data-ver-folha="x1"]');
   const abriu = await esperar('a janela da folha abriu', () => existe(pagC, '#modal-nota.aberto'), v => v === true, 10000);
   conf('a janela da folha abriu no celular', abriu.ok, true);
+  if (process.env.N2_PRINT_DIR) await pagC.screenshot({ path: path.join(process.env.N2_PRINT_DIR, 'folha_so_leitura.png') });
   conf('o título diz que é só para ler', /só para ler/.test(await texto(pagC, '#titulo-modal-nota')), true);
   conf('sem barra de ferramentas e sem "Salvo"', (await escondido(pagC, '#ferramentas-nota')) === true && (await escondido(pagC, '#status-gravacao-folha')) === true, true);
   conf('o rodapé mostra as páginas e o aviso', (await texto(pagC, '#folha-leitura-pagina')) === 'Página 1 de 2' && /Só para ler/.test(await texto(pagC, '#folha-leitura-aviso')), true);
@@ -527,7 +539,15 @@ function paginaSintetica() {
   conf('a folha x1 no observador é igual à de A, ponto por ponto', JSON.stringify(await canonicas(pagO, 'x1')), JSON.stringify(await canonicas(pagA, 'x1')));
   conf('a página densa x2 no observador é igual à de A', (await canonicas(pagO, 'x2'))[0], textoDensa);
   await pagO.evaluate(() => { const b = document.querySelector('.cel-aba[data-cel="hoje"]'); if (b) b.click(); });
-  conf('o observador vê "Ver a folha" nas duas aulas', (await esperar('os botões', () => pagO.evaluate(() => document.querySelectorAll('[data-ver-folha]').length), v => v === 2, 10000)).ok, true);
+  let botoesO = 0;
+  for (const id of ['x1', 'x2']) {
+    if ((await esperar('o bloco ' + id, () => existe(pagO, '#cel-tempo .cel-bloco[data-aula="' + id + '"]'), v => v === true, 10000)).ok) {
+      await clicar(pagO, '#cel-tempo .cel-bloco[data-aula="' + id + '"]');
+      if ((await esperar('a folha da aula ' + id, () => existe(pagO, '#cel-folha[data-aula="' + id + '"] [data-ver-folha="' + id + '"]'), v => v === true, 10000)).ok) botoesO++;
+      await clicar(pagO, '#cel-folha-fechar');
+    }
+  }
+  conf('o observador vê "Ver a folha escrita à mão" na folha das duas aulas', botoesO, 2);
   conf('nenhuma escrita saiu do observador para a nuvem', pagO.escritas.length, 0);
   // o commit do observador recusa `folhas/` por dentro também
   conf('o commit do observador recusa uma escrita em folhas/ antes de sair', await pagO.evaluate(() => Nuvem.enviarRegistros({ versaoApp: 'prova', tudo: true }).then(r => r.pulado || 'enviou')), 'so leitura');
