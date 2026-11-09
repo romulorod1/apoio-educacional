@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.18';
+  var VERSAO = '1.42.19';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,14 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.19',
+      itens: [
+        'No Hoje do celular, os avisos ficam recolhidos num sininho com o número, ao lado da data. A agenda ganha a tela.',
+        'Toque no sininho para ver os avisos, um por linha, cada um com o que fazer. Deslize um aviso para o lado, ou toque no X, para dispensar até amanhã; dá para desfazer logo em seguida.',
+        'O aviso de versão nova também aparece ali.'
+      ]
+    },
     {
       versao: '1.42.18',
       itens: [
