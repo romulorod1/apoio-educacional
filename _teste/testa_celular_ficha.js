@@ -47,8 +47,8 @@ const { conf, secao, pausa, esperar } = H;
 
 const MODOS = ['--envenenado-sem-55', '--envenenado-texto-errado', '--envenenado-abre-sozinho', '--envenenado-campo-obrigatorio',
   '--envenenado-campos-nao-sobem', '--envenenado-cobranca-retrato', '--envenenado-observador-cadastra',
-  '--envenenado-todos-os-digitos', '--envenenado-aceita-http', '--envenenado-nunca-desatualizado'];
-const [V_55, V_TEXTO, V_SOZINHO, V_OBRIGATORIO, V_NAO_SOBE, V_RETRATO, V_OBS, V_DIGITOS, V_HTTP, V_HORA] = MODOS;
+  '--envenenado-extracao-antiga', '--envenenado-aceita-http', '--envenenado-nunca-desatualizado'];
+const [V_55, V_TEXTO, V_SOZINHO, V_OBRIGATORIO, V_NAO_SOBE, V_RETRATO, V_OBS, V_EXTRACAO, V_HTTP, V_HORA] = MODOS;
 const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 function prop(rotulo, ok, veneno) {
@@ -72,7 +72,7 @@ const REGRAS = fs.readFileSync(path.join(H.RAIZ, 'firestore.rules'), 'utf8');
 
 secao('0. As âncoras dos venenos e o ambiente');
 const ANCORAS = {
-  [V_55]: ["    if (d.length === 10 || d.length === 11) d = '55' + d;", '    if (d.length === 10 || d.length === 11) d = d;'],
+  [V_55]: ["    return d.length === 11 && d.charAt(2) === '9' ? '55' + d : '';", "    return d.length === 11 && d.charAt(2) === '9' ? d : '';"],
   [V_TEXTO]: ["linkDoWhatsapp(tel, texto), { 'data-mensagem'", "linkDoWhatsapp(tel, m.rotulo), { 'data-mensagem'"],
   [V_SOZINHO]: ['    caixa.appendChild(relato);', "    caixa.appendChild(relato); if (whats) window.open(linkDoWhatsapp(tel, textoDaMensagemPronta('chegando', aluno, aula)), '_blank');"],
   [V_OBRIGATORIO]: ["var endereco = String(aluno.endereco || '').trim(), link", 'var endereco = aluno.endereco.trim(), link'],
@@ -80,15 +80,19 @@ const ANCORAS = {
   [V_RETRATO]: ["if (situacao.value !== (atual.status || 'realizada'))", "if (situacao.value !== (aula.status || 'realizada'))"],
   [V_OBS]: ['var podeCadastrar = celularEdita();', 'var podeCadastrar = true;'],
   // (revisão) a regra de antes: todos os dígitos do contato viram um número só
-  [V_DIGITOS]: ["    if (achados.length !== 1) return '';", '    achados = [String(texto || \'\')];'],
+  /* (revisão) a regra de antes: o telefone tirado do texto livre por token, e as observações ligando */
+  [V_EXTRACAO]: [["    return aluno && telefoneValidado(aluno.telefone) ? String(aluno.telefone).trim() : '';", '    return telefoneDoAluno(aluno);'],
+    ['  function telefoneValidado(texto) {', "  function telefoneValidado(texto) { var achados = [], m0, RE0 = /(?:^|[^\\d])((?:\\+?55[\\s.-]?)?(?:\\(?\\d{2}\\)?[\\s.-]?)?9?\\d{4}[\\s.-]?\\d{4})(?!\\d)/g; while ((m0 = RE0.exec(String(texto || ''))) !== null) achados.push(m0[1]); if (achados.length !== 1) return ''; var d0 = achados[0].replace(/\\D/g, ''); if (d0.length >= 12 && /^55/.test(d0)) d0 = d0.slice(2); return d0;"]],
   [V_HTTP]: ['if (/^https:\\/\\//i.test(t)) return t;', 'if (/^https?:\\/\\//i.test(t)) return t;'],
   [V_HORA]: ['var desatualizado = !!r.erroRecebimento || agora.getTime() - d.getTime() > HORAS_SEM_RECEBER * 3600 * 1000;', 'var desatualizado = false;']
 };
-conf('cada âncora de veneno está no app.js uma vez só', MODOS.map(m => APP.split(ANCORAS[m][0]).length - 1).join(','), MODOS.map(() => 1).join(','));
+const paresDe = m => Array.isArray(ANCORAS[m][0]) ? ANCORAS[m] : [ANCORAS[m]];
+conf('cada âncora de veneno está no app.js uma vez só', MODOS.map(m => paresDe(m).map(par => APP.split(par[0]).length - 1).join('+')).join(','),
+  MODOS.map(m => paresDe(m).map(() => 1).join('+')).join(','));
 conf('o app.js não tem travessão', new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']').test(APP), false);
 const trocas = {};
 if (MODO) {
-  trocas['/app.js'] = APP.replace(ANCORAS[MODO][0], ANCORAS[MODO][1]);
+  trocas['/app.js'] = paresDe(MODO).reduce((t, par) => t.replace(par[0], par[1]), APP);
   conf('o app.js servido ficou diferente do repositório (' + MODO + ')', trocas['/app.js'] !== APP, true);
 }
 /* As regras do Firestore aceitam o aluno com os campos novos: o conteúdo do
@@ -443,6 +447,8 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   conf('a lista traz os ativos em ordem de nome, sem o inativo', lista.join(', '),
     'alfa=Aluno Alfa Teste, online=Aluno Online Teste, nada=Aluno Sem Contato Teste, velho=Aluno Velho Teste, ' +
     [1, 2, 3, 4, 5].map(i => 'c' + i + '=Contato Caso ' + i + ' Teste').join(', '));
+  conf('(painel) rolada até o fim, a lista termina acima da barra de abas, com folga', await pagC.evaluate(() => { const c = document.querySelector('#cel-conteudo'); c.scrollTop = c.scrollHeight;
+    const ultimo = document.querySelector('#cel-alunos').lastElementChild.getBoundingClientRect(); const r = ultimo.bottom <= document.querySelector('#cel-abas').getBoundingClientRect().top - 8 && ultimo.bottom <= c.getBoundingClientRect().bottom - 8; c.scrollTop = 0; return r; }), true);
   conf('(painel) o aluno sem contato diz na lista "sem telefone cadastrado"', await texto(pagC, '.cel-aluno-item[data-aluno="nada"] .cel-aluno-detalhe'), 'sem telefone cadastrado');
   conf('e o que tem telefone não diz', await texto(pagC, '.cel-aluno-item[data-aluno="alfa"] .cel-aluno-detalhe'), 'Responsável Alfa Teste · Na casa do aluno');
   conf('e diz que o inativo fica no tablet', await texto(pagC, '#cel-alunos-inativos'), '1 aluno inativo fica só no tablet.');
@@ -536,7 +542,9 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   const abriuVelho = await abrirFichaPelaLista(pagC, 'velho');
   prop('a ficha do aluno sem os campos novos abre (' + (pagC.errosDePagina.join(' | ') || 'sem erro de página') + ')', abriuVelho && pagC.errosDePagina.length === 0, V_OBRIGATORIO);
   if (MODO === V_OBRIGATORIO) fimDoVeneno();
-  conf('o contato das observações liga e abre o WhatsApp', (await href(pagC, '#cel-ficha-ligar')) + ' ' + (await href(pagC, '#cel-ficha-whatsapp')), 'tel:+' + WA_VELHO + ' https://wa.me/' + WA_VELHO);
+  prop('o contato das observações NÃO liga nem abre o WhatsApp: mostra o texto e "Confira o telefone no tablet" (' + (await href(pagC, '#cel-ficha-ligar')) + ')',
+    !(await existe(pagC, '#cel-ficha-ligar')) && !(await existe(pagC, '#cel-ficha-whatsapp')) && (await texto(pagC, '#cel-ficha-telefone')) === 'Contato: ' + TEL_VELHO &&
+    /^Confira o telefone no tablet/.test((await texto(pagC, '#cel-ficha-confira')) || ''), V_EXTRACAO);
   conf('sem casa nem online, a ficha não mostra o lugar; o valor é o dele', (await existe(pagC, '#cel-ficha-lugar')) + ' ' + (await texto(pagC, '#cel-ficha-valor')).replace(/\s/g, ' '), 'false Valor por hora: R$ 80,00');
   conf('sem relato, a ficha diz', await texto(pagC, '#cel-ficha-relato'), 'Ainda sem relato de aula.');
   await clicar(pagC, '#cel-alunos-voltar');
@@ -557,7 +565,7 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
     'cel-folha-ficha,cel-folha-realizada,cel-folha-faltou,cel-folha-remarcar,cel-folha-registrar,cel-folha-cancelar,cel-folha-fechar');
   await clicar(pagC, '#cel-folha-fechar');
 
-  secao('6b. (revisão) Um telefone só, com cara de telefone: os contatos dela que não são, não viram link');
+  secao('6b. (revisão) Só o campo telefone liga: os contatos das observações não viram link, pela tela');
   const doCaso = async id => { await abrirFichaPelaLista(pagC, id); const r = await pagC.evaluate(() => ({
     ligar: (document.querySelector('#cel-ficha-ligar') || { getAttribute: () => '' }).getAttribute('href'),
     whats: (document.querySelector('#cel-ficha-whatsapp') || { getAttribute: () => '' }).getAttribute('href'),
@@ -566,15 +574,42 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
     link: !!document.querySelector('#cel-ficha-link') })); await clicar(pagC, '#cel-alunos-voltar'); return r; };
   const c1 = await doCaso('c1'), c2 = await doCaso('c2'), c3 = await doCaso('c3'), c4 = await doCaso('c4'), c5 = await doCaso('c5');
   console.log('   casos: ' + JSON.stringify({ c1, c2, c3, c4, c5 }));
-  prop('"98765-4321 (casa 2)": liga para 98765-4321, sem WhatsApp nem mensagem (falta o DDD), e pede para conferir (' + c1.ligar + ' ' + c1.whats + ')',
-    c1.ligar === 'tel:987654321' && !c1.whats && c1.msgs === 0 && c1.confira, V_DIGITOS);
-  if (MODO === V_DIGITOS) fimDoVeneno();
+  prop('"98765-4321 (casa 2)" nas observações: nenhum link, e pede para conferir (' + [c1.ligar, c1.whats, c1.msgs, c1.confira].join('|') + ')', [c1.ligar, c1.whats, c1.msgs, c1.confira].join('|') === '||0|true', V_EXTRACAO);
   conf('"mãe, prédio 12": nenhum link, o texto à vista e "Confira o telefone no tablet"', [c2.ligar, c2.whats, c2.msgs, c2.confira, c2.texto].join('|'), '||0|true|Contato: mãe, prédio 12');
   conf('dois números ("mãe 11 98765-4321, pai 11 91234-5678"): nenhum link, e pede para conferir', [c3.ligar, c3.whats, c3.msgs, c3.confira].join('|'), '||0|true');
   conf('"ramal 2": nenhum link, e pede para conferir', [c4.ligar, c4.whats, c4.msgs, c4.confira].join('|'), '||0|true');
   conf('o campo telefone próprio vence o "Contato:" das observações', c5.ligar + ' ' + c5.whats, 'tel:+5531900000005 https://wa.me/5531900000005');
   prop('(revisão) o link online com http: não vira botão, só https', c4.link === false, V_HTTP);
   if (MODO === V_HTTP) fimDoVeneno();
+
+  secao('6c. (revisão) A tabela dos 28 contatos dela: no campo telefone, link certo, só Ligar ou nenhum; nas observações, nunca');
+  /* As funções que a ficha usa, tiradas do app.js SERVIDO (o dos venenos),
+   * e a composição dela: telefoneDoCampo, e dele o Ligar e o WhatsApp. */
+  const servido = await (await fetch(amb.ORIGEM + '/app.js')).text();
+  const pega = nome => { const i = servido.indexOf('  function ' + nome + '('); if (i < 0) throw new Error('sem ' + nome);
+    const resto = servido.slice(i); const f = /\r?\n  \}\r?\n/.exec(resto); return resto.slice(0, f.index + f[0].length); };
+  const nomesF = ['telefoneDoAluno', 'telefoneValidado', 'telefoneDoCampo', 'numeroDoWhatsapp', 'linkDeLigar', 'linkDoWhatsapp'];
+  const F = new Function(nomesF.map(pega).join('\n') + '\nreturn {' + nomesF.join(',') + '};')();
+  const links = aluno => { const t = F.telefoneDoCampo(aluno); return (F.linkDeLigar(t) || '-') + ' ' + (F.linkDoWhatsapp(t, '') || '-'); };
+  const cel = d => 'tel:+55' + d + ' https://wa.me/55' + d, fixo = d => 'tel:+55' + d + ' -', nada = '- -';
+  const TABELA = [
+    ['11 98765-4321', cel('11987654321')], ['avó 99999-1234', nada], ['98765-4321 (casa 2)', nada], ['mãe 11 98765-4321, pai 11 91234-5678', nada],
+    ['98765-4321 mãe, prédio 12', nada], ['(11) 98765-4321 ramal 2', nada], ['+55 (11) 98765-4321', cel('11987654321')], ['011 98765-4321', cel('11987654321')],
+    ['55 9 9999-1234', cel('55999991234')], ['Ana, apto 1203, bloco 4, 9876-5432', nada], ['9876-5432 / 9988-7766', nada], ['(11) 98765-4321', cel('11987654321')],
+    ['+55 11 98765-4321', cel('11987654321')], ['11987654321', cel('11987654321')], ['avó 11 98765-4321', nada], ['11 3456-7890', fixo('1134567890')],
+    ['5511987654321', nada], ['(11)98765-4321', cel('11987654321')], ['11 9 8765-4321', cel('11987654321')], ['(11) 9 8765-4321', cel('11987654321')],
+    ['11 9.8765.4321', cel('11987654321')], ['apto 1203 9876-5432', nada], ['apto 12 98765-4321', nada], ['21 99876 5432', cel('21998765432')],
+    ['+5511987654321', cel('11987654321')], ['0 11 98765-4321', cel('11987654321')], ['casa 3 11 98765-4321', nada], ['(021) 98765-4321', cel('21987654321')]
+  ];
+  conf('(arranjo) a tabela tem os 28 casos dela', TABELA.length, 28);
+  const erradosCampo = TABELA.filter(([c, esp]) => links({ telefone: c }) !== esp).map(([c, esp]) => c + ' => ' + links({ telefone: c }) + ' (esperado ' + esp + ')');
+  const erradosObs = TABELA.filter(([c]) => links({ obs: 'Contato: ' + c }) !== nada).map(([c]) => 'Contato: ' + c + ' => ' + links({ obs: 'Contato: ' + c }));
+  console.log('   no campo: ' + TABELA.filter(x => x[1] !== nada).length + ' ligam (' + TABELA.filter(x => / -$/.test(x[1]) && x[1] !== nada).length + ' fixo), ' + TABELA.filter(x => x[1] === nada).length + ' sem link');
+  prop('no campo telefone, cada um dos 28 dá o link certo, só Ligar ou nenhum (' + (erradosCampo.join(' ; ') || 'todos certos') + ')', erradosCampo.length === 0, V_EXTRACAO);
+  prop('nas observações ("Contato: ..."), nenhum dos 28 vira link (' + (erradosObs.slice(0, 4).join(' ; ') || 'nenhum') + ')', erradosObs.length === 0, V_EXTRACAO);
+  if (MODO === V_EXTRACAO) fimDoVeneno();
+  conf('ao salvar, o campo que não é um telefone com DDD é recusado (a mesma regra): ' + TABELA.filter(([c]) => !F.telefoneValidado(c)).length + ' dos 28',
+    TABELA.filter(([c, esp]) => !F.telefoneValidado(c) !== (esp === nada)).length, 0);
 
   secao('7. O cadastro do celular com os campos opcionais, e eles chegam ao tablet pela fila');
   await aba(pagC, 'alunos');
@@ -600,7 +635,7 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   await clicar(pagC, '#cel-aluno-salvar');
   await pausa(300);
   conf('telefone com dois números: o cadastro avisa e não grava', (await texto(pagC, '#aviso-texto')) + ' | ' + (await pagC.evaluate(() => Store.carregar().then(b => b.alunos.some(x => x.nome === 'Aluno Novo Casa Teste')))),
-    'Escreva um telefone só, com DDD, por exemplo (11) 98765-4321. | false');
+    'Escreva o telefone com DDD, por exemplo (11) 98765-4321. | false');
   await digitar(pagC, '#cel-aluno-telefone', '(11) 90000-0004');
   await clicar(pagC, '#cel-aluno-salvar');
   const novo = await esperar('o aluno gravou', () => pagC.evaluate(() => Store.carregar().then(b => { const a = b.alunos.find(x => x.nome === 'Aluno Novo Casa Teste'); return a ? a.id : null; })), v => !!v, 10000);
@@ -656,7 +691,14 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   await pagA.evaluate(() => { const l = [...document.querySelectorAll('#lista-alunos .item-lista')].find(e => e.textContent.includes('Aluno Velho Teste')); if (l) l.click(); });
   await esperar('a ficha do Velho abriu', () => existe(pagA, '#modal-aluno.aberto #campo-local'), v => v === true, 8000);
   conf('(o aluno sem os campos) a ficha do tablet abre com eles vazios', await pagA.evaluate(() => ['#campo-telefone', '#campo-local', '#campo-endereco', '#campo-link-online'].map(s => document.querySelector(s).value).join('|')), '|||');
-  await digitar(pagA, '#campo-telefone', TEL_VELHO);
+  conf('(aluno antigo) o tablet mostra o contato das observações e o atalho para o campo Telefone', /Contato: \(21\) 90000-0002/.test((await texto(pagA, '#atalho-telefone')) || '') && (await existe(pagA, '#usar-contato-no-telefone')), true);
+  await digitar(pagA, '#campo-telefone', 'apto 12 98765-4321');
+  await pagA.$eval('#salvar-aluno', e => e.click());
+  await pausa(300);
+  conf('o tablet recusa o telefone que não é um telefone com DDD, e não grava', (await texto(pagA, '#aviso-texto')) + ' | ' + (await existe(pagA, '#modal-aluno.aberto')) + ' | ' +
+    (await pagA.evaluate(() => Store.carregar().then(d => String(d.alunos.find(y => y.id === 'velho').telefone)))), 'Escreva o telefone com DDD, por exemplo (11) 98765-4321. | true | undefined');
+  await clicar(pagA, '#usar-contato-no-telefone');
+  conf('o atalho põe o contato no campo Telefone', await pagA.evaluate(() => document.querySelector('#campo-telefone').value), TEL_VELHO);
   await pagA.select('#campo-local', 'online');
   await digitar(pagA, '#campo-link-online', 'https://meet.example.test/sala-velho');
   await pagA.$eval('#salvar-aluno', e => e.click());
@@ -666,6 +708,9 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   const sA2 = await sincronizar(pagA);
   conf('o tablet subiu o aluno', sA2.erroE === null && sA2.enviados > 0, true);
   await pagC.evaluate(() => Nuvem.receberRegistros());
+  const ligaVelho = await esperar('o celular recebeu o telefone do Velho', () => abrirFichaPelaLista(pagC, 'velho').then(() => href(pagC, '#cel-ficha-whatsapp')), v => v === 'https://wa.me/' + WA_VELHO, 15000);
+  conf('com o campo Telefone preenchido no tablet, o Velho passa a ligar e abrir o WhatsApp no celular', ligaVelho.ok, true);
+  await clicar(pagC, '#cel-alunos-voltar');
   const linkVelho = await esperar('o celular recebeu o link', () => abrirFichaPelaLista(pagC, 'velho').then(() => href(pagC, '#cel-ficha-link')), v => v === 'https://meet.example.test/sala-velho', 15000);
   conf('o link gravado no tablet chegou à ficha mínima do celular', linkVelho.ok, true);
   await clicar(pagC, '#cel-alunos-voltar');

@@ -5130,6 +5130,19 @@
         }))
       ])
     ]));
+    /* O aluno antigo, com o contato só nas observações: um atalho põe o texto
+     * no campo Telefone, para ela conferir e salvar (o texto das observações
+     * nunca liga sozinho). */
+    var contatoAntigo = !novo && !String(alunoEmEdicao.telefone || '').trim() ? telefoneDoAluno(alunoEmEdicao) : '';
+    if (contatoAntigo) {
+      painel.dados.appendChild(el('div', { class: 'faixa-info', id: 'atalho-telefone' }, [
+        el('div', { texto: 'Nas observações: "Contato: ' + contatoAntigo + '". Só o campo Telefone liga e abre o WhatsApp no celular.' }),
+        el('div', { class: 'barra u-margem-baixo-0' }, [
+          el('button', { type: 'button', class: 'btn', id: 'usar-contato-no-telefone', texto: 'Pôr no campo Telefone',
+            aoClick: function () { var c = $('#campo-telefone'); if (c) { c.value = contatoAntigo; c.focus(); } } })
+        ])
+      ]));
+    }
     painel.dados.appendChild(el('div', { class: 'linha' }, [
       el('label', { class: 'campo' }, [
         el('span', { texto: 'Endereço' }),
@@ -7626,6 +7639,9 @@
     var provisorio = { precos: precos };
     var erros = Core.validarPrecos(provisorio);
     if (erros.length) { avisar(erros[0]); return; }
+    // (D6c, lote 2) só o campo telefone liga: ele inteiro tem de ser um telefone com DDD
+    var telefoneDaFicha = lugarEContatoDaFicha().telefone;
+    if (String(telefoneDaFicha || '').trim() && !telefoneValidado(telefoneDaFicha)) { avisar(FRASE_TELEFONE_INVALIDO + '.'); return; }
 
     if (alunoEmEdicao) {
       /* A ficha mostra o ano do mapa atual quando há divergência legada.
@@ -22784,7 +22800,7 @@
       var erros = Core.validarPrecos({ precos: precos });
       if (erros.length) { avisar(erros[0]); return; }
       // um telefone só, com DDD: é ele que liga e abre o WhatsApp da família
-      if (telefone.value.trim() && !numeroDoWhatsapp(telefone.value)) { avisar('Escreva um telefone só, com DDD, por exemplo (11) 98765-4321.'); return; }
+      if (telefone.value.trim() && !telefoneValidado(telefone.value)) { avisar(FRASE_TELEFONE_INVALIDO + '.'); return; }
       var novo = alunoNovo({ nome: n, responsavel: resp.value.trim(), telefone: telefone.value, precos: precos,
         local: local.value, endereco: local.value === 'casa' ? endereco.value : '', linkOnline: local.value === 'online' ? link.value : '' });
       comoAcaoDoCelular(function () {
@@ -22822,8 +22838,9 @@
     return aluno;
   }
 
-  /* O telefone do responsável: o campo da ficha; sem ele, o que vem depois de
-   * "Contato:" nas observações, onde o cadastro do celular (D6b) o põe. */
+  /* O texto do contato, para MOSTRAR: o campo telefone; sem ele, o que vem
+   * depois de "Contato:" nas observações (onde o cadastro do celular do D6b o
+   * punha). Este texto nunca vira link. */
   function telefoneDoAluno(aluno) {
     if (!aluno) return '';
     var daFicha = String(aluno.telefone || '').trim();
@@ -22831,36 +22848,34 @@
     var m = /(?:^|\n)\s*contato\s*:\s*([^\n]+)/i.exec(String(aluno.obs || ''));
     return m ? m[1].trim() : '';
   }
-  /* UM telefone com cara de telefone, tirado do texto por token: com ou sem
-   * o 55, com ou sem o DDD (entre parênteses ou não), com hífen, ponto ou
-   * espaço. Dígitos soltos ao lado ("casa 2", "prédio 12", "ramal 2") não
-   * entram no número. Nenhum ou dois números: não há telefone certo, e o
-   * aplicativo não monta link (ligar para um estranho, ou mandar a ele o
-   * nome da criança, é pior do que não ter o botão). Devolve só os dígitos,
-   * sem o 55. */
-  var RE_TELEFONE = /(?:^|[^\d])((?:\+?55[\s.-]?)?(?:\(?\d{2}\)?[\s.-]?)?9?\d{4}[\s.-]?\d{4})(?!\d)/g;
-  function telefoneUnico(texto) {
-    var achados = [], m;
-    RE_TELEFONE.lastIndex = 0;
-    while ((m = RE_TELEFONE.exec(String(texto || ''))) !== null) achados.push(m[1]);
-    if (achados.length !== 1) return '';
-    var d = achados[0].replace(/\D/g, '');
-    if (d.length >= 12 && /^55/.test(d)) d = d.slice(2);
-    return d.length >= 8 && d.length <= 11 ? d : '';
+  /* A regra final (D6c, lote 2): tirar um telefone de texto livre sempre
+   * tem caso ambíguo ("apto 12 98765-4321", "11 9 8765-4321"), e o erro é
+   * ligar para um estranho ou mandar a ele o nome da criança. Então só o
+   * campo telefone gera link, e o campo INTEIRO tem de ser um telefone: sem
+   * espaços, parênteses, pontos e hífens, sem o +55 e o 0 da frente, sobram
+   * 10 ou 11 dígitos, com DDD de 11 a 99 cujo segundo dígito não é 0.
+   * Devolve esses dígitos (DDD e número), ou vazio. */
+  function telefoneValidado(texto) {
+    var t = String(texto || '').trim().replace(/[\s().-]/g, '');
+    if (/^\+55/.test(t)) t = t.slice(3);
+    if (/^0/.test(t)) t = t.slice(1);
+    return /^[1-9][1-9]\d{8,9}$/.test(t) ? t : '';
   }
-  /* O número para o WhatsApp (wa.me): o telefone com DDD (10 ou 11 dígitos)
-   * e o 55 do Brasil; sem DDD não há como saber a cidade, e o WhatsApp fica
-   * de fora (o ligar continua). */
+  var FRASE_TELEFONE_INVALIDO = 'Escreva o telefone com DDD, por exemplo (11) 98765-4321';
+  /* O telefone que liga: o do campo, se ele passa na regra. As observações
+   * nunca. */
+  function telefoneDoCampo(aluno) {
+    return aluno && telefoneValidado(aluno.telefone) ? String(aluno.telefone).trim() : '';
+  }
+  /* O WhatsApp só para celular: 11 dígitos, com o 9 depois do DDD. O fixo
+   * (10 dígitos) só liga. */
   function numeroDoWhatsapp(telefone) {
-    var d = telefoneUnico(telefone);
-    if (d.length === 10 || d.length === 11) d = '55' + d;
-    return /^55\d{10,11}$/.test(d) ? d : '';
+    var d = telefoneValidado(telefone);
+    return d.length === 11 && d.charAt(2) === '9' ? '55' + d : '';
   }
   function linkDeLigar(telefone) {
-    var wa = numeroDoWhatsapp(telefone);
-    if (wa) return 'tel:+' + wa;
-    var d = telefoneUnico(telefone);
-    return d ? 'tel:' + d : '';
+    var d = telefoneValidado(telefone);
+    return d ? 'tel:+55' + d : '';
   }
   /* O link abre a conversa com o texto ESCRITO, e quem toca em enviar é ela:
    * o aplicativo nunca envia nada sozinho. */
@@ -22925,19 +22940,19 @@
     var caixa = el('div', { class: 'cel-ficha', id: 'cel-ficha', 'data-aluno': aluno.id });
     var resp = String(aluno.responsavel || '').trim();
     caixa.appendChild(el('div', { class: 'cel-ficha-linha', id: 'cel-ficha-responsavel', texto: resp ? 'Responsável: ' + resp : 'Responsável não informado.' }));
-    var tel = telefoneDoAluno(aluno);
+    var contato = telefoneDoAluno(aluno), tel = telefoneDoCampo(aluno);
     var ligar = linkDeLigar(tel), whats = linkDoWhatsapp(tel, '');
-    if (tel) {
-      caixa.appendChild(el('div', { class: 'cel-ficha-telefone', id: 'cel-ficha-telefone', texto: (ligar ? 'Telefone: ' : 'Contato: ') + tel }));
+    if (contato) {
+      caixa.appendChild(el('div', { class: 'cel-ficha-telefone', id: 'cel-ficha-telefone', texto: (ligar ? 'Telefone: ' : 'Contato: ') + contato }));
       if (ligar || whats) {
         caixa.appendChild(el('div', { class: 'cel-ficha-botoes' }, [
           ligar ? botaoDeLinkCelular('cel-ficha-ligar', 'Ligar', ligar, { 'aria-label': 'Ligar para ' + (resp || 'o responsável') + ', ' + tel }) : null,
           whats ? botaoDeLinkCelular('cel-ficha-whatsapp', 'WhatsApp', whats, { 'aria-label': 'Abrir o WhatsApp de ' + (resp || 'o responsável') }) : null
         ]));
       }
-      /* Sem um telefone só, com DDD, nenhum link para o WhatsApp: ela confere no tablet. */
-      if (!whats) caixa.appendChild(el('p', { class: 'faixa-aviso', id: 'cel-ficha-confira', texto: 'Confira o telefone no tablet' +
-        (ligar ? ': para o WhatsApp, ele precisa do DDD.' : ': não achei um telefone só, com DDD, neste contato.') }));
+      /* Sem o campo telefone válido, nenhum link: ela confere no tablet. O fixo só liga. */
+      if (!ligar) caixa.appendChild(el('p', { class: 'faixa-aviso', id: 'cel-ficha-confira', texto: 'Confira o telefone no tablet: só o campo Telefone da ficha liga e abre o WhatsApp.' }));
+      else if (!whats) caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-ficha-fixo', texto: 'Telefone fixo: o WhatsApp precisa de um celular.' }));
     } else {
       caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-ficha-sem-telefone', texto: 'Sem telefone do responsável. Ele se põe no tablet, na ficha do aluno.' }));
     }

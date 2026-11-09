@@ -875,10 +875,10 @@ roda "celular ficha --envenenado-campo-obrigatorio" node "_teste/testa_celular_f
 roda "celular ficha --envenenado-campos-nao-sobem"  node "_teste/testa_celular_ficha.js" --envenenado-campos-nao-sobem
 roda "celular ficha --envenenado-cobranca-retrato"  node "_teste/testa_celular_ficha.js" --envenenado-cobranca-retrato
 roda "celular ficha --envenenado-observador-cadastra" node "_teste/testa_celular_ficha.js" --envenenado-observador-cadastra
-# (revisao do lote 2) todos os digitos do contato num numero so (o telefone de
-# um estranho), o link online com http, e o alto que nunca avisa que pode
+# (revisao do lote 2) a extracao antiga do telefone do texto livre (o telefone
+# de um estranho; a tabela dos 28 casos dela), o link online com http, e o alto que nunca avisa que pode
 # estar desatualizado
-roda "celular ficha --envenenado-todos-os-digitos"  node "_teste/testa_celular_ficha.js" --envenenado-todos-os-digitos
+roda "celular ficha --envenenado-extracao-antiga"   node "_teste/testa_celular_ficha.js" --envenenado-extracao-antiga
 roda "celular ficha --envenenado-aceita-http"       node "_teste/testa_celular_ficha.js" --envenenado-aceita-http
 roda "celular ficha --envenenado-nunca-desatualizado" node "_teste/testa_celular_ficha.js" --envenenado-nunca-desatualizado
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
