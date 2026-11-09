@@ -1,20 +1,43 @@
-# O portao de merge no GitHub.
+# O portao de merge no GitHub, em TRES NIVEIS (politica de testes por checkpoint,
+# decisao do dono em 09/11/2026: rodar tudo a cada passo custa muito tempo e
+# pouca seguranca a mais).
 #
-# Duas partes, porque o portao inteiro passa de dez minutos e quase todo esse
-# tempo e Chrome:
+#   NIVEL 1, a cada push no PR (e a cada rodada de conserto):
+#     portao-rapido    todo PR e todo push na main. Roda o confere_tudo.sh com
+#                      --rapido: tudo que nao abre navegador (suites Node e
+#                      Python, provas da biblioteca sem Chrome, trava do nome do
+#                      cache, serie da matematica, toda prova no portao,
+#                      privacidade). O que ele pula sai na saida, uma linha
+#                      "pulado" por prova. E o check que a protecao da main exige.
+#     portao-tocadas   so as provas de NAVEGADOR que o mapa liga aos arquivos
+#                      tocados pelo PR (_teste/mapa_provas.tsv, decidido por
+#                      _teste/provas_tocadas.js). Prova de navegador tocada roda
+#                      ela mesma; arquivo que nao esta no mapa leva a bateria
+#                      inteira (na duvida, mais, nunca menos). Roda em oito
+#                      fatias (portao-tocadas (fatia K de 8)) so com a parte da
+#                      selecao que cai em cada uma, e o job portao-tocadas junta.
+#                      Com o rotulo "pronto" ele fica verde sem rodar, porque a
+#                      bateria inteira cobre tudo.
 #
-#   portao-rapido     todo PR e todo push na main. Roda o confere_tudo.sh com
-#                     --rapido: tudo que nao abre navegador (suites Node e
-#                     Python, kit de figuras, provas da biblioteca sem Chrome,
-#                     trava do nome do cache, serie da matematica, toda prova
-#                     no portao, privacidade). O que ele pula sai na saida,
-#                     uma linha "pulado" por prova. E o check que a protecao
-#                     da main exige.
-#   portao-navegador  o portao inteiro, com Chrome. Roda no push na main, quando
-#                     alguem pede a mao (workflow_dispatch) e no PR que tiver o
-#                     rotulo "navegador". O portao local continua obrigatorio
-#                     antes do merge (regra F2); este e a segunda opiniao, numa
-#                     maquina limpa, sem servidor esquecido nem cache quente.
+#   NIVEL 2, uma vez por PR, quando ele e marcado como pronto:
+#     portao-navegador  o portao inteiro, com Chrome, em oito fatias
+#                      paralelas (portao-navegador-fatia) e o juntador de nome
+#                      portao-navegador, que o merge_seguro le. SO roda no PR com o
+#                      rotulo "pronto": ao pôr o rotulo (evento "labeled"), e a
+#                      cada push novo num PR que ja o tem (a bateria roda de novo
+#                      na cabeca nova). Sem o rotulo o juntador NAO EXISTE nem
+#                      aparece verde: fica ausente, o merge_seguro recusa ausente
+#                      ou pulado.
+#
+#   NIVEL 3, push na main (checkpoint de producao):
+#     portao-arvore    compara o TREE do commit da main com o da cabeca do PR que
+#                      entrou nele (API do commit, com o GITHUB_TOKEN). Tree IGUAL
+#                      e bateria inteira verde na cabeca: as oito fatias e o
+#                      juntador nao rodam de novo (ficam puladas) e o
+#                      publica-cloudflare publica. Tree diferente, PR sem bateria
+#                      verde, commit que nao veio de PR ou API fora do ar: a
+#                      bateria roda como sempre. O log diz qual caminho tomou.
+#                      Disparo manual (workflow_dispatch): sempre a bateria.
 #
 # AS PROVAS DE NAVEGADOR RODAM EM OITO FATIAS PARALELAS. Numa maquina so, uma
 # depois da outra, o inteiro passou de oitenta minutos (118 provas em 10/2026,
@@ -25,36 +48,48 @@
 # fica verde quando as oito fatias ficam verdes, e e ele que o merge_seguro
 # le. Nada disso roda na maquina de quem trabalha.
 #
-# fetch-depth 0 nas duas: a trava do cache compara com a BASE DO MERGE
-# (git merge-base HEAD origin/main), e com o clone raso de um commit so nao ha
-# base nenhuma e a trava sairia INSTAVEL em todo PR.
+# fetch-depth 0 nas que comparam com a base: a trava do cache compara com a BASE
+# DO MERGE (git merge-base HEAD origin/main), e com o clone raso de um commit so
+# nao ha base nenhuma e a trava sairia INSTAVEL em todo PR.
 #
 # A trava do cache so AFIRMA alguma coisa no PR: ali o HEAD e o commit de
 # merge e a base e a ponta da main. No push na main o HEAD e a propria main,
 # a base e ele mesmo, e as duas travas do cache dizem ok sem comparar nada.
 # Nao e furo, porque o mesmo commit ja passou por elas no PR; mas o ok do
 # push na main nao vale como conferencia do cache.
+#
+# QUAIS EVENTOS DE PR RODAM (a condicao "rodar", repetida em cada job porque o
+# Actions nao tem variavel de workflow):
+#   synchronize, reopened   sempre;
+#   labeled                 so o rotulo "pronto" (outro rotulo nao roda nada, e
+#                           ganha um grupo de concorrencia proprio para nao
+#                           cancelar a rodada que esta valendo);
+#   opened                  so se o PR nasce SEM o rotulo "pronto": nascendo com
+#                           ele, o GitHub dispara "opened" e "labeled" juntos e
+#                           quem roda e o "labeled". Duas rodadas no mesmo grupo
+#                           cancelavam uma a outra e o CANCELLED ficava mais novo
+#                           que o verde do mesmo commit (A4d, 30/10, #87).
 name: portao
 
-# SEM o evento "labeled" (A4d, 30/10). O PR nasce com o rotulo
-# (`gh pr create --label navegador`), e o GitHub dispara "opened" e "labeled"
-# juntos: duas rodadas no mesmo grupo de concorrencia, e uma cancelava a outra.
-# O check CANCELLED ficava mais novo que o verde do mesmo commit, e a protecao
-# da main e o merge_seguro recusavam o merge (#87). Rotulo posto depois de o PR
-# nascer: feche e reabra o PR (evento "reopened") ou empurre um commit.
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [labeled, synchronize, opened, reopened]
   push:
     branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: portao-${{ github.ref }}-${{ github.event_name }}
+  group: portao-${{ github.ref }}-${{ github.event_name }}-${{ (github.event_name != 'pull_request' || github.event.action == 'synchronize' || github.event.action == 'reopened' || (github.event.action == 'labeled' && github.event.label.name == 'pronto') || (github.event.action == 'opened' && !contains(github.event.pull_request.labels.*.name, 'pronto'))) && 'vale' || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   portao-rapido:
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.action == 'synchronize' ||
+      github.event.action == 'reopened' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'pronto') ||
+      (github.event.action == 'opened' && !contains(github.event.pull_request.labels.*.name, 'pronto'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -84,10 +119,133 @@ jobs:
           path: _falhas_do_portao/
           if-no-files-found: ignore
 
+  # NIVEL 1: as provas de navegador mapeadas pelos arquivos tocados. Cada fatia
+  # (K de 8) calcula a mesma selecao e roda a parte dela; a fatia sem prova da
+  # selecao sai verde logo depois do plano, sem instalar nada.
+  portao-tocadas-fatia:
+    if: >-
+      github.event_name == 'pull_request' && (
+      github.event.action == 'synchronize' ||
+      github.event.action == 'reopened' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'pronto') ||
+      (github.event.action == 'opened' && !contains(github.event.pull_request.labels.*.name, 'pronto')))
+    name: portao-tocadas (fatia ${{ matrix.fatia }} de 8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        fatia: [1, 2, 3, 4, 5, 6, 7, 8]
+    env:
+      CHROME: /usr/bin/google-chrome
+      COM_PRONTO: ${{ contains(github.event.pull_request.labels.*.name, 'pronto') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: origin/main para a base do merge
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+      - name: Plano do nivel 1 (quais provas de navegador, pelo mapa)
+        id: plano
+        run: |
+          if [ "$COM_PRONTO" = "true" ]; then
+            echo "o PR tem o rotulo pronto: a bateria inteira (portao-navegador) cobre tudo; nada a rodar aqui"
+            echo "quantas=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git diff --name-only origin/main...HEAD > "$RUNNER_TEMP/tocados.txt"
+          echo "arquivos tocados pelo PR:"
+          sed 's/^/  /' "$RUNNER_TEMP/tocados.txt"
+          node _teste/provas_tocadas.js --fatia ${{ matrix.fatia }}/8 --saida "$RUNNER_TEMP/provas.txt" < "$RUNNER_TEMP/tocados.txt"
+      - name: Nada desta selecao cai nesta fatia
+        if: steps.plano.outputs.quantas == '0'
+        run: echo "nivel 1, fatia ${{ matrix.fatia }} de 8: nenhuma prova de navegador a rodar"
+      - uses: actions/setup-node@v4
+        if: steps.plano.outputs.quantas != '0'
+        with:
+          node-version: '24.14.1'
+      - uses: actions/setup-python@v5
+        if: steps.plano.outputs.quantas != '0'
+        with:
+          python-version: '3.14'
+      - name: Dependencias Python
+        if: steps.plano.outputs.quantas != '0'
+        run: pip install -r _teste/requirements.txt
+      - name: Dependencias Node
+        if: steps.plano.outputs.quantas != '0'
+        working-directory: _teste
+        run: npm ci --no-audit --no-fund
+      - name: Chrome do runner
+        if: steps.plano.outputs.quantas != '0'
+        run: $CHROME --version
+      - name: firebase-tools e Java 21 para a prova da nuvem
+        if: steps.plano.outputs.quantas != '0'
+        run: |
+          mkdir -p "$RUNNER_TEMP/firebase-tools"
+          cd "$RUNNER_TEMP/firebase-tools"
+          npm init -y > /dev/null
+          npm install firebase-tools@15 --no-audit --no-fund
+          echo "FIREBASE_TOOLS=$RUNNER_TEMP/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js" >> "$GITHUB_ENV"
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+      - name: Provas de navegador mapeadas, desta fatia
+        if: steps.plano.outputs.quantas != '0'
+        run: sh _teste/confere_tudo.sh --provas "$RUNNER_TEMP/provas.txt" --pedaco ${{ matrix.fatia }}/8
+      - name: Saida de quem reprovou
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: falhas-do-portao-tocadas-fatia-${{ matrix.fatia }}
+          path: _falhas_do_portao/
+          if-no-files-found: ignore
+
+  # O nivel 1, com o nome proprio que o merge_seguro ve: verde so com as oito
+  # fatias verdes. Nao e o portao inteiro e nao se passa por ele.
+  portao-tocadas:
+    if: >-
+      !cancelled() && github.event_name == 'pull_request' && (
+      github.event.action == 'synchronize' ||
+      github.event.action == 'reopened' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'pronto') ||
+      (github.event.action == 'opened' && !contains(github.event.pull_request.labels.*.name, 'pronto')))
+    needs: portao-tocadas-fatia
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: As oito fatias do nivel 1
+        run: |
+          echo "resultado das fatias do nivel 1: ${{ needs.portao-tocadas-fatia.result }}"
+          test "${{ needs.portao-tocadas-fatia.result }}" = "success"
+
+  # NIVEL 3: so no push na main. Diz, no log, se a bateria inteira ja passou na
+  # MESMA arvore (tree) e nao precisa rodar de novo.
+  portao-arvore:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    outputs:
+      reaproveita: ${{ steps.arvore.outputs.reaproveita }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: O tree da main e o da cabeca de um PR com a bateria inteira verde
+        id: arvore
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node _teste/arvore_da_main.js "${{ github.sha }}"
+
   portao-navegador-fatia:
     if: >-
-      github.event_name != 'pull_request' ||
-      contains(github.event.pull_request.labels.*.name, 'navegador')
+      !cancelled() && needs.portao-arvore.outputs.reaproveita != 'sim' && (
+      github.event_name != 'pull_request' || (
+      contains(github.event.pull_request.labels.*.name, 'pronto') && (
+      github.event.action == 'synchronize' ||
+      github.event.action == 'reopened' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'pronto'))))
+    needs: portao-arvore
     name: portao-navegador (fatia ${{ matrix.fatia }} de 8)
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -143,13 +301,18 @@ jobs:
   # fatias verdes. `!cancelled()` para ele rodar e dizer vermelho quando uma
   # fatia falha (sem isso, ele seria pulado, e pulado nao e verde nem vermelho)
   # e ficar cancelado quando a rodada for cancelada; e a mesma condicao das
-  # fatias para ele ser pulado onde elas sao puladas.
+  # fatias para ele ser pulado onde elas sao puladas: no PR sem o rotulo
+  # "pronto" ele nao roda, fica ausente ou pulado, e o merge_seguro recusa; no
+  # push na main com a arvore ja conferida (portao-arvore) tambem fica pulado.
   portao-navegador:
     if: >-
-      !cancelled() && (
-      github.event_name != 'pull_request' ||
-      contains(github.event.pull_request.labels.*.name, 'navegador'))
-    needs: portao-navegador-fatia
+      !cancelled() && needs.portao-arvore.outputs.reaproveita != 'sim' && (
+      github.event_name != 'pull_request' || (
+      contains(github.event.pull_request.labels.*.name, 'pronto') && (
+      github.event.action == 'synchronize' ||
+      github.event.action == 'reopened' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'pronto'))))
+    needs: [portao-arvore, portao-navegador-fatia]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
