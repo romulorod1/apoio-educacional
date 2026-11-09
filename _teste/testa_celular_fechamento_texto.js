@@ -22,7 +22,9 @@
  *   8. o observador não vê o botão nem o editor, e nada sobe dele;
  *   9. sair sem salvar deixa um rascunho neste aparelho, que volta ao reabrir;
  *  10. junho, o fechamento de referência, continua 10 encontros, 10:30 e
- *      R$ 1.050,00 quando o texto não muda, e Salvar sem mudança não grava.
+ *      R$ 1.050,00 quando o texto não muda, e Salvar sem mudança não grava;
+ *  11. a volta de versão: um tablet com o código da 1.42.18 recebe o texto do
+ *      celular e edita para ele, pelo mesmo registro de sempre.
  *
  * Venenos, que TÊM de reprovar a propriedade:
  *   --envenenado-texto-fora-do-pdf       o celular grava o texto num campo dele, que o PDF não lê;
@@ -271,7 +273,10 @@ const fila = pag => pag.evaluate(() => Store.lerFila().then(l => l.map(e => e.id
 const filaVazia = pag => esperar('a fila esvaziou', () => pag.evaluate(() => Store.lerFila().then(l => l.length)), v => v === 0, 20000);
 const aba = (pag, t) => clicar(pag, '#cel-abas .cel-aba[data-cel="' + t + '"]').then(() => pausa(200));
 /* O texto da mensagem no disco da página (o que o PDF e a sincronização leem). */
-const textoNoDisco = (pag, aluno, mes) => pag.evaluate((a, m) => Store.carregar().then(d => Core.textoDoMes(d, a, m)), aluno, mes);
+/* Lido direto de db.resumos, e não pelo Core.textoDoMes: a seção 13 roda o
+ * tablet com o código da 1.42.18, que não tem a função. */
+const textoNoDisco = (pag, aluno, mes) => pag.evaluate((a, m) => Store.carregar().then(d => {
+  const r = (d.resumos || []).find(x => x.alunoId === a && x.mes === m); return r ? (r.texto || '') : ''; }), aluno, mes);
 async function mesNoCelular(pag, mes, tela) {
   tela = tela || 'fechamento';
   const alvo = await pag.evaluate(m => Core.mesExtenso(m), mes);
@@ -481,7 +486,7 @@ const SEL_MSG = '.cel-editar-mensagem[data-aluno="msg"]';
     const b = document.querySelector('#cel-fechamento ' + s);
     return b ? b.textContent + ' | ' + !!b.closest('[data-acao-celular]') + ' | ' + !!b.closest('.cel-fechamento-aluno[data-aluno="msg"]') : 'sem botão';
   }, SEL_MSG);
-  prop('o cartão do aluno no Fechamento tem "Editar a mensagem do mês", dentro das ações do celular (' + noFech + ')', noFech === 'Editar a mensagem do mês | true | true', V_OBS);
+  prop('o cartão do aluno no Fechamento tem "Editar a mensagem do mês", dentro das ações do celular (' + noFech + ')', noFech === 'Editar a mensagem do mês | true | true');
   conf('cada aluno do mês tem o botão (msg e rasc)', await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-fechamento .cel-editar-mensagem')).map(b => b.dataset.aluno).sort().join(',')), 'msg,rasc');
   let m = await medirTela(pagC);
   conf('o Fechamento com o botão: alvos de 48 px, sem rolagem de lado, nenhum botão de edição solto', telaBoa(m) + '|' + m.soltos.join(', '), '|');
@@ -716,7 +721,61 @@ const SEL_MSG = '.cel-editar-mensagem[data-aluno="msg"]';
   const pdfJ = await pdfDoCelular(pagC, 'ref', 'enviar');
   conf('o PDF de junho: o texto de junho, 10:30 e R$ 1.050,00', [pdfJ.indexOf(JUNHO) >= 0, /10:30/.test(pdfJ), /1\.050,00/.test(pdfJ)].join(','), 'true,true,true');
 
-  secao('12. Sem erro de página, e o veneno pedido foi visto');
+  secao('13. A volta de versão: o tablet com o código da 1.42.18 (main 94fa74b) e o celular com esta');
+  /* O que já existe nela não muda de forma: o texto continua em db.resumos, o
+   * registro continua `resumo:<aluno>:<mês>` com { alunoId, mes, texto }, e o
+   * store.js e o nuvem.js desta versão são os da 1.42.18. Aqui o tablet volta
+   * de verdade ao app.js, core.js e styles.css de 94fa74b, sem service worker
+   * no meio, e os dois lados trocam o texto. */
+  const BASE = '94fa74b';
+  const antigo = f => spawnSync('git', ['show', BASE + ':' + f], { cwd: H.RAIZ, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout || '';
+  const iguais = ['store.js', 'nuvem.js', 'sw.js'].map(f => antigo(f).replace(/\r\n/g, '\n') === fs.readFileSync(path.join(H.RAIZ, f), 'utf8').replace(/\r\n/g, '\n'));
+  conf('o store.js, o nuvem.js e o sw.js desta versão são os da 1.42.18 (a fila e o recebimento não mudaram)', iguais.join(','), 'true,true,true');
+  const regCel = await pagC.evaluate(id => Store.lerRegistros().then(l => { const r = l.find(x => x.id === id); return r ? r.tipo + ' ' + Object.keys(r.dados || {}).sort().join(',') : 'sem registro'; }), 'resumo:msg:' + MES);
+  conf('o registro que o celular grava tem a forma de sempre (' + regCel + ')', regCel, 'resumo alunoId,mes,texto');
+  ['app.js', 'core.js', 'styles.css'].forEach(f => { trocas['/' + f] = antigo(f); });
+  conf('(arranjo) o código da 1.42.18 foi lido do git', ['app.js', 'core.js', 'styles.css'].every(f => trocas['/' + f].length > 1000) && /var VERSAO = '1\.42\.18'/.test(trocas['/app.js']), true);
+  await pagA.evaluate(async () => {
+    const regs = navigator.serviceWorker ? await navigator.serviceWorker.getRegistrations() : [];
+    await Promise.all(regs.map(r => r.unregister()));
+    if (window.caches) await Promise.all((await caches.keys()).map(k => caches.delete(k)));
+  });
+  await H.abrirApp(pagA, amb.ORIGEM);
+  conf('o tablet está na 1.42.18 (sem a função nova do core)', await pagA.evaluate(() => typeof Core.gravarTextoDoMes + ' ' + typeof Core.calcularFechamento), 'undefined function');
+  const VOLTA_C = 'Do celular novo para o tablet antigo: tabuada em dia.';
+  const VOLTA_T = 'Do tablet antigo para o celular novo: leitura em dia.';
+  await aba(pagC, 'fechamento');
+  await mesNoCelular(pagC, MES);
+  await clicar(pagC, '#cel-fechamento ' + SEL_MSG);
+  await esperar('o editor abriu', () => existe(pagC, '#cel-mensagem-texto'), v => v === true, 5000);
+  await digitar(pagC, '#cel-mensagem-texto', VOLTA_C);
+  await clicar(pagC, '#cel-mensagem-salvar');
+  await esperar('o celular gravou', () => textoNoDisco(pagC, 'msg', MES), v => v === VOLTA_C, 5000);
+  await sincronizar(pagC);
+  await sincronizar(pagA);
+  const noAntigo = await pagA.evaluate(m => Store.carregar().then(d => {
+    const f = Core.calcularFechamento(d, 'msg', m);
+    const b = PDFGen.gerarFechamento(f, { incluirFolhas: false });
+    let s = ''; for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode.apply(null, b.subarray(i, i + 8192));
+    return { texto: f.resumoTexto, pdf: btoa(s) };
+  }), MES);
+  conf('o tablet da 1.42.18 recebe o texto do celular e o leva ao fechamento e ao PDF', noAntigo.texto + ' | ' + (textoDoPdf(noAntigo.pdf).indexOf(VOLTA_C) >= 0), VOLTA_C + ' | true');
+  conf('o tablet da 1.42.18 edita pela janela de sempre', await editarNoTablet(pagA, 'msg', MES, VOLTA_T), true);
+  await sincronizar(pagA);
+  await pausa(3000);
+  await sincronizar(pagA);
+  await sincronizar(pagC);
+  conf('e o celular desta versão recebe o texto do tablet antigo', (await esperar('chegou ao celular', () => textoNoDisco(pagC, 'msg', MES), v => v === VOLTA_T, 15000)).valor, VOLTA_T);
+  await clicar(pagC, '#cel-fechamento ' + SEL_MSG);
+  await esperar('o editor abriu', () => existe(pagC, '#cel-mensagem-texto'), v => v === true, 5000);
+  const origemVolta = await esperar('a origem do texto', () => texto(pagC, '#cel-mensagem-origem'), v => !!v, 5000);
+  conf('o editor do celular abre com ele e diz que veio do tablet (' + origemVolta.valor + ')',
+    (await pagC.evaluate(() => document.querySelector('#cel-mensagem-texto').value)) + ' | ' + /^Editado no tablet hoje às \d\d:\d\d\.$/.test(origemVolta.valor || ''), VOLTA_T + ' | true');
+  await clicar(pagC, '#cel-mensagem-cancelar');
+  conf('junho, já fechado, não mudou em lugar nenhum: o mesmo texto no tablet antigo e no celular',
+    (await textoNoDisco(pagA, 'ref', '2026-06')) + ' | ' + (await textoNoDisco(pagC, 'ref', '2026-06')), JUNHO + ' | ' + JUNHO);
+
+  secao('14. Sem erro de página, e o veneno pedido foi visto');
   conf('nenhum erro de página no tablet, no celular e no observador', [pagA, pagC, pagD].map(p => p.errosDePagina.join(' | ')).filter(Boolean).join(' || '), '');
   if (MODO) conf('o veneno ' + MODO + ' foi visto antes do fim', false, true);
   await ctxD.close();
