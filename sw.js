@@ -143,8 +143,8 @@
  * v109 e o v110 trouxeram navegação e Biblioteca por disciplina e ano. O v111
  * atualiza esses assets após sincronizar a Biblioteca com a main atualizada.
  * O v118 traz a navegação dia a dia na linha do tempo do celular e o atalho
- * + Aula. */
-var CACHE = 'apoio-educacional-v118';
+ * + Aula. O v119 atualiza o mapa de assuntos lado a lado. */
+var CACHE = 'apoio-educacional-v119';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
