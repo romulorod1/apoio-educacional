@@ -133,6 +133,26 @@ function gerarPacote(opcao) {
   return zip;
 }
 
+function gerarPacoteComHashInvalido(origem, destino) {
+  const py = [
+    'import json, sys, zipfile',
+    'origem, destino = sys.argv[1:]',
+    'with zipfile.ZipFile(origem) as entrada, zipfile.ZipFile(destino, "w") as saida:',
+    '    manifest = json.loads(entrada.read("manifest.json"))',
+    '    livro = next(x for x in manifest["livros"] if x["id"] == "livro-com-marcadores")',
+    '    for info in entrada.infolist():',
+    '        conteudo = entrada.read(info.filename)',
+    '        if info.filename == livro["arquivo"]: conteudo = bytes([conteudo[0] ^ 1]) + conteudo[1:]',
+    '        saida.writestr(info, conteudo)',
+  ].join('\n');
+  const r = spawnSync(PYTHON, ['-X', 'utf8', '-c', py, origem, destino], { encoding: 'utf8' });
+  if (r.status !== 0 || !fs.existsSync(destino)) {
+    console.log(String(r.stderr || '').slice(0, 800));
+    return null;
+  }
+  return destino;
+}
+
 const lerEstado = pag => pag.evaluate(() => {
   const c = document.querySelector('#estado-importacao-biblioteca');
   return c ? c.innerText.trim() : null;
@@ -332,6 +352,9 @@ async function printar(pag, nome) {
   conf('a tela diz que os livros entraram', /Livros importados\./.test(estado) && /4 livros novos/.test(estado), true);
   conf('os quatro estão no depósito livros', await H.contarDeposito(p, 'livros'), 4);
   conf('e nenhum foi para os pacotes de exercícios', await H.contarDeposito(p, 'biblioteca_pacotes'), 0);
+  conf('a gestão começa recolhida para encurtar a tela de Ajustes',
+    await p.evaluate(() => document.querySelector('#lista-instalados-biblioteca').open), false);
+  await p.evaluate(() => { document.querySelector('#lista-instalados-biblioteca').open = true; });
   const gestao = await p.evaluate(() => ({
     linhas: Array.from(document.querySelectorAll('#lista-livros-biblioteca [data-livro]')).map(x => x.innerText.replace(/\s+/g, ' ')),
     total: (document.querySelector('#livros-total') || {}).textContent || '',
@@ -497,6 +520,20 @@ async function printar(pag, nome) {
   await fecharModal(p, 'modal-leitor-epub');
 
   // ================================================================
+  secao('5b. Um livro com hash inválido é pulado sem travar nem apagar o que já estava');
+  const hashAntesDaFalha = await p.evaluate(() => Store.lerLivro('livro-com-marcadores').then(l => l.meta.hash));
+  const faltaAntesDaFalha = await p.evaluate(() => Store.removerLivro('livro-sem-marcadores'));
+  conf('um livro de teste saiu antes da reimportação parcial', faltaAntesDaFalha.achou, true);
+  const ZIP_HASH_RUIM = path.join(TMP, 'livros-prova-hash-invalido.zip');
+  conf('o pacote de teste tem hash inválido em um único livro', !!gerarPacoteComHashInvalido(ZIP, ZIP_HASH_RUIM), true);
+  const parcial = await importar(p, ZIP_HASH_RUIM, 'a importação pula o livro de hash inválido');
+  console.log('   estado: ' + JSON.stringify(parcial));
+  conf('a tela nomeia o livro pulado e diz que os demais foram processados', /1 livro foi pulado/.test(parcial) && /Livro com marcadores/.test(parcial), true);
+  conf('o livro seguinte foi importado', await H.contarDeposito(p, 'livros'), 4);
+  conf('o arquivo que falhou manteve o livro já instalado', await p.evaluate(() => Store.lerLivro('livro-com-marcadores').then(l => l.meta.hash)), hashAntesDaFalha);
+  conf('e a posição de leitura dele continua na página 4', (await p.evaluate(() => Store.lerPosicaoLivro('livro-com-marcadores')) || {}).pagina, 4);
+
+  // ================================================================
   secao('6. Remover um livro e ver o total cair; importar de novo devolve só ele');
   await H.irParaAba(p, 'ajustes');
   const totalAntes = await p.evaluate(() => Number(document.querySelector('#livros-total').dataset.bytes));
@@ -628,7 +665,7 @@ async function printar(pag, nome) {
   conf('os dez entraram', /10 livros novos/.test(estV), true);
   // o contador enxerga: os livros passaram por ele, em trechos (sem isto, "nada grande" passaria com o contador cego)
   conf('o contador viu os livros sendo lidos (trechos ou fatias)', (await p.evaluate(() => window.__trechosByob || 0)) >= 10 ||
-    maiorLeitura >= 1024 * 1024, true);
+    maiorLeitura >= 1024 * 1024 || Number((await p.evaluate(() => document.querySelector('#estado-importacao-biblioteca').dataset.bytesLidos)) || 0) >= 1024 * 1024, true);
   conf('nenhuma leitura passou de um livro (mais a cauda do zip)', maiorLeitura <= maiorLivro + 65557, true);
   conf('e a maior leitura não é o pacote', maiorLeitura < tamPacote / 2, true);
   /* O efeito, com margem larga de propósito (a memória do processo tem

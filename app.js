@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.38';
+  var VERSAO = '1.42.39';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -87,6 +87,12 @@
         'Nova tela na Biblioteca para comparar um assunto entre os livros: uma tabela mostra, para cada livro do tablet, em que capítulo e páginas o assunto aparece, indica onde não há vínculo no mapa e avisa quando o mapa ainda não foi revisado.',
         'Quando um assunto não aparece no mapa, a Biblioteca mostra “sem vínculo no mapa”; isso não significa que o livro não aborda o assunto, pois o mapa pode estar incompleto. As contagens se referem aos vínculos registrados.',
         'Você chega a ela pela aba Biblioteca (Comparar livros por assunto, com uma busca de assunto que atravessa os anos), pelo painel do capítulo de um livro e pela aula (Ver em todos os livros).'
+      ]
+    },
+    {
+      versao: '1.42.39',
+      itens: [
+        'Em Ajustes, a lista de pacotes e livros da Biblioteca fica recolhida; os controles de importação continuam no alto. Na importação, cada livro tem andamento próprio e um arquivo que falha ou demora demais é pulado com aviso, enquanto os seguintes continuam.'
       ]
     },
     {
@@ -15733,8 +15739,14 @@
       return puloAntesDeLer(espiado && espiado.manifest).then(function (pulo) {
         if (pulo) { var pulou = new Error('pulou'); pulou.puloAntesDeLer = pulo; throw pulou; }
         if (espiado && espiado.manifest.conteudo === 'livros') {
-          return Biblioteca.abrirLivrosDoArquivo(espiado, function (feitos, total) {
-            andamento(['Conferindo o pacote ' + arquivo.name + '...', feitos + ' de ' + total + ' livros conferidos.']);
+          return Biblioteca.abrirLivrosDoArquivo(espiado, function (feitos, total, meta, ok, erro, bytes, tamanho) {
+            var estado = $('#estado-importacao-biblioteca');
+            if (estado && bytes != null) estado.setAttribute('data-bytes-lidos', String(bytes));
+            var detalhe = ok === false ? 'Este livro será pulado: ' + (erro && erro.mensagem || 'falha na conferência.')
+              : ok === true ? 'Arquivo conferido.'
+              : 'Conferindo ' + Biblioteca.mb(bytes) + ' de ' + Biblioteca.mb(tamanho) + '.';
+            andamento(['Conferindo o pacote ' + arquivo.name + '...',
+              'Livro ' + feitos + ' de ' + total + ': ' + (meta && meta.titulo || 'Livro'), detalhe]);
           });
         }
         return arquivo.arrayBuffer().then(function (conteudo) {
@@ -15889,7 +15901,8 @@
         if (caixa) caixa.setAttribute('data-progresso', n + '/' + total);
       }).then(function (r) {
         resultados.push({ nome: ctx.nome, arquivo: arquivo.name, estado: r.estado, motivo: r.motivo,
-          versaoAtual: r.versaoAtual, versaoNova: r.versaoNova, porque: r.porque || null, exercicios: !!r.exercicios });
+          versaoAtual: r.versaoAtual, versaoNova: r.versaoNova, porque: r.porque || null,
+          errosLivros: r.errosLivros || null, exercicios: !!r.exercicios });
         // quem abrir a aba Biblioteca no meio da série já vê o que entrou
         if (r.exercicios && r.estado === 'entrou') { temPacoteBiblioteca = true; desenharPacotesBiblioteca(); }
         return pausaCurta().then(proximo);
@@ -15928,6 +15941,11 @@
       } else if (r.estado === 'falhou' && r.porque) {
         motivo = r.porque.texto;
         detalhe = r.porque.detalhe;
+      }
+      if (r.errosLivros && r.errosLivros.length) {
+        var pulados = r.errosLivros.map(function (e) { return e.titulo + ': ' + e.mensagem; }).join(' · ');
+        motivo = (motivo ? motivo + ' ' : '') + r.errosLivros.length +
+          (r.errosLivros.length === 1 ? ' livro pulado: ' : ' livros pulados: ') + pulados;
       }
       return el('li', { class: 'resumo-importacao-linha', 'data-estado': r.estado, 'data-arquivo': r.arquivo }, [
         el('span', { class: 'resumo-importacao-sinal', role: 'img', 'aria-label': sinal[r.estado][1], texto: sinal[r.estado][0] }),
@@ -15992,11 +16010,22 @@
     });
   }
 
+  function atualizarResumoInstaladosBiblioteca() {
+    var resumo = $('#resumo-instalados-biblioteca');
+    if (!resumo) return;
+    Promise.all([Store.listarPacotesBiblioteca(), Store.listarLivros()]).then(function (r) {
+      var pacotes = r[0].length, livros = r[1].length;
+      resumo.textContent = (pacotes ? pacotes + (pacotes === 1 ? ' pacote' : ' pacotes') : 'Nenhum pacote') +
+        ' · ' + livros + (livros === 1 ? ' livro' : ' livros') + ' neste tablet';
+    }).catch(function () { resumo.textContent = 'Conteúdo instalado neste tablet'; });
+  }
+
   function desenharPacotesBiblioteca() {
     var caixa = $('#lista-pacotes-biblioteca');
     if (!caixa) return;
     var exportar = $('#exportar-etiquetas');
     Store.listarPacotesBiblioteca().then(function (lista) {
+      atualizarResumoInstaladosBiblioteca();
       caixa.innerHTML = '';
       // o botão das etiquetas só aparece com pacote: sem ele, Ajustes fica igual ao de antes
       if (exportar) exportar.hidden = !lista.length;
@@ -16134,6 +16163,13 @@
   }
 
   function importarLivros(aberto, andamento) {
+    if (!aberto.livros.length) {
+      var somenteErros = ['Nenhum livro pôde ser importado. Os livros que já estavam no tablet foram mantidos.'];
+      aberto.erros.forEach(function (e) { somenteErros.push(e.titulo + ': ' + e.mensagem); });
+      return Promise.resolve().then(desenharLivrosAjustes).catch(function () { /* tenta novamente ao abrir Ajustes */ }).then(function () {
+        return { estado: 'falhou', classe: 'faixa-aviso', linhas: somenteErros, errosLivros: aberto.erros };
+      });
+    }
     return Store.estimarEspaco().then(function (espaco) {
       // os livros vão como estão: a folga de 10% cobre o registro de cada um
       if (espaco && espaco.quota) {
@@ -16150,19 +16186,27 @@
       return Store.tornarPersistente();
     }).then(function () {
       andamento(['Gravando os livros no tablet...']);
-      return Store.gravarLivros(aberto);
+      return Store.gravarLivros(aberto, aberto.idsDoPacote);
     }).then(function (contas) {
       var linhas = ['Livros importados.'].concat(Biblioteca.resumoDeLivros(contas),
         ['Para ler, abra a aba Biblioteca e toque no livro.']);
+      if (aberto.erros.length) {
+        linhas.push(aberto.erros.length + (aberto.erros.length === 1
+          ? ' livro foi pulado; os demais foram processados:'
+          : ' livros foram pulados; os demais foram processados:'));
+        aberto.erros.forEach(function (e) { linhas.push(e.titulo + ': ' + e.mensagem); });
+      }
       // livro que SAIU do pacote novo também é gravação (some do tablet com a posição de leitura)
       var entrou = contas.novos + contas.atualizados + contas.removidos > 0;
       var deOutro = contas.deOutroPacote && contas.deOutroPacote.length > 0;
       /* O redesenho da lista é só tela: se ele falhar com os livros já gravados,
        * o resultado continua sendo o da gravação (nunca "não entrou"). */
       return Promise.resolve().then(desenharLivrosAjustes).catch(function () { /* a lista se refaz na próxima abertura */ }).then(function () {
+        atualizarResumoInstaladosBiblioteca();
         return {
           estado: entrou ? 'entrou' : 'pulou', classe: 'faixa-info', linhas: linhas,
-          motivo: entrou ? null : contas.maisNovos ? 'livros-mais-novos' : deOutro ? 'outro-pacote' : 'ja-estava'
+          motivo: entrou ? null : contas.maisNovos ? 'livros-mais-novos' : deOutro ? 'outro-pacote' : 'ja-estava',
+          errosLivros: aberto.erros
         };
       });
     });
@@ -16183,6 +16227,7 @@
     var caixa = $('#lista-livros-biblioteca');
     return Store.listarLivros().then(function (lista) {
       quantosLivros = lista.length;
+      atualizarResumoInstaladosBiblioteca();
       livrosDoTablet = lista.map(function (l) { return { id: l.id, meta: l.meta }; });
       livrosDoTabletMudaram();
       /* B12: o índice de texto acompanha a lista (livro novo entra na fila,
