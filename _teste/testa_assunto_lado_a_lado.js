@@ -4,8 +4,9 @@
  * o ano dele, uma tabela com os assuntos irmãos (o tema do índice) nas
  * linhas, os livros do tablet daquela matéria e daquele ano nas colunas, e em
  * cada célula o capítulo e as páginas do arquivo; onde o mapa não liga, a
- * célula diz "não trata" (mapa revisado) ou "sem mapa" (mapa ainda não
- * revisado). No Chrome de verdade, com três livros SINTÉTICOS do 6º ano de
+ * célula diz "sem vínculo no mapa" (mapa revisado) ou "sem mapa" (mapa ainda
+ * não revisado). Nunca conclui que o livro não aborda o assunto. No Chrome de
+ * verdade, com três livros SINTÉTICOS do 6º ano de
  * Matemática gerados aqui (PDFs de texto, sem conteúdo de terceiro) e mapas
  * diferentes:
  *   livro-a  o mapa da orquestradora (revisado): Frações (MAT06-05) nos
@@ -22,17 +23,16 @@
  * O que prova:
  *   1. a tabela: as linhas (os 8 assuntos de Números do 6º ano) e as
  *      colunas (os três livros); a célula de Frações no livro-a tem os dois
- *      capítulos com as páginas do arquivo; "não trata" no livro-b e "sem
- *      mapa" no livro-c (frases diferentes); a falha salta na coluna de
- *      ícone da linha;
+ *      capítulos com as páginas do arquivo; "sem vínculo no mapa" no livro-b
+ *      e "sem mapa" nos livros-c e -d;
  *   2. tocar na célula abre o leitor na página do arquivo do capítulo;
- *   3. o "N livros" do painel do capítulo e o "Comparar livros por assunto"
+ *   3. os livros com vínculo no painel do capítulo e o "Comparar livros por assunto"
  *      da aba chegam à MESMA tabela;
  *   4. a busca de assunto atravessa os anos e mostra o ano e a quantidade de
  *      livros de cada um; o assunto de um ano sem livro diz que não há livro;
  *   5. a correção dela no mapa (db.ajustes.mapaDosLivros) aparece na tabela:
- *      o livro-c confirmado e corrigido passa a revisado ("não trata" onde
- *      era "sem mapa", e o capítulo onde ela ligou Frações);
+ *      o livro-c confirmado e corrigido passa a revisado ("sem vínculo no
+ *      mapa" onde era "sem mapa", e o capítulo onde ela ligou Frações);
  *   6. a aula: "Abrir no livro" oferece "Ver em todos os livros", e a linha
  *      do assunto da aula volta ao "Abrir no livro";
  *   7. tablet 1280x800 e 800 px (em pé), a 100% e a 130%: nada transborda,
@@ -41,7 +41,7 @@
  *      nenhum erro de página.
  *
  * Venenos (cada um TEM de ser visto: "VENENO visto"):
- *   --envenenado-nao-trata-vira-sem-mapa  troca as duas ausências;
+ *   --envenenado-nao-trata-vira-sem-mapa  troca sem vínculo por sem mapa;
  *   --envenenado-mapa-vazio-nao-trata     o livro de mapa vazio conta como
  *                                         revisado ([].every dá true);
  *   --envenenado-parcial-nao-trata        basta um capítulo confirmado para o
@@ -63,11 +63,11 @@ const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
 
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
-const ANCORA = "return { tipo: revisado ? 'nao-trata' : 'sem-mapa' };";
+const ANCORA = "return { tipo: revisado ? 'sem-vinculo' : 'sem-mapa' };";
 const ANCORA_VAZIO = 'return mapa.length > 0 && mapa.every(';
 const ANCORA_PARCIAL = "mapa.every(function (e) { return e.estado !== 'a_confirmar'; })";
 const trocas = {};
-if (VENENO) trocas['/app.js'] = APP.split(ANCORA).join("return { tipo: revisado ? 'sem-mapa' : 'nao-trata' };");
+if (VENENO) trocas['/app.js'] = APP.split(ANCORA).join("return { tipo: revisado ? 'sem-mapa' : 'sem-vinculo' };");
 if (MODO === '--envenenado-mapa-vazio-nao-trata') trocas['/app.js'] = APP.split(ANCORA_VAZIO).join('return mapa.every(');
 if (MODO === '--envenenado-parcial-nao-trata') trocas['/app.js'] = APP.split(ANCORA_PARCIAL).join("mapa.some(function (e) { return e.estado !== 'a_confirmar'; })");
 async function venenoVisto(rotulo, visto, detalhe) {
@@ -215,7 +215,7 @@ const medir = pag => pag.evaluate(() => {
   const grade = caixa.querySelector('.lado-grade');
   const gr = grade ? grade.getBoundingClientRect() : null;
   const nome = e => (e.id || e.dataset.livro || e.dataset.assunto || e.dataset.ano || e.className.baseVal || e.className || e.tagName) + '';
-  caixa.querySelectorAll('button, .bibl-forte, .bibl-apoio, .lado-assunto, .lado-nao, .lado-sem, .lado-pg-cap, .lado-pg-p, .tag, h2, input').forEach(e => {
+  caixa.querySelectorAll('button, .bibl-forte, .bibl-apoio, .lado-assunto, .lado-sem-vinculo, .lado-sem, .lado-pg-cap, .lado-pg-p, .tag, h2, input').forEach(e => {
     const r = e.getBoundingClientRect();
     if (!r.width && !r.height) return;
     const dentro = grade && grade.contains(e) ? gr : cr;
@@ -269,9 +269,9 @@ const medir = pag => pag.evaluate(() => {
   secao('1. A tabela pelo "Comparar livros por assunto" da aba');
   await abrirBibliotecaNoAno(pag, 'matematica', '06');
   const chips = await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-comparar .bibl-comparar-chip')).map(b => (b.dataset.comparar || b.id) + '=' + b.innerText.replace(/\s+/g, ' ').trim()).join(' ; '));
-  conf('a aba oferece os assuntos do ano que mais livros tratam, com a quantidade, e "Todos os N assuntos"', chips,
-    'MAT06-01=Sistema de numeração decimal 2 livros ; MAT06-06=Operações com frações 2 livros ; MAT06-07=Números decimais e suas operações 2 livros ; ' +
-    'MAT06-05=Frações: o que são e como comparar 1 livro ; bib-comparar-todos=Todos os 14 assuntos');
+  conf('a aba oferece assuntos com mais vínculos registrados e "Todos os N assuntos"', chips,
+    'MAT06-01=Sistema de numeração decimal 2 livros com vínculo no mapa ; MAT06-06=Operações com frações 2 livros com vínculo no mapa ; MAT06-07=Números decimais e suas operações 2 livros com vínculo no mapa ; ' +
+    'MAT06-05=Frações: o que são e como comparar 1 livro com vínculo no mapa ; bib-comparar-todos=Todos os 14 assuntos');
   conf('o título da seção diz o ano', await pag.evaluate(() => document.querySelector('#bib-comparar .bibl-rotulo').textContent), 'Comparar livros por assunto, 6º ano');
   await clicar(pag, '#bib-comparar [data-comparar="MAT06-05"]');
   let lado = (await esperar('a tabela de Frações', () => lerLado(pag), v => v.visivel && v.modo === 'tabela' && !!v.colunas, 10000)).valor;
@@ -279,14 +279,14 @@ const medir = pag => pag.evaluate(() => {
   conf('o título é o tema e o ano', lado.titulo, 'Números, 6º ano');
   if (MODO === '--envenenado-mapa-vazio-nao-trata') {
     const fr = lado.celulas.split(' ; ').filter(x => x.indexOf('MAT06-05:') === 0).join('');
-    return venenoVisto('o livro de mapa vazio diz "não trata"', /livro-d=não trata/.test(fr), fr);
+    return venenoVisto('o livro de mapa vazio diz "sem vínculo no mapa"', /livro-d=sem vínculo no mapa/.test(fr), fr);
   }
-  conf('o resumo diz quantos livros e quantos ainda sem mapa revisado', lado.resumo, '4 livros do 6º ano; 2 com o mapa ainda não revisado');
+  conf('o resumo separa sugestões pendentes e livros sem mapa', lado.resumo, '4 livros do 6º ano; 1 com sugestão a confirmar; 1 sem mapa de assuntos');
   conf('as colunas são os quatro livros do 6º ano', lado.colunas, 'livro-a,livro-b,livro-c,livro-d');
   conf('as linhas são os 8 assuntos de Números do 6º ano', lado.linhas, 'MAT06-01,MAT06-02,MAT06-03,MAT06-04,MAT06-05,MAT06-06,MAT06-07,MAT06-08');
   conf('a linha de Frações vem marcada', lado.marcada, 'MAT06-05');
-  conf('a cabeça de cada livro diz quantos assuntos ele trata, e o livro não revisado diz isso',
-    lado.cabecas, 'livro-a=4 de 8 assuntos ; livro-b=2 de 8 assuntos ; livro-c=1 de 8 assuntos|mapa a confirmar ; livro-d=0 de 8 assuntos|sem mapa de assuntos');
+  conf('a cabeça de cada livro conta vínculos do mapa, sugestões pendentes e mapa ausente',
+    lado.cabecas, 'livro-a=4 de 8 com vínculo no mapa ; livro-b=2 de 8 com vínculo no mapa ; livro-c=1 de 8 com vínculo no mapa|mapa a confirmar ; livro-d=0 de 8 com vínculo no mapa|sem mapa de assuntos');
   conf('a linha escolhida diz isso sem depender da cor', await pag.evaluate(() => {
     const l = document.querySelector('#lado-a-lado .lado-linha.escolhido');
     return l.getAttribute('aria-current') + '|' + l.querySelector('.lado-escolhido').textContent;
@@ -295,24 +295,24 @@ const medir = pag => pag.evaluate(() => {
   conf('Frações no livro-a: os dois capítulos, com as páginas do arquivo', celulas['MAT06-05'].split('|')[0],
     'livro-a=Cap. 2, Frações p. 3 a 4 Cap. 3, Comparar e operar frações p. 5 a 6');
   const ausencias = celulas['MAT06-05'].split('|').slice(1).join('|');
-  if (VENENO) return venenoVisto('a tabela trocou "não trata" e "sem mapa"', ausencias.indexOf('livro-b=não trata') < 0, ausencias);
-  conf('"não trata" no livro-b (mapa revisado), "sem mapa" no livro-c (passe automático) e no livro-d (mapa vazio)', ausencias,
-    'livro-b=não trata|livro-c=sem mapa|livro-d=sem mapa');
-  conf('as duas frases têm cores diferentes (âmbar para "não trata")', await pag.evaluate(() => {
-    const n = document.querySelector('.lado-celula[data-tipo="nao-trata"] .lado-nao');
+  if (VENENO) return venenoVisto('a tabela trocou "sem vínculo no mapa" e "sem mapa"', ausencias.indexOf('livro-b=sem vínculo no mapa') < 0, ausencias);
+  conf('"sem vínculo no mapa" no livro-b e "sem mapa" nos livros-c e -d', ausencias,
+    'livro-b=sem vínculo no mapa|livro-c=sem mapa|livro-d=sem mapa');
+  conf('a ausência no mapa não usa a cor de alerta', await pag.evaluate(() => {
+    const n = document.querySelector('.lado-celula[data-tipo="sem-vinculo"] .lado-sem-vinculo');
     const s = document.querySelector('.lado-celula[data-tipo="sem-mapa"] .lado-sem');
     const ambar = getComputedStyle(document.documentElement).getPropertyValue('--aviso-texto').trim();
     const rgb = h => { const x = parseInt(h.slice(1), 16); return 'rgb(' + (x >> 16) + ', ' + ((x >> 8) & 255) + ', ' + (x & 255) + ')'; };
-    return getComputedStyle(n).color === rgb(ambar) && getComputedStyle(s).color !== getComputedStyle(n).color;
+    return getComputedStyle(n).color !== rgb(ambar) && getComputedStyle(s).color !== getComputedStyle(n).color;
   }), true);
-  conf('decimais: livro-a e livro-c tratam, livro-b não', celulas['MAT06-07'], 'livro-a=Cap. 4, Decimais p. 7 a 8|livro-b=não trata|livro-c=Cap. 1, Decimais p. 1 a 2|livro-d=sem mapa');
-  conf('a legenda diz as duas frases, no mesmo corpo de 14 px, com o ícone de alerta', await pag.evaluate(() => {
+  conf('decimais: livro-a e livro-c têm vínculo, livro-b não tem vínculo no mapa', celulas['MAT06-07'], 'livro-a=Cap. 4, Decimais p. 7 a 8|livro-b=sem vínculo no mapa|livro-c=Cap. 1, Decimais p. 1 a 2|livro-d=sem mapa');
+  conf('a legenda explica a diferença entre vínculo ausente e mapa não revisado', await pag.evaluate(() => {
     const g = document.querySelector('#lado-legenda');
     const f = Array.from(g.querySelectorAll('strong')).map(x => getComputedStyle(x).fontSize + '/' + getComputedStyle(x).fontWeight);
     return g.innerText.replace(/\s+/g, ' ').trim() + '|' + (new Set(f)).size + '|' + Math.round(parseFloat(getComputedStyle(g).fontSize)) + '|' + !!g.querySelector('[data-icone-nome="alerta"]');
-  }), 'não trata: o mapa revisado não liga sem mapa: o mapa do livro ainda não foi revisado|1|14|true');
-  conf('a falha salta na coluna de ícone da linha (alerta onde algum livro não trata)', lado.sinais,
-    'MAT06-01=-,MAT06-02=alerta,MAT06-03=alerta,MAT06-04=alerta,MAT06-05=alerta,MAT06-06=-,MAT06-07=alerta,MAT06-08=alerta');
+  }), 'sem vínculo no mapa: o mapa revisado não liga este assunto sem mapa: o livro não tem mapa ou há sugestões pendentes|1|14|false');
+  conf('só há sinal positivo quando todos os mapas têm vínculo', lado.sinais,
+    'MAT06-01=-,MAT06-02=-,MAT06-03=-,MAT06-04=-,MAT06-05=-,MAT06-06=-,MAT06-07=-,MAT06-08=-');
   conf('o pé abre cada livro no primeiro capítulo ligado', lado.rodape, 'livro-a=Abrir na p. 1,livro-b=Abrir na p. 1,livro-c=Abrir na p. 1');
   conf('o botão do pé diz o livro para quem ouve', await pag.evaluate(() => document.querySelector('#lado-a-lado .lado-abrir[data-livro="livro-b"]').getAttribute('aria-label')),
     'Abrir na p. 1, Matemática B');
@@ -360,9 +360,9 @@ const medir = pag => pag.evaluate(() => {
   const painel = (await esperar('o "N livros" do assunto ligado', () => pag.evaluate(() =>
     Array.from(document.querySelectorAll('#bib-livro .bibl-assunto')).map(a => a.dataset.assunto + '=' + a.textContent.replace(/\s+/g, ' ').trim()).join(' ; ')),
   v => /livros|neste/.test(v || ''), 10000)).valor;
-  // o leitor parou na página 5: o painel é o do capítulo 3, com Frações (só neste) e Operações com frações (2 livros)
-  conf('o painel do capítulo mostra cada assunto ligado com quantos livros o tratam', painel,
-    'MAT06-05=Frações: o que são e como compararsó neste ; MAT06-06=Operações com frações2 livros');
+  // o leitor parou na página 5: o painel é o do capítulo 3 e mostra quantos mapas têm cada vínculo
+  conf('o painel do capítulo diz quantos livros têm vínculo registrado nos mapas', painel,
+    'MAT06-05=Frações: o que são e como comparar1 livro com vínculo no mapa ; MAT06-06=Operações com frações2 livros com vínculo no mapa');
   await clicar(pag, '#bib-livro [data-comparar="MAT06-06"]');
   lado = (await esperar('a tabela pelo painel', () => lerLado(pag), v => v.visivel && v.escolhido === 'MAT06-06', 10000)).valor;
   const peloPainel = lado.titulo + '|' + lado.marcada + '|' + lado.colunas + '|' + lado.celulas;
@@ -390,15 +390,15 @@ const medir = pag => pag.evaluate(() => {
   await pag.keyboard.type('fraç');
   esc = (await esperar('o resultado de "fraç"', lerEscolha, v => /todos os anos/.test(v.conta) && v.itens.length > 2, 5000)).valor;
   console.log('   ' + esc.itens.join(' ; '));
-  conf('"fraç" acha assuntos de vários anos, cada um com o ano e quantos livros o tratam', esc.itens.filter(x => /^MAT0[456]-/.test(x)).join(' ; '),
-    'MAT04-05|4º ano|nenhum livro ; MAT05-03|5º ano|1 livro ; MAT05-04|5º ano|nenhum livro ; MAT06-05|6º ano|1 livro ; MAT06-06|6º ano|2 livros');
+  conf('"fraç" acha assuntos de vários anos e quantos livros têm vínculo no mapa', esc.itens.filter(x => /^MAT0[456]-/.test(x)).join(' ; '),
+    'MAT04-05|4º ano|nenhum vínculo nos mapas ; MAT05-03|5º ano|1 livro com vínculo no mapa ; MAT05-04|5º ano|nenhum vínculo nos mapas ; MAT06-05|6º ano|1 livro com vínculo no mapa ; MAT06-06|6º ano|2 livros com vínculo no mapa');
   conf('os anos da lista são vários', new Set(esc.itens.map(x => x.split('|')[1])).size >= 3, true);
   await clicar(pag, '#lado-escolha-lista [data-comparar="MAT05-03"]');
   lado = (await esperar('a tabela do 5º ano', () => lerLado(pag), v => v.visivel && v.modo === 'tabela' && v.escolhido === 'MAT05-03', 5000)).valor;
   conf('o livro do 6º com capítulo ligado ao assunto do 5º (série vizinha) entra na tabela do 5º, e a contagem fecha (1 livro, 1 coluna)',
     lado.colunas + '|' + lado.celulas.split(' ; ').filter(x => x.indexOf('MAT05-03:') === 0).join(''), 'livro-b|MAT05-03:livro-b=Cap. 3, Revisão do 5º ano p. 5 a 6');
   conf('a cabeça diz que o livro é de outro ano, e o resumo também', await pag.evaluate(() => (document.querySelector('#lado-a-lado [data-vizinho]') || {}).textContent) + '|' + lado.resumo,
-    'de outro ano|1 livro; 1 de outro ano, com capítulo ligado; com o mapa revisado');
+    'de outro ano|1 livro; 1 de outro ano, com capítulo ligado; vínculos registrados revisados');
   await clicar(pag, '#lado-voltar');
   await esperar('a busca de volta', lerEscolha, v => /todos os anos/.test(v.conta), 5000);
   await clicar(pag, '#lado-escolha-lista [data-comparar="MAT04-05"]');
@@ -439,24 +439,24 @@ const medir = pag => pag.evaluate(() => {
   // (b) parcial: o capítulo 1 confirmado e o 2 ainda do passe automático
   let k = await corrigirELer({ 1: CAP1 }, 'a tabela com o livro-c parcial', x => !!x.celulas);
   if (MODO === '--envenenado-parcial-nao-trata') {
-    return venenoVisto('o livro parcialmente confirmado diz "não trata"', k.cel['MAT06-05'].split('|')[2] === 'livro-c=não trata', k.cel['MAT06-05']);
+    return venenoVisto('o mapa parcialmente confirmado parece revisado', k.cel['MAT06-05'].split('|')[2] === 'livro-c=sem vínculo no mapa', k.cel['MAT06-05']);
   }
   conf('parcial (um capítulo confirmado, outro a confirmar): as ausências do livro-c continuam "sem mapa"',
     k.cel['MAT06-05'].split('|')[2] + ' ; ' + k.cel['MAT06-06'].split('|')[2], 'livro-c=sem mapa ; livro-c=sem mapa');
-  conf('e a cabeça dele continua "mapa a confirmar"', k.v.cabecas.split(' ; ')[2], 'livro-c=1 de 8 assuntos|mapa a confirmar');
+  conf('e a cabeça dele continua "mapa a confirmar"', k.v.cabecas.split(' ; ')[2], 'livro-c=1 de 8 com vínculo no mapa|mapa a confirmar');
   // (c) a correção para "nenhum assunto" é ausência confirmada
   k = await corrigirELer({ 1: CAP1, 2: { titulo: 'Capítulo 2: Partes do inteiro', assuntos: [], acao: 'corrigiu', quando: '2026-11-11T09:01:00.000Z' } },
-    'a tabela com o capítulo 2 sem assunto', x => /livro-c=não trata/.test(x.celulas));
-  conf('"nenhum assunto" no capítulo 2: o livro-c passa a revisado, e as ausências viram "não trata"',
-    k.cel['MAT06-05'].split('|')[2] + ' ; ' + k.cel['MAT06-07'].split('|')[2], 'livro-c=não trata ; livro-c=Cap. 1, Decimais p. 1 a 2');
+    'a tabela com o capítulo 2 sem assunto', x => /livro-c=sem vínculo no mapa/.test(x.celulas));
+  conf('"nenhum assunto" no capítulo 2: o livro-c fica sem vínculo nesses assuntos',
+    k.cel['MAT06-05'].split('|')[2] + ' ; ' + k.cel['MAT06-07'].split('|')[2], 'livro-c=sem vínculo no mapa ; livro-c=Cap. 1, Decimais p. 1 a 2');
   // a correção para um assunto
   k = await corrigirELer({ 1: CAP1, 2: { titulo: 'Capítulo 2: Partes do inteiro', assuntos: ['MAT06-05'], acao: 'corrigiu', quando: '2026-11-11T09:02:00.000Z' } },
     'a tabela com a correção', x => /livro-c=Cap\. 2/.test(x.celulas));
   lado = k.v;
   const c2 = k.cel;
   conf('Frações: o capítulo que ela ligou no livro-c', c2['MAT06-05'].split('|')[2], 'livro-c=Cap. 2, Partes do inteiro p. 3 a 4');
-  conf('o livro-c, todo confirmado, vira revisado: "não trata" onde era "sem mapa"', c2['MAT06-06'], 'livro-a=Cap. 3, Comparar e operar frações p. 5 a 6|livro-b=Cap. 2, Operações com frações p. 3 a 4|livro-c=não trata|livro-d=sem mapa');
-  conf('e a cabeça dele perde o "mapa a confirmar"', lado.cabecas.split(' ; ')[2], 'livro-c=2 de 8 assuntos');
+  conf('o livro-c, todo confirmado, mostra ausência de vínculo sem afirmar ausência do assunto', c2['MAT06-06'], 'livro-a=Cap. 3, Comparar e operar frações p. 5 a 6|livro-b=Cap. 2, Operações com frações p. 3 a 4|livro-c=sem vínculo no mapa|livro-d=sem mapa');
+  conf('e a cabeça dele perde o "mapa a confirmar"', lado.cabecas.split(' ; ')[2], 'livro-c=2 de 8 com vínculo no mapa');
 
   // ================================================================
   secao('6. A aula: "Abrir no livro" e "Ver em todos os livros"');
@@ -475,14 +475,14 @@ const medir = pag => pag.evaluate(() => {
   conf('o "Abrir no livro" da linha volta à lista dos livros do assunto, com a aula aberta embaixo', await pag.evaluate(() =>
     document.querySelector('#modal-aula').classList.contains('aberto') && /Os livros do ano/.test(document.querySelector('#corpo-modal-livros').textContent)), true);
   await fecharModal(pag, 'modal-livros');
-  conf('o assunto da aula que nenhum livro trata ganha "Ver em todos os livros" no lugar do "Abrir no livro"', await pag.evaluate(() =>
+  conf('o assunto da aula sem vínculo em livro ganha "Ver em todos os livros" no lugar do "Abrir no livro"', await pag.evaluate(() =>
     !document.querySelector('#corpo-modal-aula [data-abrir-no-livro="MAT06-03"]') + '|' +
     ((document.querySelector('#corpo-modal-aula [data-ver-nos-livros="MAT06-03"]') || {}).textContent || '')), 'true|Ver em todos os livros');
   await clicar(pag, '#corpo-modal-aula [data-ver-nos-livros="MAT06-03"]');
   lado = (await esperar('a tabela do assunto sem livro', () => lerLado(pag), v => v.visivel && v.escolhido === 'MAT06-03', 10000)).valor;
-  conf('a tabela diz livro a livro que ninguém trata, sem "Abrir no livro" na linha',
+  conf('a tabela mostra ausência de vínculo no mapa, sem "Abrir no livro" na linha',
     lado.celulas.split(' ; ').filter(x => x.indexOf('MAT06-03:') === 0).join('') + '|' + lado.abrirNoLivro,
-    'MAT06-03:livro-a=não trata|livro-b=não trata|livro-c=não trata|livro-d=sem mapa|false');
+    'MAT06-03:livro-a=sem vínculo no mapa|livro-b=sem vínculo no mapa|livro-c=sem vínculo no mapa|livro-d=sem mapa|false');
   await pag.evaluate(() => history.back());
   const voltou = await esperar('o Voltar do sistema', () => pag.evaluate(() =>
     document.querySelector('#lado-a-lado').hidden + '|' + document.querySelector('#modal-aula').classList.contains('aberto')), v => v === 'true|true', 5000);
