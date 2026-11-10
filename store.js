@@ -2190,7 +2190,7 @@
    *   o mesmo id vindo de OUTRO pacote: fica o que está (deOutroPacote), para
    *     um pacote não tomar o livro do outro calado.
    * Devolve as contas, para a tela dizer o que aconteceu. */
-  function gravarLivros(aberto) {
+  function gravarLivros(aberto, preservarIds) {
     var m = aberto.manifest;
     var chave = m.pacote, versao = m.versao;
     var agora = new Date().toISOString();
@@ -2201,6 +2201,7 @@
         var contas = { novos: 0, atualizados: 0, iguais: 0, maisNovos: 0, removidos: 0, posicoesSoltas: 0,
           deOutroPacote: [], bytes: 0 };
         var noPacote = {};
+        (preservarIds || []).forEach(function (id) { noPacote[id] = true; });
         aberto.livros.forEach(function (l) {
           noPacote[l.meta.id] = true;
           var req = dep.get(l.meta.id);

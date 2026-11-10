@@ -143,10 +143,13 @@
  * v109 e o v110 trouxeram navegação e Biblioteca por disciplina e ano. O v111
  * atualiza esses assets após sincronizar a Biblioteca com a main atualizada.
  * O v118 traz a navegação dia a dia na linha do tempo do celular e o atalho
- * + Aula; o v119 atualiza a descrição de ausência de vínculo no mapa, o v120
- * inclui Vagos, o v121 organiza a janela de aula em duas colunas e o v122
- * adiciona o seletor de assunto na janela. */
-var CACHE = 'apoio-educacional-v122';
+ * + Aula; o v119 atualiza a descrição de ausência de vínculo no mapa. O v120
+ * recolhe a gestão da Biblioteca em Ajustes e isola a conferência de cada livro
+ * em Worker com prazo. O v121 inclui o atalho de pagamento pendente. O v122
+ * inclui Vagos, a disponibilidade semanal no celular. O v123 reorganiza a janela
+ * da aula em duas colunas no tablet. O v124 adiciona a escolha do assunto da aula.
+ */
+var CACHE = 'apoio-educacional-v124';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -162,6 +165,7 @@ var ARQUIVOS = [
    * nunca passa por aqui: ele vai para o IndexedDB ao ser importado. */
   './zip.js',
   './biblioteca.js',
+  './conferir-livro-worker.js',
   /* O índice de texto dos livros (B12): o mesmo arquivo é o script da página
    * e o Web Worker que lê os livros. Os livros e o índice nunca passam por
    * aqui: ficam no IndexedDB. */

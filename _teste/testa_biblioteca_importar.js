@@ -65,8 +65,13 @@ const lerEstado = pag => pag.evaluate(() => {
   return c ? c.innerText.trim() : null;
 });
 const lerLista = pag => pag.evaluate(() => {
+  const detalhes = document.querySelector('#lista-instalados-biblioteca');
+  const estavaAberta = detalhes && detalhes.open;
+  if (detalhes) detalhes.open = true;
   const c = document.querySelector('#lista-pacotes-biblioteca');
-  return c ? c.innerText.trim() : null;
+  const texto = c ? c.innerText.trim() : null;
+  if (detalhes) detalhes.open = estavaAberta;
+  return texto;
 });
 
 async function importar(pag, arquivo, rotulo) {

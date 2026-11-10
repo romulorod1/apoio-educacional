@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.41';
+  var VERSAO = '1.42.43';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -82,24 +82,35 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.41',
+      versao: '1.42.43',
       itens: [
         'A janela da aula deixa escolher o assunto trabalhado e inclui essa informação no fechamento do mês.'
       ]
     },
     {
-      versao: '1.42.40',
+      versao: '1.42.42',
       itens: [
         'No tablet, a janela da aula organiza os campos em duas colunas; os mesmos campos e ações continuam disponíveis.'
       ]
     },
     {
-      versao: '1.42.39',
+      versao: '1.42.41',
       itens: [
         'No celular, a aba Vagos mostra horários disponíveis e deixa preparar uma mensagem para as famílias; ao escolher um horário, o formulário de aula abre preenchido, sem gravar antes de salvar.'
       ]
     },
     {
+      versao: '1.42.40',
+      itens: [
+        'Em Pagamentos pendentes, cada aluno tem o atalho Marcar pago, que abre o registro daquele m\u00eas e aluno.'
+      ]
+    },
+    {
+      versao: '1.42.39',
+      itens: [
+        'Em Ajustes, a lista de pacotes e livros da Biblioteca fica recolhida; os controles de importação continuam no alto. Na importação, cada livro tem andamento próprio e um arquivo que falha ou demora demais é pulado com aviso, enquanto os seguintes continuam.'
+      ]
+    },    {
       versao: '1.42.38',
       itens: [
         'Nova tela na Biblioteca para comparar um assunto entre os livros: uma tabela mostra, para cada livro do tablet, em que capítulo e páginas o assunto aparece, indica onde não há vínculo no mapa e avisa quando o mapa ainda não foi revisado.',
@@ -118,6 +129,7 @@
       itens: [
         'A aba Biblioteca do tablet ficou organizada por disciplina e ano, com os livros de cada um e, no alto, o "Continuar lendo": o livro e o lugar onde você parou. Os exercícios e listas continuam logo abaixo.',
         'Cada livro tem agora uma tela própria, com o sumário: toque num capítulo para abrir o livro nele. O botão "Livros" e a janela da estante saíram: tudo isso passa pela aba Biblioteca.'
+
       ]
     },
     {
@@ -13057,6 +13069,10 @@
           el('div', { class: 'detalhe', texto: detalhe })
         ]),
         el('strong', { class: 'pendente-falta', texto: (p.aMenos ? 'faltam ' : '') + dinheiro(p.falta) }),
+        el('button', {
+          type: 'button', class: 'btn pequeno principal', texto: p.aMenos ? 'Atualizar pagamento' : 'Marcar pago',
+          aoClick: function () { abrirPagamentoDaPendencia(p); }
+        }),
         p.mes === mesAtual ? null : el('button', {
           type: 'button', class: 'btn pequeno', texto: 'Ver o mês',
           aoClick: function () { mesAtual = p.mes; desenharAgenda(); desenharFechamento(); }
@@ -13091,6 +13107,28 @@
       botao
     ]));
     caixa.appendChild(corpo);
+  }
+
+  /* Atalho da lista de pendências: vai ao mês, encontra a linha já calculada
+   * pelo fechamento e abre o formulário existente de pagamento. */
+  function abrirPagamentoDaPendencia(p) {
+    mesAtual = p.mes;
+    desenharAgenda();
+    desenharFechamento();
+    var focar = function () {
+      var lista = $('#lista-fechamento');
+      if (!lista) return;
+      var linhas = lista.querySelectorAll('.linha-pagamento');
+      var alvo = Array.prototype.filter.call(linhas, function (linha) {
+        return linha.getAttribute('data-aluno') === p.alunoId;
+      })[0];
+      if (!alvo) { avisar('Não encontrei esse pagamento no mês. A lista foi atualizada.'); return; }
+      alvo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var botao = alvo.querySelector('.btn-marcar-pago, .btn-alterar-pagamento');
+      if (botao) botao.click();
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focar);
+    else setTimeout(focar, 0);
   }
 
   /* O que ela deu e não cobrou no mês.
@@ -15809,8 +15847,14 @@
       return puloAntesDeLer(espiado && espiado.manifest).then(function (pulo) {
         if (pulo) { var pulou = new Error('pulou'); pulou.puloAntesDeLer = pulo; throw pulou; }
         if (espiado && espiado.manifest.conteudo === 'livros') {
-          return Biblioteca.abrirLivrosDoArquivo(espiado, function (feitos, total) {
-            andamento(['Conferindo o pacote ' + arquivo.name + '...', feitos + ' de ' + total + ' livros conferidos.']);
+          return Biblioteca.abrirLivrosDoArquivo(espiado, function (feitos, total, meta, ok, erro, bytes, tamanho) {
+            var estado = $('#estado-importacao-biblioteca');
+            if (estado && bytes != null) estado.setAttribute('data-bytes-lidos', String(bytes));
+            var detalhe = ok === false ? 'Este livro será pulado: ' + (erro && erro.mensagem || 'falha na conferência.')
+              : ok === true ? 'Arquivo conferido.'
+              : 'Conferindo ' + Biblioteca.mb(bytes) + ' de ' + Biblioteca.mb(tamanho) + '.';
+            andamento(['Conferindo o pacote ' + arquivo.name + '...',
+              'Livro ' + feitos + ' de ' + total + ': ' + (meta && meta.titulo || 'Livro'), detalhe]);
           });
         }
         return arquivo.arrayBuffer().then(function (conteudo) {
@@ -15965,7 +16009,8 @@
         if (caixa) caixa.setAttribute('data-progresso', n + '/' + total);
       }).then(function (r) {
         resultados.push({ nome: ctx.nome, arquivo: arquivo.name, estado: r.estado, motivo: r.motivo,
-          versaoAtual: r.versaoAtual, versaoNova: r.versaoNova, porque: r.porque || null, exercicios: !!r.exercicios });
+          versaoAtual: r.versaoAtual, versaoNova: r.versaoNova, porque: r.porque || null,
+          errosLivros: r.errosLivros || null, exercicios: !!r.exercicios });
         // quem abrir a aba Biblioteca no meio da série já vê o que entrou
         if (r.exercicios && r.estado === 'entrou') { temPacoteBiblioteca = true; desenharPacotesBiblioteca(); }
         return pausaCurta().then(proximo);
@@ -16004,6 +16049,11 @@
       } else if (r.estado === 'falhou' && r.porque) {
         motivo = r.porque.texto;
         detalhe = r.porque.detalhe;
+      }
+      if (r.errosLivros && r.errosLivros.length) {
+        var pulados = r.errosLivros.map(function (e) { return e.titulo + ': ' + e.mensagem; }).join(' · ');
+        motivo = (motivo ? motivo + ' ' : '') + r.errosLivros.length +
+          (r.errosLivros.length === 1 ? ' livro pulado: ' : ' livros pulados: ') + pulados;
       }
       return el('li', { class: 'resumo-importacao-linha', 'data-estado': r.estado, 'data-arquivo': r.arquivo }, [
         el('span', { class: 'resumo-importacao-sinal', role: 'img', 'aria-label': sinal[r.estado][1], texto: sinal[r.estado][0] }),
@@ -16068,11 +16118,23 @@
     });
   }
 
+  function atualizarResumoInstaladosBiblioteca() {
+    var resumo = $('#resumo-instalados-biblioteca');
+    if (!resumo) return;
+    Promise.all([Store.listarPacotesBiblioteca(), Store.listarLivros()]).then(function (r) {
+      var pacotes = r[0].length, livros = r[1].length;
+      var resumoPacotes = pacotes ? pacotes + (pacotes === 1 ? ' pacote de exercícios' : ' pacotes de exercícios') : 'nenhum pacote de exercícios';
+      var resumoLivros = livros + (livros === 1 ? ' livro' : ' livros') + ' neste tablet';
+      resumo.textContent = pacotes ? resumoPacotes + ' · ' + resumoLivros : resumoLivros + ' · ' + resumoPacotes;
+    }).catch(function () { resumo.textContent = 'Conteúdo instalado neste tablet'; });
+  }
+
   function desenharPacotesBiblioteca() {
     var caixa = $('#lista-pacotes-biblioteca');
     if (!caixa) return;
     var exportar = $('#exportar-etiquetas');
     Store.listarPacotesBiblioteca().then(function (lista) {
+      atualizarResumoInstaladosBiblioteca();
       caixa.innerHTML = '';
       // o botão das etiquetas só aparece com pacote: sem ele, Ajustes fica igual ao de antes
       if (exportar) exportar.hidden = !lista.length;
@@ -16210,6 +16272,13 @@
   }
 
   function importarLivros(aberto, andamento) {
+    if (!aberto.livros.length) {
+      var somenteErros = ['Nenhum livro pôde ser importado. Os livros que já estavam no tablet foram mantidos.'];
+      aberto.erros.forEach(function (e) { somenteErros.push(e.titulo + ': ' + e.mensagem); });
+      return Promise.resolve().then(desenharLivrosAjustes).catch(function () { /* tenta novamente ao abrir Ajustes */ }).then(function () {
+        return { estado: 'falhou', classe: 'faixa-aviso', linhas: somenteErros, errosLivros: aberto.erros };
+      });
+    }
     return Store.estimarEspaco().then(function (espaco) {
       // os livros vão como estão: a folga de 10% cobre o registro de cada um
       if (espaco && espaco.quota) {
@@ -16226,19 +16295,27 @@
       return Store.tornarPersistente();
     }).then(function () {
       andamento(['Gravando os livros no tablet...']);
-      return Store.gravarLivros(aberto);
+      return Store.gravarLivros(aberto, aberto.idsDoPacote);
     }).then(function (contas) {
       var linhas = ['Livros importados.'].concat(Biblioteca.resumoDeLivros(contas),
         ['Para ler, abra a aba Biblioteca e toque no livro.']);
+      if (aberto.erros.length) {
+        linhas.push(aberto.erros.length + (aberto.erros.length === 1
+          ? ' livro foi pulado; os demais foram processados:'
+          : ' livros foram pulados; os demais foram processados:'));
+        aberto.erros.forEach(function (e) { linhas.push(e.titulo + ': ' + e.mensagem); });
+      }
       // livro que SAIU do pacote novo também é gravação (some do tablet com a posição de leitura)
       var entrou = contas.novos + contas.atualizados + contas.removidos > 0;
       var deOutro = contas.deOutroPacote && contas.deOutroPacote.length > 0;
       /* O redesenho da lista é só tela: se ele falhar com os livros já gravados,
        * o resultado continua sendo o da gravação (nunca "não entrou"). */
       return Promise.resolve().then(desenharLivrosAjustes).catch(function () { /* a lista se refaz na próxima abertura */ }).then(function () {
+        atualizarResumoInstaladosBiblioteca();
         return {
           estado: entrou ? 'entrou' : 'pulou', classe: 'faixa-info', linhas: linhas,
-          motivo: entrou ? null : contas.maisNovos ? 'livros-mais-novos' : deOutro ? 'outro-pacote' : 'ja-estava'
+          motivo: entrou ? null : contas.maisNovos ? 'livros-mais-novos' : deOutro ? 'outro-pacote' : 'ja-estava',
+          errosLivros: aberto.erros
         };
       });
     });
@@ -16259,6 +16336,7 @@
     var caixa = $('#lista-livros-biblioteca');
     return Store.listarLivros().then(function (lista) {
       quantosLivros = lista.length;
+      atualizarResumoInstaladosBiblioteca();
       livrosDoTablet = lista.map(function (l) { return { id: l.id, meta: l.meta }; });
       livrosDoTabletMudaram();
       /* B12: o índice de texto acompanha a lista (livro novo entra na fila,
