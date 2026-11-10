@@ -3878,6 +3878,10 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 }
 .bibl-ano:hover { background: var(--soft); }
 .bibl-ano.ativo { background: var(--navy); border-color: var(--navy); color: var(--branco); font-weight: var(--peso-forte); }
+.bibl-tipos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.bibl-tipo { min-height: 34px; padding: 5px 10px; border: 1px solid var(--fio); border-radius: 999px; background: var(--branco); font: inherit; font-size: var(--letra-14); color: var(--texto); cursor: pointer; }
+.bibl-tipo:hover { background: var(--soft); }
+.bibl-tipo.ativo { border-color: var(--navy); background: var(--acao-clara); color: var(--navy); font-weight: var(--peso-forte); }
 .bibl-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 16px; margin-top: 12px; }
 .bibl-livro-cartao {
   display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 0;
@@ -3885,6 +3889,8 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 }
 .bibl-livro-cartao:focus-visible { outline-offset: 4px; }
 .bibl-livro-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.bibl-tipo-selo { align-self: flex-start; margin-bottom: 2px; padding: 2px 7px; border-radius: 999px; background: var(--soft); color: var(--muted); font-size: var(--letra-12); }
+.bibl-tipo-selo.pratica { background: var(--acao-clara); color: var(--navy); }
 .bibl-exercicios { padding: 8px; border: 1px dashed var(--fio); border-radius: var(--raio); }
 .bibl-vazio { margin: 12px 0 0; }
 .bibl-exercicios-titulo { margin-top: 20px; }

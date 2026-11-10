@@ -142,13 +142,11 @@
  * styles.css), com a lista igual. O v108 adicionou o indexador de livros; o
  * v109 e o v110 trouxeram navegação e Biblioteca por disciplina e ano. O v111
  * atualiza esses assets após sincronizar a Biblioteca com a main atualizada.
- * O v118 traz a navegação dia a dia na linha do tempo do celular e o atalho
- * + Aula; o v119 atualiza a descrição de ausência de vínculo no mapa. O v120
- * recolhe a gestão da Biblioteca em Ajustes e isola a conferência de cada livro
- * em Worker com prazo. O v121 inclui o atalho de pagamento pendente. O v122
- * inclui Vagos, a disponibilidade semanal no celular. O v126 mantém o encaixe
- * da agenda no celular. O v127 sincroniza PDFs e fotos anexados a aulas.
- * O v128 atualiza os assets de Vagos.
+ * O v118 traz navegação dia a dia no celular; v119 ajusta a legenda do mapa.
+ * O v120 isola a conferência de livros; v121 traz Marcar pago; v122, página impressa;
+ * v123, edição da ficha móvel; v126, encaixe da agenda no celular. O v127
+ * sincroniza PDFs e fotos anexados a aulas; v128 traz os filtros de tipo na Biblioteca.
+ * O v128 também inclui os assets de Vagos e preserva sua navegação dia a dia.
  */
 var CACHE = 'apoio-educacional-v128';
 var BAIXADOS = 'apoio-educacional-baixados';
