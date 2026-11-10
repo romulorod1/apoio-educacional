@@ -25,6 +25,10 @@
  * teste anda junto em vez de reprovar por engano.
  */
 const puppeteer = require('puppeteer-core');
+const H = require('./_bib_navegador');
+/* O relógio da rodada (segunda, 16/11/2026, 11:00), no processo e na página: a
+ * prova não depende do dia em que roda (a virada anual abre sozinha em janeiro). */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const path = require('path');
 const fs = require('fs');
 
@@ -71,6 +75,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     defaultViewport: { width: 1280, height: 1000, hasTouch: true }
   });
   const pag = await navegador.newPage();
+  await RELOGIO.naPagina(pag);
   const errosDePagina = [];
   pag.on('pageerror', e => errosDePagina.push(e.message));
   pag.on('console', m => { if (m.type() === 'error') errosDePagina.push('console: ' + m.text()); });
@@ -91,6 +96,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
   await pag.goto(URL_APP, { waitUntil: 'networkidle0' });
   await espera(1400);
+  await RELOGIO.conferir(pag, conf);
 
   /* Conta cada chamada do gerador de PDF. É a prova mais direta de que registrar
    * assunto não gera material: se alguma tela chamar o gerador, o contador sobe
@@ -638,6 +644,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
    * sem as outras matérias mesmo depois de o sinal voltar, e a faixa de aviso não
    * aparecia, porque ela estava pendurada só no índice. */
   const pag2 = await navegador.newPage();
+  await RELOGIO.naPagina(pag2);
   pag2.on('dialog', async d => { try { await d.accept(); } catch (e) { /* ok */ } });
   await pag2.setRequestInterception(true);
   let bloqueando = true;

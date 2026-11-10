@@ -12,6 +12,10 @@
  * aplicativo abre do cache sem rede.
  */
 const puppeteer = require('puppeteer-core');
+const H = require('./_bib_navegador');
+/* O relógio da rodada (segunda, 16/11/2026, 11:00), no processo e na página: a
+ * prova não depende do dia em que roda. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
@@ -133,6 +137,7 @@ const servidor = http.createServer((req, res) => {
       args: ['--no-sandbox'], defaultViewport: { width: 1280, height: 1000, hasTouch: true }
     });
     const p = await nav.newPage();
+    await RELOGIO.naPagina(p);
     p.on('dialog', async d => { try { await d.accept(); } catch (e) { } });
     return { nav, p };
   }
@@ -148,6 +153,7 @@ const servidor = http.createServer((req, res) => {
   let { nav, p } = await abrirNavegador();
   await p.goto(url, { waitUntil: 'networkidle0' });
   await espera(2500);
+  await RELOGIO.conferirData(p, conf);
   conf('começa na versão instalada', await versao(p), '1.0.0');
   const guardadas = await aulas(p);
 

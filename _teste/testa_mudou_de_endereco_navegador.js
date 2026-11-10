@@ -40,6 +40,9 @@ const path = require('path');
 const http = require('http');
 const H = require('./_bib_navegador');
 const { conf, secao, esperar, pausa, placar, RAIZ } = H;
+/* O relógio da rodada (segunda, 16/11/2026, 11:00), no processo e na página: a
+ * prova não depende do dia em que roda (a virada anual abre sozinha em janeiro). */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 
 const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const PORTA = Number(process.env.PORTA_B4 || 8881);
@@ -107,6 +110,7 @@ function portaOcupada() {
 let nav = null;
 async function novaPagina() {
   const pag = await nav.newPage();
+  await RELOGIO.naPagina(pag);
   pag.setDefaultTimeout(60000);
   pag.errosDePagina = [];
   pag.on('pageerror', e => pag.errosDePagina.push(e.message));
@@ -173,6 +177,7 @@ async function provaDaFaixa() {
   secao('ligada, endereço antigo: a faixa aparece e o aplicativo segue com os dados');
   const pag = await novaPagina();
   await abrir(pag, ANTIGO);
+  await RELOGIO.conferir(pag);
   conf('a página roda com a origem do endereço antigo', await pag.evaluate(() => location.origin), 'https://romulorod1.github.io');
   let f = await estadoFaixa(pag);
   conf('a faixa existe no endereço antigo', f.existe, true);
