@@ -23543,7 +23543,8 @@
     var caixa = el('div', { class: 'cel-tempo cel-tempo-proporcional', id: 'cel-tempo', 'data-dia': dia });
     var hoje = Core.hojeIso();
     var agora = dia === hoje ? minutosAgoraCelular() : null;
-    var inicioGrade = 7 * 60, fimGrade = 20 * 60, pxPorMinuto = 52 / 60;
+    var inicioGrade = 7 * 60, fimGrade = 20 * 60;
+    var pxPorMinuto = (52 / 60) * ((parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16);
     aulasDoDiaCelular(dia).forEach(function (a) {
       var m = Core.minutosDaHora(a.hora);
       if (m === null) return;

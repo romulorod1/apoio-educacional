@@ -2998,7 +2998,7 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-semana-topo { flex-wrap: nowrap; align-items: center; margin-bottom: 0; }
 .cel-semana-topo .btn { min-width: var(--alvo-celular); flex-shrink: 0; }
 .cel-semana-topo .cel-titulo { margin: 0; text-align: center; font-size: var(--letra-16); line-height: 1.15; }
-.cel-semana-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0 0 8px; }
+.cel-semana-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0; }
 .cel-semana-dia {
   min-height: 56px;
   min-width: 0; /* em 390 px cada dia tem 49; num celular de 360, encolhe sem rolar de lado */
@@ -3287,7 +3287,7 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
 }
 
 /* F2: agenda proporcional do celular, das 07:00 às 20:00. */
-.cel-tempo-proporcional { position: relative; box-sizing: border-box; min-height: 0; margin: 8px 0 18px; overflow: visible; }
+.cel-tempo-proporcional { position: relative; box-sizing: border-box; min-height: 0; margin: 4px 0 18px; overflow: visible; }
 .cel-tempo-proporcional .cel-tempo-linha { position: absolute; box-sizing: border-box; left: 0; right: 0; display: block; margin: 0; }
 .cel-tempo-proporcional .cel-tempo-hora { position: absolute; top: 2px; left: 0; width: 44px; padding: 0; font-size: var(--letra-12); line-height: 1.2; text-align: right; }
 .cel-tempo-proporcional .cel-tempo-item { position: absolute; top: 0; right: 0; bottom: 0; left: 48px; display: block; overflow: visible; }
