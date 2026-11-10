@@ -2,6 +2,10 @@
  * A busca de assunto, no navegador: acento, e o registro do que não foi achado.
  */
 const puppeteer = require('puppeteer-core');
+const H = require('./_bib_navegador');
+/* O relógio da rodada (segunda, 16/11/2026, 11:00), no processo e na página: a
+ * prova não depende do dia em que roda (a virada anual abre sozinha em janeiro). */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const path = require('path');
 const dados = require('./_prints_dados.js');
 const { irParaMes } = require('./_ir_para_mes.js');
@@ -27,6 +31,7 @@ function secao(t) { console.log('\n=== ' + t + ' ==='); }
     defaultViewport: { width: 1280, height: 1000, hasTouch: true }
   });
   const pag = await nav.newPage();
+  await RELOGIO.naPagina(pag);
   const errosDePagina = [];
   pag.on('pageerror', e => errosDePagina.push(e.message));
   pag.on('console', m => { if (m.type() === 'error') errosDePagina.push('console: ' + m.text()); });
@@ -34,6 +39,7 @@ function secao(t) { console.log('\n=== ' + t + ' ==='); }
 
   await pag.goto(URL_APP, { waitUntil: 'networkidle0' });
   await espera(1300);
+  await RELOGIO.conferir(pag, conf);
 
   const banco = dados.montar('2026-09');
   await pag.evaluate((b) => new Promise((res) => {
