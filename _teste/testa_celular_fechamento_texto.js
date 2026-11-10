@@ -115,6 +115,8 @@ const VERSAO_DO_APP = (APP.match(/var VERSAO = '([0-9.]+)';/) || [])[1] || '';
 const VERSAO_PROTOCOLO_MENSAGEM = (APP.match(/var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '([0-9.]+)';/) || [])[1] || '';
 const VERSAO_SERVIDA = VERSAO_DO_APP === '1.42.18' ? '1.42.19' : VERSAO_DO_APP;
 const APP_SERVIDO = VERSAO_DO_APP === '1.42.18' ? APP.replace("var VERSAO = '1.42.18';", "var VERSAO = '" + VERSAO_SERVIDA + "';") : APP;
+conf('K6 exige o mínimo do protocolo de mensagem, não a versão inteira do app',
+  VERSAO_PROTOCOLO_MENSAGEM === '1.42.40' && APP_SERVIDO.indexOf('Core.versaoAntes(v.app, VERSAO_MINIMA_PROTOCOLO_MENSAGEM)') >= 0, true);
 const NUVEM = fs.readFileSync(path.join(H.RAIZ, 'nuvem.js'), 'utf8');
 const FONTES = { 'app.js': APP_SERVIDO, 'store.js': STORE, 'nuvem.js': NUVEM };
 conf('cada âncora de veneno está no arquivo dela uma vez só', MODOS.map(m => FONTES[ANCORAS[m][0]].split(ANCORAS[m][1]).length - 1).join(','), MODOS.map(() => 1).join(','));
