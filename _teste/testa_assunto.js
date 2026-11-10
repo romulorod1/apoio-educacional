@@ -270,7 +270,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
       depoisDoTitulo: h3 ? segue(h3, assunto) : null,
       altura: Math.round(r.height),
       largura: Math.round(r.width),
-      larguraDoCorpo: Math.round(raiz.getBoundingClientRect().width),
+      larguraDoGrupo: Math.round(raiz.querySelector('#grupo-preparar').getBoundingClientRect().width),
       dentroDoModalDeMaterial: !!assunto.closest('#modal-tema'),
       ajuda: raiz.textContent.replace(/\s+/g, ' ')
     };
@@ -286,7 +286,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('ele vem antes da fileira da folha, na cara dela', entrada.antesDaFileira, true);
   conf('e depois do título Conteúdo da aula', entrada.depoisDoTitulo, true);
   conf('é alvo grande de tocar, para dedo em tablet', entrada.altura >= 44, true);
-  conf('e ocupa a linha inteira', entrada.largura > entrada.larguraDoCorpo * 0.7, true);
+  conf('e ocupa a linha inteira', entrada.largura > entrada.larguraDoGrupo * 0.7, true);
   conf('a ajuda explica que o assunto entra no fechamento',
     /assunto entra no fechamento do mês/i.test(entrada.ajuda), true);
   /* Sem material autoral e sem pacote da biblioteca importado não há material
@@ -318,6 +318,18 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('e ela diz de quem é a aula',
     await pag.$eval('#titulo-modal-tema', e => e.textContent),
     'Assunto da aula, ' + marcelo.nome);
+  const painelAssunto = await pag.evaluate(() => {
+    const r = document.querySelector('#modal-tema .modal').getBoundingClientRect();
+    return {
+      lateral: Math.abs(r.right - innerWidth) < 1 && r.left > innerWidth - 460,
+      altura: Math.abs(r.height - innerHeight) < 1,
+      aulaVisivelAoFundo: document.querySelector('#modal-aula').classList.contains('aberto'),
+      contexto: document.querySelector('#tema-contexto').textContent.includes('Aluno Referência Teste'),
+      legenda: !!document.querySelector('#corpo-modal-tema .tema-legenda')
+    };
+  });
+  conf('o seletor abre em painel lateral mantendo a aula atrás', painelAssunto.lateral && painelAssunto.altura && painelAssunto.aulaVisivelAoFundo, true);
+  conf('o seletor mostra o contexto do aluno e a legenda dos sinais', painelAssunto.contexto && painelAssunto.legenda, true);
 
   /* Regra do tablet: nada de foco automático. O teclado sobe por cima da lista
    * e ela perde de vista justamente o que veio escolher. */

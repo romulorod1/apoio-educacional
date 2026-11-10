@@ -734,6 +734,16 @@ label.campo-checkbox {
 }
 .item-lista .cresce { flex: 1; min-width: 0; }
 .item-lista .nome { font-weight: 600; color: var(--navy); }
+.tema-contexto { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 8px; color: var(--navy); }
+.tema-ultima-aula { color: var(--muted); font-size: var(--letra-14); }
+.tema-legenda { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 10px; color: var(--muted); font-size: var(--letra-12); }
+.tema-legenda > span { display: inline-flex; align-items: center; gap: 4px; }
+.tema-legenda .ico { width: 14px; height: 14px; }
+.tema-sinais { display: grid; grid-template-columns: repeat(3, 16px); gap: 10px; flex: 0 0 auto; color: var(--muted); }
+.tema-sinal { width: 16px; height: 16px; display: grid; place-items: center; opacity: .24; }
+.tema-sinal.disponivel { opacity: 1; color: var(--navy); }
+.tema-sinal .ico { width: 14px; height: 14px; }
+.irmao-aninhado { margin-left: 20px; width: calc(100% - 20px); }
 /* O NOME DO ARQUIVO ANEXADO QUEBRA, e nunca encosta no Abrir. É uma palavra
    só ("Equacoes_do_Segundo_Grau_biblioteca.pdf"), sem espaço onde quebrar, e
    passava por cima do botão. Quebra em qualquer ponto e fica inteiro, porque
@@ -876,6 +886,27 @@ table.dados tr.total td { font-weight: 600; color: var(--navy); background: var(
   .janela-aula-registrar { grid-area: registrar; }
   .janela-aula-arquivos { grid-area: arquivos; }
   .janela-aula-coluna .bloco-grupo-aula { margin-bottom: 10px; }
+
+  #modal-tema {
+    align-items: stretch;
+    justify-content: flex-end;
+    padding: 0;
+    background: rgba(18, 28, 44, .14);
+    pointer-events: auto;
+  }
+  #modal-tema .modal {
+    width: min(448px, 100vw);
+    max-width: none;
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+    pointer-events: auto;
+  }
+  #corpo-modal-tema { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  #corpo-modal-tema > .barra { flex: 0 0 auto; }
+  #lista-assuntos { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
+  #lista-assuntos .item-assunto { align-items: flex-start; }
 }
 .fechar {
   border: none;

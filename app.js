@@ -11839,6 +11839,16 @@
     corpo.innerHTML = '';
     rodape.innerHTML = '';
 
+    var anoDoAluno = aluno && Core.anoEscolarDe(aluno);
+    var aulaAnterior = db.aulas.filter(function (a) {
+      return a.alunoId === aula.alunoId && a.id !== aula.id && a.data <= aula.data;
+    }).sort(function (a, b) { return b.data.localeCompare(a.data); })[0];
+    corpo.appendChild(el('div', { class: 'tema-contexto', id: 'tema-contexto' }, [
+      el('strong', { texto: 'Para ' + (aluno ? aluno.nome : 'este aluno') }),
+      anoDoAluno ? el('span', { class: 'tag', texto: nomeDoAno(anoDoAluno) }) : null,
+      aulaAnterior ? el('span', { class: 'tema-ultima-aula', texto: 'Última aula: ' + Core.ddmm(aulaAnterior.data) }) : null
+    ].filter(Boolean)));
+
     var busca = '';
     var textoLivre = '';
     var nivel = { tipo: 'raiz' };
@@ -11853,7 +11863,12 @@
       nivel = { tipo: 'raiz' };
       desenhar();
     });
-    corpo.appendChild(el('div', { class: 'barra' }, [campoBusca]));
+    corpo.appendChild(el('div', { class: 'barra tema-busca' }, [campoBusca]));
+    corpo.appendChild(el('div', { class: 'tema-legenda', 'aria-label': 'Legenda dos materiais relacionados' }, [
+      el('span', {}, [icone('book'), document.createTextNode('Teoria')]),
+      el('span', {}, [icone('exerc'), document.createTextNode('Exercícios')]),
+      el('span', {}, [icone('medal'), document.createTextNode('OBMEP')])
+    ]));
 
     var lista = el('div', { id: 'lista-assuntos' });
     corpo.appendChild(lista);
@@ -11886,7 +11901,28 @@
       var item = linha(titulo, detalhe, aoTocar);
       item._assuntoDisponibilidade = assunto;
       item._detalheBase = detalhe;
+      var sinais = el('span', { class: 'tema-sinais', 'aria-label': 'Materiais relacionados' }, [
+        el('span', { class: 'tema-sinal', 'data-tipo-sinal': 'teoria', 'aria-label': 'Teoria no livro', role: 'img' }, [icone('book')]),
+        el('span', { class: 'tema-sinal', 'data-tipo-sinal': 'exercicios', 'aria-label': 'Exercícios', role: 'img' }, [icone('exerc')]),
+        el('span', { class: 'tema-sinal', 'data-tipo-sinal': 'obmep', 'aria-label': 'Lista OBMEP', role: 'img' }, [icone('medal')])
+      ]);
+      item.appendChild(sinais);
+      item._sinaisTema = sinais;
       return item;
+    }
+
+    function disponibilidadeDoAssunto(assunto) {
+      var estado = { teoria: false, exercicios: false, obmep: false };
+      if (!bib || !assunto || assunto.disciplina && assunto.disciplina !== Core.MATERIA_PADRAO) return estado;
+      var achado = moduloDoAssunto(assunto);
+      var mod = achado && bib.modulos[achado.chave];
+      if (!mod) return estado;
+      estado.teoria = !!(mod.teorias && mod.teorias.length);
+      estado.exercicios = !!contarItens(mod);
+      estado.obmep = !!((bib.listasPorModulo && bib.listasPorModulo[mod.chave]) || []).some(function (l) {
+        return /obmep|olimp/i.test((l && (l.titulo || l.nome)) || '');
+      });
+      return estado;
     }
 
     function atualizarDisponibilidadeVisivel() {
@@ -11896,6 +11932,12 @@
         if (!detalhe) return;
         var disponivel = resumoDisponibilidadeDoAssunto(item._assuntoDisponibilidade);
         detalhe.textContent = item._detalheBase + (disponivel ? ' · ' + disponivel : '');
+        var estado = disponibilidadeDoAssunto(item._assuntoDisponibilidade);
+        Array.prototype.forEach.call(item._sinaisTema.querySelectorAll('[data-tipo-sinal]'), function (sinal) {
+          var ativo = !!estado[sinal.dataset.tipoSinal];
+          sinal.classList.toggle('disponivel', ativo);
+          sinal.setAttribute('aria-hidden', ativo ? 'false' : 'true');
+        });
       });
     }
 
@@ -11959,7 +12001,7 @@
       // 2. Continuar trabalhando / Assuntos recentes deste aluno
       var recentes = sugestoesRecentesDeAssunto(aula, aluno);
       if (recentes.length) {
-        lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Continuar trabalhando com este aluno' }));
+        lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Sugestões para ' + (aluno ? aluno.nome : 'este aluno') }));
         recentes.forEach(function (s) {
           lista.appendChild(criarLinhaSugestao(s));
         });
@@ -12076,11 +12118,13 @@
       (g.blocos || []).forEach(function (b) {
         lista.appendChild(el('div', { class: 'bloco-exercicios', texto: b.titulo }));
         (b.topicos || []).forEach(function (titulo, i) {
-          lista.appendChild(linha(titulo, '', function () {
+          var item = linha(titulo, '', function () {
             registrarAssunto(aula, itemDeTopico({
               id: (b.ids || [])[i], titulo: titulo, disciplina: d.chave, grupo: g.chave
             }));
-          }));
+          });
+          item.classList.add('irmao-aninhado');
+          lista.appendChild(item);
         });
       });
     }
