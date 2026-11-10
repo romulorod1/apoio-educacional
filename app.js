@@ -3610,8 +3610,6 @@
       }) + '. Toque em Salvar para guardar na aula.'
     }));
 
-    desenharDominio(grupoRegistro, aulaEmEdicao, eFutura);
-
     desenharAreas(grupoRegistro, aulaEmEdicao);
 
     // ----------------------------------------------------
@@ -3749,7 +3747,7 @@
 
   function atualizarBlocoDominio(aulaId) {
     if (!blocoDominioAtivo || blocoDominioAtivo.aulaId !== aulaId) return false;
-    if (!$('#bloco-dominio')) return false;
+    if (!$('#lista-temas-aula')) return false;
     blocoDominioAtivo.desenhar();
     return true;
   }
@@ -3940,9 +3938,6 @@
    * Tirar um assunto ou registrar um novo muda também o rótulo do botão, e
    * redesenhar só a lista deixaria a tela mentindo. */
   function atualizarBlocoAssunto(aulaId) {
-    /* Registrar ou tirar assunto muda também a lista de domínio, lá embaixo em
-     * Registrar como foi: cada assunto tem a sua linha. */
-    atualizarBlocoDominio(aulaId);
     if (!blocoAssuntoAtivo || blocoAssuntoAtivo.aulaId !== aulaId) return false;
     if (!$('#bloco-assunto')) return false;
     blocoAssuntoAtivo.desenhar();
@@ -4089,6 +4084,9 @@
   function desenharTemasDaAula(caixa, aula, aluno) {
     caixa.innerHTML = '';
     var lista = Core.temasDaAula(aula);
+    blocoDominioAtivo = { aulaId: aula.id, desenhar: function () {
+      if ($('#lista-temas-aula')) desenharTemasDaAula($('#lista-temas-aula'), aula, aluno);
+    } };
     if (!lista.length) return;
 
     if (!aluno) aluno = alunoPorId(aula.alunoId);
@@ -4096,6 +4094,10 @@
     caixa.appendChild(el('div', {
       class: 'bloco-exercicios',
       texto: lista.length === 1 ? 'Assunto da aula' : 'Assuntos desta aula'
+    }));
+    caixa.appendChild(el('div', {
+      class: 'ajuda u-margem-topo-menos2 dominio-assuntos-privado',
+      texto: 'Domínio por assunto · Só você vê'
     }));
 
     /* A etiqueta da matéria e o botão Material dependem de dois índices
@@ -4199,6 +4201,20 @@
       var nosLivros = t.id && livrosDoTablet && livrosDoTablet.length
         ? Biblioteca.livrosComAssunto(livrosDoTablet, correcoesDosLivros(), t.id, anoParaOsLivros(aluno, t)) : [];
 
+      var estadoDominio = Core.estadoDeDominio(t);
+      var futura = aula.data > Core.hojeIso();
+      var botoesDominio = el('div', {
+        class: 'segmentado opcoes-dominio', role: 'group',
+        'aria-label': 'Domínio de ' + (t.titulo || t.id)
+      });
+      Core.DOMINIO.forEach(function (op) {
+        botoesDominio.appendChild(el('button', {
+          type: 'button', class: 'opcao-seg opcao-dominio' + (estadoDominio === op.id ? ' ativa' : ''),
+          'data-estado': op.id, 'aria-pressed': estadoDominio === op.id ? 'true' : 'false',
+          texto: op.rotulo, disabled: futura ? 'disabled' : null,
+          aoClick: function () { marcarDominioNaAula(aula, t, op.id); }
+        }));
+      });
       caixa.appendChild(el('div', { class: 'item-lista item-assunto-aula' }, [
         el('div', { class: 'cresce' }, [
           el('div', { class: 'nome' }, [
@@ -4207,7 +4223,11 @@
               ? el('span', { class: 'tag u-margem-esq-8', texto: 'com material pronto' })
               : null
           ].filter(Boolean)),
-          detalhe ? el('div', { class: 'detalhe', texto: detalhe }) : null
+          detalhe ? el('div', { class: 'detalhe', texto: detalhe }) : null,
+          el('div', { class: 'dominio-assunto-controles' }, [
+            botoesDominio,
+            futura ? el('div', { class: 'ajuda dominio-futuro', texto: 'Marque depois que a aula acontecer.' }) : null
+          ].filter(Boolean))
         ].filter(Boolean)),
         podeMaterial ? el('button', {
           type: 'button', class: 'btn pequeno', texto: 'Material',

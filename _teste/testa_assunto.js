@@ -460,6 +460,11 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
   let linhas = await linhasDaAula();
   conf('três linhas na aula', linhas.length, 3);
+  conf('há três controles de domínio dentro das linhas dos assuntos',
+    await pag.$$eval('#lista-temas-aula .item-assunto-aula .opcoes-dominio', es => es.length), 3);
+  conf('o domínio informa que é privado',
+    await pag.$eval('#lista-temas-aula', e => /Só você vê/.test(e.textContent)), true);
+  conf('o domínio não aparece num bloco separado', await visivel('#bloco-dominio'), false);
   conf('com o cabeçalho no plural',
     await pag.$eval('#lista-temas-aula .bloco-exercicios', e => e.textContent.trim()),
     'Assuntos desta aula');
@@ -478,6 +483,13 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('a linha da outra matéria diz a matéria',
     new RegExp(DISCIPLINA, 'i').test(linhas[1].tudo), true);
   conf('e diz o grupo', linhas[1].tudo.indexOf(GRUPO.rotulo) >= 0, true);
+
+  await pag.evaluate(() => document.querySelectorAll('#lista-temas-aula .item-assunto-aula')[1]
+    .querySelector('.opcoes-dominio [data-estado="andamento"]').click());
+  await espera(700);
+  const assuntoComDominio = (await bd()).aulas.find(a => a.id === aula.id);
+  conf('o estado escolhido fica gravado no assunto correspondente',
+    assuntoComDominio.temas[1].dominio, 'andamento');
 
   /* Sem material autoral, o botão Material é da BIBLIOTECA e de mais ninguém:
    * sem pacote importado, nenhuma das três linhas o oferece. Com pacote, quem

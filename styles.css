@@ -734,6 +734,11 @@ label.campo-checkbox {
 }
 .item-lista .cresce { flex: 1; min-width: 0; }
 .item-lista .nome { font-weight: 600; color: var(--navy); }
+.dominio-assuntos-privado { margin-bottom: 8px; }
+.dominio-assunto-controles { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.dominio-assunto-controles .segmentado { gap: 4px; }
+.dominio-assunto-controles .opcao-seg { flex: 0 1 auto; min-width: 0; min-height: 38px; padding: 7px 10px; }
+.dominio-futuro { flex-basis: 100%; }
 .tema-contexto { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 8px; color: var(--navy); }
 .tema-ultima-aula { color: var(--muted); font-size: var(--letra-14); }
 .tema-legenda { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 10px; color: var(--muted); font-size: var(--letra-12); }

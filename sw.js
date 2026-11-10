@@ -149,8 +149,9 @@
  * O v113 ajusta o botão de Vagos na faixa da semana.
  * O v114 traz a janela de aula em duas colunas no tablet.
  * O v115 traz o seletor de assunto na janela da aula.
- * O v116 salva o registro da aula automaticamente. */
-var CACHE = 'apoio-educacional-v116';
+ * O v116 salva o registro da aula automaticamente.
+ * O v117 aproxima o domínio do assunto a que pertence. */
+var CACHE = 'apoio-educacional-v117';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
