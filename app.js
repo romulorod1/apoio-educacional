@@ -2703,6 +2703,12 @@
     $('#leitor-largura').addEventListener('click', function () { zoomDoLeitorPdf(0); });
     $('#leitor-como-folha').addEventListener('click', paginaDoLeitorComoFolha);
     $('#leitor-sumario').addEventListener('click', alternarSumarioDoLeitor);
+    if ($('#leitor-ir-pagina')) {
+      $('#leitor-ir-pagina').addEventListener('change', function () { irParaPaginaDoLeitor(this.value); });
+      $('#leitor-ir-pagina').addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); irParaPaginaDoLeitor(this.value); }
+      });
+    }
     $('#epub-anterior').addEventListener('click', function () { andarNoEpub(-1); });
     $('#epub-proximo').addEventListener('click', function () { andarNoEpub(1); });
     $('#epub-sumario').addEventListener('click', alternarSumarioEpub);
@@ -16341,7 +16347,8 @@
       }
       var sumario = reg.meta.sumario || [];
       return abrirLeitorPdf(reg.blob, {
-        titulo: tituloDoLivro(reg.meta), nome: reg.id + '.pdf', pagina: (destino && destino.pagina) || (pos && pos.pagina) || 1,
+        titulo: tituloDoLivro(reg.meta), nome: reg.id + '.pdf',
+        pagina: (destino && destino.pagina) || Biblioteca.paginaDaPosicao(reg.meta, pos) || 1,
         sumario: sumario, livro: reg,
         dica: sumario.length ? '' : 'Este livro não tem sumário: use Anterior e Próxima.',
         aoMudarPagina: function (n) {
@@ -16501,9 +16508,9 @@
     achados.forEach(function (a) {
       var e = a.entrada;
       var epub = a.meta.formato === 'epub';
-      var onde = e.obraInteira ? 'Vínculo no mapa: livro inteiro' :
-        'Vínculo no mapa: capítulo ' + e.titulo + (epub ? '' : ', página ' + e.pagina);
-      if (e.estado === 'a_confirmar') onde += ' · sugestão a confirmar';
+        var onde = e.obraInteira ? 'V\u00ednculo no mapa: livro inteiro' :
+          'V\u00ednculo no mapa: cap\u00edtulo ' + e.titulo + (epub ? '' : ', p\u00e1gina ' + paginaParaMostrar(a.meta, e));
+        if (e.estado === 'a_confirmar') onde += ' \u00b7 sugest\u00e3o a confirmar';
       var linha = linhaBib(tituloDoLivro(a.meta), onde, function () {
         fecharModal('modal-livros');
         abrirLivro(a.id, e.obraInteira ? null : (epub ? { capitulo: e.capitulo, ancora: e.ancora } : { pagina: e.pagina }));
@@ -16812,7 +16819,7 @@
 
   /* O sumário do livro, no PDF e no EPUB: uma lista embaixo da barra, um
    * toque em cada entrada, recuada pelo nível. `ir` recebe a entrada. */
-  function desenharSumario(caixa, sumario, atual, ir) {
+  function desenharSumario(caixa, sumario, atual, ir, meta) {
     caixa.innerHTML = '';
     if (!sumario || !sumario.length) {
       caixa.appendChild(el('p', { class: 'ajuda vazio-do-sumario', texto: 'Este livro não tem sumário.' }));
@@ -16823,7 +16830,7 @@
         type: 'button', class: e === atual ? 'atual' : '', 'data-entrada': String(e.n),
         style: 'padding-left:' + (10 + 18 * Math.max(0, (e.nivel || 1) - 1)) + 'px',
         aoClick: function () { ir(e); }
-      }, [e.titulo, e.pagina ? el('span', { class: 'pagina-do-sumario', texto: 'p. ' + e.pagina }) : null]));
+      }, [e.titulo, e.pagina ? el('span', { class: 'pagina-do-sumario', texto: 'p. ' + paginaParaMostrar(meta, e) }) : null]));
     });
   }
 
@@ -17630,13 +17637,24 @@
     return { numero: String(k), titulo: titulo, palavra: 'Capítulo' };
   }
 
-  /* A PÁGINA QUE O SUMÁRIO MOSTRA. Hoje é a página do ARQUIVO (a do PDF), a
-   * mesma que o leitor conta. A fatia B3 do redesenho traz a página impressa
-   * na meta do livro (o deslocamento entre as duas): é em paginaParaMostrar
-   * que ela entra, e o rótulo da coluna (ROTULO_DA_PAGINA) muda junto. O
-   * leitor continua abrindo pela página do arquivo (paginaDoArquivo). */
+  /* A PÁGINA QUE O SUMÁRIO MOSTRA (B3). Quando o livro traz `numeracao` e a
+   * página está dentro de um trecho numerado, a tela mostra a página impressa
+   * (e a coluna diz "página impressa"). Sem `numeracao` ou fora de trecho
+   * (capa, folha de rosto), fica a página do arquivo. O leitor continua
+   * abrindo e salvando posição pela página do arquivo (paginaDoArquivo). */
   var ROTULO_DA_PAGINA = 'página do arquivo';
-  function paginaParaMostrar(meta, entrada) { return entrada.pagina; }
+  var ROTULO_DA_PAGINA_IMPRESSA = 'página impressa';
+  function livroTemNumeracao(meta) {
+    return !!(meta && Array.isArray(meta.numeracao) && meta.numeracao.length && !Biblioteca.conferirNumeracao(meta));
+  }
+  function rotuloDaPaginaDoLivro(meta) {
+    return livroTemNumeracao(meta) ? ROTULO_DA_PAGINA_IMPRESSA : ROTULO_DA_PAGINA;
+  }
+  function paginaParaMostrar(meta, entrada) {
+    var arq = entrada && typeof entrada === 'object' ? entrada.pagina : entrada;
+    var imp = typeof Biblioteca !== 'undefined' && Biblioteca.paginaImpressa ? Biblioteca.paginaImpressa(meta, arq) : null;
+    return imp !== null && imp !== undefined ? imp : arq;
+  }
   function paginaDoArquivo(meta, entrada) { return entrada.pagina; }
 
   // os anos do livro ('06', 'em1') e as séries dos exercícios ('6ano', '1em')
@@ -17722,7 +17740,7 @@
       cap = (p.palavra === 'Capítulo' ? 'Cap. ' : p.palavra + ' ') + p.numero + ', ' + p.titulo;
     }
     if (epub) return cap || 'Parte ' + (pos.capitulo || 1);
-    return [cap, 'p. ' + (pos.pagina || 1)].filter(Boolean).join(' · ');
+    return [cap, 'p. ' + paginaParaMostrar(meta, pos.pagina || 1)].filter(Boolean).join(' · ');
   }
   function progressoDoLivro(l) {
     var pos = l.pos, meta = l.meta;
@@ -18040,7 +18058,7 @@
       });
     }
     atual = atual || capitulos[0] || null;
-    var continuar = l.pos ? (epub ? 'Continuar no capítulo ' + (l.pos.capitulo || 1) : 'Continuar na p. ' + (l.pos.pagina || 1)) : 'Abrir o livro';
+    var continuar = l.pos ? (epub ? 'Continuar no capítulo ' + (l.pos.capitulo || 1) : 'Continuar na p. ' + paginaParaMostrar(meta, l.pos.pagina || 1)) : 'Abrir o livro';
 
     // redesenhar o MESMO livro (o leitor fechou, os nomes dos assuntos chegaram) mantém a rolagem do sumário
     var rolagem = !tela.hidden && tela.dataset.livro === l.id ? tela.scrollTop : 0;
@@ -18065,7 +18083,7 @@
     var lista = el('section', { class: 'bibl-sumario', 'aria-label': 'Sumário' }, [
       el('div', { class: 'bibl-sumario-cabeca' }, [
         el('h3', { class: 'bibl-titulo', texto: 'Sumário' }),
-        sumario.length && !epub ? el('span', { class: 'bibl-apoio', texto: ROTULO_DA_PAGINA }) : null
+        sumario.length && !epub ? el('span', { class: 'bibl-apoio', texto: rotuloDaPaginaDoLivro(meta) }) : null
       ])
     ]);
     if (!sumario.length) {
@@ -18106,9 +18124,15 @@
       var ma = mapa.length ? entradaDoMapaDoCapitulo(mapa, meta, atual) : null;
       var pAtual = partesDoCapitulo(atual.titulo, capitulos.indexOf(atual) + 1);
       var fim = atual.pagina_fim;
+      var impIni = !epub && atual.pagina ? Biblioteca.paginaImpressa(meta, atual.pagina) : null;
+      var impFim = !epub && fim ? Biblioteca.paginaImpressa(meta, fim) : null;
       var paginas = epub || !atual.pagina ? '' : fim && fim >= atual.pagina ?
-        'Páginas do arquivo ' + paginaParaMostrar(meta, atual) + ' a ' + fim + ' · ' + plural(fim - atual.pagina + 1, 'página', 'páginas') :
-        'Começa na página do arquivo ' + paginaParaMostrar(meta, atual);
+        (impIni !== null && impFim !== null ?
+          'Página impressa ' + impIni + ' a ' + impFim + ' · ' + plural(fim - atual.pagina + 1, 'página', 'páginas') :
+          'Páginas do arquivo ' + paginaParaMostrar(meta, atual) + ' a ' + paginaParaMostrar(meta, fim) + ' · ' + plural(fim - atual.pagina + 1, 'página', 'páginas')) :
+        (impIni !== null ?
+          'Começa na página impressa ' + impIni :
+          'Começa na página do arquivo ' + paginaParaMostrar(meta, atual));
       var assuntos;
       if (!mapa.length) assuntos = [el('p', { class: 'bibl-falta-texto', texto: 'Este livro ainda não tem mapa de assuntos.' })];
       else if (!ma || !ma.assuntos.length) assuntos = [el('p', { class: 'bibl-falta-texto', texto: 'Nenhum assunto ligado ainda.' })];
@@ -18444,7 +18468,7 @@
             var epub = c.meta.formato === 'epub';
             var cap = rotuloDoCapituloDoMapa(c.meta, e);
             var paginas = e.obraInteira ? 'o livro inteiro' : epub ? 'parte ' + e.capitulo :
-              'p. ' + paginaParaMostrar(c.meta, e) + (e.pagina_fim && e.pagina_fim > e.pagina ? ' a ' + e.pagina_fim : '');
+              'p. ' + paginaParaMostrar(c.meta, e) + (e.pagina_fim && e.pagina_fim > e.pagina ? ' a ' + paginaParaMostrar(c.meta, e.pagina_fim) : '');
             return el('button', { type: 'button', class: 'lado-pg', 'data-n': String(e.n),
               'data-pagina': epub ? null : String(paginaDoArquivo(c.meta, e)),
               'aria-label': a.titulo + ', ' + tituloDoLivro(c.meta) + ', ' + cap + ', ' + paginas,
@@ -22492,8 +22516,9 @@
     mostrarDicaDoLeitor(opcoes.comoFolha === false ? '' : opcoes.dica);
     // o botão Sumário só existe para quem traz sumário (o livro); o anexo da aula fica como era
     $('#leitor-sumario').hidden = !(opcoes.sumario && opcoes.sumario.length);
-    // "Exportar em PDF" (C15.4) só no livro
+    // "Exportar em PDF" (C15.4) e "Ir para a página" (B3) só no livro
     $('#leitor-exportar').hidden = !opcoes.livro;
+    if ($('#leitor-ir-caixa')) $('#leitor-ir-caixa').hidden = !opcoes.livro;
     fecharSumarioDoLeitor();
     // "Este capítulo cobre" (C15.2) nasce escondido: só o livro o mostra, a cada página
     esconderCobre('pdf');
@@ -22590,9 +22615,24 @@
     entregarArquivo(nome, blob, op.titulo || nome);
   }
 
+  function textoDoContadorDoLeitor(meta, paginaArq, total) {
+    var imp = meta ? Biblioteca.paginaImpressa(meta, paginaArq) : null;
+    if (imp !== null && imp !== undefined) {
+      return 'p. ' + paginaArq + ' de ' + total + ' (impressa ' + imp + ')';
+    }
+    return 'Página ' + paginaArq + ' de ' + total;
+  }
+
   function atualizarBarraDoLeitor() {
     var tem = !!(leitor && leitor.doc);
-    $('#leitor-contador').textContent = tem ? 'Página ' + leitor.pagina + ' de ' + leitor.total : '';
+    var meta = tem && leitor.opcoes && leitor.opcoes.livro ? leitor.opcoes.livro.meta : null;
+    var imp = meta ? Biblioteca.paginaImpressa(meta, leitor.pagina) : null;
+    $('#leitor-contador').textContent = tem ? textoDoContadorDoLeitor(meta, leitor.pagina, leitor.total) : '';
+    var ir = $('#leitor-ir-pagina');
+    if (ir) {
+      ir.disabled = !tem;
+      ir.value = tem ? String(imp !== null && imp !== undefined ? imp : leitor.pagina) : '';
+    }
     $('#leitor-anterior').disabled = !tem || leitor.pagina <= 1;
     $('#leitor-proxima').disabled = !tem || leitor.pagina >= leitor.total;
     $('#leitor-menos').disabled = !tem || leitor.zoom <= LEITOR_ZOOM_MIN;
@@ -22601,6 +22641,20 @@
     $('#leitor-como-folha').disabled = !tem;
     $('#leitor-sumario').disabled = !tem;
     $('#leitor-exportar').disabled = !tem;
+  }
+
+  function irParaPaginaDoLeitor(valor) {
+    if (!leitor || !leitor.doc) return false;
+    var meta = leitor.opcoes && leitor.opcoes.livro ? leitor.opcoes.livro.meta : null;
+    var destino = Biblioteca.resolverPaginaDoLeitor(meta, valor, leitor.total);
+    if (!destino || destino < 1 || destino > leitor.total) {
+      atualizarBarraDoLeitor();
+      return false;
+    }
+    fecharSumarioDoLeitor();
+    leitor.pagina = destino;
+    desenharPaginaDoLeitor(true);
+    return true;
   }
 
   function fecharSumarioDoLeitor() {
@@ -22615,12 +22669,13 @@
     if (!leitor || !leitor.doc || !lista) return;
     if (!lista.hidden) { fecharSumarioDoLeitor(); return; }
     var sumario = leitor.opcoes.sumario || [];
+    var meta = leitor.opcoes && leitor.opcoes.livro ? leitor.opcoes.livro.meta : null;
     desenharSumario(lista, sumario, entradaAtualDoSumario(sumario, 'pagina', leitor.pagina), function (e) {
       fecharSumarioDoLeitor();
       if (!leitor || !leitor.doc) return;
       leitor.pagina = Math.max(1, Math.min(leitor.total, e.pagina));
       desenharPaginaDoLeitor(true);
-    });
+    }, meta);
     lista.hidden = false;
     $('#leitor-sumario').setAttribute('aria-expanded', 'true');
   }
