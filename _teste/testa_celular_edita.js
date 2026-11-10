@@ -1,13 +1,13 @@
 /* testa_celular_edita.js
  *
- * D6, parte 2: o celular DA DONA edita em quatro ações, contra o Firebase
+ * D6, parte 2: o celular DA DONA edita em cinco ações, contra o Firebase
  * Emulator Suite (Auth e Firestore), com um tablet (1280 px) e um celular
  * (390 x 844) da mesma conta, e um observador de outra conta (390 x 844).
  *
  * O que prova, com dados fictícios:
  *   1. o celular da dona traz a cópia e fica com a marca "este aparelho é
  *      celular": edita pelos registros e nunca envia a cópia completa;
- *   2. as quatro ações, pela tela, em 390 x 844, com todo alvo de pelo menos
+ *   2. as cinco ações, pela tela, em 390 x 844, com todo alvo de pelo menos
  *      48 px e sem rolagem de lado: marcar aula num dia escolhido, cancelar
  *      aula (com Desfazer), "Registrar como foi" (situação, relato e assunto
  *      dado), cadastrar aluno (o essencial) e o "pago em" no Fechamento;
@@ -21,7 +21,7 @@
  *   7. o celular nunca envia a cópia completa: zero escritas em copias/ e em
  *      estado/copia vindas dele (fechar, voltar, a diária, o pedido direto),
  *      com o controle positivo do tablet visto pelo mesmo instrumento;
- *   8. o celular não grava fora das quatro ações: tudo o que subiu dele é um
+ *   8. o celular não grava fora das cinco ações: tudo o que subiu dele é um
  *      registro das ações (nenhum ajuste), e os caminhos do tablet (folha,
  *      "Apagar tudo", excluir aluno) continuam recusados nele;
  *   9. o observador de outra conta não vê nenhum botão de edição e não
@@ -438,7 +438,7 @@ const fechamentoDe = (pag, alunoId, mes) => pag.evaluate((id, m) => Store.carreg
 }), alunoId, mes);
 
 /* O que está à vista no celular, medido: rolagem de lado, alvos de 48 px e os
- * botões de edição (os das quatro ações vêm marcados com data-acao-celular). */
+ * botões de edição (os das cinco ações vêm marcados com data-acao-celular). */
 const RE_EDICAO = 'registrar|corrigir|editar|salvar|excluir|apagar|nova aula|novo aluno|^\\s*\\+|desmarcar|marcar|cancelar a aula|cancelar aula|cadastrar|pago|anotar|alterar|confirmar';
 const medirTela = (pag) => pag.evaluate((reEdicao) => {
   const re = new RegExp(reEdicao, 'i');
@@ -935,6 +935,35 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('o aviso do cadastro diz "Aluno cadastrado."', /^Aluno cadastrado\./.test((await texto(pagC, '#aviso-texto')) || ''), true);
   const idBeta = beta.valor;
 
+  secao('7b. Editar a ficha existente no celular, sem alterar valores ou outros dados');
+  await clicar(pagC, '#cel-abas .cel-aba[data-cel="alunos"]');
+  await pausa(200);
+  conf('a lista do celular abre a ficha do aluno existente', await clicar(pagC, '#cel-alunos-lista .cel-aluno-item[data-aluno="alfa"]'), true);
+  conf('a dona vê a ação marcada para editar a ficha', await existe(pagC, '#cel-alunos-editar-ficha[data-acao-celular="editar-ficha-aluno"]'), true);
+  await clicar(pagC, '#cel-alunos-editar-ficha');
+  conf('o formulário de edição permite completar o telefone pendente', await existe(pagC, '#cel-ficha-edicao-telefone'), true);
+  conf('valores não são editáveis por esta ação', await existe(pagC, '#cel-ficha-edicao-preco'), false);
+  m = await medirTela(pagC);
+  conf('a ficha editável cabe no celular, com alvos de 48 px e campos previstos', m.pequenos.join('; ') + ' | ' + m.campos.join(','),
+    ' | cel-ficha-edicao-nome,cel-ficha-edicao-responsavel,cel-ficha-edicao-telefone,cel-ficha-edicao-local');
+  await digitar(pagC, '#cel-ficha-edicao-nome', 'Aluno Alfa Atualizado');
+  await digitar(pagC, '#cel-ficha-edicao-responsavel', 'Responsável Alfa Atualizado');
+  await digitar(pagC, '#cel-ficha-edicao-telefone', '123');
+  await clicar(pagC, '#cel-ficha-edicao-salvar');
+  conf('um telefone inválido explica como corrigir', /Escreva o telefone com DDD/.test((await texto(pagC, '#aviso-texto')) || ''), true);
+  conf('a validação não grava parcialmente a ficha', await pagC.evaluate(() => Store.carregar().then(d => {
+    const a = d.alunos.find(x => x.id === 'alfa'); return [a.nome, a.responsavel, a.telefone || ''].join('|');
+  })), 'Aluno Alfa Teste|Responsável Alfa Teste|');
+  await digitar(pagC, '#cel-ficha-edicao-telefone', '(11) 90000-0011');
+  await pagC.select('#cel-ficha-edicao-local', 'casa');
+  await digitar(pagC, '#cel-ficha-edicao-endereco', 'Rua de teste, 10');
+  await clicar(pagC, '#cel-ficha-edicao-salvar');
+  const fichaAtualizada = await esperar('a ficha foi atualizada no celular', () => pagC.evaluate(() => Store.carregar().then(d => {
+    const a = d.alunos.find(x => x.id === 'alfa');
+    return a && [a.nome, a.responsavel, a.telefone, a.local, a.endereco, a.precos[0].valorHora, a.cor].join('|');
+  })), v => v === 'Aluno Alfa Atualizado|Responsável Alfa Atualizado|(11) 90000-0011|casa|Rua de teste, 10|100|#1F3A5F', 10000);
+  conf('a ficha mudou só nos campos editados; preço e cor foram preservados', fichaAtualizada.valor, 'Aluno Alfa Atualizado|Responsável Alfa Atualizado|(11) 90000-0011|casa|Rua de teste, 10|100|#1F3A5F');
+
   secao('8. "Pago em" no Fechamento, por aluno e por mês');
   await clicar(pagC, '#cel-abas .cel-aba[data-cel="fechamento"]');
   await pausa(200);
@@ -966,7 +995,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     const p = (b.pagamentos || []).find(x => x.alunoId === 'alfa' && x.mes === m); return p ? p.pagoEm + '/' + p.valor : null; }), MES), v => v === HOJE + '/250', 10000);
   conf('o pagamento está no celular', pago.ok, true);
   conf('a linha diz "Pago em", com o valor', /Pago em .* R\$\s?250,00/.test(await texto(pagC, '.cel-fechamento-aluno[data-aluno="alfa"] .linha-pagamento')), true);
-  conf('nenhum "Este celular só lê" nas quatro ações', await pagC.evaluate(() => window.__avisos.filter(t => /só lê/.test(t)).length), 0);
+  conf('nenhum "Este celular só lê" nas cinco ações', await pagC.evaluate(() => window.__avisos.filter(t => /só lê/.test(t)).length), 0);
 
   secao('9. Tudo sobe pelo sincronizar e chega ao tablet, que recebe ao abrir');
   const sC = await sincronizar(pagC);
@@ -977,19 +1006,24 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     const outro = d.aulas.find(x => x.id === 'aula-outro');
     const hoje = d.aulas.find(x => x.id === 'aula-hoje');
     const beta = d.alunos.find(x => x.id === a.idBeta);
+    const alfa = d.alunos.find(x => x.id === 'alfa');
     const p = (d.pagamentos || []).find(x => x.alunoId === 'alfa' && x.mes === a.mes);
     return !!(nova && nova.hora === '14:00' && outro && outro.status === 'cancelada' && hoje && hoje.notaTexto === 'Relato escrito no celular' &&
-      beta && p && p.valor === 250);
+      beta && alfa && alfa.telefone === '(11) 90000-0011' && alfa.responsavel === 'Responsável Alfa Atualizado' && p && p.valor === 250);
   }.toString(), { idMarcada, idBeta, mes: MES });
-  conf('as quatro ações chegaram ao tablet ao abrir', chegou.ok, true);
+  conf('as cinco ações chegaram ao tablet ao abrir', chegou.ok, true);
   const noTablet = await pagA.evaluate((a) => Store.carregar().then(d => {
     const nova = d.aulas.find(x => x.id === a.idMarcada), hoje = d.aulas.find(x => x.id === 'aula-hoje'), beta = d.alunos.find(x => x.id === a.idBeta);
+    const alfa = d.alunos.find(x => x.id === 'alfa');
     return { nova: nova && [nova.data, nova.hora, nova.duracaoMin, nova.alunoId].join(' '), temas: (hoje.temas || []).map(t => t.titulo).join(','),
-      beta: beta && [beta.nome, beta.responsavel, 'obs=' + beta.obs + ' telefone=' + beta.telefone, beta.precos.map(p => p.valorHora + '@' + p.inicio).join(',')].join(' | ') };
+      beta: beta && [beta.nome, beta.responsavel, 'obs=' + beta.obs + ' telefone=' + beta.telefone, beta.precos.map(p => p.valorHora + '@' + p.inicio).join(',')].join(' | '),
+      alfa: alfa && [alfa.nome, alfa.responsavel, alfa.telefone, alfa.local, alfa.endereco, alfa.precos[0].valorHora, alfa.cor].join('|') };
   }), { idMarcada, idBeta });
   conf('marcar aula: a aula do celular no tablet, com data, hora, duração e aluno', noTablet.nova, TERCEIRO + ' 14:00 60 alfa');
   conf('"Registrar como foi": o assunto dado chegou ao tablet', noTablet.temas, 'Frações equivalentes');
   conf('cadastrar aluno: o aluno do celular no tablet, com o essencial', noTablet.beta, 'Aluno Beta Teste | Responsável Beta Teste | obs= telefone=(11) 90000-0010 | 120@' + HOJE);
+  conf('editar ficha: telefone e contato chegam ao tablet sem alterar preço ou cor', noTablet.alfa,
+    'Aluno Alfa Atualizado|Responsável Alfa Atualizado|(11) 90000-0011|casa|Rua de teste, 10|100|#1F3A5F');
   /* (D6c) O que a folha fez chega ao tablet igual: a remarcação de uma aula
    * da repetição (o tablet, ao abrir, materializa a série e não recria a
    * aula na data de onde ela saiu), o cancelar de hoje com cobrança, o faltou
@@ -1176,7 +1210,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   prop('no servidor, nenhuma cópia apontada foi enviada pelo celular (' + autores.length + ' lidas)', autores.length > 0 && autores.indexOf(idCelular) < 0, MODOS[0]);
   if (MODO === MODOS[0]) fimDoVeneno();
 
-  secao('13. O celular não grava fora das quatro ações');
+  secao('13. O celular não grava fora das cinco ações');
   const tudoDoCelular = Array.from(new Set((await escritasLidas(pagC)).map(n => decodeURIComponent(n.replace(/^.*\/documents\/usuarios\/[^/]+\//, '')))));
   console.log('   o que subiu do celular: ' + tudoDoCelular.join(', '));
   /* (D7) o diagnóstico do celular, só o do PRÓPRIO aparelho, é a outra coisa
@@ -1185,10 +1219,10 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('(D7) o celular que editou sobe o diagnóstico dele, e só o do próprio aparelho', diagnosticosDoCelular.join(','), 'diagnostico/' + idCelular);
   const enviadosDoCelular = tudoDoCelular.filter(n => !/^diagnostico\//.test(n));
   // (D6c) e os da folha: faltou e realizada (ontem), a remarcação da repetição (a aula e a série) e a de junho
-  const esperados = ['registros/aula:' + idMarcada, 'registros/aula:aula-outro', 'registros/aula:aula-hoje', 'registros/aluno:' + idBeta, 'registros/aula:aula-terceiro',
+  const esperados = ['registros/aula:' + idMarcada, 'registros/aula:aula-outro', 'registros/aula:aula-hoje', 'registros/aluno:' + idBeta, 'registros/aluno:alfa', 'registros/aula:aula-terceiro',
     'registros/aula:aula-ontem', 'registros/aula:' + idGama1, 'registros/serie:' + serieGama.id, 'registros/aula:ref-2026-06-10'];
   const pagamento = enviadosDoCelular.filter(n => /^registros\/pagamento:/.test(n));
-  conf('tudo o que subiu do celular é um registro das quatro ações: as aulas, o aluno novo e o pagamento, e nada mais',
+  conf('tudo o que subiu do celular é um registro das cinco ações: as aulas, o aluno novo e o pagamento, e nada mais',
     enviadosDoCelular.filter(n => esperados.indexOf(n) < 0 && pagamento.indexOf(n) < 0).join(', ') + '|' + esperados.filter(n => enviadosDoCelular.indexOf(n) < 0).join(', ') + '|' + pagamento.length, '||1');
   conf('nenhum ajuste subiu do celular', enviadosDoCelular.filter(n => /ajuste:/.test(n)).length, 0);
   const recusas = await pagC.evaluate(async () => {
@@ -1218,7 +1252,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     await pausa(200);
     const md = await medirTela(pagD);
     telasD.push(t + ': ' + md.dasAcoes.concat(md.soltos).concat(md.campos).join(' + '));
-    if (t === 'hoje') conf('(controle) o observador vê a linha do tempo, com a aula de hoje', /Aluno Alfa Teste/.test((await texto(pagD, '#cel-tempo .cel-bloco[data-aula="aula-hoje"]')) || ''), true);
+    if (t === 'hoje') conf('(controle) o observador vê a linha do tempo, com a aula de hoje', /Aluno Alfa Atualizado/.test((await texto(pagD, '#cel-tempo .cel-bloco[data-aula="aula-hoje"]')) || ''), true);
   }
   /* (D6c) a linha do tempo do observador: o toque no bloco mostra a aula, sem
    * nenhuma ação; nem o "+", nem as horas dos horários livres. */
@@ -1231,7 +1265,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     botoes: Array.from(document.querySelectorAll('#cel-folha button')).map(b => b.id || b.textContent.trim()).join(','),
     mais: !!(document.querySelector('#cel-marcar-aula') && document.querySelector('#cel-marcar-aula').getBoundingClientRect().height), horas: document.querySelectorAll('.cel-livre-hora').length
   }));
-  conf('(controle) o observador vê a linha do tempo e a folha abre com a aula', livresD >= 0 && !!(await existe(pagD, '#cel-tempo')) && abriuD && /Aluno Alfa Teste/.test((await texto(pagD, '#cel-folha')) || ''), true);
+  conf('(controle) o observador vê a linha do tempo e a folha abre com a aula', livresD >= 0 && !!(await existe(pagD, '#cel-tempo')) && abriuD && /Aluno Alfa Atualizado/.test((await texto(pagD, '#cel-folha')) || ''), true);
   prop('(D6c) na linha do tempo e na folha do observador, nenhuma ação: sem "+", sem horas para marcar, só o nome (a ficha mínima) e "Fechar" (' + JSON.stringify(folhaD) + ')',
     folhaD.acoes === 0 && !folhaD.mais && folhaD.horas === 0 && /^cel-folha-ficha,(Ver a sua anotação,)?cel-folha-fechar$/.test(folhaD.botoes), MODOS[1]);
   await clicar(pagD, '#cel-folha-fechar');
