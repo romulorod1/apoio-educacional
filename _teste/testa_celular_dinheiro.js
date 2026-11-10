@@ -500,6 +500,23 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
   conf('trouxe a cópia do tablet', await trazerCopiaNoCelular(pagC), true);
   conf('(arranjo) é o celular da dona, que edita', await pagC.evaluate(() => Nuvem.estado().celularDaDona), true);
 
+  secao('2b. O atalho de Pagamentos pendentes abre o pagamento daquele mês e aluno');
+  await pagA.evaluate(() => document.querySelector('#abrir-pendentes-pagamento').click());
+  const pendenteJunho = await pagA.evaluate(() => Array.from(document.querySelectorAll('.pendente-pagamento'))
+    .find(x => x.dataset.aluno === 'ref' && x.dataset.mes === '2026-06'));
+  conf('a lista mostra a pendência de junho do aluno de referência', !!pendenteJunho, true);
+  await pagA.evaluate(() => Array.from(document.querySelectorAll('.pendente-pagamento'))
+    .find(x => x.dataset.aluno === 'ref' && x.dataset.mes === '2026-06').querySelector('button.principal').click());
+  const abriuAtalho = await esperar('o atalho abre o valor de junho', () => pagA.evaluate(() => ({
+    mes: document.querySelector('#mes-fechamento').value,
+    valor: (document.querySelector('.linha-pagamento[data-aluno="ref"] .pagamento-valor') || {}).value || ''
+  })), x => x.mes === '2026-06' && !!x.valor, 10000);
+  conf('vai ao mês certo e abre o formulário do aluno', abriuAtalho.ok, true);
+  conf('o valor vem preenchido com o total devido', abriuAtalho.valor && abriuAtalho.valor.valor, '1.050,00');
+  await pagA.evaluate(() => document.querySelector('.linha-pagamento[data-aluno="ref"] .btn-cancelar-pagamento').click());
+  conf('fechar o formulário sem confirmar não grava pagamento', await pagA.evaluate(() => Store.carregar().then(d => d.pagamentos.length)), 2);
+  await mesNoTablet(pagA, MES);
+
   secao('3. O selo de cada família: o mesmo do tablet, e o esperado à mão');
   await aba(pagC, 'fechamento');
   conf('(arranjo) o Fechamento do celular abre no mês de hoje', await mesNoCelular(pagC, MES), true);
