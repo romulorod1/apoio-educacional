@@ -144,8 +144,9 @@
  * store.js e sw.js). O v109 fixa a altura da linha de proposta entre
  * plataformas. O v110 traz a navegação com a Biblioteca, o trilho lateral do
  * tablet e a barra de baixo do celular (app.js, index.html e styles.css).
- * O v111 traz a linha do tempo do Hoje no celular e o atalho + Aula. */
-var CACHE = 'apoio-educacional-v111';
+ * O v111 traz a linha do tempo do Hoje no celular e o atalho + Aula.
+ * O v112 traz Vagos, a disponibilidade semanal no celular. */
+var CACHE = 'apoio-educacional-v112';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

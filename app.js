@@ -22324,6 +22324,7 @@
    * botão de edição. */
   var modoCelular = false;
   var telaCelular = 'hoje';
+  var semanaVagosCelular = null, diaVagosCelular = null, duracaoVagosCelular = 60;
   var mesCelular = Core.mesDe(Core.hojeIso());
   var diaCelular = Core.hojeIso(); // o dia que Hoje mostra (ela pode escolher outro)
   var formCelular = null;         // a ação aberta em Hoje: { tipo: 'aula' | 'relato' | 'aluno', aulaId }
@@ -22644,13 +22645,14 @@
     if (folhaCelular && !celularEdita() && folhaCelular.passo !== 'ficha') folhaCelular.passo = 'acoes';
     desenharTopoCelular();
     ajustarAbasDoCelular(); // as telas do observador (D7) só com ele
+    if (telaCelular === 'vagos' && !celularEdita()) telaCelular = 'hoje';
     $$('#modo-celular .cel-tela').forEach(function (t) { t.classList.remove('ativa'); });
     $$('#cel-abas .cel-aba').forEach(function (b) {
       var ativa = !entrada && b.dataset.cel === telaCelular;
       b.classList.toggle('ativa', ativa);
       b.setAttribute('aria-current', ativa ? 'page' : 'false');
     });
-    $('#cel-abas').hidden = entrada;
+    $('#cel-abas').hidden = entrada || telaCelular === 'vagos';
     if (entrada) { desenharEntradaCelular(); $('#cel-entrada').classList.add('ativa'); return; }
     if (telaCelular === 'fechamento') desenharFechamentoCelular();
     else if (telaCelular === 'enviar') desenharEnvioCelular();
@@ -22658,6 +22660,7 @@
     else if (telaCelular === 'ajustes') desenharAjustesObservador();
     else if (telaCelular === 'alunos') desenharAlunosCelular();
     else if (telaCelular === 'biblioteca') desenharBibliotecaCelular();
+    else if (telaCelular === 'vagos') desenharVagosCelular();
     else desenharHojeCelular();
     $('#cel-' + telaCelular).classList.add('ativa');
     if (telaCelular === 'hoje') rolarHojeCelular(diaCelular || Core.hojeIso());
@@ -23549,6 +23552,12 @@
     if (dia === hoje) porAvisosNaFaixaCelular(faixa);
     caixa.appendChild(faixa);
     caixa.appendChild(semana.dias);
+    if (edita) caixa.appendChild(el('button', { type: 'button', class: 'btn cel-abrir-vagos', id: 'cel-abrir-vagos', texto: 'Ver horários vagos', aoClick: function () {
+      var h = Core.hojeIso();
+      semanaVagosCelular = somarDiasCelular(h, -((Core.diaSemana(h) + 6) % 7));
+      diaVagosCelular = h >= semanaVagosCelular && h <= somarDiasCelular(semanaVagosCelular, 5) ? h : semanaVagosCelular;
+      irParaTelaCelular('vagos');
+    } }));
     ajustarPainelDosAvisosCelular();
     var aulas = aulasDoDiaCelular(dia);
     if (!aulas.length) {
@@ -23574,6 +23583,63 @@
     if (folhaCelular) desenharFolhaCelular();
     hojeVistoCelular = hoje; // o dia em que esta linha do tempo foi desenhada (a virada da meia-noite)
     rolarHojeCelular(dia);
+  }
+
+  function desenharVagosCelular() {
+    var caixa = $('#cel-vagos');
+    caixa.innerHTML = '';
+    var hoje = Core.hojeIso();
+    if (!semanaVagosCelular) semanaVagosCelular = somarDiasCelular(hoje, -((Core.diaSemana(hoje) + 6) % 7));
+    var inicio = semanaVagosCelular, fim = somarDiasCelular(inicio, 5);
+    caixa.appendChild(el('div', { class: 'cel-vagos-topo' }, [
+      el('button', { type: 'button', class: 'btn pequeno', id: 'cel-vagos-voltar', 'aria-label': 'Voltar para Hoje', texto: '‹', aoClick: function () { irParaTelaCelular('hoje'); } }),
+      el('div', { class: 'cel-vagos-titulo' }, [
+        el('h2', { class: 'cel-titulo', texto: 'Vagos' }),
+        el('span', { class: 'cel-vagos-periodo', id: 'cel-vagos-periodo', texto: Core.ddmm(inicio) + ' a ' + Core.ddmm(fim) })
+      ]),
+      el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Semana anterior', texto: '‹', aoClick: function () { semanaVagosCelular = somarDiasCelular(inicio, -7); diaVagosCelular = null; desenharVagosCelular(); } }),
+      el('button', { type: 'button', class: 'btn pequeno', 'aria-label': 'Semana seguinte', texto: '›', aoClick: function () { semanaVagosCelular = somarDiasCelular(inicio, 7); diaVagosCelular = null; desenharVagosCelular(); } })
+    ]));
+    caixa.appendChild(el('p', { class: 'ajuda cel-vagos-ajuda', texto: 'Das 07:00 às 20:00. Toque num horário para preparar a aula.' }));
+    var filtros = el('div', { class: 'cel-vagos-duracoes', role: 'group', 'aria-label': 'Duração da aula' });
+    [60, 90, 120].forEach(function (dur) {
+      var rotulo = dur === 60 ? '1h' : dur === 90 ? '1h30' : '2h';
+      filtros.appendChild(el('button', { type: 'button', class: 'btn cel-vagos-chip' + (dur === duracaoVagosCelular ? ' ativo' : ''),
+        'aria-pressed': dur === duracaoVagosCelular ? 'true' : 'false', texto: rotulo, aoClick: function () { duracaoVagosCelular = dur; desenharVagosCelular(); } }));
+    });
+    caixa.appendChild(filtros);
+    var dias = [];
+    for (var i = 0; i < 6; i++) dias.push(somarDiasCelular(inicio, i));
+    if (!diaVagosCelular || dias.indexOf(diaVagosCelular) < 0) diaVagosCelular = dias.indexOf(hoje) >= 0 ? hoje : dias[0];
+    dias.forEach(function (dia) {
+      var vagas = horariosLivresCelular(dia, duracaoVagosCelular).filter(function (hora) {
+        var inicioMinutos = Core.minutosDaHora(hora);
+        return inicioMinutos + duracaoVagosCelular <= 20 * 60 && (dia !== hoje || inicioMinutos >= minutosAgoraCelular());
+      });
+      var selecionado = dia === diaVagosCelular;
+      var conteudo = el('div', { class: 'cel-vagos-conteudo' });
+      if (vagas.length) {
+        var botoes = el('div', { class: 'cel-vagos-horarios' });
+        vagas.forEach(function (hora) {
+          botoes.appendChild(el('button', { type: 'button', class: 'btn cel-vagos-horario', 'data-hora': hora,
+            texto: hora + ' a ' + horaDeMinutosCelular(Core.minutosDaHora(hora) + duracaoVagosCelular),
+            aoClick: function () { diaCelular = dia; irParaTelaCelular('hoje'); abrirFormularioCelular({ tipo: 'aula', data: dia, hora: hora, duracaoMin: duracaoVagosCelular }); }
+          }));
+        });
+      } else botoes = null;
+      if (botoes) conteudo.appendChild(botoes);
+      else conteudo.appendChild(el('p', { class: 'ajuda cel-vagos-sem-horario', texto: dia === hoje ? 'Sem horários disponíveis pelo restante do dia.' : 'Sem horário livre para essa duração.' }));
+      if (selecionado && vagas.length) {
+        var lista = vagas.map(function (h) { return h + ' a ' + horaDeMinutosCelular(Core.minutosDaHora(h) + duracaoVagosCelular); });
+        var mensagem = 'Olá! Tenho estes horários disponíveis para aula na ' + Core.diaSemanaLongo(dia) + ', ' + Core.ddmm(dia) + ': ' + lista.join(', ') + '. Qual funciona para você?';
+        conteudo.appendChild(botaoDeLinkCelular('cel-vagos-whatsapp', 'Mandar os horários de ' + Core.diaSemanaLongo(dia).toLowerCase(),
+          'https://wa.me/?text=' + encodeURIComponent(mensagem), { class: 'btn principal cel-vagos-mandar', 'aria-label': 'Abrir o WhatsApp com os horários de ' + Core.diaSemanaLongo(dia) + ' preparados' }));
+      }
+      caixa.appendChild(el('section', { class: 'cel-vagos-dia' + (selecionado ? ' selecionado' : ''), 'data-dia': dia }, [
+        el('button', { type: 'button', class: 'cel-vagos-escolher-dia', 'aria-pressed': selecionado ? 'true' : 'false',
+          texto: Core.diaSemanaCurto(dia) + ' ' + Core.ddmm(dia), aoClick: function () { diaVagosCelular = dia; desenharVagosCelular(); } }), conteudo
+      ]));
+    });
   }
 
   /* Ao chegar a um dia, a linha do tempo rola até agora (hoje) ou até a
@@ -24063,7 +24129,7 @@
     }
     var selAluno = el('select', { id: 'cel-aula-aluno' }, ativos.map(function (al) { return el('option', { value: al.id, texto: al.nome }); }));
     caixa.appendChild(campoCelular('Aluno', selAluno));
-    var h = camposDeHorarioCelular('cel-aula', { data: formCelular.data || diaCelular || Core.hojeIso(), hora: formCelular.hora || '15:30', duracaoMin: 60 }, null, 'realizada',
+    var h = camposDeHorarioCelular('cel-aula', { data: formCelular.data || diaCelular || Core.hojeIso(), hora: formCelular.hora || '15:30', duracaoMin: formCelular.duracaoMin || 60 }, null, 'realizada',
       function (v, choques) { titulo.textContent = 'Marcar aula às ' + v.hora; ajustarSalvarAoChoque($('#cel-aula-salvar'), 'Salvar na agenda', choques); });
     h.campos.forEach(function (c) { caixa.appendChild(c); });
     caixa.appendChild(el('p', { class: 'ajuda', texto: 'Aula de repetição se marca no tablet.' }));
