@@ -416,7 +416,7 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
   return {
     rolaDeLado: document.documentElement.scrollWidth > window.innerWidth || document.body.scrollWidth > window.innerWidth ||
       (conteudo && conteudo.scrollWidth > conteudo.clientWidth) || !!Array.from(raiz.querySelectorAll('*')).find(e => e.getBoundingClientRect().right > window.innerWidth + 0.5 && visivel(e)),
-    pequenos, soltos, acoes: raiz.querySelectorAll('[data-acao-celular]').length
+    pequenos, soltos, acoes: Array.from(raiz.querySelectorAll('[data-acao-celular]')).filter(visivel).length
   };
 }, RE_EDICAO);
 const telaBoa = m => m.pequenos.join('; ') + (m.rolaDeLado ? ' ROLA DE LADO' : '');
@@ -825,10 +825,10 @@ const medePainel = pag => pag.evaluate(() => {
   seVeneno(V_EMPILHADOS);
   /* O topo fixo (a barra do aplicativo e o que fica preso com ela) em no
    * máximo 20% da altura, em 360 x 780, 390 x 844 e 412 x 915, com a letra
-   * normal e a 130% (as letras do app, que são em px, multiplicadas por 1,3,
-   * como faz a escala de fonte do aparelho). Medido com a agenda rolada até
+   * normal e a 130% (a raiz em rem cresce com a preferência do aparelho).
+   * Medido com a agenda rolada até
    * agora, que é quando o preso está preso. */
-  const LETRA_130 = ':root{' + [11, 13, 14, 15, 16, 20].map((px, i) => '--letra-' + (i + 1) + ':' + Math.round(px * 13) / 10 + 'px').join(';') + '}';
+  const LETRA_130 = 'html{font-size:130%} body{font-size:20.8px}';
   const tetos = [];
   for (const [w, h] of [[360, 780], [390, 844], [412, 915]]) {
     for (const letra of ['100%', '130%']) {
@@ -837,17 +837,33 @@ const medePainel = pag => pag.evaluate(() => {
         if (css) { const s = document.createElement('style'); s.id = 'prova-letra'; s.textContent = css; document.head.appendChild(s); } }, letra === '130%' ? LETRA_130 : '');
       await momento(pagC, ...CENA);
       const t = await pagC.evaluate(() => { const f = document.querySelector('#cel-semana').getBoundingClientRect(), c = document.querySelector('#cel-conteudo');
-        return { preso: Math.round(f.bottom), rolagem: Math.round(c.scrollTop), rolaDeLado: document.documentElement.scrollWidth > innerWidth || c.scrollWidth > c.clientWidth }; });
+        const dias = document.querySelectorAll('#cel-semana-dias .cel-semana-dia').length;
+        const horas = Array.from(document.querySelectorAll('#cel-tempo .cel-tempo-grade-hora'));
+        const h7 = horas.find(x => x.textContent === '07:00'), h8 = horas.find(x => x.textContent === '08:00'), h20 = horas.find(x => x.textContent === '20:00');
+        const grade = document.querySelector('#cel-tempo'), g = grade.getBoundingClientRect(), anterior = c.scrollTop;
+        c.scrollTop = 0;
+        const gradeNoTopo = grade.getBoundingClientRect(), nav = document.querySelector('#cel-abas').getBoundingClientRect();
+        const gradeFits = gradeNoTopo.top >= f.bottom - 1 && gradeNoTopo.bottom <= nav.top + 1;
+        c.scrollTop = anterior;
+        return { preso: Math.round(f.bottom), rolagem: Math.round(anterior), dias, gradeFits, bounds: [gradeNoTopo.top, gradeNoTopo.bottom, f.bottom, nav.top].map(Math.round).join('/'), raiz: getComputedStyle(document.documentElement).fontSize,
+          escala: h7 && h8 && h20 ? Math.round(h8.getBoundingClientRect().top - h7.getBoundingClientRect().top) : 0,
+          horas: [h7 && h7.textContent, h20 && h20.textContent],
+          rolaDeLado: document.documentElement.scrollWidth > innerWidth || c.scrollWidth > c.clientWidth }; });
       const sl = await selinho(pagC);
-      tetos.push({ tela: w + 'x' + h, letra, preso: t.preso, pct: Math.round(t.preso / h * 1000) / 10, rolagem: t.rolagem, rolaDeLado: t.rolaDeLado, selo: sl.numero, aberto: sl.painelVisivel });
+      tetos.push({ tela: w + 'x' + h, letra, preso: t.preso, pct: Math.round(t.preso / h * 1000) / 10, rolagem: t.rolagem,
+        dias: t.dias, escala: t.escala, horas: t.horas, gradeFits: t.gradeFits, bounds: t.bounds, raiz: t.raiz, rolaDeLado: t.rolaDeLado, selo: sl.numero, aberto: sl.painelVisivel });
     }
   }
   await pagC.evaluate(() => { const v = document.querySelector('#prova-letra'); if (v) v.remove(); });
   await pagC.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true });
-  tetos.forEach(t => console.log('   topo fixo ' + t.tela + ' letra ' + t.letra + ': ' + t.preso + ' px, ' + t.pct + '% (rolagem ' + t.rolagem + ', selinho ' + t.selo + ', aberto ' + t.aberto + ')'));
-  conf('(arranjo) as seis medidas foram com a agenda rolada até agora e o selinho com os 3', tetos.every(t => t.rolagem > 0 && t.selo === '3'), true);
+  tetos.forEach(t => console.log('   topo fixo ' + t.tela + ' letra ' + t.letra + ': ' + t.preso + ' px, ' + t.pct + '% (rolagem ' + t.rolagem + ', escala ' + t.escala + ' px/h, raiz ' + t.raiz + ', grade inteira visível sem rolar ' + t.gradeFits + ', bordas ' + t.bounds + ', selinho ' + t.selo + ')'));
+  conf('(arranjo) as seis medidas rolam para a linha de agora e mantêm o selinho com os 3', tetos.every(t => t.rolagem > 0 && t.selo === '3'), true);
   prop('o topo fixo fica em no máximo 20% da altura nas três telas, com a letra normal e a 130% (' + tetos.map(t => t.tela + '/' + t.letra + ' ' + t.pct + '%').join(', ') + ')',
     tetos.every(t => t.pct <= 20), V_TOPO);
+  conf('a semana mantém os sete dias e a grade mostra a escala horária de 07:00 a 20:00 nas seis combinações de tela e fonte',
+    tetos.every(t => t.dias === 7 && t.escala === Math.round(52 * (t.letra === '130%' ? 1.3 : 1)) && t.horas[0] === '07:00' && t.horas[1] === '20:00'), true);
+  conf('a grade inteira cabe sem rolar a 412 x 915 com a letra normal',
+    tetos.find(t => t.tela === '412x915' && t.letra === '100%').gradeFits, true);
   seVeneno(V_TOPO);
   conf('nas seis, nada rola de lado', tetos.filter(t => t.rolaDeLado).map(t => t.tela + '/' + t.letra).join(','), '');
   /* Com a letra a 130% num celular de 360 x 780: o painel aberto, o terceiro
