@@ -141,14 +141,11 @@
  * duas linhas, a barra de cima menor e a trava de transbordo (app.js e
  * styles.css), com a lista igual. O v108 adicionou o indexador de livros; o
  * v109 e o v110 trouxeram navegação e Biblioteca por disciplina e ano. O v111
- * atualiza esses assets após sincronizar a Biblioteca com a main atualizada.
- * O v118 traz a navegação dia a dia na linha do tempo do celular e o atalho
- * + Aula. O v119 atualiza a descrição de ausência de vínculo no mapa.
- * O v120 recolhe a gestão da Biblioteca em Ajustes e isola a conferência de cada
- * livro em Worker com prazo (app.js, biblioteca.js e conferir-livro-worker.js). */
-/* v121 inclui o atalho de pagamento pendente em app.js. */
-/* v122 inclui a pagina impressa na leitura dos livros. */
-var CACHE = 'apoio-educacional-v122';
+ * atualiza esses assets apos sincronizar a Biblioteca com a main atualizada.
+ * O v118 traz navegacao dia a dia no celular; v119 ajusta a legenda do mapa.
+ * O v120 isola a conferencia de livros; v121 traz Marcar pago; v122, pagina impressa;
+ * v123, edicao da ficha movel. */
+var CACHE = 'apoio-educacional-v123';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
