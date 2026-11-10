@@ -36,9 +36,11 @@ const VENENOS = ['--envenenado-rotulo-corta'];
 const VENENO_ROTULO = process.argv.indexOf('--envenenado-rotulo-corta') !== -1;
 
 const CSS = fs.readFileSync(path.join(H.RAIZ, 'styles.css'), 'utf8');
-const ANCORA_ROTULO = 'grid-auto-columns: minmax(min-content, 1fr);';
+const ANCORA_ROTULO = '.cel-abas.muitas .nav-rotulo { white-space: normal; overflow-wrap: anywhere; line-height: 1.05; }';
+const ANCORA_COLUNA = 'grid-auto-columns: minmax(min-content, 1fr);';
 const trocas = {};
-if (VENENO_ROTULO) trocas['/styles.css'] = CSS.split(ANCORA_ROTULO).join('grid-auto-columns: minmax(0, 1fr);');
+if (VENENO_ROTULO) trocas['/styles.css'] = CSS.replace(ANCORA_COLUNA, 'grid-auto-columns: minmax(0, 1fr);')
+  .replace(ANCORA_ROTULO, '.cel-abas.muitas .nav-rotulo { white-space: nowrap; overflow-wrap: normal; line-height: 1.05; }');
 
 const amb = H.criarAmbiente(PORTA, 'perfil_navegacao_biblioteca', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'nav_bib_'));

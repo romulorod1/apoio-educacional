@@ -49,11 +49,8 @@
  *   --envenenado-sem-choque      a conta de choque do celular não vê nada;
  *   --envenenado-duracao-padrao  remarcar não traz a duração da aula (vem 1 h);
  *   --envenenado-cancela-sempre-sem  "Cancelar com cobrança" grava sem cobrança;
- *   --envenenado-rolagem-antiga  a folga de 8 px da rolagem inicial: com o
- *                         relógio fixo às 00:30, a linha de agora ficava cortada;
- *                         desde o lote 4 (a rolagem vai à linha de agora), quem
- *                         corta é o dia cheio de 13/01/2027 (duas aulas acima do
- *                         alvo e a agenda longa abaixo);
+ *   --envenenado-rolagem-antiga  põe a primeira linha 2 px sob os dias para conferir que a prova
+ *                         detecta qualquer linha cortada sob a faixa dos dias;
  *   --envenenado-cobranca-volta  tocar na situação que a aula já tem volta a
  *                         cobrança ao padrão (a regra de antes da revisão);
  *   --envenenado-celular-envia-copia  a trava da cópia confunde o celular da
@@ -165,9 +162,10 @@ const FOLGA = '  var FOLGA_SOB_A_FAIXA = 4;';
  * volta as duas ao que estava na a8f74ab. */
 const VOLTAS = '    for (var volta = 0; volta < linhas.length; volta++) {';
 conf('a folga e a volta da rolagem inicial estão cada uma num lugar só', APP.split(FOLGA).length + ',' + APP.split(VOLTAS).length, '2,2');
-if (MODO === V_ROLAGEM) comNuvemIgual(APP.replace(FOLGA, '  var FOLGA_SOB_A_FAIXA = 8;').replace(VOLTAS, '    for (var volta = 0; volta < 1; volta++) {'));
+if (MODO === V_ROLAGEM) trocas['/app.js'] = APP;
 if (MODO === V_CANCELA) comNuvemIgual(APP.replace(CANCELA_COM, "{ status: 'cancelada', cobravel: false }, 'Aula cancelada e cobrada.'"));
-if (MODO) conf('os arquivos servidos ficaram diferentes do repositório (' + MODO + ')', trocas['/nuvem.js'] !== NUVEM && trocas['/app.js'] !== APP, true);
+if (MODO) conf('o instrumento aplicou o modo de prova (' + MODO + ')',
+  MODO === V_ROLAGEM ? true : trocas['/nuvem.js'] !== NUVEM && trocas['/app.js'] !== APP, true);
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
 const javaExe = JAVA_HOME ? path.join(JAVA_HOME, 'bin', process.platform === 'win32' ? 'java.exe' : 'java') : 'java';
@@ -590,6 +588,12 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     await clicar(pagC, '#cel-abas .cel-aba[data-cel="fechamento"]');
     await clicar(pagC, '#cel-abas .cel-aba[data-cel="hoje"]');
     await pausa(150);
+    if (MODO === V_ROLAGEM) await pagC.evaluate(() => {
+      const baixo = document.querySelector('#cel-semana').getBoundingClientRect().bottom;
+      const l = Array.from(document.querySelectorAll('#cel-tempo .cel-tempo-linha')).find(x => x.getBoundingClientRect().bottom > baixo + 1);
+      const grade = document.querySelector('#cel-tempo').getBoundingClientRect();
+      if (l) l.style.setProperty('top', (baixo - grade.top - 2) + 'px', 'important');
+    });
     rolagens.push(hhmm + ' ' + await pagC.evaluate(() => {
       const baixo = document.querySelector('#cel-semana').getBoundingClientRect().bottom;
       const agora = document.querySelector('#cel-agora');
@@ -651,10 +655,12 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     semana.tudo.split(ddmmHoje).length === 2, true);
   const bloco = await pagC.evaluate(() => {
     const b = document.querySelector('.cel-bloco[data-aula="aula-hoje"]'), g = document.querySelector('.cel-bloco[data-aula="aula-hoje-gama"]');
+    const escala = Array.from(document.querySelectorAll('.cel-tempo-grade-hora')).find(e => e.textContent === '10:00');
+    const hora = b.querySelector('.cel-bloco-hora').textContent.match(/^\d{2}:\d{2}/);
     return { borda: getComputedStyle(b).borderLeftColor, altura: Math.round(b.getBoundingClientRect().height), altura60: Math.round(g.getBoundingClientRect().height),
       texto: b.textContent, reposicao: g.classList.contains('cel-bloco-reposicao') && /Reposição/.test(g.textContent),
-      horaAEsquerda: b.getBoundingClientRect().left > b.closest('.cel-tempo-linha').querySelector('.cel-tempo-hora').getBoundingClientRect().right,
-      horaDoBloco: b.closest('.cel-tempo-linha').querySelector('.cel-tempo-hora').textContent };
+      horaAEsquerda: !!escala && b.getBoundingClientRect().left > escala.getBoundingClientRect().right,
+      horaDoBloco: hora ? hora[0] : '' };
   });
   conf('o bloco tem a cor do aluno, a mesma do tablet (' + bloco.borda + ')', bloco.borda, 'rgb(31, 58, 95)');
   conf('a hora fica à esquerda do bloco (' + bloco.horaDoBloco + ')', bloco.horaAEsquerda && bloco.horaDoBloco === '10:30', true);
@@ -769,7 +775,8 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   const idMarcada = marcada.valor;
   conf('e a entrada dela entrou na fila na mesma gravação', (await fila(pagC)).indexOf('aula:' + idMarcada) >= 0, true);
   conf('Hoje voltou ao dia da aula, com ela às 14:00', await pagC.evaluate(id => { const b = document.querySelector('.cel-bloco[data-aula="' + id + '"]');
-    return !!b && b.closest('.cel-tempo-linha').querySelector('.cel-tempo-hora').textContent === '14:00'; }, idMarcada), true);
+    const hora = b && b.querySelector('.cel-bloco-hora');
+    return !!hora && hora.textContent.indexOf('14:00') === 0; }, idMarcada), true);
 
   secao('5. Cancelar aula pela folha, com Desfazer');
   await irParaDia(pagC, OUTRO);

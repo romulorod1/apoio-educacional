@@ -3315,7 +3315,6 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
 .cel-tempo-sem-hora .cel-tempo-hora { position: static; flex: 0 0 44px; color: var(--novidades-subtitulo); }
 .cel-tempo-sem-hora .cel-tempo-item { position: static; display: flex; flex: 1; min-width: 0; }
 .cel-tempo-sem-hora .cel-bloco { position: relative; flex: 1; min-height: 48px; }
-.cel-tempo-proporcional > .cel-tempo-linha .cel-tempo-hora { color: transparent; }
 .cel-tempo-proporcional .cel-bloco { position: absolute; box-sizing: border-box; min-height: 48px; margin: 0; overflow: hidden; }
 .cel-tempo-proporcional .cel-livre { position: relative; box-sizing: border-box; top: 0; left: 0; width: 100%; height: 100%; min-height: 26px; margin: 0; overflow: hidden; }
 .cel-tempo-proporcional .cel-bloco { padding: 4px 6px; border-radius: 8px; gap: 1px; }

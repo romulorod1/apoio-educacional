@@ -1,5 +1,9 @@
 /* Janela de perfil do aluno com histórico, campos novos, e a janela de novidades. */
 const puppeteer = require('puppeteer-core');
+const H = require('./_bib_navegador');
+/* O relógio da rodada (segunda, 16/11/2026, 11:00), no processo e na página: a
+ * prova não depende do dia em que roda (a virada anual abre sozinha em janeiro). */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 let f = 0, p = 0;
 function conf(r, o, e) {
   const ok = String(o) === String(e);
@@ -14,11 +18,13 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
     headless: 'new', args: ['--no-sandbox'], defaultViewport: { width: 1280, height: 1000 }
   });
   const pag = await b.newPage();
+  await RELOGIO.naPagina(pag);
   const erros = [];
   pag.on('pageerror', e => erros.push(e.message));
   pag.on('dialog', async d => { try { await d.accept(); } catch (e) { } });
   await pag.goto('http://127.0.0.1:8777/index.html', { waitUntil: 'networkidle0' });
   await esp(2200);
+  await RELOGIO.conferir(pag, conf);
 
   const bd = () => pag.evaluate(() => new Promise(r => {
     const q = indexedDB.open('apoio-educacional');
