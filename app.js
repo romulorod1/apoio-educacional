@@ -5,6 +5,9 @@
   'use strict';
 
   var VERSAO = '1.42.45';
+  /* O protocolo para o celular editar a mensagem do mês chegou na 1.42.40.
+   * Versões posteriores do app podem trazer apenas ajustes de interface. */
+  var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -24249,10 +24252,10 @@
     linhas.filter(function (l) { return l.tipo === 'livre'; }).forEach(function (l) {
       var ini = Math.max(inicioGrade, l.ini), fim = Math.min(fimGrade, l.fim);
       if (fim - ini < 30) return;
-      /* O cartão livre contém uma descrição e botões de pelo menos 48 px.
-       * Gaps curtos não comportam o conjunto sem invadir a aula seguinte;
-       * o atalho + Aula continua disponível na barra inferior. */
-      if (posicao(fim) - posicao(ini) < 84) return;
+      /* No celular da dona, o cartão livre contém uma descrição e botões de
+       * pelo menos 48 px. Gaps curtos não comportam o conjunto sem invadir a
+       * próxima aula; no modo de consulta permanece o resumo textual curto. */
+      if (edita && posicao(fim) - posicao(ini) < 84) return;
       var linha = linhaProporcional('livre', ini, fim, 26);
       linha.querySelector('.cel-tempo-item').appendChild(buracoLivreCelular({ ini: ini, fim: fim }, dia, edita));
       caixa.appendChild(linha);
@@ -25936,15 +25939,14 @@
     return Promise.race([lida, espera]);
   }
 
-  /* Um tablet numa versão anterior a esta não conhece a regra da mensagem do
-   * mês (vence a escrita mais recente) e, com uma edição dele mais velha na
-   * fila, cobriria a do celular. Enquanto o tablet não atualiza, o celular não
-   * edita a mensagem. */
+  /* Um tablet anterior ao protocolo da mensagem do mês (1.42.40) não conhece
+   * a regra de escrita mais recente e poderia cobrir a edição do celular. A
+   * versão atual do app é independente desse mínimo, pois pode mudar só a UI. */
   function abrirMensagemCelular(alunoId, mes) {
     if (!podeEditarMensagemCelular()) return;
     return versaoDoTabletCelular().then(function (v) {
-      if (v && Core.versaoAntes(v.app, VERSAO) === true) {
-        avisar('Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão ' + v.app + ', e esta é a ' + VERSAO + '.');
+      if (v && Core.versaoAntes(v.app, VERSAO_MINIMA_PROTOCOLO_MENSAGEM) === true) {
+        avisar('Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão ' + v.app + ', e precisa estar na versão ' + VERSAO_MINIMA_PROTOCOLO_MENSAGEM + ' ou mais recente.');
         return;
       }
       abrirEditorDaMensagemCelular(alunoId, mes);
