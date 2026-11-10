@@ -72,6 +72,7 @@
   var temporizadorAutosaveAula = null;
   var promessaAutosaveAula = null;
   var snapshotAutosaveAula = null;
+  var revisaoAutosaveAula = 0;
   var alunoEmEdicao = null;
   /* Redesenha o resumo de etapas do alto da aba Dados. Quem marca a etapa é o
    * quadro da aba Mapeamento, e ele avisa aqui para as duas abas nunca
@@ -1767,6 +1768,19 @@
     mudancaNaoGuardada = false;
     clearTimeout(tempoNovaTentativa);
     esconderFaixaGravacao();
+    if (aulaEmEdicao && $('#modal-aula').classList.contains('aberto')) {
+      var valores = valoresEditadosDaAula();
+      var snapshot = snapshotAutosaveAula || {};
+      Object.keys(valores).forEach(function (chave) {
+        if (valores[chave] === aulaEmEdicao[chave]) snapshot[chave] = valores[chave];
+      });
+      snapshotAutosaveAula = snapshot;
+      if (!aulaTemMudancasParaAutosave()) {
+        rotuloEstadoAutosaveAula('Salvo ' + new Date().toLocaleTimeString('pt-BR', {
+          hour: '2-digit', minute: '2-digit'
+        }));
+      }
+    }
   }
 
   function falhaDeGravacao(erro) {
@@ -3134,6 +3148,7 @@
     var aula = aulaEmEdicao;
     var valores = valoresEditadosDaAula();
     var antes = snapshotAutosaveAula || {};
+    var revisaoNoInicio = revisaoAutosaveAula;
     var mudancas = {};
     Object.keys(valores).forEach(function (chave) {
       if (valores[chave] !== antes[chave]) mudancas[chave] = valores[chave];
@@ -3148,7 +3163,7 @@
         rotuloEstadoAutosaveAula('Salvo ' + new Date().toLocaleTimeString('pt-BR', {
           hour: '2-digit', minute: '2-digit'
         }));
-        snapshotAutosaveAula = Object.assign({}, valoresEditadosDaAula());
+        snapshotAutosaveAula = Object.assign({}, antes, valores);
         $('#titulo-modal-aula').textContent = 'Aula de ' + Core.ddmmaaaa(aula.data);
         desenharAgenda();
       }
@@ -3160,7 +3175,8 @@
       return false;
     }).then(function (resultado) {
       promessaAutosaveAula = null;
-      if (aulaTemMudancasParaAutosave()) return gravarAutosaveAula();
+      if (resultado && aulaTemMudancasParaAutosave()) return gravarAutosaveAula();
+      if (!resultado && revisaoAutosaveAula > revisaoNoInicio) agendarAutosaveAula();
       return resultado;
     });
     return promessaAutosaveAula;
@@ -3169,6 +3185,7 @@
   function agendarAutosaveAula() {
     if (!aulaEmEdicao || !$('#modal-aula').classList.contains('aberto')) return;
     if (temporizadorAutosaveAula) clearTimeout(temporizadorAutosaveAula);
+    revisaoAutosaveAula++;
     rotuloEstadoAutosaveAula('Alterações pendentes');
     temporizadorAutosaveAula = setTimeout(function () {
       gravarAutosaveAula();
@@ -3202,6 +3219,7 @@
     temporizadorAutosaveAula = null;
     promessaAutosaveAula = null;
     snapshotAutosaveAula = null;
+    revisaoAutosaveAula = 0;
     rotuloEstadoAutosaveAula(novo ? '' : 'Salvo ' + new Date().toLocaleTimeString('pt-BR', {
       hour: '2-digit', minute: '2-digit'
     }));
