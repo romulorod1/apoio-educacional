@@ -3072,7 +3072,12 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
    tela, também com a letra a 130% num celular de 360 (auditoria de 09/11). */
 .cel-semana-topo { flex-wrap: nowrap; align-items: center; margin-bottom: 0; }
 .cel-semana-topo .btn { min-width: var(--alvo-celular); flex-shrink: 0; }
-.cel-semana-topo .cel-titulo { margin: 0; text-align: center; font-size: var(--letra-16); line-height: 1.15; }
+.cel-semana-topo .cel-semana-passo { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 8px 7px; font-size: var(--letra-12); white-space: nowrap; }
+.cel-semana-topo .cel-titulo { min-width: 0; margin: 0; text-align: center; font-size: var(--letra-16); line-height: 1.15; }
+@media (max-width: 380px) {
+  /* Mantém a data legível no celular estreito, com as duas setas e Hoje. */
+  .cel-semana-topo .cel-semana-passo { gap: 0; padding-left: 0; padding-right: 0; }
+}
 .cel-semana-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0; }
 .cel-semana-dia {
   min-height: 56px;
@@ -3834,3 +3839,163 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .cel-aba-mais .nav-ind { width: 40px; height: 32px; color: var(--nav-mais-traco); background: var(--nav-mais-fundo); border-radius: 16px; }
 .cel-aba-mais .nav-rotulo { color: var(--nav-ativo-texto); font-weight: 600; }
 /* ==================== B1: navegação (fim) ==================== */
+
+/* ==================== B2: a Biblioteca por disciplina e ano ====================
+   O desenho é o de design\biblioteca (tab_biblioteca e tab_livro_sumario), com
+   os tokens da F1: marinho para a ação e o escolhido, âmbar só para o que falta,
+   letras de 12 a 24 e alvo de 48. As capas usam as cores do protótipo, declaradas
+   aqui (o sistema não tinha cor de capa), todas com letra branca a 4,5:1 ou mais. */
+:root {
+  --capa-alfa: #3D6A9B;
+  --capa-beta: #9A5A3C;
+  --capa-gama: #3E7A5D;
+  --capa-delta: #6F5A92;
+  --capa-zeta: #2F7A82;
+  --capa-ouro: #7A5D22;
+}
+.bibl-topo { display: flex; align-items: center; gap: 12px 24px; flex-wrap: wrap; margin-bottom: 16px; }
+.bibl-topo .titulo { font-size: var(--letra-24); }
+.bibl-contagem { font-size: var(--letra-14); color: var(--muted); }
+.bibl-contagem[hidden] { display: none; }
+.bibl-busca {
+  flex: 1 1 18rem; min-width: 0; display: flex; align-items: center; gap: 8px;
+  min-height: var(--alvo); padding: 0 6px 0 14px;
+  border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco);
+}
+.bibl-busca:focus-within { border-color: var(--acao); }
+.bibl-lupa { display: inline-flex; color: var(--muted); }
+.bibl-busca input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; padding: 10px 0; font: inherit; font-size: var(--letra-16); color: var(--texto); }
+.bibl-busca input::placeholder { color: var(--muted); }
+.bibl-exercicios-cabeca { display: flex; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; margin: 0 0 12px; }
+.bibl-exercicios-cabeca .cresce { flex: 1; }
+.bibl-exercicios-titulo { font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); margin: 0; }
+.bibl-exercicios-titulo[hidden] { display: none; }
+.bibl[hidden], .bibl-livro[hidden] { display: none; }
+.bibl.bibl-na-busca { display: none; }
+.bibl { margin-bottom: 8px; }
+.bibl-rotulo { font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--texto); margin: 0 0 8px; }
+.bibl-titulo { font-size: var(--letra-20); font-weight: var(--peso-forte); color: var(--navy); margin: 0; }
+.bibl-forte { display: block; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--texto); text-wrap: balance; }
+.bibl-apoio { font-size: var(--letra-14); color: var(--muted); }
+.bibl-pequena { display: inline-flex; align-items: center; gap: 4px; font-size: var(--letra-12); color: var(--muted); }
+.bibl-falta { display: block; font-size: var(--letra-12); color: var(--aviso-texto); }
+.bibl-falta-texto { font-size: var(--letra-14); color: var(--aviso-texto); }
+.bibl-linha-unica { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* as capas: um bloco de cor com a lombada e a faixa, sem imagem do livro */
+.bibl-capa {
+  position: relative; flex: none; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: space-between;
+  width: 100%; max-width: 8.25rem; aspect-ratio: 132 / 172;
+  padding: 10px 8px 8px 12px; border-radius: 4px 8px 8px 4px;
+  background: var(--capa, var(--navy)); color: var(--branco); box-shadow: var(--sombra); text-align: left;
+}
+.bibl-capa::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: color-mix(in srgb, var(--texto) 18%, var(--branco-a00)); }
+.bibl-capa::after { content: ""; position: absolute; left: 5px; right: 0; top: 58%; height: 6px; background: color-mix(in srgb, var(--branco) 22%, var(--branco-a00)); }
+.bibl-capa-topo { position: relative; font-size: var(--letra-14); font-weight: var(--peso-forte); overflow-wrap: anywhere; }
+.bibl-capa-pe { position: relative; font-size: var(--letra-12); overflow-wrap: anywhere; }
+.bibl-capa.mini { width: 36px; height: 48px; aspect-ratio: auto; padding: 0; border-radius: 2px 5px 5px 2px; }
+.bibl-capa.mini::after { top: 55%; height: 4px; }
+.bibl-capa-exercicios { --capa: var(--capa-ouro); }
+
+/* Continuar lendo */
+.bibl-continuar { margin-bottom: 16px; }
+.bibl-continuar-linha { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 12px; }
+.bibl-continuar-cartao {
+  display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 4.5rem;
+  padding: 10px 14px 10px 12px; border: 1px solid var(--fio-claro); border-radius: var(--raio);
+  background: var(--branco); font: inherit; text-align: left; cursor: pointer; color: inherit;
+}
+.bibl-continuar-cartao:hover { background: var(--fundo-leve); }
+.bibl-continuar-texto { flex: 1; min-width: 0; }
+.bibl-progresso { display: block; height: 4px; border-radius: 2px; background: var(--fio-claro); margin-top: 6px; overflow: hidden; }
+.bibl-progresso i { display: block; height: 100%; background: var(--navy); }
+
+/* disciplinas à esquerda, livros do ano à direita */
+/* Lado a lado quando cabe; na largura estreita (tablet em pé, letra a 130%) as
+   disciplinas sobem para cima dos livros, sem rolagem de lado. */
+.bibl-paineis {
+  display: flex; flex-wrap: wrap;
+  border-top: 1px solid var(--fio-claro); border-bottom: 1px solid var(--fio-claro);
+}
+.bibl-disciplinas { flex: 1 1 15rem; max-width: 100%; border-right: 1px solid var(--fio-claro); padding: 8px 12px 12px 0; min-width: 0; }
+.bibl-legenda { display: flex; align-items: center; gap: 4px; margin: 4px 0 8px; padding: 0 12px; font-size: var(--letra-12); color: var(--muted); }
+.bibl-disciplina {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--alvo);
+  padding: 0 12px; border: 0; border-radius: var(--raio); background: transparent;
+  font: inherit; font-size: var(--letra-16); color: var(--texto); text-align: left; cursor: pointer;
+}
+.bibl-disciplina .cresce { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.bibl-disciplina:hover { background: var(--soft); }
+.bibl-disciplina.ativa { background: var(--acao-clara); color: var(--navy); font-weight: var(--peso-forte); box-shadow: inset 4px 0 0 var(--navy); }
+.bibl-sinal-mapa { display: inline-flex; color: var(--muted); }
+.bibl-painel { flex: 999 1 28rem; padding: 12px 0 16px 24px; min-width: 0; }
+.bibl-painel-cabeca { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.bibl-anos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.bibl-ano {
+  min-width: var(--alvo); min-height: var(--alvo); padding: 6px 14px;
+  border: 1px solid var(--fio); border-radius: 999px; background: var(--branco);
+  font: inherit; font-size: var(--letra-14); color: var(--texto); cursor: pointer;
+}
+.bibl-ano:hover { background: var(--soft); }
+.bibl-ano.ativo { background: var(--navy); border-color: var(--navy); color: var(--branco); font-weight: var(--peso-forte); }
+.bibl-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 16px; margin-top: 12px; }
+.bibl-livro-cartao {
+  display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 0;
+  border: 0; background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.bibl-livro-cartao:focus-visible { outline-offset: 4px; }
+.bibl-livro-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.bibl-exercicios { padding: 8px; border: 1px dashed var(--fio); border-radius: var(--raio); }
+.bibl-vazio { margin: 12px 0 0; }
+.bibl-exercicios-titulo { margin-top: 20px; }
+
+/* a tela do livro: tela cheia, por cima do trilho, com Voltar escrito */
+.bibl-livro {
+  position: fixed; inset: 0; z-index: 40; overflow-y: auto;
+  display: flex; flex-direction: column; background: var(--fundo);
+}
+.bibl-livro-cabeca {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  min-height: 76px; padding: 8px 16px 8px 8px; border-bottom: 1px solid var(--fio-claro); background: var(--fundo);
+}
+.bibl-voltar-livro { border-color: transparent; background: transparent; color: var(--navy); }
+.bibl-livro-nome { flex: 1 1 12rem; min-width: 0; }
+.bibl-titulo-livro { font-size: var(--letra-24); font-weight: var(--peso-forte); color: var(--navy); margin: 0; overflow-wrap: anywhere; text-wrap: balance; }
+.bibl-painel-rotulo { margin: 0; }
+.bibl-livro-nome .bibl-apoio { margin: 2px 0 0; }
+/* O sumário e o painel lado a lado; estreito, o painel desce para baixo do sumário. */
+.bibl-livro-corpo { flex: 1; display: flex; flex-wrap: wrap; align-items: stretch; }
+.bibl-sumario { flex: 999 1 28rem; padding: 12px 24px 16px; background: var(--branco); min-width: 0; }
+.bibl-sumario-cabeca { display: flex; align-items: baseline; gap: 12px; padding: 4px 12px 8px; }
+.bibl-sumario-cabeca .bibl-apoio { margin-left: auto; }
+.bibl-sem-sumario { padding: 0 12px; }
+.bibl-cap, .bibl-sec {
+  display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline;
+  width: 100%; min-height: var(--alvo); padding: 10px 12px; border: 0; border-top: 1px solid var(--fio-claro);
+  background: transparent; font: inherit; color: var(--texto); text-align: left; cursor: pointer;
+}
+.bibl-sec { border-top-color: transparent; align-items: center; padding-block: 4px; }
+.bibl-cap:hover, .bibl-sec:hover { background: var(--soft); }
+.bibl-cap.atual { background: var(--acao-clara); border-radius: var(--raio); border-top-color: transparent; box-shadow: inset 4px 0 0 var(--navy); }
+.bibl-cap.atual + .bibl-sec, .bibl-cap.atual + .bibl-cap { border-top-color: transparent; }
+.bibl-cap-n { font-size: var(--letra-20); font-weight: var(--peso-forte); color: var(--muted); }
+.bibl-sec .bibl-cap-n { font-size: var(--letra-14); font-weight: var(--peso-normal); }
+.bibl-sec .bibl-cap-titulo { font-size: var(--letra-16); }
+.bibl-cap.atual .bibl-cap-n { color: var(--navy); }
+.bibl-cap-titulo { font-size: var(--letra-16); min-width: 0; overflow-wrap: anywhere; text-wrap: balance; }
+.bibl-cap .bibl-cap-titulo { font-weight: var(--peso-forte); }
+.bibl-cap-p { font-size: var(--letra-16); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.bibl-cap-assuntos { grid-column: 2 / 3; font-size: var(--letra-14); line-height: 1.4; color: var(--muted); }
+.bibl-cap-assuntos.bibl-falta-texto { color: var(--aviso-texto); }
+.bibl-livro-painel { flex: 1 1 24rem; display: flex; flex-direction: column; min-width: 0; border-left: 1px solid var(--fio-claro); background: var(--fundo); }
+.bibl-livro-painel-corpo { flex: 1; padding: 14px 20px 16px; }
+.bibl-livro-painel-corpo > p { margin: 4px 0 0; }
+.bibl-livro-painel-corpo .bibl-rotulo { margin-top: 18px; }
+.bibl-assunto { display: flex; align-items: center; min-height: 2.75rem; border-top: 1px solid var(--fio-claro); font-size: var(--letra-16); }
+.bibl-livro-painel-pe {
+  position: sticky; bottom: 0; display: flex; gap: 12px; flex-wrap: wrap;
+  padding: 12px 20px; border-top: 1px solid var(--fio-claro); background: var(--branco);
+}
+.bibl-livro-painel-pe .btn { flex: 1 1 auto; }
+/* ==================== B2 (fim) ==================== */

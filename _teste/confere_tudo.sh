@@ -495,6 +495,12 @@ roda "biblioteca navegar --envenenado-apelidos" node "_teste/testa_biblioteca_na
 # estourado tem de ser visto.
 roda "navegacao biblioteca"                     node "_teste/testa_navegacao_biblioteca.js"
 roda "navegacao biblioteca --envenenado-rotulo-corta" node "_teste/testa_navegacao_biblioteca.js" --envenenado-rotulo-corta
+# B2: a aba Biblioteca do tablet por disciplina e ano, com os livros
+# sinteticos, o Continuar lendo e a tela do livro com o sumario clicavel (o
+# capitulo abre o leitor na pagina do arquivo dele). O veneno abre todo
+# capitulo na pagina 1, e a prova tem de ver.
+roda "biblioteca livros tela"                   node "_teste/testa_biblioteca_livros_tela.js"
+roda "biblioteca livros tela --envenenado-capitulo-abre-pagina-errada" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-capitulo-abre-pagina-errada
 # C12: os pacotes de provas (OBMEP Mirim por nivel e ENEM) importam, as abas vao
 # do 2o ao 5o ano e os assuntos do aplicativo aparecem como modulos. O modo
 # envenenado serve o app.js que so espalhava o Banco pelas series equivalentes.

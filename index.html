@@ -115,23 +115,34 @@
     <!-- ---------------- biblioteca ----------------
          Sem pacote importado, oferece a importação pelo controle de Ajustes. -->
     <section class="tela" id="tela-biblioteca">
-      <div class="barra u-margem-baixo-12">
+      <!-- B2: o topo do desenho, numa linha: o título, quantos livros e a busca.
+           A busca é a dos EXERCÍCIOS (a de livros é outra fatia), e diz isso. -->
+      <div class="bibl-topo">
         <h2 class="titulo">Biblioteca</h2>
-        <span class="cresce"></span>
-        <button class="btn pequeno u-margem-dir-8" id="btn-guia-listas" type="button">Como usar as listas</button>
-        <div id="bib-contagem" class="ajuda u-margem-0 u-peso-seminegrito"></div>
+        <span class="bibl-contagem" id="bib-livros-contagem" hidden></span>
+        <div class="bibl-busca" id="bib-busca-cartao" role="search" style="display:none">
+          <span class="bibl-lupa" data-icone="search" aria-hidden="true"></span>
+          <input type="text" id="busca-biblioteca" aria-label="Buscar nos exercícios" placeholder="Buscar nos exercícios (bhaskara, pitágoras...)" autocomplete="off">
+          <button class="btn pequeno" id="limpar-busca-biblioteca" type="button" style="display:none">Limpar</button>
+        </div>
       </div>
       <!-- B12: o índice de texto dos livros sendo preparado; some quando termina -->
       <p id="indice-livros-progresso" class="ajuda indice-livros-progresso" role="status" aria-live="polite" hidden></p>
-      <div class="cartao u-margem-baixo-14 u-recuo-12-14" id="bib-busca-cartao" style="display:none">
-        <div class="barra u-margem-baixo-0 u-vao-8">
-          <input class="u-flex-1 u-larg-min-200" type="text" id="busca-biblioteca" placeholder="Buscar na biblioteca: assunto, fórmula ou nome (bhaskara, pitágoras...)" autocomplete="off">
-          <button class="btn pequeno" id="limpar-busca-biblioteca" type="button" style="display:none">Limpar</button>
-        </div>
+      <!-- B2: os livros do tablet por disciplina e ano, com o Continuar lendo.
+           Só aparece com livro no tablet; sem livro, a aba fica como era. -->
+      <div class="bibl" id="bib-livros" hidden></div>
+      <!-- a cabeça dos exercícios: o título (com livros no tablet), a contagem e o guia das listas -->
+      <div class="bibl-exercicios-cabeca" id="bib-exercicios-cabeca">
+        <h3 class="bibl-exercicios-titulo" id="bib-exercicios-titulo" hidden>Exercícios e listas</h3>
+        <div id="bib-contagem" class="ajuda u-margem-0 u-peso-seminegrito"></div>
+        <span class="cresce"></span>
+        <button class="btn pequeno" id="btn-guia-listas" type="button">Como usar as listas</button>
       </div>
       <div class="bib-contexto" id="bib-contexto" hidden></div>
       <div class="bib-carrinho" id="bib-carrinho" hidden></div>
       <div id="bib-corpo"></div>
+      <!-- B2: o livro aberto, com o sumário clicável, em tela cheia com Voltar -->
+      <section class="bibl-livro" id="bib-livro" hidden aria-label="Livro"></section>
     </section>
 
     <!-- ---------------- ajustes ---------------- -->
