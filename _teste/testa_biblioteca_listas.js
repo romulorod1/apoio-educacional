@@ -83,6 +83,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const H = require('./_bib_navegador.js');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, pausa, esperar } = H;
 
@@ -740,7 +745,7 @@ async function cenarioVerNaoTroca(pag) {
 async function abrirAulaDeHoje(pag, hora) {
   await H.irParaAba(pag, 'agenda');
   await pausa(400);
-  const hoje = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+  const hoje = RELOGIO.dia(0);
   const ok = await pag.evaluate((h, hr) => {
     const p = Array.from(document.querySelectorAll('[data-dia="' + h + '"] .pilula')).find(x => x.textContent.indexOf(hr) === 0);
     if (!p) return false; p.click(); return true;
@@ -789,7 +794,7 @@ async function cenarioPortas(pag) {
         temNota: false, anexos: [], temas: [{ titulo: 'Teorema de Pitágoras', fonte: 'livre' }] });
       await Store.salvar(d);
     }
-  }, (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })());
+  }, RELOGIO.dia(0));
   await reiniciar(pag);
 
   // (A) 9 à mão, reinício, Material da aula: os 9 recuperáveis na ordem dela
@@ -1060,7 +1065,9 @@ async function cenarioPortas(pag) {
   }
   await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   await H.abrirApp(pag, amb.ORIGEM);
+  await RELOGIO.conferir(pag);
 
   const zip = path.join(TMP, 'com-listas.zip');
   Sintetico.gerar(zip, { listas: true });
@@ -1931,8 +1938,7 @@ async function cenarioPortas(pag) {
    * nunca mostrasse a frase passaria aqui. */
   secao('5g. Depois de anexar, a tela diz para onde a lista foi');
   // aluna FICTÍCIA: os nomes da carga inicial do aplicativo são de alunos de verdade
-  const diaFuturo = (() => { const d = new Date(); d.setDate(d.getDate() + 45);
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+  const diaFuturo = RELOGIO.dia(45);
   const nomeAluno = await pag.evaluate(async (h, futuro) => {
     const d = await Store.carregar();
     d.alunos.push(Object.assign({}, d.alunos[0], { id: 'aluna-prova-b10', nome: 'Aluna de Prova' }));
@@ -1947,7 +1953,7 @@ async function cenarioPortas(pag) {
     d.ajustes.bibliotecaTitulos['aluna-prova-b10'] = { titulo: 'Título da aluna de prova', subtitulo: '' };
     await Store.salvar(d);
     return 'Aluna de Prova';
-  }, (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })(), diaFuturo);
+  }, RELOGIO.dia(0), diaFuturo);
   await pag.reload({ waitUntil: 'networkidle0' });
   await H.abrirApp(pag, amb.ORIGEM);
   await H.irParaAba(pag, 'biblioteca');
@@ -2051,7 +2057,7 @@ async function cenarioPortas(pag) {
    * do botão sem a caixa mudar um pixel. E o nome inteiro tem de estar lá: um
    * conserto que cortasse o nome também passaria na régua da distância. */
   secao('5h. O nome do arquivo anexado não encosta no Abrir');
-  const hojeAnexo = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+  const hojeAnexo = RELOGIO.dia(0);
   const medidasNome = [];
   for (const largura of [800, 1280]) {
     await pag.setViewport({ width: largura, height: 1000, hasTouch: true });
@@ -2136,7 +2142,7 @@ async function cenarioPortas(pag) {
       hora: '17:00', duracaoMin: 60, status: 'agendada', cobravel: true, notaTexto: '', notaPrivada: '',
       temNota: false, anexos: [] });
     await Store.salvar(d);
-  }, (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })());
+  }, RELOGIO.dia(0));
   await pag.reload({ waitUntil: 'networkidle0' });
   await H.abrirApp(pag, amb.ORIGEM);
   await H.irParaAba(pag, 'biblioteca');
@@ -2598,8 +2604,7 @@ async function cenarioPortas(pag) {
   await H.abrirApp(pag, amb.ORIGEM);
   await H.irParaAba(pag, 'agenda');
   await pausa(700);
-  const hojeIso = new Date();
-  const ISO = hojeIso.getFullYear() + '-' + String(hojeIso.getMonth() + 1).padStart(2, '0') + '-' + String(hojeIso.getDate()).padStart(2, '0');
+  const ISO = RELOGIO.dia(0);
   conf('abriu a aula de hoje na agenda', await pag.evaluate(d => {
     const dia = document.querySelector('[data-dia="' + d + '"]');
     const p = dia && dia.querySelector('.pilula');
@@ -2731,6 +2736,7 @@ async function cenarioPortas(pag) {
     const ambControle = H.criarAmbiente(PORTA + 1, 'perfil_bib_listas_ctrl', { '/app.js': comEntrada });
     await ambControle.subir();
     const pagC = await ambControle.pagina();
+    await RELOGIO.naPagina(pagC);
     await H.abrirApp(pagC, ambControle.ORIGEM);
     const antes = await pagC.evaluate(async () => {
       const d = await Store.carregar();
