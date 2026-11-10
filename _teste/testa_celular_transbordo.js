@@ -114,7 +114,7 @@ conf('o estilo do aviso novo está no styles.css uma vez só, com começo e fim'
   [CSS.split(AVISO_NOVO_CSS_INICIO).length - 1, CSS.split(AVISO_NOVO_CSS_FIM).length - 1].join(','), '1,1');
 conf('a âncora do elemento largo (o título da lista de Alunos) está no app.js uma vez só', APP.split(ANCORA_LARGO).length - 1, 1);
 const ABA_NOVA = '.cel-abas.muitas .cel-aba { flex: 1 1 auto; padding: 0; min-width: var(--alvo-celular); font-weight: 400; line-height: 1.15;\n  overflow-wrap: break-word; hyphens: auto; }';
-const ABA_VELHA = '.cel-abas.muitas .cel-aba { flex: 1 1 auto; padding: 0 1px; }';
+const ABA_VELHA = '.cel-abas.muitas .cel-aba { flex: 1 1 auto; padding: 0 1px; min-width: 47px; }';
 conf('a regra das cinco abas está no styles.css uma vez só', CSS.split(ABA_NOVA).length - 1, 1);
 conf('o sw.js tem o nome do cache onde a prova o troca', /var CACHE = '[^']+';/.test(SW), true);
 const TRAV = new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']');
