@@ -3115,6 +3115,7 @@
 
     var corpo = $('#corpo-modal-aula');
     corpo.innerHTML = '';
+    corpo.classList.remove('janela-aula-tablet');
 
     var selAluno = el('select', { id: 'campo-aluno' });
     db.alunos.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome); }).forEach(function (a) {
@@ -3551,6 +3552,19 @@
       ])
     ]);
     grupoArquivos.appendChild(acoesAvancadas);
+
+    // F6: a janela de edição do tablet fica em duas colunas. Os grupos são
+    // apenas reorganizados no DOM; os campos e os caminhos de salvamento não mudam.
+    var colunaPreparar = el('div', { class: 'janela-aula-coluna janela-aula-preparar', id: 'janela-aula-preparar' });
+    var colunaRegistrar = el('div', { class: 'janela-aula-coluna janela-aula-registrar', id: 'janela-aula-registrar' });
+    var colunaArquivos = el('div', { class: 'janela-aula-coluna janela-aula-arquivos', id: 'janela-aula-arquivos' });
+    colunaPreparar.appendChild(grupoPreparar);
+    colunaRegistrar.appendChild(grupoRegistro);
+    colunaArquivos.appendChild(grupoArquivos);
+    corpo.classList.add('janela-aula-tablet');
+    corpo.appendChild(colunaPreparar);
+    corpo.appendChild(colunaRegistrar);
+    corpo.appendChild(colunaArquivos);
 
     atualizarPrevisao();
     abrirModal('modal-aula');

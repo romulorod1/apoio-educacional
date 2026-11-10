@@ -186,6 +186,30 @@ async function rodar() {
   conf('os 3 blocos existem na ordem correta', blocos.join(' | '),
     'grupo-preparar | grupo-registro | grupo-arquivos');
 
+  const gradeTablet = await pag.evaluate(() => {
+    const caixa = e => {
+      const r = document.querySelector(e).getBoundingClientRect();
+      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom,
+        width: r.width, height: r.height };
+    };
+    const corpo = document.querySelector('#corpo-modal-aula');
+    const modal = caixa('#modal-aula .modal');
+    const preparar = caixa('#janela-aula-preparar');
+    const registrar = caixa('#janela-aula-registrar');
+    const arquivos = caixa('#janela-aula-arquivos');
+    return {
+      telaCheia: Math.abs(modal.left) < 1 && Math.abs(modal.top) < 1 &&
+        Math.abs(modal.width - innerWidth) < 1 && Math.abs(modal.height - innerHeight) < 1,
+      registroNaDireita: registrar.left >= preparar.right && registrar.right <= modal.right + 1,
+      arquivosSobPreparar: Math.abs(arquivos.left - preparar.left) < 1 && arquivos.top > preparar.top,
+      corpoSemRolagem: corpo.scrollHeight <= corpo.clientHeight + 1
+    };
+  });
+  conf('a janela ocupa a tela inteira do tablet', gradeTablet.telaCheia, true);
+  conf('Registrar fica na coluna direita', gradeTablet.registroNaDireita, true);
+  conf('Arquivos ficam abaixo de Preparar', gradeTablet.arquivosSobPreparar, true);
+  conf('o painel cabe sem rolagem própria a 1280x800', gradeTablet.corpoSemRolagem, true);
+
   // Confere que memória/trilha vêm antes do bloco de quando (primeira dobra)
   const ordemInternaGrupo1 = await pag.evaluate(() => {
     const prep = document.querySelector('#grupo-preparar');

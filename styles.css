@@ -843,6 +843,40 @@ table.dados tr.total td { font-weight: 600; color: var(--navy); background: var(
   background: var(--soft);
 }
 .modal-rodape .esquerda { margin-right: auto; }
+
+/* F6: janela de edição em tela cheia no tablet; em telas menores, a janela
+   conserva o fluxo vertical já usado pelo celular. */
+@media (min-width: 1100px) and (min-height: 700px) {
+  #modal-aula { padding: 0; }
+  #modal-aula .modal {
+    width: 100%;
+    max-width: none;
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+  }
+  #corpo-modal-aula.janela-aula-tablet {
+    display: grid;
+    grid-template-columns: minmax(0, 1.85fr) minmax(360px, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(120px, .45fr);
+    grid-template-areas: "preparo registrar" "arquivos registrar";
+    gap: 12px;
+    padding: 12px 16px;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .janela-aula-coluna {
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .janela-aula-preparar { grid-area: preparo; }
+  .janela-aula-registrar { grid-area: registrar; }
+  .janela-aula-arquivos { grid-area: arquivos; }
+  .janela-aula-coluna .bloco-grupo-aula { margin-bottom: 10px; }
+}
 .fechar {
   border: none;
   background: transparent;
