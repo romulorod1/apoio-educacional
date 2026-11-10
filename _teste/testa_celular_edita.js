@@ -29,7 +29,7 @@
  *
  * D6c (lote 1), Hoje como linha do tempo, na mesma rodada:
  *  10. a faixa da semana, a linha do tempo com a cor do aluno, os horários
- *      livres escritos e a linha de agora; o "+" flutuante e o toque num
+ *      livres escritos e a linha de agora; o "+ Aula" na barra inferior e o toque num
  *      horário livre ("Marcar aula às 14:00"); o alto enxuto (sem o texto de
  *      sistema da dona); data dd/mm/aaaa e hora em 24 h em todos os
  *      formulários, e Salvar à vista com o teclado aberto;
@@ -580,7 +580,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('Hoje: sem rolagem de lado em ' + m.largura + ' px', m.rolaDeLado, false);
   conf('Hoje: todo alvo tem 48 px ou mais (' + m.alvos + ' alvos)', m.pequenos.join('; '), '');
   conf('Hoje: os botões de edição são todos das ações do celular (' + m.dasAcoes.join(', ') + ')', m.soltos.join(', '), '');
-  conf('Hoje: o "+" flutuante e "Cadastrar aluno" à vista', m.dasAcoes.indexOf('+') >= 0 && m.dasAcoes.indexOf('Cadastrar aluno') >= 0, true);
+  conf('Hoje: o "+ Aula" na barra inferior e "Cadastrar aluno" à vista', m.dasAcoes.some(x => /\+ Aula/.test(x)) && m.dasAcoes.indexOf('Cadastrar aluno') >= 0, true);
   /* A rolagem inicial de Hoje vai à aula de agora, à próxima ou à linha de agora: depende da hora.
    * O relógio da página fica fixo em horas escolhidas (madrugada, antes da primeira aula, entre as
    * aulas, depois da última, quase meia-noite), e a prova nunca depende da hora em que o CI roda. */
@@ -658,7 +658,8 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   });
   conf('o bloco tem a cor do aluno, a mesma do tablet (' + bloco.borda + ')', bloco.borda, 'rgb(31, 58, 95)');
   conf('a hora fica à esquerda do bloco (' + bloco.horaDoBloco + ')', bloco.horaAEsquerda && bloco.horaDoBloco === '10:30', true);
-  conf('a altura vai pela duração: a aula de 1h30 (' + bloco.altura + ' px) é maior que a de 1h (' + bloco.altura60 + ' px)', bloco.altura > bloco.altura60 && bloco.altura >= 100, true);
+  conf('a altura segue a escala proporcional: 1h30 ocupa 78 px e 1h ocupa 52 px (' + bloco.altura + ' e ' + bloco.altura60 + ' px)',
+    bloco.altura === 78 && bloco.altura60 === 52, true);
   conf('a reposição se vê pela cor e pelo nome', bloco.reposicao, true);
   conf('o bloco não repete o relato da última aula (ele fica na folha)', /Na última aula|Rendeu bem/.test(bloco.texto), false);
   /* (revisão) hoje, o que já passou não é livre; e a aula de agora e a próxima levam o nome. */
@@ -1219,9 +1220,9 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   const livresD = await pagD.evaluate(() => document.querySelectorAll('#cel-tempo .cel-livre').length);
   const abriuD = await abrirFolha(pagD, 'aula-hoje');
   const folhaD = await pagD.evaluate(() => ({
-    acoes: document.querySelectorAll('#modo-celular [data-acao-celular]').length,
+    acoes: Array.from(document.querySelectorAll('#modo-celular [data-acao-celular]')).filter(b => b.getBoundingClientRect().height > 0).length,
     botoes: Array.from(document.querySelectorAll('#cel-folha button')).map(b => b.id || b.textContent.trim()).join(','),
-    mais: !!document.querySelector('#cel-marcar-aula'), horas: document.querySelectorAll('.cel-livre-hora').length
+    mais: !!(document.querySelector('#cel-marcar-aula') && document.querySelector('#cel-marcar-aula').getBoundingClientRect().height), horas: document.querySelectorAll('.cel-livre-hora').length
   }));
   conf('(controle) o observador vê a linha do tempo e a folha abre com a aula', livresD >= 0 && !!(await existe(pagD, '#cel-tempo')) && abriuD && /Aluno Alfa Teste/.test((await texto(pagD, '#cel-folha')) || ''), true);
   prop('(D6c) na linha do tempo e na folha do observador, nenhuma ação: sem "+", sem horas para marcar, só o nome (a ficha mínima) e "Fechar" (' + JSON.stringify(folhaD) + ')',

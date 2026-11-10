@@ -22430,7 +22430,15 @@
 
   function iniciarCelular() {
     $$('#cel-abas .cel-aba').forEach(function (b) {
+      if (b.id === 'cel-marcar-aula') return;
       b.addEventListener('click', function () { irParaTelaCelular(b.dataset.cel); });
+    });
+    var marcar = $('#cel-marcar-aula');
+    if (marcar) marcar.addEventListener('click', function () {
+      if (!celularEdita()) return;
+      var dia = diaCelular || Core.hojeIso();
+      irParaTelaCelular('hoje');
+      abrirFormularioCelular({ tipo: 'aula', data: dia });
     });
     if (temNuvem()) Nuvem.aoMudar(function () {
       if (!modoCelular) return;
@@ -22776,7 +22784,6 @@
    * começa antes ou acaba depois. Cada minuto de aula vale 1,2 px: a altura
    * do bloco é a duração, com um piso para o toque. */
   var INICIO_DIA_CELULAR = 7 * 60, FIM_DIA_CELULAR = 21 * 60;
-  var PX_POR_MINUTO_CELULAR = 1.2, ALTURA_MINIMA_BLOCO = 56;
   var COR_SEM_ALUNO = '#9AA3AF'; // a mesma do tablet, para a aula sem aluno
 
   function somarDiasCelular(iso, n) {
@@ -22970,7 +22977,7 @@
     if (semRegistro) filhos.push(el('span', { class: 'cel-bloco-sem-registro', 'aria-hidden': 'true', title: 'Sem registro de como foi' }));
     return el('button', {
       type: 'button', class: 'cel-bloco cel-bloco-' + sit.classe + (choques.length ? ' com-choque' : '') + (marca ? ' cel-bloco-' + marca : '') + (semRegistro ? ' sem-registro' : ''), 'data-aula': a.id,
-      style: '--cor-aluno:' + corDoAlunoCelular(aluno) + ';min-height:' + Math.max(ALTURA_MINIMA_BLOCO, Math.round(dur * PX_POR_MINUTO_CELULAR)) + 'px',
+      style: '--cor-aluno:' + corDoAlunoCelular(aluno),
       'aria-label': (marca ? (marca === 'agora' ? 'Agora: ' : 'Próxima: ') : '') + nome + ', ' + (a.hora || 'sem horário') + ', ' + Core.fmtDuracao(dur) + ', ' + sit.texto + (choques.length ? ', no mesmo horário de outra aula' : '') + (semRegistro ? ', sem registro de como foi' : ''),
       aoClick: function () { abrirFolhaDaAulaCelular(a.id); }
     }, filhos);
@@ -23004,46 +23011,89 @@
   /* A linha do tempo do dia: a hora à esquerda, a aula ou o buraco à direita,
    * e, hoje, a linha de agora no lugar dela. */
   function linhaDoTempoCelular(dia, edita) {
-    var caixa = el('div', { class: 'cel-tempo', id: 'cel-tempo' });
+    var caixa = el('div', { class: 'cel-tempo cel-tempo-proporcional', id: 'cel-tempo', 'data-dia': dia });
     var hoje = Core.hojeIso();
     var agora = dia === hoje ? minutosAgoraCelular() : null;
-    var linhaAgora = null;
+    var inicioGrade = 7 * 60, fimGrade = 20 * 60, pxPorMinuto = 52 / 60;
+    aulasDoDiaCelular(dia).forEach(function (a) {
+      var m = Core.minutosDaHora(a.hora);
+      if (m === null) return;
+      inicioGrade = Math.min(inicioGrade, Math.floor(m / 60) * 60);
+      fimGrade = Math.max(fimGrade, Math.ceil(fimDaAulaCelular(a) / 60) * 60);
+    });
+    if (agora !== null) {
+      inicioGrade = Math.min(inicioGrade, Math.floor(agora / 60) * 60);
+      fimGrade = Math.max(fimGrade, Math.ceil(agora / 60) * 60);
+    }
+    var semHora = aulasDoDiaCelular(dia).filter(function (a) { return Core.minutosDaHora(a.hora) === null; });
+    var inicioVisual = semHora.length * 64 + (semHora.length ? 8 : 0);
+    caixa.style.height = (inicioVisual + (fimGrade - inicioGrade) * pxPorMinuto) + 'px';
+    for (var hora = Math.floor(inicioGrade / 60); hora <= Math.ceil(fimGrade / 60); hora++) {
+      var y = inicioVisual + (hora * 60 - inicioGrade) * pxPorMinuto;
+      caixa.appendChild(el('div', { class: 'cel-tempo-grade-linha', style: 'top:' + y + 'px' }));
+      caixa.appendChild(el('span', { class: 'cel-tempo-grade-hora', style: 'top:' + y + 'px', texto: String(hora).padStart(2, '0') + ':00' }));
+    }
     /* A marca de sem registro sai da MESMA lista do aviso (o critério, a
      * janela e os dispensados de hoje): o ponto e a lista nunca discordam. */
     var semRegistro = {};
     aulasDoAvisoSemRegistroCelular(hoje, minutosAgoraCelular()).forEach(function (a) { semRegistro[a.id] = true; });
-    var semHora = aulasDoDiaCelular(dia).filter(function (a) { return Core.minutosDaHora(a.hora) === null; });
-    semHora.forEach(function (a) {
-      caixa.appendChild(el('div', { class: 'cel-tempo-linha' }, [
+    semHora.forEach(function (a, indice) {
+      caixa.appendChild(el('div', { class: 'cel-tempo-sem-hora', style: 'top:' + (indice * 64) + 'px' }, [
         el('span', { class: 'cel-tempo-hora', texto: 'sem hora' }),
         el('div', { class: 'cel-tempo-item' }, [blocoDaAulaCelular(a, null, !!semRegistro[a.id])])
       ]));
     });
-    var marcaDeAgora = function () {
-      return el('div', { class: 'cel-agora', id: 'cel-agora', 'aria-label': 'Agora, ' + horaDeMinutosCelular(agora) }, [
-        el('span', { class: 'cel-agora-hora', texto: horaDeMinutosCelular(agora) })
-      ]);
-    };
+    var linhas = linhasDoDiaCelular(dia), aulas = linhas.filter(function (l) { return l.tipo === 'aula'; });
+    var grupos = [], grupo = null;
+    aulas.filter(function (l) { return l.aula.status !== 'cancelada'; }).sort(function (a, b) { return a.ini - b.ini; }).forEach(function (l) {
+      if (!grupo || l.ini >= grupo.fim) { grupo = { fim: l.fim, itens: [] }; grupos.push(grupo); }
+      grupo.fim = Math.max(grupo.fim, l.fim);
+      grupo.itens.push(l);
+    });
+    grupos.forEach(function (g) {
+      var fins = [];
+      g.itens.forEach(function (l) {
+        var faixa = fins.findIndex(function (fim) { return fim <= l.ini; });
+        if (faixa < 0) { faixa = fins.length; fins.push(l.fim); } else fins[faixa] = l.fim;
+        l.faixa = faixa;
+      });
+      g.faixas = fins.length;
+    });
     var marcas = agora !== null ? marcasDeAgoraCelular(dia, agora).marcas : {};
-    linhasDoDiaCelular(dia).forEach(function (l) {
-      if (agora !== null && !linhaAgora && agora < l.ini) {
-        linhaAgora = marcaDeAgora();
-        caixa.appendChild(el('div', { class: 'cel-tempo-linha cel-tempo-agora-solta' }, [linhaAgora]));
-      }
-      var item = el('div', { class: 'cel-tempo-item' }, [l.tipo === 'aula' ? blocoDaAulaCelular(l.aula, marcas[l.aula.id], !!semRegistro[l.aula.id]) : buracoLivreCelular(l, dia, edita)]);
-      var linha = el('div', { class: 'cel-tempo-linha cel-tempo-' + l.tipo }, [
-        el('span', { class: 'cel-tempo-hora', texto: horaDeMinutosCelular(l.ini) }), item
-      ]);
-      if (agora !== null && !linhaAgora && agora >= l.ini && agora < l.fim) {
-        linhaAgora = marcaDeAgora();
-        linhaAgora.style.top = (Math.round((agora - l.ini) / (l.fim - l.ini) * 1000) / 10) + '%';
-        linha.appendChild(linhaAgora);
-      }
+    function posicao(minutos) { return inicioVisual + Math.max(0, Math.min((fimGrade - inicioGrade) * pxPorMinuto, (minutos - inicioGrade) * pxPorMinuto)); }
+    function linhaProporcional(tipo, ini, fim, alturaMinima) {
+      var linha = el('div', { class: 'cel-tempo-linha cel-tempo-' + tipo, style: 'top:' + posicao(ini) + 'px;height:' + Math.max(alturaMinima || 0, posicao(fim) - posicao(ini)) + 'px' });
+      linha.appendChild(el('span', { class: 'cel-tempo-hora', texto: horaDeMinutosCelular(ini) }));
+      linha.appendChild(el('div', { class: 'cel-tempo-item' }));
+      return linha;
+    }
+    linhas.filter(function (l) { return l.tipo === 'livre'; }).forEach(function (l) {
+      var ini = Math.max(inicioGrade, l.ini), fim = Math.min(fimGrade, l.fim);
+      if (fim - ini < 30) return;
+      var linha = linhaProporcional('livre', ini, fim, 26);
+      linha.querySelector('.cel-tempo-item').appendChild(buracoLivreCelular({ ini: ini, fim: fim }, dia, edita));
       caixa.appendChild(linha);
     });
-    if (agora !== null && !linhaAgora) {
-      linhaAgora = marcaDeAgora();
-      caixa.appendChild(el('div', { class: 'cel-tempo-linha cel-tempo-agora-solta' }, [linhaAgora]));
+    aulas.forEach(function (l) {
+      var inicio = Core.minutosDaHora(l.aula.hora), fim = fimDaAulaCelular(l.aula);
+      if (fim <= inicioGrade || inicio >= fimGrade) return;
+      var topo = posicao(inicio), baixo = posicao(fim);
+      var bloco = blocoDaAulaCelular(l.aula, marcas[l.aula.id], !!semRegistro[l.aula.id]);
+      var g = l.aula.status === 'cancelada' ? null : grupos.find(function (x) { return x.itens.indexOf(l) >= 0; });
+      var faixas = g ? g.faixas : 1, faixa = g ? l.faixa : 0;
+      bloco.classList.add('cel-tempo-bloco-grade');
+      bloco.style.cssText += ';top:0;height:100%;left:' + (100 * faixa / faixas) + '%;width:' + (100 / faixas) + '%;z-index:' + (l.aula.status === 'cancelada' ? 2 : 3);
+      var linhaAula = linhaProporcional('aula', Math.max(inicioGrade, inicio), Math.min(fimGrade, fim), 48);
+      linhaAula.querySelector('.cel-tempo-item').appendChild(bloco);
+      caixa.appendChild(linhaAula);
+    });
+    if (agora !== null && agora >= inicioGrade && agora <= fimGrade) {
+      var linhaAtual = linhaProporcional('agora-solta', agora, agora, 12);
+      var linhaAgora = el('div', { class: 'cel-agora cel-agora-grade', id: 'cel-agora', 'aria-label': 'Agora, ' + horaDeMinutosCelular(agora) }, [
+        el('span', { class: 'cel-agora-hora', texto: horaDeMinutosCelular(agora) })
+      ]);
+      linhaAtual.querySelector('.cel-tempo-item').appendChild(linhaAgora);
+      caixa.appendChild(linhaAtual);
     }
     return caixa;
   }
@@ -23519,11 +23569,6 @@
         botaoDeAcaoCelular('cadastrar-aluno', { class: 'btn', id: 'cel-novo-aluno', texto: 'Cadastrar aluno',
           aoClick: function () { abrirFormularioCelular({ tipo: 'aluno' }); } })
       ]));
-      /* "Marcar aula neste dia" é o "+" flutuante, no canto de baixo. */
-      caixa.appendChild(el('div', { class: 'cel-fab-lugar' }, [
-        botaoDeAcaoCelular('marcar-aula', { class: 'cel-fab', id: 'cel-marcar-aula', 'aria-label': 'Marcar aula neste dia', icone: 'plus',
-          aoClick: function () { abrirFormularioCelular({ tipo: 'aula', data: dia }); } })
-      ]));
     }
     if (folhaCelular) desenharFolhaCelular();
     hojeVistoCelular = hoje; // o dia em que esta linha do tempo foi desenhada (a virada da meia-noite)
@@ -23544,6 +23589,9 @@
     var alvo = $('#cel-tempo .cel-bloco-agora') || $('#cel-agora') || $('#cel-tempo .cel-bloco-proxima') || $('#cel-tempo .cel-bloco');
     var faixa = $('#cel-semana');
     if (!conteudo) return;
+    /* Em telas altas, a agenda proporcional inteira cabe de uma vez; não
+     * esconda a faixa dos dias rolando até a linha de agora. */
+    if (conteudo.scrollHeight <= conteudo.clientHeight + 1) { conteudo.scrollTop = 0; return; }
     if (!alvo) { conteudo.scrollTop = 0; return; }
     var linha = alvo.closest('.cel-tempo-linha') || alvo;
     var baixoDaFaixa = function () { return faixa ? faixa.getBoundingClientRect().bottom : conteudo.getBoundingClientRect().top; };
@@ -24870,6 +24918,7 @@
       // o observador não envia PDF às famílias: a aba Enviar dá lugar às dele
       if (telaDoObservador(b.dataset.cel)) b.hidden = !observador;
       else if (b.dataset.cel === 'enviar' || b.dataset.cel === 'biblioteca') b.hidden = observador;
+      else if (b.id === 'cel-marcar-aula') b.hidden = observador || !celularEdita();
     });
     var abas = $('#cel-abas');
     if (abas) abas.classList.toggle('muitas', $$('#cel-abas .cel-aba').filter(function (b) { return !b.hidden; }).length > 4);

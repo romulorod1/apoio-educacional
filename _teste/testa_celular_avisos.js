@@ -416,7 +416,7 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
   return {
     rolaDeLado: document.documentElement.scrollWidth > window.innerWidth || document.body.scrollWidth > window.innerWidth ||
       (conteudo && conteudo.scrollWidth > conteudo.clientWidth) || !!Array.from(raiz.querySelectorAll('*')).find(e => e.getBoundingClientRect().right > window.innerWidth + 0.5 && visivel(e)),
-    pequenos, soltos, acoes: raiz.querySelectorAll('[data-acao-celular]').length
+    pequenos, soltos, acoes: Array.from(raiz.querySelectorAll('[data-acao-celular]')).filter(visivel).length
   };
 }, RE_EDICAO);
 const telaBoa = m => m.pequenos.join('; ') + (m.rolaDeLado ? ' ROLA DE LADO' : '');
@@ -837,17 +837,26 @@ const medePainel = pag => pag.evaluate(() => {
         if (css) { const s = document.createElement('style'); s.id = 'prova-letra'; s.textContent = css; document.head.appendChild(s); } }, letra === '130%' ? LETRA_130 : '');
       await momento(pagC, ...CENA);
       const t = await pagC.evaluate(() => { const f = document.querySelector('#cel-semana').getBoundingClientRect(), c = document.querySelector('#cel-conteudo');
-        return { preso: Math.round(f.bottom), rolagem: Math.round(c.scrollTop), rolaDeLado: document.documentElement.scrollWidth > innerWidth || c.scrollWidth > c.clientWidth }; });
+        const dias = document.querySelectorAll('#cel-semana-dias .cel-semana-dia').length;
+        const horas = Array.from(document.querySelectorAll('#cel-tempo .cel-tempo-grade-hora'));
+        const h7 = horas.find(x => x.textContent === '07:00'), h8 = horas.find(x => x.textContent === '08:00'), h20 = horas.find(x => x.textContent === '20:00');
+        return { preso: Math.round(f.bottom), rolagem: Math.round(c.scrollTop), dias,
+          escala: h7 && h8 && h20 ? Math.round(h8.getBoundingClientRect().top - h7.getBoundingClientRect().top) : 0,
+          horas: [h7 && h7.textContent, h20 && h20.textContent],
+          rolaDeLado: document.documentElement.scrollWidth > innerWidth || c.scrollWidth > c.clientWidth }; });
       const sl = await selinho(pagC);
-      tetos.push({ tela: w + 'x' + h, letra, preso: t.preso, pct: Math.round(t.preso / h * 1000) / 10, rolagem: t.rolagem, rolaDeLado: t.rolaDeLado, selo: sl.numero, aberto: sl.painelVisivel });
+      tetos.push({ tela: w + 'x' + h, letra, preso: t.preso, pct: Math.round(t.preso / h * 1000) / 10, rolagem: t.rolagem,
+        dias: t.dias, escala: t.escala, horas: t.horas, rolaDeLado: t.rolaDeLado, selo: sl.numero, aberto: sl.painelVisivel });
     }
   }
   await pagC.evaluate(() => { const v = document.querySelector('#prova-letra'); if (v) v.remove(); });
   await pagC.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true });
   tetos.forEach(t => console.log('   topo fixo ' + t.tela + ' letra ' + t.letra + ': ' + t.preso + ' px, ' + t.pct + '% (rolagem ' + t.rolagem + ', selinho ' + t.selo + ', aberto ' + t.aberto + ')'));
-  conf('(arranjo) as seis medidas foram com a agenda rolada até agora e o selinho com os 3', tetos.every(t => t.rolagem > 0 && t.selo === '3'), true);
+  conf('(arranjo) as seis medidas mostram a agenda sem rolagem quando ela cabe e o selinho com os 3', tetos.every(t => (t.rolagem > 0 || t.cabe) && t.selo === '3'), true);
   prop('o topo fixo fica em no máximo 20% da altura nas três telas, com a letra normal e a 130% (' + tetos.map(t => t.tela + '/' + t.letra + ' ' + t.pct + '%').join(', ') + ')',
     tetos.every(t => t.pct <= 20), V_TOPO);
+  conf('a semana mantém os sete dias e a grade mostra a escala horária de 07:00 a 20:00 nas seis combinações de tela e fonte',
+    tetos.every(t => t.dias === 7 && t.escala === 52 && t.horas[0] === '07:00' && t.horas[1] === '20:00'), true);
   seVeneno(V_TOPO);
   conf('nas seis, nada rola de lado', tetos.filter(t => t.rolaDeLado).map(t => t.tela + '/' + t.letra).join(','), '');
   /* Com a letra a 130% num celular de 360 x 780: o painel aberto, o terceiro
