@@ -143,8 +143,13 @@
  * em segundo plano, indice-livros.js, na lista de arquivos (app.js, index.html,
  * store.js e sw.js). O v109 fixa a altura da linha de proposta entre
  * plataformas. O v110 traz a navegação com a Biblioteca, o trilho lateral do
- * tablet e a barra de baixo do celular (app.js, index.html e styles.css). */
-var CACHE = 'apoio-educacional-v113';
+ * tablet e a barra de baixo do celular (app.js, index.html e styles.css).
+ * O v111 traz a linha do tempo do Hoje no celular e o atalho + Aula.
+ * O v112 traz Vagos, a disponibilidade semanal no celular.
+ * O v113 ajusta o botão de Vagos na faixa da semana.
+ * O v114 traz a janela de aula em duas colunas no tablet.
+ * O v115 traz o seletor de assunto na janela da aula. */
+var CACHE = 'apoio-educacional-v115';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
