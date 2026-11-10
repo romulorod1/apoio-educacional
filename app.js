@@ -5,7 +5,7 @@
   'use strict';
 
   var VERSAO = '1.42.45';
-  /* O protocolo para o celular editar a mensagem do mês chegou na 1.42.40.
+  /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
 
