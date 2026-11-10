@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.46';
+  var VERSAO = '1.42.47';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,9 +85,10 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.46',
+      versao: '1.42.47',
       itens: [
-        'PDFs e fotos anexados a uma aula passam a sincronizar com a nuvem. Os anexos que já estavam no tablet não sobem sozinhos.'
+        'PDFs e fotos anexados a uma aula passam a sincronizar com a nuvem. Os anexos que já estavam no tablet não sobem sozinhos.',
+        'Na Biblioteca, os materiais agora têm categorias e filtros para separar livros didáticos, capítulos e apostilas, projetos, práticas, guias e avaliações.'
       ]
     },
     {
@@ -17668,7 +17669,7 @@
    * e o cartão "Exercícios e listas" do ano de Matemática leva até eles.
    *
    * Sem livro no tablet, a seção some e a aba fica como era. */
-  var bibLivrosNav = { disciplina: null, ano: null };
+  var bibLivrosNav = { disciplina: null, ano: null, tipo: 'todos' };
   var bibLivrosVez = 0;
   var bibLivrosCache = Object.create(null);   // id -> { id, meta, pos, cor }, do último desenho
   var bibLivroAberto = null;                   // o id do livro na tela do livro
@@ -17735,12 +17736,42 @@
     var m = Core.materiaPorId(id);
     // a matéria que o app não conhece fica com o nome dela, e cada uma no seu grupo
     var nome = (m && m.rotulo) || (meta && meta.materia_nome) ||
-      (id === 'outra' ? 'Outros livros' : id.charAt(0).toUpperCase() + id.slice(1).replace(/[-_]+/g, ' '));
+      (id === 'outra' ? 'Outros materiais' : id.charAt(0).toUpperCase() + id.slice(1).replace(/[-_]+/g, ' '));
     return { id: id, nome: nome };
   }
   function anosDoLivro(meta) {
     var s = Array.isArray(meta && meta.series) ? meta.series.filter(function (x) { return typeof x === 'string' && x; }) : [];
     return s.length ? s : [SEM_ANO];
+  }
+  // O tipo classifica o uso do material, sem misturá-lo com disciplina/ano.
+  // Pacotes podem declarar tipo_material; para acervos antigos, usamos pistas
+  // do título e deixamos como "outro" quando não há evidência suficiente.
+  var TIPOS_DE_MATERIAL = [
+    ['livro-didatico', 'Livros didáticos', 'Livro didático'],
+    ['capitulo-apostila', 'Capítulos e apostilas', 'Capítulo/apostila'],
+    ['projeto', 'Projetos e sequências', 'Projeto'],
+    ['pratica', 'Práticas e experimentos', 'Prática'],
+    ['guia-referencia', 'Guias e referências', 'Guia/referência'],
+    ['avaliacao', 'Questões e avaliações', 'Avaliação'],
+    ['complementar', 'Outros materiais', 'Outro']
+  ];
+  function tipoDoMaterial(meta) {
+    var declarado = String(meta && (meta.tipo_material || meta.tipoMaterial || '')).toLowerCase()
+      .replace(/[_\s]+/g, '-');
+    if (TIPOS_DE_MATERIAL.some(function (x) { return x[0] === declarado; })) return declarado;
+    var titulo = String(meta && (meta.titulo || meta.nome || '')).toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (/\b(prova|simulado|questoes|avaliacao|lista de exercicios)\b/.test(titulo)) return 'avaliacao';
+    if (/\b(projeto|sequencia didatica)\b/.test(titulo)) return 'projeto';
+    if (/\b(aula\s*\d+\s*[-–:]\s*(guia do aluno|material do professor)|experimento|atividade experimental|pratica experimental|roteiro experimental|laboratorio|teste do biureto)\b/.test(titulo)) return 'pratica';
+    if (/\b(capitulo|modulo|apostila|caderno de atividades)\b/.test(titulo)) return 'capitulo-apostila';
+    if (/\b(guia|manual|referencia|para professores|formacao docente)\b/.test(titulo)) return 'guia-referencia';
+    if (/\b(livro didatico|colecao|volume [ivx0-9]+)\b/.test(titulo)) return 'livro-didatico';
+    return 'complementar';
+  }
+  function rotuloDoTipo(tipo, longo) {
+    var info = TIPOS_DE_MATERIAL.filter(function (x) { return x[0] === tipo; })[0];
+    return info ? info[longo ? 1 : 2] : 'Outro';
   }
   function mapaComAssuntos(l) {
     return Biblioteca.mapaDoLivro(l.meta, correcoesDosLivros()[l.id]).some(function (e) { return e.assuntos.length; });
@@ -17900,7 +17931,7 @@
     var disciplinas = disciplinasDaBiblioteca(livros);
     var comLivro = disciplinas.filter(function (d) { return d.livros.length; }).length;
     var cont = $('#bib-livros-contagem');
-    if (cont) cont.textContent = plural(livros.length, 'livro', 'livros') + ', ' + plural(comLivro, 'disciplina', 'disciplinas');
+    if (cont) cont.textContent = plural(livros.length, 'material', 'materiais') + ', ' + plural(comLivro, 'disciplina', 'disciplinas');
 
     var recentes = livros.filter(function (l) { return l.pos && l.pos.quando; })
       .sort(function (a, b) { return b.pos.quando - a.pos.quando; }).slice(0, 3);
@@ -17950,26 +17981,27 @@
       var on = d.id === disc.id;
       lista.appendChild(el('button', { type: 'button', class: 'bibl-disciplina' + (on ? ' ativa' : ''), 'data-disciplina': d.id,
         'aria-current': on ? 'true' : null,
-        aoClick: function () { bibLivrosNav.disciplina = d.id; bibLivrosNav.ano = null; redesenhar(); } }, [
+        aoClick: function () { bibLivrosNav.disciplina = d.id; bibLivrosNav.ano = null; bibLivrosNav.tipo = 'todos'; redesenhar(); } }, [
         el('span', { class: 'cresce', texto: d.nome }),
         d.temMapa ? el('span', { class: 'bibl-sinal-mapa' }, [icone('mapa', 'com mapa de assuntos')]) : null,
         el('span', { class: 'bibl-apoio', texto: String(d.livros.length) })
       ]));
     });
 
-    var painel = el('section', { class: 'bibl-painel', 'aria-label': 'Livros de ' + disc.nome });
+    var painel = el('section', { class: 'bibl-painel', 'aria-label': 'Materiais de ' + disc.nome });
     var anosComLivro = disc.listaAnos.filter(function (a) { return a !== SEM_ANO && livrosDoAno(disc, a).length; });
     var faixa = !anosComLivro.length ? '' : anosComLivro.length === 1 ? ' do ' + nomeDoAno(anosComLivro[0]) :
       ' do ' + nomeDoAno(anosComLivro[0]) + ' ao ' + nomeDoAno(anosComLivro[anosComLivro.length - 1]);
     painel.appendChild(el('div', { class: 'bibl-painel-cabeca' }, [
       el('h3', { class: 'bibl-titulo', texto: disc.nome }),
-      el('span', { class: 'bibl-apoio', texto: disc.livros.length ? plural(disc.livros.length, 'livro', 'livros') + faixa : 'nenhum livro no tablet' })
+      el('span', { class: 'bibl-apoio', texto: disc.livros.length ? plural(disc.livros.length, 'material', 'materiais') + faixa : 'nenhum material no tablet' })
     ]));
     if (disc.listaAnos.some(function (a) { return a !== SEM_ANO; })) {
       /* Grupo de rádio de verdade: um só na ordem do Tab (o escolhido), e as
        * setas trocam o ano, como no rádio do sistema. */
       var escolherAno = function (a, focar) {
         bibLivrosNav.ano = a;
+        bibLivrosNav.tipo = 'todos';
         redesenhar();
         if (focar) { var b = caixa.querySelector('.bibl-ano[data-ano="' + a + '"]'); if (b) b.focus(); }
       };
@@ -17991,14 +18023,32 @@
       });
       painel.appendChild(chips);
     }
+    var livrosDoRecorte = livrosDoAno(disc, bibLivrosNav.ano);
+    var tipos = TIPOS_DE_MATERIAL.map(function (t) {
+      return { id: t[0], nome: t[1], qtd: livrosDoRecorte.filter(function (l) { return tipoDoMaterial(l.meta) === t[0]; }).length };
+    }).filter(function (t) { return t.qtd; });
+    if (bibLivrosNav.tipo !== 'todos' && !tipos.some(function (t) { return t.id === bibLivrosNav.tipo; })) bibLivrosNav.tipo = 'todos';
+    if (tipos.length > 1) {
+      var escolherTipo = function (tipo) { bibLivrosNav.tipo = tipo; redesenhar(); };
+      var filtros = el('div', { class: 'bibl-tipos', role: 'group', 'aria-label': 'Filtrar por tipo de material' });
+      [{ id: 'todos', nome: 'Todos', qtd: livrosDoRecorte.length }].concat(tipos).forEach(function (t) {
+        var on = bibLivrosNav.tipo === t.id;
+        filtros.appendChild(el('button', { type: 'button', class: 'bibl-tipo' + (on ? ' ativo' : ''),
+          'aria-pressed': on ? 'true' : 'false', 'data-tipo': t.id,
+          texto: t.nome + ' · ' + t.qtd, aoClick: function () { escolherTipo(t.id); } }));
+      });
+      painel.appendChild(filtros);
+    } else bibLivrosNav.tipo = 'todos';
     var grade = el('div', { class: 'bibl-grade' });
-    livrosDoAno(disc, bibLivrosNav.ano).forEach(function (l) {
+    livrosDoRecorte.filter(function (l) { return bibLivrosNav.tipo === 'todos' || tipoDoMaterial(l.meta) === bibLivrosNav.tipo; }).forEach(function (l) {
       var semSumario = !(l.meta.sumario && l.meta.sumario.length);
+      var tipo = tipoDoMaterial(l.meta);
       grade.appendChild(el('button', { type: 'button', class: 'bibl-livro-cartao', 'data-livro': l.id,
         'aria-label': 'Abrir o sumário de ' + tituloDoLivro(l.meta),
         aoClick: function () { abrirTelaDoLivro(l.id); } }, [
         capaDoLivro(l),
         el('span', { class: 'bibl-livro-meta' }, [
+          el('span', { class: 'bibl-tipo-selo' + (tipo === 'pratica' ? ' pratica' : ''), texto: rotuloDoTipo(tipo, false) }),
           el('span', { class: 'bibl-forte', texto: tituloDoLivro(l.meta) }),
           el('span', { class: 'bibl-apoio', texto: tamanhoDoLivro(l.meta) }),
           semSumario ? el('span', { class: 'bibl-falta', 'data-falta': 'sumario', texto: 'sem sumário nem mapa de assuntos' }) :
@@ -18029,7 +18079,7 @@
     }
     painel.appendChild(grade);
     if (!grade.children.length) {
-      painel.appendChild(el('p', { class: 'bibl-apoio bibl-vazio', texto: 'Nenhum livro de ' + disc.nome +
+      painel.appendChild(el('p', { class: 'bibl-apoio bibl-vazio', texto: 'Nenhum material de ' + disc.nome +
         (bibLivrosNav.ano && bibLivrosNav.ano !== SEM_ANO ? ' do ' + nomeDoAno(bibLivrosNav.ano) : '') + ' neste tablet.' }));
     }
     var comparar = secaoComparar(disc, bibLivrosNav.ano, livros, redesenhar);
