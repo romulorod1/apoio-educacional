@@ -3989,3 +3989,117 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 }
 .bibl-livro-painel-pe .btn { flex: 1 1 auto; }
 /* ==================== B2 (fim) ==================== */
+
+/* ==================== B6: o assunto lado a lado ==================== */
+/* o atalho "3 livros" do assunto ligado, no painel do capítulo */
+.bibl-assunto { gap: 8px; }
+.bibl-n-livros {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  min-height: var(--alvo); min-width: var(--alvo); padding: 0 8px; border: 0; border-radius: var(--raio);
+  background: transparent; font: inherit; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--acao); cursor: pointer;
+}
+.bibl-n-livros:hover { background: var(--acao-clara); }
+/* "Comparar livros por assunto", na aba */
+.bibl-comparar { margin-top: 20px; }
+.bibl-comparar .bibl-rotulo { font-size: var(--letra-16); }
+.bibl-comparar-lista { display: flex; flex-wrap: wrap; gap: 8px; }
+.bibl-comparar-chip {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
+  min-height: var(--alvo); padding: 6px 14px; border: 1px solid var(--fio); border-radius: 999px;
+  background: var(--branco); font: inherit; font-size: var(--letra-16); color: var(--texto); text-align: left; cursor: pointer;
+}
+.bibl-comparar-chip:hover { background: var(--soft); }
+.bibl-comparar-nome { min-width: 0; overflow-wrap: anywhere; }
+.bibl-comparar-chip .bibl-apoio { flex: none; }
+
+/* a tela: tela cheia com Voltar, a cabeça, o filtro e a tabela que rola */
+.lado {
+  position: fixed; inset: 0; z-index: 45;
+  display: flex; flex-direction: column; background: var(--fundo);
+}
+.lado[hidden] { display: none; }
+.lado-cabeca {
+  display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap;
+  min-height: 76px; padding: 8px 16px 8px 8px; border-bottom: 1px solid var(--fio-claro); background: var(--fundo);
+}
+.lado-nome { flex: 1 1 14rem; min-width: 0; }
+.lado-nome > p { margin: 2px 0 0; }
+.lado-quem { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.lado-anos { margin-top: 0; }
+.lado-filtro {
+  display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap;
+  padding: 10px 24px; border-bottom: 1px solid var(--fio-claro);
+}
+.lado-chips { margin-top: 0; }
+.lado-chips .bibl-ano { max-width: 100%; text-align: left; overflow-wrap: anywhere; }
+.lado-legenda { margin: 0 0 0 auto; display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: var(--letra-14); color: var(--muted); }
+.lado-legenda-item { display: inline-flex; align-items: center; gap: 6px; }
+.lado-legenda-item strong { font-weight: var(--peso-forte); }
+.lado-legenda [data-icone-nome="alerta"] { color: var(--aviso-texto); }
+.lado-rola { flex: 1; min-height: 0; overflow: auto; padding: 12px 24px 40px; }
+.lado-vazio { margin: 12px 0; }
+/* A tabela: a coluna dos assuntos e uma coluna por livro, de largura igual.
+ * Com muitos livros, só a tabela rola de lado (a página não): a coluna dos
+ * assuntos e a cabeça dos livros ficam presas. */
+.lado-grade {
+  display: grid; min-width: min-content;
+  grid-template-columns: minmax(11rem, 15rem) repeat(var(--lado-colunas, 3), minmax(11rem, 1fr));
+}
+.lado-linha { display: contents; }
+.lado-linha > * { border-top: 1px solid var(--fio-claro); }
+.lado-linha-cabeca > * { border-top: 0; position: sticky; top: -12px; z-index: 2; background: var(--fundo); }
+.lado-rotulo, .lado-canto { position: sticky; left: -24px; z-index: 1; background: var(--fundo); }
+.lado-linha-cabeca > .lado-canto { z-index: 3; }
+.lado-livro { display: flex; align-items: flex-start; gap: 10px; padding: 4px 8px 12px; min-width: 0; }
+.lado-livro-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.lado-tag { align-self: flex-start; background: var(--aviso-fundo); color: var(--aviso-texto); text-transform: none; }
+.lado-rotulo { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; min-width: 0; }
+.lado-escolhido { font-size: var(--letra-12); }
+.lado-sinal { flex: none; display: inline-flex; justify-content: center; width: 1.5rem; }
+.lado-sinal [data-icone-nome="alerta"] { color: var(--aviso-texto); }
+.lado-sinal [data-icone-nome="check"] { color: var(--teal); }
+.lado-rotulo-texto { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.lado-assunto { font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--texto); overflow-wrap: anywhere; }
+.lado-linha.escolhido > * { background: var(--acao-clara); }
+.lado-linha.escolhido > .lado-rotulo { box-shadow: inset 4px 0 0 var(--navy); }
+.lado-celula { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; min-width: 0; }
+.lado-pg {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  min-height: var(--alvo); padding: 4px 8px 4px 12px; border: 1px solid var(--acao-clara); border-radius: var(--raio);
+  background: var(--branco); font: inherit; color: var(--acao); text-align: left; cursor: pointer;
+}
+.lado-pg:hover { background: var(--acao-clara); }
+.lado-pg-texto { display: flex; flex-direction: column; min-width: 0; }
+.lado-pg-cap { font-size: var(--letra-14); font-weight: var(--peso-forte); overflow-wrap: anywhere; }
+.lado-pg-p { font-size: var(--letra-14); color: var(--muted); }
+/* Não haver vínculo no mapa não prova ausência do assunto no livro. */
+.lado-sem-vinculo { font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--texto); }
+.lado-sem { font-size: var(--letra-14); color: var(--muted); }
+.lado-pe { padding-top: 10px; }
+.lado-abrir { width: 100%; background: var(--acao-clara); border-color: var(--acao-clara); color: var(--acao); }
+.lado-abrir-no-livro { font-size: var(--letra-14); }
+/* a busca de assunto que atravessa os anos */
+.lado-busca { flex: 1 1 100%; max-width: 48rem; }
+.lado-busca .ico { color: var(--muted); }
+.lado-busca-campo::-webkit-search-cancel-button { display: none; }
+.lado-escolha-lista { max-width: 56rem; display: flex; flex-direction: column; }
+.lado-escolha-lista > p { margin: 0 0 8px; }
+.lado-escolha-item {
+  display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; width: 100%;
+  min-height: var(--alvo); padding: 8px 12px; border: 0; border-top: 1px solid var(--fio-claro);
+  background: transparent; font: inherit; color: var(--texto); text-align: left; cursor: pointer;
+}
+.lado-escolha-item:hover { background: var(--soft); }
+.lado-escolha-texto { display: flex; flex-direction: column; min-width: 0; flex: 1 1 14rem; }
+.lado-ano { background: var(--acao-clara); color: var(--acao); text-transform: none; }
+.lado-n { flex: none; }
+/* Estreito (abaixo de 600 px): a coluna dos assuntos encolhe, e a margem e
+ * os encaixes presos acompanham a margem menor da área que rola. */
+@media (max-width: 600px) {
+  .lado-rola { padding: 12px 16px 40px; }
+  .lado-grade { grid-template-columns: minmax(8rem, 8rem) repeat(var(--lado-colunas, 3), minmax(9rem, 1fr)); }
+  .lado-rotulo, .lado-canto { left: -16px; }
+  .lado-filtro { padding: 10px 16px; }
+}
+/* ==================== B6 (fim) ==================== */

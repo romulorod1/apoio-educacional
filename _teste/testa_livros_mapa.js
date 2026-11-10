@@ -21,8 +21,9 @@
  *      depois de recarregar o aplicativo; o mapa do pacote não muda;
  *   3. a correção vai na cópia de segurança (em dados.ajustes.mapaDosLivros),
  *      os livros não, e restaurar a cópia devolve a correção;
- *   4. "Abrir no livro" na aula: lista os livros do ano do aluno com o
- *      assunto (com a correção valendo), abre o PDF na página do capítulo e o
+ *   4. "Abrir no livro" na aula: lista os livros do ano do aluno em que há
+ *      vínculo no mapa para o assunto (com a correção valendo), identifica
+ *      sugestões pendentes, abre o PDF na página do capítulo e o
  *      EPUB no capítulo; o aluno de outro ano não ganha o botão;
  *   5. nenhum erro de página.
  *
@@ -372,6 +373,9 @@ async function printar(pag, nome) {
   await p.evaluate(() => document.querySelector('#corpo-modal-aula [data-abrir-no-livro="MAT06-05"]').click());
   const l05 = (await esperar('a lista dos livros de Frações', () => linhasDosLivros(p), v => !!v && v.length > 0, 5000)).valor;
   console.log('   Frações: ' + JSON.stringify(l05));
+  conf('a lista diz que são vínculos do mapa', await p.$eval('#livros-do-assunto', e => e.textContent),
+    'Os livros do ano com vínculo no mapa para "Frações: o que são e como comparar". O toque abre o trecho mapeado.');
+  conf('a linha descreve o trecho como vínculo registrado', /Vínculo no mapa: capítulo/.test(l05[0]), true);
   conf('Frações: só o livro do mapa (o capítulo 2 do outro foi corrigido para "Operações com frações")',
     (l05 || []).map(x => x.split(' ')[0]).join(','), 'livro-sem-marcadores#1');
   await printar(p, 'c15b_abrir_no_livro.png');
@@ -413,6 +417,7 @@ async function printar(pag, nome) {
   await p.evaluate(() => document.querySelector('#corpo-modal-aula [data-abrir-no-livro]').click());
   const lm = (await esperar('a lista do EPUB', () => linhasDosLivros(p), v => !!v && v.length > 0, 5000)).valor;
   console.log('   literatura: ' + JSON.stringify(lm));
+  conf('a lista avisa que a sugestão automática ainda precisa ser confirmada', /sugestão a confirmar/.test(lm[0]), true);
   conf('o EPUB, no capítulo 2 do mapa', (lm || []).map(x => x.split(' ')[0]).join(','), 'livro-de-prova#2');
   await p.evaluate(() => document.querySelector('#corpo-modal-livros [data-livro]').click());
   conf('o toque abre o EPUB no capítulo 2', (await esperar('a parte do EPUB', () => epubAberto(p), v => /^\d+$/.test(v || ''), 20000)).valor, '2');
