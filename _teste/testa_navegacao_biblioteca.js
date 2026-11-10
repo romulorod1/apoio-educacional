@@ -36,9 +36,11 @@ const VENENOS = ['--envenenado-rotulo-corta'];
 const VENENO_ROTULO = process.argv.indexOf('--envenenado-rotulo-corta') !== -1;
 
 const CSS = fs.readFileSync(path.join(H.RAIZ, 'styles.css'), 'utf8');
-const ANCORA_ROTULO = 'grid-auto-columns: minmax(min-content, 1fr);';
+const ANCORA_ROTULO = '.cel-abas.muitas .nav-rotulo { white-space: normal; overflow-wrap: anywhere; line-height: 1.05; }';
+const ANCORA_COLUNA = 'grid-auto-columns: minmax(min-content, 1fr);';
 const trocas = {};
-if (VENENO_ROTULO) trocas['/styles.css'] = CSS.split(ANCORA_ROTULO).join('grid-auto-columns: minmax(0, 1fr);');
+if (VENENO_ROTULO) trocas['/styles.css'] = CSS.replace(ANCORA_COLUNA, 'grid-auto-columns: minmax(0, 1fr);')
+  .replace(ANCORA_ROTULO, '.cel-abas.muitas .nav-rotulo { white-space: nowrap; overflow-wrap: normal; line-height: 1.05; }');
 
 const amb = H.criarAmbiente(PORTA, 'perfil_navegacao_biblioteca', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'nav_bib_'));
@@ -82,8 +84,10 @@ const medirBarra = pag => pag.evaluate(() => {
   if (folga < 6) ruins.push('rótulos a ' + folga.toFixed(1) + ' px um do outro');
   if (br.left < -0.5 || br.right > innerWidth + 0.5 || br.bottom > innerHeight + 0.5) ruins.push('a barra sai da tela');
   if (document.documentElement.scrollWidth > innerWidth) ruins.push('a página rola de lado');
-  return { ruins, rotulos: itens.map(i => i.texto).join(','), folga: Math.round(folga * 10) / 10,
-    ativos: itens.filter(i => i.ativa).map(i => i.cel).join(','), atuais: itens.filter(i => i.atual === 'page').map(i => i.cel).join(',') };
+  const mais = bar.querySelector('#cel-marcar-aula');
+  return { ruins, rotulos: itens.filter(i => i.cel).map(i => i.texto).join(','), folga: Math.round(folga * 10) / 10,
+    maisOculto: !!(!mais || mais.hidden),
+    ativos: itens.filter(i => i.cel && i.ativa).map(i => i.cel).join(','), atuais: itens.filter(i => i.cel && i.atual === 'page').map(i => i.cel).join(',') };
 });
 
 const lerTrilho = pag => pag.evaluate(() => {
@@ -305,8 +309,8 @@ async function abrirCelular(w, h) {
 
   // ================================================================
   secao('3. Celular: a barra de baixo com a Biblioteca');
-  conf('o "+" de Hoje no celular é o de antes ("Marcar aula neste dia")',
-    fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').split("botaoDeAcaoCelular('marcar-aula', { class: 'cel-fab', id: 'cel-marcar-aula', 'aria-label': 'Marcar aula neste dia', icone: 'plus'").length - 1, 1);
+  conf('o "+ Aula" fica na barra inferior e mantém a ação acessível',
+    fs.readFileSync(path.join(H.RAIZ, 'index.html'), 'utf8').split('class="cel-aba cel-aba-mais" id="cel-marcar-aula"').length - 1, 1);
   for (const [w, h, l] of [[360, 780, ''], [390, 844, ''], [412, 915, ''], [360, 780, LETRA_130], [390, 844, LETRA_130]]) {
     const nome = w + ' px' + (l ? ' com a letra a 130%' : '');
     const cel = await abrirCelular(w, h);
@@ -315,6 +319,7 @@ async function abrirCelular(w, h) {
     const m = await medirBarra(cel);
     console.log('   ' + nome + ': rótulos a ' + m.folga + ' px um do outro no mais apertado');
     conf(nome + ': os destinos, na ordem', m.rotulos, 'Hoje,Alunos,Biblioteca,Fechamento,Enviar');
+    conf(nome + ': + Aula fica reservado ao celular da dona', m.maisOculto, true);
     conf(nome + ': um ativo só, Hoje, com aria-current', m.ativos + '|' + m.atuais, 'hoje|hoje');
     conf(nome + ': rótulos sem corte nem sobreposição, alvo de 48 px (' + (m.ruins.join('; ') || 'nada') + ')', m.ruins.length, 0);
     let menor = m.folga;
