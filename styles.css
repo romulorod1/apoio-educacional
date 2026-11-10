@@ -3021,7 +3021,8 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-semana-dia.ativo .cel-semana-numero { color: var(--branco); }
 .cel-semana-bolinhas { display: flex; gap: 2px; min-height: 7px; }
 .cel-bolinha { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1px var(--branco); }
-.cel-abrir-vagos { margin: 8px 0 12px; min-height: var(--alvo-celular); }
+.cel-abrir-vagos { margin: 0; min-height: var(--alvo-celular); }
+.cel-semana-topo .cel-abrir-vagos { flex: 0 0 auto; min-width: var(--alvo-celular); padding: 4px; }
 .cel-vagos-topo { display: flex; align-items: center; gap: 4px; margin: 0 0 8px; padding: 4px 0; border-bottom: 1px solid var(--fio-claro); }
 .cel-vagos-topo .btn { flex: 0 0 auto; min-width: var(--alvo-celular); min-height: var(--alvo-celular); padding: 4px; }
 .cel-vagos-titulo { flex: 1 1 auto; min-width: 0; }

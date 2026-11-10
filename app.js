@@ -22866,7 +22866,7 @@
    * anterior e a seguinte nas pontas; embaixo, a faixa da semana, de domingo
    * a sábado como a agenda do tablet, com uma bolinha na cor do aluno por
    * aula. Um toque no dia troca o dia. */
-  function faixaDaSemanaCelular(dia) {
+  function faixaDaSemanaCelular(dia, edita) {
     var hoje = Core.hojeIso();
     /* O dia da semana curto ("Hoje, qui 29/10"): com a letra a 130%, num
      * celular de 360, o nome longo quebrava em três linhas e o alto preso
@@ -22884,6 +22884,13 @@
       topo.splice(2, 0, el('button', { type: 'button', class: 'btn pequeno', id: 'cel-dia-hoje', texto: 'Hoje',
         aoClick: function () { irParaDiaCelular(hoje); } }));
     }
+    if (edita) topo.push(el('button', { type: 'button', class: 'btn pequeno cel-abrir-vagos', id: 'cel-abrir-vagos',
+      'aria-label': 'Ver horários vagos', texto: 'Vagos', aoClick: function () {
+        var h = Core.hojeIso();
+        semanaVagosCelular = somarDiasCelular(h, -((Core.diaSemana(h) + 6) % 7));
+        diaVagosCelular = h >= semanaVagosCelular && h <= somarDiasCelular(semanaVagosCelular, 5) ? h : semanaVagosCelular;
+        irParaTelaCelular('vagos');
+      } }));
     var inicio = somarDiasCelular(dia, -Core.diaSemana(dia));
     var dias = [];
     for (var i = 0; i < 7; i++) dias.push(somarDiasCelular(inicio, i));
@@ -23546,18 +23553,12 @@
     if (hojeVistoCelular && hojeVistoCelular !== hoje && diaCelular === hojeVistoCelular) { diaCelular = hoje; diaRoladoCelular = null; }
     var dia = diaCelular || hoje;
     var edita = celularEdita();
-    var semana = faixaDaSemanaCelular(dia), faixa = semana.faixa;
+    var semana = faixaDaSemanaCelular(dia, edita), faixa = semana.faixa;
     // os avisos (D6c, lote 4) só no dia de hoje, presos com a faixa: a rolagem até agora não os esconde;
     // recolhidos, são o selinho na linha da data; abertos, o painel, até a metade da tela
     if (dia === hoje) porAvisosNaFaixaCelular(faixa);
     caixa.appendChild(faixa);
     caixa.appendChild(semana.dias);
-    if (edita) caixa.appendChild(el('button', { type: 'button', class: 'btn cel-abrir-vagos', id: 'cel-abrir-vagos', texto: 'Ver horários vagos', aoClick: function () {
-      var h = Core.hojeIso();
-      semanaVagosCelular = somarDiasCelular(h, -((Core.diaSemana(h) + 6) % 7));
-      diaVagosCelular = h >= semanaVagosCelular && h <= somarDiasCelular(semanaVagosCelular, 5) ? h : semanaVagosCelular;
-      irParaTelaCelular('vagos');
-    } }));
     ajustarPainelDosAvisosCelular();
     var aulas = aulasDoDiaCelular(dia);
     if (!aulas.length) {
