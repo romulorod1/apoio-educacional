@@ -448,7 +448,7 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
 
   secao('3. A aba Alunos: a lista dos ativos');
   conf('a aba Alunos está nas abas de baixo, depois de Hoje', await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-abas .cel-aba')).filter(b => !b.hidden).map(b => b.textContent).join(',')),
-    'Hoje,Alunos,Biblioteca,Fechamento,Enviar,+ Aula'); // B1: a Biblioteca entrou e F2 trouxe a ação para a barra
+    'Hoje,Alunos,Livros,Fechar mês,Enviar,+ Aula'); // B1: a Biblioteca entrou; F2 encurtou os rótulos na barra
   await aba(pagC, 'alunos');
   const lista = await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-alunos-lista .cel-aluno-item')).map(b => b.dataset.aluno + '=' + b.querySelector('.cel-aluno-nome').textContent));
   conf('a lista traz os ativos em ordem de nome, sem o inativo', lista.join(', '),
@@ -775,7 +775,7 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   conf('trouxe a cópia da dona pelo código da conta dela', await trazerCopiaNoCelular(pagD, dona.localId), true);
   await pausa(400);
   const abasD = await pagD.evaluate(() => Array.from(document.querySelectorAll('#cel-abas .cel-aba')).filter(b => !b.hidden).map(b => b.textContent + ':' + Math.round(b.getBoundingClientRect().height)));
-  conf('o observador tem a aba Alunos, com as dele (' + abasD.join(', ') + ')', abasD.map(t => t.split(':')[0]).join(','), 'Hoje,Alunos,Fechamento,Diagnóstico,Ajustes');
+  conf('o observador tem a aba Alunos, com as dele (' + abasD.join(', ') + ')', abasD.map(t => t.split(':')[0]).join(','), 'Hoje,Alunos,Fechar mês,Diagnóstico,Ajustes');
   await aba(pagD, 'alunos');
   m = await medirTela(pagD);
   conf('o observador, a lista: alvos de 48 px e sem rolagem de lado, com as cinco abas', telaBoa(m), '');

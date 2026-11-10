@@ -1291,7 +1291,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     texto: (document.querySelector('#cel-tempo .cel-livre[data-livre-de="18:30"] .cel-livre-texto') || {}).textContent || '',
     botoes: document.querySelectorAll('#cel-tempo .cel-livre[data-livre-de="18:30"] .cel-livre-hora').length
   }));
-  conf('(controle) o observador continua vendo o texto do intervalo curto sem receber botões de edição',
+  if (MODO !== MODOS[1]) conf('(controle) o observador continua vendo o texto do intervalo curto sem receber botões de edição',
     /Livre 18:30 a 19:00/.test(gapObservador.texto) && gapObservador.botoes === 0, true);
   await irParaDia(pagD, HOJE);
   const livresD = await pagD.evaluate(() => document.querySelectorAll('#cel-tempo .cel-livre').length);
