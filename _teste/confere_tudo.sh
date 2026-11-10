@@ -329,6 +329,11 @@ done
 roda "documento do ciclo"    node _teste/testa_documento_do_ciclo.js
 # B5: cabecalho em uma unica linha de 64 px e abas de toque de 44 px no tablet em pe.
 roda "cabecalho tablet (B5)"  node _teste/testa_cabecalho_tablet.js
+# Todo var(--x) do CSS e do app tem definicao (ou e posto pelo JS, com nome):
+# a F1 tirou a --letra-3 e o aviso do #136 caiu na letra herdada, calado.
+roda "vars definidas"         node _teste/testa_vars_definidas.js
+roda "vars definidas --envenenado-letra-3" node _teste/testa_vars_definidas.js --envenenado-letra-3
+roda "vars definidas --envenenado-excecao-velha" node _teste/testa_vars_definidas.js --envenenado-excecao-velha
 # B6: alvos de toque de 44 px e tipografia base
 roda "alvos de toque (B6)"    node _teste/testa_alvos_toque.js
 # B12: nenhuma cor literal fora do :root no styles.css e no maximo 6 tamanhos de
