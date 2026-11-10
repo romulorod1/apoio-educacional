@@ -507,9 +507,11 @@ async function percorrer(pag, telas) {
   await pausa(200);
   const vagasIniciais = await pagC.evaluate(() => ({ ativa: !!document.querySelector('#cel-vagos.ativa'), abasOcultas: document.querySelector('#cel-abas').hidden,
     dias: document.querySelectorAll('#cel-vagos .cel-vagos-dia').length, filtros: Array.from(document.querySelectorAll('#cel-vagos .cel-vagos-chip')).map(b => b.textContent).join(','),
-    largura: document.documentElement.scrollWidth, viewport: innerWidth, horarios: document.querySelectorAll('#cel-vagos .cel-vagos-horario').length }));
+    largura: document.documentElement.scrollWidth, viewport: innerWidth, horarios: document.querySelectorAll('#cel-vagos .cel-vagos-horario').length,
+    vagasDeOntem: document.querySelectorAll('#cel-vagos .cel-vagos-dia[data-dia="2026-10-05"] .cel-vagos-horario').length }));
   conf('F3: mostra a semana de seis dias e só oculta a barra inferior na tela própria', vagasIniciais.ativa + '|' + vagasIniciais.abasOcultas + '|' + vagasIniciais.dias, 'true|true|6');
   conf('F3: filtros de 1h, 1h30 e 2h; a página não rola de lado', vagasIniciais.filtros + '|' + vagasIniciais.largura + '/' + vagasIniciais.viewport, '1h,1h30,2h|' + vagasIniciais.viewport + '/' + vagasIniciais.viewport);
+  conf('F3: na terça, segunda-feira já passada não oferece vagas', vagasIniciais.vagasDeOntem, 0);
   conf('F3: horários aparecem como alvos de toque com pelo menos 48 px', await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-vagos .cel-vagos-horario')).every(b => {
     const r = b.getBoundingClientRect(); return r.width >= 48 && r.height >= 48;
   })), true);
@@ -536,6 +538,27 @@ async function percorrer(pag, telas) {
   }
   await clicar(pagC, '#cel-vagos-voltar');
   await pausa(100);
+  await momento(pagC, '2026-10-11', '12:00');
+  await clicar(pagC, '#cel-abrir-vagos');
+  await pausa(150);
+  const domingoVagos = await pagC.evaluate(() => ({
+    periodo: document.querySelector('#cel-vagos-periodo').textContent,
+    dias: Array.from(document.querySelectorAll('#cel-vagos .cel-vagos-dia')).map(d => d.dataset.dia),
+    semDiasPassados: Array.from(document.querySelectorAll('#cel-vagos .cel-vagos-dia')).every(d => d.dataset.dia >= '2026-10-11')
+  }));
+  conf('F3: no domingo, Vagos começa na segunda seguinte', domingoVagos.periodo + '|' + domingoVagos.dias[0] + '|' + domingoVagos.dias[5], '12/10 a 17/10|2026-10-12|2026-10-17');
+  conf('F3: no domingo, todos os dias mostrados são futuros', domingoVagos.semDiasPassados, true);
+  await clicar(pagC, '#cel-vagos .cel-vagos-topo button[aria-label="Semana anterior"]');
+  await pausa(100);
+  const semanaPassadaVagos = await pagC.evaluate(() => ({
+    vagas: document.querySelectorAll('#cel-vagos .cel-vagos-horario').length,
+    whatsapp: document.querySelectorAll('#cel-vagos-whatsapp').length,
+    aviso: document.querySelector('.cel-vagos-dia[data-dia="2026-10-05"] .cel-vagos-sem-horario')?.textContent || ''
+  }));
+  conf('F3: ao consultar semana passada, não oferece horários nem WhatsApp', semanaPassadaVagos.vagas + '|' + semanaPassadaVagos.whatsapp + '|' + semanaPassadaVagos.aviso, '0|0|Este dia já passou.');
+  await clicar(pagC, '#cel-vagos-voltar');
+  await pausa(100);
+  await momento(pagC, '2026-10-06', '14:50');
   const folhaDe = (aula, passo, dia) => async () => {
     await hojeCom();
     if (dia) { await clicar(pagC, '.cel-semana-dia[data-dia="' + dia + '"]'); await pausa(200); }

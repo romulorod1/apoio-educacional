@@ -314,7 +314,7 @@ label.campo > span {
   color: var(--navy);
   margin-bottom: 5px;
 }
-input[type=text], input[type=date], input[type=time], input[type=number], input[type=email], input[type=password], select, textarea {
+input[type=text], input[type=tel], input[type=url], input[type=date], input[type=time], input[type=number], input[type=email], input[type=password], select, textarea {
   width: 100%;
   padding: 11px 12px;
   border: 1px solid var(--fio);
@@ -2116,6 +2116,10 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-pdf-barra { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
   padding: 10px 18px; border-bottom: 1px solid var(--fio); background: var(--soft); }
 .leitor-pdf-contador { min-width: 128px; text-align: center; font-size: var(--letra-16); font-weight: 600; color: var(--navy); }
+.leitor-ir-pagina { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: var(--letra-14); color: var(--muted); }
+.leitor-ir-pagina[hidden] { display: none; }
+.leitor-ir-pagina input { width: 58px; min-height: 44px; padding: 0 8px; border: 1px solid var(--fio); border-radius: 8px;
+  background: var(--branco); color: var(--navy); font: inherit; font-size: var(--letra-16); font-weight: 600; text-align: center; box-sizing: border-box; }
 .leitor-pdf-zoom { display: inline-flex; gap: 8px; margin-left: auto; }
 .leitor-pdf-quadrado { min-width: 44px; padding: 10px 0; font-size: var(--letra-20); line-height: 1; }
 .leitor-pdf-corpo { background: var(--fio-claro); overflow: auto; padding: 18px; }
@@ -2994,7 +2998,7 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-semana {
   position: sticky;
   top: -12px; /* o recuo do conteúdo: presa rente ao alto da tela */
-  z-index: 3;
+  z-index: 4;
   background: var(--ivory);
   margin: -12px -16px 8px;
   padding: 4px 16px;
@@ -3317,7 +3321,7 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
 }
 
 /* F2: agenda proporcional do celular, das 07:00 às 20:00. */
-.cel-tempo-proporcional { position: relative; box-sizing: border-box; min-height: 0; margin: 4px 0 18px; overflow: visible; }
+.cel-tempo-proporcional { position: relative; isolation: isolate; box-sizing: border-box; min-height: 0; margin: 4px 0 18px; overflow: visible; }
 .cel-tempo-proporcional .cel-tempo-linha { position: absolute; box-sizing: border-box; left: 0; right: 0; display: block; margin: 0; }
 .cel-tempo-proporcional .cel-tempo-hora { position: absolute; top: 2px; left: 0; width: 44px; padding: 0; font-size: var(--letra-12); line-height: 1.2; text-align: right; }
 .cel-tempo-proporcional .cel-tempo-item { position: absolute; top: 0; right: 0; bottom: 0; left: 48px; display: block; overflow: visible; }
@@ -3766,6 +3770,9 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .cel-aba .nav-ind { width: 100%; max-width: 56px; height: 28px; }
 .cel-aba.ativa { color: var(--nav-ativo-texto); font-weight: 600; }
 .cel-abas.muitas .nav-rotulo { white-space: normal; overflow-wrap: anywhere; line-height: 1.05; }
+.cel-abas.muitas .cel-aba[data-cel="biblioteca"] .nav-rotulo,
+.cel-abas.muitas .cel-aba[data-cel="fechamento"] .nav-rotulo { overflow-wrap: normal; word-break: normal; hyphens: none; }
+.cel-abas.muitas .cel-aba .nav-rotulo { display: flex; align-items: center; justify-content: center; min-height: 2.1em; }
 .cel-aba.ativa .nav-ind { background: var(--nav-ativo-fundo); }
 .cel-aba:focus-visible { outline: 2px solid var(--nav-ativo-texto); outline-offset: -2px; border-radius: 12px; }
 .cel-aba-mais .nav-ind { width: 40px; height: 32px; color: var(--nav-mais-traco); background: var(--nav-mais-fundo); border-radius: 16px; }

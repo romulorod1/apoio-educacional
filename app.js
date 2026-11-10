@@ -4,7 +4,10 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.41';
+  var VERSAO = '1.42.46';
+  /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
+   * Versões posteriores do app podem trazer apenas ajustes de interface. */
+  var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -82,9 +85,21 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.41',
+      versao: '1.42.46',
       itens: [
         'No celular, a aba Vagos mostra horários disponíveis e deixa preparar uma mensagem para as famílias; ao escolher um horário, o formulário de aula abre preenchido, sem gravar antes de salvar.'
+      ]
+    },
+    {
+      versao: '1.42.42',
+      itens: [
+        'No celular, a ficha do aluno permite atualizar nome, respons\u00e1vel, telefone e local da aula. Valores e informa\u00e7\u00f5es pedag\u00f3gicas continuam preservados.'
+      ]
+    },
+    {
+      versao: '1.42.41',
+      itens: [
+        'A Biblioteca mostra a p\u00e1gina impressa dos livros no sum\u00e1rio e no leitor PDF, inclusive n\u00fameros romanos.'
       ]
     },
     {
@@ -96,20 +111,21 @@
     {
       versao: '1.42.39',
       itens: [
-        'Em Ajustes, a lista de pacotes e livros da Biblioteca fica recolhida; os controles de importação continuam no alto. Na importação, cada livro tem andamento próprio e um arquivo que falha ou demora demais é pulado com aviso, enquanto os seguintes continuam.'
+        'Em Ajustes, a lista de pacotes e livros da Biblioteca fica recolhida; os controles de importa\u00e7\u00e3o continuam no alto. Na importa\u00e7\u00e3o, cada livro tem andamento pr\u00f3prio e um arquivo que falha ou demora demais \u00e9 pulado com aviso, enquanto os seguintes continuam.'
       ]
-    },    {
+    },
+    {
       versao: '1.42.38',
       itens: [
-        'Nova tela na Biblioteca para comparar um assunto entre os livros: uma tabela mostra, para cada livro do tablet, em que capítulo e páginas o assunto aparece, indica onde não há vínculo no mapa e avisa quando o mapa ainda não foi revisado.',
-        'Quando um assunto não aparece no mapa, a Biblioteca mostra “sem vínculo no mapa”; isso não significa que o livro não aborda o assunto, pois o mapa pode estar incompleto. As contagens se referem aos vínculos registrados.',
-        'Você chega a ela pela aba Biblioteca (Comparar livros por assunto, com uma busca de assunto que atravessa os anos), pelo painel do capítulo de um livro e pela aula (Ver em todos os livros).'
+        'Nova tela na Biblioteca para comparar um assunto entre os livros: uma tabela mostra, para cada livro do tablet, em que cap\u00edtulo e p\u00e1ginas o assunto aparece, indica onde n\u00e3o h\u00e1 v\u00ednculo no mapa e avisa quando o mapa ainda n\u00e3o foi revisado.',
+        'Quando um assunto n\u00e3o aparece no mapa, a Biblioteca mostra "sem v\u00ednculo no mapa"; isso n\u00e3o significa que o livro n\u00e3o aborda o assunto, pois o mapa pode estar incompleto. As contagens se referem aos v\u00ednculos registrados.',
+        'Voc\u00ea chega a ela pela aba Biblioteca (Comparar livros por assunto, com uma busca de assunto que atravessa os anos), pelo painel do cap\u00edtulo de um livro e pela aula (Ver em todos os livros).'
       ]
     },
     {
       versao: '1.42.37',
       itens: [
-        'No celular, as setas da agenda avançam ou voltam um dia por vez. Assim, dá para abrir amanhã sem pular para a semana seguinte.'
+        'No celular, as setas da agenda avan\u00e7am ou voltam um dia por vez. Assim, d\u00e1 para abrir amanh\u00e3 sem pular para a semana seguinte.'
       ]
     },
     {
@@ -1780,7 +1796,7 @@
   function salvar() {
     /* O celular só lê (D6): nada chega ao banco por aqui. A recusa é dita uma
      * vez, sem a faixa de falha de gravação, que mandaria tentar de novo.
-     * O celular da DONA (D6, parte 2) grava daqui só dentro de uma das quatro
+     * O celular da DONA (D6, parte 2) grava daqui só dentro de uma das cinco
      * ações dele (comoAcaoDoCelular): qualquer outro caminho que chegue aqui
      * no celular continua recusado. */
     if (aparelhoSoLe() && !(gravacaoDoCelular > 0 && celularEdita())) {
@@ -2708,6 +2724,12 @@
     $('#leitor-largura').addEventListener('click', function () { zoomDoLeitorPdf(0); });
     $('#leitor-como-folha').addEventListener('click', paginaDoLeitorComoFolha);
     $('#leitor-sumario').addEventListener('click', alternarSumarioDoLeitor);
+    if ($('#leitor-ir-pagina')) {
+      $('#leitor-ir-pagina').addEventListener('change', function () { irParaPaginaDoLeitor(this.value); });
+      $('#leitor-ir-pagina').addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); irParaPaginaDoLeitor(this.value); }
+      });
+    }
     $('#epub-anterior').addEventListener('click', function () { andarNoEpub(-1); });
     $('#epub-proximo').addEventListener('click', function () { andarNoEpub(1); });
     $('#epub-sumario').addEventListener('click', alternarSumarioEpub);
@@ -16229,12 +16251,18 @@
     }).then(function (contas) {
       var linhas = ['Livros importados.'].concat(Biblioteca.resumoDeLivros(contas),
         ['Para ler, abra a aba Biblioteca e toque no livro.']);
-      if (aberto.erros.length) {
-        linhas.push(aberto.erros.length + (aberto.erros.length === 1
-          ? ' livro foi pulado; os demais foram processados:'
-          : ' livros foram pulados; os demais foram processados:'));
-        aberto.erros.forEach(function (e) { linhas.push(e.titulo + ': ' + e.mensagem); });
-      }
+        if (aberto.erros.length) {
+          linhas.push(aberto.erros.length + (aberto.erros.length === 1
+            ? ' livro foi pulado; os demais foram processados:'
+            : ' livros foram pulados; os demais foram processados:'));
+          aberto.erros.forEach(function (e) { linhas.push(e.titulo + ': ' + e.mensagem); });
+        }
+        var recusados = aberto.recusados || [];
+        if (recusados.length) {
+          linhas.push('Aten\u00e7\u00e3o: ' + recusados.length + (recusados.length === 1 ? ' livro n\u00e3o foi importado' : ' livros n\u00e3o foram importados') +
+            ' por numera\u00e7\u00e3o impressa inv\u00e1lida.');
+          recusados.forEach(function (livro) { if (livro.motivo) linhas.push(livro.motivo); });
+        }
       // livro que SAIU do pacote novo também é gravação (some do tablet com a posição de leitura)
       var entrou = contas.novos + contas.atualizados + contas.removidos > 0;
       var deOutro = contas.deOutroPacote && contas.deOutroPacote.length > 0;
@@ -16346,7 +16374,8 @@
       }
       var sumario = reg.meta.sumario || [];
       return abrirLeitorPdf(reg.blob, {
-        titulo: tituloDoLivro(reg.meta), nome: reg.id + '.pdf', pagina: (destino && destino.pagina) || (pos && pos.pagina) || 1,
+        titulo: tituloDoLivro(reg.meta), nome: reg.id + '.pdf',
+        pagina: (destino && destino.pagina) || Biblioteca.paginaDaPosicao(reg.meta, pos) || 1,
         sumario: sumario, livro: reg,
         dica: sumario.length ? '' : 'Este livro não tem sumário: use Anterior e Próxima.',
         aoMudarPagina: function (n) {
@@ -16506,9 +16535,9 @@
     achados.forEach(function (a) {
       var e = a.entrada;
       var epub = a.meta.formato === 'epub';
-      var onde = e.obraInteira ? 'Vínculo no mapa: livro inteiro' :
-        'Vínculo no mapa: capítulo ' + e.titulo + (epub ? '' : ', página ' + e.pagina);
-      if (e.estado === 'a_confirmar') onde += ' · sugestão a confirmar';
+        var onde = e.obraInteira ? 'V\u00ednculo no mapa: livro inteiro' :
+          'V\u00ednculo no mapa: cap\u00edtulo ' + e.titulo + (epub ? '' : ', p\u00e1gina ' + paginaParaMostrar(a.meta, e));
+        if (e.estado === 'a_confirmar') onde += ' \u00b7 sugest\u00e3o a confirmar';
       var linha = linhaBib(tituloDoLivro(a.meta), onde, function () {
         fecharModal('modal-livros');
         abrirLivro(a.id, e.obraInteira ? null : (epub ? { capitulo: e.capitulo, ancora: e.ancora } : { pagina: e.pagina }));
@@ -16817,7 +16846,7 @@
 
   /* O sumário do livro, no PDF e no EPUB: uma lista embaixo da barra, um
    * toque em cada entrada, recuada pelo nível. `ir` recebe a entrada. */
-  function desenharSumario(caixa, sumario, atual, ir) {
+  function desenharSumario(caixa, sumario, atual, ir, meta) {
     caixa.innerHTML = '';
     if (!sumario || !sumario.length) {
       caixa.appendChild(el('p', { class: 'ajuda vazio-do-sumario', texto: 'Este livro não tem sumário.' }));
@@ -16828,7 +16857,7 @@
         type: 'button', class: e === atual ? 'atual' : '', 'data-entrada': String(e.n),
         style: 'padding-left:' + (10 + 18 * Math.max(0, (e.nivel || 1) - 1)) + 'px',
         aoClick: function () { ir(e); }
-      }, [e.titulo, e.pagina ? el('span', { class: 'pagina-do-sumario', texto: 'p. ' + e.pagina }) : null]));
+      }, [e.titulo, e.pagina ? el('span', { class: 'pagina-do-sumario', texto: 'p. ' + paginaParaMostrar(meta, e) }) : null]));
     });
   }
 
@@ -17635,13 +17664,24 @@
     return { numero: String(k), titulo: titulo, palavra: 'Capítulo' };
   }
 
-  /* A PÁGINA QUE O SUMÁRIO MOSTRA. Hoje é a página do ARQUIVO (a do PDF), a
-   * mesma que o leitor conta. A fatia B3 do redesenho traz a página impressa
-   * na meta do livro (o deslocamento entre as duas): é em paginaParaMostrar
-   * que ela entra, e o rótulo da coluna (ROTULO_DA_PAGINA) muda junto. O
-   * leitor continua abrindo pela página do arquivo (paginaDoArquivo). */
+  /* A PÁGINA QUE O SUMÁRIO MOSTRA (B3). Quando o livro traz `numeracao` e a
+   * página está dentro de um trecho numerado, a tela mostra a página impressa
+   * (e a coluna diz "página impressa"). Sem `numeracao` ou fora de trecho
+   * (capa, folha de rosto), fica a página do arquivo. O leitor continua
+   * abrindo e salvando posição pela página do arquivo (paginaDoArquivo). */
   var ROTULO_DA_PAGINA = 'página do arquivo';
-  function paginaParaMostrar(meta, entrada) { return entrada.pagina; }
+  var ROTULO_DA_PAGINA_IMPRESSA = 'página impressa';
+  function livroTemNumeracao(meta) {
+    return !!(meta && Array.isArray(meta.numeracao) && meta.numeracao.length && !Biblioteca.conferirNumeracao(meta));
+  }
+  function rotuloDaPaginaDoLivro(meta) {
+    return livroTemNumeracao(meta) ? ROTULO_DA_PAGINA_IMPRESSA : ROTULO_DA_PAGINA;
+  }
+  function paginaParaMostrar(meta, entrada) {
+    var arq = entrada && typeof entrada === 'object' ? entrada.pagina : entrada;
+    var imp = typeof Biblioteca !== 'undefined' && Biblioteca.paginaImpressa ? Biblioteca.paginaImpressa(meta, arq) : null;
+    return imp !== null && imp !== undefined ? imp : arq;
+  }
   function paginaDoArquivo(meta, entrada) { return entrada.pagina; }
 
   // os anos do livro ('06', 'em1') e as séries dos exercícios ('6ano', '1em')
@@ -17727,7 +17767,7 @@
       cap = (p.palavra === 'Capítulo' ? 'Cap. ' : p.palavra + ' ') + p.numero + ', ' + p.titulo;
     }
     if (epub) return cap || 'Parte ' + (pos.capitulo || 1);
-    return [cap, 'p. ' + (pos.pagina || 1)].filter(Boolean).join(' · ');
+    return [cap, 'p. ' + paginaParaMostrar(meta, pos.pagina || 1)].filter(Boolean).join(' · ');
   }
   function progressoDoLivro(l) {
     var pos = l.pos, meta = l.meta;
@@ -18045,7 +18085,7 @@
       });
     }
     atual = atual || capitulos[0] || null;
-    var continuar = l.pos ? (epub ? 'Continuar no capítulo ' + (l.pos.capitulo || 1) : 'Continuar na p. ' + (l.pos.pagina || 1)) : 'Abrir o livro';
+    var continuar = l.pos ? (epub ? 'Continuar no capítulo ' + (l.pos.capitulo || 1) : 'Continuar na p. ' + paginaParaMostrar(meta, l.pos.pagina || 1)) : 'Abrir o livro';
 
     // redesenhar o MESMO livro (o leitor fechou, os nomes dos assuntos chegaram) mantém a rolagem do sumário
     var rolagem = !tela.hidden && tela.dataset.livro === l.id ? tela.scrollTop : 0;
@@ -18070,7 +18110,7 @@
     var lista = el('section', { class: 'bibl-sumario', 'aria-label': 'Sumário' }, [
       el('div', { class: 'bibl-sumario-cabeca' }, [
         el('h3', { class: 'bibl-titulo', texto: 'Sumário' }),
-        sumario.length && !epub ? el('span', { class: 'bibl-apoio', texto: ROTULO_DA_PAGINA }) : null
+        sumario.length && !epub ? el('span', { class: 'bibl-apoio', texto: rotuloDaPaginaDoLivro(meta) }) : null
       ])
     ]);
     if (!sumario.length) {
@@ -18111,9 +18151,15 @@
       var ma = mapa.length ? entradaDoMapaDoCapitulo(mapa, meta, atual) : null;
       var pAtual = partesDoCapitulo(atual.titulo, capitulos.indexOf(atual) + 1);
       var fim = atual.pagina_fim;
+      var impIni = !epub && atual.pagina ? Biblioteca.paginaImpressa(meta, atual.pagina) : null;
+      var impFim = !epub && fim ? Biblioteca.paginaImpressa(meta, fim) : null;
       var paginas = epub || !atual.pagina ? '' : fim && fim >= atual.pagina ?
-        'Páginas do arquivo ' + paginaParaMostrar(meta, atual) + ' a ' + fim + ' · ' + plural(fim - atual.pagina + 1, 'página', 'páginas') :
-        'Começa na página do arquivo ' + paginaParaMostrar(meta, atual);
+        (impIni !== null && impFim !== null ?
+          'Página impressa ' + impIni + ' a ' + impFim + ' · ' + plural(fim - atual.pagina + 1, 'página', 'páginas') :
+          'Páginas do arquivo ' + paginaParaMostrar(meta, atual) + ' a ' + paginaParaMostrar(meta, fim) + ' · ' + plural(fim - atual.pagina + 1, 'página', 'páginas')) :
+        (impIni !== null ?
+          'Começa na página impressa ' + impIni :
+          'Começa na página do arquivo ' + paginaParaMostrar(meta, atual));
       var assuntos;
       if (!mapa.length) assuntos = [el('p', { class: 'bibl-falta-texto', texto: 'Este livro ainda não tem mapa de assuntos.' })];
       else if (!ma || !ma.assuntos.length) assuntos = [el('p', { class: 'bibl-falta-texto', texto: 'Nenhum assunto ligado ainda.' })];
@@ -18449,7 +18495,7 @@
             var epub = c.meta.formato === 'epub';
             var cap = rotuloDoCapituloDoMapa(c.meta, e);
             var paginas = e.obraInteira ? 'o livro inteiro' : epub ? 'parte ' + e.capitulo :
-              'p. ' + paginaParaMostrar(c.meta, e) + (e.pagina_fim && e.pagina_fim > e.pagina ? ' a ' + e.pagina_fim : '');
+              'p. ' + paginaParaMostrar(c.meta, e) + (e.pagina_fim && e.pagina_fim > e.pagina ? ' a ' + paginaParaMostrar(c.meta, e.pagina_fim) : '');
             return el('button', { type: 'button', class: 'lado-pg', 'data-n': String(e.n),
               'data-pagina': epub ? null : String(paginaDoArquivo(c.meta, e)),
               'aria-label': a.titulo + ', ' + tituloDoLivro(c.meta) + ', ' + cap + ', ' + paginas,
@@ -22497,8 +22543,9 @@
     mostrarDicaDoLeitor(opcoes.comoFolha === false ? '' : opcoes.dica);
     // o botão Sumário só existe para quem traz sumário (o livro); o anexo da aula fica como era
     $('#leitor-sumario').hidden = !(opcoes.sumario && opcoes.sumario.length);
-    // "Exportar em PDF" (C15.4) só no livro
+    // "Exportar em PDF" (C15.4) e "Ir para a página" (B3) só no livro
     $('#leitor-exportar').hidden = !opcoes.livro;
+    if ($('#leitor-ir-caixa')) $('#leitor-ir-caixa').hidden = !opcoes.livro;
     fecharSumarioDoLeitor();
     // "Este capítulo cobre" (C15.2) nasce escondido: só o livro o mostra, a cada página
     esconderCobre('pdf');
@@ -22595,9 +22642,24 @@
     entregarArquivo(nome, blob, op.titulo || nome);
   }
 
+  function textoDoContadorDoLeitor(meta, paginaArq, total) {
+    var imp = meta ? Biblioteca.paginaImpressa(meta, paginaArq) : null;
+    if (imp !== null && imp !== undefined) {
+      return 'p. ' + paginaArq + ' de ' + total + ' (impressa ' + imp + ')';
+    }
+    return 'Página ' + paginaArq + ' de ' + total;
+  }
+
   function atualizarBarraDoLeitor() {
     var tem = !!(leitor && leitor.doc);
-    $('#leitor-contador').textContent = tem ? 'Página ' + leitor.pagina + ' de ' + leitor.total : '';
+    var meta = tem && leitor.opcoes && leitor.opcoes.livro ? leitor.opcoes.livro.meta : null;
+    var imp = meta ? Biblioteca.paginaImpressa(meta, leitor.pagina) : null;
+    $('#leitor-contador').textContent = tem ? textoDoContadorDoLeitor(meta, leitor.pagina, leitor.total) : '';
+    var ir = $('#leitor-ir-pagina');
+    if (ir) {
+      ir.disabled = !tem;
+      ir.value = tem ? String(imp !== null && imp !== undefined ? imp : leitor.pagina) : '';
+    }
     $('#leitor-anterior').disabled = !tem || leitor.pagina <= 1;
     $('#leitor-proxima').disabled = !tem || leitor.pagina >= leitor.total;
     $('#leitor-menos').disabled = !tem || leitor.zoom <= LEITOR_ZOOM_MIN;
@@ -22606,6 +22668,20 @@
     $('#leitor-como-folha').disabled = !tem;
     $('#leitor-sumario').disabled = !tem;
     $('#leitor-exportar').disabled = !tem;
+  }
+
+  function irParaPaginaDoLeitor(valor) {
+    if (!leitor || !leitor.doc) return false;
+    var meta = leitor.opcoes && leitor.opcoes.livro ? leitor.opcoes.livro.meta : null;
+    var destino = Biblioteca.resolverPaginaDoLeitor(meta, valor, leitor.total);
+    if (!destino || destino < 1 || destino > leitor.total) {
+      atualizarBarraDoLeitor();
+      return false;
+    }
+    fecharSumarioDoLeitor();
+    leitor.pagina = destino;
+    desenharPaginaDoLeitor(true);
+    return true;
   }
 
   function fecharSumarioDoLeitor() {
@@ -22620,12 +22696,13 @@
     if (!leitor || !leitor.doc || !lista) return;
     if (!lista.hidden) { fecharSumarioDoLeitor(); return; }
     var sumario = leitor.opcoes.sumario || [];
+    var meta = leitor.opcoes && leitor.opcoes.livro ? leitor.opcoes.livro.meta : null;
     desenharSumario(lista, sumario, entradaAtualDoSumario(sumario, 'pagina', leitor.pagina), function (e) {
       fecharSumarioDoLeitor();
       if (!leitor || !leitor.doc) return;
       leitor.pagina = Math.max(1, Math.min(leitor.total, e.pagina));
       desenharPaginaDoLeitor(true);
-    });
+    }, meta);
     lista.hidden = false;
     $('#leitor-sumario').setAttribute('aria-expanded', 'true');
   }
@@ -23416,12 +23493,13 @@
    * deixaria de editar. A tela do aparelho e a marca não giram. Fora disso, o
    * aplicativo fica exatamente como sempre foi.
    *
-   * O CELULAR DA DONA EDITA, e só em quatro ações (D6, parte 2): marcar e
-   * cancelar aula, "Registrar como foi", cadastrar aluno com o essencial e o
+   * O CELULAR DA DONA EDITA só nas ações autorizadas (D6, parte 2): marcar e
+    * cancelar aula, "Registrar como foi", cadastrar aluno, editar os dados
+    * essenciais da ficha e o
    * "pago em". Cada uma grava pelo salvar() de sempre, dentro de
    * comoAcaoDoCelular, e a mudança entra na fila de registros na mesma
    * transação e sobe pelo sincronizar. O resto continua do tablet, com as
-   * travas de sempre: nada grava no banco fora das quatro ações e do que vem
+   * travas de sempre: nada grava no banco fora dessas cinco ações e do que vem
    * da nuvem (Store.somenteLeitura e as três portas do celular, na porta das
    * transações, e o salvar() daqui); a CÓPIA COMPLETA nunca sobe deste
    * aparelho, nem ao fechar, nem uma vez por dia, nem pelo toque (o commit do
@@ -23464,7 +23542,7 @@
   function celularEdita() {
     return modoCelular && temNuvem() && Nuvem.celularDaDona() && !leOutraConta();
   }
-  /* As quatro ações do celular gravam por aqui, e só elas: o salvar() aceita
+  /* As cinco ações do celular gravam por aqui, e só elas: o salvar() aceita
    * no celular enquanto a ação corre (o comDesfazer guarda a permissão para a
    * gravação dele, que vem depois, e para o Desfazer). */
   var gravacaoDoCelular = 0;
@@ -23900,6 +23978,10 @@
     var d = new Date(p[0], p[1] - 1, p[2] + n);
     return d.getFullYear() + '-' + Core.pad2(d.getMonth() + 1) + '-' + Core.pad2(d.getDate());
   }
+  function inicioSemanaVagosCelular(dia) {
+    var diasDesdeSegunda = (Core.diaSemana(dia) + 6) % 7;
+    return somarDiasCelular(dia, diasDesdeSegunda === 6 ? 1 : -diasDesdeSegunda);
+  }
   function minutosAgoraCelular() { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
   function horaDeMinutosCelular(m) { return Core.pad2(Math.floor(m / 60)) + ':' + Core.pad2(m % 60); }
   function fimDaAulaCelular(a) {
@@ -23995,7 +24077,7 @@
     if (edita) topo.push(el('button', { type: 'button', class: 'btn pequeno cel-abrir-vagos', id: 'cel-abrir-vagos',
       'aria-label': 'Ver horários vagos', texto: 'Vagos', aoClick: function () {
         var h = Core.hojeIso();
-        semanaVagosCelular = somarDiasCelular(h, -((Core.diaSemana(h) + 6) % 7));
+        semanaVagosCelular = inicioSemanaVagosCelular(h);
         diaVagosCelular = h >= semanaVagosCelular && h <= somarDiasCelular(semanaVagosCelular, 5) ? h : semanaVagosCelular;
         irParaTelaCelular('vagos');
       } }));
@@ -24164,7 +24246,9 @@
     });
     var linhas = linhasDoDiaCelular(dia), aulas = linhas.filter(function (l) { return l.tipo === 'aula'; });
     var grupos = [], grupo = null;
-    aulas.filter(function (l) { return l.aula.status !== 'cancelada'; }).sort(function (a, b) { return a.ini - b.ini; }).forEach(function (l) {
+    /* A cancelada não ocupa horário livre, mas ainda precisa de uma faixa
+     * visual quando coincide com uma aula ativa, para não sumir por baixo. */
+    aulas.sort(function (a, b) { return a.ini - b.ini; }).forEach(function (l) {
       if (!grupo || l.ini >= grupo.fim) { grupo = { fim: l.fim, itens: [] }; grupos.push(grupo); }
       grupo.fim = Math.max(grupo.fim, l.fim);
       grupo.itens.push(l);
@@ -24188,6 +24272,10 @@
     linhas.filter(function (l) { return l.tipo === 'livre'; }).forEach(function (l) {
       var ini = Math.max(inicioGrade, l.ini), fim = Math.min(fimGrade, l.fim);
       if (fim - ini < 30) return;
+      /* No celular da dona, o cartão livre contém uma descrição e botões de
+       * pelo menos 48 px. Gaps curtos não comportam o conjunto sem invadir a
+       * próxima aula; no modo de consulta permanece o resumo textual curto. */
+      if (edita && posicao(fim) - posicao(ini) < 84) return;
       var linha = linhaProporcional('livre', ini, fim, 26);
       linha.querySelector('.cel-tempo-item').appendChild(buracoLivreCelular({ ini: ini, fim: fim }, dia, edita));
       caixa.appendChild(linha);
@@ -24197,7 +24285,7 @@
       if (fim <= inicioGrade || inicio >= fimGrade) return;
       var topo = posicao(inicio), baixo = posicao(fim);
       var bloco = blocoDaAulaCelular(l.aula, marcas[l.aula.id], !!semRegistro[l.aula.id]);
-      var g = l.aula.status === 'cancelada' ? null : grupos.find(function (x) { return x.itens.indexOf(l) >= 0; });
+      var g = grupos.find(function (x) { return x.itens.indexOf(l) >= 0; });
       var faixas = g ? g.faixas : 1, faixa = g ? l.faixa : 0;
       bloco.classList.add('cel-tempo-bloco-grade');
       bloco.style.cssText += ';top:0;height:100%;left:' + (100 * faixa / faixas) + '%;width:' + (100 / faixas) + '%;z-index:' + (l.aula.status === 'cancelada' ? 2 : 3);
@@ -24697,7 +24785,7 @@
     var caixa = $('#cel-vagos');
     caixa.innerHTML = '';
     var hoje = Core.hojeIso();
-    if (!semanaVagosCelular) semanaVagosCelular = somarDiasCelular(hoje, -((Core.diaSemana(hoje) + 6) % 7));
+    if (!semanaVagosCelular) semanaVagosCelular = inicioSemanaVagosCelular(hoje);
     var inicio = semanaVagosCelular, fim = somarDiasCelular(inicio, 5);
     caixa.appendChild(el('div', { class: 'cel-vagos-topo' }, [
       el('button', { type: 'button', class: 'btn pequeno', id: 'cel-vagos-voltar', 'aria-label': 'Voltar para Hoje', texto: '‹', aoClick: function () { irParaTelaCelular('hoje'); } }),
@@ -24722,7 +24810,8 @@
     dias.forEach(function (dia) {
       var vagas = horariosLivresCelular(dia, duracaoVagosCelular).filter(function (hora) {
         var inicioMinutos = Core.minutosDaHora(hora);
-        return inicioMinutos + duracaoVagosCelular <= 20 * 60 && (dia !== hoje || inicioMinutos >= minutosAgoraCelular());
+        return dia >= hoje && inicioMinutos + duracaoVagosCelular <= 20 * 60 &&
+          (dia !== hoje || inicioMinutos >= minutosAgoraCelular());
       });
       var selecionado = dia === diaVagosCelular;
       var conteudo = el('div', { class: 'cel-vagos-conteudo' });
@@ -24736,7 +24825,8 @@
         });
       } else botoes = null;
       if (botoes) conteudo.appendChild(botoes);
-      else conteudo.appendChild(el('p', { class: 'ajuda cel-vagos-sem-horario', texto: dia === hoje ? 'Sem horários disponíveis pelo restante do dia.' : 'Sem horário livre para essa duração.' }));
+      else conteudo.appendChild(el('p', { class: 'ajuda cel-vagos-sem-horario', texto: dia < hoje ? 'Este dia já passou.' :
+        dia === hoje ? 'Sem horários disponíveis pelo restante do dia.' : 'Sem horário livre para essa duração.' }));
       if (selecionado && vagas.length) {
         var lista = vagas.map(function (h) { return h + ' a ' + horaDeMinutosCelular(Core.minutosDaHora(h) + duracaoVagosCelular); });
         var mensagem = 'Olá! Tenho estes horários disponíveis para aula na ' + Core.diaSemanaLongo(dia) + ', ' + Core.ddmm(dia) + ': ' + lista.join(', ') + '. Qual funciona para você?';
@@ -25494,7 +25584,7 @@
     return el('a', atributos);
   }
 
-  /* A ficha mínima: o que ela precisa na rua. A ficha completa fica no tablet. */
+  /* A ficha mostra o essencial na rua; a edição dos campos básicos fica na aba Alunos. */
   function fichaMinimaCelular(aluno, aula) {
     var caixa = el('div', { class: 'cel-ficha', id: 'cel-ficha', 'data-aluno': aluno.id });
     var resp = String(aluno.responsavel || '').trim();
@@ -25510,10 +25600,14 @@
         ]));
       }
       /* Sem o campo telefone válido, nenhum link: ela confere no tablet. O fixo só liga. */
-      if (!ligar) caixa.appendChild(el('p', { class: 'faixa-aviso', id: 'cel-ficha-confira', texto: 'Confira o telefone no tablet: só o campo Telefone da ficha liga e abre o WhatsApp.' }));
+      if (!ligar) caixa.appendChild(el('p', { class: 'faixa-aviso', id: 'cel-ficha-confira', texto: celularEdita()
+        ? 'Para cadastrar ou corrigir, abra Alunos e toque em Editar ficha.'
+        : 'Confira o telefone no tablet: só o campo Telefone da ficha liga e abre o WhatsApp.' }));
       else if (!whats) caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-ficha-fixo', texto: 'Telefone fixo: o WhatsApp precisa de um celular.' }));
     } else {
-      caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-ficha-sem-telefone', texto: 'Sem telefone do responsável. Ele se põe no tablet, na ficha do aluno.' }));
+      caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-ficha-sem-telefone', texto: celularEdita()
+        ? 'Sem telefone do responsável. Para cadastrar, abra Alunos e toque em Editar ficha.'
+        : 'Sem telefone do responsável. Ele se põe no tablet, na ficha do aluno.' }));
     }
     if (whats) {
       /* "Estou 10 minutos atrasada" e "Chegando" só valem para a aula de HOJE
@@ -25554,12 +25648,15 @@
       relato.appendChild(el('div', { texto: 'Ainda sem relato de aula.' }));
     }
     caixa.appendChild(relato);
-    caixa.appendChild(el('p', { class: 'ajuda', texto: 'A ficha completa fica no tablet.' }));
+    caixa.appendChild(el('p', { class: 'ajuda', texto: celularEdita()
+      ? 'Edite nome e contato pela aba Alunos. Valores e ficha pedagógica continuam no tablet.'
+      : 'A ficha completa fica no tablet.' }));
     return caixa;
   }
 
-  /* A aba Alunos: a lista dos ativos e, com um toque no nome, a ficha mínima. */
+  /* A aba Alunos: lista, ficha e edição dos dados essenciais pelo celular da dona. */
   var alunoCelular = null; // o aluno da ficha aberta na aba Alunos
+  var editandoFichaAlunoCelular = false;
   /* B1: a Biblioteca é destino da barra de baixo, mas os livros e as
    * questões moram no tablet (o pacote importado fica no aparelho dele). A
    * busca do celular é outra fatia; por ora a tela diz onde abrir. */
@@ -25578,14 +25675,22 @@
       caixa.appendChild(el('div', { class: 'cel-folha-cabeca', style: '--cor-aluno:' + corDoAlunoCelular(aberto) }, [
         el('h2', { class: 'cel-titulo', id: 'cel-ficha-nome', texto: aberto.nome })
       ]));
+      if (editandoFichaAlunoCelular && celularEdita()) {
+        desenharEdicaoFichaAlunoCelular(caixa, aberto);
+        return;
+      }
+      editandoFichaAlunoCelular = false;
       caixa.appendChild(fichaMinimaCelular(aberto, aulaDeContextoDoAluno(aberto.id)));
       caixa.appendChild(el('div', { class: 'barra' }, [
+        celularEdita() ? botaoDeAcaoCelular('editar-ficha-aluno', { class: 'btn', id: 'cel-alunos-editar-ficha', texto: 'Editar ficha',
+          aoClick: function () { editandoFichaAlunoCelular = true; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } }) : null,
         el('button', { type: 'button', class: 'btn', id: 'cel-alunos-voltar', texto: 'Voltar à lista',
-          aoClick: function () { alunoCelular = null; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } })
+          aoClick: function () { alunoCelular = null; editandoFichaAlunoCelular = false; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } })
       ]));
       return;
     }
     alunoCelular = null;
+    editandoFichaAlunoCelular = false;
     caixa.appendChild(el('h2', { class: 'cel-titulo', texto: 'Alunos' }));
     var ativos = db.alunos.filter(function (al) { return al.ativo !== false; })
       .sort(function (x, y) { return String(x.nome).localeCompare(String(y.nome)); });
@@ -25594,7 +25699,7 @@
       var detalhe = [String(al.responsavel || '').trim(), ONDE_E_A_AULA[al.local] || '', telefoneDoAluno(al) ? '' : 'sem telefone cadastrado'].filter(Boolean).join(' · ');
       return el('button', { type: 'button', class: 'cel-aluno-item', 'data-aluno': al.id, style: '--cor-aluno:' + corDoAlunoCelular(al),
         'aria-label': 'Ver a ficha de ' + al.nome + (detalhe ? ', ' + detalhe : ''),
-        aoClick: function () { alunoCelular = al.id; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } }, [
+        aoClick: function () { alunoCelular = al.id; editandoFichaAlunoCelular = false; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } }, [
         el('span', { class: 'cel-aluno-nome', texto: al.nome }),
         detalhe ? el('span', { class: 'cel-aluno-detalhe', texto: detalhe }) : null
       ]);
@@ -25608,6 +25713,59 @@
           aoClick: function () { irParaTelaCelular('hoje'); abrirFormularioCelular({ tipo: 'aluno' }); } })
       ]));
     }
+  }
+
+  /* Edita só nome e contato/local já existentes. Valores, aulas, observações,
+   * mapas e demais campos da ficha não passam por esta ação e são preservados. */
+  function desenharEdicaoFichaAlunoCelular(caixa, aluno) {
+    caixa.appendChild(el('h3', { class: 'cel-subtitulo', id: 'cel-editar-ficha-titulo', texto: 'Editar ficha' }));
+    var nome = el('input', { type: 'text', id: 'cel-ficha-edicao-nome', autocomplete: 'off' });
+    nome.value = String(aluno.nome || '');
+    var responsavel = el('input', { type: 'text', id: 'cel-ficha-edicao-responsavel', autocomplete: 'off' });
+    responsavel.value = String(aluno.responsavel || '');
+    var telefone = el('input', { type: 'tel', id: 'cel-ficha-edicao-telefone', autocomplete: 'off', inputmode: 'tel', placeholder: 'Com DDD, por exemplo (11) 98765-4321' });
+    telefone.value = String(aluno.telefone || '');
+    var local = el('select', { id: 'cel-ficha-edicao-local' }, [['', 'Ainda não sei'], ['casa', ONDE_E_A_AULA.casa], ['online', ONDE_E_A_AULA.online]].map(function (o) {
+      return el('option', { value: o[0], texto: o[1], selected: o[0] === (aluno.local || '') ? 'selected' : null });
+    }));
+    var endereco = el('input', { type: 'text', id: 'cel-ficha-edicao-endereco', autocomplete: 'off', placeholder: 'Rua, número, bairro' });
+    endereco.value = String(aluno.endereco || '');
+    var link = el('input', { type: 'url', id: 'cel-ficha-edicao-link', autocomplete: 'off', inputmode: 'url', placeholder: 'https://meet.google.com/...' });
+    link.value = String(aluno.linkOnline || '');
+    var campoEndereco = campoCelular('Endereço (abre no mapa)', endereco), campoLink = campoCelular('Link da aula online', link);
+    var atualizarLocal = function () { campoEndereco.hidden = local.value !== 'casa'; campoLink.hidden = local.value !== 'online'; };
+    local.addEventListener('change', atualizarLocal);
+    caixa.appendChild(campoCelular('Nome do aluno', nome));
+    caixa.appendChild(campoCelular('Responsável', responsavel));
+    caixa.appendChild(campoCelular('Telefone do responsável', telefone));
+    caixa.appendChild(campoCelular('Onde é a aula', local));
+    caixa.appendChild(campoEndereco);
+    caixa.appendChild(campoLink);
+    caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-ficha-edicao-limites', texto: 'O valor por hora, as aulas e os demais dados continuam como estão.' }));
+    atualizarLocal();
+    caixa.appendChild(el('div', { class: 'barra cel-rodape-form' }, [
+      botaoDeAcaoCelular('editar-ficha-aluno', { class: 'btn principal', id: 'cel-ficha-edicao-salvar', texto: 'Salvar ficha', aoClick: function () {
+        var atual = alunoPorId(aluno.id), n = nome.value.trim(), t = telefone.value.trim();
+        if (!celularEdita()) { editandoFichaAlunoCelular = false; desenharAlunosCelular(); avisar('Este celular só lê. Para mudar alguma coisa, use o tablet.'); return; }
+        if (!atual) { editandoFichaAlunoCelular = false; desenharAlunosCelular(); avisar('Este aluno não está mais neste aparelho.'); return; }
+        if (!n) { avisar('Informe o nome do aluno.'); return; }
+        if (t && !telefoneValidado(t)) { avisar(FRASE_TELEFONE_INVALIDO + '.'); return; }
+        comoAcaoDoCelular(function () {
+          atual.nome = n;
+          atual.responsavel = responsavel.value.trim();
+          gravarLugarEContato(atual, { telefone: t, local: local.value,
+            endereco: local.value === 'casa' ? endereco.value : '', linkOnline: local.value === 'online' ? link.value : '' });
+          return salvarEDepois(function (gravou) {
+            editandoFichaAlunoCelular = false;
+            desenharAlunosCelular();
+            if (gravou) avisar('Ficha atualizada.');
+          });
+        });
+      } }),
+      el('button', { type: 'button', class: 'btn', id: 'cel-ficha-edicao-cancelar', texto: 'Cancelar', aoClick: function () {
+        editandoFichaAlunoCelular = false; desenharAlunosCelular();
+      } })
+    ]));
   }
 
   // ---------- Fechamento ----------
@@ -25860,15 +26018,14 @@
     return Promise.race([lida, espera]);
   }
 
-  /* Um tablet numa versão anterior a esta não conhece a regra da mensagem do
-   * mês (vence a escrita mais recente) e, com uma edição dele mais velha na
-   * fila, cobriria a do celular. Enquanto o tablet não atualiza, o celular não
-   * edita a mensagem. */
+  /* Um tablet anterior ao protocolo da mensagem do mês (1.42.40) não conhece
+   * a regra de escrita mais recente e poderia cobrir a edição do celular. A
+   * versão atual do app é independente desse mínimo, pois pode mudar só a UI. */
   function abrirMensagemCelular(alunoId, mes) {
     if (!podeEditarMensagemCelular()) return;
     return versaoDoTabletCelular().then(function (v) {
-      if (v && Core.versaoAntes(v.app, VERSAO) === true) {
-        avisar('Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão ' + v.app + ', e esta é a ' + VERSAO + '.');
+      if (v && Core.versaoAntes(v.app, VERSAO_MINIMA_PROTOCOLO_MENSAGEM) === true) {
+        avisar('Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão ' + v.app + ', e precisa estar na versão ' + VERSAO_MINIMA_PROTOCOLO_MENSAGEM + ' ou mais recente.');
         return;
       }
       abrirEditorDaMensagemCelular(alunoId, mes);

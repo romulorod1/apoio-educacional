@@ -1245,6 +1245,13 @@ roda "livros (regras) --envenenado-respostas-no-capitulo" node "_teste/testa_liv
 # Revisao do C15.5: o gabarito do fim do capitulo (achado so pelo lugar) nunca
 # tira pagina do capitulo exportado. O veneno volta a regra antiga.
 roda "livros (regras) --envenenado-fim-do-capitulo-tira" node "_teste/testa_livros_regras.js" --envenenado-fim-do-capitulo-tira
+# B3: a pagina impressa do livro (trechos romanos e arabicos, mudanca no meio,
+# ida e volta em todas as paginas, tela e leitor mostrando a impressa e abrindo
+# e gravando em pagina do arquivo, e recusa so do livro com numeracao invalida).
+roda "livros (pagina impressa)"                 node "_teste/testa_livros_impressa.js"
+roda "livros (pagina impressa) --envenenado-impressa-fora-por-um" node "_teste/testa_livros_impressa.js" --envenenado-impressa-fora-por-um
+roda "livros (pagina impressa) --envenenado-posicao-lida-como-impressa" node "_teste/testa_livros_impressa.js" --envenenado-posicao-lida-como-impressa
+roda "livros (pagina impressa) --envenenado-trecho-romano-zero" node "_teste/testa_livros_impressa.js" --envenenado-trecho-romano-zero
 # C15.5: o passe semiautomatico do gabarito (titulos de respostas, numero do
 # capitulo, o fim do capitulo, so as impares, manual do professor, sem texto),
 # a trava do casamento medida pelo texto e os venenos dentro da prova (casar

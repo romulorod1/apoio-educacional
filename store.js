@@ -313,7 +313,7 @@
    * três: o documento pelo escritor de diferença (o salvar, que enfileira na
    * mesma transação), a fila de saída (o envio tira dela o que subiu) e o
    * histórico (o ponto do Desfazer). O que o celular edita é decidido na tela
-   * (as quatro ações); aqui fica a porta. O observador de outra conta nunca
+   * (as cinco ações); aqui fica a porta. O observador de outra conta nunca
    * ganha as portas. */
   var soLeitura = false;
   var celularEdita = false;

@@ -104,7 +104,7 @@ const ANCORAS = {
   // o envio de antes: a mensagem sem carimbo conhecido sobe sem precondição e cobre a do outro aparelho
   [V_SEMPRE]: ['nuvem.js', "(itens[k].fila.restauro || itens[k].registro.tipo === 'resumo')", '(itens[k].fila.restauro)'],
   // o celular edita com o tablet ainda numa versão anterior
-  [V_K6]: ['app.js', 'if (v && Core.versaoAntes(v.app, VERSAO) === true) {', 'if (false) {']
+  [V_K6]: ['app.js', 'if (v && Core.versaoAntes(v.app, VERSAO_MINIMA_PROTOCOLO_MENSAGEM) === true) {', 'if (false) {']
 };
 /* O app servido leva a VERSAO desta entrega (a que o portão sobe ao juntar):
  * é com ela que o celular compara a versão do tablet (K6). */
@@ -112,6 +112,7 @@ const ANCORAS = {
  * versão ao juntar, ela já é maior que a 1.42.18; só no ramo ainda na 1.42.18
  * a prova serve uma versão acima, para o K6 ter o que comparar. */
 const VERSAO_DO_APP = (APP.match(/var VERSAO = '([0-9.]+)';/) || [])[1] || '';
+const VERSAO_PROTOCOLO_MENSAGEM = (APP.match(/var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '([0-9.]+)';/) || [])[1] || '';
 const VERSAO_SERVIDA = VERSAO_DO_APP === '1.42.18' ? '1.42.19' : VERSAO_DO_APP;
 const APP_SERVIDO = VERSAO_DO_APP === '1.42.18' ? APP.replace("var VERSAO = '1.42.18';", "var VERSAO = '" + VERSAO_SERVIDA + "';") : APP;
 const NUVEM = fs.readFileSync(path.join(H.RAIZ, 'nuvem.js'), 'utf8');
@@ -968,9 +969,20 @@ const ABERTO_C = 'Escrito no celular enquanto o tablet mandava outra.';
   await clicar(pagC, '#cel-fechamento ' + SEL_MSG);
   const avisoK6 = await esperar('o aviso de atualizar o tablet', () => texto(pagC, '#aviso-texto'), v => /Atualize o tablet/.test(v || ''), 8000);
   prop('K6: com o tablet na 1.42.18, o celular não abre o editor e diz o que fazer (' + avisoK6.valor + ')',
-    fmt(avisoK6.valor) === 'Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão 1.42.18, e esta é a ' + VERSAO_SERVIDA + '.' &&
+    fmt(avisoK6.valor) === 'Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão 1.42.18, e precisa estar na versão ' + VERSAO_PROTOCOLO_MENSAGEM + ' ou mais recente.' &&
     !(await existe(pagC, '#cel-mensagem')) && pagC.dialogos.length === avisoK6Antes, V_K6);
   seVeneno(V_K6);
+  /* Uma versão visual mais antiga ainda pode falar o protocolo novo. */
+  await pagC.evaluate(() => {
+    window.__listarDiagnosticosOriginal = Nuvem.listarDiagnosticos;
+    Nuvem.listarDiagnosticos = async () => [{ papel: 'tablet', app: '1.42.42' }];
+  });
+  await clicar(pagC, '#cel-fechamento ' + SEL_MSG);
+  const editorComVersaoCompativel = await existe(pagC, '#cel-mensagem');
+  prop('K6: o tablet na 1.42.42 continua compatível com a edição da mensagem após uma atualização visual do celular',
+    editorComVersaoCompativel, V_K6);
+  if (editorComVersaoCompativel) await clicar(pagC, '#cel-mensagem-cancelar');
+  await pagC.evaluate(() => { Nuvem.listarDiagnosticos = window.__listarDiagnosticosOriginal; delete window.__listarDiagnosticosOriginal; });
   conf('junho, já fechado, não mudou em lugar nenhum: o mesmo texto no tablet antigo e no celular',
     (await textoNoDisco(pagA, 'ref', '2026-06')) + ' | ' + (await textoNoDisco(pagC, 'ref', '2026-06')), JUNHO + ' | ' + JUNHO);
 
