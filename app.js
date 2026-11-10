@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.39';
+  var VERSAO = '1.42.40';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -82,17 +82,23 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.38',
+      versao: '1.42.40',
       itens: [
-        'Nova tela na Biblioteca para comparar um assunto entre os livros: uma tabela mostra, para cada livro do tablet, em que capítulo e páginas o assunto aparece, indica onde não há vínculo no mapa e avisa quando o mapa ainda não foi revisado.',
-        'Quando um assunto não aparece no mapa, a Biblioteca mostra “sem vínculo no mapa”; isso não significa que o livro não aborda o assunto, pois o mapa pode estar incompleto. As contagens se referem aos vínculos registrados.',
-        'Você chega a ela pela aba Biblioteca (Comparar livros por assunto, com uma busca de assunto que atravessa os anos), pelo painel do capítulo de um livro e pela aula (Ver em todos os livros).'
+        'Em Pagamentos pendentes, cada aluno tem o atalho Marcar pago, que abre o registro daquele m\u00eas e aluno.'
       ]
     },
     {
       versao: '1.42.39',
       itens: [
         'Em Ajustes, a lista de pacotes e livros da Biblioteca fica recolhida; os controles de importação continuam no alto. Na importação, cada livro tem andamento próprio e um arquivo que falha ou demora demais é pulado com aviso, enquanto os seguintes continuam.'
+      ]
+    },
+    {
+      versao: '1.42.38',
+      itens: [
+        'Nova tela na Biblioteca para comparar um assunto entre os livros: uma tabela mostra, para cada livro do tablet, em que capítulo e páginas o assunto aparece, indica onde não há vínculo no mapa e avisa quando o mapa ainda não foi revisado.',
+        'Quando um assunto não aparece no mapa, a Biblioteca mostra “sem vínculo no mapa”; isso não significa que o livro não aborda o assunto, pois o mapa pode estar incompleto. As contagens se referem aos vínculos registrados.',
+        'Você chega a ela pela aba Biblioteca (Comparar livros por assunto, com uma busca de assunto que atravessa os anos), pelo painel do capítulo de um livro e pela aula (Ver em todos os livros).'
       ]
     },
     {
@@ -106,6 +112,7 @@
       itens: [
         'A aba Biblioteca do tablet ficou organizada por disciplina e ano, com os livros de cada um e, no alto, o "Continuar lendo": o livro e o lugar onde você parou. Os exercícios e listas continuam logo abaixo.',
         'Cada livro tem agora uma tela própria, com o sumário: toque num capítulo para abrir o livro nele. O botão "Livros" e a janela da estante saíram: tudo isso passa pela aba Biblioteca.'
+
       ]
     },
     {
@@ -12987,6 +12994,10 @@
           el('div', { class: 'detalhe', texto: detalhe })
         ]),
         el('strong', { class: 'pendente-falta', texto: (p.aMenos ? 'faltam ' : '') + dinheiro(p.falta) }),
+        el('button', {
+          type: 'button', class: 'btn pequeno principal', texto: p.aMenos ? 'Atualizar pagamento' : 'Marcar pago',
+          aoClick: function () { abrirPagamentoDaPendencia(p); }
+        }),
         p.mes === mesAtual ? null : el('button', {
           type: 'button', class: 'btn pequeno', texto: 'Ver o mês',
           aoClick: function () { mesAtual = p.mes; desenharAgenda(); desenharFechamento(); }
@@ -13021,6 +13032,28 @@
       botao
     ]));
     caixa.appendChild(corpo);
+  }
+
+  /* Atalho da lista de pendências: vai ao mês, encontra a linha já calculada
+   * pelo fechamento e abre o formulário existente de pagamento. */
+  function abrirPagamentoDaPendencia(p) {
+    mesAtual = p.mes;
+    desenharAgenda();
+    desenharFechamento();
+    var focar = function () {
+      var lista = $('#lista-fechamento');
+      if (!lista) return;
+      var linhas = lista.querySelectorAll('.linha-pagamento');
+      var alvo = Array.prototype.filter.call(linhas, function (linha) {
+        return linha.getAttribute('data-aluno') === p.alunoId;
+      })[0];
+      if (!alvo) { avisar('Não encontrei esse pagamento no mês. A lista foi atualizada.'); return; }
+      alvo.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var botao = alvo.querySelector('.btn-marcar-pago, .btn-alterar-pagamento');
+      if (botao) botao.click();
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focar);
+    else setTimeout(focar, 0);
   }
 
   /* O que ela deu e não cobrou no mês.
