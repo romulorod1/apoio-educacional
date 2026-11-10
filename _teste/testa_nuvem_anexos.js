@@ -29,14 +29,26 @@
  *  10. PRODUÇÃO: a volta para a versão do ar (06a8936, servida de verdade) não
  *      perde a entrada de anexo que esperava na fila; o que ela remove solto
  *      vira lápide quando esta versão volta; o que ela grava (sem estado) não sobe;
- *  11. o observador baixa o anexo e nada sobe dele.
+ *  11. o observador baixa o anexo e nada sobe dele;
+ *  12. um segundo tablet baixa na hora o arquivo cujo metadado chegou;
+ *  13. o cenário da lente B: o download que falha num segundo tablet em dia
+ *      fica "a baixar", a reconciliação não o lapida (0 lápides), o PDF segue
+ *      intacto no tablet A e o "a baixar" baixa na rodada seguinte;
+ *  14. a defesa: a lápide de um anexo que a aula viva ainda cita não tira o
+ *      arquivo do tablet.
  *
  * Venenos (cada um TEM de ser visto):
  *   --envenenado-sha-errado       o envio grava um sha256 que não é dos bytes:
  *                                 quem baixa TEM de recusar, e a prova vê o PDF
  *                                 não abrir no celular;
  *   --envenenado-sobe-duas-vezes  a dedupe pelo sha256 sai: o segundo envio do
- *                                 mesmo arquivo TEM de ser visto.
+ *                                 mesmo arquivo TEM de ser visto;
+ *   --envenenado-lapida-o-recebido a reconciliação volta a lapidar o estado
+ *                                 vivo sem arquivo, e a defesa sai junto (é o
+ *                                 código que a lente B pegou): a prova TEM de
+ *                                 ver a lápide e o PDF apagado do tablet A;
+ *   --envenenado-sem-defesa       só a defesa sai: a lápide da seção 14 TEM de
+ *                                 apagar o PDF do tablet A.
  *
  * Portas: 8911 (app), 8913 (auth), 8914 (firestore), 8915 (hub), 8916 (log),
  * 8917 (websocket). Precisa do firebase-tools e de um JDK 21 em JAVA_HOME.
@@ -50,7 +62,7 @@ const { spawn, spawnSync, execFileSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, esperar } = H;
 
-const MODOS = ['--envenenado-sha-errado', '--envenenado-sobe-duas-vezes'];
+const MODOS = ['--envenenado-sha-errado', '--envenenado-sobe-duas-vezes', '--envenenado-lapida-o-recebido', '--envenenado-sem-defesa'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 function prop(rotulo, ok, veneno) {
   if (MODO && MODO === veneno) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
@@ -92,10 +104,17 @@ conf('o salvarAnexo e o salvarMidia passam pela transação com estado e fila', 
 conf('o sha256 é calculado antes da transação', /return shaDoArquivo\(origem, registro\)\.then\(function \(info\) \{\s*return abrir\(\)/.test(STORE), true);
 conf('as regras têm anexos/{anexo} e arquivos/{sha}/partes/{n}', /match \/anexos\/\{anexo\}/.test(REGRAS) && /match \/arquivos\/\{sha\}/.test(REGRAS) && /match \/partes\/\{parte\}/.test(REGRAS) &&
   REGRAS.indexOf("sha.matches('^[0-9a-f]{64}$')") > 0, true);
+const SO_O_DAQUI = 'if (!lapidavelNaReconciliacao(e) || !p) return;';
+const DEFESA = 'if (citado) contas.preservados = (contas.preservados || 0) + 1; else deposito.delete(p.id);';
+conf('a reconciliação só lapida o estado nascido aqui, num lugar só', STORE.split(SO_O_DAQUI).length, 2);
+conf('a defesa da lápide de arquivo ainda citado está num lugar só', STORE.split(DEFESA).length, 2);
+conf('o celular não promete mais que o anexo "chega sozinho"', APP.indexOf('chega sozinho') < 0 && NUVEM.indexOf('chega sozinho') < 0, true);
 const trocas = {};
+if (MODO === MODOS[2]) trocas['/store.js'] = STORE.replace(SO_O_DAQUI, 'if (!e || e.apagadoEm || !p) return;').replace(DEFESA, 'deposito.delete(p.id);');
+if (MODO === MODOS[3]) trocas['/store.js'] = STORE.replace(DEFESA, 'deposito.delete(p.id);');
 if (MODO === MODOS[0]) trocas['/nuvem.js'] = NUVEM.replace(SHA_NO_DOC, "campo.sha256 = (sha.charAt(0) === '0' ? '1' : '0') + sha.slice(1);");
 if (MODO === MODOS[1]) trocas['/nuvem.js'] = NUVEM.replace(DEDUPE, '').replace(MEMO_DO_ENVIO, '');
-if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', (trocas['/nuvem.js'] || NUVEM) !== NUVEM, true);
+if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', (trocas['/nuvem.js'] || NUVEM) !== NUVEM || (trocas['/store.js'] || STORE) !== STORE, true);
 
 /* A versão do ar, de verdade, para a volta de versão (seção 10). */
 const DO_AR = {};
@@ -657,8 +676,12 @@ const idDoAnexoNaAula = (pag, aulaId, nome) => pag.evaluate((a, n) => Store.carr
     d.ajustes.versaoVista = '1.42.18';
     await Store.salvar(d);
   });
-  // (os venenos acabam antes desta seção: aqui o repositório volta a ser servido como está)
+  // (os venenos do nuvem.js acabam antes desta seção: aqui o repositório volta a ser servido como está)
   delete trocas['/app.js']; delete trocas['/store.js']; delete trocas['/nuvem.js'];
+  // os venenos das seções 13 e 14 voltam a ser servidos daqui em diante
+  const VENENO_DO_STORE = MODO === MODOS[2] ? STORE.replace(SO_O_DAQUI, 'if (!e || e.apagadoEm || !p) return;').replace(DEFESA, 'deposito.delete(p.id);')
+    : MODO === MODOS[3] ? STORE.replace(DEFESA, 'deposito.delete(p.id);') : null;
+  if (VENENO_DO_STORE) trocas['/store.js'] = VENENO_DO_STORE;
   await H.abrirApp(pagA, amb.ORIGEM);
   conf('a página voltou para esta versão', await pagA.evaluate(() => typeof Store.reconciliarArquivos), 'function');
   /* A abertura sincroniza sozinha (a fila pode subir antes de a prova olhar):
@@ -708,5 +731,102 @@ const idDoAnexoNaAula = (pag, aulaId, nome) => pag.evaluate((a, n) => Store.carr
   conf('o tablet baixa na hora o arquivo cujo metadado chegou, e o sha256 bate', naHora.ok && naHora.valor === (await shaNoAparelho(pagA, 'anexo:pendente1')), true);
   conf('nenhum erro de página em B', pagB.errosDePagina.join(' | '), '');
   await pagB.close(); await contextoB.close();
+
+  /* O cenário provado pela lente B (seção 13 dela, 09/11/2026): um segundo
+   * tablet em dia recebe o metadado de um anexo novo e o download falha; antes
+   * do conserto, a reconciliação o tratava como removido solto, lapidava e
+   * mandava a lápide, e o tablet dela APAGAVA o PDF que a aula ainda lista. */
+  secao('13. O download que falha no segundo tablet fica "a baixar": não vira lápide nem apaga o PDF do tablet dela');
+  const copiaK1 = await enviarCopiaPelaTela(pagA);
+  conf('A enviou uma cópia nova (K1), do jeito que está agora', !!copiaK1, true);
+  const contextoB2 = await pagA.browser().createBrowserContext();
+  const pagB2 = await contextoB2.newPage();
+  await prepararPagina(pagB2, false);
+  await H.abrirApp(pagB2, amb.ORIGEM);
+  await H.irParaAba(pagB2, 'ajustes');
+  conf('o tablet B2 entrou com a conta da dona', await entrarPelaTela(pagB2, DONA.email, DONA.senha, '#nuvem-enviar'), true);
+  conf('B2 restaurou a cópia K1 (a de agora)', await restaurarPelaApi(pagB2, dona.localId, copiaK1, false), copiaK1);
+  const e13b = await enviarAteEsvaziar(pagB2, 4);
+  await receber(pagB2);
+  console.log('   B2 em dia: ' + JSON.stringify(e13b));
+  const NOVO = pdfSintetico(200000, 'novo-1');
+  const SHA_NOVO = sha256(NOVO);
+  await pagA.evaluate(async b64 => {
+    const bin = atob(b64), u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    const d = await Store.carregar();
+    await Store.salvarAnexo('novo1', { nome: 'Novo_1_teste.pdf', tipo: 'application/pdf', blob: new Blob([u], { type: 'application/pdf' }) }, { aulaId: 'x1' });
+    d.aulas.find(a => a.id === 'x1').anexos.push({ id: 'novo1', nome: 'Novo_1_teste.pdf', tamanho: u.length });
+    await Store.salvar(d);
+  }, NOVO.toString('base64'));
+  const e13a = await enviarAteEsvaziar(pagA, 3);
+  conf('A subiu o novo1 e o tem no aparelho', e13a.erro === null && (await lerDoc(dona.idToken, dona.localId, 'anexos/anexo:novo1')).status === 200 &&
+    (await shaNoAparelho(pagA, 'anexo:novo1')) === SHA_NOVO, true);
+  // o download em B2 falha: a rede cai para arquivos/ (cabeçalho e partes)
+  await pagB2.evaluate(() => {
+    if (!window.__fetchSemCorte) window.__fetchSemCorte = window.fetch;
+    const original = window.__fetchSemCorte;
+    window.fetch = function (url) {
+      if (String(url).indexOf('/arquivos/') >= 0) return Promise.reject(new TypeError('a rede caiu (prova)'));
+      return original.apply(this, arguments);
+    };
+  });
+  const rB13 = await receber(pagB2);
+  const estB13 = await pagB2.evaluate(() => Store.estadoDoArquivo('anexo:novo1'));
+  console.log('   recebimento em B2 com a rede cortada para arquivos/: ' + JSON.stringify(rB13));
+  conf('B2 recebeu o metadado, o download falhou, e o estado vivo ficou "a baixar" (veio da nuvem), sem o arquivo',
+    JSON.stringify([!!estB13 && !estB13.apagadoEm, estB13 && estB13.recebido, estB13 && estB13.aBaixar, await shaNoAparelho(pagB2, 'anexo:novo1')]), '[true,true,true,null]');
+  conf('a aula x1 em B2 lista o novo1', await pagB2.evaluate(() => Store.carregar().then(d => d.aulas.find(a => a.id === 'x1').anexos.some(an => an.id === 'novo1'))), true);
+  const escritasB13 = pagB2.escritas.length;
+  const rec13 = await pagB2.evaluate(() => Store.reconciliarArquivos());
+  prop('a reconciliação em B2 não lapida o "a baixar" (0 lápides)', rec13.lapides === 0, MODOS[2]);
+  if (MODO === MODOS[2]) console.log('   (veneno) reconciliação em B2: ' + JSON.stringify(rec13));
+  const e13c = await enviarAteEsvaziar(pagB2, 3);
+  const lapidesDeB2 = contar(pagB2, escritasB13, x => x.indexOf('/anexos/anexo:novo1') > 0);
+  const doc13 = (await lerDoc(dona.idToken, dona.localId, 'anexos/anexo:novo1')).json;
+  prop('nenhuma lápide sai de B2 e o documento do novo1 segue vivo na nuvem', e13c.erro === null && lapidesDeB2 === 0 && !campoTexto(doc13, 'apagadoEm') && campoTexto(doc13, 'sha256') === SHA_NOVO, MODOS[2]);
+  const rA13 = await receber(pagA);
+  const x1EmA = await pagA.evaluate(() => Store.carregar().then(d => d.aulas.find(a => a.id === 'x1').anexos.map(an => an.id)));
+  const shaA13 = await shaNoAparelho(pagA, 'anexo:novo1');
+  console.log('   recebimento em A: ' + JSON.stringify(rA13) + '; a aula x1 em A lista ' + JSON.stringify(x1EmA) + '; sha do novo1 em A: ' + shaA13);
+  prop('o PDF novo1 segue intacto no tablet A, e a aula x1 o lista', shaA13 === SHA_NOVO && x1EmA.indexOf('novo1') >= 0, MODOS[2]);
+  if (MODO === MODOS[2]) {
+    console.log('   (veneno) baixar o novo1 da nuvem agora devolve: ' + await pagB2.evaluate(() => Nuvem.baixarArquivo('anexo:novo1').then(r => String(r), e => 'erro ' + e.codigo)));
+    throw fimDoVeneno();
+  }
+  // a rede volta: o "a baixar" é pedido de novo na rodada seguinte, sem novidade nenhuma na nuvem
+  await pagB2.evaluate(() => { window.fetch = window.__fetchSemCorte; });
+  const rB13b = await receber(pagB2);
+  console.log('   recebimento seguinte em B2: ' + JSON.stringify(rB13b));
+  const estB13b = await pagB2.evaluate(() => Store.estadoDoArquivo('anexo:novo1'));
+  conf('na rodada seguinte o "a baixar" baixou em B2, com o sha256 do de A, e deixou de estar "a baixar"',
+    JSON.stringify([await shaNoAparelho(pagB2, 'anexo:novo1') === SHA_NOVO, estB13b && estB13b.aBaixar]), '[true,false]');
+  conf('nenhum erro de página em B2', pagB2.errosDePagina.join(' | '), '');
+  await pagB2.close(); await contextoB2.close();
+
+  secao('14. A defesa: a lápide de um anexo que a aula viva ainda cita não apaga o arquivo do tablet');
+  const NOVO2 = pdfSintetico(50000, 'novo-2');
+  const SHA_NOVO2 = sha256(NOVO2);
+  await pagA.evaluate(async b64 => {
+    const bin = atob(b64), u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    const d = await Store.carregar();
+    await Store.salvarAnexo('novo2', { nome: 'Novo_2_teste.pdf', tipo: 'application/pdf', blob: new Blob([u], { type: 'application/pdf' }) }, { aulaId: 'x1' });
+    d.aulas.find(a => a.id === 'x1').anexos.push({ id: 'novo2', nome: 'Novo_2_teste.pdf', tamanho: u.length });
+    await Store.salvar(d);
+  }, NOVO2.toString('base64'));
+  const e14 = await enviarAteEsvaziar(pagA, 3);
+  conf('A subiu o novo2', e14.erro === null && (await lerDoc(dona.idToken, dona.localId, 'anexos/anexo:novo2')).status === 200, true);
+  // uma lápide de outro aparelho, posta direto no emulador, com a aula x1 ainda citando o novo2
+  const lap14 = await commitRest(dona.idToken, [{ update: { name: nomeCompleto(dona.localId, 'anexos/anexo:novo2'), fields: { id: { stringValue: 'anexo:novo2' }, aulaId: { stringValue: 'x1' },
+    origem: { stringValue: 'anexo' }, sha256: { stringValue: SHA_NOVO2 }, atualizadoEm: { stringValue: '2026-11-10T15:00:00.000Z' }, apagadoEm: { stringValue: '2026-11-10T15:00:00.000Z' },
+    aparelho: { stringValue: 'apOutroTablet' }, esquema: { integerValue: '1' } } }, updateTransforms: [{ fieldPath: 'servidorEm', setToServerValue: 'REQUEST_TIME' }] }]);
+  conf('a lápide de outro aparelho entrou na nuvem', lap14.status, 200);
+  const lapEmA = await esperar('a lápide do novo2 chegou em A', () => receber(pagA).then(() => pagA.evaluate(() => Store.estadoDoArquivo('anexo:novo2').then(e => !!(e && e.apagadoEm)))), v => v === true, 15000);
+  conf('A recebeu a lápide (o estado é lápide)', lapEmA.ok, true);
+  prop('o PDF novo2 continua no tablet A, porque a aula x1 ainda o cita', (await shaNoAparelho(pagA, 'anexo:novo2')) === SHA_NOVO2, MODOS[3]);
+  if (MODO === MODOS[3]) throw fimDoVeneno();
+  console.log('   (o "Remover" legítimo, em que a aula deixa de citar o anexo, segue apagando no celular: seção 7)');
+  conf('nenhum erro de página em A', pagA.errosDePagina.join(' | '), '');
   try { fs.rmSync(PASTA_ARQ, { recursive: true, force: true }); } catch (e) { /* fica no temporário */ }
 })().then(() => derrubarEmulador().then(H.fim(amb)), e => derrubarEmulador().then(() => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e))));

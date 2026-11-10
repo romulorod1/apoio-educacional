@@ -308,7 +308,7 @@
     SEM_COMPRESSAO: 'Este navegador não comprime a folha para a nuvem: as folhas ficam só neste aparelho.',
     SEM_WEBCRYPTO: 'Este navegador não calcula o hash da folha para a nuvem: as folhas ficam só neste aparelho.',
     ARQUIVO_INVALIDO: 'O arquivo que veio da nuvem não confere com o original e não foi aberto.',
-    ARQUIVO_AUSENTE: 'O arquivo ainda não chegou da nuvem. Com sinal, ele chega sozinho.',
+    ARQUIVO_AUSENTE: 'Um anexo não está mais neste aparelho e não sobe para a nuvem.',
     ARQUIVO_GRANDE: 'Um anexo passa de 25 MB e não sobe para a nuvem; ele continua neste aparelho.',
     RESOURCE_EXHAUSTED: 'A cota da nuvem acabou por hoje; tento de novo mais tarde.',
     UNAVAILABLE: 'A nuvem está indisponível agora; tento de novo mais tarde.',
@@ -1124,6 +1124,13 @@
           if (arquivosGrandes.length && typeof root.Store.quarentenar === 'function') {
             quarentena = quarentena.then(function () { return root.Store.quarentenar(arquivosGrandes, 'ARQUIVO_GRANDE'); }).then(null, function () {});
           }
+          if (!itens.length) return quarentena.then(function () { return 0; });
+          /* O TETO DE BYTES do commit (N2): um lote com páginas de folha que
+           * passe dele volta para ser dividido ao meio, sem culpa de ninguém.
+           * A decisão vem ANTES da subida dos arquivos: o lote que volta não
+           * deixa partes subindo soltas (o lote dividido as subiria de novo). */
+          var total = preparados.reduce(function (s, p) { return s + p.bytes; }, 0);
+          if (itens.length > 1 && total > TETO_COMMIT_BYTES) throw erro('LOTE_GRANDE');
           /* Os ARQUIVOS do lote sobem antes dos documentos que apontam para eles,
            * um de cada vez (o mesmo sha256 duas vezes no lote sobe uma). */
           var comArquivo = preparados.filter(function (p) { return !!p.arquivo; });
@@ -1134,11 +1141,6 @@
               }, Promise.resolve());
             });
           }
-          if (!itens.length) return quarentena.then(function () { return 0; });
-          /* O TETO DE BYTES do commit (N2): um lote com páginas de folha que
-           * passe dele volta para ser dividido ao meio, sem culpa de ninguém. */
-          var total = preparados.reduce(function (s, p) { return s + p.bytes; }, 0);
-          if (itens.length > 1 && total > TETO_COMMIT_BYTES) throw erro('LOTE_GRANDE');
           return quarentena.then(function () { return commit(preparados.map(function (p, k) {
             var conhecido = itens[k].registro.nuvem && itens[k].registro.nuvem.updateTime;
             /* A entrada de RESTAURAÇÃO sem carimbo conhecido exige que o documento
@@ -1579,14 +1581,24 @@
       }
       return pagina();
     }).then(function (r) {
-      // no tablet, o que falta baixa agora, um de cada vez; a falha de um não derruba o recebimento
-      if (r.pulado || !podeEnviarCopia() || !faltam.length) return r;
+      /* No tablet, o que falta baixa agora, um de cada vez; a falha de um não
+       * derruba o recebimento. O "a baixar" de antes (o download que falhou,
+       * com o cursor já adiante) é pedido de novo aqui, a cada recebimento. */
+      if (r.pulado || !podeEnviarCopia()) return r;
+      var deAntes = typeof root.Store.arquivosABaixar === 'function' ? root.Store.arquivosABaixar().then(null, function () { return []; }) : Promise.resolve([]);
+      return deAntes.then(function (lista) {
+        (lista || []).forEach(function (id) { if (faltam.indexOf(id) < 0) faltam.push(id); });
+        return baixarOsQueFaltam(r);
+      });
+    }).then(function (r) { r.baixados = baixados; r.invalidos = invalidos; return r; });
+    function baixarOsQueFaltam(r) {
+      if (!faltam.length) return r;
       return faltam.reduce(function (cadeia, filaId) {
         return cadeia.then(function () {
           return baixarArquivo(filaId).then(function (g) { if (g) baixados++; }, function (e) { if (e && e.codigo === 'ARQUIVO_INVALIDO') invalidos++; });
         });
       }, Promise.resolve()).then(function () { return r; });
-    }).then(function (r) { r.baixados = baixados; r.invalidos = invalidos; return r; });
+    }
   }
   var SHA256_VALIDO = /^[0-9a-f]{64}$/;
   /* BAIXA UM ARQUIVO DA NUVEM e o guarda neste aparelho: o documento

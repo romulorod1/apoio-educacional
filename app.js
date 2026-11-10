@@ -23704,7 +23704,15 @@
 
   function abrirAnexoNoCelular(an, aula) {
     return lerArquivoDoAnexo(an).then(function (r) {
-      if (!r || !r.blob) { avisar('O arquivo ainda não chegou da nuvem. Com sinal, ele chega sozinho.'); return false; }
+      if (!r || !r.blob) {
+        /* Sem sinal, ele não vem agora; com sinal e sem ele lá, é um anexo que
+         * ainda não foi para a nuvem (o de antes desta versão só sobe numa
+         * restauração no tablet), e esperar não o traz. */
+        avisar(typeof navigator !== 'undefined' && navigator.onLine === false
+          ? 'Sem sinal, o anexo não vem. Tente de novo com sinal.'
+          : 'Este anexo ainda não foi para a nuvem. Abra no tablet.');
+        return false;
+      }
       if (ehPdf(r.tipo, an.nome)) abrirLeitorPdf(r.blob, { titulo: an.nome, nome: an.nome, aulaId: aula.id });
       else entregarArquivo(an.nome, r.blob, an.nome);
       return true;
