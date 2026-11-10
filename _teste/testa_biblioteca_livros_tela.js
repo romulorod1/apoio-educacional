@@ -366,7 +366,8 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   }));
   conf('o leitor do livro prepara as seis páginas em rolagem contínua', continuo.paginas, 6);
   conf('a barra de página cobre o livro inteiro', continuo.sliderMax, '6');
-  conf('a página aberta está desenhada', continuo.pagina3, true);
+  const canvasInicial = await esperar('o canvas da página aberta', () => pag.evaluate(() => !!document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="3"] canvas')), Boolean, 15000);
+  conf('a página aberta está desenhada', canvasInicial.valor, true);
   await pag.evaluate(() => document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="5"]').scrollIntoView({ block: 'start' }));
   const r5 = await esperar('rolagem contínua até a página 5', () => paginaDesenhada(pag), v => v === '5', 5000);
   conf('rolar atualiza a página guardada', r5.valor, '5');
@@ -473,15 +474,18 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     const t = document.querySelector('.bibl-topo .titulo').getBoundingClientRect();
     const c = document.querySelector('#bib-livros-contagem').getBoundingClientRect();
     const b = document.querySelector('#bib-busca-cartao').getBoundingClientRect();
+    const buscaLivros = document.querySelector('#bib-busca-livros');
     const cont = document.querySelector('.bibl-continuar').getBoundingClientRect();
     const area = document.querySelector('.conteudo').getBoundingClientRect();
     const meio = r => r.top + r.height / 2;
     return { umaLinha: Math.abs(meio(t) - meio(c)) < 12 && Math.abs(meio(t) - meio(b)) < 12,
       lupa: !!document.querySelector('#bib-busca-cartao svg[data-icone-nome="search"]'),
+      buscaLivros: !!buscaLivros && !buscaLivros.hidden && buscaLivros.getBoundingClientRect().bottom <= cont.top,
       continuar: Math.round(cont.top - area.top) };
   });
   conf('título, contagem e busca (com a lupa) numa linha só', topo.umaLinha && topo.lupa, true);
-  conf('o Continuar lendo logo abaixo do topo (a menos de 120 px do alto)', topo.continuar < 120, true);
+  conf('a busca dos livros aparece antes do Continuar lendo', topo.buscaLivros, true);
+  conf('o Continuar lendo segue visível depois da busca (a menos de 180 px do alto)', topo.continuar < 180, true);
   console.log('   Continuar lendo a ' + topo.continuar + ' px do alto');
   ruins = await medir(pag, '.bibl-topo');
   conf('o topo não transborda', ruins.join('; '), '');
