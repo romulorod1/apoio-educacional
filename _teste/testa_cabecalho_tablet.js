@@ -2,6 +2,9 @@
  *
  * Prova estatica e de regras CSS para o item B5:
  * Cabecalho do tablet em pe em uma unica linha de 64 px e abas de toque de 44 px.
+ * Desde a B1 as abas moram no trilho lateral (fora do cabecalho, no bloco
+ * "B1: navegacao" do styles.css): a prova confere que elas saem do
+ * cabecalho (#abas fixo) e que o alvo de cada item tem 56 px de altura.
  */
 'use strict';
 const fs = require('fs');
@@ -41,11 +44,10 @@ conf('cabecalho possui altura fixada em 64px', cabecalho64, true);
 const semSubtitulo = /\.marca\s+span\s*\{[\s\S]*?display:\s*none[\s\S]*?\}/.test(bloco);
 conf('subtitulo da marca oculto na faixa tablet em pe', semSubtitulo, true);
 
-const abasSemQuebra = /\.abas\s*\{[\s\S]*?flex-wrap:\s*nowrap[\s\S]*?\}/.test(bloco);
-conf('abas com flex-wrap: nowrap para impedir quebra em duas linhas', abasSemQuebra, true);
-
-const aba44 = /\.aba\s*\{[\s\S]*?height:\s*44px[\s\S]*?\}/.test(bloco);
-conf('alvo de toque das abas com altura de 44px', aba44, true);
+const TRILHO = /#abas\s*\{[^}]*?position:\s*fixed[^}]*\}/;
+const ITEM56 = /#abas \.aba\s*\{[^}]*?min-height:\s*56px[^}]*\}/;
+conf('as abas saem do cabecalho para o trilho fixo (B1), sem quebrar a linha dele', TRILHO.test(css), true);
+conf('alvo de toque das abas com 56 px de altura (acima dos 44)', ITEM56.test(css), true);
 
 secao('3. Regra zero travessoes (em-dash e en-dash)');
 
@@ -63,16 +65,14 @@ function validaBloco(conteudo) {
   const b = m[1];
   const h64 = /\.cabecalho\s*\{[\s\S]*?(?:height:\s*64px|max-height:\s*64px)[\s\S]*?\}/.test(b);
   const noSub = /\.marca\s+span\s*\{[\s\S]*?display:\s*none[\s\S]*?\}/.test(b);
-  const noWrap = /\.abas\s*\{[\s\S]*?flex-wrap:\s*nowrap[\s\S]*?\}/.test(b);
-  const h44 = /\.aba\s*\{[\s\S]*?height:\s*44px[\s\S]*?\}/.test(b);
-  return h64 && noSub && noWrap && h44;
+  return h64 && noSub && TRILHO.test(conteudo) && ITEM56.test(conteudo);
 }
 
 conf('validador aprova o CSS real', validaBloco(css), true);
 conf('veneno: sem media query reprova', validaBloco(css.replace(/@media\s*\(\s*min-width:\s*721px\s*\)/, '@media (min-width: 9999px)')), false);
 conf('veneno: sem subtitulo oculto reprova', validaBloco(css.replace(/(min-width:\s*721px[\s\S]*?\.marca\s+span\s*\{[\s\S]*?)display:\s*none;/, '$1display: block;')), false);
-conf('veneno: sem abas 44px reprova', validaBloco(css.replace(/(min-width:\s*721px[\s\S]*?\.aba\s*\{[\s\S]*?)height:\s*44px;/, '$1height: 32px;')), false);
-conf('veneno: com flex-wrap: wrap reprova', validaBloco(css.replace(/(min-width:\s*721px[\s\S]*?\.abas\s*\{[\s\S]*?)flex-wrap:\s*nowrap;/, '$1flex-wrap: wrap;')), false);
+conf('veneno: abas de 32 px reprova', validaBloco(css.replace(/(#abas \.aba\s*\{[^}]*?)min-height:\s*56px;/, '$1min-height: 32px;')), false);
+conf('veneno: abas de volta ao cabecalho (sem o trilho fixo) reprova', validaBloco(css.replace(/(#abas\s*\{[^}]*?)position:\s*fixed;/, '$1position: static;')), false);
 
 console.log('\n' + '='.repeat(60));
 console.log(passes + ' verificacoes passaram, ' + falhas + ' falharam.');

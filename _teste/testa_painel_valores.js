@@ -35,6 +35,10 @@
  * coisa.
  */
 const puppeteer = require('puppeteer-core');
+const H = require('./_bib_navegador');
+/* O relógio da rodada (segunda, 16/11/2026, 11:00), no processo e na página: a
+ * prova não depende do dia em que roda (a virada anual abre sozinha em janeiro). */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -324,6 +328,7 @@ async function abrirFechamento(pag) {
     defaultViewport: { width: 1280, height: 1000, hasTouch: true }
   });
   const pag = await nav.newPage();
+  await RELOGIO.naPagina(pag);
   pag.setDefaultTimeout(60000);
   const errosDePagina = [];
   pag.on('pageerror', e => errosDePagina.push(e.message));
@@ -367,6 +372,7 @@ async function abrirFechamento(pag) {
   await esperar('o service worker assumiu o controle da página',
     () => pag.evaluate(() => !!navigator.serviceWorker.controller), v => v === true, 30000);
   await pag.reload({ waitUntil: 'networkidle0' });
+  await RELOGIO.conferir(pag, conf);
   let painel = await abrirFechamento(pag);
   conf('o painel existe na tela', painel && painel.existe, true);
   conf('o título "Cada aluno, desde quando e por quanto" está à vista',

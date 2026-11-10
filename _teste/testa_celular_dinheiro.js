@@ -314,7 +314,7 @@ async function irParaDia(pag, iso) {
     }, iso);
     if (onde === 'achou') { await clicar(pag, '.cel-semana-dia[data-dia="' + iso + '"]'); await pausa(60); return true; }
     if (onde === 'sem faixa') return false;
-    await clicar(pag, onde === 'antes' ? '#cel-semana-anterior' : '#cel-semana-seguinte');
+    await clicar(pag, onde === 'antes' ? '#cel-dia-anterior' : '#cel-dia-seguinte');
   }
   return false;
 }
@@ -385,7 +385,7 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
   return {
     rolaDeLado: document.documentElement.scrollWidth > window.innerWidth || document.body.scrollWidth > window.innerWidth ||
       (conteudo && conteudo.scrollWidth > conteudo.clientWidth) || !!Array.from(raiz.querySelectorAll('*')).find(e => e.getBoundingClientRect().right > window.innerWidth + 0.5 && visivel(e)),
-    alvos: alvos.length, pequenos, soltos, acoes: raiz.querySelectorAll('[data-acao-celular]').length
+    alvos: alvos.length, pequenos, soltos, acoes: Array.from(raiz.querySelectorAll('[data-acao-celular]')).filter(e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0).length
   };
 }, RE_EDICAO);
 const telaBoa = m => m.pequenos.join('; ') + (m.rolaDeLado ? ' ROLA DE LADO' : '');
@@ -499,6 +499,24 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
   conf('o celular entrou com a conta da dona', await entrarNoCelular(pagC, DONA), true);
   conf('trouxe a cópia do tablet', await trazerCopiaNoCelular(pagC), true);
   conf('(arranjo) é o celular da dona, que edita', await pagC.evaluate(() => Nuvem.estado().celularDaDona), true);
+
+  secao('2b. O atalho de Pagamentos pendentes abre o pagamento daquele mês e aluno');
+  await pagA.evaluate(() => document.querySelector('#abrir-pendentes-pagamento').click());
+  const pendenteJunho = await pagA.evaluate(() => Array.from(document.querySelectorAll('.pendente-pagamento'))
+    .find(x => x.dataset.aluno === 'ref' && x.dataset.mes === '2026-06'));
+  conf('a lista mostra a pendência de junho do aluno de referência', !!pendenteJunho, true);
+  await pagA.evaluate(() => Array.from(document.querySelectorAll('.pendente-pagamento'))
+    .find(x => x.dataset.aluno === 'ref' && x.dataset.mes === '2026-06').querySelector('button.principal').click());
+  const abriuAtalho = await esperar('o atalho abre o valor de junho', () => pagA.evaluate(() => ({
+    mes: document.querySelector('#mes-fechamento').value,
+    valor: (document.querySelector('.linha-pagamento[data-aluno="ref"] .pagamento-valor') || {}).value || ''
+  })), x => x.mes === '2026-06' && !!x.valor, 10000);
+  conf('vai ao mês certo e abre o formulário do aluno', abriuAtalho.ok, true);
+  prop('o valor vem preenchido com o total devido (' + (abriuAtalho.valor && abriuAtalho.valor.valor) + ')',
+    !!abriuAtalho.valor && abriuAtalho.valor.valor === '1.050,00', V_PRECO);
+  await pagA.evaluate(() => document.querySelector('.linha-pagamento[data-aluno="ref"] .btn-cancelar-pagamento').click());
+  conf('fechar o formulário sem confirmar não grava pagamento', await pagA.evaluate(() => Store.carregar().then(d => d.pagamentos.length)), 2);
+  await mesNoTablet(pagA, MES);
 
   secao('3. O selo de cada família: o mesmo do tablet, e o esperado à mão');
   await aba(pagC, 'fechamento');

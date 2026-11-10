@@ -195,7 +195,7 @@ button, input, select, textarea { font-family: inherit; }
 .cabecalho {
   background: var(--branco);
   border-bottom: 2px solid var(--navy);
-  padding: 8px 16px 6px; /* F1: com as abas de 48 px (antes 44), o cabeçalho segue com 64 */
+  padding: 10px 16px 8px; /* B1: as abas saíram do cabeçalho (vão para o trilho), então volta ao padding de antes e o cabeçalho segue com 64 */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -210,8 +210,6 @@ button, input, select, textarea { font-family: inherit; }
   font-size: var(--letra-12);
   white-space: nowrap;
 }
-
-.abas { display: flex; gap: 4px; flex-wrap: wrap; }
 
 /* Botão que esconde os valores da tela. Fica no cabeçalho, ao alcance do
    polegar, porque às vezes é preciso apagar a renda da vista em um toque. */
@@ -234,21 +232,6 @@ button, input, select, textarea { font-family: inherit; }
 .olho .ico { width: 1.25em; height: 1.25em; }
 .olho:hover { background: var(--soft); }
 .olho.ativo { background: var(--navy); border-color: var(--navy); color: var(--branco); }
-
-.aba {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--muted);
-  padding: 9px 16px;
-  border-radius: 999px;
-  font-size: var(--letra-16);
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  min-height: var(--alvo, 48px);
-}
-.aba:hover { background: var(--soft); }
-.aba.ativa { background: var(--navy); color: var(--branco); }
 
 /* ---------- área principal ---------- */
 
@@ -331,7 +314,7 @@ label.campo > span {
   color: var(--navy);
   margin-bottom: 5px;
 }
-input[type=text], input[type=date], input[type=time], input[type=number], input[type=email], input[type=password], select, textarea {
+input[type=text], input[type=tel], input[type=url], input[type=date], input[type=time], input[type=number], input[type=email], input[type=password], select, textarea {
   width: 100%;
   padding: 11px 12px;
   border: 1px solid var(--fio);
@@ -1519,6 +1502,9 @@ table.dados tr.total td { font-weight: 600; color: var(--navy); background: var(
    todo, sem aviso nenhum no ar. Visto no print. No transform, o estado fechado
    continua o de sempre e a animacao continua sendo uma so. */
 .aviso.aberto { transform: translateX(-50%) translateY(calc(var(--sobe, 0px) * -1)); }
+/* Fechado, o aviso fica só escondido por baixo da tela (translateY): a sombra forte dele, de 40 px de
+   desfoque, aparecia como uma mancha cinza na base. Sem sombra enquanto não está aberto. */
+.aviso:not(.aberto) { box-shadow: none; }
 .aviso button {
   pointer-events: auto;
   background: transparent;
@@ -2013,8 +1999,6 @@ button.alvo-rascunho:hover { background: var(--soft); }
 
 @media (max-width: 720px) {
   .cabecalho { flex-direction: column; align-items: stretch; gap: 8px; }
-  .abas { justify-content: space-between; }
-  .aba { flex: 1; padding: 9px 8px; font-size: var(--letra-14); }
   .dia { min-height: 62px; }
   .marca span { display: none; }
   .olho { position: absolute; top: 10px; right: 12px; }
@@ -2038,19 +2022,6 @@ button.alvo-rascunho:hover { background: var(--soft); }
   .marca strong {
     font-size: var(--letra-16);
     letter-spacing: normal;
-  }
-  .abas {
-    flex-wrap: nowrap;
-    gap: 4px;
-  }
-  .aba {
-    height: 44px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 12px;
-    font-size: var(--letra-14);
-    white-space: nowrap;
   }
 }
 
@@ -2145,6 +2116,10 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-pdf-barra { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
   padding: 10px 18px; border-bottom: 1px solid var(--fio); background: var(--soft); }
 .leitor-pdf-contador { min-width: 128px; text-align: center; font-size: var(--letra-16); font-weight: 600; color: var(--navy); }
+.leitor-ir-pagina { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: var(--letra-14); color: var(--muted); }
+.leitor-ir-pagina[hidden] { display: none; }
+.leitor-ir-pagina input { width: 58px; min-height: 44px; padding: 0 8px; border: 1px solid var(--fio); border-radius: 8px;
+  background: var(--branco); color: var(--navy); font: inherit; font-size: var(--letra-16); font-weight: 600; text-align: center; box-sizing: border-box; }
 .leitor-pdf-zoom { display: inline-flex; gap: 8px; margin-left: auto; }
 .leitor-pdf-quadrado { min-width: 44px; padding: 10px 0; font-size: var(--letra-20); line-height: 1; }
 .leitor-pdf-corpo { background: var(--fio-claro); overflow: auto; padding: 18px; }
@@ -2203,6 +2178,13 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-cobre .cobre-rolagem { flex: 1 1 100%; margin: 0; }
 .livro-linha .detalhe { margin-top: 2px; }
 #lista-livros-biblioteca .livros-total { font-weight: 600; margin: 4px 0 8px; }
+#lista-instalados-biblioteca > summary {
+  cursor: pointer;
+  color: inherit;
+  font-weight: 600;
+  padding: 8px 0;
+}
+#lista-instalados-biblioteca[open] > summary { margin-bottom: 8px; }
 /* C15.4: exportar o capítulo; uma opção por linha, e o campo das páginas logo abaixo da dele */
 .livro-exportar-opcoes { display: flex; flex-direction: column; align-items: flex-start; }
 .livro-exportar-opcoes .livro-exportar-quais { margin: 0 0 4px 34px; width: calc(100% - 34px); }
@@ -3026,8 +3008,9 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
    tela, também com a letra a 130% num celular de 360 (auditoria de 09/11). */
 .cel-semana-topo { flex-wrap: nowrap; align-items: center; margin-bottom: 0; }
 .cel-semana-topo .btn { min-width: var(--alvo-celular); flex-shrink: 0; }
-.cel-semana-topo .cel-titulo { margin: 0; text-align: center; font-size: var(--letra-16); line-height: 1.15; }
-.cel-semana-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0 0 8px; }
+.cel-semana-topo .cel-semana-passo { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 8px 7px; font-size: var(--letra-12); white-space: nowrap; }
+.cel-semana-topo .cel-titulo { min-width: 0; margin: 0; text-align: center; font-size: var(--letra-16); line-height: 1.15; }
+.cel-semana-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0; }
 .cel-semana-dia {
   min-height: 56px;
   min-width: 0; /* em 390 px cada dia tem 49; num celular de 360, encolhe sem rolar de lado */
@@ -3315,6 +3298,31 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
   box-shadow: var(--sombra-forte);
 }
 
+/* F2: agenda proporcional do celular, das 07:00 às 20:00. */
+.cel-tempo-proporcional { position: relative; box-sizing: border-box; min-height: 0; margin: 4px 0 18px; overflow: visible; }
+.cel-tempo-proporcional .cel-tempo-linha { position: absolute; box-sizing: border-box; left: 0; right: 0; display: block; margin: 0; }
+.cel-tempo-proporcional .cel-tempo-hora { position: absolute; top: 2px; left: 0; width: 44px; padding: 0; font-size: var(--letra-12); line-height: 1.2; text-align: right; }
+.cel-tempo-proporcional .cel-tempo-item { position: absolute; top: 0; right: 0; bottom: 0; left: 48px; display: block; overflow: visible; }
+.cel-tempo-grade-linha { position: absolute; z-index: 0; left: 48px; right: 0; border-top: 1px solid var(--fio-claro); pointer-events: none; }
+.cel-tempo-grade-hora { position: absolute; z-index: 1; left: 0; width: 44px; transform: translateY(-50%); text-align: right; font-size: var(--letra-12); line-height: 1.2; color: var(--novidades-subtitulo); pointer-events: none; }
+.cel-tempo-sem-hora { position: absolute; z-index: 4; display: flex; gap: 8px; left: 0; right: 0; height: 56px; }
+.cel-tempo-sem-hora .cel-tempo-hora { position: static; flex: 0 0 44px; color: var(--novidades-subtitulo); }
+.cel-tempo-sem-hora .cel-tempo-item { position: static; display: flex; flex: 1; min-width: 0; }
+.cel-tempo-sem-hora .cel-bloco { position: relative; flex: 1; min-height: 48px; }
+.cel-tempo-proporcional .cel-bloco { position: absolute; box-sizing: border-box; min-height: 48px; margin: 0; overflow: hidden; }
+.cel-tempo-proporcional .cel-livre { position: relative; box-sizing: border-box; top: 0; left: 0; width: 100%; height: 100%; min-height: 26px; margin: 0; overflow: hidden; }
+.cel-tempo-proporcional .cel-bloco { padding: 4px 6px; border-radius: 8px; gap: 1px; }
+.cel-tempo-proporcional .cel-bloco-nome { font-size: var(--letra-14); line-height: 1.15; }
+.cel-tempo-proporcional .cel-bloco-hora,
+.cel-tempo-proporcional .cel-bloco-situacao { font-size: var(--letra-12); line-height: 1.15; }
+.cel-tempo-proporcional .cel-bloco-marca { font-size: var(--letra-12); line-height: 1.1; padding: 0 4px; }
+.cel-tempo-proporcional .cel-livre { z-index: 1; padding: 3px 6px; border-radius: 8px; background: var(--branco-a60); }
+.cel-tempo-proporcional .cel-livre-texto { font-size: var(--letra-12); line-height: 1.2; }
+.cel-tempo-proporcional .cel-livre-horas { gap: 2px; }
+.cel-tempo-proporcional .cel-livre-hora { min-height: 48px; padding: 2px 6px; font-size: var(--letra-12); }
+.cel-agora-grade { left: 0; right: 0; z-index: 5; }
+.cel-agora-grade .cel-agora-hora { left: -48px; }
+
 /* A folha de baixo da aula: botões grandes, sobre um véu. */
 .cel-folha-fundo {
   position: fixed;
@@ -3504,26 +3512,6 @@ body.modo-celular .celular .cel-icone { min-width: var(--alvo-celular); padding:
 /* O valor de cada aula, alinhado à direita e na cor do texto: a cor aqui não
    quer dizer nada (pago ou não é do tablet, na lista de pendências). */
 .cel-valor { white-space: nowrap; color: var(--texto); }
-.cel-abas {
-  display: flex;
-  flex-shrink: 0;
-  background: var(--branco);
-  border-top: 1px solid var(--fio);
-  padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
-}
-.cel-abas[hidden] { display: none; }
-.cel-aba {
-  flex: 1;
-  min-height: 52px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--novidades-subtitulo);
-  font: inherit;
-  font-size: var(--letra-16);
-  font-weight: 600;
-}
-.cel-aba.ativa { background: var(--soft); color: var(--navy); }
 body.modo-celular .celular .btn { min-height: var(--alvo-celular); }
 /* Campos e botões do celular com 48 px (D6b: as quatro ações escrevem aqui). */
 body.modo-celular .celular input,
@@ -3598,8 +3586,6 @@ body.modo-celular .celular a.cel-link-botao:focus { background: var(--branco); }
 .cel-aluno-nome { font-size: var(--letra-16); font-weight: 600; color: var(--navy); }
 .cel-aluno-detalhe { font-size: var(--letra-14); color: var(--novidades-subtitulo); }
 body.modo-celular .celular .campo[hidden] { display: none; }
-/* Com cinco abas (o observador), a letra desce um degrau para caber em 390 px. */
-.cel-abas.muitas .cel-aba { min-width: 0; padding: 0 2px; font-size: var(--letra-14); }
 /* O aviso no celular ocupa o seu lugar entre o conteúdo e as abas (o app.js
    o põe ali): nunca cobre o formulário nem a barra de baixo. */
 body.modo-celular .celular > .aviso { position: static; transform: none; transition: none; display: none; max-width: none;
@@ -3663,3 +3649,381 @@ body.modo-celular .celular .linha { flex-direction: column; }
 .resumo-importacao-texto { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .resumo-importacao-detalhe { display: block; margin-top: 2px; }
 #fechar-resumo-importacao { min-height: 48px; }
+
+/* ==================== B1: navegação (início) ====================
+   O trilho lateral do tablet e a barra de baixo do celular, copiados dos
+   protótipos da Biblioteca (tab_biblioteca.html, .rail; cel_biblioteca.html,
+   .nav4). As cores são variáveis LOCAIS com o valor do protótipo: a F1 troca
+   pelos tokens dela sem mexer na estrutura. Os ganchos das provas ficam:
+   #abas, .aba, .ativa, data-tela; #cel-abas, .cel-aba, data-cel. */
+:root {
+  /* 96 px como no protótipo; com a letra do aparelho maior, o trilho alarga
+     junto (6,4 vezes o rótulo cabe o "Fechamento" em 600), e o corpo acompanha. */
+  --nav-trilho-largura: max(96px, calc(var(--letra-12) * 6.93));
+  --nav-superficie: #FFFFFF;
+  --nav-fio: #E8E2D7;
+  --nav-texto: #4A5464;
+  --nav-ativo-texto: #1F3A5F;
+  --nav-ativo-fundo: #E8EDF4;
+  --nav-mais-fundo: #1F3A5F;
+  --nav-mais-traco: #C9A75B;
+  --nav-sombra: 0 1px 2px rgba(22, 44, 73, .06), 0 1px 3px rgba(22, 44, 73, .08);
+  /* O protótipo pede 12 px, mas a escala de hoje (trava B12: no máximo 6
+     tamanhos) não tem 12: fica o degrau mais perto sem descer de 12, o de
+     13 px, que cresce com a letra do aparelho. A F1 traz o 12 na escala dela. */
+  --nav-rotulo: var(--letra-12);
+}
+.nav-ico {
+  width: 20px; height: 20px; flex: none;
+  stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;
+}
+.nav-ind { display: grid; place-items: center; border-radius: 999px; }
+.nav-rotulo { display: block; white-space: nowrap; }
+
+/* ---- tablet: o trilho lateral ---- */
+body { padding-left: var(--nav-trilho-largura); }
+body.modo-celular, body.modo-familia { padding-left: 0; }
+#abas {
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 30;
+  width: var(--nav-trilho-largura);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 12px 0;
+  background: var(--nav-superficie);
+  border-right: 1px solid var(--nav-fio);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+#abas .nav-mais {
+  width: 56px; height: 56px; flex: none; margin-bottom: 12px;
+  display: grid; place-items: center; padding: 0;
+  border: 0; border-radius: 16px; cursor: pointer;
+  background: var(--nav-mais-fundo); color: var(--nav-mais-traco);
+  box-shadow: var(--nav-sombra);
+}
+#abas .nav-mais .nav-ico { stroke-width: 2.25; }
+#abas .aba {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  width: 100%; min-height: 56px; padding: 4px 0; flex: none;
+  border: 0; border-radius: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: var(--nav-rotulo); font-weight: 400; line-height: 1.2;
+  color: var(--nav-texto); text-align: center;
+}
+#abas .aba .nav-ind { width: 56px; height: 32px; }
+@media (hover: hover) {
+  #abas .aba:hover .nav-ind { background: var(--nav-ativo-fundo); }
+}
+#abas .aba.ativa { color: var(--nav-ativo-texto); font-weight: 600; }
+#abas .aba.ativa .nav-ind { background: var(--nav-ativo-fundo); }
+/* Ajustes não é destino do desenho: fica no pé do trilho, com o mesmo item
+   dos outros. O ícone dele (controles deslizantes, no index.html) é provisório:
+   a F1 troca pelo do sistema dela. */
+#abas .aba.nav-pe { margin-top: auto; }
+#abas button:focus-visible { outline: 2px solid var(--nav-ativo-texto); outline-offset: -2px; }
+
+/* ---- celular: a barra de baixo ----
+   As colunas seguem quantos destinos estiverem à vista: com quatro (se Enviar
+   e Fechamento virarem um só), basta tirar o item da lista no index.html. */
+.cel-abas {
+  flex-shrink: 0;
+  display: grid; grid-auto-flow: column;
+  /* nav: âncora do veneno do rótulo (a coluna nunca fica menor que o rótulo) */
+  grid-auto-columns: minmax(min-content, 1fr);
+  column-gap: 8px; align-items: center;
+  min-height: 64px;
+  padding: 0 4px env(safe-area-inset-bottom, 0px);
+  background: var(--nav-superficie);
+  border-top: 1px solid var(--nav-fio);
+}
+.cel-abas[hidden] { display: none; }
+.cel-abas.muitas { min-height: 72px; }
+.cel-aba {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-width: 0; height: 64px; padding: 0;
+  border: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: var(--nav-rotulo); font-weight: 400; line-height: 1.2;
+  color: var(--nav-texto);
+}
+.cel-aba[hidden] { display: none; }
+.cel-abas.muitas .cel-aba { height: 72px; }
+.cel-aba .nav-ind { width: 100%; max-width: 56px; height: 28px; }
+.cel-aba.ativa { color: var(--nav-ativo-texto); font-weight: 600; }
+.cel-abas.muitas .nav-rotulo { white-space: normal; overflow-wrap: anywhere; line-height: 1.05; }
+.cel-aba.ativa .nav-ind { background: var(--nav-ativo-fundo); }
+.cel-aba:focus-visible { outline: 2px solid var(--nav-ativo-texto); outline-offset: -2px; border-radius: 12px; }
+.cel-aba-mais .nav-ind { width: 40px; height: 32px; color: var(--nav-mais-traco); background: var(--nav-mais-fundo); border-radius: 16px; }
+.cel-aba-mais .nav-rotulo { color: var(--nav-ativo-texto); font-weight: 600; }
+/* ==================== B1: navegação (fim) ==================== */
+
+/* ==================== B2: a Biblioteca por disciplina e ano ====================
+   O desenho é o de design\biblioteca (tab_biblioteca e tab_livro_sumario), com
+   os tokens da F1: marinho para a ação e o escolhido, âmbar só para o que falta,
+   letras de 12 a 24 e alvo de 48. As capas usam as cores do protótipo, declaradas
+   aqui (o sistema não tinha cor de capa), todas com letra branca a 4,5:1 ou mais. */
+:root {
+  --capa-alfa: #3D6A9B;
+  --capa-beta: #9A5A3C;
+  --capa-gama: #3E7A5D;
+  --capa-delta: #6F5A92;
+  --capa-zeta: #2F7A82;
+  --capa-ouro: #7A5D22;
+}
+.bibl-topo { display: flex; align-items: center; gap: 12px 24px; flex-wrap: wrap; margin-bottom: 16px; }
+.bibl-topo .titulo { font-size: var(--letra-24); }
+.bibl-contagem { font-size: var(--letra-14); color: var(--muted); }
+.bibl-contagem[hidden] { display: none; }
+.bibl-busca {
+  flex: 1 1 18rem; min-width: 0; display: flex; align-items: center; gap: 8px;
+  min-height: var(--alvo); padding: 0 6px 0 14px;
+  border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco);
+}
+.bibl-busca:focus-within { border-color: var(--acao); }
+.bibl-lupa { display: inline-flex; color: var(--muted); }
+.bibl-busca input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; padding: 10px 0; font: inherit; font-size: var(--letra-16); color: var(--texto); }
+.bibl-busca input::placeholder { color: var(--muted); }
+.bibl-exercicios-cabeca { display: flex; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; margin: 0 0 12px; }
+.bibl-exercicios-cabeca .cresce { flex: 1; }
+.bibl-exercicios-titulo { font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); margin: 0; }
+.bibl-exercicios-titulo[hidden] { display: none; }
+.bibl[hidden], .bibl-livro[hidden] { display: none; }
+.bibl.bibl-na-busca { display: none; }
+.bibl { margin-bottom: 8px; }
+.bibl-rotulo { font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--texto); margin: 0 0 8px; }
+.bibl-titulo { font-size: var(--letra-20); font-weight: var(--peso-forte); color: var(--navy); margin: 0; }
+.bibl-forte { display: block; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--texto); text-wrap: balance; }
+.bibl-apoio { font-size: var(--letra-14); color: var(--muted); }
+.bibl-pequena { display: inline-flex; align-items: center; gap: 4px; font-size: var(--letra-12); color: var(--muted); }
+.bibl-falta { display: block; font-size: var(--letra-12); color: var(--aviso-texto); }
+.bibl-falta-texto { font-size: var(--letra-14); color: var(--aviso-texto); }
+.bibl-linha-unica { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* as capas: um bloco de cor com a lombada e a faixa, sem imagem do livro */
+.bibl-capa {
+  position: relative; flex: none; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: space-between;
+  width: 100%; max-width: 8.25rem; aspect-ratio: 132 / 172;
+  padding: 10px 8px 8px 12px; border-radius: 4px 8px 8px 4px;
+  background: var(--capa, var(--navy)); color: var(--branco); box-shadow: var(--sombra); text-align: left;
+}
+.bibl-capa::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: color-mix(in srgb, var(--texto) 18%, var(--branco-a00)); }
+.bibl-capa::after { content: ""; position: absolute; left: 5px; right: 0; top: 58%; height: 6px; background: color-mix(in srgb, var(--branco) 22%, var(--branco-a00)); }
+.bibl-capa-topo { position: relative; font-size: var(--letra-14); font-weight: var(--peso-forte); overflow-wrap: anywhere; }
+.bibl-capa-pe { position: relative; font-size: var(--letra-12); overflow-wrap: anywhere; }
+.bibl-capa.mini { width: 36px; height: 48px; aspect-ratio: auto; padding: 0; border-radius: 2px 5px 5px 2px; }
+.bibl-capa.mini::after { top: 55%; height: 4px; }
+.bibl-capa-exercicios { --capa: var(--capa-ouro); }
+
+/* Continuar lendo */
+.bibl-continuar { margin-bottom: 16px; }
+.bibl-continuar-linha { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 12px; }
+.bibl-continuar-cartao {
+  display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 4.5rem;
+  padding: 10px 14px 10px 12px; border: 1px solid var(--fio-claro); border-radius: var(--raio);
+  background: var(--branco); font: inherit; text-align: left; cursor: pointer; color: inherit;
+}
+.bibl-continuar-cartao:hover { background: var(--fundo-leve); }
+.bibl-continuar-texto { flex: 1; min-width: 0; }
+.bibl-progresso { display: block; height: 4px; border-radius: 2px; background: var(--fio-claro); margin-top: 6px; overflow: hidden; }
+.bibl-progresso i { display: block; height: 100%; background: var(--navy); }
+
+/* disciplinas à esquerda, livros do ano à direita */
+/* Lado a lado quando cabe; na largura estreita (tablet em pé, letra a 130%) as
+   disciplinas sobem para cima dos livros, sem rolagem de lado. */
+.bibl-paineis {
+  display: flex; flex-wrap: wrap;
+  border-top: 1px solid var(--fio-claro); border-bottom: 1px solid var(--fio-claro);
+}
+.bibl-disciplinas { flex: 1 1 15rem; max-width: 100%; border-right: 1px solid var(--fio-claro); padding: 8px 12px 12px 0; min-width: 0; }
+.bibl-legenda { display: flex; align-items: center; gap: 4px; margin: 4px 0 8px; padding: 0 12px; font-size: var(--letra-12); color: var(--muted); }
+.bibl-disciplina {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--alvo);
+  padding: 0 12px; border: 0; border-radius: var(--raio); background: transparent;
+  font: inherit; font-size: var(--letra-16); color: var(--texto); text-align: left; cursor: pointer;
+}
+.bibl-disciplina .cresce { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.bibl-disciplina:hover { background: var(--soft); }
+.bibl-disciplina.ativa { background: var(--acao-clara); color: var(--navy); font-weight: var(--peso-forte); box-shadow: inset 4px 0 0 var(--navy); }
+.bibl-sinal-mapa { display: inline-flex; color: var(--muted); }
+.bibl-painel { flex: 999 1 28rem; padding: 12px 0 16px 24px; min-width: 0; }
+.bibl-painel-cabeca { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.bibl-anos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.bibl-ano {
+  min-width: var(--alvo); min-height: var(--alvo); padding: 6px 14px;
+  border: 1px solid var(--fio); border-radius: 999px; background: var(--branco);
+  font: inherit; font-size: var(--letra-14); color: var(--texto); cursor: pointer;
+}
+.bibl-ano:hover { background: var(--soft); }
+.bibl-ano.ativo { background: var(--navy); border-color: var(--navy); color: var(--branco); font-weight: var(--peso-forte); }
+.bibl-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 16px; margin-top: 12px; }
+.bibl-livro-cartao {
+  display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 0;
+  border: 0; background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.bibl-livro-cartao:focus-visible { outline-offset: 4px; }
+.bibl-livro-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.bibl-exercicios { padding: 8px; border: 1px dashed var(--fio); border-radius: var(--raio); }
+.bibl-vazio { margin: 12px 0 0; }
+.bibl-exercicios-titulo { margin-top: 20px; }
+
+/* a tela do livro: tela cheia, por cima do trilho, com Voltar escrito */
+.bibl-livro {
+  position: fixed; inset: 0; z-index: 40; overflow-y: auto;
+  display: flex; flex-direction: column; background: var(--fundo);
+}
+.bibl-livro-cabeca {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  min-height: 76px; padding: 8px 16px 8px 8px; border-bottom: 1px solid var(--fio-claro); background: var(--fundo);
+}
+.bibl-voltar-livro { border-color: transparent; background: transparent; color: var(--navy); }
+.bibl-livro-nome { flex: 1 1 12rem; min-width: 0; }
+.bibl-titulo-livro { font-size: var(--letra-24); font-weight: var(--peso-forte); color: var(--navy); margin: 0; overflow-wrap: anywhere; text-wrap: balance; }
+.bibl-painel-rotulo { margin: 0; }
+.bibl-livro-nome .bibl-apoio { margin: 2px 0 0; }
+/* O sumário e o painel lado a lado; estreito, o painel desce para baixo do sumário. */
+.bibl-livro-corpo { flex: 1; display: flex; flex-wrap: wrap; align-items: stretch; }
+.bibl-sumario { flex: 999 1 28rem; padding: 12px 24px 16px; background: var(--branco); min-width: 0; }
+.bibl-sumario-cabeca { display: flex; align-items: baseline; gap: 12px; padding: 4px 12px 8px; }
+.bibl-sumario-cabeca .bibl-apoio { margin-left: auto; }
+.bibl-sem-sumario { padding: 0 12px; }
+.bibl-cap, .bibl-sec {
+  display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline;
+  width: 100%; min-height: var(--alvo); padding: 10px 12px; border: 0; border-top: 1px solid var(--fio-claro);
+  background: transparent; font: inherit; color: var(--texto); text-align: left; cursor: pointer;
+}
+.bibl-sec { border-top-color: transparent; align-items: center; padding-block: 4px; }
+.bibl-cap:hover, .bibl-sec:hover { background: var(--soft); }
+.bibl-cap.atual { background: var(--acao-clara); border-radius: var(--raio); border-top-color: transparent; box-shadow: inset 4px 0 0 var(--navy); }
+.bibl-cap.atual + .bibl-sec, .bibl-cap.atual + .bibl-cap { border-top-color: transparent; }
+.bibl-cap-n { font-size: var(--letra-20); font-weight: var(--peso-forte); color: var(--muted); }
+.bibl-sec .bibl-cap-n { font-size: var(--letra-14); font-weight: var(--peso-normal); }
+.bibl-sec .bibl-cap-titulo { font-size: var(--letra-16); }
+.bibl-cap.atual .bibl-cap-n { color: var(--navy); }
+.bibl-cap-titulo { font-size: var(--letra-16); min-width: 0; overflow-wrap: anywhere; text-wrap: balance; }
+.bibl-cap .bibl-cap-titulo { font-weight: var(--peso-forte); }
+.bibl-cap-p { font-size: var(--letra-16); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.bibl-cap-assuntos { grid-column: 2 / 3; font-size: var(--letra-14); line-height: 1.4; color: var(--muted); }
+.bibl-cap-assuntos.bibl-falta-texto { color: var(--aviso-texto); }
+.bibl-livro-painel { flex: 1 1 24rem; display: flex; flex-direction: column; min-width: 0; border-left: 1px solid var(--fio-claro); background: var(--fundo); }
+.bibl-livro-painel-corpo { flex: 1; padding: 14px 20px 16px; }
+.bibl-livro-painel-corpo > p { margin: 4px 0 0; }
+.bibl-livro-painel-corpo .bibl-rotulo { margin-top: 18px; }
+.bibl-assunto { display: flex; align-items: center; min-height: 2.75rem; border-top: 1px solid var(--fio-claro); font-size: var(--letra-16); }
+.bibl-livro-painel-pe {
+  position: sticky; bottom: 0; display: flex; gap: 12px; flex-wrap: wrap;
+  padding: 12px 20px; border-top: 1px solid var(--fio-claro); background: var(--branco);
+}
+.bibl-livro-painel-pe .btn { flex: 1 1 auto; }
+/* ==================== B2 (fim) ==================== */
+
+/* ==================== B6: o assunto lado a lado ==================== */
+/* o atalho "3 livros" do assunto ligado, no painel do capítulo */
+.bibl-assunto { gap: 8px; }
+.bibl-n-livros {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  min-height: var(--alvo); min-width: var(--alvo); padding: 0 8px; border: 0; border-radius: var(--raio);
+  background: transparent; font: inherit; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--acao); cursor: pointer;
+}
+.bibl-n-livros:hover { background: var(--acao-clara); }
+/* "Comparar livros por assunto", na aba */
+.bibl-comparar { margin-top: 20px; }
+.bibl-comparar .bibl-rotulo { font-size: var(--letra-16); }
+.bibl-comparar-lista { display: flex; flex-wrap: wrap; gap: 8px; }
+.bibl-comparar-chip {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
+  min-height: var(--alvo); padding: 6px 14px; border: 1px solid var(--fio); border-radius: 999px;
+  background: var(--branco); font: inherit; font-size: var(--letra-16); color: var(--texto); text-align: left; cursor: pointer;
+}
+.bibl-comparar-chip:hover { background: var(--soft); }
+.bibl-comparar-nome { min-width: 0; overflow-wrap: anywhere; }
+.bibl-comparar-chip .bibl-apoio { flex: none; }
+
+/* a tela: tela cheia com Voltar, a cabeça, o filtro e a tabela que rola */
+.lado {
+  position: fixed; inset: 0; z-index: 45;
+  display: flex; flex-direction: column; background: var(--fundo);
+}
+.lado[hidden] { display: none; }
+.lado-cabeca {
+  display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap;
+  min-height: 76px; padding: 8px 16px 8px 8px; border-bottom: 1px solid var(--fio-claro); background: var(--fundo);
+}
+.lado-nome { flex: 1 1 14rem; min-width: 0; }
+.lado-nome > p { margin: 2px 0 0; }
+.lado-quem { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.lado-anos { margin-top: 0; }
+.lado-filtro {
+  display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap;
+  padding: 10px 24px; border-bottom: 1px solid var(--fio-claro);
+}
+.lado-chips { margin-top: 0; }
+.lado-chips .bibl-ano { max-width: 100%; text-align: left; overflow-wrap: anywhere; }
+.lado-legenda { margin: 0 0 0 auto; display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: var(--letra-14); color: var(--muted); }
+.lado-legenda-item { display: inline-flex; align-items: center; gap: 6px; }
+.lado-legenda-item strong { font-weight: var(--peso-forte); }
+.lado-legenda [data-icone-nome="alerta"] { color: var(--aviso-texto); }
+.lado-rola { flex: 1; min-height: 0; overflow: auto; padding: 12px 24px 40px; }
+.lado-vazio { margin: 12px 0; }
+/* A tabela: a coluna dos assuntos e uma coluna por livro, de largura igual.
+ * Com muitos livros, só a tabela rola de lado (a página não): a coluna dos
+ * assuntos e a cabeça dos livros ficam presas. */
+.lado-grade {
+  display: grid; min-width: min-content;
+  grid-template-columns: minmax(11rem, 15rem) repeat(var(--lado-colunas, 3), minmax(11rem, 1fr));
+}
+.lado-linha { display: contents; }
+.lado-linha > * { border-top: 1px solid var(--fio-claro); }
+.lado-linha-cabeca > * { border-top: 0; position: sticky; top: -12px; z-index: 2; background: var(--fundo); }
+.lado-rotulo, .lado-canto { position: sticky; left: -24px; z-index: 1; background: var(--fundo); }
+.lado-linha-cabeca > .lado-canto { z-index: 3; }
+.lado-livro { display: flex; align-items: flex-start; gap: 10px; padding: 4px 8px 12px; min-width: 0; }
+.lado-livro-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.lado-tag { align-self: flex-start; background: var(--aviso-fundo); color: var(--aviso-texto); text-transform: none; }
+.lado-rotulo { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 12px; min-width: 0; }
+.lado-escolhido { font-size: var(--letra-12); }
+.lado-sinal { flex: none; display: inline-flex; justify-content: center; width: 1.5rem; }
+.lado-sinal [data-icone-nome="alerta"] { color: var(--aviso-texto); }
+.lado-sinal [data-icone-nome="check"] { color: var(--teal); }
+.lado-rotulo-texto { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.lado-assunto { font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--texto); overflow-wrap: anywhere; }
+.lado-linha.escolhido > * { background: var(--acao-clara); }
+.lado-linha.escolhido > .lado-rotulo { box-shadow: inset 4px 0 0 var(--navy); }
+.lado-celula { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; min-width: 0; }
+.lado-pg {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  min-height: var(--alvo); padding: 4px 8px 4px 12px; border: 1px solid var(--acao-clara); border-radius: var(--raio);
+  background: var(--branco); font: inherit; color: var(--acao); text-align: left; cursor: pointer;
+}
+.lado-pg:hover { background: var(--acao-clara); }
+.lado-pg-texto { display: flex; flex-direction: column; min-width: 0; }
+.lado-pg-cap { font-size: var(--letra-14); font-weight: var(--peso-forte); overflow-wrap: anywhere; }
+.lado-pg-p { font-size: var(--letra-14); color: var(--muted); }
+/* Não haver vínculo no mapa não prova ausência do assunto no livro. */
+.lado-sem-vinculo { font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--texto); }
+.lado-sem { font-size: var(--letra-14); color: var(--muted); }
+.lado-pe { padding-top: 10px; }
+.lado-abrir { width: 100%; background: var(--acao-clara); border-color: var(--acao-clara); color: var(--acao); }
+.lado-abrir-no-livro { font-size: var(--letra-14); }
+/* a busca de assunto que atravessa os anos */
+.lado-busca { flex: 1 1 100%; max-width: 48rem; }
+.lado-busca .ico { color: var(--muted); }
+.lado-busca-campo::-webkit-search-cancel-button { display: none; }
+.lado-escolha-lista { max-width: 56rem; display: flex; flex-direction: column; }
+.lado-escolha-lista > p { margin: 0 0 8px; }
+.lado-escolha-item {
+  display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; width: 100%;
+  min-height: var(--alvo); padding: 8px 12px; border: 0; border-top: 1px solid var(--fio-claro);
+  background: transparent; font: inherit; color: var(--texto); text-align: left; cursor: pointer;
+}
+.lado-escolha-item:hover { background: var(--soft); }
+.lado-escolha-texto { display: flex; flex-direction: column; min-width: 0; flex: 1 1 14rem; }
+.lado-ano { background: var(--acao-clara); color: var(--acao); text-transform: none; }
+.lado-n { flex: none; }
+/* Estreito (abaixo de 600 px): a coluna dos assuntos encolhe, e a margem e
+ * os encaixes presos acompanham a margem menor da área que rola. */
+@media (max-width: 600px) {
+  .lado-rola { padding: 12px 16px 40px; }
+  .lado-grade { grid-template-columns: minmax(8rem, 8rem) repeat(var(--lado-colunas, 3), minmax(9rem, 1fr)); }
+  .lado-rotulo, .lado-canto { left: -16px; }
+  .lado-filtro { padding: 10px 16px; }
+}
+/* ==================== B6 (fim) ==================== */

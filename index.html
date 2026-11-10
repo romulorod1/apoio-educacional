@@ -25,12 +25,17 @@
       <span>Apoio Educacional</span>
     </div>
     <button class="olho" id="alternar-valores" type="button" title="Esconder os valores" aria-label="Esconder os valores" data-icone="olho"></button>
-    <nav class="abas" id="abas">
-      <button class="aba ativa" data-tela="agenda" type="button">Agenda</button>
-      <button class="aba" data-tela="alunos" type="button">Alunos</button>
-      <button class="aba" data-tela="fechamento" type="button">Fechamento</button>
-      <button class="aba" data-tela="biblioteca" type="button">Biblioteca</button>
-      <button class="aba" data-tela="ajustes" type="button">Ajustes</button>
+    <!-- B1: o trilho lateral do tablet (o "+" no alto, os quatro destinos e Ajustes no pé).
+         Os ganchos das provas ficam: #abas, .aba, .ativa e data-tela.
+         O ícone de Ajustes (controles deslizantes) foi desenhado aqui, no traço 1,75 da grade 24,
+         porque o ICONS do desenho final não tem engrenagem: a F1 troca pelo dela. -->
+    <nav class="abas" id="abas" aria-label="Navegação">
+      <button class="nav-mais" id="nav-marcar-aula" type="button" aria-label="Marcar aula"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="aba ativa" data-tela="agenda" type="button" aria-current="page"><span class="nav-ind"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 11l8-6.5 8 6.5V20H4z"/><path d="M10 20v-5h4v5"/></svg></span><span class="nav-rotulo">Agenda</span></button>
+      <button class="aba" data-tela="alunos" type="button"><span class="nav-ind"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8.5" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5a3.5 3.5 0 0 1 0 7M17.5 14.3A6 6 0 0 1 21 20"/></svg></span><span class="nav-rotulo">Alunos</span></button>
+      <button class="aba" data-tela="biblioteca" type="button"><span class="nav-ind"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v14.5H7.5A2.5 2.5 0 0 0 5 20z"/><path d="M5 20a2 2 0 0 0 2 1.5H19"/></svg></span><span class="nav-rotulo">Biblioteca</span></button>
+      <button class="aba" data-tela="fechamento" type="button"><span class="nav-ind"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="6" width="17" height="13" rx="2.5"/><path d="M3.5 10h17M15.5 14.5h2"/></svg></span><span class="nav-rotulo">Fechamento</span></button>
+      <button class="aba nav-pe" data-tela="ajustes" type="button"><span class="nav-ind"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg></span><span class="nav-rotulo">Ajustes</span></button>
     </nav>
   </header>
 
@@ -110,23 +115,34 @@
     <!-- ---------------- biblioteca ----------------
          Sem pacote importado, oferece a importação pelo controle de Ajustes. -->
     <section class="tela" id="tela-biblioteca">
-      <div class="barra u-margem-baixo-12">
+      <!-- B2: o topo do desenho, numa linha: o título, quantos livros e a busca.
+           A busca é a dos EXERCÍCIOS (a de livros é outra fatia), e diz isso. -->
+      <div class="bibl-topo">
         <h2 class="titulo">Biblioteca</h2>
-        <span class="cresce"></span>
-        <button class="btn pequeno u-margem-dir-8" id="btn-guia-listas" type="button">Como usar as listas</button>
-        <div id="bib-contagem" class="ajuda u-margem-0 u-peso-seminegrito"></div>
+        <span class="bibl-contagem" id="bib-livros-contagem" hidden></span>
+        <div class="bibl-busca" id="bib-busca-cartao" role="search" style="display:none">
+          <span class="bibl-lupa" data-icone="search" aria-hidden="true"></span>
+          <input type="text" id="busca-biblioteca" aria-label="Buscar nos exercícios" placeholder="Buscar nos exercícios (bhaskara, pitágoras...)" autocomplete="off">
+          <button class="btn pequeno" id="limpar-busca-biblioteca" type="button" style="display:none">Limpar</button>
+        </div>
       </div>
       <!-- B12: o índice de texto dos livros sendo preparado; some quando termina -->
       <p id="indice-livros-progresso" class="ajuda indice-livros-progresso" role="status" aria-live="polite" hidden></p>
-      <div class="cartao u-margem-baixo-14 u-recuo-12-14" id="bib-busca-cartao" style="display:none">
-        <div class="barra u-margem-baixo-0 u-vao-8">
-          <input class="u-flex-1 u-larg-min-200" type="text" id="busca-biblioteca" placeholder="Buscar na biblioteca: assunto, fórmula ou nome (bhaskara, pitágoras...)" autocomplete="off">
-          <button class="btn pequeno" id="limpar-busca-biblioteca" type="button" style="display:none">Limpar</button>
-        </div>
+      <!-- B2: os livros do tablet por disciplina e ano, com o Continuar lendo.
+           Só aparece com livro no tablet; sem livro, a aba fica como era. -->
+      <div class="bibl" id="bib-livros" hidden></div>
+      <!-- a cabeça dos exercícios: o título (com livros no tablet), a contagem e o guia das listas -->
+      <div class="bibl-exercicios-cabeca" id="bib-exercicios-cabeca">
+        <h3 class="bibl-exercicios-titulo" id="bib-exercicios-titulo" hidden>Exercícios e listas</h3>
+        <div id="bib-contagem" class="ajuda u-margem-0 u-peso-seminegrito"></div>
+        <span class="cresce"></span>
+        <button class="btn pequeno" id="btn-guia-listas" type="button">Como usar as listas</button>
       </div>
       <div class="bib-contexto" id="bib-contexto" hidden></div>
       <div class="bib-carrinho" id="bib-carrinho" hidden></div>
       <div id="bib-corpo"></div>
+      <!-- B2: o livro aberto, com o sumário clicável, em tela cheia com Voltar -->
+      <section class="bibl-livro" id="bib-livro" hidden aria-label="Livro"></section>
     </section>
 
     <!-- ---------------- ajustes ---------------- -->
@@ -190,17 +206,19 @@
           Importado uma vez, o pacote fica neste tablet e abre sem internet, na aba Biblioteca.
           A cópia de segurança não leva os pacotes: num tablet novo, importe de novo do Drive.
         </p>
-        <div id="lista-pacotes-biblioteca"></div>
-        <!-- C15.1: os livros de referência, com o tamanho de cada um e o total.
-             Ficam aqui, ao lado dos pacotes e do Importar, e não na aba
-             Biblioteca, que é de leitura: remover é decisão de espaço. -->
-        <div id="lista-livros-biblioteca"></div>
         <div id="estado-importacao-biblioteca" role="status"></div>
         <div class="barra u-margem-baixo-0">
           <button class="btn" id="importar-biblioteca" type="button">Importar biblioteca</button>
           <button class="btn" id="exportar-etiquetas" type="button" hidden>Exportar minhas etiquetas de dificuldade</button>
           <input type="file" id="arquivo-biblioteca" accept=".zip,application/zip,application/x-zip-compressed" multiple hidden>
         </div>
+        <details id="lista-instalados-biblioteca" class="u-margem-topo-12">
+          <summary id="resumo-instalados-biblioteca">Pacotes e livros neste tablet</summary>
+          <div id="lista-pacotes-biblioteca"></div>
+          <!-- A gestão e remoção ficam recolhidas para deixar os controles de
+               importação e manutenção ao alcance sem percorrer todos os livros. -->
+          <div id="lista-livros-biblioteca"></div>
+        </details>
       </div>
 
       <h3 class="subtitulo">Espaço e manutenção</h3>
@@ -271,21 +289,29 @@
       <section class="cel-tela" id="cel-hoje"></section>
       <!-- D6c, lote 2: a lista de alunos e a ficha mínima (a completa fica no tablet) -->
       <section class="cel-tela" id="cel-alunos"></section>
+      <!-- B1: a Biblioteca como destino do celular (os livros moram no tablet) -->
+      <section class="cel-tela" id="cel-biblioteca"></section>
       <section class="cel-tela" id="cel-fechamento"></section>
       <section class="cel-tela" id="cel-enviar"></section>
       <!-- D7: as duas telas do aparelho observador (a cópia de outra conta, só leitura) -->
       <section class="cel-tela" id="cel-diagnostico"></section>
       <section class="cel-tela" id="cel-ajustes"></section>
     </div>
-    <nav class="cel-abas" id="cel-abas">
-      <button class="cel-aba" data-cel="hoje" type="button">Hoje</button>
-      <button class="cel-aba" data-cel="alunos" type="button">Alunos</button>
-      <button class="cel-aba" data-cel="fechamento" type="button">Fechamento</button>
-      <button class="cel-aba" data-cel="enviar" type="button">Enviar</button>
-      <button class="cel-aba" data-cel="diagnostico" type="button" hidden>Diagnóstico</button>
-      <button class="cel-aba" data-cel="ajustes" type="button" hidden>Ajustes</button>
+    <nav class="cel-abas" id="cel-abas" aria-label="Navegação">
+      <button class="cel-aba" data-cel="hoje" type="button"><span class="nav-ind"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 11l8-6.5 8 6.5V20H4z"/><path d="M10 20v-5h4v5"/></svg></span><span class="nav-rotulo">Hoje</span></button>
+      <button class="cel-aba" data-cel="alunos" type="button"><span class="nav-ind"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8.5" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5a3.5 3.5 0 0 1 0 7M17.5 14.3A6 6 0 0 1 21 20"/></svg></span><span class="nav-rotulo">Alunos</span></button>
+      <button class="cel-aba" data-cel="biblioteca" type="button"><span class="nav-ind"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3H19v14.5H7.5A2.5 2.5 0 0 0 5 20z"/><path d="M5 20a2 2 0 0 0 2 1.5H19"/></svg></span><span class="nav-rotulo">Biblioteca</span></button>
+      <button class="cel-aba" data-cel="fechamento" type="button"><span class="nav-ind"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="6" width="17" height="13" rx="2.5"/><path d="M3.5 10h17M15.5 14.5h2"/></svg></span><span class="nav-rotulo">Fechamento</span></button>
+      <button class="cel-aba" data-cel="enviar" type="button"><span class="nav-ind"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 5.5h15v10.5H10l-5.5 4z"/><path d="M8.5 10h7"/></svg></span><span class="nav-rotulo">Enviar</span></button>
+      <button class="cel-aba cel-aba-mais" id="cel-marcar-aula" type="button" data-acao-celular="marcar-aula" aria-label="Marcar aula neste dia"><span class="nav-ind"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg></span><span class="nav-rotulo">+ Aula</span></button>
+      <button class="cel-aba" data-cel="diagnostico" type="button" hidden><span class="nav-ind"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l7 2.8v5.4c0 4.4-2.9 7.4-7 8.8-4.1-1.4-7-4.4-7-8.8V6.3z"/><path d="M9.3 12l2 2 3.5-3.6"/></svg></span><span class="nav-rotulo">Diagnóstico</span></button>
+      <button class="cel-aba" data-cel="ajustes" type="button" hidden><span class="nav-ind"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg></span><span class="nav-rotulo">Ajustes</span></button>
     </nav>
   </div>
+
+  <!-- B6: o assunto lado a lado (e a busca de assunto que leva a ele), em tela
+       cheia com Voltar, por cima da aba, do livro ou da aula de onde veio -->
+  <section class="lado" id="lado-a-lado" hidden aria-label="Assunto lado a lado"></section>
 
   <!-- ---------------- modais ---------------- -->
 
@@ -494,6 +520,11 @@
         <button class="btn" id="leitor-proxima" type="button" data-icone-depois="chr">Próxima</button>
         <!-- C15.1: o sumário do livro; some no anexo da aula, que não tem -->
         <button class="btn" id="leitor-sumario" type="button" hidden aria-expanded="false">Sumário</button>
+        <!-- B3: ir direto para a página do livro (impressa quando tem numeração) -->
+        <label class="leitor-ir-pagina" id="leitor-ir-caixa" hidden>
+          <span>Ir p.</span>
+          <input id="leitor-ir-pagina" type="text" inputmode="text" autocapitalize="off" spellcheck="false" aria-label="Ir para a página">
+        </label>
         <span class="leitor-pdf-zoom">
           <button class="btn leitor-pdf-quadrado" id="leitor-menos" type="button" aria-label="Diminuir">&minus;</button>
           <button class="btn leitor-pdf-quadrado" id="leitor-mais" type="button" aria-label="Aumentar">+</button>

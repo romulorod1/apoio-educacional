@@ -313,7 +313,7 @@
    * três: o documento pelo escritor de diferença (o salvar, que enfileira na
    * mesma transação), a fila de saída (o envio tira dela o que subiu) e o
    * histórico (o ponto do Desfazer). O que o celular edita é decidido na tela
-   * (as quatro ações); aqui fica a porta. O observador de outra conta nunca
+   * (as cinco ações); aqui fica a porta. O observador de outra conta nunca
    * ganha as portas. */
   var soLeitura = false;
   var celularEdita = false;
@@ -2663,7 +2663,7 @@
    *   o mesmo id vindo de OUTRO pacote: fica o que está (deOutroPacote), para
    *     um pacote não tomar o livro do outro calado.
    * Devolve as contas, para a tela dizer o que aconteceu. */
-  function gravarLivros(aberto) {
+  function gravarLivros(aberto, preservarIds) {
     var m = aberto.manifest;
     var chave = m.pacote, versao = m.versao;
     var agora = new Date().toISOString();
@@ -2674,6 +2674,7 @@
         var contas = { novos: 0, atualizados: 0, iguais: 0, maisNovos: 0, removidos: 0, posicoesSoltas: 0,
           deOutroPacote: [], bytes: 0 };
         var noPacote = {};
+        (preservarIds || []).forEach(function (id) { noPacote[id] = true; });
         aberto.livros.forEach(function (l) {
           noPacote[l.meta.id] = true;
           var req = dep.get(l.meta.id);

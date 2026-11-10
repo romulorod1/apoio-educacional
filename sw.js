@@ -139,11 +139,13 @@
  * Versão silenciosa. O v105 (N2 fatia 1) traz as folhas por página na nuvem
  * (app.js, nuvem.js, store.js, draw.js e styles.css), com a lista igual. O v106 (sistema visual) traz os tokens, a escala de letras e o conjunto de ícones (app.js, index.html e styles.css), com a lista igual. O v107 traz o celular sem transbordo: o aviso de versão em
  * duas linhas, a barra de cima menor e a trava de transbordo (app.js e
- * styles.css), com a lista igual. O v108 (índice dos livros) traz o indexador
- * em segundo plano, indice-livros.js, na lista de arquivos (app.js, index.html,
- * store.js e sw.js). O v109 fixa a altura da linha de proposta entre
- * plataformas. O v110 (N2 fatia 2) sincroniza PDFs e fotos anexados a aulas. */
-var CACHE = 'apoio-educacional-v110';
+ * styles.css), com a lista igual. O v108 adicionou o indexador de livros; o
+ * v109 e o v110 trouxeram navegação e Biblioteca por disciplina e ano. O v111
+ * atualiza esses assets após sincronizar a Biblioteca com a main atualizada.
+ * O v118 traz navegação dia a dia no celular; v119 ajusta a legenda do mapa.
+ * O v120 isola a conferência de livros; v121 traz Marcar pago; v122, página impressa;
+ * v123, edição da ficha móvel. O v127 sincroniza PDFs e fotos anexados a aulas. */
+var CACHE = 'apoio-educacional-v127';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -159,6 +161,7 @@ var ARQUIVOS = [
    * nunca passa por aqui: ele vai para o IndexedDB ao ser importado. */
   './zip.js',
   './biblioteca.js',
+  './conferir-livro-worker.js',
   /* O índice de texto dos livros (B12): o mesmo arquivo é o script da página
    * e o Web Worker que lê os livros. Os livros e o índice nunca passam por
    * aqui: ficam no IndexedDB. */

@@ -3,7 +3,7 @@
  * D6, parte 1: o modo celular, no navegador e contra o Firebase Emulator
  * Suite (Auth e Firestore), do mesmo jeito que o testa_nuvem.js.
  *
- * Desde a parte 2 (D6b), o celular DA DONA edita em quatro ações (marcar e
+ * Desde a parte 2 (D6b), o celular DA DONA edita em cinco ações (marcar e
  * cancelar aula, "Registrar como foi", cadastrar aluno e o "pago em"), que
  * sobem pela fila de registros; essas ações e a chegada delas ao tablet são
  * provadas no testa_celular_edita.js. Aqui o celular não toca em nenhuma
@@ -363,7 +363,7 @@ async function fecharEVoltar(pag) {
 }
 
 /* O que está à vista na página, medido: rolagem de lado, alvos de 48 px e
- * edição. Os botões das quatro ações do celular da dona vêm marcados
+ * edição. Os botões das cinco ações do celular da dona vêm marcados
  * (data-acao-celular) e contam à parte: o que não pode existir é botão de
  * edição FORA delas. O campo de escolher o dia é consulta (data-consulta). */
 const RE_EDICAO = 'registrar|corrigir|editar|salvar|excluir|apagar|nova aula|novo aluno|^\\s*\\+|desmarcar|marcar|cancelar a aula|cancelar aula|cadastrar|pago|anotar|alterar|confirmar';
@@ -508,10 +508,12 @@ const ONTEM = RELOGIO.dia(-1);
     (semCorteNoDisco ? 'não veio' : 'veio, em ' + (await recebimentosNoBanco(pagB)) + ' recebimento(s)') + ')', (await escritasNoBanco(pagB)).length, 0);
   await zerarEscritas(pagB);
 
-  secao('4. As três telas: sem rolagem de lado, alvos de 48 px e nenhum botão de edição fora das quatro ações');
+  secao('4. As três telas: sem rolagem de lado, alvos de 48 px e nenhum botão de edição fora das cinco ações');
   const hojeTexto = await texto(pagB, '#cel-hoje');
-  conf('Hoje: a aula do dia, na linha do tempo, com o horário à esquerda', await pagB.evaluate(() => { const b = document.querySelector('#cel-tempo .cel-bloco[data-aula="aula-hoje"]');
-    return !!b && /Aluno Alfa Teste/.test(b.textContent) && b.closest('.cel-tempo-linha').querySelector('.cel-tempo-hora').textContent === '10:30'; }), true);
+  conf('Hoje: a aula do dia mantém o horário no bloco e a escala horária à esquerda', await pagB.evaluate(() => { const b = document.querySelector('#cel-tempo .cel-bloco[data-aula="aula-hoje"]');
+    const hora = Array.from(document.querySelectorAll('#cel-tempo .cel-tempo-grade-hora')).find(e => e.textContent === '10:00');
+    return !!b && /Aluno Alfa Teste/.test(b.textContent) && b.querySelector('.cel-bloco-hora').textContent.startsWith('10:30') &&
+      !!hora && hora.getBoundingClientRect().left < b.getBoundingClientRect().left; }), true);
   /* D6c: o bloco não repete o relato da última aula; o lembrete, a última aula
    * e a nota só minha ficam na folha que o toque no bloco abre. */
   conf('Hoje: o bloco não repete o relato da última aula', /Na última aula|Rendeu bem em frações/.test(hojeTexto), false);
@@ -535,7 +537,7 @@ const ONTEM = RELOGIO.dia(-1);
     conf('a tela "' + t + '" existe e abre pela aba de baixo', ativa, true);
     conf('"' + t + '": sem rolagem de lado em ' + telas[t].largura + ' px', telas[t].rolaDeLado, false);
     conf('"' + t + '": todo alvo de toque tem 48 px ou mais (' + telas[t].alvos + ' alvos)', telas[t].pequenos.join('; '), '');
-    prop('"' + t + '": nenhum botão de edição nem campo de escrever fora das quatro ações (' + (telas[t].botoesEdicao.concat(telas[t].campos).join(', ') || 'nenhum') +
+    prop('"' + t + '": nenhum botão de edição nem campo de escrever fora das cinco ações (' + (telas[t].botoesEdicao.concat(telas[t].campos).join(', ') || 'nenhum') +
       '; das ações: ' + (telas[t].dasAcoes.join(', ') || 'nenhum') + ')',
       telas[t].botoesEdicao.length === 0 && telas[t].campos.length === 0, t === 'hoje' ? '--envenenado-edicao' : 'nenhum');
     conf('"' + t + '": nada do tablet à vista', telas[t].doTablet.join(','), '');
@@ -544,14 +546,14 @@ const ONTEM = RELOGIO.dia(-1);
   if (EDICAO) { await ctxB.close(); return; }
   // o instrumento vê os botões das ações: sem isto, "nenhum botão fora delas" passaria com a medida cega
   conf('(controle) as ações do celular da dona estão à vista e a medida as separa: Hoje (' + telas.hoje.dasAcoes.join(', ') + '), Fechamento (' + telas.fechamento.dasAcoes.join(', ') + ')',
-    telas.hoje.dasAcoes.indexOf('+') >= 0 && telas.hoje.dasAcoes.indexOf('Cadastrar aluno') >= 0 &&
+    telas.hoje.dasAcoes.some(a => /^\+ Aula/.test(a)) && telas.hoje.dasAcoes.indexOf('Cadastrar aluno') >= 0 &&
     telas.fechamento.dasAcoes.indexOf('Marcar como pago') >= 0, true);
   conf('todos os botões das três telas e do alto foram medidos (' + Object.keys(telas).map(t => t + ': ' + telas[t].alvos).join(', ') + ')',
     Object.keys(telas).every(t => telas[t].alvos >= 5), true);
-  // (D7) as abas só do observador ficam escondidas (hidden) no celular da dona: não são alvo; as quatro à vista (com Alunos, D6c lote 2) é que se medem
-  conf('as abas de baixo à vista (quatro) têm alvo de 48 px ou mais', await pagB.evaluate(() => {
+  // As abas só do observador ficam escondidas; a dona vê também a ação "+ Aula".
+  conf('as abas de baixo à vista (seis) têm alvo de 48 px ou mais', await pagB.evaluate(() => {
     const vistas = Array.from(document.querySelectorAll('#cel-abas .cel-aba')).filter(b => !b.hidden);
-    return vistas.length === 4 && vistas.every(b => b.getBoundingClientRect().height >= 48);
+    return vistas.length === 6 && vistas.every(b => b.getBoundingClientRect().height >= 48);
   }), true);
   conf('Fechamento: o aluno, as aulas e o valor do mês', await pagB.evaluate(() => {
     document.querySelector('#cel-abas .cel-aba[data-cel="fechamento"]').click();
@@ -585,7 +587,7 @@ const ONTEM = RELOGIO.dia(-1);
     (await esperar('o PDF da sequência saiu', () => pagB.evaluate(() => window.__baixou.length), v => v === enviadosAntes + 1, 10000)).ok, true);
   await esperar('o fim da sequência', () => existe(pagB, '#envio-fechar'), v => v === true, 5000);
   await pagB.evaluate(() => document.querySelector('#envio-fechar').click());
-  conf('usar as três telas e enviar (fora das quatro ações) não gravou nada no banco', (await escritasNoBanco(pagB)).length, 0);
+  conf('usar as três telas e enviar (fora das cinco ações) não gravou nada no banco', (await escritasNoBanco(pagB)).length, 0);
 
   secao('5. Nenhum envio à nuvem do celular: ao fechar, ao voltar, deitado');
   const antesB = pagB.escritasNaNuvem.length;
@@ -602,7 +604,7 @@ const ONTEM = RELOGIO.dia(-1);
     await abrir(pagB);
     const deitado = await medirTela(pagB);
     conf('reaberto deitado, continua no modo celular', deitado.celular, true);
-    conf('deitado: nada do tablet à vista e nenhum botão de edição fora das quatro ações', deitado.doTablet.concat(deitado.botoesEdicao).join(','), '');
+    conf('deitado: nada do tablet à vista e nenhum botão de edição fora das cinco ações', deitado.doTablet.concat(deitado.botoesEdicao).join(','), '');
     conf('deitado (janela de 900 px, tela de celular): "Este aparelho passa a editar" não aparece', await existe(pagB, '#nuvem-passa-a-editar'), false);
     await pagB.evaluate(() => Nuvem.marcarMudanca());
     await fecharEVoltar(pagB);

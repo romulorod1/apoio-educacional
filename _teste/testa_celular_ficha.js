@@ -302,7 +302,7 @@ async function irParaDia(pag, iso) {
     }, iso);
     if (onde === 'achou') { await clicar(pag, '.cel-semana-dia[data-dia="' + iso + '"]'); await pausa(60); return true; }
     if (onde === 'sem faixa') return false;
-    await clicar(pag, onde === 'antes' ? '#cel-semana-anterior' : '#cel-semana-seguinte');
+    await clicar(pag, onde === 'antes' ? '#cel-dia-anterior' : '#cel-dia-seguinte');
   }
   return false;
 }
@@ -331,7 +331,7 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
     largura: window.innerWidth,
     rolaDeLado: document.documentElement.scrollWidth > window.innerWidth || document.body.scrollWidth > window.innerWidth ||
       (conteudo && conteudo.scrollWidth > conteudo.clientWidth) || !!Array.from(raiz.querySelectorAll('*')).find(e => e.getBoundingClientRect().right > window.innerWidth + 0.5 && visivel(e)),
-    alvos: alvos.length, pequenos, soltos, campos, acoes: raiz.querySelectorAll('[data-acao-celular]').length
+    alvos: alvos.length, pequenos, soltos, campos, acoes: Array.from(raiz.querySelectorAll('[data-acao-celular]')).filter(e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0).length
   };
 }, RE_EDICAO);
 const telaBoa = m => m.pequenos.join('; ') + (m.rolaDeLado ? ' ROLA DE LADO' : '');
@@ -448,7 +448,7 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
 
   secao('3. A aba Alunos: a lista dos ativos');
   conf('a aba Alunos está nas abas de baixo, depois de Hoje', await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-abas .cel-aba')).filter(b => !b.hidden).map(b => b.textContent).join(',')),
-    'Hoje,Alunos,Fechamento,Enviar');
+    'Hoje,Alunos,Biblioteca,Fechamento,Enviar,+ Aula'); // B1: a Biblioteca entrou e F2 trouxe a ação para a barra
   await aba(pagC, 'alunos');
   const lista = await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-alunos-lista .cel-aluno-item')).map(b => b.dataset.aluno + '=' + b.querySelector('.cel-aluno-nome').textContent));
   conf('a lista traz os ativos em ordem de nome, sem o inativo', lista.join(', '),
@@ -549,16 +549,16 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   const abriuVelho = await abrirFichaPelaLista(pagC, 'velho');
   prop('a ficha do aluno sem os campos novos abre (' + (pagC.errosDePagina.join(' | ') || 'sem erro de página') + ')', abriuVelho && pagC.errosDePagina.length === 0, V_OBRIGATORIO);
   if (MODO === V_OBRIGATORIO) fimDoVeneno();
-  prop('o contato das observações NÃO liga nem abre o WhatsApp: mostra o texto e "Confira o telefone no tablet" (' + (await href(pagC, '#cel-ficha-ligar')) + ')',
+  prop('o contato das observações NÃO liga nem abre o WhatsApp: mostra o texto e indica a edição no celular (' + (await href(pagC, '#cel-ficha-ligar')) + ')',
     !(await existe(pagC, '#cel-ficha-ligar')) && !(await existe(pagC, '#cel-ficha-whatsapp')) && (await texto(pagC, '#cel-ficha-telefone')) === 'Contato: ' + TEL_VELHO &&
-    /^Confira o telefone no tablet/.test((await texto(pagC, '#cel-ficha-confira')) || ''), V_EXTRACAO);
+    /^Para cadastrar ou corrigir, abra Alunos e toque em Editar ficha\./.test((await texto(pagC, '#cel-ficha-confira')) || ''), V_EXTRACAO);
   conf('sem casa nem online, a ficha não mostra o lugar; o valor é o dele', (await existe(pagC, '#cel-ficha-lugar')) + ' ' + (await texto(pagC, '#cel-ficha-valor')).replace(/\s/g, ' '), 'false Valor por hora: R$ 80,00');
   conf('sem relato, a ficha diz', await texto(pagC, '#cel-ficha-relato'), 'Ainda sem relato de aula.');
   await clicar(pagC, '#cel-alunos-voltar');
   await abrirFichaPelaLista(pagC, 'nada');
-  conf('sem telefone: a ficha diz onde pôr, e não oferece ligar, WhatsApp nem mensagem pronta',
+  conf('sem telefone: a ficha direciona para edição no celular, sem oferecer ligar, WhatsApp nem mensagem pronta',
     (await texto(pagC, '#cel-ficha-sem-telefone')) + ' | ' + (await pagC.evaluate(() => document.querySelectorAll('#cel-ficha a').length)),
-    'Sem telefone do responsável. Ele se põe no tablet, na ficha do aluno. | 0');
+    'Sem telefone do responsável. Para cadastrar, abra Alunos e toque em Editar ficha. | 0');
   conf('sem valor por hora, a ficha diz', await texto(pagC, '#cel-ficha-valor'), 'Sem valor por hora para hoje.');
   await clicar(pagC, '#cel-alunos-voltar');
   await abrirFichaPelaLista(pagC, 'online');
@@ -582,7 +582,7 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   const c1 = await doCaso('c1'), c2 = await doCaso('c2'), c3 = await doCaso('c3'), c4 = await doCaso('c4'), c5 = await doCaso('c5');
   console.log('   casos: ' + JSON.stringify({ c1, c2, c3, c4, c5 }));
   prop('"98765-4321 (casa 2)" nas observações: nenhum link, e pede para conferir (' + [c1.ligar, c1.whats, c1.msgs, c1.confira].join('|') + ')', [c1.ligar, c1.whats, c1.msgs, c1.confira].join('|') === '||0|true', V_EXTRACAO);
-  conf('"mãe, prédio 12": nenhum link, o texto à vista e "Confira o telefone no tablet"', [c2.ligar, c2.whats, c2.msgs, c2.confira, c2.texto].join('|'), '||0|true|Contato: mãe, prédio 12');
+  conf('"mãe, prédio 12": nenhum link, o texto à vista e o aviso de edição na aba Alunos', [c2.ligar, c2.whats, c2.msgs, c2.confira, c2.texto].join('|'), '||0|true|Contato: mãe, prédio 12');
   conf('dois números ("mãe 11 98765-4321, pai 11 91234-5678"): nenhum link, e pede para conferir', [c3.ligar, c3.whats, c3.msgs, c3.confira].join('|'), '||0|true');
   conf('"ramal 2": nenhum link, e pede para conferir', [c4.ligar, c4.whats, c4.msgs, c4.confira].join('|'), '||0|true');
   conf('o campo telefone próprio vence o "Contato:" das observações', c5.ligar + ' ' + c5.whats, 'tel:+5531900000005 https://wa.me/5531900000005');
@@ -795,7 +795,7 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   await irParaDia(pagD, HOJE);
   await clicar(pagD, '.cel-bloco[data-aula="aula-hoje"]');
   await clicar(pagD, '#cel-folha-ficha');
-  conf('na folha, o observador também abre a ficha pelo nome, sem nenhuma ação', (await existe(pagD, '#cel-folha #cel-ficha')) + ' ' + (await pagD.evaluate(() => document.querySelectorAll('#modo-celular [data-acao-celular]').length)), 'true 0');
+  conf('na folha, o observador também abre a ficha pelo nome, sem nenhuma ação', (await existe(pagD, '#cel-folha #cel-ficha')) + ' ' + (await pagD.evaluate(() => Array.from(document.querySelectorAll('#modo-celular [data-acao-celular]')).filter(e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0).length)), 'true 0');
   await pausa(2500);
   conf('nenhuma escrita na nuvem saiu do observador', pagD.commitsNaRede, 0);
 

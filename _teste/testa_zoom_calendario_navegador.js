@@ -17,6 +17,11 @@
  */
 'use strict';
 const H = require('./_bib_navegador');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia em que roda: o botão Hoje cai
+ * sempre em novembro de 2026 (a volta para junho, na seção 9, são cinco meses),
+ * e a virada anual que o app abre sozinho em janeiro não cobre os toques. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const amb = H.criarAmbiente(8851, 'nath_t12_zoom');
 const { conf, secao, esperar, pausa } = H;
 
@@ -24,14 +29,16 @@ async function rodar() {
   await amb.subir();
   const pag = await amb.pagina();
   await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
+  await RELOGIO.naPagina(pag);
   await H.abrirApp(pag, amb.ORIGEM);
+  await RELOGIO.conferir(pag);
 
   // ================================================================
   secao('1. Ausencia de bloco Hoje fixo e preservacao das 5 abas');
 
   const abas = await pag.$$eval('#abas .aba', es => es.map(e => e.textContent.trim()));
   conf('exatamente 5 abas na barra superior', abas.length, 5);
-  conf('abas preservam nomes conhecidos', abas.join(' | '), 'Agenda | Alunos | Fechamento | Biblioteca | Ajustes');
+  conf('abas preservam nomes conhecidos', abas.join(' | '), 'Agenda | Alunos | Biblioteca | Fechamento | Ajustes');
 
   const existeBlocoHojeFixo = await pag.evaluate(() => {
     return !!document.querySelector('#bloco-hoje, .bloco-hoje, #secao-hoje');

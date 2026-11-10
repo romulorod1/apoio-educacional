@@ -418,9 +418,16 @@ for t in testa_temas testa_busca testa_mapa_e2e \
          testa_zoom_calendario_navegador \
          testa_dominio_navegador \
          testa_sondagem_navegador \
+         testa_relogio_padrao \
          e2e e2e_correcoes; do
   roda "$t" node "_teste/$t.js"
 done
+# O RELOGIO FIXO PADRAO do _bib_navegador (a bomba-relogio de 01/01/2027: o app
+# abre a virada anual sozinho num relogio de 2027 em diante). A prova simula o
+# mundo em 02/01/2027 e confere que a virada NAO abre com o padrao e ABRE com
+# { relogioReal: true }; o veneno serve o helper sem o padrao e a virada tem de
+# abrir ("VENENO visto").
+roda "relogio padrao --envenenado-sem-padrao"   node "_teste/testa_relogio_padrao.js" --envenenado-sem-padrao
 
 # D2: o service worker com cache primeiro. Fechar o aplicativo sem tocar no
 # aviso nao troca a versao (o navegador ativa o worker em espera sozinho, e a
@@ -481,6 +488,30 @@ roda "importar varios --envenenado-livro-velho-volta" node "_teste/testa_bibliot
 # que ignora os apelidos do pacote, e "bhaskara" tem de perder as listas.
 roda "biblioteca navegar"                       node "_teste/testa_biblioteca_navegar.js"
 roda "biblioteca navegar --envenenado-apelidos" node "_teste/testa_biblioteca_navegar.js" --envenenado-apelidos
+# B1: a navegacao com a Biblioteca. O trilho lateral do tablet (o "+" no alto,
+# Agenda, Alunos, Biblioteca, Fechamento, Ajustes no pe) e a barra de baixo do
+# celular com a Biblioteca, a 360, 390 e 412 px e a 360 com a letra a 130%. O
+# veneno deixa a coluna da barra encolher abaixo do rotulo, e o "Fechamento"
+# estourado tem de ser visto.
+roda "navegacao biblioteca"                     node "_teste/testa_navegacao_biblioteca.js"
+roda "navegacao biblioteca --envenenado-rotulo-corta" node "_teste/testa_navegacao_biblioteca.js" --envenenado-rotulo-corta
+# B2: a aba Biblioteca do tablet por disciplina e ano, com os livros
+# sinteticos, o Continuar lendo e a tela do livro com o sumario clicavel (o
+# capitulo abre o leitor na pagina do arquivo dele). O veneno abre todo
+# capitulo na pagina 1, e a prova tem de ver.
+roda "biblioteca livros tela"                   node "_teste/testa_biblioteca_livros_tela.js"
+roda "biblioteca livros tela --envenenado-capitulo-abre-pagina-errada" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-capitulo-abre-pagina-errada
+# B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
+# 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
+# revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
+# (aba, painel do capitulo, aula), a busca que atravessa
+# os anos e a correcao dela. Os venenos trocam as duas ausencias, contam o mapa
+# vazio como revisado e o livro parcialmente confirmado como revisado; a prova
+# tem de ver cada um.
+roda "assunto lado a lado"                      node "_teste/testa_assunto_lado_a_lado.js"
+roda "assunto lado a lado --envenenado-nao-trata-vira-sem-mapa" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-nao-trata-vira-sem-mapa
+roda "assunto lado a lado --envenenado-mapa-vazio-nao-trata" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-mapa-vazio-nao-trata
+roda "assunto lado a lado --envenenado-parcial-nao-trata" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-parcial-nao-trata
 # C12: os pacotes de provas (OBMEP Mirim por nivel e ENEM) importam, as abas vao
 # do 2o ao 5o ano e os assuntos do aplicativo aparecem como modulos. O modo
 # envenenado serve o app.js que so espalhava o Banco pelas series equivalentes.
@@ -1236,6 +1267,13 @@ roda "livros (regras) --envenenado-respostas-no-capitulo" node "_teste/testa_liv
 # Revisao do C15.5: o gabarito do fim do capitulo (achado so pelo lugar) nunca
 # tira pagina do capitulo exportado. O veneno volta a regra antiga.
 roda "livros (regras) --envenenado-fim-do-capitulo-tira" node "_teste/testa_livros_regras.js" --envenenado-fim-do-capitulo-tira
+# B3: a pagina impressa do livro (trechos romanos e arabicos, mudanca no meio,
+# ida e volta em todas as paginas, tela e leitor mostrando a impressa e abrindo
+# e gravando em pagina do arquivo, e recusa so do livro com numeracao invalida).
+roda "livros (pagina impressa)"                 node "_teste/testa_livros_impressa.js"
+roda "livros (pagina impressa) --envenenado-impressa-fora-por-um" node "_teste/testa_livros_impressa.js" --envenenado-impressa-fora-por-um
+roda "livros (pagina impressa) --envenenado-posicao-lida-como-impressa" node "_teste/testa_livros_impressa.js" --envenenado-posicao-lida-como-impressa
+roda "livros (pagina impressa) --envenenado-trecho-romano-zero" node "_teste/testa_livros_impressa.js" --envenenado-trecho-romano-zero
 # C15.5: o passe semiautomatico do gabarito (titulos de respostas, numero do
 # capitulo, o fim do capitulo, so as impares, manual do professor, sem texto),
 # a trava do casamento medida pelo texto e os venenos dentro da prova (casar
