@@ -2185,6 +2185,23 @@
         }
         Object.keys(arquivos || {}).forEach(function (filaId) {
           var a = arquivos[filaId], velho = antigos[filaId], p = partesDoIdDoArquivo(filaId);
+          /* A cópia pode referenciar um arquivo cujo download ainda não
+           * terminou. Ele não está apagado: preserve o estado conhecido e
+           * deixe o recebimento completar o download. */
+          if (a.pendente) {
+            if (!velho) return;
+            controle.put(velho, PREFIXO_ARQUIVO + filaId);
+            if (!saida || velho.recebido || velho.apagadoEm) return;
+            var deposito = t.objectStore(depositoDaOrigem(p.origem));
+            deposito.count(p.id).onsuccess = function (ev) {
+              if (!ev.target.result) return;
+              var entradaPendente = { id: filaId, tipo: 'anexo', atualizadoEm: velho.atualizadoEm, apagadoEm: null,
+                aulaId: velho.aulaId || '', origem: velho.origem };
+              if (opcoes.restauro) entradaPendente.restauro = true;
+              enfileirar(saida, entradaPendente);
+            };
+            return;
+          }
           controle.put({ sha256: null, tamanho: null, tipo: a.tipo || null, origem: p.origem, aulaId: a.aulaId || '', nome: a.nome || '',
             w: a.w || null, h: a.h || null, atualizadoEm: carimbo, apagadoEm: null, nuvem: velho && velho.nuvem ? velho.nuvem : null }, PREFIXO_ARQUIVO + filaId);
           if (!saida) return;
@@ -2211,10 +2228,17 @@
    * pela lista `anexos` da aula, a mídia pela folha que a cita. */
   function arquivosDaCopia(dados, notas, midias, anexos) {
     var saida = {}, aulaDoAnexo = {}, aulaDaMidia = {};
-    ((dados && dados.aulas) || []).forEach(function (a) { (a.anexos || []).forEach(function (an) { aulaDoAnexo[an.id || an] = a.id; }); });
+    ((dados && dados.aulas) || []).forEach(function (a) { (a.anexos || []).forEach(function (an) {
+      var id = an.id || an;
+      aulaDoAnexo[id] = a.id;
+      saida[idDoArquivo('anexo', id)] = { aulaId: a.id || '', pendente: true };
+    }); });
     Object.keys(notas || {}).forEach(function (aulaId) {
       ((notas[aulaId] && notas[aulaId].paginas) || []).forEach(function (p) {
-        (p.itens || []).forEach(function (it) { if (it.t === 'imagem' && it.ref && !aulaDaMidia[it.ref]) aulaDaMidia[it.ref] = aulaId; });
+        (p.itens || []).forEach(function (it) { if (it.t === 'imagem' && it.ref) {
+          if (!aulaDaMidia[it.ref]) aulaDaMidia[it.ref] = aulaId;
+          if (!saida[idDoArquivo('midia', it.ref)]) saida[idDoArquivo('midia', it.ref)] = { aulaId: aulaId, pendente: true };
+        } });
       });
     });
     Object.keys(anexos || {}).forEach(function (id) {
@@ -2287,23 +2311,26 @@
    * arquivo do aparelho; o vivo vira estado, e o que falta no disco volta em
    * `faltam`, para o tablet baixar na hora (o celular e o observador baixam
    * quando ela abre). Item sem id só avança o cursor. */
-  /* A aula viva ainda cita o arquivo? O anexo, pela lista `anexos` do registro
-   * da aula; a imagem, pela folha da aula. Sem aula conhecida, não. */
+  /* Algum dado local ainda cita o arquivo? Referências compartilhadas e
+   * alterações ainda não sincronizadas também protegem os bytes locais. */
   function aindaCitado(t, p, aulaId, depois) {
-    if (!aulaId) { depois(false); return; }
     if (p.origem === 'midia') {
-      t.objectStore('notas').get(aulaId).onsuccess = function (ev) {
-        var n = ev.target.result;
-        depois(!!(n && (n.paginas || []).some(function (pg) {
+      t.objectStore('notas').getAll().onsuccess = function (ev) {
+        depois((ev.target.result || []).some(function (n) { return (n.paginas || []).some(function (pg) {
           return pg && (pg.itens || []).some(function (it) { return it && it.t === 'imagem' && it.ref === p.id; });
-        })));
+        }); }));
       };
       return;
     }
-    t.objectStore('registros').get('aula:' + aulaId).onsuccess = function (ev) {
-      var r = ev.target.result;
-      depois(!!(r && !r.apagadoEm && r.dados && (r.dados.anexos || []).some(function (an) { return an && (an.id || an) === p.id; })));
-    };
+    var principal, registros, restantes = 2;
+    function conferir() {
+      if (--restantes) return;
+      var citado = (principal && (principal.aulas || []).some(function (a) { return (a.anexos || []).some(function (an) { return (an.id || an) === p.id; }); })) ||
+        (registros || []).some(function (r) { return r && !r.apagadoEm && r.dados && (r.dados.anexos || []).some(function (an) { return (an.id || an) === p.id; }); });
+      depois(!!citado);
+    }
+    t.objectStore('dados').get('principal').onsuccess = function (ev) { principal = ev.target.result; conferir(); };
+    t.objectStore('registros').getAll().onsuccess = function (ev) { registros = ev.target.result; conferir(); };
   }
   /* Os arquivos "a baixar" (o download que falhou), que o tablet pede de novo
    * a cada recebimento: o estado vivo que veio da nuvem e ainda não está no
@@ -2330,7 +2357,7 @@
     var agora = new Date().toISOString();
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = transacao(b, ['anexos', 'midias', 'controle', 'saida', 'registros', 'notas'], 'readwrite', true);
+        var t = transacao(b, ['anexos', 'midias', 'controle', 'saida', 'registros', 'notas', 'dados'], 'readwrite', true);
         var controle = t.objectStore('controle'), saida = t.objectStore('saida');
         var contas = { aplicados: 0, ignorados: 0, apagados: 0, faltam: [], invalidos: 0, preservados: 0 };
         var fila = {}, cursorAntes = null, desligada = false;
@@ -3059,6 +3086,26 @@
             if (chaveExterna) Object.keys(registros || {}).forEach(function (k) { s.put(registros[k], k); });
             else (registros || []).forEach(function (r) { s.put(r); });
           }
+          function trocarArquivos(nome, registros, arquivos, origem, campo) {
+            var s = t.objectStore(nome), valores = s.getAll();
+            valores.onsuccess = function () {
+              var chaves = s.getAllKeys();
+              chaves.onsuccess = function () {
+                var antes = valores.result || [], ids = chaves.result || [];
+                s.clear();
+                Object.keys(registros || {}).forEach(function (k) { s.put(registros[k], k); });
+                ids.forEach(function (id, i) {
+                  var filaId = idDoArquivo(origem, id), a = arquivos[filaId], novo = registros && registros[id];
+                  if (!a || !a.pendente || (novo && novo[campo])) return;
+                  var antigo = antes[i];
+                  if (!antigo || !antigo[campo]) return;
+                  var preservado = Object.assign({}, antigo, novo || {});
+                  preservado[campo] = antigo[campo];
+                  s.put(preservado, id);
+                });
+              };
+            };
+          }
           /* A fila: a restauração só NÃO enfileira no aparelho que só lê (o
            * celular do D6a, que nunca envia). Num aparelho que escreve, o
            * tablet novo ou reinstalado é dono do que restaurou e tudo o que
@@ -3096,14 +3143,15 @@
           var agoraIso = new Date().toISOString();
           if (daNuvem && soLeitura) limparEstadoDasFolhas(t);
           else restaurarEstadoDasFolhas(t, pacote.notas, carimbo || agoraIso, agoraIso, { restauro: daNuvem });
-          trocar('midias', pacote.midias, true);
-          trocar('anexos', anexos, true);
+          var arquivosCopia = arquivosDaCopia(pacote.dados, pacote.notas, pacote.midias, anexos);
+          trocarArquivos('midias', pacote.midias, arquivosCopia, 'midia', 'dataUrl');
+          trocarArquivos('anexos', anexos, arquivosCopia, 'anexo', 'blob');
           /* Os arquivos (N2, fatia 2), como as folhas: o estado é refeito a
            * partir do anterior e da cópia; no aparelho que escreve, todo arquivo
            * da cópia entra na fila e o que a nuvem tem e a cópia não vira lápide.
            * O celular só leitura só limpa o estado (o recebimento o refaz). */
           if (daNuvem && soLeitura) { apagarFaixaDeControle(t, PREFIXO_ARQUIVO); t.objectStore('controle').delete('cursorAnexos'); }
-          else restaurarEstadoDosArquivos(t, arquivosDaCopia(pacote.dados, pacote.notas, pacote.midias, anexos), carimbo || agoraIso, agoraIso, { restauro: daNuvem });
+          else restaurarEstadoDosArquivos(t, arquivosCopia, carimbo || agoraIso, agoraIso, { restauro: daNuvem });
           t.objectStore('historico').clear();
           /* O estado anterior fica no histórico, depois da limpeza (os pedidos
            * respondem na ordem): cada versão que a restauração troca ou apaga

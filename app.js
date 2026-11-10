@@ -25993,7 +25993,9 @@
   function abrirMensagemCelular(alunoId, mes) {
     if (!podeEditarMensagemCelular()) return;
     return versaoDoTabletCelular().then(function (v) {
-      if (v && Core.versaoAntes(v.app, VERSAO) === true) {
+      /* A regra da mensagem do mês está estável desde 1.42.40. Exigir a
+       * versão inteira do app bloqueava tablets mais antigos compatíveis. */
+      if (v && Core.versaoAntes(v.app, '1.42.40') === true) {
         avisar('Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão ' + v.app + ', e esta é a ' + VERSAO + '.');
         return;
       }

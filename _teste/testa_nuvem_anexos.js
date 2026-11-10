@@ -777,6 +777,11 @@ const idDoAnexoNaAula = (pag, aulaId, nome) => pag.evaluate((a, n) => Store.carr
   conf('B2 recebeu o metadado, o download falhou, e o estado vivo ficou "a baixar" (veio da nuvem), sem o arquivo',
     JSON.stringify([!!estB13 && !estB13.apagadoEm, estB13 && estB13.recebido, estB13 && estB13.aBaixar, await shaNoAparelho(pagB2, 'anexo:novo1')]), '[true,true,true,null]');
   conf('a aula x1 em B2 lista o novo1', await pagB2.evaluate(() => Store.carregar().then(d => d.aulas.find(a => a.id === 'x1').anexos.some(an => an.id === 'novo1'))), true);
+  const pacoteComDownloadPendente = JSON.parse(await pagB2.evaluate(() => Store.carregar().then(d => Store.exportarTudo(d)).then(p => JSON.stringify(p))));
+  const arquivoPendenteNaCopia = pacoteComDownloadPendente.anexos.novo1;
+  conf('a cópia mantém a referência de novo1, mas não leva bytes cujo download falhou',
+    JSON.stringify([pacoteComDownloadPendente.dados.aulas.some(a => a.id === 'x1' && a.anexos.some(an => (an.id || an) === 'novo1')),
+      !arquivoPendenteNaCopia || (!arquivoPendenteNaCopia.blob && !arquivoPendenteNaCopia.conteudo)]), '[true,true]');
   const escritasB13 = pagB2.escritas.length;
   const rec13 = await pagB2.evaluate(() => Store.reconciliarArquivos());
   prop('a reconciliação em B2 não lapida o "a baixar" (0 lápides)', rec13.lapides === 0, MODOS[2]);
@@ -801,6 +806,18 @@ const idDoAnexoNaAula = (pag, aulaId, nome) => pag.evaluate((a, n) => Store.carr
   const estB13b = await pagB2.evaluate(() => Store.estadoDoArquivo('anexo:novo1'));
   conf('na rodada seguinte o "a baixar" baixou em B2, com o sha256 do de A, e deixou de estar "a baixar"',
     JSON.stringify([await shaNoAparelho(pagB2, 'anexo:novo1') === SHA_NOVO, estB13b && estB13b.aBaixar]), '[true,false]');
+  /* Uma cópia de B2 enquanto o anexo ainda estava pendente é incompleta por
+   * definição. Restaurá-la em A deve preservar os bytes que A já tinha e não
+   * converter a referência em lápide. */
+  const restaurouPendente = await pagA.evaluate(async json => {
+    await Store.importarTudo(JSON.parse(json));
+    const estado = await Store.estadoDoArquivo('anexo:novo1');
+    const fila = await Store.lerFila();
+    return { sha: await Store.lerAnexo('novo1').then(a => a && a.blob && a.blob.size), apagado: !!(estado && estado.apagadoEm),
+      pendente: !!(estado && estado.aBaixar), lapideNaFila: fila.some(e => e.id === 'anexo:novo1' && e.apagadoEm) };
+  }, JSON.stringify(pacoteComDownloadPendente));
+  conf('restaurar a cópia incompleta preserva os bytes locais e não cria lápide', JSON.stringify(restaurouPendente),
+    JSON.stringify({ sha: NOVO.length, apagado: false, pendente: false, lapideNaFila: false }));
   conf('nenhum erro de página em B2', pagB2.errosDePagina.join(' | '), '');
   await pagB2.close(); await contextoB2.close();
 
@@ -817,8 +834,9 @@ const idDoAnexoNaAula = (pag, aulaId, nome) => pag.evaluate((a, n) => Store.carr
   }, NOVO2.toString('base64'));
   const e14 = await enviarAteEsvaziar(pagA, 3);
   conf('A subiu o novo2', e14.erro === null && (await lerDoc(dona.idToken, dona.localId, 'anexos/anexo:novo2')).status === 200, true);
-  // uma lápide de outro aparelho, posta direto no emulador, com a aula x1 ainda citando o novo2
-  const lap14 = await commitRest(dona.idToken, [{ update: { name: nomeCompleto(dona.localId, 'anexos/anexo:novo2'), fields: { id: { stringValue: 'anexo:novo2' }, aulaId: { stringValue: 'x1' },
+  // O id da aula informado na lápide pode não ser a única referência local.
+  // A aula x1 cita o arquivo, embora a lápide aponte para y1.
+  const lap14 = await commitRest(dona.idToken, [{ update: { name: nomeCompleto(dona.localId, 'anexos/anexo:novo2'), fields: { id: { stringValue: 'anexo:novo2' }, aulaId: { stringValue: 'y1' },
     origem: { stringValue: 'anexo' }, sha256: { stringValue: SHA_NOVO2 }, atualizadoEm: { stringValue: '2026-11-10T15:00:00.000Z' }, apagadoEm: { stringValue: '2026-11-10T15:00:00.000Z' },
     aparelho: { stringValue: 'apOutroTablet' }, esquema: { integerValue: '1' } } }, updateTransforms: [{ fieldPath: 'servidorEm', setToServerValue: 'REQUEST_TIME' }] }]);
   conf('a lápide de outro aparelho entrou na nuvem', lap14.status, 200);
@@ -827,6 +845,22 @@ const idDoAnexoNaAula = (pag, aulaId, nome) => pag.evaluate((a, n) => Store.carr
   prop('o PDF novo2 continua no tablet A, porque a aula x1 ainda o cita', (await shaNoAparelho(pagA, 'anexo:novo2')) === SHA_NOVO2, MODOS[3]);
   if (MODO === MODOS[3]) throw fimDoVeneno();
   console.log('   (o "Remover" legítimo, em que a aula deixa de citar o anexo, segue apagando no celular: seção 7)');
+  secao('15. Uma lápide não apaga imagem compartilhada em outra folha local');
+  const IMAGEM_COMPARTILHADA = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j8ioAAAAASUVORK5CYII=';
+  await pagA.evaluate(async dataUrl => {
+    await Store.salvarMidia('imagemCompartilhada', { dataUrl: 'data:image/png;base64,' + dataUrl, w: 1, h: 1 });
+    await Store.salvarNota('x1', { paginas: [{ fundo: 'pautado', itens: [{ t: 'imagem', ref: 'imagemCompartilhada', x: 1, y: 1, w: 1, h: 1 }] }] });
+  }, IMAGEM_COMPARTILHADA);
+  const subiuImagem = await enviarAteEsvaziar(pagA, 3);
+  conf('A enviou a imagem e sua folha de teste', subiuImagem.erro, null);
+  const lapImagem = await commitRest(dona.idToken, [{ update: { name: nomeCompleto(dona.localId, 'anexos/midia:imagemCompartilhada'), fields: {
+    id: { stringValue: 'midia:imagemCompartilhada' }, aulaId: { stringValue: 'y1' }, origem: { stringValue: 'midia' }, sha256: { stringValue: sha256(Buffer.from(IMAGEM_COMPARTILHADA, 'base64')) },
+    atualizadoEm: { stringValue: '2026-11-10T16:00:00.000Z' }, apagadoEm: { stringValue: '2026-11-10T16:00:00.000Z' }, aparelho: { stringValue: 'apOutroTablet' }, esquema: { integerValue: '1' }
+  } }, updateTransforms: [{ fieldPath: 'servidorEm', setToServerValue: 'REQUEST_TIME' }] }]);
+  conf('a lápide da imagem entrou na nuvem', lapImagem.status, 200);
+  await receber(pagA);
+  const imagemLocal = await pagA.evaluate(() => Store.lerMidia('imagemCompartilhada'));
+  conf('a imagem continua no aparelho porque a folha local ainda a cita', !!(imagemLocal && imagemLocal.dataUrl), true);
   conf('nenhum erro de página em A', pagA.errosDePagina.join(' | '), '');
   try { fs.rmSync(PASTA_ARQ, { recursive: true, force: true }); } catch (e) { /* fica no temporário */ }
 })().then(() => derrubarEmulador().then(H.fim(amb)), e => derrubarEmulador().then(() => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e))));

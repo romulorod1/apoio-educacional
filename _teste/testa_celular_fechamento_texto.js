@@ -104,7 +104,7 @@ const ANCORAS = {
   // o envio de antes: a mensagem sem carimbo conhecido sobe sem precondição e cobre a do outro aparelho
   [V_SEMPRE]: ['nuvem.js', "(itens[k].fila.restauro || itens[k].registro.tipo === 'resumo')", '(itens[k].fila.restauro)'],
   // o celular edita com o tablet ainda numa versão anterior
-  [V_K6]: ['app.js', 'if (v && Core.versaoAntes(v.app, VERSAO) === true) {', 'if (false) {']
+  [V_K6]: ['app.js', "if (v && Core.versaoAntes(v.app, '1.42.40') === true) {", 'if (false) {']
 };
 /* O app servido leva a VERSAO desta entrega (a que o portão sobe ao juntar):
  * é com ela que o celular compara a versão do tablet (K6). */
@@ -114,6 +114,7 @@ const ANCORAS = {
 const VERSAO_DO_APP = (APP.match(/var VERSAO = '([0-9.]+)';/) || [])[1] || '';
 const VERSAO_SERVIDA = VERSAO_DO_APP === '1.42.18' ? '1.42.19' : VERSAO_DO_APP;
 const APP_SERVIDO = VERSAO_DO_APP === '1.42.18' ? APP.replace("var VERSAO = '1.42.18';", "var VERSAO = '" + VERSAO_SERVIDA + "';") : APP;
+conf('K6 exige o mínimo do protocolo de mensagem (1.42.40), não a versão inteira do app', APP_SERVIDO.indexOf("Core.versaoAntes(v.app, '1.42.40')") >= 0, true);
 const NUVEM = fs.readFileSync(path.join(H.RAIZ, 'nuvem.js'), 'utf8');
 const FONTES = { 'app.js': APP_SERVIDO, 'store.js': STORE, 'nuvem.js': NUVEM };
 conf('cada âncora de veneno está no arquivo dela uma vez só', MODOS.map(m => FONTES[ANCORAS[m][0]].split(ANCORAS[m][1]).length - 1).join(','), MODOS.map(() => 1).join(','));
