@@ -302,7 +302,7 @@ async function irParaDia(pag, iso) {
     }, iso);
     if (onde === 'achou') { await clicar(pag, '.cel-semana-dia[data-dia="' + iso + '"]'); await pausa(60); return true; }
     if (onde === 'sem faixa') return false;
-    await clicar(pag, onde === 'antes' ? '#cel-semana-anterior' : '#cel-semana-seguinte');
+    await clicar(pag, onde === 'antes' ? '#cel-dia-anterior' : '#cel-dia-seguinte');
   }
   return false;
 }
