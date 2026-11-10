@@ -2997,7 +2997,8 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
    tela, também com a letra a 130% num celular de 360 (auditoria de 09/11). */
 .cel-semana-topo { flex-wrap: nowrap; align-items: center; margin-bottom: 0; }
 .cel-semana-topo .btn { min-width: var(--alvo-celular); flex-shrink: 0; }
-.cel-semana-topo .cel-titulo { margin: 0; text-align: center; font-size: var(--letra-16); line-height: 1.15; }
+.cel-semana-topo .cel-semana-passo { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 8px 7px; font-size: var(--letra-12); white-space: nowrap; }
+.cel-semana-topo .cel-titulo { min-width: 0; margin: 0; text-align: center; font-size: var(--letra-16); line-height: 1.15; }
 .cel-semana-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0; }
 .cel-semana-dia {
   min-height: 56px;

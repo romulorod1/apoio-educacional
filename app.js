@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.34';
+  var VERSAO = '1.42.37';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.37',
+      itens: [
+        'No celular, as setas da agenda avançam ou voltam um dia por vez. Assim, dá para abrir amanhã sem pular para a semana seguinte.'
+      ]
+    },
     {
       versao: '1.42.34',
       itens: [
@@ -23388,8 +23394,8 @@
     desenharHojeCelular();
   }
 
-  /* No alto, o dia uma vez só ("Hoje, domingo, 08/11"), com a semana
-   * anterior e a seguinte nas pontas; embaixo, a faixa da semana, de domingo
+  /* No alto, o dia uma vez só ("Hoje, domingo, 08/11"), com o dia
+   * anterior e o seguinte nas pontas; embaixo, a faixa da semana, de domingo
    * a sábado como a agenda do tablet, com uma bolinha na cor do aluno por
    * aula. Um toque no dia troca o dia. */
   function faixaDaSemanaCelular(dia) {
@@ -23400,11 +23406,13 @@
     var titulo = (dia === hoje ? 'Hoje, ' : '') + Core.diaSemanaCurto(dia) + ' ' + Core.ddmm(dia);
     if (dia.slice(0, 4) !== hoje.slice(0, 4)) titulo += '/' + dia.slice(0, 4);
     var topo = [
-      el('button', { type: 'button', class: 'btn pequeno', id: 'cel-semana-anterior', 'aria-label': 'Semana anterior', icone: 'chl',
-        aoClick: function () { irParaDiaCelular(somarDiasCelular(dia, -7)); } }),
+      el('button', { type: 'button', class: 'btn pequeno cel-semana-passo', id: 'cel-dia-anterior',
+        'aria-label': 'Dia anterior, voltar um dia', title: 'Dia anterior', icone: 'chl', texto: '1 dia',
+        aoClick: function () { irParaDiaCelular(somarDiasCelular(dia, -1)); } }),
       el('h2', { class: 'cel-titulo cresce', id: 'cel-dia-titulo', texto: titulo }),
-      el('button', { type: 'button', class: 'btn pequeno', id: 'cel-semana-seguinte', 'aria-label': 'Semana seguinte', icone: 'chr',
-        aoClick: function () { irParaDiaCelular(somarDiasCelular(dia, 7)); } })
+      el('button', { type: 'button', class: 'btn pequeno cel-semana-passo', id: 'cel-dia-seguinte',
+        'aria-label': 'Dia seguinte, avançar um dia', title: 'Dia seguinte', icone: 'chr', texto: '1 dia',
+        aoClick: function () { irParaDiaCelular(somarDiasCelular(dia, 1)); } })
     ];
     if (dia !== hoje) {
       topo.splice(2, 0, el('button', { type: 'button', class: 'btn pequeno', id: 'cel-dia-hoje', texto: 'Hoje',
@@ -24024,7 +24032,7 @@
     if (!aberto) { painel.hidden = true; fundo.hidden = true; }
     if (!/cel-avisos-sobre/.test(classeDoPainel)) fundo.hidden = true;
     var topo = faixa.querySelector('.cel-semana-topo');
-    topo.insertBefore(selo, topo.querySelector('#cel-semana-seguinte'));
+    topo.insertBefore(selo, topo.querySelector('#cel-dia-seguinte'));
     faixa.appendChild(fundo);
     faixa.appendChild(painel);
   }
