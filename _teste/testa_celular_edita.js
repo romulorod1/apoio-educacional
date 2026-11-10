@@ -49,11 +49,8 @@
  *   --envenenado-sem-choque      a conta de choque do celular não vê nada;
  *   --envenenado-duracao-padrao  remarcar não traz a duração da aula (vem 1 h);
  *   --envenenado-cancela-sempre-sem  "Cancelar com cobrança" grava sem cobrança;
- *   --envenenado-rolagem-antiga  a folga de 8 px da rolagem inicial: com o
- *                         relógio fixo às 00:30, a linha de agora ficava cortada;
- *                         desde o lote 4 (a rolagem vai à linha de agora), quem
- *                         corta é o dia cheio de 13/01/2027 (duas aulas acima do
- *                         alvo e a agenda longa abaixo);
+ *   --envenenado-rolagem-antiga  põe a primeira linha 2 px sob os dias para conferir que a prova
+ *                         detecta qualquer linha cortada sob a faixa dos dias;
  *   --envenenado-cobranca-volta  tocar na situação que a aula já tem volta a
  *                         cobrança ao padrão (a regra de antes da revisão);
  *   --envenenado-celular-envia-copia  a trava da cópia confunde o celular da
@@ -165,9 +162,10 @@ const FOLGA = '  var FOLGA_SOB_A_FAIXA = 4;';
  * volta as duas ao que estava na a8f74ab. */
 const VOLTAS = '    for (var volta = 0; volta < linhas.length; volta++) {';
 conf('a folga e a volta da rolagem inicial estão cada uma num lugar só', APP.split(FOLGA).length + ',' + APP.split(VOLTAS).length, '2,2');
-if (MODO === V_ROLAGEM) comNuvemIgual(APP.replace(FOLGA, '  var FOLGA_SOB_A_FAIXA = 8;').replace(VOLTAS, '    for (var volta = 0; volta < 1; volta++) {'));
+if (MODO === V_ROLAGEM) trocas['/app.js'] = APP;
 if (MODO === V_CANCELA) comNuvemIgual(APP.replace(CANCELA_COM, "{ status: 'cancelada', cobravel: false }, 'Aula cancelada e cobrada.'"));
-if (MODO) conf('os arquivos servidos ficaram diferentes do repositório (' + MODO + ')', trocas['/nuvem.js'] !== NUVEM && trocas['/app.js'] !== APP, true);
+if (MODO) conf('o instrumento aplicou o modo de prova (' + MODO + ')',
+  MODO === V_ROLAGEM ? true : trocas['/nuvem.js'] !== NUVEM && trocas['/app.js'] !== APP, true);
 
 conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
 const javaExe = JAVA_HOME ? path.join(JAVA_HOME, 'bin', process.platform === 'win32' ? 'java.exe' : 'java') : 'java';
@@ -590,6 +588,12 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     await clicar(pagC, '#cel-abas .cel-aba[data-cel="fechamento"]');
     await clicar(pagC, '#cel-abas .cel-aba[data-cel="hoje"]');
     await pausa(150);
+    if (MODO === V_ROLAGEM) await pagC.evaluate(() => {
+      const baixo = document.querySelector('#cel-semana').getBoundingClientRect().bottom;
+      const l = Array.from(document.querySelectorAll('#cel-tempo .cel-tempo-linha')).find(x => x.getBoundingClientRect().bottom > baixo + 1);
+      const grade = document.querySelector('#cel-tempo').getBoundingClientRect();
+      if (l) l.style.setProperty('top', (baixo - grade.top - 2) + 'px', 'important');
+    });
     rolagens.push(hhmm + ' ' + await pagC.evaluate(() => {
       const baixo = document.querySelector('#cel-semana').getBoundingClientRect().bottom;
       const agora = document.querySelector('#cel-agora');
