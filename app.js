@@ -23593,7 +23593,6 @@
     function posicao(minutos) { return inicioVisual + Math.max(0, Math.min((fimGrade - inicioGrade) * pxPorMinuto, (minutos - inicioGrade) * pxPorMinuto)); }
     function linhaProporcional(tipo, ini, fim, alturaMinima) {
       var linha = el('div', { class: 'cel-tempo-linha cel-tempo-' + tipo, style: 'top:' + posicao(ini) + 'px;height:' + Math.max(alturaMinima || 0, posicao(fim) - posicao(ini)) + 'px' });
-      linha.appendChild(el('span', { class: 'cel-tempo-hora', texto: horaDeMinutosCelular(ini) }));
       linha.appendChild(el('div', { class: 'cel-tempo-item' }));
       return linha;
     }
