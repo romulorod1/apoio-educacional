@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.47';
+  var VERSAO = '1.42.48';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,7 +85,7 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.47',
+      versao: '1.42.48',
       itens: [
         'No celular, a aba Vagos mostra horários disponíveis e deixa preparar uma mensagem para as famílias; ao escolher um horário, o formulário de aula abre preenchido, sem gravar antes de salvar.'
       ]

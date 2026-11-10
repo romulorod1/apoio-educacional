@@ -146,9 +146,9 @@
  * O v120 isola a conferência de livros; v121 traz Marcar pago; v122, página impressa;
  * v123, edição da ficha móvel; v126, encaixe da agenda no celular. O v127
  * sincroniza PDFs e fotos anexados a aulas; v128 traz os filtros de tipo na Biblioteca.
- * O v128 também inclui os assets de Vagos e preserva sua navegação dia a dia.
+ * O v129 atualiza os assets de Vagos em cache exclusivo.
  */
-var CACHE = 'apoio-educacional-v128';
+var CACHE = 'apoio-educacional-v129';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
