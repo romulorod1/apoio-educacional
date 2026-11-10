@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.35';
+  var VERSAO = '1.42.36';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.36',
+      itens: [
+        'Nos livros que trazem a numeração impressa na biblioteca, o sumário, a tela do livro, o Continuar lendo e a comparação entre livros mostram o número da página impressa do livro (inclusive páginas iniciais em algarismos romanos).',
+        'No leitor do livro, a barra mostra a página do arquivo e a página impressa lado a lado, e o campo Ir p. aceita ir direto para a página impressa.'
+      ]
+    },
     {
       versao: '1.42.35',
       itens: [
