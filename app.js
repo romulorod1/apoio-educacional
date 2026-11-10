@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.42';
+  var VERSAO = '1.42.43';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.43',
+      itens: [
+        'No tablet, a leitura de livros PDF segue em rolagem cont\u00ednua, e a barra permite ir diretamente a uma p\u00e1gina.',
+        'Na exporta\u00e7\u00e3o, marque p\u00e1ginas com toques ou digite intervalos pela numera\u00e7\u00e3o impressa; p\u00e1ginas sem n\u00famero aparecem como "arquivo N".'
+      ]
+    },
     {
       versao: '1.42.42',
       itens: [
