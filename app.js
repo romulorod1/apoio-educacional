@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.40';
+  var VERSAO = '1.42.41';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.41',
+      itens: [
+        'A Biblioteca mostra a página impressa dos livros no sumário e no leitor PDF, inclusive números romanos.'
+      ]
+    },
     {
       versao: '1.42.40',
       itens: [
@@ -16242,7 +16248,6 @@
             ' por numera\u00e7\u00e3o impressa inv\u00e1lida.');
           recusados.forEach(function (livro) { if (livro.motivo) linhas.push(livro.motivo); });
         }
-      }
       // livro que SAIU do pacote novo também é gravação (some do tablet com a posição de leitura)
       var entrou = contas.novos + contas.atualizados + contas.removidos > 0;
       var deOutro = contas.deOutroPacote && contas.deOutroPacote.length > 0;

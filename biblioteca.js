@@ -911,6 +911,7 @@
         noZip[n] = true;
       });
       var livros = lerLivros(manifest, noZip, lista);
+      var recusados = livros.recusados || [];
       livros.forEach(function (l) {
         var en = porNome[l.meta.arquivo];
         if (en.tamanho > TETO_POR_LIVRO) {
@@ -949,7 +950,7 @@
       return proximo().then(function () {
           return { manifest: manifest, livros: livros.filter(function (l) { return !!l.blob; }),
             idsDoPacote: livros.map(function (l) { return l.meta.id; }), erros: erros, bytesTotais: bytesTotais,
-            recusados: livros.recusados || [] };
+            recusados: recusados };
       });
     }).catch(function (e) {
       if (e && e.message === 'SEM_DESCOMPRESSAO') throw Recusa(SEM_NAVEGADOR);

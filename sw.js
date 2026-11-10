@@ -147,7 +147,8 @@
  * O v120 recolhe a gestão da Biblioteca em Ajustes e isola a conferência de cada
  * livro em Worker com prazo (app.js, biblioteca.js e conferir-livro-worker.js). */
 /* v121 inclui o atalho de pagamento pendente em app.js. */
-var CACHE = 'apoio-educacional-v121';
+/* v122 inclui a pagina impressa na leitura dos livros. */
+var CACHE = 'apoio-educacional-v122';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

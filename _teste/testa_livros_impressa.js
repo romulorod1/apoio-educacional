@@ -84,7 +84,14 @@ function carregarBiblioteca() {
     }
     codigo = codigo.replace(de, para);
   }
-  const ctx = { Zip, crypto: crypto.webcrypto, TextDecoder, Uint8Array, ArrayBuffer, Blob, Promise, Math, JSON, Object, Array, String, Number, Error, RegExp, parseInt, isFinite };
+  // Esta prova cobre a validação do manifest e o filtro por numeracao. O hash
+  // por livro já tem cobertura no teste de navegador; aqui o Worker é dublado
+  // para devolver o blob sem depender de um navegador real.
+  const WorkerDeProva = class {
+    postMessage(dados) { this.onmessage({ data: { ok: true, blob: new Blob([dados.entrada.nome]) } }); }
+    terminate() {}
+  };
+  const ctx = { Zip, crypto: crypto.webcrypto, TextDecoder, Uint8Array, ArrayBuffer, Blob, Worker: WorkerDeProva, setTimeout, clearTimeout, Promise, Math, JSON, Object, Array, String, Number, Error, RegExp, parseInt, isFinite };
   ctx.self = ctx;
   vm.runInNewContext(codigo, ctx, { filename: 'biblioteca.js' });
   return ctx.Biblioteca;
@@ -201,6 +208,7 @@ function carregarFuncoesDeTela(Bib) {
     fecharTelaDoLivro: () => {},
     desenharLivrosDaBiblioteca: () => Promise.resolve(),
     desenharLivrosAjustes: () => Promise.resolve(),
+    atualizarResumoInstaladosBiblioteca: () => {},
     abrirLadoALado: () => {},
     icone: nome => criarNo('svg', { 'data-icone-nome': nome }),
     avisar: () => {},
@@ -449,6 +457,9 @@ const LIVRO_SEM_NUMERACAO = {
   conf('numeracao exige total de paginas valido', !!Biblioteca.conferirNumeracao(semTotalDePaginas), true);
   const resultadoParcial = await tela.importarLivros({
     bytesTotais: 0,
+    livros: [{ meta: { id: 'livro-bom' } }],
+    idsDoPacote: ['livro-bom'],
+    erros: [],
     recusados: [{ id: 'livro-ruim', motivo: 'Numeracao impressa invalida no livro-ruim.' }]
   }, () => {});
   const avisoParcial = resultadoParcial.linhas.join(' ');
