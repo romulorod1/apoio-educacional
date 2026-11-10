@@ -146,7 +146,7 @@
  * tablet e a barra de baixo do celular (app.js, index.html e styles.css).
  * O v111 traz a linha do tempo do Hoje no celular e o atalho + Aula.
  * O v112 traz Vagos, a disponibilidade semanal no celular. */
-var CACHE = 'apoio-educacional-v112';
+var CACHE = 'apoio-educacional-v113';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
