@@ -4,6 +4,10 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const puppeteer = require('puppeteer-core');
+const H = require('./_bib_navegador');
+/* O relógio da rodada (segunda, 16/11/2026, 11:00), no processo e na página: a
+ * prova não depende do dia em que roda (a virada anual abre sozinha em janeiro). */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const { execFileSync } = require('child_process');
 
 const raiz = path.resolve(__dirname, '..');
@@ -181,7 +185,8 @@ const servidor = http.createServer((req, res) => {
     await new Promise(resolve => servidor.listen(porta, '127.0.0.1', resolve));
     navegador = await puppeteer.launch({ executablePath: process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe',
       headless: 'new', args: ['--no-sandbox'], defaultViewport: { width: 1280, height: 1000, hasTouch: true } });
-    let pagina = await navegador.newPage();
+    const paginaComRelogio = async () => { const p = await navegador.newPage(); await RELOGIO.naPagina(p); return p; };
+    let pagina = await paginaComRelogio();
     pagina.on('dialog', d => d.dismiss().catch(() => {}));
     const url = 'http://127.0.0.1:' + porta + '/index.html';
     await pagina.goto(url, { waitUntil: 'domcontentloaded' });
@@ -193,6 +198,8 @@ const servidor = http.createServer((req, res) => {
       if (!instalada) await new Promise(resolve => setTimeout(resolve, 200));
     }
     if (!instalada) throw new Error('Versão inicial não ficou pronta');
+    /* o arranjo do relógio: sem mensagem de sucesso (o placar desta prova é o de cada modo); só falha se a página estiver fora do dia */
+    await RELOGIO.conferirData(pagina, (r, o, e) => { if (String(o) !== String(e)) throw new Error(r + ' [obtido: ' + o + ' | esperado: ' + e + ']'); });
     if (process.argv.includes('--serie-lenta')) {
       await pagina.evaluate(() => fetch('./banco/serie-teste.json').then(r => r.json()));
       redeLenta = true;
@@ -243,7 +250,7 @@ const servidor = http.createServer((req, res) => {
       if (!(await pagina.evaluate(() => window.__EXTRA === 1))) throw new Error('A versão 1 não carregou o extra.js');
       await pagina.close();
       semRede = true;
-      pagina = await navegador.newPage();
+      pagina = await paginaComRelogio();
       await pagina.goto(url, { waitUntil: 'load' }).catch(() => {});
       await new Promise(resolve => setTimeout(resolve, 2000));
       await pagina.reload({ waitUntil: 'load' }).catch(() => {});
@@ -271,7 +278,7 @@ const servidor = http.createServer((req, res) => {
       if (!(await pagina.evaluate(async () => !!(await navigator.serviceWorker.getRegistration()).installing)))
         throw new Error('O install da 9.0.2 não estava em andamento na hora da abertura');
       await pagina.close();
-      pagina = await navegador.newPage();
+      pagina = await paginaComRelogio();
       await pagina.goto(url, { waitUntil: 'domcontentloaded' });
       await pagina.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration()).waiting, { timeout: 30000 });
       await new Promise(resolve => setTimeout(resolve, 2500));
@@ -330,7 +337,7 @@ const servidor = http.createServer((req, res) => {
       await pagina.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
       await pagina.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration()).waiting, { timeout: 30000 });
       await pagina.close();
-      pagina = await navegador.newPage();
+      pagina = await paginaComRelogio();
       pagina.on('dialog', d => d.dismiss().catch(() => {}));
       await pagina.goto(url, { waitUntil: 'domcontentloaded' });
       await pagina.waitForFunction(() => document.querySelector('#versao-app')?.textContent === '9.0.2', { timeout: 15000 });
@@ -363,7 +370,7 @@ const servidor = http.createServer((req, res) => {
       if (apagou) throw new Error('O corte apagou o cache ativo da main (' + CACHE_DA_MAIN + ')');
       semRede = true;
       await pagina.close();
-      pagina = await navegador.newPage();
+      pagina = await paginaComRelogio();
       await pagina.goto(url, { waitUntil: 'domcontentloaded' }).catch(() => {});
       const aberta = await pagina.waitForFunction(() => document.querySelector('#versao-app')?.textContent.includes('9.0.1'),
         { timeout: 10000 }).then(() => true, () => false);
@@ -394,7 +401,7 @@ const servidor = http.createServer((req, res) => {
        * worker novo ao fechar, a escolha vai para a versão nova (regra antiga,
        * uma última vez). Mantê-lo na versão da main o deixaria sem aviso. */
       await pagina.close();
-      pagina = await navegador.newPage();
+      pagina = await paginaComRelogio();
       await pagina.goto(url, { waitUntil: 'domcontentloaded' });
       await pagina.waitForFunction(() => document.querySelector('#versao-app')?.textContent.includes('9.0.2'), { timeout: 15000 });
       const nomesMigracao = await pagina.evaluate(() => caches.keys());
@@ -403,7 +410,7 @@ const servidor = http.createServer((req, res) => {
       return;
     }
     const antes = await pagina.$eval('#versao-app', e => e.textContent.trim());
-    const outraJanela = await navegador.newPage();
+    const outraJanela = await paginaComRelogio();
     outraJanela.on('dialog', d => d.dismiss().catch(() => {}));
     await outraJanela.goto(url, { waitUntil: 'domcontentloaded' });
     await outraJanela.waitForSelector('#versao-app');
@@ -455,7 +462,7 @@ const servidor = http.createServer((req, res) => {
     }
     await outraJanela.close();
     await pagina.close();
-    pagina = await navegador.newPage();
+    pagina = await paginaComRelogio();
     await pagina.goto(url, { waitUntil: 'domcontentloaded' });
     await pagina.waitForSelector('#versao-app');
     const depois = await pagina.$eval('#versao-app', e => e.textContent.trim());
@@ -481,7 +488,7 @@ const servidor = http.createServer((req, res) => {
       await pagina.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
       await pagina.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration()).waiting, { timeout: 30000 });
       await pagina.close();
-      pagina = await navegador.newPage();
+      pagina = await paginaComRelogio();
       await pagina.goto(url, { waitUntil: 'domcontentloaded' });
       await pagina.waitForSelector('#versao-app');
       const anterior = await pagina.$eval('#versao-app', e => e.textContent.trim());

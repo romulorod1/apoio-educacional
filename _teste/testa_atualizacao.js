@@ -13,6 +13,10 @@
  * avaliação de 21/10.
  */
 const puppeteer = require('puppeteer-core');
+const H = require('./_bib_navegador');
+/* O relógio da rodada (segunda, 16/11/2026, 11:00), no processo e na página: a
+ * prova não depende do dia em que roda (a virada anual abre sozinha em janeiro). */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const fs = require('fs');
 const path = require('path');
 const { irParaMes } = require('./_ir_para_mes.js');
@@ -129,6 +133,7 @@ async function tocarNoAviso(p, sel) {
     args: ['--no-sandbox'], defaultViewport: { width: 1280, height: 1000, hasTouch: true }
   });
   let pag = await navegador.newPage();
+  await RELOGIO.naPagina(pag);
   const errosPagina = [];
   pag.on('pageerror', e => errosPagina.push(e.message));
   pag.on('dialog', async d => { try { await d.accept(); } catch (e) { } });
@@ -136,6 +141,7 @@ async function tocarNoAviso(p, sel) {
   const url = 'http://127.0.0.1:' + PORTA + '/index.html';
   await pag.goto(url, { waitUntil: 'networkidle0' });
   await espera(2000);
+  await RELOGIO.conferirData(pag, conf);
 
   const bd = () => pag.evaluate(() => new Promise(r => {
     const q = indexedDB.open('apoio-educacional');
@@ -362,6 +368,7 @@ async function tocarNoAviso(p, sel) {
   await pag.close();
   await espera(1500);
   pag = await navegador.newPage();
+  await RELOGIO.naPagina(pag);
   pag.on('pageerror', e => errosPagina.push(e.message));
   pag.on('dialog', async d => { try { await d.accept(); } catch (e) { } });
   await pag.goto(url, { waitUntil: 'networkidle0' });
