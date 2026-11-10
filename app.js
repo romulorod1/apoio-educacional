@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.32';
+  var VERSAO = '1.42.33';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,13 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.33',
+      itens: [
+        'No tablet, as abas do alto passaram para uma coluna à esquerda, com o botão + no alto para marcar uma aula. Agenda, Alunos, Biblioteca e Fechamento ficam na coluna, e Ajustes no pé dela.',
+        'No celular, a barra de baixo ganhou ícones e a Biblioteca. Por enquanto, a Biblioteca do celular avisa que os livros e as questões ficam no tablet.'
+      ]
+    },
     {
       versao: '1.42.32',
       itens: [
@@ -2474,8 +2481,9 @@
   function ligarEventos() {
     $$('#abas .aba').forEach(function (b) {
       b.addEventListener('click', function () {
-        $$('#abas .aba').forEach(function (x) { x.classList.remove('ativa'); });
+        $$('#abas .aba').forEach(function (x) { x.classList.remove('ativa'); x.removeAttribute('aria-current'); });
         b.classList.add('ativa');
+        b.setAttribute('aria-current', 'page');
         $$('.tela').forEach(function (t) { t.classList.remove('ativa'); });
         $('#tela-' + b.dataset.tela).classList.add('ativa');
         $('.conteudo').scrollTop = 0;
@@ -2565,6 +2573,8 @@
       }
     });
     $('#nova-aula').addEventListener('click', function () { abrirAula(null, Core.hojeIso()); });
+    /* B1: o "+" do alto do trilho é o mesmo "+ Nova aula" da Agenda. */
+    $('#nav-marcar-aula').addEventListener('click', function () { abrirAula(null, Core.hojeIso()); });
     $('#novo-aluno').addEventListener('click', function () { abrirAluno(null); });
     var btnGuiaBib = $('#btn-guia-listas');
     if (btnGuiaBib) {
@@ -22639,6 +22649,7 @@
     else if (telaCelular === 'diagnostico') desenharDiagnosticoCelular();
     else if (telaCelular === 'ajustes') desenharAjustesObservador();
     else if (telaCelular === 'alunos') desenharAlunosCelular();
+    else if (telaCelular === 'biblioteca') desenharBibliotecaCelular();
     else desenharHojeCelular();
     $('#cel-' + telaCelular).classList.add('ativa');
     if (telaCelular === 'hoje') rolarHojeCelular(diaCelular || Core.hojeIso());
@@ -24326,6 +24337,16 @@
 
   /* A aba Alunos: a lista dos ativos e, com um toque no nome, a ficha mínima. */
   var alunoCelular = null; // o aluno da ficha aberta na aba Alunos
+  /* B1: a Biblioteca é destino da barra de baixo, mas os livros e as
+   * questões moram no tablet (o pacote importado fica no aparelho dele). A
+   * busca do celular é outra fatia; por ora a tela diz onde abrir. */
+  function desenharBibliotecaCelular() {
+    var caixa = $('#cel-biblioteca');
+    caixa.innerHTML = '';
+    caixa.appendChild(el('h2', { class: 'cel-titulo', texto: 'Biblioteca' }));
+    caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-biblioteca-onde', texto: 'Os livros e as questões da OBMEP ficam no tablet. Abra a Biblioteca por lá.' }));
+  }
+
   function desenharAlunosCelular() {
     var caixa = $('#cel-alunos');
     caixa.innerHTML = '';
@@ -24848,12 +24869,12 @@
     $$('#cel-abas .cel-aba').forEach(function (b) {
       // o observador não envia PDF às famílias: a aba Enviar dá lugar às dele
       if (telaDoObservador(b.dataset.cel)) b.hidden = !observador;
-      else if (b.dataset.cel === 'enviar') b.hidden = observador;
+      else if (b.dataset.cel === 'enviar' || b.dataset.cel === 'biblioteca') b.hidden = observador;
     });
     var abas = $('#cel-abas');
     if (abas) abas.classList.toggle('muitas', $$('#cel-abas .cel-aba').filter(function (b) { return !b.hidden; }).length > 4);
     if (telaDoObservador(telaCelular) && !observador) telaCelular = 'hoje';
-    if (telaCelular === 'enviar' && observador) telaCelular = 'hoje';
+    if ((telaCelular === 'enviar' || telaCelular === 'biblioteca') && observador) telaCelular = 'hoje';
   }
 
   function tituloDoAparelho(rotulo) {

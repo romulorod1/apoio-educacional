@@ -142,8 +142,9 @@
  * styles.css), com a lista igual. O v108 (índice dos livros) traz o indexador
  * em segundo plano, indice-livros.js, na lista de arquivos (app.js, index.html,
  * store.js e sw.js). O v109 fixa a altura da linha de proposta entre
- * plataformas, preservando o alvo previsto. */
-var CACHE = 'apoio-educacional-v109';
+ * plataformas. O v110 traz a navegação com a Biblioteca, o trilho lateral do
+ * tablet e a barra de baixo do celular (app.js, index.html e styles.css). */
+var CACHE = 'apoio-educacional-v110';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

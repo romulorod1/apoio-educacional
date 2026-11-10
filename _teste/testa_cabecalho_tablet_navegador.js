@@ -7,6 +7,8 @@
  * Usa o arnes _bib_navegador: servidor proprio na porta 8866 servindo os arquivos
  * desta arvore, perfil temporario do Chromium e conferencia rigorosa contra
  * transbordamento, sobreposicao e quebra de abas.
+ * Desde a B1 as abas moram no trilho lateral: o cabecalho fica com a marca e
+ * o olho, e as abas sao medidas no trilho (uma coluna, alvo de 44 px ou mais).
  */
 'use strict';
 const path = require('path');
@@ -60,7 +62,7 @@ const PASTA_PRINTS = process.env.SALVAR_PRINTS || '';
         const rectsAbas = abas.map(a => a.getBoundingClientRect());
 
         const subDisplay = window.getComputedStyle(subtitulo).display;
-        const tops = rectsAbas.map(r => Math.round(r.top));
+        const lefts = rectsAbas.map(r => Math.round(r.left));
         const alturas = rectsAbas.map(r => Math.round(r.height));
 
         // Transbordamento: scrollWidth nao pode exceder clientWidth
@@ -70,14 +72,14 @@ const PASTA_PRINTS = process.env.SALVAR_PRINTS || '';
         const tudoDentroDaTela = rectsAbas.every(r => r.right <= larguraTotal + 1 && r.left >= 0) &&
                                  marcaRect.left >= 0 && olhoRect.right <= larguraTotal;
 
-        // Sobreposicao horizontal: marca antes do olho, olho antes das abas
+        // Sobreposicao: marca antes do olho, e o cabecalho ao lado do trilho
         const semSobreposicaoFilhos = (marcaRect.right <= olhoRect.left + 2) &&
-                                      (olhoRect.right <= abasRect.left + 2);
+                                      (abasRect.right <= cabRect.left + 2);
 
-        // Abas individuais sem sobreposicao entre si
+        // Abas individuais sem sobreposicao entre si (uma embaixo da outra)
         let abasSemColisao = true;
         for (let i = 0; i < rectsAbas.length - 1; i++) {
-          if (rectsAbas[i].right > rectsAbas[i + 1].left + 1) {
+          if (rectsAbas[i].bottom > rectsAbas[i + 1].top + 1) {
             abasSemColisao = false;
             break;
           }
@@ -85,8 +87,8 @@ const PASTA_PRINTS = process.env.SALVAR_PRINTS || '';
 
         return {
           alturaCabecalho: Math.round(cabRect.height),
-          mesmaLinha: new Set(tops).size === 1,
-          tops,
+          mesmaColuna: new Set(lefts).size === 1,
+          lefts,
           alturas,
           subtituloOculto: subDisplay === 'none',
           alturaOlho: Math.round(olhoRect.height),
@@ -99,8 +101,8 @@ const PASTA_PRINTS = process.env.SALVAR_PRINTS || '';
 
       H.conf(`[${w}px] cabecalho exatamente em 64px de altura`, m.alturaCabecalho, 64);
       H.conf(`[${w}px] subtitulo oculto para poupar largura`, m.subtituloOculto, true);
-      H.conf(`[${w}px] todas as 5 abas em uma unica linha`, m.mesmaLinha, true);
-      H.conf(`[${w}px] abas com altura de toque confortavel de pelo menos 44px`, m.alturas.every(h => h >= 44), true);
+      H.conf(`[${w}px] todas as 5 abas numa coluna so, no trilho`, m.mesmaColuna, true);
+      H.conf(`[${w}px] abas com altura de toque confortavel, 44px ou mais`, m.alturas.every(h => h >= 44), true);
       H.conf(`[${w}px] botao do olho com 44x44px`, m.alturaOlho === 44 && m.larguraOlho === 44, true);
       H.conf(`[${w}px] sem transbordamento horizontal (scrollWidth <= clientWidth)`, m.semTransbordamento, true);
       H.conf(`[${w}px] todos os elementos dentro dos limites da tela`, m.tudoDentroDaTela, true);

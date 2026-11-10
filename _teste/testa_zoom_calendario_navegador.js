@@ -31,7 +31,7 @@ async function rodar() {
 
   const abas = await pag.$$eval('#abas .aba', es => es.map(e => e.textContent.trim()));
   conf('exatamente 5 abas na barra superior', abas.length, 5);
-  conf('abas preservam nomes conhecidos', abas.join(' | '), 'Agenda | Alunos | Fechamento | Biblioteca | Ajustes');
+  conf('abas preservam nomes conhecidos', abas.join(' | '), 'Agenda | Alunos | Biblioteca | Fechamento | Ajustes');
 
   const existeBlocoHojeFixo = await pag.evaluate(() => {
     return !!document.querySelector('#bloco-hoje, .bloco-hoje, #secao-hoje');
