@@ -84,39 +84,39 @@
     {
       versao: '1.42.42',
       itens: [
-        'No celular, a ficha do aluno permite atualizar nome, respons?vel, telefone e local da aula. Valores e informa??es pedag?gicas continuam preservados.'
+        'No celular, a ficha do aluno permite atualizar nome, respons\u00e1vel, telefone e local da aula. Valores e informa\u00e7\u00f5es pedag\u00f3gicas continuam preservados.'
       ]
     },
     {
       versao: '1.42.41',
       itens: [
-        'A Biblioteca mostra a p?gina impressa dos livros no sum?rio e no leitor PDF, inclusive n?meros romanos.'
+        'A Biblioteca mostra a p\u00e1gina impressa dos livros no sum\u00e1rio e no leitor PDF, inclusive n\u00fameros romanos.'
       ]
     },
     {
       versao: '1.42.40',
       itens: [
-        'Em Pagamentos pendentes, cada aluno tem o atalho Marcar pago, que abre o registro daquele m?s e aluno.'
+        'Em Pagamentos pendentes, cada aluno tem o atalho Marcar pago, que abre o registro daquele m\u00eas e aluno.'
       ]
     },
     {
       versao: '1.42.39',
       itens: [
-        'Em Ajustes, a lista de pacotes e livros da Biblioteca fica recolhida; os controles de importa??o continuam no alto. Na importa??o, cada livro tem andamento pr?prio e um arquivo que falha ou demora demais ? pulado com aviso, enquanto os seguintes continuam.'
+        'Em Ajustes, a lista de pacotes e livros da Biblioteca fica recolhida; os controles de importa\u00e7\u00e3o continuam no alto. Na importa\u00e7\u00e3o, cada livro tem andamento pr\u00f3prio e um arquivo que falha ou demora demais \u00e9 pulado com aviso, enquanto os seguintes continuam.'
       ]
     },
     {
       versao: '1.42.38',
       itens: [
-        'Nova tela na Biblioteca para comparar um assunto entre os livros: uma tabela mostra, para cada livro do tablet, em que cap?tulo e p?ginas o assunto aparece, indica onde n?o h? v?nculo no mapa e avisa quando o mapa ainda n?o foi revisado.',
-        'Quando um assunto n?o aparece no mapa, a Biblioteca mostra ?sem v?nculo no mapa?; isso n?o significa que o livro n?o aborda o assunto, pois o mapa pode estar incompleto. As contagens se referem aos v?nculos registrados.',
-        'Voc? chega a ela pela aba Biblioteca (Comparar livros por assunto, com uma busca de assunto que atravessa os anos), pelo painel do cap?tulo de um livro e pela aula (Ver em todos os livros).'
+        'Nova tela na Biblioteca para comparar um assunto entre os livros: uma tabela mostra, para cada livro do tablet, em que cap\u00edtulo e p\u00e1ginas o assunto aparece, indica onde n\u00e3o h\u00e1 v\u00ednculo no mapa e avisa quando o mapa ainda n\u00e3o foi revisado.',
+        'Quando um assunto n\u00e3o aparece no mapa, a Biblioteca mostra "sem v\u00ednculo no mapa"; isso n\u00e3o significa que o livro n\u00e3o aborda o assunto, pois o mapa pode estar incompleto. As contagens se referem aos v\u00ednculos registrados.',
+        'Voc\u00ea chega a ela pela aba Biblioteca (Comparar livros por assunto, com uma busca de assunto que atravessa os anos), pelo painel do cap\u00edtulo de um livro e pela aula (Ver em todos os livros).'
       ]
     },
     {
       versao: '1.42.37',
       itens: [
-        'No celular, as setas da agenda avan?am ou voltam um dia por vez. Assim, d? para abrir amanh? sem pular para a semana seguinte.'
+        'No celular, as setas da agenda avan\u00e7am ou voltam um dia por vez. Assim, d\u00e1 para abrir amanh\u00e3 sem pular para a semana seguinte.'
       ]
     },
     {

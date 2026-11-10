@@ -80,7 +80,7 @@ const MODOS = ['--envenenado-celular-envia-copia', '--envenenado-observador-edit
   '--envenenado-remarca-todas', '--envenenado-remarca-solta', '--envenenado-sem-choque', '--envenenado-duracao-padrao', '--envenenado-cancela-sempre-sem',
   '--envenenado-cobranca-volta', '--envenenado-rolagem-antiga'];
 const V_TODAS = MODOS[3], V_SOLTA = MODOS[4], V_CHOQUE = MODOS[5], V_DURACAO = MODOS[6], V_CANCELA = MODOS[7], V_COBRANCA = MODOS[8], V_ROLAGEM = MODOS[9];
-/* --prints <pasta>: tira os quatro prints do D6c em 390 x 844 (dados fictícios). */
+/* --prints <pasta>: tira os cinco prints do D6c e da ficha em 390 x 844 (dados fictícios). */
 const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 function prop(rotulo, ok, veneno) {
@@ -103,8 +103,11 @@ const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const NUVEM = fs.readFileSync(path.join(H.RAIZ, 'nuvem.js'), 'utf8');
 const STORE = fs.readFileSync(path.join(H.RAIZ, 'store.js'), 'utf8');
 const REGRAS = fs.readFileSync(path.join(H.RAIZ, 'firestore.rules'), 'utf8');
+const CSS = fs.readFileSync(path.join(H.RAIZ, 'styles.css'), 'utf8');
 
 secao('0. As âncoras, os venenos e o ambiente');
+conf('campos tel e url usam o estilo arredondado dos demais campos',
+  /input\[type=text\][^\n]*input\[type=tel\][^\n]*input\[type=url\]/.test(CSS), true);
 const TRAVA_COPIA = 'function podeEnviarCopia() { return !marcaCelular && !travadoNestaAbertura; }';
 // (D7) o celular da dona sobe também o diagnóstico do PRÓPRIO aparelho (só metadados), e nada mais
 const COMMIT = 'if (!podeEnviarCopia() && !(celularDaDona() && (soRegistros(escritas) || soDiagnosticoProprio(escritas)))) return Promise.reject(recusaSoLeitura());';
@@ -941,6 +944,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('a lista do celular abre a ficha do aluno existente', await clicar(pagC, '#cel-alunos-lista .cel-aluno-item[data-aluno="alfa"]'), true);
   conf('a dona vê a ação marcada para editar a ficha', await existe(pagC, '#cel-alunos-editar-ficha[data-acao-celular="editar-ficha-aluno"]'), true);
   await clicar(pagC, '#cel-alunos-editar-ficha');
+  await tirarPrint(pagC, '5_editar_ficha.png');
   conf('o formulário de edição permite completar o telefone pendente', await existe(pagC, '#cel-ficha-edicao-telefone'), true);
   conf('valores não são editáveis por esta ação', await existe(pagC, '#cel-ficha-edicao-preco'), false);
   m = await medirTela(pagC);
