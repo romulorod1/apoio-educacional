@@ -389,6 +389,40 @@ async function importar(pag, arquivo) {
   r = await buscar(pag, 'palavra que não existe');
   conf('termo que não existe não acha nada, sem erro', (r.livros || []).length + '/' + (r.pendentes || []).length, '0/0');
 
+  secao('3.1. A busca na tela da Biblioteca');
+  await pag.evaluate(() => {
+    const campo = document.querySelector('#bib-busca-livros-campo');
+    campo.value = 'FRAÇÕES';
+    campo.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const telaBusca = await esperar('a tela acha as páginas do livro', () => pag.evaluate(() => ({
+    status: document.querySelector('#bib-busca-livros-status').textContent,
+    livro: document.querySelector('#bib-busca-livros-resultados [data-livro="indice-curto"]') &&
+      document.querySelector('#bib-busca-livros-resultados [data-livro="indice-curto"]').textContent,
+    botao: document.querySelector('#bib-busca-livros-resultados [data-livro="indice-curto"] button') &&
+      document.querySelector('#bib-busca-livros-resultados [data-livro="indice-curto"] button').textContent
+  })), v => !!v && /2 páginas encontradas/.test(v.status) && /3, 4/.test(v.livro) && /Abrir na p\. 3/.test(v.botao), 10000);
+  conf('a busca mostra o livro, o capítulo, as páginas e o atalho para a página encontrada', telaBusca.ok, true);
+  await pag.setViewport({ width: 360, height: 800, hasTouch: true });
+  const larguraBusca = await pag.evaluate(() => {
+    document.documentElement.style.fontSize = '130%';
+    const caixa = document.querySelector('#bib-busca-livros-resultados [data-livro="indice-curto"]');
+    const botao = caixa && caixa.querySelector('button');
+    const r = botao && botao.getBoundingClientRect();
+    const medida = { rolaDeLado: document.documentElement.scrollWidth > innerWidth + 1,
+      botaoFora: !!r && (r.left < 0 || r.right > innerWidth + 1), botaoPequeno: !!r && r.height < 47.5 };
+    document.documentElement.style.fontSize = '';
+    return medida;
+  });
+  conf('a busca e o atalho cabem a 360 px com a letra a 130%', JSON.stringify(larguraBusca), JSON.stringify({ rolaDeLado: false, botaoFora: false, botaoPequeno: false }));
+  await pag.setViewport({ width: 1280, height: 1000, hasTouch: true });
+  await pag.evaluate(() => document.querySelector('#bib-busca-livros-resultados [data-livro="indice-curto"] button').click());
+  const leitorBusca = await esperar('o resultado abre na página 3', () => pag.evaluate(() =>
+    document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada || ''), v => v === '3', 10000);
+  conf('abrir o resultado leva à página encontrada no livro', leitorBusca.ok, true);
+  await pag.evaluate(() => document.querySelector('#modal-leitor-pdf [data-fechar]').click());
+  await esperar('o leitor da busca fecha', () => pag.evaluate(() => !document.querySelector('#modal-leitor-pdf.aberto')), v => v, 5000);
+
   const norm = await pag.evaluate(() => [IndiceLivros.normalizar('multipli-' + String.fromCharCode(10) + 'cação'),
     IndiceLivros.normalizar('multi' + String.fromCharCode(0xAD) + 'plicação'), IndiceLivros.normalizar('Frações  EQUIVALENTES'),
     IndiceLivros.normalizar('bem-vindo')].join('|'));
