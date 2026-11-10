@@ -891,7 +891,7 @@ table.dados tr.total td { font-weight: 600; color: var(--navy); background: var(
     align-items: stretch;
     justify-content: flex-end;
     padding: 0;
-    background: rgba(18, 28, 44, .14);
+    background: var(--navy-a12);
     pointer-events: auto;
   }
   #modal-tema .modal {
