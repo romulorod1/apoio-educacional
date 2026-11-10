@@ -381,6 +381,17 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   const volta3 = await esperar('rolagem contínua de volta à página 3', () => paginaDesenhada(pag), v => v === '3', 5000);
   conf('a página do capítulo continua sendo a atual', volta3.valor, '3');
   await fecharModal(pag, 'modal-leitor-pdf');
+  await pag.evaluate(() => { window.__intersectionObserverOriginal = window.IntersectionObserver; window.IntersectionObserver = undefined; });
+  await clicar(pag, '#bib-livro .bibl-cap[data-n="2"]');
+  await esperar('continuous reader without IntersectionObserver', () => paginaDesenhada(pag), v => v === '3', 20000);
+  await pag.evaluate(() => document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="5"]').scrollIntoView({ block: 'start' }));
+  const fallbackP5 = await esperar('scroll without observer draws page 5', () => pag.evaluate(() => ({
+    atual: document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada,
+    desenho: !!document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="5"] canvas')
+  })), v => v && v.atual === '5' && v.desenho, 5000);
+  conf('without IntersectionObserver, scroll renders page 5 instead of a blank spacer', fallbackP5.ok, true);
+  await fecharModal(pag, 'modal-leitor-pdf');
+  await pag.evaluate(() => { window.IntersectionObserver = window.__intersectionObserverOriginal; delete window.__intersectionObserverOriginal; });
   await esperar('a tela do livro com a posição nova', () => lerLivro(pag), v => v.visivel && /p\. 3/.test(v.continuar), 5000);
   await clicar(pag, '#bib-livro .bibl-sec[data-n="3"]');
   const r3 = await esperar('o leitor na página da seção 2.1', () => paginaDesenhada(pag), v => v !== 'fechado' && v !== '', 20000);

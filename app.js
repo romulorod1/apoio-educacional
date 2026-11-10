@@ -22949,6 +22949,16 @@
     registro.desenhando = false;
   }
 
+  function prepararPaginasSemObservador(estado, centro) {
+    if (typeof IntersectionObserver === 'function' || !estado || !estado.paginas) return;
+    var primeira = Math.max(1, centro - 1), ultima = Math.min(estado.total, centro + 1);
+    estado.paginas.forEach(function (pagina) {
+      pagina.visivel = pagina.n >= primeira && pagina.n <= ultima;
+      if (pagina.visivel) desenharPaginaContinua(estado, pagina);
+      else liberarPaginaContinua(pagina);
+    });
+  }
+
   function paginaMaisProximaDoCentro(estado) {
     var corpo = $('#corpo-modal-leitor-pdf'), caixas = estado.paginas || [];
     var centro = corpo.getBoundingClientRect().top + corpo.clientHeight / 2, melhor = estado.pagina, distancia = Infinity;
@@ -22968,6 +22978,7 @@
       leitorRolarAgendado = false;
       if (!leitor || !leitor.continuo) return;
       var n = paginaMaisProximaDoCentro(leitor);
+      prepararPaginasSemObservador(leitor, n);
       // Em uma navegação suave, o meio da tela ainda passa por páginas
       // anteriores. Não grave esse trecho intermediário como a última página.
       if (leitor.rolagemProgramaticaAte && n !== leitor.rolagemProgramaticaAte) return;
@@ -23010,12 +23021,7 @@
         }, 900);
       }
       p.caixa.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'start' });
-      if (typeof IntersectionObserver !== 'function') {
-        leitor.paginas.slice(Math.max(0, leitor.pagina - 2), leitor.pagina + 1).forEach(function (visivel) {
-          visivel.visivel = true;
-          desenharPaginaContinua(leitor, visivel);
-        });
-      }
+      prepararPaginasSemObservador(leitor, p.n);
       return desenharPaginaContinua(leitor, p).then(function () { return !!p.caixa.querySelector('canvas'); });
     }
     desenharPaginaDoLeitor(true);
@@ -23031,7 +23037,7 @@
       p.caixa.style.height = Math.ceil(largura * leitor.proporcaoPagina) + 'px';
     });
     if (paraOAlto) irAProximaPaginaDoLeitor(leitor.pagina, false);
-    else leitor.paginas.slice(Math.max(0, leitor.pagina - 2), leitor.pagina + 1).forEach(function (p) { desenharPaginaContinua(leitor, p); });
+    else prepararPaginasSemObservador(leitor, leitor.pagina);
     return Promise.resolve(true);
   }
 
