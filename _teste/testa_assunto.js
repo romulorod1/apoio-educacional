@@ -263,6 +263,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     const h3 = titulos.filter(h => /Conteúdo da aula/i.test(h.textContent))[0] || null;
     const segue = (a, b) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
     const r = assunto.getBoundingClientRect();
+    const secaoAssunto = assunto.closest('#bloco-assunto');
     return {
       achou: true,
       texto: assunto.textContent.replace(/\s+/g, ' ').trim(),
@@ -270,7 +271,8 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
       depoisDoTitulo: h3 ? segue(h3, assunto) : null,
       altura: Math.round(r.height),
       largura: Math.round(r.width),
-      larguraDoGrupo: Math.round(raiz.querySelector('#grupo-preparar').getBoundingClientRect().width),
+      larguraDoCorpo: Math.round(raiz.getBoundingClientRect().width),
+      larguraDaSecao: secaoAssunto ? Math.round(secaoAssunto.getBoundingClientRect().width) : 0,
       dentroDoModalDeMaterial: !!assunto.closest('#modal-tema'),
       ajuda: raiz.textContent.replace(/\s+/g, ' ')
     };
@@ -286,7 +288,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('ele vem antes da fileira da folha, na cara dela', entrada.antesDaFileira, true);
   conf('e depois do título Conteúdo da aula', entrada.depoisDoTitulo, true);
   conf('é alvo grande de tocar, para dedo em tablet', entrada.altura >= 44, true);
-  conf('e ocupa a linha inteira', entrada.largura > entrada.larguraDoGrupo * 0.7, true);
+  conf('e ocupa a linha disponível na seção de assunto', entrada.largura > entrada.larguraDaSecao * 0.7, true);
   conf('a ajuda explica que o assunto entra no fechamento',
     /assunto entra no fechamento do mês/i.test(entrada.ajuda), true);
   /* Sem material autoral e sem pacote da biblioteca importado não há material
