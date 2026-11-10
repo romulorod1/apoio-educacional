@@ -725,7 +725,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     return Array.from(document.querySelectorAll('#cel-folha .cel-folha-botao')).filter(b => b.id !== 'cel-folha-cancelar').every(b => {
       const o = b.getBoundingClientRect(); return Math.max(c.top - o.bottom, o.top - c.bottom, c.left - o.right, o.left - c.right) >= 16; }); }), true);
   conf('a aula de HOJE oferece o nome (a ficha, D6c lote 2), Realizada, Faltou, Cancelar, Remarcar e Registrar como foi', (await botoesDaFolha(pagC)).join(','),
-    'cel-folha-ficha,cel-folha-realizada,cel-folha-faltou,cel-folha-remarcar,cel-folha-registrar,cel-folha-cancelar,cel-folha-fechar');
+    'cel-folha-ficha,cel-folha-realizada,cel-folha-faltou,cel-folha-remarcar,cel-folha-duracao,cel-folha-registrar,cel-folha-cancelar,cel-folha-fechar');
   m = await medirTela(pagC);
   conf('a folha: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
   conf('a folha: os botões de edição são todos das ações do celular', m.soltos.join(', '), '');
@@ -736,7 +736,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('"Fechar" tira a folha', await existe(pagC, '#cel-folha'), false);
   await irParaDia(pagC, OUTRO);
   await abrirFolha(pagC, 'aula-outro');
-  conf('a aula de amanhã oferece Cancelar e Remarcar, e não Realizada nem Faltou', (await botoesDaFolha(pagC)).join(','), 'cel-folha-ficha,cel-folha-remarcar,cel-folha-cancelar,cel-folha-fechar');
+  conf('a aula de amanhã oferece Cancelar, Remarcar e Ajustar duração, e não Realizada nem Faltou', (await botoesDaFolha(pagC)).join(','), 'cel-folha-ficha,cel-folha-remarcar,cel-folha-duracao,cel-folha-cancelar,cel-folha-fechar');
   await clicar(pagC, '#cel-folha-fechar');
 
   secao('3c. Faltou e Realizada, pela folha');
@@ -920,10 +920,44 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   console.log('   no celular: ' + JSON.stringify(rg));
   prop('a aula remarcada continua na série (destacada, às 17:00, 1h) e a data de onde saiu fica como exclusão da série',
     rg.movida === 'true true 17:00 60' && rg.serie.split(' ')[1] === TERCEIRO, V_SOLTA);
-  prop('as outras três aulas da repetição não mudaram, nem a hora da série (' + rg.outras + ')', rg.outras === outrasAntes && rg.serie.split(' ')[0] === '16:00', V_TODAS);
+  prop('o ajuste de duração individual permaneceu e as demais aulas da repetição não mudaram (' + rg.outras + ')', rg.outras === outrasAntes && rg.serie.split(' ')[0] === '16:00', V_TODAS);
   if (MODO === V_SOLTA || MODO === V_TODAS) fimDoVeneno();
   conf('Hoje foi ao dia novo da aula, às 17:00', (await texto(pagC, '#cel-dia-titulo')).indexOf(QUARTO.slice(8, 10) + '/' + QUARTO.slice(5, 7)) >= 0 &&
     !!(await existe(pagC, '.cel-bloco[data-aula="' + idGama1 + '"]')), true);
+
+  secao('6c1. Ajustar duração de uma aula da repetição: só esta ocorrência e a home reflete');
+  const proximaGama = serieGama.aulas.map(t => t.split(' ')).find(p => p[1] !== TERCEIRO);
+  const idGama2 = proximaGama[0], dataGama2 = proximaGama[1];
+  await irParaDia(pagC, dataGama2);
+  await abrirFolha(pagC, idGama2);
+  await clicar(pagC, '#cel-folha-duracao');
+  conf('Ajustar duração informa que só esta aula da repetição muda', /muda só esta/.test((await texto(pagC, '#cel-duracao-serie')) || ''), true);
+  conf('a duração inicial é 1h', await pagC.evaluate(() => document.querySelector('#cel-ajustar-duracao').value), '60');
+  await digitar(pagC, '#cel-ajustar-duracao', '90');
+  await clicar(pagC, '#cel-ajustar-duracao-salvar');
+  const duracaoNova = await esperar('a duração individual foi salva', () => pagC.evaluate(id => Store.carregar().then(b => {
+    const a = b.aulas.find(x => x.id === id); return a && a.duracaoMin;
+  }), idGama2), v => v === 90, 10000);
+  conf('a aula selecionada ficou com 1h30', duracaoNova.ok, true);
+  conf('a home mostra o novo intervalo e 1h30', await pagC.evaluate(id => {
+    const b = document.querySelector('.cel-bloco[data-aula="' + id + '"]'); return b && b.textContent;
+  }, idGama2).then(v => /16:00 a 17:30 · 1h30/.test(v || '')), true);
+  const estadoDuracao = await pagC.evaluate(sid => Store.carregar().then(b => ({
+    duracoes: b.aulas.filter(a => a.serieId === sid).map(a => a.duracaoMin), padrao: b.series.find(s => s.id === sid).duracaoMin
+  })), serieGama.id);
+  estadoDuracao.duracoes.sort((a, b) => a - b);
+  conf('a repetição mantém 1h como padrão e só uma ocorrência fica em 1h30', JSON.stringify(estadoDuracao), JSON.stringify({ duracoes: [60, 60, 60, 90], padrao: 60 }));
+  await abrirCelular(pagC);
+  await esperar('a busca automática do celular terminou depois de atualizar', () => pagC.evaluate(() => !/Buscando a cópia mais nova/.test((document.querySelector('#cel-origem') || {}).textContent || '')), v => v === true, 30000);
+  const duracaoAposAtualizar = await pagC.evaluate(id => Store.carregar().then(b => {
+    const a = b.aulas.find(x => x.id === id); return a && a.duracaoMin;
+  }), idGama2);
+  conf('F5 e a sincronização não desfazem o ajuste de duração', duracaoAposAtualizar, 90);
+  await irParaDia(pagC, dataGama2);
+  conf('depois de F5, a home ainda mostra a aula até 17:30', await pagC.evaluate(id => {
+    const b = document.querySelector('.cel-bloco[data-aula="' + id + '"]'); return b && b.textContent;
+  }, idGama2).then(v => /16:00 a 17:30 · 1h30/.test(v || '')), true);
+  const rgDepoisDuracao = await retratoGama(pagC);
 
   secao('6d. O fechamento de referência de junho continua igual depois de remarcar a aula de 1h30 dele');
   conf('a faixa da semana chega a 10/06/2026', await irParaDia(pagC, '2026-06-10'), true);
@@ -1058,7 +1092,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
    * e realizada, e junho. */
   const rgA = await retratoGama(pagA);
   console.log('   no tablet: ' + JSON.stringify(rgA));
-  conf('(D6c) remarcar chegou ao tablet: a aula na série, destacada, às 17:00, e as outras três como estavam', JSON.stringify(rgA), JSON.stringify(rg));
+  conf('(D6c) remarcar e ajuste de duração chegaram ao tablet sem alterar a série', JSON.stringify(rgA), JSON.stringify(rgDepoisDuracao));
   conf('(D6c) e o tablet, ao abrir, não recriou a aula na data de onde ela saiu (a repetição continua com quatro)', rgA.gama, 4);
   conf('(D6c) cancelar hoje com cobrança chegou ao tablet', await pagA.evaluate(() => Store.carregar().then(b => { const a = b.aulas.find(x => x.id === 'aula-hoje'); return a.status + '/' + a.cobravel; })), 'cancelada/true');
   conf('(D6c) faltou e realizada: a aula de ontem chegou ao tablet como realizada', await pagA.evaluate(() => Store.carregar().then(b => b.aulas.find(x => x.id === 'aula-ontem').status)), 'realizada');
@@ -1246,9 +1280,9 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   const diagnosticosDoCelular = tudoDoCelular.filter(n => /^diagnostico\//.test(n));
   conf('(D7) o celular que editou sobe o diagnóstico dele, e só o do próprio aparelho', diagnosticosDoCelular.join(','), 'diagnostico/' + idCelular);
   const enviadosDoCelular = tudoDoCelular.filter(n => !/^diagnostico\//.test(n));
-  // (D6c) e os da folha: faltou e realizada (ontem), a remarcação da repetição (a aula e a série) e a de junho
+  // (D6c) e os da folha: faltou/realizada, remarcação e duração de uma ocorrência da repetição, e a aula de junho
   const esperados = ['registros/aula:' + idMarcada, 'registros/aula:aula-outro', 'registros/aula:aula-hoje', 'registros/aluno:' + idBeta, 'registros/aluno:alfa', 'registros/aula:aula-terceiro',
-    'registros/aula:aula-ontem', 'registros/aula:' + idGama1, 'registros/serie:' + serieGama.id, 'registros/aula:ref-2026-06-10'];
+    'registros/aula:aula-ontem', 'registros/aula:' + idGama1, 'registros/serie:' + serieGama.id, 'registros/aula:' + idGama2, 'registros/aula:ref-2026-06-10'];
   const pagamento = enviadosDoCelular.filter(n => /^registros\/pagamento:/.test(n));
   conf('tudo o que subiu do celular é um registro das cinco ações: as aulas, o aluno novo e o pagamento, e nada mais',
     enviadosDoCelular.filter(n => esperados.indexOf(n) < 0 && pagamento.indexOf(n) < 0).join(', ') + '|' + esperados.filter(n => enviadosDoCelular.indexOf(n) < 0).join(', ') + '|' + pagamento.length, '||1');
