@@ -63,8 +63,8 @@ const VENENOS = {
     ancora: '--letra-12: .75rem;',
     troca: '--letra-12: .6875rem;' },
   '--envenenado-glifo-solto': { arquivo: 'app.js', tipos: ['GLIFO'],
-    ancora: "id: 'cel-semana-anterior', 'aria-label': 'Semana anterior', icone: 'chl',",
-    troca: "id: 'cel-semana-anterior', 'aria-label': 'Semana anterior', texto: '‹'," },
+    ancora: "id: 'cel-dia-anterior',\n        'aria-label': 'Dia anterior, voltar um dia', title: 'Dia anterior', icone: 'chl', texto: '1 dia',",
+    troca: "id: 'cel-dia-anterior',\n        'aria-label': 'Dia anterior, voltar um dia', title: 'Dia anterior', texto: '‹'," },
   '--envenenado-icone-vazio': { arquivo: 'app.js', tipos: ['ICONE'],
     ancora: "s.innerHTML = ICONES_DO_SISTEMA[nome] || '';",
     troca: "s.innerHTML = '';" }
@@ -77,7 +77,7 @@ conf('nenhum veneno desconhecido pedido (' + desconhecidos.join(', ') + ')', des
 const trocas = {};
 for (const m of MODOS) {
   const v = VENENOS[m];
-  const texto = fs.readFileSync(path.join(H.RAIZ, v.arquivo), 'utf8');
+  const texto = fs.readFileSync(path.join(H.RAIZ, v.arquivo), 'utf8').replace(/\r\n/g, '\n');
   const vezes = texto.split(v.ancora).length - 1;
   conf('a âncora do ' + m + ' aparece uma vez só no ' + v.arquivo, vezes, 1);
   if (m === MODO && vezes === 1) trocas['/' + v.arquivo] = texto.replace(v.ancora, v.troca);

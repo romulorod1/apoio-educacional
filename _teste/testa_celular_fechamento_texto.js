@@ -371,7 +371,7 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
   return {
     rolaDeLado: document.documentElement.scrollWidth > window.innerWidth || document.body.scrollWidth > window.innerWidth ||
       (conteudo && conteudo.scrollWidth > conteudo.clientWidth) || !!Array.from(raiz.querySelectorAll('*')).find(e => e.getBoundingClientRect().right > window.innerWidth + 0.5 && visivel(e)),
-    alvos: alvos.length, pequenos, soltos, acoes: raiz.querySelectorAll('[data-acao-celular]').length
+    alvos: alvos.length, pequenos, soltos, acoes: Array.from(raiz.querySelectorAll('[data-acao-celular]')).filter(e => e.getBoundingClientRect().width > 0 && e.getBoundingClientRect().height > 0).length
   };
 }, RE_EDICAO);
 const telaBoa = m => m.pequenos.join('; ') + (m.rolaDeLado ? ' ROLA DE LADO' : '');
