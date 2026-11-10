@@ -112,7 +112,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   async function cartaoDoMarcelo() {
     const achou = await pag.evaluate(() => {
       const c = Array.from(document.querySelectorAll('#lista-fechamento .cartao'))
-        .find(x => /Marcelo/.test((x.querySelector('h3') || {}).textContent || ''));
+        .find(x => /Aluno Referência Teste/.test((x.querySelector('h3') || {}).textContent || ''));
       if (c) c.setAttribute('data-e2e', 'marcelo');
       return !!c;
     });
@@ -224,11 +224,11 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   const semValor = await pag.$eval('#lista-alunos .faixa-aviso', e => e.textContent);
   conf('avisa que faltam valores por hora', semValor.includes('11 alunos sem valor por hora'), true);
   const nomes = await pag.$$eval('#lista-alunos .item-lista .nome', es => es.map(e => e.textContent.replace('falta o valor','').trim()));
-  conf('Daniel está na lista', nomes.includes('Daniel'), true);
-  conf('Cecília está na lista', nomes.includes('Cecília'), true);
-  conf('Theo está na lista', nomes.includes('Theo'), true);
+  conf('Daniel está na lista', nomes.includes('Aluno Beta Teste'), true);
+  conf('Cecília está na lista', nomes.includes('Aluno Alfa Teste'), true);
+  conf('Theo está na lista', nomes.includes('Aluno Zeta Teste'), true);
   conf('o Marcelo já tem valor', (await pag.$$eval('#lista-alunos .item-lista', es =>
-    es.find(e => e.textContent.includes('Marcelo')).textContent)).includes('R$ 100,00 por hora'), true);
+    es.find(e => e.textContent.includes('Aluno Referência Teste')).textContent)).includes('R$ 100,00 por hora'), true);
   await clicar('#novo-aluno');
   await espera(300);
   await preencher('#campo-nome', 'Cecília Andrade');
@@ -509,7 +509,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await clicarTexto('#lista-fechamento button', 'Editar o feedback');
   await espera(900);
   const resumoExistente = await pag.$eval('#campo-resumo', e => e.value);
-  conf('o resumo do exemplo já vem escrito', resumoExistente.includes('homenzinho'), true);
+  conf('o resumo do exemplo já vem escrito', resumoExistente.includes('Resumo de exemplo'), true);
   await preencher('#campo-resumo', 'Mês muito bom. Marcelo evoluiu na interpretação de textos e ganhou autonomia nas tarefas de casa.');
   await clicar('#salvar-resumo');
   await espera(500);
@@ -541,20 +541,20 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   console.log('  arquivos gerados: ' + baixados.join(', '));
   const errosAteAqui = errosDePagina.filter(e => !/favicon|manifest|sw\.js|ServiceWorker/i.test(e));
   if (errosAteAqui.length) console.log('  ERROS ATE AQUI: ' + JSON.stringify(errosAteAqui));
-  conf('gerou o PDF do aluno', baixados.some(f => /^Fechamento_Marcelo_2026-06\.pdf$/.test(f)), true);
+  conf('gerou o PDF do aluno', baixados.some(f => /^Fechamento_Aluno_Referencia_Teste_2026-06\.pdf$/.test(f)), true);
   conf('gerou o PDF com as folhas', baixados.some(f => /com_folhas\.pdf$/.test(f)), true);
-  conf('gerou o texto do aluno', baixados.some(f => /^Fechamento_Marcelo_2026-06\.md$/.test(f)), true);
+  conf('gerou o texto do aluno', baixados.some(f => /^Fechamento_Aluno_Referencia_Teste_2026-06\.md$/.test(f)), true);
   conf('gerou o texto do mês', baixados.some(f => /^Fechamento_do_mes_2026-06\.md$/.test(f)), true);
   conf('gerou o PDF do mês', baixados.some(f => /^Fechamento_do_mes_2026-06\.pdf$/.test(f)), true);
 
-  const pdfAluno = path.join(PASTA_DOWNLOAD, 'Fechamento_Marcelo_2026-06.pdf');
+  const pdfAluno = path.join(PASTA_DOWNLOAD, 'Fechamento_Aluno_Referencia_Teste_2026-06.pdf');
   if (fs.existsSync(pdfAluno)) {
     const b = fs.readFileSync(pdfAluno);
     conf('o PDF começa com %PDF', b.slice(0, 4).toString(), '%PDF');
     conf('o PDF tem tamanho razoável', b.length > 2500, true);
     conf('o PDF termina com EOF', b.slice(-20).toString().includes('%%EOF'), true);
   }
-  const mdAluno = path.join(PASTA_DOWNLOAD, 'Fechamento_Marcelo_2026-06.md');
+  const mdAluno = path.join(PASTA_DOWNLOAD, 'Fechamento_Aluno_Referencia_Teste_2026-06.md');
   if (fs.existsSync(mdAluno)) {
     const t = fs.readFileSync(mdAluno, 'utf8');
     conf('o texto traz o total certo', t.includes('R$ 1.050,00'), true);
@@ -569,7 +569,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await aba('alunos');
   await pag.evaluate(() => {
     const itens = Array.from(document.querySelectorAll('#lista-alunos .item-lista'));
-    const alvo = itens.find(i => i.textContent.includes('Marcelo'));
+    const alvo = itens.find(i => i.textContent.includes('Aluno Referência Teste'));
     alvo.querySelector('button').click();
   });
   await espera(400);

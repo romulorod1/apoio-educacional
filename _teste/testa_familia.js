@@ -105,8 +105,8 @@ async function tocarFormato(pag, ehDoAluno, texto) {
       s.onsuccess = () => r(s.result);
     });
 
-    const marcelo = atual.alunos.find(a => a.nome === 'Marcelo');
-    const ceci = atual.alunos.find(a => a.nome === 'Cecília');
+    const marcelo = atual.alunos.find(a => a.nome === 'Aluno Referência Teste');
+    const ceci = atual.alunos.find(a => a.nome === 'Aluno Alfa Teste');
     ceci.precos = [{ id: 'preco-ceci', inicio: '2026-01-01', fim: null, valorHora: 150 }];
     ['2026-06-04', '2026-06-11'].forEach((d, i) => {
       atual.aulas.push({
@@ -130,7 +130,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
 
     await new Promise(r => {
       const s = banco.transaction('dados', 'readwrite').objectStore('dados').put(atual, 'principal');
-      s.onsuccess = () => r();
+      s.transaction.oncomplete = () => r();
     });
   }, { soMinha: SO_MINHA, rendeu1: RENDEU_1, rendeu2: RENDEU_2 });
 
@@ -180,7 +180,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
       const s = banco.transaction('dados', 'readonly').objectStore('dados').get('principal');
       s.onsuccess = () => r(s.result);
     });
-    return d.alunos.map(a => a.nome).filter(n => n !== 'Marcelo');
+    return d.alunos.map(a => a.nome).filter(n => n !== 'Aluno Referência Teste');
   });
   conf('e há uma dúzia de nomes para a varredura procurar', OUTROS.length >= 10, true);
 
@@ -190,7 +190,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
   // C10b: o botão mora em "Mais formatos", na janela do documento
   await pag.evaluate(() => {
     const cartao = Array.from(document.querySelectorAll('#lista-fechamento .cartao'))
-      .find(c => /Marcelo/.test(c.querySelector('h3').textContent));
+      .find(c => /Aluno Referência Teste/.test(c.querySelector('h3').textContent));
     cartao.querySelector('.btn-preparar-doc').click();
   });
   await espera(300);
@@ -198,13 +198,13 @@ async function tocarFormato(pag, ehDoAluno, texto) {
     await pag.evaluate(() => Array.from(document.querySelectorAll('#modal-documento-familia button'))
       .some(b => b.textContent.trim() === 'O mês numa tela')), true);
 
-  await tocarFormato(pag, { re: 'Marcelo', sim: true }, 'O mês numa tela');
+  await tocarFormato(pag, { re: 'Aluno Referência Teste', sim: true }, 'O mês numa tela');
   await espera(600);
 
   const aberta = () => pag.$eval('#modal-mes', e => e.classList.contains('aberto'));
   conf('a janela do mês abriu', await aberta(), true);
   conf('o título traz o aluno e o mês',
-    await pag.$eval('#titulo-modal-mes', e => e.textContent.trim()), 'Marcelo, Junho de 2026');
+    await pag.$eval('#titulo-modal-mes', e => e.textContent.trim()), 'Aluno Referência Teste, Junho de 2026');
 
   const dela = await pag.$eval('#modal-mes', e => e.innerText);
   conf('ela vê o total do mês', dela.includes('R$ 1.050,00'), true);
@@ -217,7 +217,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
     await pag.$$eval('#modal-mes .so-minha', es => es.length), 1);
   conf('a anotação particular está DENTRO desse bloco',
     await pag.$eval('#modal-mes .so-minha', e => e.textContent.includes('Falar com a mae')), true);
-  conf('ela vê o feedback que já escreveu', dela.includes('Marcelo está se tornando um homenzinho'), true);
+  conf('ela vê o feedback que já escreveu', dela.includes('Resumo de exemplo do mês de junho'), true);
   conf('e tem por onde editar o feedback daqui',
     await pag.evaluate(() => Array.from(document.querySelectorAll('#rodape-modal-mes button'))
       .some(b => b.textContent.trim() === 'Editar o feedback')), true);
@@ -236,7 +236,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
   await clicar('#modal-resumo .modal-rodape button', 'Cancelar');
   conf('desistir dela devolve o mês inteiro', await aberta(), true);
   conf('com o feedback intacto',
-    await pag.$eval('#modal-mes', e => e.innerText.includes('Marcelo está se tornando um homenzinho')), true);
+    await pag.$eval('#modal-mes', e => e.innerText.includes('Resumo de exemplo do mês de junho')), true);
 
   await pag.screenshot({ path: '_teste/v_mes_dela.png' });
 
@@ -249,7 +249,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
   conf('ele abre a leitura do que vai sumir',
     await pag.$$eval('#rodape-modal-mes .confirma-familia', es => es.length), 1);
   conf('e essa leitura diz de quem é a tela',
-    await pag.$eval('#rodape-modal-mes .confirma-familia', e => e.textContent.includes('Marcelo')), true);
+    await pag.$eval('#rodape-modal-mes .confirma-familia', e => e.textContent.includes('Aluno Referência Teste')), true);
 
   await clicar('#rodape-modal-mes button', 'Agora não');
   conf('dá para desistir no meio',
@@ -329,7 +329,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
     await pag.evaluate(() => window.__gerados.length), 0);
 
   conf('o que interessa continua na tela: o nome dele',
-    varredura.tela.includes('Marcelo'), true);
+    varredura.tela.includes('Aluno Referência Teste'), true);
   conf('o mês', varredura.tela.includes('Junho de 2026'), true);
   conf('os assuntos', varredura.tela.includes('Frações e números decimais'), true);
   conf('e o que rendeu em cada encontro', varredura.tela.includes(RENDEU_1), true);
@@ -399,18 +399,18 @@ async function tocarFormato(pag, ehDoAluno, texto) {
   // ================================================================
   secao('5. O cartão do mês: ela escolhe a frase e vê antes de mandar');
 
-  await tocarFormato(pag, { re: 'Marcelo', sim: true }, 'Cartão do mês');
+  await tocarFormato(pag, { re: 'Aluno Referência Teste', sim: true }, 'Cartão do mês');
   await espera(700);
 
   conf('a janela do cartão abriu',
     await pag.$eval('#modal-cartao', e => e.classList.contains('aberto')), true);
   conf('o título diz de quem é',
-    await pag.$eval('#titulo-modal-cartao', e => e.textContent.trim()), 'Cartão do mês, Marcelo');
+    await pag.$eval('#titulo-modal-cartao', e => e.textContent.trim()), 'Cartão do mês, Aluno Referência Teste');
 
   const frases = await pag.$$eval('#corpo-modal-cartao .opcao-frase', es => es.map(e => e.textContent.trim()));
   conf('as frases do feedback dela viraram opções', frases.length >= 4, true);
   conf('e saíram do texto que ela escreveu, sem uma palavra trocada',
-    frases[0].startsWith('Marcelo está se tornando um homenzinho'), true);
+    frases[0].startsWith('Resumo de exemplo do mês de junho'), true);
   conf('a última opção é não pôr frase nenhuma', frases[frases.length - 1], 'Sem frase nenhuma');
   conf('cada opção é alvo de dedo',
     await pag.$$eval('#corpo-modal-cartao .opcao-frase',
@@ -441,7 +441,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
       const s = banco.transaction('dados', 'readonly').objectStore('dados').get('principal');
       s.onsuccess = () => r(s.result);
     });
-    const marcelo = d.alunos.find(a => a.nome === 'Marcelo');
+    const marcelo = d.alunos.find(a => a.nome === 'Aluno Referência Teste');
     const f = Core.calcularFechamento(d, marcelo.id, '2026-06');
     const tela = document.createElement('canvas');
     const p = Cartao.desenhar(tela, f, { frase: Cartao.frasesDoResumo(f.resumoTexto)[0] });
@@ -454,7 +454,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
   conf('nem a anotação particular dela',
     conteudoDoCartao.includes('Falar com a mae'), false);
   conf('mas o nome dele e o mês estão lá',
-    conteudoDoCartao.includes('Marcelo') && conteudoDoCartao.includes('Junho'), true);
+    conteudoDoCartao.includes('Aluno Referência Teste') && conteudoDoCartao.includes('Junho'), true);
 
   await pag.screenshot({ path: '_teste/v_cartao_escolha.png' });
   await pag.setViewport({ width: 820, height: 1180, hasTouch: true });
@@ -470,7 +470,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
   conf('só então o cartão é enviado', !!png, true);
   if (png) {
     conf('e é uma imagem, que aparece dentro da conversa', png.tipo, 'image/png');
-    conf('com o nome do aluno e o mês no arquivo', png.nome, 'Cartao_Marcelo_2026-06.png');
+    conf('com o nome do aluno e o mês no arquivo', png.nome, 'Cartao_Aluno_Referencia_Teste_2026-06.png');
     const bin = Buffer.from(png.b64, 'base64');
     conf('o arquivo é PNG de verdade', bin.slice(1, 4).toString('latin1'), 'PNG');
     conf('e tem 1080 por 1080',
@@ -488,7 +488,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
   /* O outro aluno pelo NOME, e nao pela posicao: desde que o fechamento passou a
    * vir em ordem alfabetica (ece2b95), o segundo cartao deixou de ser ele e o
    * teste abria o cartao do aluno COM feedback. */
-  await tocarFormato(pag, { re: 'Marcelo', sim: false }, 'Cartão do mês');
+  await tocarFormato(pag, { re: 'Aluno Referência Teste', sim: false }, 'Cartão do mês');
   await espera(700);
   conf('a janela abre igual',
     await pag.$eval('#modal-cartao', e => e.classList.contains('aberto')), true);
@@ -507,7 +507,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
 
   const fech = await pag.$eval('#tela-fechamento', e => e.innerText);
   conf('o fechamento continua mostrando os dois alunos',
-    fech.includes('Marcelo') && fech.includes('Cecília'), true);
+    fech.includes('Aluno Referência Teste') && fech.includes('Aluno Alfa Teste'), true);
   conf('e continua mostrando o dinheiro', fech.includes('R$ 1.050,00'), true);
   // C10b: o feedback continua no cartão; os outros, na janela do documento
   await pag.evaluate(() => document.querySelector('#lista-fechamento .btn-preparar-doc').click());

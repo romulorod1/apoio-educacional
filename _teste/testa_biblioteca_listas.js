@@ -1506,7 +1506,8 @@ async function cenarioPortas(pag) {
    * cobriria o defeito de a ordem ser jogada fora, e ela não cobria nada. */
   const rotuloVoltar = await pag.evaluate(() => {
     const b = document.querySelector('.bib-voltar');
-    return b ? b.textContent.trim() : '(não achei)';
+    // F1: o "‹" virou o ícone chl, lido aqui como o sinal de antes
+    return b ? (b.querySelector('svg[data-icone-nome="chl"]') ? '‹ ' : '') + b.textContent.trim() : '(não achei)';
   });
   console.log('   o botão de voltar da lista cheia diz: ' + JSON.stringify(rotuloVoltar));
   if (V_VOLTA) {

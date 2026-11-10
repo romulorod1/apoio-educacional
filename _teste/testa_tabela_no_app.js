@@ -150,7 +150,7 @@ const gravar = (p, banco) => p.evaluate(b => new Promise(resolve => {
   const req = indexedDB.open('apoio-educacional');
   req.onsuccess = () => {
     const s = req.result.transaction('dados', 'readwrite').objectStore('dados').put(b, 'principal');
-    s.onsuccess = () => resolve(true);
+    s.transaction.oncomplete = () => resolve(true);
     s.onerror = () => resolve(false);
   };
   req.onerror = () => resolve(false);
@@ -372,7 +372,7 @@ async function paginaEnvenenada(navegador, trocas) {
   // ================================================================
   secao('0. O banco de prova: itens antigos, sem id, como o tablet dela tem hoje');
   await abrirComBanco(pag, banco => {
-    marcelo = banco.alunos.filter(a => /Marcelo/i.test(a.nome))[0];
+    marcelo = banco.alunos.filter(a => /Aluno Referência Teste/i.test(a.nome))[0];
     const dele = d => banco.aulas.filter(a => a.alunoId === marcelo.id && a.data === d)[0];
     dele(DIA_MIGRA).temas = [
       { titulo: POR07.titulo, fonte: 'topico', disciplina: 'portugues', grupo: '07' },
@@ -586,7 +586,7 @@ async function paginaEnvenenada(navegador, trocas) {
     });
     let idAluno = null;
     await abrirComBanco(env.p, banco => {
-      const al = banco.alunos.filter(a => /Marcelo/i.test(a.nome))[0];
+      const al = banco.alunos.filter(a => /Aluno Referência Teste/i.test(a.nome))[0];
       idAluno = al.id;
       banco.aulas.filter(a => a.alunoId === al.id && a.data === DIA_MIGRA)[0].temas = [
         { titulo: REP_POR.titulo, fonte: 'topico', disciplina: 'portugues', grupo: REP_POR.grupo }
@@ -609,7 +609,7 @@ async function paginaEnvenenada(navegador, trocas) {
     });
     let idAluno = null;
     await abrirComBanco(env.p, banco => {
-      const al = banco.alunos.filter(a => /Marcelo/i.test(a.nome))[0];
+      const al = banco.alunos.filter(a => /Aluno Referência Teste/i.test(a.nome))[0];
       idAluno = al.id;
       banco.aulas.filter(a => a.alunoId === al.id && a.data === DIA_REPETIDO)[0].temas = [
         { titulo: REP_POR.titulo, fonte: 'livre', disciplina: 'portugues' }
@@ -632,7 +632,7 @@ async function paginaEnvenenada(navegador, trocas) {
       'core.js': [['if (!i.so || !pedidas.length || fixos.indexOf(i.id) !== -1) return true;', 'if (!i.so || !pedidas.length) return true;']]
     });
     await abrirComBanco(env.p, banco => {
-      const al = banco.alunos.filter(a => /Marcelo/i.test(a.nome))[0];
+      const al = banco.alunos.filter(a => /Aluno Referência Teste/i.test(a.nome))[0];
       const mm = Core.mapeamentoNovo();
       Core.marcarNaMateria(mm, 'portugues', 'atencao', itemPortugues.id, true);
       al.mapeamentos = [mm];

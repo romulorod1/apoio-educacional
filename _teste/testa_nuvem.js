@@ -120,7 +120,7 @@ conf('o aplicativo não cria conta: nenhum signUp nem "Criar conta" no código',
 const trocas = {};
 // o observador de outra conta nunca passa a editar: a decisão está numa função só, leOutraConta
 const LE_OUTRA_CONTA = 'return !!(est && est.uidDona && est.entrada && est.uidDona !== est.entrada.uid);';
-conf('o app.js decide "lê a cópia de outra conta" num lugar só, e o usa no botão e na função', APP.split(LE_OUTRA_CONTA).length === 2 && APP.split('leOutraConta()').length === 8, true); // a função e seis usos (D6b: quem edita no celular; D7: as abas do observador)
+conf('o app.js decide "lê a cópia de outra conta" num lugar só, e o usa no botão e na função', APP.split(LE_OUTRA_CONTA).length === 2 && APP.split('leOutraConta()').length === 9, true); // a função e sete usos (D6b: quem edita no celular; D7: as abas do observador; o lembrete da cópia, que o observador não recebe)
 if (OBSERVADOR_EDITA) trocas['/app.js'] = APP.replace(LE_OUTRA_CONTA, 'return false;');
 if (SOBE_VAZIO) {
   trocas['/nuvem.js'] = NUVEM

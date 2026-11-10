@@ -16,6 +16,17 @@
 #                                        nao roda nada: diz, uma por linha, que
 #                                        prova de navegador rodaria (a prova das
 #                                        fatias e o testa_pedacos_do_portao)
+#   sh _teste/confere_tudo.sh --provas ARQUIVO
+#                                        so as provas de navegador cujos
+#                                        arquivos estao em ARQUIVO (um caminho
+#                                        por linha, como diz o --listar na
+#                                        linha "arq"). E o nivel 1 do CI: as
+#                                        provas mapeadas pelos arquivos tocados
+#                                        no PR (_teste/provas_tocadas.js). Caminho
+#                                        da lista que nao casa prova nenhuma e
+#                                        HA FALHA, nao pulo calado. Combina com
+#                                        --pedaco K/N: so as da lista que caem
+#                                        na fatia K (o nivel 1 em oito maquinas).
 #
 # O --rapido e o que o GitHub roda em todo PR (.github/workflows/portao.yml),
 # porque o inteiro passa de dez minutos e quase todo esse tempo e Chrome. Ele
@@ -35,11 +46,13 @@ pulada=0
 rapido=0
 listar=0
 pedaco=""
+provas_arq=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --rapido) rapido=1 ;;
     --listar) listar=1 ;;
     --pedaco) pedaco_dado=1; pedaco="${2:-}"; if [ "$#" -gt 1 ]; then shift; fi ;;
+    --provas) provas_arq="${2:-}"; if [ "$#" -gt 1 ]; then shift; fi; [ -n "$provas_arq" ] || { printf -- '--provas pede o arquivo com a lista\n'; exit 2; } ;;
     *) printf 'opcao desconhecida: %s\n' "$1"; exit 2 ;;
   esac
   shift
@@ -74,6 +87,16 @@ if [ "${pedaco_dado:-0}" = "1" ]; then
   # "nenhuma prova" calada (nem o portao inteiro): sai com 2.
   minhas_provas=$(node _teste/divide_portao.js "$pk" "$pn") || { printf 'nao consegui dividir o portao em fatias (divide_portao.js)\n'; exit 2; }
 fi
+# Nivel 1 do CI: so as provas de navegador da lista. Lista ilegivel ou vazia
+# nao vira "nenhuma prova" calada nem o portao inteiro: sai com 2.
+provas_lista=""
+if [ -n "$provas_arq" ]; then
+  if [ "$rapido" = "1" ]; then printf -- '--provas nao combina com --rapido\n'; exit 2; fi
+  [ -f "$provas_arq" ] || { printf 'lista de provas nao existe: %s\n' "$provas_arq"; exit 2; }
+  provas_lista=$(tr -d '\r' < "$provas_arq" | grep . || true)
+  [ -n "$provas_lista" ] || { printf 'a lista de provas esta vazia: %s\n' "$provas_arq"; exit 2; }
+fi
+provas_vistas=""
 numero_navegador=0
 rodadas_aqui=0
 
@@ -152,15 +175,20 @@ roda() {
   # de um teste falso derrubaria o portao inteiro na primeira prova)
   if [ "$na_secao_navegador" = "1" ]; then
     numero_navegador=$((numero_navegador + 1))
+    provas_vistas="$provas_vistas
+${2:-}"
     if [ -n "$pn" ] && ! printf '%s\n' "$minhas_provas" | grep -Fxq -- "$nome"; then
       return 0
     fi
-  elif [ -n "$pn" ]; then
+    if [ -n "$provas_lista" ] && ! printf '%s\n' "$provas_lista" | grep -Fxq -- "${2:-}"; then
+      return 0
+    fi
+  elif [ -n "$pn" ] || [ -n "$provas_lista" ]; then
     # o que nao abre navegador roda no portao-rapido, em todo PR
     return 0
   fi
   if [ "$listar" = "1" ]; then
-    if [ "$na_secao_navegador" = "1" ]; then printf '  vai     %s %s\n' "$numero_navegador" "$nome"; fi
+    if [ "$na_secao_navegador" = "1" ]; then printf '  vai     %s %s\n  arq     %s %s\n' "$numero_navegador" "$nome" "$numero_navegador" "${2:-}"; fi
     return 0
   fi
   if [ "$na_secao_navegador" = "1" ]; then rodadas_aqui=$((rodadas_aqui + 1)); fi
@@ -280,6 +308,12 @@ roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
 # B4: o deploy no Cloudflare Pages so depois do portao inteiro verde na main,
 # com venenos, e o site montado com tudo o que o aplicativo pede.
 roda "publica cloudflare (B4)" node _teste/testa_publica_cloudflare.js
+# Politica de testes por checkpoint (09/11/2026): o nivel 1 (quais provas de
+# navegador rodam pelos arquivos tocados, com o mapa em mapa_provas.tsv) e o
+# nivel 3 (a main reaproveita a bateria inteira se o tree for igual ao da cabeca
+# do PR que passou). Sem navegador.
+roda "provas tocadas (nivel 1)" node _teste/testa_provas_tocadas.js
+roda "arvore da main (nivel 3)" node _teste/testa_arvore_da_main.js
 # Oito que moravam no laco "com navegador" sem abrir navegador nenhum (nem
 # puppeteer, nem a porta 8777). La, o --rapido os pulava; aqui o GitHub os roda
 # em todo PR.
@@ -295,6 +329,11 @@ done
 roda "documento do ciclo"    node _teste/testa_documento_do_ciclo.js
 # B5: cabecalho em uma unica linha de 64 px e abas de toque de 44 px no tablet em pe.
 roda "cabecalho tablet (B5)"  node _teste/testa_cabecalho_tablet.js
+# Todo var(--x) do CSS e do app tem definicao (ou e posto pelo JS, com nome):
+# a F1 tirou a --letra-3 e o aviso do #136 caiu na letra herdada, calado.
+roda "vars definidas"         node _teste/testa_vars_definidas.js
+roda "vars definidas --envenenado-letra-3" node _teste/testa_vars_definidas.js --envenenado-letra-3
+roda "vars definidas --envenenado-excecao-velha" node _teste/testa_vars_definidas.js --envenenado-excecao-velha
 # B6: alvos de toque de 44 px e tipografia base
 roda "alvos de toque (B6)"    node _teste/testa_alvos_toque.js
 # B12: nenhuma cor literal fora do :root no styles.css e no maximo 6 tamanhos de
@@ -544,6 +583,10 @@ roda "salvar --envenenado-escreve-no-pedido"    node "_teste/testa_store_grava_n
 # registros) e veneno proprio: --envenenado-salvar-no-pedido faz o salvar responder
 # com a transacao aberta e tem de acusar exatamente o salvar.
 roda "salvar --envenenado-salvar-no-pedido"     node "_teste/testa_store_grava_no_commit.js" --envenenado-salvar-no-pedido
+# N2 (folha por pagina): o salvarNota tem transacao propria (notas, controle e
+# saida); --envenenado-nota-no-pedido o faz responder com ela aberta e tem de
+# acusar EXATAMENTE o salvarNota
+roda "salvar --envenenado-nota-no-pedido"       node "_teste/testa_store_grava_no_commit.js" --envenenado-nota-no-pedido
 # E o outro lado, que o conserto criou: a escrita que falha passa a REJEITAR.
 # --envenenado-nao-rejeita tira o onabort do escrever, e a transacao abortada
 # depois do sucesso do pedido tem de deixar a promessa pendurada a vista;
@@ -715,6 +758,23 @@ roda "livros --envenenado-zip-inteiro"            node "_teste/testa_livros.js" 
 # A revisao do C15.1 pela orquestradora: o mesmo pacote com dois PDFs trocados
 # (mesmo id, mesma versao) atualiza pelo hash; o veneno compara so o id.
 roda "livros --envenenado-so-id"                  node "_teste/testa_livros.js" --envenenado-so-id
+# B12: o indice de texto dos livros, num banco IndexedDB a parte
+# (indice-livros), lido por um Web Worker com o PDF.js do app. Acha o termo sem
+# acento e sem caixa, na pagina do arquivo e agrupado pelo capitulo; conta a
+# pagina sem texto; retoma no meio sem refazer o livro pronto; fica fora da
+# copia e sobrevive a restauracao; o "Apagar tudo" o apaga; o banco principal
+# segue na v6 e o store.js do commit pai o le. Porta 8898. Um veneno por regra.
+roda "livros indice"                              node "_teste/testa_livros_indice.js"
+roda "livros indice --envenenado-indice-na-copia" node "_teste/testa_livros_indice.js" --envenenado-indice-na-copia
+roda "livros indice --envenenado-refaz-indexado"  node "_teste/testa_livros_indice.js" --envenenado-refaz-indexado
+roda "livros indice --envenenado-com-acento"      node "_teste/testa_livros_indice.js" --envenenado-com-acento
+# A revisao do B12 (duas lentes): a falha passageira (o Worker que morre no
+# meio) nao tira o livro da leitura, e o "Apagar tudo" nao espera o banco do
+# indice (outra janela segurando a conexao nao o deixa pela metade).
+roda "livros indice --envenenado-erro-vira-pronto"    node "_teste/testa_livros_indice.js" --envenenado-erro-vira-pronto
+roda "livros indice --envenenado-apagar-espera-indice" node "_teste/testa_livros_indice.js" --envenenado-apagar-espera-indice
+# A pagina que sempre falha (de forma passageira) sai sozinha; o livro fica na busca.
+roda "livros indice --envenenado-pagina-ruim-derruba-livro" node "_teste/testa_livros_indice.js" --envenenado-pagina-ruim-derruba-livro
 # C15.2 e C15.3: "Este capitulo cobre" no leitor, Confirmar e Corrigir (so a
 # materia e o ano do livro), a correcao depois de recarregar e na copia de
 # seguranca (os livros nao), e o "Abrir no livro" da aula na pagina do PDF e no
@@ -763,6 +823,15 @@ roda "pago em"                                    node "_teste/testa_pago_em.js"
 # A2a: a cópia preparada e o compartilhamento cancelado não atualizam a data;
 # download pede confirmação, e share resolvido marca a data.
 roda "copia confirmada"                           node "_teste/testa_copia_confirmada.js"
+# Item 7: o lembrete da copia considera a nuvem (estado da nuvem simulado na
+# pagina, sem conta e sem emulador). Em dia: so a linha "Na nuvem, salvo as";
+# fila parada ha mais de 24 h: o alerta fala da nuvem; desligada: o de antes;
+# celular e observador: nada. O veneno volta ao lembrete so pela copia local.
+roda "alerta da copia com a nuvem"                node "_teste/testa_alerta_copia_nuvem.js"
+roda "alerta da copia --envenenado-alerta-so-local" node "_teste/testa_alerta_copia_nuvem.js" --envenenado-alerta-so-local
+# a idade do que parou sai da fila, e nao do ultimo envio: o veneno volta a
+# medir pelo envio e a quarentena com envio recente fica calada
+roda "alerta da copia --envenenado-idade-do-envio" node "_teste/testa_alerta_copia_nuvem.js" --envenenado-idade-do-envio
 roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_aluno_cascata.js"
 roda "relato e Voltar"                            node "_teste/testa_relato_voltar.js"
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
@@ -834,6 +903,36 @@ roda "nuvem recebe --envenenado-eco-so-sem-carimbo" node "_teste/testa_nuvem_rec
 roda "nuvem diagnostico (D7)"                       node "_teste/testa_nuvem_diagnostico.js"
 roda "nuvem diagnostico --envenenado-diagnostico-aberto" node "_teste/testa_nuvem_diagnostico.js" --envenenado-diagnostico-aberto
 roda "nuvem diagnostico --envenenado-observador-grava" node "_teste/testa_nuvem_diagnostico.js" --envenenado-observador-grava
+# N2 (fase 2 da nuvem, fatia 1): a folha sobe POR PAGINA (hash SHA-256 do texto
+# canonico, pontos a 0,1, gzip pelo CompressionStream) em usuarios/{uid}/folhas,
+# so do tablet; o celular da dona e o observador recebem e abrem so para ler;
+# a pagina igual nao sobe de novo; a lapide apaga a pagina no outro; quem recebe
+# confere o hash. Venenos: a pagina sem hash TEM de ser recusada pelas regras; a
+# regravacao da pagina igual TEM de ser vista; a folha editada no celular TEM de
+# ser vista; o documento adulterado aplicado sem conferir o hash TEM de ser visto.
+roda "nuvem folhas (N2 fatia 1)"                    node "_teste/testa_nuvem_folhas.js"
+roda "nuvem folhas --envenenado-sem-hash"           node "_teste/testa_nuvem_folhas.js" --envenenado-sem-hash
+roda "nuvem folhas --envenenado-regrava-igual"      node "_teste/testa_nuvem_folhas.js" --envenenado-regrava-igual
+roda "nuvem folhas --envenenado-celular-edita-folha" node "_teste/testa_nuvem_folhas.js" --envenenado-celular-edita-folha
+roda "nuvem folhas --envenenado-aplica-sem-conferir-hash" node "_teste/testa_nuvem_folhas.js" --envenenado-aplica-sem-conferir-hash
+# (revisao do PR 133) a lapide da pagina que nunca subiu nao vira documento
+# orfao; a aula excluida lapida a folha (e a que volta a traz); a restauracao
+# apaga o estado por faixa (o cursor apagava os puts da propria restauracao) e
+# lapida na nuvem a pagina que a copia nao tem; a precondicao que nao se resolve
+# recebendo isola a culpada em vez de prender a fila; o "Apagar tudo" lapida as
+# folhas para o "Enviar copia agora" leva-las; a pagina grande demais vai direto
+# para a quarentena com a frase que diz qual folha; a volta de versao reconcilia
+# as folhas com estado. Os oito venenos TEM de ser vistos.
+roda "nuvem folhas --envenenado-lapide-orfa"        node "_teste/testa_nuvem_folhas.js" --envenenado-lapide-orfa
+roda "nuvem folhas --envenenado-exclui-sem-lapide"  node "_teste/testa_nuvem_folhas.js" --envenenado-exclui-sem-lapide
+roda "nuvem folhas --envenenado-limpa-por-cursor"   node "_teste/testa_nuvem_folhas.js" --envenenado-limpa-por-cursor
+roda "nuvem folhas --envenenado-restauro-sem-lapide" node "_teste/testa_nuvem_folhas.js" --envenenado-restauro-sem-lapide
+roda "nuvem folhas --envenenado-precondicao-prende" node "_teste/testa_nuvem_folhas.js" --envenenado-precondicao-prende
+roda "nuvem folhas --envenenado-apaga-estado-no-apagar-tudo" node "_teste/testa_nuvem_folhas.js" --envenenado-apaga-estado-no-apagar-tudo
+roda "nuvem folhas --envenenado-pagina-grande-tenta" node "_teste/testa_nuvem_folhas.js" --envenenado-pagina-grande-tenta
+roda "nuvem folhas --envenenado-sem-reconciliar"    node "_teste/testa_nuvem_folhas.js" --envenenado-sem-reconciliar
+# (lente B, 2a rodada) a pagina grande na quarentena que a copia restaurada nao tem sai da fila
+roda "nuvem folhas --envenenado-quarentena-sobrevive-ao-restauro" node "_teste/testa_nuvem_folhas.js" --envenenado-quarentena-sobrevive-ao-restauro
 # (revisao do PR 118) o "Apagar tudo" zera a fila deste aparelho e o recebimento
 # em curso confere a marca dentro da transacao; o celular nao enfileira a lapide
 # da fusao; a restauracao enfileira tambem o que e igual a copia; a confirmacao
@@ -933,6 +1032,15 @@ roda "celular dinheiro --envenenado-falta-e-o-total" node "_teste/testa_celular_
 roda "celular dinheiro --envenenado-sem-meses-anteriores" node "_teste/testa_celular_dinheiro.js" --envenenado-sem-meses-anteriores
 roda "celular dinheiro --envenenado-cancela-sem-confirmar" node "_teste/testa_celular_dinheiro.js" --envenenado-cancela-sem-confirmar
 roda "celular dinheiro --envenenado-sem-redesenho"  node "_teste/testa_celular_dinheiro.js" --envenenado-sem-redesenho
+# A carga de exemplo e so das provas (09/11/2026, com o app em producao): ela
+# entra so na origem local (127.0.0.1, localhost). Nas origens de producao
+# (pages.dev e github.io, servidas do disco pela interceptacao) o banco vazio
+# abre vazio, tambem depois do "Apagar tudo"; e o aparelho novo que entra na
+# conta e liga a nuvem (no emulador) nao sobe nenhum registro de exemplo. O
+# controle positivo e a mesma carga, em 127.0.0.1, subindo numa outra conta. O
+# veneno volta a carga em qualquer origem e a nuvem tem de mostrar os registros.
+roda "carga inicial so nas provas"                  node "_teste/testa_carga_inicial.js"
+roda "carga inicial --envenenado-carga-em-producao" node "_teste/testa_carga_inicial.js" --envenenado-carga-em-producao
 # D6c (lote 4): o que o app mostra sozinho no alto de Hoje do celular. A
 # proxima aula (a mesma marca do lote 1), a aula passada sem registro (o
 # criterio do tablet, Core.aulaTemRegistro), a familia em aberto do dia 6 em
@@ -948,6 +1056,35 @@ roda "celular avisos --envenenado-registrada-falta-registrar" node "_teste/testa
 roda "celular avisos --envenenado-lembrete-fora-da-janela" node "_teste/testa_celular_avisos.js" --envenenado-lembrete-fora-da-janela
 # (revisao do lote 4) cobrar e fechar o mes so no celular que e da dona, nunca pela falta de observador
 roda "celular avisos --envenenado-observador-sem-sessao" node "_teste/testa_celular_avisos.js" --envenenado-observador-sem-sessao
+# A trava de transbordo do celular (e o alvo de 48 px das abas): todas as telas e estados (entrar, Hoje com e
+# sem avisos e com o aviso de versao nova, Alunos, ficha, Fechamento, Enviar, os
+# formularios, a folha so leitura, o observador e o Diagnostico) em 360, 390 e
+# 412 px, com a letra normal e em 130%: nenhum elemento rola de lado, nenhum
+# texto sai da caixa e nada passa da borda. Venenos: o aviso de versao antigo
+# ("Atualizar agora" e "Depois da aula" lado a lado) e um elemento de 500 px.
+roda "celular transbordo"                           node "_teste/testa_celular_transbordo.js"
+roda "celular transbordo --envenenado-aviso-largo"  node "_teste/testa_celular_transbordo.js" --envenenado-aviso-largo
+roda "celular transbordo --envenenado-elemento-largo" node "_teste/testa_celular_transbordo.js" --envenenado-elemento-largo
+# as cinco abas do observador com a regra que deixava o "Hoje" com 47 px (alvo de 48)
+roda "celular transbordo --envenenado-aba-estreita" node "_teste/testa_celular_transbordo.js" --envenenado-aba-estreita
+# A mensagem do mes (o feedback do fechamento) editada no celular: o mesmo
+# campo do tablet (Core.textoDoMes e Core.gravarTextoDoMes), o texto salvo sai
+# no PDF do Enviar e do Ver, sobe pela fila e chega ao tablet; a edicao do
+# tablet chega com "Editado no tablet hoje as HH:MM"; nos dois lados vale a
+# ultima gravacao; o observador nao ve; o rascunho volta; junho de referencia
+# igual quando o texto nao muda. Um veneno para cada propriedade.
+roda "celular mensagem do mes"                      node "_teste/testa_celular_fechamento_texto.js"
+roda "celular mensagem --envenenado-texto-fora-do-pdf" node "_teste/testa_celular_fechamento_texto.js" --envenenado-texto-fora-do-pdf
+roda "celular mensagem --envenenado-texto-nao-sobe" node "_teste/testa_celular_fechamento_texto.js" --envenenado-texto-nao-sobe
+roda "celular mensagem --envenenado-observador-edita-texto" node "_teste/testa_celular_fechamento_texto.js" --envenenado-observador-edita-texto
+roda "celular mensagem --envenenado-vale-o-primeiro" node "_teste/testa_celular_fechamento_texto.js" --envenenado-vale-o-primeiro
+# (revisao) na mensagem do mes vence a escrita mais recente: o texto escrito no
+# onibus sem sinal nao cobre a correcao feita depois no tablet
+roda "celular mensagem --envenenado-vale-quem-chega-depois" node "_teste/testa_celular_fechamento_texto.js" --envenenado-vale-quem-chega-depois
+# (lente B) K4: a mensagem nova sem carimbo sobe com a precondicao "nao existe";
+# K6: com o tablet numa versao anterior, o celular nao edita a mensagem
+roda "celular mensagem --envenenado-resumo-sem-precondicao" node "_teste/testa_celular_fechamento_texto.js" --envenenado-resumo-sem-precondicao
+roda "celular mensagem --envenenado-tablet-antigo-edita" node "_teste/testa_celular_fechamento_texto.js" --envenenado-tablet-antigo-edita
 # (avisos compactos, 09/11, desenho final base C) recolhidos num selinho na linha
 # da data, o painel por cima da agenda (uma linha por tipo, Dispensar todos, a
 # sincronia no rodape), o ponto no bloco da aula sem registro pela mesma lista, e o
@@ -970,6 +1107,15 @@ roda "celular avisos --envenenado-dispensa-na-nuvem" node "_teste/testa_celular_
 roda "celular avisos --envenenado-topo-alto"        node "_teste/testa_celular_avisos.js" --envenenado-topo-alto
 roda "cabecalho tablet em pe"                       node "_teste/testa_cabecalho_tablet_navegador.js"
 roda "alvos de toque tablet (B6)"                 node "_teste/testa_alvos_toque_navegador.js"
+# F1 (sistema visual do redesenho): no celular a 412 px e no tablet a 1280 x 800,
+# pelo estilo computado, a cor de acao so marinho, letra de 12 px para cima e na
+# escala de 5, pesos 400 e 600, sem caixa alta nem italico, nenhum glifo solto
+# nos botoes e contraste de 4,5:1. Os tres venenos TEM de ser vistos. Porta 8934.
+roda "sistema visual na tela (F1)"                 node "_teste/testa_sistema_visual_navegador.js"
+roda "sistema visual --envenenado-botao-verde"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-botao-verde
+roda "sistema visual --envenenado-fonte-11px"      node "_teste/testa_sistema_visual_navegador.js" --envenenado-fonte-11px
+roda "sistema visual --envenenado-glifo-solto"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-glifo-solto
+roda "sistema visual --envenenado-icone-vazio"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-icone-vazio
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
 roda "preço descartado não vaza"                  node "_teste/testa_preco_cancelado.js"
 roda "ações de aula no fechamento"                node "_teste/testa_acoes_fechamento.js"
@@ -1479,7 +1625,24 @@ else
   fi
 fi
 
+if [ -n "$provas_lista" ]; then
+  # caminho da lista que nenhuma prova de navegador tem: erro de quem montou a
+  # lista, e prova que nao rodou nao pode sair como verde
+  sem_prova=$(printf '%s\n' "$provas_lista" | while IFS= read -r a; do
+    printf '%s\n' "$provas_vistas" | grep -Fxq -- "$a" || printf '%s ' "$a"
+  done)
+  if [ -n "$sem_prova" ]; then
+    printf '  FALHOU  %-24s caminho da lista sem prova de navegador: %s\n' "provas mapeadas" "$sem_prova"
+    falhou=1
+  fi
+fi
+
 printf '\n'
+if [ -n "$pn" ] && [ -n "$provas_lista" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
+  # o nivel 1 em fatias: a fatia pode nao ter prova da lista, e isso e verde
+  printf 'FATIA %s DE %s: nenhuma prova da lista cai nesta fatia; nada a rodar.\n' "$pk" "$pn"
+  exit 0
+fi
 if [ -n "$pn" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
   # fatia vazia nao e fatia verde: com mais fatias que provas, a conta esta errada
   printf 'HA FALHA. A fatia %s de %s nao rodou prova nenhuma.\n' "$pk" "$pn"
@@ -1487,6 +1650,11 @@ if [ -n "$pn" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
 fi
 if [ "$falhou" != "0" ]; then
   printf 'HA FALHA. Nao faca o merge antes de resolver.\n'
+elif [ -n "$provas_lista" ]; then
+  # So o nivel 1 (com --pedaco, so a parte dele que cai nesta fatia): o verde dele nao e o portao inteiro, e diz isso.
+  printf 'PROVAS MAPEADAS PASSARAM: %s das %s provas de navegador rodaram aqui (nivel 1). A bateria inteira so roda com o rotulo pronto.\n' \
+    "$rodadas_aqui" "$numero_navegador"
+  if [ "$instavel" != "0" ]; then printf 'Algum teste so passou na segunda vez (INSTAVEL acima).\n'; fi
 elif [ -n "$pn" ]; then
   # So a fatia: o verde dela nao e o portao inteiro, e diz isso. O inteiro e o
   # job portao-navegador do CI, que so fica verde com todas as fatias verdes.

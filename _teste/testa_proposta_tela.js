@@ -1004,7 +1004,8 @@ function textoDoPdf(bytes) {
         d.ajustes = d.ajustes || {};
         d.ajustes.propostaRascunhos = lista;
         d.ajustes.propostaRascunho = null;
-        st.put(d, 'principal').onsuccess = () => resolve(true);
+        st.put(d, 'principal');
+        st.transaction.oncomplete = () => resolve(true);
       };
     };
   }), rascunhos);
@@ -1220,7 +1221,8 @@ function textoDoPdf(bytes) {
           cobranca: { modo: 'hora', valorHora: 120, ancora: 140,
             descontos: { mensal: 0, trimestral: 5, semestral: 10 }, recomendado: 'trimestral' }
         };
-        st.put(d, 'principal').onsuccess = () => resolve(true);
+        st.put(d, 'principal');
+        st.transaction.oncomplete = () => resolve(true);
       };
     };
   }));
@@ -1260,7 +1262,8 @@ function textoDoPdf(bytes) {
             descontos: { mensal: 0, trimestral: 5, semestral: 10 }, recomendado: 'trimestral' }
         }));
         d.ajustes.propostaRascunho = null;
-        st.put(d, 'principal').onsuccess = () => resolve(true);
+        st.put(d, 'principal');
+        st.transaction.oncomplete = () => resolve(true);
       };
     };
   }));
@@ -1293,7 +1296,8 @@ function textoDoPdf(bytes) {
         const d = g.result;
         d.ajustes.propostaRascunhos = [];
         d.ajustes.propostaRascunho = null;
-        st.put(d, 'principal').onsuccess = () => resolve(true);
+        st.put(d, 'principal');
+        st.transaction.oncomplete = () => resolve(true);
       };
     };
   }));

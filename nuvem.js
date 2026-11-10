@@ -28,6 +28,17 @@
  *                              ultimoRecebimento, ultimaCopia, sincronizacao,
  *                              navegador, instalado, persistente, erroCodigo,
  *                              erroFrase, erroQuando, erroOrigem }  (D7)
+ *   folhas/{folha:aulaId:n}  { id, aulaId, n, hash, bytes, tamanho, algoritmo,
+ *                              atualizadoEm, apagadoEm, aparelho, esquema, app,
+ *                              servidorEm }  (N2, fatia 1)
+ * A FOLHA sobe POR PÁGINA (N2): o texto canônico da página (store.js,
+ * paginaCanonica: pontos arredondados a 0,1, em JSON), comprimido com
+ * CompressionStream('gzip') em `bytes`, com o SHA-256 do texto em `hash`. Só
+ * o tablet a envia (o commit recusa `folhas/` fora dele); o celular e o
+ * observador a recebem e a leem. Quem recebe descomprime e CONFERE o hash:
+ * o documento que não bate é pulado e contado, nunca aplicado. A lápide vai
+ * sem bytes. A página recém-gravada espera 30 segundos sem traço novo
+ * (store.js, ESPERA_FOLHA) e sobe na hora ao fechar a folha ou o aplicativo.
  * O DIAGNÓSTICO é um resumo pequeno de cada aparelho que escreve (o tablet e
  * o celular da dona), só metadados e nunca dado de criança: a versão, o
  * último erro (o código e a frase fixa dele, nunca o conteúdo), a última
@@ -88,6 +99,11 @@
   var TETO_PARTE = 768 * 1024;
   var PARTES_POR_PEDIDO = 8;
   var REGISTROS_POR_COMMIT = 200;   // o commit aceita 500 escritas; 200 deixa folga de tamanho
+  /* Um commit aceita 10 MiB. Com páginas de folha no lote (N2), o lote é
+   * cortado pelos bytes também: 5 MiB em base64 deixa folga para os campos. */
+  var TETO_COMMIT_BYTES = 5 * 1024 * 1024;
+  var TETO_PAGINA_BYTES = 900 * 1024;   // uma página comprimida acima disto não cabe num documento (as regras também recusam)
+  var TETO_KEEPALIVE = 60 * 1024;       // o corpo que ainda cabe num fetch com keepalive (o navegador limita a 64 KiB)
   var ATRASO_ENVIO_REGISTROS = 2500; // depois de uma gravação dela, espera as vizinhas antes de subir
   var NOME_BANCO = 'apoio-nuvem';
   var UM_DIA = 24 * 60 * 60 * 1000;
@@ -275,6 +291,10 @@
     FAILED_PRECONDITION: 'Outro aparelho gravou antes; vou receber e tentar de novo.',
     ALREADY_EXISTS: 'Outro aparelho gravou antes; vou receber e tentar de novo.',
     INVALID_ARGUMENT: 'A nuvem recusou a forma de um registro.',
+    PAGINA_GRANDE: 'Uma página da folha é grande demais para a nuvem e não sobe: divida a página em duas para ela subir.',
+    LOTE_GRANDE: 'O lote passou do tamanho e vai dividido.',
+    SEM_COMPRESSAO: 'Este navegador não comprime a folha para a nuvem: as folhas ficam só neste aparelho.',
+    SEM_WEBCRYPTO: 'Este navegador não calcula o hash da folha para a nuvem: as folhas ficam só neste aparelho.',
     RESOURCE_EXHAUSTED: 'A cota da nuvem acabou por hoje; tento de novo mais tarde.',
     UNAVAILABLE: 'A nuvem está indisponível agora; tento de novo mais tarde.',
     DEADLINE_EXCEEDED: 'A nuvem demorou demais; tento de novo mais tarde.',
@@ -304,9 +324,15 @@
       corpo = JSON.stringify(corpo);
       cabecalhos['Content-Type'] = 'application/json';
     }
+    /* `keepalive` (ao fechar o aplicativo, N2): o pedido sobrevive à página
+     * fechando. O navegador limita o corpo em voo com keepalive a 64 KiB; um
+     * lote com uma página densa (67 KB em gzip, mais em base64) não cabe, e
+     * vai sem keepalive: se a página morrer antes, a fila guarda a entrada e
+     * ela sobe na próxima abertura. */
+    var keepalive = !!opcoes.keepalive && (corpo === undefined || corpo.length <= TETO_KEEPALIVE);
     var p;
     try {
-      p = fetch(url, { method: opcoes.metodo || (corpo !== undefined ? 'POST' : 'GET'), headers: cabecalhos, body: corpo });
+      p = fetch(url, { method: opcoes.metodo || (corpo !== undefined ? 'POST' : 'GET'), headers: cabecalhos, body: corpo, keepalive: keepalive });
     } catch (e) { return Promise.reject(semRede()); }
     return p.then(function (r) {
       return r.text().then(function (texto) {
@@ -534,10 +560,19 @@
     var nome = escritas.length === 1 && escritas[0] && escritas[0].update && escritas[0].update.name;
     return !!(sessao && id && nome && nome === nomeDoc(sessao.uid, 'diagnostico/' + id));
   }
-  function commit(escritas) {
+  /* A folha (N2) só sobe do tablet: qualquer escrita em `folhas/` fora dele é
+   * recusada aqui, mesmo que a entrada tenha escapado para a fila. */
+  function temFolhas(escritas) {
+    return escritas.some(function (w) {
+      var nome = (w && w.update && w.update.name) || (w && w.delete) || '';
+      return nome.indexOf('/folhas/') > 0;
+    });
+  }
+  function commit(escritas, opcoes) {
+    if (!podeEnviarCopia() && temFolhas(escritas)) return Promise.reject(recusaSoLeitura());
     if (!podeEnviarCopia() && !(celularDaDona() && (soRegistros(escritas) || soDiagnosticoProprio(escritas)))) return Promise.reject(recusaSoLeitura());
     return comToken(function (cab) {
-      return pedir(urlDoc(raizDocumentos()) + ':commit', { cabecalhos: cab, corpo: { writes: escritas } });
+      return pedir(urlDoc(raizDocumentos()) + ':commit', { cabecalhos: cab, corpo: { writes: escritas }, keepalive: !!(opcoes && opcoes.keepalive) });
     });
   }
   function gravacao(nome, obj) { return { update: { name: nome, fields: campos(obj) } }; }
@@ -864,12 +899,77 @@
     return campo;
   }
 
+  // ---------- bytes comprimidos (as páginas da folha, N2) ----------
+
+  /* A folha só sobe (e só se confere) com WebCrypto e CompressionStream; sem
+   * um deles a página fica na fila e a frase vai para Ajustes e o diagnóstico. */
+  function suportaFolhas() {
+    return typeof CompressionStream === 'function' && typeof DecompressionStream === 'function' &&
+      !!(root.Store && typeof root.Store.temWebCrypto === 'function' && root.Store.temWebCrypto());
+  }
+  function juntarFluxo(fluxo) {
+    return new Response(fluxo).arrayBuffer().then(function (buf) { return new Uint8Array(buf); });
+  }
+  function comprimir(texto) {
+    if (typeof CompressionStream !== 'function') return Promise.reject(erro('SEM_COMPRESSAO'));
+    return juntarFluxo(new Blob([new TextEncoder().encode(texto)]).stream().pipeThrough(new CompressionStream('gzip')));
+  }
+  function descomprimir(bytes) {
+    if (typeof DecompressionStream !== 'function') return Promise.reject(erro('SEM_COMPRESSAO'));
+    return juntarFluxo(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).then(function (saida) {
+      return new TextDecoder('utf-8', { fatal: true }).decode(saida);
+    });
+  }
+  /* O documento de uma PÁGINA DE FOLHA (N2): o texto canônico comprimido, o
+   * hash dele e os metadados. A lápide vai sem bytes. Assíncrono (o gzip e o
+   * SHA-256 são). Uma página comprimida acima do teto do documento não sobe:
+   * o erro PAGINA_GRANDE leva a entrada à quarentena, sem segurar as outras. */
+  function documentoDaPagina(reg, versaoApp) {
+    var campo = { id: reg.id, aulaId: reg.aulaId, n: reg.n, atualizadoEm: reg.atualizadoEm, apagadoEm: reg.apagadoEm || null,
+      aparelho: idDoAparelho() || reg.aparelho || 'aparelho', esquema: reg.esquema || 1, app: versaoApp || '' };
+    if (reg.apagadoEm || !reg.pagina) {
+      if (reg.hash) campo.hash = reg.hash;
+      return Promise.resolve({ doc: campo, bytes: 0, hash: reg.hash || null });
+    }
+    var texto = root.Store.paginaCanonica(reg.pagina);
+    return Promise.all([root.Store.sha256Hex(texto), comprimir(texto)]).then(function (r) {
+      if (r[1].length > TETO_PAGINA_BYTES) throw erro('PAGINA_GRANDE');
+      campo.hash = r[0];
+      campo.bytes = r[1];
+      campo.tamanho = texto.length;
+      campo.algoritmo = 'gzip';
+      return { doc: campo, bytes: r[1].length, hash: r[0] };
+    });
+  }
+  /* Os documentos de um lote, cada um com o caminho dele e o tamanho em
+   * bytes: registro em `registros/`, página em `folhas/`. A página GRANDE
+   * DEMAIS para um documento não derruba o lote: vem marcada (`grande`), e o
+   * envio a põe direto na quarentena, com o motivo, sem tentar de novo (o
+   * tamanho não muda tentando); a tela diz qual folha e o que fazer. */
+  function documentosDoLote(itens, versaoApp) {
+    return Promise.all(itens.map(function (i) {
+      var reg = i.registro;
+      if (reg.tipo === 'folha') {
+        return documentoDaPagina(reg, versaoApp).then(function (r) { return { colecao: 'folhas/', doc: r.doc, bytes: r.bytes, hash: r.hash }; }, function (e) {
+          if (e && e.codigo === 'PAGINA_GRANDE') return { grande: true, id: i.fila.id };
+          throw e;
+        });
+      }
+      var doc = documentoDoRegistro(reg, versaoApp);
+      return Promise.resolve({ colecao: 'registros/', doc: doc, bytes: JSON.stringify(doc).length, hash: null });
+    }));
+  }
+
   function contarFila() {
     if (!root.Store || typeof root.Store.estadoDaFila !== 'function') return Promise.resolve(0);
     return root.Store.estadoDaFila().then(function (e) {
-      if (e.pendentes !== registros.pendentes || e.quarentena !== registros.quarentena) {
+      var grandes = e.grandes || [];
+      if (e.pendentes !== registros.pendentes || e.quarentena !== registros.quarentena || JSON.stringify(grandes) !== JSON.stringify(registros.paginasGrandes || [])) {
         registros.pendentes = e.pendentes;
         registros.quarentena = e.quarentena;
+        registros.paginasGrandes = grandes;
+        // a página grande saiu da quarentena (foi dividida e regravada): a frase sai com ela
+        if (!grandes.length && registros.erro && registros.erro.codigo === 'PAGINA_GRANDE') { registros.erro = null; guardarRegistros(); }
         avisarOuvintes();
       }
       return e.pendentes;
@@ -904,10 +1004,15 @@
    * Nunca rejeita: devolve { enviados, erro }, e o erro fica em
    * registros.erro para a tela. Uma entrada sai da fila só depois de o lote
    * dela responder, e só se ainda for a que subiu. */
+  var tudoPendente = false;      // um "sobe tudo agora" chegou com um envio em voo: roda de novo quando ele acabar
+  var ultimaInfoDeEnvio = {};
   function enviarRegistros(info) {
     info = info || {};
-    if (enviandoRegistros) return enviandoRegistros;
-    var enviados = 0, lotes = 0, emQuarentenaAntes = [];
+    ultimaInfoDeEnvio = info;
+    /* O "sobe ao fechar" não se perde com um envio em curso (revisão da fatia
+     * 1): fica marcado e o envio roda de novo, com `tudo`, assim que este acabar. */
+    if (enviandoRegistros) { if (info.tudo) tudoPendente = true; return enviandoRegistros; }
+    var enviados = 0, lotes = 0, emQuarentenaAntes = [], adiadas = 0, folhasSemSuporte = 0, paginasGrandes = 0, lapidesDescartadas = 0;
     enviandoRegistros = carregarEstado().then(function () {
       return lerSincronizacaoDesligada();
     }).then(function () {
@@ -922,24 +1027,42 @@
         ? root.Store.lerFila().then(function (l) { emQuarentenaAntes = (l || []).filter(function (e) { return e.quarentena && !e.retestada; }).map(function (e) { return e.id; }); }, function () {})
         : Promise.resolve();
       /* Um lote inteiro, num commit; o que subiu sai da fila. */
-      function subirLote(itens) {
-        var docs = itens.map(function (i) { return documentoDoRegistro(i.registro, info.versaoApp); });
-        return commit(docs.map(function (d, k) {
-          var conhecido = itens[k].registro.nuvem && itens[k].registro.nuvem.updateTime;
-          /* A entrada de RESTAURAÇÃO sem carimbo conhecido exige que o documento
-           * não exista: se existir, a nuvem tem algo que este aparelho não viu,
-           * a precondição falha, o recebimento decide e só então se tenta de
-           * novo. */
-          var precondicao = conhecido ? { updateTime: conhecido } : (itens[k].fila.restauro ? { exists: false } : null);
-          return gravacaoCarimbada(nomeDoc(uid, 'registros/' + d.id), d, precondicao);
-        })).then(function (resposta) {
-          var resultados = (resposta && resposta.writeResults) || [];
-          return root.Store.confirmarEnvio(itens.map(function (i, k) {
-            var w = resultados[k] || {};
-            var transformado = w.transformResults && w.transformResults[0] && w.transformResults[0].timestampValue;
-            return { id: i.fila.id, atualizadoEm: i.fila.atualizadoEm, apagadoEm: i.registro.apagadoEm || null,
-              nuvem: { updateTime: w.updateTime || null, servidorEm: transformado || w.updateTime || null } };
-          }));
+      function subirLote(todos) {
+        return documentosDoLote(todos, info.versaoApp).then(function (todosPreparados) {
+          // as páginas grandes demais vão para a quarentena agora, e o resto do lote segue
+          var grandes = todosPreparados.filter(function (p) { return p.grande; }).map(function (p) { return p.id; });
+          var itens = todos.filter(function (i, k) { return !todosPreparados[k].grande; });
+          var preparados = todosPreparados.filter(function (p) { return !p.grande; });
+          var quarentena = grandes.length && typeof root.Store.quarentenar === 'function'
+            ? root.Store.quarentenar(grandes, 'PAGINA_GRANDE').then(function () { paginasGrandes += grandes.length; }, function () {})
+            : Promise.resolve();
+          if (!itens.length) return quarentena.then(function () { return 0; });
+          /* O TETO DE BYTES do commit (N2): um lote com páginas de folha que
+           * passe dele volta para ser dividido ao meio, sem culpa de ninguém. */
+          var total = preparados.reduce(function (s, p) { return s + p.bytes; }, 0);
+          if (itens.length > 1 && total > TETO_COMMIT_BYTES) throw erro('LOTE_GRANDE');
+          return quarentena.then(function () { return commit(preparados.map(function (p, k) {
+            var conhecido = itens[k].registro.nuvem && itens[k].registro.nuvem.updateTime;
+            /* A entrada de RESTAURAÇÃO sem carimbo conhecido exige que o documento
+             * não exista: se existir, a nuvem tem algo que este aparelho não viu,
+             * a precondição falha, o recebimento decide e só então se tenta de
+             * novo. */
+            /* A mensagem do mês sem carimbo conhecido também (um texto novo do
+             * mês, escrito sem sinal): se o outro aparelho já o criou na nuvem, a
+             * precondição falha e o recebimento decide pela hora em que cada um
+             * foi escrito, em vez de este envio cobrir o outro calado. */
+            var precondicao = conhecido ? { updateTime: conhecido }
+              : ((itens[k].fila.restauro || itens[k].registro.tipo === 'resumo') ? { exists: false } : null);
+            return gravacaoCarimbada(nomeDoc(uid, p.colecao + p.doc.id), p.doc, precondicao);
+          }), { keepalive: !!info.fechando }).then(function (resposta) {
+            var resultados = (resposta && resposta.writeResults) || [];
+            return root.Store.confirmarEnvio(itens.map(function (i, k) {
+              var w = resultados[k] || {};
+              var transformado = w.transformResults && w.transformResults[0] && w.transformResults[0].timestampValue;
+              return { id: i.fila.id, tipo: i.registro.tipo, atualizadoEm: i.fila.atualizadoEm, apagadoEm: i.registro.apagadoEm || null, hash: preparados[k].hash,
+                nuvem: { updateTime: w.updateTime || null, servidorEm: transformado || w.updateTime || null } };
+            }));
+          }); });
         });
       }
       /* O COMMIT É ATÔMICO: um registro que a regra ou o teto de 1 MiB recuse
@@ -948,14 +1071,18 @@
        * (sem rede, sessão vencida) sobe na hora. Devolve o que subiu e os que
        * ficaram sozinhos sem passar (indefinidos), com o erro. Se a metade de
        * cima falhou inteira, a de baixo é tentada inteira uma vez: as duas
-       * falhando inteiras é a nuvem recusando tudo, e não se desce mais. */
-      function subir(itens) {
+       * falhando inteiras é a nuvem recusando tudo, e não se desce mais.
+       * A PRECONDIÇÃO QUE FALHA sobe inteira enquanto o recebimento pode
+       * resolvê-la (lerLote recebe e tenta de novo); esgotados os recebimentos
+       * (`isolar`), ela é culpa de uma entrada, e o lote é dividido até achar
+       * qual, para a fila não ficar presa nela (revisão do PR 133). */
+      function subir(itens, isolar) {
         return subirLote(itens).then(function (n) { return { enviados: n, indefinidos: [], erro: null }; }, function (e) {
-          if (!e || e.codigo === 'SEM_REDE' || e.codigo === 'TOKEN_EXPIRED' || e.codigo === 'FAILED_PRECONDITION') throw e;
+          if (!e || e.codigo === 'SEM_REDE' || e.codigo === 'TOKEN_EXPIRED' || (e.codigo === 'FAILED_PRECONDITION' && !isolar)) throw e;
           if (itens.length === 1) return { enviados: 0, indefinidos: itens, erro: e };
           var meio = Math.ceil(itens.length / 2), a = itens.slice(0, meio), b = itens.slice(meio);
-          return subir(a).then(function (r1) {
-            if (r1.enviados === 0 && r1.indefinidos.length === a.length && a.length > 1) {
+          return subir(a, isolar).then(function (r1) {
+            if (r1.enviados === 0 && r1.indefinidos.length === a.length && a.length > 1 && !isolar) {
               return subirLote(b).then(function (n) {
                 return { enviados: n, indefinidos: r1.indefinidos, erro: r1.erro };
               }, function (e2) {
@@ -963,7 +1090,7 @@
                 throw r1.erro || e2;
               });
             }
-            return subir(b).then(function (r2) {
+            return subir(b, isolar).then(function (r2) {
               return { enviados: r1.enviados + r2.enviados, indefinidos: r1.indefinidos.concat(r2.indefinidos), erro: r1.erro || r2.erro };
             });
           });
@@ -971,15 +1098,45 @@
       }
       var jaCulpados = {}; // quem levou tentativa neste envio não volta ao lote até o próximo envio
       var recebimentos = 0; // quantas vezes a precondição mandou receber antes de insistir
+      /* A LÁPIDE DA PÁGINA QUE NUNCA SUBIU (N2): não há documento a apagar na
+       * nuvem, e escrever a lápide criaria um documento órfão. Ela sai da fila
+       * sem escrever nada. A página que subiu e cuja confirmação ainda não
+       * anotou o carimbo não cai aqui: a confirmação repõe a lápide na fila
+       * quando o carimbo chega (confirmarEnvio). */
+      function descartarLapidesOrfas(itens) {
+        var orfas = itens.filter(function (i) {
+          var reg = i.registro;
+          return reg.tipo === 'folha' && reg.apagadoEm && !(reg.nuvem && (reg.nuvem.updateTime || reg.nuvem.servidorEm));
+        });
+        if (!orfas.length) return Promise.resolve(itens);
+        return root.Store.confirmarEnvio(orfas.map(function (i) {
+          return { id: i.fila.id, tipo: 'folha', atualizadoEm: i.fila.atualizadoEm, apagadoEm: i.registro.apagadoEm, hash: null, nuvem: null };
+        })).then(function () {
+          lapidesDescartadas += orfas.length;
+          return itens.filter(function (i) { return orfas.indexOf(i) < 0; });
+        });
+      }
       function proximoLote() {
         return quarentenaLida.then(lerLote);
       }
       function lerLote() {
-        return root.Store.registrosDaFila(REGISTROS_POR_COMMIT).then(function (itens) {
+        return root.Store.registrosDaFila(REGISTROS_POR_COMMIT, { tudo: !!info.tudo }).then(function (itens) {
+          // páginas de folha recém-gravadas que esperam mais traços (N2): o envio volta daqui a pouco
+          if (itens.adiadas) adiadas = itens.adiadas;
+          /* Sem WebCrypto ou sem CompressionStream a folha NÃO SOBE: as páginas
+           * ficam na fila e a frase vai para Ajustes e para o diagnóstico. */
+          if (!suportaFolhas()) {
+            var comFolhas = itens.length;
+            itens = itens.filter(function (i) { return !(i.registro && i.registro.tipo === 'folha'); });
+            folhasSemSuporte += comFolhas - itens.length;
+          }
           itens = itens.filter(function (i) { return !!i.registro && !jaCulpados[i.fila.id]; });
           if (!itens.length || lotes >= 50) return { enviados: enviados };
           lotes++;
-          return subir(itens).then(null, function (e) {
+          return descartarLapidesOrfas(itens).then(function (itens) {
+            if (!itens.length) return { enviados: 0, indefinidos: [], erro: null };
+            return subir(itens, recebimentos >= 2);
+          }).then(null, function (e) {
             /* A PRECONDIÇÃO FALHOU: outro aparelho (ou outra aba) gravou algum
              * destes registros depois do que este aparelho viu. Recebe primeiro
              * (a regra do recebimento decide, e anota o carimbo novo), e tenta de
@@ -1001,7 +1158,7 @@
              * recusar tudo (503, regras ainda não coladas) não pode ir para a
              * quarentena sem culpa. */
             var culpados = r.indefinidos.filter(function (i) {
-              return r.enviados > 0 || (r.erro && r.erro.codigo === 'INVALID_ARGUMENT');
+              return r.enviados > 0 || (r.erro && (r.erro.codigo === 'INVALID_ARGUMENT' || r.erro.codigo === 'FAILED_PRECONDITION'));
             });
             if (!culpados.length) throw r.erro;
             culpados.forEach(function (i) { jaCulpados[i.fila.id] = true; });
@@ -1016,7 +1173,21 @@
     }).then(function (r) {
       if (!r.pulado) {
         registros.erro = null;
-        registros.ultimoEnvio = { quando: new Date().toISOString(), enviados: r.enviados };
+        /* As páginas que este navegador não consegue subir (sem WebCrypto ou
+         * sem CompressionStream) ficam na fila, e a frase fica aqui: Ajustes e o
+         * diagnóstico (D7) a mostram. */
+        if (folhasSemSuporte) {
+          var codigoSuporte = root.Store && typeof root.Store.temWebCrypto === 'function' && !root.Store.temWebCrypto() ? 'SEM_WEBCRYPTO' : 'SEM_COMPRESSAO';
+          registros.erro = { codigo: codigoSuporte, quando: new Date().toISOString(), mensagem: FRASES[codigoSuporte] };
+        }
+        /* A PÁGINA GRANDE DEMAIS fica na quarentena, e a frase fica aqui enquanto
+         * ela estiver lá (a deste envio ou de um anterior): Ajustes diz qual
+         * folha (pela lista em registros.paginasGrandes) e o diagnóstico leva o
+         * código e a frase. */
+        if (paginasGrandes || (registros.paginasGrandes && registros.paginasGrandes.length)) {
+          registros.erro = { codigo: 'PAGINA_GRANDE', quando: new Date().toISOString(), mensagem: FRASES.PAGINA_GRANDE };
+        }
+        registros.ultimoEnvio = { quando: new Date().toISOString(), enviados: r.enviados, lapidesDescartadas: lapidesDescartadas };
         guardarRegistros();
         /* Um envio inteiro sem recusa solta a quarentena UMA vez, como reteste:
          * quem foi parar lá por uma queda da nuvem sai no próximo envio; quem
@@ -1033,6 +1204,21 @@
     });
     var limpar = function () {
       enviandoRegistros = null;
+      registros.folhasAdiadas = adiadas;
+      // o "sobe tudo agora" que chegou durante este envio roda agora
+      if (tudoPendente) {
+        tudoPendente = false;
+        setTimeout(function () { enviarRegistros(Object.assign({}, ultimaInfoDeEnvio, { tudo: true })).catch(function () { /* o erro ficou em registros.erro */ }); }, 0);
+      }
+      /* Páginas de folha que esperavam mais traços (N2): o envio volta quando a
+       * espera acabar, sem depender de outra gravação dela. */
+      if (adiadas && registrosDevidos()) {
+        if (envioAgendado) clearTimeout(envioAgendado);
+        envioAgendado = setTimeout(function () {
+          envioAgendado = null;
+          enviarRegistros().catch(function () { /* o erro ficou em registros.erro */ });
+        }, (root.Store && root.Store.ESPERA_FOLHA) || 30000);
+      }
       // a fila contada antes do diagnóstico: o resumo leva o tamanho de agora
       contarFila().then(avisarOuvintes, avisarOuvintes).then(gravarDiagnostico);
     };
@@ -1128,10 +1314,19 @@
         return pagina();
       });
     }).then(function (r) {
+      if (r.pulado) return r;
+      // depois dos registros, as páginas de folha (N2), com cursor próprio
+      return receberFolhas(uidDona).then(function (f) {
+        r.folhas = f.aplicados || 0;
+        r.folhasInvalidas = f.invalidas || 0;
+        return r;
+      });
+    }).then(function (r) {
       if (!r.pulado) {
         registros.erroRecebimento = null;
         registros.puladosFormatoAntigo = (registros.puladosFormatoAntigo || 0) + puladosAqui;
-        registros.ultimoRecebimento = { quando: new Date().toISOString(), aplicados: r.aplicados, lidos: r.lidos, puladosFormatoAntigo: puladosAqui };
+        registros.folhasInvalidas = (registros.folhasInvalidas || 0) + (r.folhasInvalidas || 0);
+        registros.ultimoRecebimento = { quando: new Date().toISOString(), aplicados: r.aplicados, lidos: r.lidos, puladosFormatoAntigo: puladosAqui, folhas: r.folhas || 0 };
       }
       return r;
     }, function (e) {
@@ -1141,6 +1336,77 @@
     var limpar = function () { recebendo = null; avisarOuvintes(); gravarDiagnostico(); };
     recebendo.then(limpar, limpar);
     return recebendo;
+  }
+
+  /* As PÁGINAS DE FOLHA que chegaram (N2): a coleção `folhas`, em ordem de
+   * (servidorEm, nome), depois do cursor próprio (controle/cursorFolhas), em
+   * páginas de 50 (os documentos são maiores). Cada documento é descomprimido
+   * e o hash do texto é CONFERIDO: o que não bate (ou não abre) é pulado e
+   * contado, e o cursor passa por cima dele. O eco é o do próprio aparelho. */
+  function receberFolhas(uidDona) {
+    var aplicados = 0, lidos = 0, invalidas = 0, paginas = 0;
+    if (!root.Store || typeof root.Store.aplicarFolhasRecebidas !== 'function') return Promise.resolve({ aplicados: 0 });
+    return root.Store.lerCursorFolhas().then(function (cursor) {
+      var desde = cursor && cursor.servidorEm ? { servidorEm: cursor.servidorEm, nome: cursor.nome || null } : null;
+      function montarConsulta(c) {
+        var q = { from: [{ collectionId: 'folhas' }],
+          orderBy: [{ field: { fieldPath: 'servidorEm' }, direction: 'ASCENDING' }, { field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
+          limit: 50 };
+        if (c && c.servidorEm) {
+          var v = [{ timestampValue: c.servidorEm }];
+          if (c.nome) v.push({ referenceValue: c.nome });
+          q.startAt = { values: v, before: !c.nome };
+        }
+        return q;
+      }
+      function abrirPagina(v) {
+        if (v.apagadoEm) return Promise.resolve({ pagina: null, ok: true });
+        if (!(v.bytes instanceof Uint8Array) || typeof v.hash !== 'string' || !v.hash) return Promise.resolve({ ok: false });
+        return descomprimir(v.bytes).then(function (texto) {
+          return root.Store.sha256Hex(texto).then(function (hash) {
+            if (hash !== v.hash) return { ok: false };
+            var pagina = JSON.parse(texto);
+            if (!pagina || typeof pagina !== 'object' || Array.isArray(pagina) || !Array.isArray(pagina.itens)) return { ok: false };
+            return { ok: true, pagina: pagina };
+          });
+        }).catch(function () { return { ok: false }; });
+      }
+      function pagina() {
+        if (paginas++ >= 50) return { aplicados: aplicados, lidos: lidos, invalidas: invalidas };
+        return comToken(function (cab) {
+          return pedir(urlDoc(raizDocumentos() + '/usuarios/' + uidDona) + ':runQuery', { cabecalhos: cab, corpo: { structuredQuery: montarConsulta(desde) } });
+        }).then(function (resposta) {
+          var docs = (resposta || []).filter(function (x) { return x && x.document; }).map(function (x) { return x.document; });
+          lidos += docs.length;
+          var meuId = idDoAparelho();
+          return Promise.all(docs.map(function (d) {
+            var v = valores(d.fields);
+            var base = { servidorEm: v.servidorEm || null, nome: d.name };
+            if (typeof v.id !== 'string' || !root.Store.partesDoIdDaPagina(v.id)) { invalidas++; return base; }
+            return abrirPagina(v).then(function (r) {
+              /* INVÁLIDO (o hash não bate, ou não abre): o conteúdo nunca entra; só
+               * o carimbo do servidor é anotado no estado local da página, para a
+               * próxima escrita deste aparelho passar na precondição e cobrir o
+               * documento ruim. */
+              if (!r.ok) { invalidas++; return Object.assign(base, { id: v.id, invalido: true, updateTime: d.updateTime || null }); }
+              return Object.assign(base, { id: v.id, hash: v.hash || null, pagina: r.pagina, apagadoEm: v.apagadoEm || null, atualizadoEm: v.atualizadoEm || null,
+                aparelho: v.aparelho || '', updateTime: d.updateTime || null, eco: !!(meuId && v.aparelho === meuId) });
+            });
+          })).then(function (lote) {
+            var ultimo = lote.length ? lote[lote.length - 1] : null;
+            var aplicar = lote.length ? root.Store.aplicarFolhasRecebidas(lote) : Promise.resolve({ aplicados: 0 });
+            return aplicar.then(function (contas) {
+              if (contas.pulado === 'desligada') { sincronizacaoDesligada = true; return { pulado: 'desligada', aplicados: aplicados, lidos: lidos, invalidas: invalidas }; }
+              aplicados += contas.aplicados || 0;
+              if (docs.length < 50 || !ultimo || !ultimo.servidorEm) return { aplicados: aplicados, lidos: lidos, invalidas: invalidas };
+              desde = ultimo;
+              return pagina();
+            });
+          });
+        });
+      }
+      return pagina();
+    });
   }
   /* Receber e depois enviar: a ordem que faz a precondição passar na maior
    * parte das vezes. O aparelho que só lê só recebe; o celular da dona envia
@@ -1321,7 +1587,8 @@
       aparelhoId: idDoAparelho(),
       registros: { pendentes: registros.pendentes, quarentena: registros.quarentena, ultimoEnvio: registros.ultimoEnvio,
         erro: registros.erro, enviando: !!enviandoRegistros, ultimoRecebimento: registros.ultimoRecebimento || null,
-        erroRecebimento: registros.erroRecebimento || null, recebendo: !!recebendo, puladosFormatoAntigo: registros.puladosFormatoAntigo || 0 },
+        erroRecebimento: registros.erroRecebimento || null, recebendo: !!recebendo, puladosFormatoAntigo: registros.puladosFormatoAntigo || 0,
+        folhasAdiadas: registros.folhasAdiadas || 0, folhasInvalidas: registros.folhasInvalidas || 0, paginasGrandes: (registros.paginasGrandes || []).slice() },
       // a marca "este aparelho é celular"; quem edita nele é só a dona (celularDaDona)
       celular: !!marcaCelular,
       celularDaDona: celularDaDona(),
@@ -1374,6 +1641,7 @@
     esquecerDiagnostico: esquecerDiagnostico,
     fraseDoCodigo: fraseDoCodigo, rotuloDoNavegador: rotuloDoNavegador, instaladoNaTela: instaladoNaTela,
     fraseDeQuando: fraseDeQuando,
-    TETO_PARTE: TETO_PARTE
+    comprimir: comprimir, descomprimir: descomprimir,
+    TETO_PARTE: TETO_PARTE, TETO_PAGINA_BYTES: TETO_PAGINA_BYTES
   };
 })(typeof self !== 'undefined' ? self : this);

@@ -487,7 +487,7 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   if (MODO === V_55) fimDoVeneno();
   m = await medirTela(pagC);
   conf('a ficha: alvos de 48 px (os links também) e sem rolagem de lado', telaBoa(m), '');
-  conf('(painel) o telefone na ficha em letra maior (16 px, negrito)', await pagC.evaluate(() => { const c = getComputedStyle(document.querySelector('#cel-ficha-telefone')); return c.fontSize + ' ' + c.fontWeight + ' ' + document.querySelector('#cel-ficha-telefone').textContent; }), '16px 700 Telefone: ' + TEL_ALFA);
+  conf('(painel) o telefone na ficha em letra maior (16 px, peso 600 do sistema visual)', await pagC.evaluate(() => { const c = getComputedStyle(document.querySelector('#cel-ficha-telefone')); return c.fontSize + ' ' + c.fontWeight + ' ' + document.querySelector('#cel-ficha-telefone').textContent; }), '16px 600 Telefone: ' + TEL_ALFA);
   conf('a ficha: nenhum botão nem campo de edição', m.soltos.join(', ') + '|' + m.campos.join(','), '|');
   await tirarPrint(pagC, '2_ficha_minima.png');
 

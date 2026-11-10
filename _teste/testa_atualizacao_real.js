@@ -215,7 +215,7 @@ const servidor = http.createServer((req, res) => {
   fs.writeFileSync(path.join(PASTA, 'app.js'),
     appOriginal.replace("var VERSAO = '" + VERSAO_NOVA + "'", "var VERSAO = '9.9.9'"));
   const swOriginal = fs.readFileSync(path.join(PASTA, 'sw.js'), 'utf8');
-  fs.writeFileSync(path.join(PASTA, 'sw.js'), swOriginal.replace(CACHE_ATUAL, 'apoio-educacional-v99'));
+  fs.writeFileSync(path.join(PASTA, 'sw.js'), swOriginal.replace(CACHE_ATUAL, CACHE_ATUAL + '-seguinte'));
 
   /* QUANTAS ABERTURAS ATÉ O AVISO DA VERSÃO SEGUINTE, sem limpar cache nenhum.
    *

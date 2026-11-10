@@ -102,7 +102,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   async function abrirFichaDoMarcelo() {
     await pag.evaluate(() => {
       const linha = Array.from(document.querySelectorAll('#lista-alunos .item-lista'))
-        .find(e => /Marcelo/.test(e.textContent));
+        .find(e => /Aluno Referência Teste/.test(e.textContent));
       linha.click();
     });
     await espera(700);
@@ -351,7 +351,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await espera(1400);
 
   banco = await bd();
-  const marcelo = banco.alunos.find(a => /Marcelo/.test(a.nome));
+  const marcelo = banco.alunos.find(a => /Aluno Referência Teste/.test(a.nome));
   conf('o aluno antigo agora está mapeado', (marcelo.mapeamentos || []).length, 1);
   conf('com o que ela marcou', marcelo.mapeamentos[0].marcados.atencao.join(','), 'dispersa');
 
@@ -380,7 +380,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await espera(1400);
 
   banco = await bd();
-  const marcelo2 = banco.alunos.find(a => /Marcelo/.test(a.nome));
+  const marcelo2 = banco.alunos.find(a => /Aluno Referência Teste/.test(a.nome));
   conf('agora são dois mapeamentos', (marcelo2.mapeamentos || []).length, 2);
   conf('o antigo ficou como estava',
     marcelo2.mapeamentos[0].marcados.atencao.join(','), 'dispersa');
@@ -459,7 +459,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await espera(1600);
   banco = await bd();
   conf('os mapeamentos continuam lá',
-    (banco.alunos.find(a => /Marcelo/.test(a.nome)).mapeamentos || []).length, 2);
+    (banco.alunos.find(a => /Aluno Referência Teste/.test(a.nome)).mapeamentos || []).length, 2);
   conf('e o da aluna nova também',
     (banco.alunos.find(a => a.nome === 'Helena Prova').mapeamentos || []).length, 1);
 

@@ -122,7 +122,7 @@ const TRAVA_BANCO = "if (modo === 'readwrite' && soLeitura && porta !== true && 
 const SALVAR_GUARDA = '    if (aparelhoSoLe() && !(gravacaoDoCelular > 0 && celularEdita())) {';
 const SEM_CARGA = '} else if (modoCelular) {';
 conf('a trava de envio do nuvem.js está num lugar só', NUVEM.split(PODE_ENVIAR).length, 2);
-conf('o commit e a automática do nuvem.js passam pela trava da cópia', /function commit\(escritas\) \{\r?\n    if \(!podeEnviarCopia\(\) && /.test(NUVEM) &&
+conf('o commit e a automática do nuvem.js passam pela trava da cópia', /function commit\(escritas, opcoes\) \{\r?\n    if \(!podeEnviarCopia\(\) && /.test(NUVEM) &&
   NUVEM.indexOf('return !!(podeEnviarCopia() && sessao') > 0, true);
 conf('a automática do app.js recusa no aparelho que só lê, num lugar só', (APP.match(new RegExp(GUARDA_AUTO_RE.source, 'g')) || []).length, 1);
 conf('a automática do app.js recusa em tela de celular, num lugar só', (APP.match(new RegExp(GUARDA_TELA_RE.source, 'g')) || []).length, 1);
@@ -380,10 +380,12 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
    * à vista. */
   const campos = Array.from(raiz.querySelectorAll('input, select, textarea, [contenteditable=true]')).filter(visivel)
     .filter(e => !e.closest('#cel-entrada') && !e.hasAttribute('data-consulta')).map(e => e.id || e.tagName);
+  /* F1: o "+" agora é um ícone; ele conta como o "+" de antes */
+  const tx = b => (b.querySelector('svg[data-icone-nome="plus"]') ? '+' : '') + b.textContent;
   const deEdicao = Array.from(document.querySelectorAll('button')).filter(visivel)
-    .filter(b => !b.closest('.fundo-modal')).filter(b => re.test(b.textContent));
-  const botoesEdicao = deEdicao.filter(b => !b.closest('[data-acao-celular]')).map(b => b.textContent.trim());
-  const dasAcoes = deEdicao.filter(b => b.closest('[data-acao-celular]')).map(b => b.textContent.trim());
+    .filter(b => !b.closest('.fundo-modal')).filter(b => re.test(tx(b)));
+  const botoesEdicao = deEdicao.filter(b => !b.closest('[data-acao-celular]')).map(b => tx(b).trim());
+  const dasAcoes = deEdicao.filter(b => b.closest('[data-acao-celular]')).map(b => tx(b).trim());
   const doTablet = ['#nova-aula', '#novo-aluno', '#proposta-nova', '#grade-mes', '#abas', '#nuvem-enviar']
     .filter(s => { const e = document.querySelector(s); return e && visivel(e); });
   const conteudo = document.querySelector('#cel-conteudo');
