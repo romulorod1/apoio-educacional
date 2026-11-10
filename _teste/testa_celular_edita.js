@@ -397,10 +397,10 @@ const fixarRelogio = (pag, iso, hhmm) => pag.evaluate((iso, hhmm) => {
 }, iso, hhmm);
 const soltarRelogio = pag => pag.evaluate(() => { if (window.__DataReal) window.Date = window.__DataReal; });
 
-/* (D6c) A agenda pela tela: a faixa da semana troca de semana pelas setas até
- * o dia aparecer, e um toque nele; o toque no bloco abre a folha da aula. */
+/* (D6c) A agenda pela tela: as setas avançam um dia por vez até o dia
+ * aparecer, e um toque nele; o toque no bloco abre a folha da aula. */
 async function irParaDia(pag, iso) {
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < 365; i++) {
     const onde = await pag.evaluate(d => {
       if (document.querySelector('.cel-semana-dia[data-dia="' + d + '"]')) return 'achou';
       const primeiro = document.querySelector('.cel-semana-dia');
@@ -409,7 +409,7 @@ async function irParaDia(pag, iso) {
     }, iso);
     if (onde === 'achou') { await clicar(pag, '.cel-semana-dia[data-dia="' + iso + '"]'); await pausa(60); return true; }
     if (onde === 'sem faixa') return false;
-    await clicar(pag, onde === 'antes' ? '#cel-semana-anterior' : '#cel-semana-seguinte');
+    await clicar(pag, onde === 'antes' ? '#cel-dia-anterior' : '#cel-dia-seguinte');
   }
   return false;
 }

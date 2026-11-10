@@ -203,12 +203,29 @@ const epubAberto = pag => pag.evaluate(() => {
 });
 const noQuadro = (pag, f) => pag.evaluate(f);
 
+/* B2: a estante virou a seção de livros da própria aba Biblioteca. O livro é
+ * achado pela disciplina e pelo ano dele, e o botão do alto da tela do livro
+ * abre o leitor onde ela parou, como o toque na estante fazia. */
 async function abrirPelaEstante(pag, id) {
   await H.irParaAba(pag, 'biblioteca');
-  await esperar('o botão Livros na aba Biblioteca', () => pag.evaluate(() => !!document.querySelector('#btn-livros')), v => v, 10000);
-  await pag.evaluate(() => document.querySelector('#btn-livros').click());
-  await esperar('a estante com o livro ' + id, () => pag.evaluate(i => !!document.querySelector('#corpo-modal-livros [data-livro="' + i + '"]'), id), v => v, 10000);
-  await pag.evaluate(i => document.querySelector('#corpo-modal-livros [data-livro="' + i + '"]').click(), id);
+  await esperar('o livro ' + id + ' na aba Biblioteca', () => pag.evaluate(i => {
+    const sel = '#bib-livros [data-livro="' + i + '"]';
+    if (document.querySelector(sel)) return true;
+    for (const d of Array.from(document.querySelectorAll('#bib-livros .bibl-disciplina')).map(b => b.dataset.disciplina)) {
+      document.querySelector('#bib-livros .bibl-disciplina[data-disciplina="' + d + '"]').click();
+      if (document.querySelector(sel)) return true;
+      for (const a of Array.from(document.querySelectorAll('#bib-livros .bibl-ano')).map(b => b.dataset.ano)) {
+        document.querySelector('#bib-livros .bibl-ano[data-ano="' + a + '"]').click();
+        if (document.querySelector(sel)) return true;
+      }
+    }
+    return false;
+  }, id), v => v, 10000);
+  await pag.evaluate(i => document.querySelector('#bib-livros [data-livro="' + i + '"]').click(), id);
+  await esperar('a tela do livro ' + id, () => pag.evaluate(i => {
+    const t = document.querySelector('#bib-livro'); return !!t && !t.hidden && t.dataset.livro === i;
+  }, id), v => v, 10000);
+  await pag.evaluate(() => document.querySelector('#bib-livro-continuar').click());
 }
 
 async function fecharModal(pag, id) {
@@ -300,7 +317,11 @@ async function printar(pag, nome) {
   conf('as contagens de antes, depósito por depósito, são as de depois',
     chaves.map(k => k + '=' + antes[k]).join(' '), chaves.map(k => k + '=' + depois[k]).join(' '));
   conf('e os depósitos novos começam vazios', depois.livros + '+' + depois.livros_posicoes, '0+0');
-  conf('sem livro, a aba Biblioteca não ganha o botão Livros', await p.evaluate(() => !!document.querySelector('#btn-livros')), false);
+  await H.irParaAba(p, 'biblioteca');
+  await pausa(300);
+  conf('sem livro, a aba Biblioteca não mostra a seção de livros', await p.evaluate(() => {
+    const c = document.querySelector('#bib-livros'); return !!c && !c.hidden && getComputedStyle(c).display !== 'none';
+  }), false);
 
   // ================================================================
   secao('2. Importar o pacote de livros em Ajustes');
@@ -487,7 +508,9 @@ async function printar(pag, nome) {
   conf('a lista diz 3 livros', caiu.ok, true);
   conf('e o total caiu exatamente o tamanho do livro removido', caiu.valor && totalAntes - caiu.valor.bytes, bytesDe['livro-sem-sumario']);
   conf('o livro saiu do depósito', await H.contarDeposito(p, 'livros'), 3);
-  conf('o botão da Biblioteca diz 3', await p.evaluate(() => (document.querySelector('#btn-livros') || {}).textContent), 'Livros (3)');
+  await H.irParaAba(p, 'biblioteca');
+  conf('a aba Biblioteca diz 3 livros', (await esperar('a contagem da Biblioteca', () => p.evaluate(() =>
+    (document.querySelector('#bib-livros-contagem') || {}).textContent || ''), v => /^3 livros/.test(v || ''), 10000)).ok, true);
   const de_novo = await importar(p, ZIP, 'a segunda importação');
   console.log('   estado: ' + JSON.stringify(de_novo));
   conf('importar de novo devolve só o que faltava', /1 livro novo/.test(de_novo) && /3 já estavam no tablet/.test(de_novo), true);
