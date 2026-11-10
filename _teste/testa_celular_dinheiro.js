@@ -512,7 +512,8 @@ const fmt = s => s.replace(/\u00a0/g, ' ');
     valor: (document.querySelector('.linha-pagamento[data-aluno="ref"] .pagamento-valor') || {}).value || ''
   })), x => x.mes === '2026-06' && !!x.valor, 10000);
   conf('vai ao mês certo e abre o formulário do aluno', abriuAtalho.ok, true);
-  conf('o valor vem preenchido com o total devido', abriuAtalho.valor && abriuAtalho.valor.valor, '1.050,00');
+  prop('o valor vem preenchido com o total devido (' + (abriuAtalho.valor && abriuAtalho.valor.valor) + ')',
+    !!abriuAtalho.valor && abriuAtalho.valor.valor === '1.050,00', V_PRECO);
   await pagA.evaluate(() => document.querySelector('.linha-pagamento[data-aluno="ref"] .btn-cancelar-pagamento').click());
   conf('fechar o formulário sem confirmar não grava pagamento', await pagA.evaluate(() => Store.carregar().then(d => d.pagamentos.length)), 2);
   await mesNoTablet(pagA, MES);
