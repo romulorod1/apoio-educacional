@@ -310,8 +310,15 @@ function fim(amb) {
  * usa por cima o fixarRelogio dela, que guarda este como o Date de volta.
  *
  * O passo da página vem do relógio do sistema (performance.timeOrigin), e não
- * do Date do processo: assim a página e o processo concordam mesmo quando o
- * Date do processo foi trocado antes (o controle que finge a meia-noite). */
+ * do Date do processo nem do Date da página: assim a página e o processo
+ * concordam mesmo quando um dos dois foi trocado antes (o controle que finge a
+ * meia-noite no processo e no navegador).
+ *
+ * Quem usa: celular_edita, celular_leitura, falha_de_gravacao e as provas de
+ * tela que liam o dia de verdade (domínio, sondagem, documento do ciclo, anexo,
+ * documento da família, virada anual, leitor de PDF, limpeza, sem material
+ * autoral, celular_ficha e as da biblioteca). A data do teste sai de
+ * RELOGIO.dia(n), no relógio local, e nunca de toISOString (o dia em UTC). */
 function relogioDaRodada(iso, hhmm) {
   const Base = Date;
   const p = iso.split('-').map(Number), h = hhmm.split(':').map(Number);
@@ -330,12 +337,19 @@ function relogioDaRodada(iso, hhmm) {
   const isoDe = d => { const q = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + q(d.getMonth() + 1) + '-' + q(d.getDate()); };
   /* O dia `n` dias depois (antes, se negativo) do dia fixo, em aaaa-mm-dd. */
   const dia = n => isoDe(new Base(p[0], p[1] - 1, p[2] + n, 12, 0));
+  /* (arranjo) A página aberta e o processo estão no dia da rodada: sem isto,
+   * uma prova que esqueceu o naPagina passaria no dia de hoje sem ninguém ver. */
+  const conferir = async pag => conf('(arranjo) a página e o processo estão no dia da rodada (' + iso + ')',
+    [await pag.evaluate(() => Core.hojeIso()), isoDe(new Date())].join(' '), iso + ' ' + iso);
   return {
-    iso, hhmm, fixo, dia,
+    iso, hhmm, fixo, dia, conferir,
     naPagina: pag => pag.evaluateOnNewDocument(desl => {
       if (window.__DataDaRodada) return;
       const Real = Date;
-      const agoraPag = () => Real.now() + desl;
+      /* Do relógio do sistema, e não do Date que a página já tinha: se algo
+       * trocou o Date dela antes (o controle que finge a data no navegador
+       * inteiro), a rodada continua no dia dela. */
+      const agoraPag = () => performance.timeOrigin + performance.now() + desl;
       function DaRodada(...a) {
         if (!new.target) return new Real(agoraPag()).toString();
         return a.length ? new Real(...a) : new Real(agoraPag());

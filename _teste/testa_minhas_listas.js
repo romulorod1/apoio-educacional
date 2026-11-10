@@ -40,6 +40,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const H = require('./_bib_navegador.js');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, pausa, esperar } = H;
 
@@ -144,7 +149,9 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   }
   await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   await H.abrirApp(pag, amb.ORIGEM);
+  await RELOGIO.conferir(pag);
   const zip = path.join(TMP, 'com-listas.zip');
   Sintetico.gerar(zip, { listas: true });
   conf('importou o pacote sintético', /^Biblioteca importada\./.test(await importar(pag, zip)), true);
