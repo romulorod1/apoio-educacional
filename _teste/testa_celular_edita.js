@@ -520,6 +520,14 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     d.alunos.push({ id: 'ref', nome: 'Aluno Referência Teste', ativo: true, cor: '#2E7D6B', responsavel: '',
       precos: [{ id: 'pr1', inicio: '2025-01-01', fim: '2026-05-31', valorHora: 100 }, { id: 'pr2', inicio: '2026-06-01', fim: null, valorHora: 100 }], mapeamentos: [] });
     d.aulas.push({ id: 'aula-hoje-gama', alunoId: 'gama', serieId: null, data: hoje, hora: '14:00', duracaoMin: 60, status: 'reposicao', cobravel: true, notaTexto: '', anexos: [] });
+    /* Intervalo longo e intervalo de meia hora para testar o encaixe dos
+     * horários livres na home da dona, sem envolver os dados de cobrança. */
+    d.aulas.push(
+      { id: 'ux-gap-longo-antes', alunoId: 'alfa', serieId: null, data: ontem, hora: '14:00', duracaoMin: 60, status: 'agendada', cobravel: true, notaTexto: '', anexos: [] },
+      { id: 'ux-gap-curto-antes', alunoId: 'alfa', serieId: null, data: ontem, hora: '17:30', duracaoMin: 60, status: 'agendada', cobravel: true, notaTexto: '', anexos: [] },
+      { id: 'ux-gap-cancelada', alunoId: 'alfa', serieId: null, data: ontem, hora: '17:30', duracaoMin: 60, status: 'cancelada', cobravel: false, notaTexto: '', anexos: [] },
+      { id: 'ux-gap-depois', alunoId: 'alfa', serieId: null, data: ontem, hora: '19:00', duracaoMin: 60, status: 'agendada', cobravel: true, notaTexto: '', anexos: [] }
+    );
     // marcada no tablet como realizada, mas sem cobrança
     d.aulas.push({ id: 'aula-gratis', alunoId: 'gama', serieId: null, data: ontem, hora: '16:00', duracaoMin: 60, status: 'realizada', cobravel: false, notaTexto: '', anexos: [] });
     junho.forEach(([data, dur], i) => d.aulas.push({ id: 'ref-' + data, alunoId: 'ref', serieId: null, data, hora: '15:30', duracaoMin: dur, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] }));
@@ -644,6 +652,22 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('(revisão) as bolinhas de hoje dizem de quem é cada aula a quem lê a tela', await pagC.evaluate(h =>
     document.querySelector('.cel-semana-dia[data-dia="' + h + '"] .cel-semana-bolinhas').getAttribute('aria-label'), HOJE), '2 aulas: Aluno Alfa Teste às 10:30, Aluno Gama Teste às 14:00');
   conf('o "+" diz o que faz a quem lê a tela', await pagC.evaluate(() => document.querySelector('#cel-marcar-aula').getAttribute('aria-label')), 'Marcar aula neste dia');
+  await irParaDia(pagC, ONTEM);
+  const horariosGap = await pagC.evaluate(() => ({
+    grande: !!document.querySelector('#cel-tempo .cel-livre-hora[data-livre="10:00"]'),
+    curto: !!document.querySelector('#cel-tempo .cel-livre-hora[data-livre="18:30"]'),
+    maisVisivel: document.querySelector('#cel-marcar-aula').getBoundingClientRect().height >= 48,
+    canceladaAoLado: (() => {
+      const a = document.querySelector('#cel-tempo .cel-bloco[data-aula="ux-gap-curto-antes"]');
+      const c = document.querySelector('#cel-tempo .cel-bloco[data-aula="ux-gap-cancelada"]');
+      if (!a || !c || !/Cancelada/.test(c.textContent)) return false;
+      const x = a.getBoundingClientRect(), y = c.getBoundingClientRect();
+      return x.width > 48 && y.width > 48 && (x.right <= y.left + 1 || y.right <= x.left + 1);
+    })()
+  }));
+  conf('a dona mantém horários num intervalo longo, oculta o chip do gap curto e mostra a aula cancelada ao lado; + Aula segue acessível', horariosGap,
+    { grande: true, curto: false, maisVisivel: true, canceladaAoLado: true });
+  await irParaDia(pagC, HOJE);
   const semana = await pagC.evaluate(hoje => {
     const dias = Array.from(document.querySelectorAll('#cel-semana-dias .cel-semana-dia'));
     const deHoje = document.querySelector('.cel-semana-dia[data-dia="' + hoje + '"]');

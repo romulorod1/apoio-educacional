@@ -144,8 +144,8 @@
  * atualiza esses assets apos sincronizar a Biblioteca com a main atualizada.
  * O v118 traz navegacao dia a dia no celular; v119 ajusta a legenda do mapa.
  * O v120 isola a conferencia de livros; v121 traz Marcar pago; v122, pagina impressa;
- * v123, edicao da ficha movel. */
-var CACHE = 'apoio-educacional-v123';
+ * v123, edicao da ficha movel; v126, encaixe da agenda no celular. */
+var CACHE = 'apoio-educacional-v126';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.42';
+  var VERSAO = '1.42.45';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -24223,7 +24223,9 @@
     });
     var linhas = linhasDoDiaCelular(dia), aulas = linhas.filter(function (l) { return l.tipo === 'aula'; });
     var grupos = [], grupo = null;
-    aulas.filter(function (l) { return l.aula.status !== 'cancelada'; }).sort(function (a, b) { return a.ini - b.ini; }).forEach(function (l) {
+    /* A cancelada não ocupa horário livre, mas ainda precisa de uma faixa
+     * visual quando coincide com uma aula ativa, para não sumir por baixo. */
+    aulas.sort(function (a, b) { return a.ini - b.ini; }).forEach(function (l) {
       if (!grupo || l.ini >= grupo.fim) { grupo = { fim: l.fim, itens: [] }; grupos.push(grupo); }
       grupo.fim = Math.max(grupo.fim, l.fim);
       grupo.itens.push(l);
@@ -24247,6 +24249,10 @@
     linhas.filter(function (l) { return l.tipo === 'livre'; }).forEach(function (l) {
       var ini = Math.max(inicioGrade, l.ini), fim = Math.min(fimGrade, l.fim);
       if (fim - ini < 30) return;
+      /* O cartão livre contém uma descrição e botões de pelo menos 48 px.
+       * Gaps curtos não comportam o conjunto sem invadir a aula seguinte;
+       * o atalho + Aula continua disponível na barra inferior. */
+      if (posicao(fim) - posicao(ini) < 84) return;
       var linha = linhaProporcional('livre', ini, fim, 26);
       linha.querySelector('.cel-tempo-item').appendChild(buracoLivreCelular({ ini: ini, fim: fim }, dia, edita));
       caixa.appendChild(linha);
@@ -24256,7 +24262,7 @@
       if (fim <= inicioGrade || inicio >= fimGrade) return;
       var topo = posicao(inicio), baixo = posicao(fim);
       var bloco = blocoDaAulaCelular(l.aula, marcas[l.aula.id], !!semRegistro[l.aula.id]);
-      var g = l.aula.status === 'cancelada' ? null : grupos.find(function (x) { return x.itens.indexOf(l) >= 0; });
+      var g = grupos.find(function (x) { return x.itens.indexOf(l) >= 0; });
       var faixas = g ? g.faixas : 1, faixa = g ? l.faixa : 0;
       bloco.classList.add('cel-tempo-bloco-grade');
       bloco.style.cssText += ';top:0;height:100%;left:' + (100 * faixa / faixas) + '%;width:' + (100 / faixas) + '%;z-index:' + (l.aula.status === 'cancelada' ? 2 : 3);
