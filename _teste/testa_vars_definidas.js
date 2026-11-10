@@ -31,7 +31,7 @@ const ler = a => fs.readFileSync(path.join(RAIZ, a), 'utf8');
 
 /* As variáveis que o app.js põe no atributo style de cada elemento: não têm
  * definição no CSS, e a regra que as usa só vale dentro desse elemento. */
-const EXCECOES = ['--cor-aluno', '--sobe'];
+const EXCECOES = ['--cor-aluno', '--lado-colunas', '--sobe'];
 
 const MODOS = ['--envenenado-letra-3', '--envenenado-excecao-velha'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) >= 0)[0] || '';

@@ -142,11 +142,11 @@
  * styles.css), com a lista igual. O v108 adicionou o indexador de livros; o
  * v109 e o v110 trouxeram navegação e Biblioteca por disciplina e ano. O v111
  * atualiza esses assets após sincronizar a Biblioteca com a main atualizada.
- * O v118 traz a navegação dia a dia no celular, o v119 inclui Vagos, o v120
- * reorganiza a janela da aula, o v121 integra o seletor de assunto, o v122
- * salva automaticamente as edições e o v123 aproxima o domínio do assunto
- * a que pertence. */
-var CACHE = 'apoio-educacional-v123';
+ * O v118 traz a navegação dia a dia no celular, o v119 atualiza a descrição
+ * de ausência de vínculo no mapa, o v120 inclui Vagos, o v121 reorganiza a
+ * janela, o v122 adiciona o seletor de assunto, o v123 salva automaticamente
+ * as edições e o v124 integra o domínio ao assunto trabalhado. */
+var CACHE = 'apoio-educacional-v124';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
