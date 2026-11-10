@@ -12,7 +12,7 @@
  * O que prova:
  *   1. sem livro, a seção de livros não aparece e os exercícios ficam como
  *      eram;
- *   2. com os livros, a aba diz quantos livros e disciplinas há, lista as
+ *   2. com os livros, a aba diz quantos materiais e disciplinas há, lista as
  *      disciplinas na ordem do app com a quantidade e o sinal do mapa (com a
  *      legenda uma vez), e cada ano mostra os livros certos; o livro sem
  *      sumário diz isso, e o do 9º de Matemática traz o cartão dos exercícios;
@@ -263,7 +263,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await abrirBiblioteca(pag);
   await esperar('a seção de livros', () => lerSecao(pag), v => v.visivel && !!v.livros, 10000);
   s = await lerSecao(pag);
-  conf('a contagem diz livros e disciplinas', s.contagem, '4 livros, 2 disciplinas');
+  conf('a contagem diz materiais e disciplinas', s.contagem, '4 materiais, 2 disciplinas');
   conf('as disciplinas, na ordem do app, com a quantidade e o sinal do mapa', s.disciplinas, 'matematica:3:mapa,literatura:1:mapa');
   conf('a legenda do mapa aparece uma vez só', s.legendas, 1);
   conf('abre em Matemática', s.ativa, 'matematica');
