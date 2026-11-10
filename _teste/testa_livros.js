@@ -693,7 +693,6 @@ async function printar(pag, nome) {
   conf('os livros ficaram', await H.contarDeposito(p, 'livros'), livrosAntes);
   conf('e a pergunta disse que os livros ficam', /Os livros importados ficam no tablet/.test(mensagens[0] || ''), true);
 
-  secao('10. Nenhum erro de página');
   secao('9. Livro recusado numa versao nova permanece instalado');
   const hashLivroPreservado = await p.evaluate(() => Store.lerLivro('livro-sem-marcadores').then(l => l.meta.hash));
   const preservacao = await p.evaluate(async (pacote, versao, idRecusado) => {
@@ -707,5 +706,6 @@ async function printar(pag, nome) {
   conf('o registro antigo do livro recusado continua no tablet', preservacao.id, 'livro-sem-marcadores');
   conf('e o arquivo antigo nao e apagado nem substituido', preservacao.hash, hashLivroPreservado);
 
+  secao('10. Nenhum erro de pagina');
   conf('nenhum erro', p.errosDePagina.join(' | '), '');
 })().then(() => H.fim(amb)(), e => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e)));
