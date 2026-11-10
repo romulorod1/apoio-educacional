@@ -2999,6 +2999,10 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-semana-topo .btn { min-width: var(--alvo-celular); flex-shrink: 0; }
 .cel-semana-topo .cel-semana-passo { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 8px 7px; font-size: var(--letra-12); white-space: nowrap; }
 .cel-semana-topo .cel-titulo { min-width: 0; margin: 0; text-align: center; font-size: var(--letra-16); line-height: 1.15; }
+@media (max-width: 380px) {
+  /* Mantém a data legível no celular estreito, com as duas setas e Hoje. */
+  .cel-semana-topo .cel-semana-passo { gap: 0; padding-left: 0; padding-right: 0; }
+}
 .cel-semana-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0; }
 .cel-semana-dia {
   min-height: 56px;
