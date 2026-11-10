@@ -31,6 +31,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const H = require('./_bib_navegador.js');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, pausa, esperar } = H;
 
@@ -46,7 +51,7 @@ const amb = H.criarAmbiente(PORTA, 'perfil_bib_navegar', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'bib_navegar_'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
 
-const hojeIso = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+const hojeIso = RELOGIO.dia(0);
 
 async function importar(pag, arquivo) {
   await H.irParaAba(pag, 'ajustes');
@@ -132,7 +137,9 @@ const minisVisiveisProntas = pag => pag.evaluate(() => {
   }
   await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   await H.abrirApp(pag, amb.ORIGEM);
+  await RELOGIO.conferir(pag);
 
   // ================================================================
   secao('1. Sem pacote: Biblioteca oferece importação');

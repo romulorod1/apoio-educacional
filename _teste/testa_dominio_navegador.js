@@ -31,6 +31,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const H = require('./_bib_navegador');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 /* --envenenado-aula-dada serve um core.js com a regra de antes do C1 (o passo
  * fecha por aula dada) e a prova TEM de reprovar: é o controle de que a tela
  * enxerga a regra, e não só o botão. Fica fora do portão, que roda a limpa. */
@@ -98,8 +103,8 @@ if (DERIVADA.length < 3) throw new Error('a trilha até ' + ALVO + ' tem menos d
 const T1 = DERIVADA[0];
 const T2 = DERIVADA[1];
 function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
-const HOJE = iso(new Date());
-const SEMANA_PASSADA = (() => { const d = new Date(); d.setDate(d.getDate() - 7); return iso(d); })();
+const HOJE = RELOGIO.dia(0);
+const SEMANA_PASSADA = RELOGIO.dia(-7);
 const ddmm = s => s.slice(8, 10) + '/' + s.slice(5, 7);
 const ddmmaaaa = s => ddmm(s) + '/' + s.slice(0, 4);
 // o que a família não pode ler, em qualquer caixa
@@ -232,6 +237,7 @@ async function printDe(pag, seletor, nome, folga) {
 (async () => {
   await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   await pag.setViewport({ width: 1280, height: 900, hasTouch: true });
   /* O Chrome sem cabeça não compartilha nem deixa baixar em sequência: o
    * arquivo é capturado no momento em que o aplicativo o entrega, e é o mesmo
@@ -256,6 +262,7 @@ async function printDe(pag, seletor, nome, folga) {
     };
   });
   await H.abrirApp(pag, amb.ORIGEM);
+  await RELOGIO.conferir(pag);
 
   // ================================================================
   secao('1. Em Registrar como foi, os três estados embaixo de cada assunto');

@@ -59,6 +59,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const H = require('./_bib_navegador.js');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, pausa, esperar } = H;
 
@@ -101,7 +106,7 @@ if (VENENO) trocas['/app.js'] = APP_REPO.split(ALVO_VENENO).join(TROCA_VENENO);
 const amb = H.criarAmbiente(PORTA, 'perfil_caminho_curto', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'b7_curto_'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
-const hojeIso = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+const hojeIso = RELOGIO.dia(0);
 
 const MOD = '9ano:teorema-de-pitagoras';
 const EX = '9ano:teorema-de-pitagoras:aplicacoes:ex:';
@@ -181,7 +186,9 @@ const botaoDoModulo = pag => pag.evaluate(() => {
   }
   await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   await H.abrirApp(pag, amb.ORIGEM);
+  await RELOGIO.conferir(pag);
 
   const zip = path.join(TMP, 'nono.zip');
   Sintetico.gerar(zip, {});

@@ -1,6 +1,11 @@
 /* B8: três decisões no fechamento, uma ocorrência por vez, com persistência. */
 'use strict';
 const H = require('./_bib_navegador');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const amb = H.criarAmbiente(8862, 'b8_fechamento');
 const { conf, esperar } = H;
 
@@ -8,7 +13,9 @@ const { conf, esperar } = H;
   await amb.subir();
   const pagina = await amb.pagina();
   await pagina.setViewport({ width: 1280, height: 1000, hasTouch: true });
+  await RELOGIO.naPagina(pagina);
   await H.abrirApp(pagina, amb.ORIGEM);
+  await RELOGIO.conferir(pagina);
   const datas = await pagina.evaluate(async () => {
     const db = await Store.carregar();
     const mes = Core.hojeIso().slice(0, 7);
