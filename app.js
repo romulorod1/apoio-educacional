@@ -24974,7 +24974,10 @@
           : 'Este anexo ainda não foi para a nuvem. Abra no tablet.');
         return false;
       }
-      if (ehPdf(r.tipo, an.nome)) abrirLeitorPdf(r.blob, { titulo: an.nome, nome: an.nome, aulaId: aula.id });
+      if (ehPdf(r.tipo, an.nome)) {
+        fecharFolhaCelular();
+        abrirLeitorPdf(r.blob, { titulo: an.nome, nome: an.nome, aulaId: aula.id, comoFolha: false });
+      }
       else entregarArquivo(an.nome, r.blob, an.nome);
       return true;
     }, function () { avisar('Não consegui abrir este arquivo. Tente de novo.'); return false; });

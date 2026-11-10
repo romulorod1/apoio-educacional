@@ -493,6 +493,11 @@ const idDoAnexoNaAula = (pag, aulaId, nome) => pag.evaluate((a, n) => Store.carr
     console.log('   (veneno) arquivos recusados em C: ' + await pagC.evaluate(() => Nuvem.estado().registros.arquivosInvalidos));
     throw fimDoVeneno();
   }
+  conf('o leitor de PDF fica visível sem a ficha por cima nem ação de abrir como folha', JSON.stringify(await pagC.evaluate(() => {
+    const leitor = document.querySelector('#modal-leitor-pdf');
+    return [!!(leitor && leitor.classList.contains('aberto') && getComputedStyle(leitor).display === 'flex'),
+      !document.querySelector('#cel-folha-fundo'), document.querySelector('#leitor-como-folha').style.display === 'none'];
+  })), '[true,true,true]');
   await pagC.evaluate(() => { const m = document.querySelector('#modal-leitor-pdf [data-fechar], #modal-leitor-pdf .fechar'); if (m) m.click(); });
   await H.abrirApp(pagC, amb.ORIGEM);
   await pagC.evaluate(() => { const b = document.querySelector('.cel-aba[data-cel="hoje"]'); if (b) b.click(); });
