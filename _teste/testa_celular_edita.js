@@ -655,10 +655,12 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     semana.tudo.split(ddmmHoje).length === 2, true);
   const bloco = await pagC.evaluate(() => {
     const b = document.querySelector('.cel-bloco[data-aula="aula-hoje"]'), g = document.querySelector('.cel-bloco[data-aula="aula-hoje-gama"]');
+    const escala = Array.from(document.querySelectorAll('.cel-tempo-grade-hora')).find(e => e.textContent === '10:00');
+    const hora = b.querySelector('.cel-bloco-hora').textContent.match(/^\d{2}:\d{2}/);
     return { borda: getComputedStyle(b).borderLeftColor, altura: Math.round(b.getBoundingClientRect().height), altura60: Math.round(g.getBoundingClientRect().height),
       texto: b.textContent, reposicao: g.classList.contains('cel-bloco-reposicao') && /Reposição/.test(g.textContent),
-      horaAEsquerda: b.getBoundingClientRect().left > b.closest('.cel-tempo-linha').querySelector('.cel-tempo-hora').getBoundingClientRect().right,
-      horaDoBloco: b.closest('.cel-tempo-linha').querySelector('.cel-tempo-hora').textContent };
+      horaAEsquerda: !!escala && b.getBoundingClientRect().left > escala.getBoundingClientRect().right,
+      horaDoBloco: hora ? hora[0] : '' };
   });
   conf('o bloco tem a cor do aluno, a mesma do tablet (' + bloco.borda + ')', bloco.borda, 'rgb(31, 58, 95)');
   conf('a hora fica à esquerda do bloco (' + bloco.horaDoBloco + ')', bloco.horaAEsquerda && bloco.horaDoBloco === '10:30', true);
@@ -773,7 +775,8 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   const idMarcada = marcada.valor;
   conf('e a entrada dela entrou na fila na mesma gravação', (await fila(pagC)).indexOf('aula:' + idMarcada) >= 0, true);
   conf('Hoje voltou ao dia da aula, com ela às 14:00', await pagC.evaluate(id => { const b = document.querySelector('.cel-bloco[data-aula="' + id + '"]');
-    return !!b && b.closest('.cel-tempo-linha').querySelector('.cel-tempo-hora').textContent === '14:00'; }, idMarcada), true);
+    const hora = b && b.querySelector('.cel-bloco-hora');
+    return !!hora && hora.textContent.indexOf('14:00') === 0; }, idMarcada), true);
 
   secao('5. Cancelar aula pela folha, com Desfazer');
   await irParaDia(pagC, OUTRO);
