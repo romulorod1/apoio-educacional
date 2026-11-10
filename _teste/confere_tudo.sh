@@ -329,6 +329,11 @@ done
 roda "documento do ciclo"    node _teste/testa_documento_do_ciclo.js
 # B5: cabecalho em uma unica linha de 64 px e abas de toque de 44 px no tablet em pe.
 roda "cabecalho tablet (B5)"  node _teste/testa_cabecalho_tablet.js
+# Todo var(--x) do CSS e do app tem definicao (ou e posto pelo JS, com nome):
+# a F1 tirou a --letra-3 e o aviso do #136 caiu na letra herdada, calado.
+roda "vars definidas"         node _teste/testa_vars_definidas.js
+roda "vars definidas --envenenado-letra-3" node _teste/testa_vars_definidas.js --envenenado-letra-3
+roda "vars definidas --envenenado-excecao-velha" node _teste/testa_vars_definidas.js --envenenado-excecao-velha
 # B6: alvos de toque de 44 px e tipografia base
 roda "alvos de toque (B6)"    node _teste/testa_alvos_toque.js
 # B12: nenhuma cor literal fora do :root no styles.css e no maximo 6 tamanhos de
@@ -413,9 +418,16 @@ for t in testa_temas testa_busca testa_mapa_e2e \
          testa_zoom_calendario_navegador \
          testa_dominio_navegador \
          testa_sondagem_navegador \
+         testa_relogio_padrao \
          e2e e2e_correcoes; do
   roda "$t" node "_teste/$t.js"
 done
+# O RELOGIO FIXO PADRAO do _bib_navegador (a bomba-relogio de 01/01/2027: o app
+# abre a virada anual sozinho num relogio de 2027 em diante). A prova simula o
+# mundo em 02/01/2027 e confere que a virada NAO abre com o padrao e ABRE com
+# { relogioReal: true }; o veneno serve o helper sem o padrao e a virada tem de
+# abrir ("VENENO visto").
+roda "relogio padrao --envenenado-sem-padrao"   node "_teste/testa_relogio_padrao.js" --envenenado-sem-padrao
 
 # D2: o service worker com cache primeiro. Fechar o aplicativo sem tocar no
 # aviso nao troca a versao (o navegador ativa o worker em espera sozinho, e a

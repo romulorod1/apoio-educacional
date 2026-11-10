@@ -10,6 +10,37 @@
  * temporário do sistema (sobra dentro do repositório acionaria a trava de
  * privacidade do portão), e a troca de UM arquivo servido para os modos
  * envenenados, sem cópia nenhuma em disco.
+ *
+ * O RELÓGIO FIXO É O PADRÃO. Toda página que uma prova abre por aqui
+ * (amb.pagina(), nav.newPage() ou ctx.newPage() de nav.createBrowserContext()) já nasce com o relógio da
+ * rodada: segunda, 16/11/2026, às 11:00, andando no passo do relógio do sistema.
+ * O Date do PROCESSO também é posto no mesmo dia, no criarAmbiente, para a
+ * prova que monta datas com new Date() concordar com a página. Ninguém precisa
+ * chamar nada: abrir o app já é abrir o app em 16/11/2026.
+ *
+ * POR QUÊ: é a bomba-relógio de 01/01/2027. A carga inicial do app grava
+ * ultimoAnoLetivoAtualizado = 2026 e, num relógio de 2027 em diante, o app abre
+ * SOZINHO o modal da virada anual (verificarViradaAnualAutomatica, 1,4 s depois
+ * de abrir), por cima dos cliques da prova. Com o padrão, nenhuma prova de
+ * navegador depende do dia em que o CI roda. Quem prova isto é o
+ * testa_relogio_padrao (a virada NÃO abre com o padrão e ABRE com a saída).
+ *
+ * A SAÍDA TEM NOME: { relogioReal: true }, no criarAmbiente(porta, perfil,
+ * trocas, { relogioReal: true }) para o ambiente inteiro, ou no
+ * amb.pagina({ relogioReal: true }) para uma página só. Usa quem precisa do
+ * relógio de verdade (por exemplo, quem prova que o app abre a virada sozinho).
+ *
+ * A ESCOLHA EXPLÍCITA SEMPRE VENCE O PADRÃO. A prova que chama
+ * relogioDaRodada('2027-03-10', '09:00') e RELOGIO.naPagina(pag) fica no dia
+ * dela, na ordem que for: o naPagina explícito troca o relógio padrão da
+ * página (e só ele: uma escolha explícita anterior continua valendo) e o
+ * relogioDaRodada explícito tira o padrão do processo e põe o dele, sempre em
+ * cima do Date de verdade (window.__DateDoMundo na página, Date.__baseDaRodada
+ * no processo), e nunca um relógio dentro do outro. fixarRelogio e afins, que
+ * as provas põem por cima no meio da rodada, continuam empilhando como antes.
+ * O padrão vale para quem abre pela página do helper: popup aberto pelo próprio
+ * app (window.open) não herda, e a prova que lança o puppeteer por conta
+ * própria (sem este arquivo) nem chega aqui.
  */
 'use strict';
 const puppeteer = require('puppeteer-core');
@@ -60,9 +91,18 @@ async function esperar(rotulo, ler, condicao, limiteMs) {
   return { ok: false, valor };
 }
 
-/* trocas: { '/caminho.js': textoServido } substitui só esses arquivos. */
-function criarAmbiente(porta, nomePerfil, trocas) {
+/* trocas: { '/caminho.js': textoServido } substitui só esses arquivos.
+ * opcoes.relogioReal: true tira o relógio fixo padrão do ambiente inteiro (a
+ * página e o processo ficam no relógio de verdade); ver o cabeçalho. */
+function criarAmbiente(porta, nomePerfil, trocas, opcoes) {
   trocas = trocas || {};
+  opcoes = opcoes || {};
+  /* O padrão no processo: aqui, e não ao carregar o arquivo, para a prova que
+   * escolheu o dia dela (relogioDaRodada antes do criarAmbiente) ficar com ele. */
+  if (RELOGIO_PADRAO_LIGADO && !opcoes.relogioReal) {
+    relogioPadrao();   // a conta do da página nasce no mesmo instante que a do processo
+    if (!Date.__baseDaRodada) instalarNoProcesso(DIA_PADRAO, HORA_PADRAO, true);
+  }
   const ORIGEM = 'http://127.0.0.1:' + porta;
   const PERFIL = path.join(os.tmpdir(), nomePerfil + '_' + process.pid + '_' + Date.now());
   const conexoes = new Set();
@@ -123,6 +163,7 @@ function criarAmbiente(porta, nomePerfil, trocas) {
   }
 
   let nav = null;
+  let semPadraoNaProxima = false;   // pagina({ relogioReal: true }) liga só em volta do newPage
   const amb = {
     ORIGEM, PERFIL, quatrocentos, extras, cortado: false, cortados: [], segurar: null, segurados: [],
     soltarSegurados() {
@@ -143,10 +184,36 @@ function criarAmbiente(porta, nomePerfil, trocas) {
         args: ['--no-sandbox', '--disable-dev-shm-usage'],
         defaultViewport: { width: 1280, height: 1000, hasTouch: true }
       });
+      /* O relógio fixo padrão entra em TODA página aberta por este navegador,
+       * inclusive a que a prova pede direto com nav.newPage(), antes de
+       * qualquer script dela e do documento. */
+      const instalarRelogioSePadrao = async function (p) {
+        if (RELOGIO_PADRAO_LIGADO && !opcoes.relogioReal && !semPadraoNaProxima) await relogioPadrao().naPagina(p);
+        return p;
+      };
+      const novaPagina = nav.newPage.bind(nav);
+      nav.newPage = async function (...a) {
+        return instalarRelogioSePadrao(await novaPagina(...a));
+      };
+      if (typeof nav.createBrowserContext === 'function') {
+        const criarContexto = nav.createBrowserContext.bind(nav);
+        nav.createBrowserContext = async function (...a) {
+          const ctx = await criarContexto(...a);
+          if (ctx && typeof ctx.newPage === 'function') {
+            const novaPaginaCtx = ctx.newPage.bind(ctx);
+            ctx.newPage = async function (...b) {
+              return instalarRelogioSePadrao(await novaPaginaCtx(...b));
+            };
+          }
+          return ctx;
+        };
+      }
       return nav;
     },
-    async pagina() {
-      const pag = await nav.newPage();
+    async pagina(opcoesPagina) {
+      semPadraoNaProxima = !!(opcoesPagina && opcoesPagina.relogioReal);
+      let pag;
+      try { pag = await nav.newPage(); } finally { semPadraoNaProxima = false; }
       pag.setDefaultTimeout(60000);
       pag.errosDePagina = [];
       pag.on('pageerror', e => pag.errosDePagina.push(e.message));
@@ -295,6 +362,88 @@ function fim(amb) {
   };
 }
 
+/* O relógio padrão: o mesmo dia e a mesma hora de quase todas as provas. A
+ * RELOGIO_PADRAO_LIGADO existe para o veneno do testa_relogio_padrao (o helper
+ * servido sem o padrão); em produção é sempre true. */
+const RELOGIO_PADRAO_LIGADO = true;
+const DIA_PADRAO = '2026-11-16';
+const HORA_PADRAO = '11:00';
+
+/* A conta do relógio, sem tocar em nada: o instante fixo (hora local) e o
+ * deslocamento do relógio do sistema até ele. */
+function contaDoRelogio(iso, hhmm) {
+  const p = iso.split('-').map(Number), h = hhmm.split(':').map(Number);
+  const fixo = new (Date.__baseDaRodada || Date)(p[0], p[1] - 1, p[2], h[0], h[1]).getTime();
+  const sistema = () => performance.timeOrigin + performance.now();
+  return { p, fixo, deslocamento: fixo - sistema() };
+}
+
+/* Põe o relógio da rodada no Date do processo, sempre em cima do Date de
+ * verdade: se já havia um relógio da rodada (o padrão, ou uma escolha anterior),
+ * ele sai, e o novo não fica dentro do outro. Um Date trocado por quem não é
+ * este arquivo (o controle que finge a meia-noite) continua sendo a base. */
+function instalarNoProcesso(iso, hhmm, ehPadrao) {
+  const Base = Date.__baseDaRodada || Date;
+  const { fixo } = contaDoRelogio(iso, hhmm);
+  const base0 = Base.now();
+  const agora = () => fixo + (Base.now() - base0);
+  function DaRodada(...a) {
+    if (!new.target) return new Base(agora()).toString();
+    return a.length ? new Base(...a) : new Base(agora());
+  }
+  DaRodada.prototype = Base.prototype;
+  DaRodada.now = agora; DaRodada.UTC = Base.UTC; DaRodada.parse = Base.parse;
+  DaRodada.__baseDaRodada = Base; DaRodada.__padrao = !!ehPadrao;
+  global.Date = DaRodada;
+}
+
+const isoDeData = d => { const q = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + q(d.getMonth() + 1) + '-' + q(d.getDate()); };
+
+/* O objeto da rodada (dia, conferir, naPagina) para o dia e a hora dados. Não
+ * mexe no Date do processo: quem instala é o instalarNoProcesso. */
+function montarRelogio(iso, hhmm, ehPadrao) {
+  const { p, fixo, deslocamento } = contaDoRelogio(iso, hhmm);
+  const Base = Date.__baseDaRodada || Date;
+  /* O dia `n` dias depois (antes, se negativo) do dia fixo, em aaaa-mm-dd. */
+  const dia = n => isoDeData(new Base(p[0], p[1] - 1, p[2] + n, 12, 0));
+  /* (arranjo) A página aberta e o processo estão no dia da rodada: sem isto,
+   * uma prova que esqueceu o naPagina passaria no dia de hoje sem ninguém ver. */
+  /* confDaProva: o conf da prova que não usa o placar deste helper. */
+  const conferir = async (pag, confDaProva) => (confDaProva || conf)('(arranjo) a página e o processo estão no dia da rodada (' + iso + ')',
+    [await pag.evaluate(() => Core.hojeIso()), isoDeData(new Date())].join(' '), iso + ' ' + iso);
+  /* O mesmo arranjo sem depender do app (Core): serve a página de uma versão
+   * antiga do aplicativo, como as provas de atualização servem. */
+  const conferirData = async (pag, confDaProva) => (confDaProva || conf)('(arranjo) a página e o processo estão no dia da rodada (' + iso + ')',
+    [await pag.evaluate(() => { const d = new Date(), q = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + q(d.getMonth() + 1) + '-' + q(d.getDate()); }),
+      isoDeData(new Date())].join(' '), iso + ' ' + iso);
+  return {
+    iso, hhmm, fixo, dia, conferir, conferirData,
+    /* O padrão (ehPadrao) cede a vez: se a página já tem uma escolha explícita
+     * da prova, ele não entra; se tem só o padrão, a escolha explícita o
+     * substitui. Em qualquer ordem a página fica com a escolha da prova. */
+    naPagina: pag => pag.evaluateOnNewDocument((desl, padrao) => {
+      if (window.__DataDaRodada && (padrao || !window.__DataDaRodadaPadrao)) return;
+      /* O Date de verdade da página, de antes de qualquer relógio da rodada: o
+       * novo relógio nunca fica dentro do outro. */
+      const Real = window.__DateDoMundo || Date;
+      /* Do relógio do sistema, e não do Date que a página já tinha: se algo
+       * trocou o Date dela antes (o controle que finge a data no navegador
+       * inteiro), a rodada continua no dia dela. */
+      const agoraPag = () => performance.timeOrigin + performance.now() + desl;
+      function DaRodada(...a) {
+        if (!new.target) return new Real(agoraPag()).toString();
+        return a.length ? new Real(...a) : new Real(agoraPag());
+      }
+      DaRodada.prototype = Real.prototype;
+      DaRodada.now = agoraPag; DaRodada.UTC = Real.UTC; DaRodada.parse = Real.parse;
+      window.__DateDoMundo = Real;
+      window.__DataDaRodadaPadrao = !!padrao;
+      window.__DataDaRodada = DaRodada;
+      window.Date = DaRodada;
+    }, deslocamento, !!ehPadrao)
+  };
+}
+
 /* O relógio da rodada: a prova inteira acontece num dia e numa hora escolhidos,
  * e nunca no dia e na hora em que o CI roda (o portão de 09/11 caiu porque uma
  * conferência dependia da hora real, depois da meia-noite UTC).
@@ -310,42 +459,28 @@ function fim(amb) {
  * usa por cima o fixarRelogio dela, que guarda este como o Date de volta.
  *
  * O passo da página vem do relógio do sistema (performance.timeOrigin), e não
- * do Date do processo: assim a página e o processo concordam mesmo quando o
- * Date do processo foi trocado antes (o controle que finge a meia-noite). */
+ * do Date do processo nem do Date da página: assim a página e o processo
+ * concordam mesmo quando um dos dois foi trocado antes (o controle que finge a
+ * meia-noite no processo e no navegador).
+ *
+ * Quem usa: celular_edita, celular_leitura, falha_de_gravacao e as provas de
+ * tela que liam o dia de verdade (domínio, sondagem, documento do ciclo, anexo,
+ * documento da família, virada anual, leitor de PDF, limpeza, sem material
+ * autoral, celular_ficha e as da biblioteca). A data do teste sai de
+ * RELOGIO.dia(n), no relógio local, e nunca de toISOString (o dia em UTC). */
 function relogioDaRodada(iso, hhmm) {
-  const Base = Date;
-  const p = iso.split('-').map(Number), h = hhmm.split(':').map(Number);
-  const fixo = new Base(p[0], p[1] - 1, p[2], h[0], h[1]).getTime();
-  const base0 = Base.now();
-  const sistema = () => performance.timeOrigin + performance.now();
-  const deslocamento = fixo - sistema();
-  const agora = () => fixo + (Base.now() - base0);
-  function DaRodada(...a) {
-    if (!new.target) return new Base(agora()).toString();
-    return a.length ? new Base(...a) : new Base(agora());
-  }
-  DaRodada.prototype = Base.prototype;
-  DaRodada.now = agora; DaRodada.UTC = Base.UTC; DaRodada.parse = Base.parse;
-  global.Date = DaRodada;
-  const isoDe = d => { const q = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + q(d.getMonth() + 1) + '-' + q(d.getDate()); };
-  /* O dia `n` dias depois (antes, se negativo) do dia fixo, em aaaa-mm-dd. */
-  const dia = n => isoDe(new Base(p[0], p[1] - 1, p[2] + n, 12, 0));
-  return {
-    iso, hhmm, fixo, dia,
-    naPagina: pag => pag.evaluateOnNewDocument(desl => {
-      if (window.__DataDaRodada) return;
-      const Real = Date;
-      const agoraPag = () => Real.now() + desl;
-      function DaRodada(...a) {
-        if (!new.target) return new Real(agoraPag()).toString();
-        return a.length ? new Real(...a) : new Real(agoraPag());
-      }
-      DaRodada.prototype = Real.prototype;
-      DaRodada.now = agoraPag; DaRodada.UTC = Real.UTC; DaRodada.parse = Real.parse;
-      window.__DataDaRodada = DaRodada;
-      window.Date = DaRodada;
-    }, deslocamento)
-  };
+  instalarNoProcesso(iso, hhmm, false);
+  return montarRelogio(iso, hhmm, false);
 }
 
-module.exports = { RAIZ, conf, secao, pausa, esperar, criarAmbiente, abrirApp, irParaAba, contarDeposito, placar, fim, relogioDaRodada };
+/* O relógio padrão (o objeto dele, criado na primeira vez que alguém pede): o
+ * da página é instalado pelo navegador do ambiente, e o do processo, pelo
+ * criarAmbiente. Quem quiser conferir o arranjo numa prova sem escolha
+ * explícita usa relogioPadrao().conferir(pag). */
+let padraoMontado = null;
+function relogioPadrao() {
+  if (!padraoMontado) padraoMontado = montarRelogio(DIA_PADRAO, HORA_PADRAO, true);
+  return padraoMontado;
+}
+
+module.exports = { RAIZ, conf, secao, pausa, esperar, criarAmbiente, abrirApp, irParaAba, contarDeposito, placar, fim, relogioDaRodada, relogioPadrao };

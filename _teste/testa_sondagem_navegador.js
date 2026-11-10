@@ -40,6 +40,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const H = require('./_bib_navegador');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const Sintetico = require('./_pacote_sintetico');
 
 const amb = H.criarAmbiente(8861, 'nath_c5_sondagem', {});
@@ -56,8 +61,8 @@ const SALVAR = process.env.SALVAR_PRINTS || '';
 const ALUNO = 'aluno_c5_alfa';
 const AULA = 'aula_c5_mapeamento';
 function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
-const HOJE = iso(new Date());
-const MES_PASSADO = (() => { const d = new Date(); d.setDate(d.getDate() - 30); return iso(d); })();
+const HOJE = RELOGIO.dia(0);
+const MES_PASSADO = RELOGIO.dia(-30);
 const ddmm = s => s.slice(8, 10) + '/' + s.slice(5, 7);
 const LACUNAS_EM1 = ['fatoracao', 'eq2', 'pitagoras', 'semelhanca', 'trigonometria', 'funcoes', 'conjuntos'];
 // o 3º ano (C5b): outra criança, outro encontro de mapeamento no mesmo dia
@@ -193,6 +198,7 @@ async function printDe(pag, seletor, nome, folga) {
 (async () => {
   await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   await pag.setViewport({ width: 1280, height: 1000, hasTouch: true });
   await pag.evaluateOnNewDocument(() => {
     window.__gerados = [];
@@ -214,6 +220,7 @@ async function printDe(pag, seletor, nome, folga) {
     };
   });
   await H.abrirApp(pag, amb.ORIGEM);
+  await RELOGIO.conferir(pag);
   await semear(pag);
   await H.abrirApp(pag, amb.ORIGEM);
   const zip = path.join(os.tmpdir(), 'c5_sondagem_' + process.pid + '.zip');

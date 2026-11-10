@@ -38,6 +38,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const H = require('./_bib_navegador.js');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia em que roda: a "aula nova de
+ * hoje" cai sempre no mesmo dia, e a virada anual que o app abre sozinho em
+ * janeiro não cobre os toques. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, pausa, esperar } = H;
 
@@ -168,7 +173,9 @@ const MARCADOS = [SP + 1, SP + 2, SP + 4, SP + 7, RB + 1, RB + 2, RB + 3, RB + 5
   }
   await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   await H.abrirApp(pag, amb.ORIGEM);
+  await RELOGIO.conferir(pag);
   const zip = path.join(TMP, 'nono.zip');
   Sintetico.gerar(zip, { compor: true });
   conf('importou o pacote sintético', /^Biblioteca importada\./.test(await importar(pag, zip)), true);

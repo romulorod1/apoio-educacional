@@ -1946,6 +1946,7 @@ body.modo-familia .modal-cabecalho h3 { font-size: var(--letra-20); }
   text-align: left;
   min-height: 44px;
   padding: 5px 11px;
+  line-height: 1.2;
   border: 1px solid var(--fio);
   border-radius: 10px;
   background: var(--branco);

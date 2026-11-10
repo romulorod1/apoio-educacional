@@ -13,6 +13,10 @@
  * memória do ano escolar do aluno), mais as áreas e a divisão da aula.
  */
 const puppeteer = require('puppeteer-core');
+const H = require('./_bib_navegador');
+/* O relógio da rodada (segunda, 16/11/2026, 11:00), no processo e na página: a
+ * prova não depende do dia em que roda (a virada anual abre sozinha em janeiro). */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const path = require('path');
 
 const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
@@ -43,6 +47,7 @@ const porValor = (sel, valor) => `(() => {
     defaultViewport: { width: 1280, height: 1000, hasTouch: true }
   });
   const pag = await navegador.newPage();
+  await RELOGIO.naPagina(pag);
   const errosDePagina = [];
   pag.on('pageerror', e => errosDePagina.push(e.message));
   pag.on('console', m => { if (m.type() === 'error') errosDePagina.push('console: ' + m.text()); });
@@ -58,6 +63,7 @@ const porValor = (sel, valor) => `(() => {
 
   await pag.goto(URL_APP, { waitUntil: 'networkidle0' });
   await espera(1400);
+  await RELOGIO.conferir(pag, conf);
 
   const visivel = (sel) => pag.$eval(sel, e => getComputedStyle(e).display !== 'none' &&
     (!e.classList.contains('fundo-modal') || e.classList.contains('aberto'))).catch(() => false);

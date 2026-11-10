@@ -38,6 +38,11 @@ const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const H = require('./_bib_navegador');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const Core = require('../core.js');
 
 const RAIZ = path.join(__dirname, '..');
@@ -63,7 +68,7 @@ const TRAVESSOES = new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']');
 
 const ALUNO = 'aluno_c9_alfa';
 function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
-const HOJE = iso(new Date());
+const HOJE = RELOGIO.dia(0);
 const PERIODO = Core.periodoPadraoDoCiclo(HOJE);
 // uma aula por semana, do começo do período até hoje
 const DATAS = (() => {
@@ -214,6 +219,7 @@ async function printDe(pag, seletor, nome, folga) {
 (async () => {
   await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   await pag.setViewport({ width: 1280, height: 1000, hasTouch: true });
   /* Sem service worker: o "antes" e o "depois" são servidos pela mesma porta,
    * e o cache dele entregaria o código de um no lugar do outro. */
@@ -245,6 +251,7 @@ async function printDe(pag, seletor, nome, folga) {
   Object.assign(trocas, ANTES);
   await abrirSemAjuda(pag);
   conf('três meses de aulas semeados (uma por semana)', await semear(pag), DATAS.length);
+  await RELOGIO.conferir(pag);
   await abrirSemAjuda(pag);
   const antesAoAbrir = await abertosSozinhos(pag);
   console.log('       antes, ao abrir: ' + JSON.stringify(antesAoAbrir));
