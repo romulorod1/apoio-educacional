@@ -610,7 +610,8 @@
   /* Confere um livro lido em trechos de 1 MB: tamanho, CRC do zip e hash do
    * manifest. Nenhum trecho fica para o próximo. */
   var TRECHO = 1024 * 1024;
-  function conferirLivroPorTrechos(blob, entrada, shaHex) {
+  var PRAZO_CONFERENCIA_LIVRO_MS = 120000;
+  function conferirLivroPorTrechos(blob, entrada, shaHex, aoProgredir) {
     var sha = new Sha256(), crc = 0, pos = 0, total = blob.size;
     function somar(b) { crc = Zip.crc32(b, crc); sha.atualizar(b); }
     /* Com leitor "byob", os trechos caem sempre no MESMO buffer de 1 MB: nada
@@ -624,6 +625,7 @@
         if (r.done) return;
         somar(r.value);
         pos += r.value.length;
+        if (aoProgredir) aoProgredir(pos, total);
         return porByob(r.value.buffer);
       });
     }
@@ -633,6 +635,7 @@
       return blob.slice(pos, ate).arrayBuffer().then(function (ab) {
         somar(new Uint8Array(ab));
         pos = ate;
+        if (aoProgredir) aoProgredir(pos, total);
         return porFatias();
       });
     }
@@ -643,6 +646,48 @@
         throw Recusa('O arquivo ' + entrada.nome + ' do pacote está corrompido.');
       }
       if (sha.fim() !== shaHex) throw Recusa('O arquivo ' + entrada.nome + ' do pacote não confere com o manifest.', 'defeito');
+    });
+  }
+
+  /* A conferência pesada de cada livro roda isolada. Se a leitura do Blob não
+   * responder, o chamador encerra o Worker e segue para o próximo livro. */
+  function conferirLivroIsolado(arquivo, entrada, formato, shaHex, aoProgredir) {
+    if (typeof Worker !== 'function') {
+      return Promise.reject(Recusa('Este navegador não consegue conferir livros em segurança. Atualize o Chrome e tente de novo.'));
+    }
+    return new Promise(function (resolve, reject) {
+      var worker;
+      var encerrado = false;
+      var timer = setTimeout(function () {
+        encerrar();
+        reject(Recusa('A conferência passou de 2 minutos; este livro foi pulado.'));
+      }, PRAZO_CONFERENCIA_LIVRO_MS);
+      function encerrar() {
+        if (encerrado) return;
+        encerrado = true;
+        clearTimeout(timer);
+        try { if (worker) worker.terminate(); } catch (e) { /* já encerrado */ }
+      }
+      try {
+        worker = new Worker('conferir-livro-worker.js');
+        worker.onmessage = function (ev) {
+          if (ev.data && ev.data.progresso) {
+            if (aoProgredir) aoProgredir(ev.data.progresso.bytes, ev.data.progresso.total);
+            return;
+          }
+          encerrar();
+          if (ev.data && ev.data.ok) resolve(ev.data.blob);
+          else reject(Recusa(ev.data && ev.data.erro || 'Não foi possível conferir este livro; ele foi pulado.'));
+        };
+        worker.onerror = function () {
+          encerrar();
+          reject(Recusa('A conferência deste livro falhou; ele foi pulado.'));
+        };
+        worker.postMessage({ arquivo: arquivo, entrada: entrada, formato: formato, shaHex: shaHex });
+      } catch (e) {
+        encerrar();
+        reject(Recusa('Não foi possível iniciar a conferência deste livro; ele foi pulado.'));
+      }
     });
   }
 
@@ -683,7 +728,8 @@
    *     e os bytes são soltos antes do próximo: o pico é perto de UM livro;
    *   - o que vai para a gravação é a fatia do próprio arquivo (o livro vem
    *     sem compressão), que o navegador copia do disco para o banco.
-   * Devolve { manifest, livros: [{ meta, blob }], bytesTotais }. */
+   * Devolve { manifest, livros: [{ meta, blob }], erros, idsDoPacote,
+   * bytesTotais }. Erro num livro não impede os seguintes. */
   function abrirLivrosDoArquivo(espiado, aoProgredir) {
     var zipArq = espiado.zip, manifest = espiado.manifest;
     return Promise.resolve().then(function () {
@@ -710,24 +756,35 @@
           throw Recusa('O livro "' + l.meta.titulo + '" veio comprimido no pacote, e o aplicativo só lê livro sem compressão.', 'defeito');
         }
       });
-      var i = 0, bytesTotais = 0;
+      var i = 0, bytesTotais = 0, erros = [];
       function proximo() {
         if (i >= livros.length) return Promise.resolve();
         var l = livros[i++];
         var en = porNome[l.meta.arquivo];
         var m = /^sha256:([0-9a-f]{64})$/.exec(String(lista[l.meta.arquivo] || ''));
-        if (!m) return Promise.reject(Recusa('O manifest.json não traz o hash de ' + l.meta.arquivo + '.'));
+        function registrarErro(e) {
+          erros.push({ id: l.meta.id, titulo: l.meta.titulo, arquivo: l.meta.arquivo,
+            mensagem: e && e.message || 'Não foi possível conferir este livro.' });
+          if (aoProgredir) aoProgredir(i, livros.length, l.meta, false, erros[erros.length - 1]);
+          return proximo();
+        }
+        if (!m) return registrarErro(Recusa('O manifest.json não traz o hash deste livro.'));
         // a fatia do próprio arquivo: conferida por trechos e, depois, gravada como está
-        return Zip.fatiaDoArquivo(zipArq, en, FORMATOS_DE_LIVRO[l.meta.formato]).then(function (blob) {
-          return conferirLivroPorTrechos(blob, en, m[1]).then(function () { return blob; });
+        return conferirLivroIsolado(zipArq.arquivo, en, FORMATOS_DE_LIVRO[l.meta.formato], m[1], function (bytes, total) {
+          if (aoProgredir) aoProgredir(i, livros.length, l.meta, null, null, bytes, total);
         }).then(function (blob) {
           bytesTotais += blob.size;
           l.blob = blob;
-          if (aoProgredir) aoProgredir(i, livros.length);
+          if (aoProgredir) aoProgredir(i, livros.length, l.meta, true, null);
           return proximo();
+        }).catch(function (e) {
+          return registrarErro(e);
         });
       }
-      return proximo().then(function () { return { manifest: manifest, livros: livros, bytesTotais: bytesTotais }; });
+      return proximo().then(function () {
+        return { manifest: manifest, livros: livros.filter(function (l) { return !!l.blob; }),
+          idsDoPacote: livros.map(function (l) { return l.meta.id; }), erros: erros, bytesTotais: bytesTotais };
+      });
     }).catch(function (e) {
       if (e && e.message === 'SEM_DESCOMPRESSAO') throw Recusa(SEM_NAVEGADOR);
       if (e && e.zip) throw Recusa(e.message || 'O pacote não pôde ser aberto.');
@@ -982,6 +1039,7 @@
   return {
     ESQUEMA: ESQUEMA, SEM_NAVEGADOR: SEM_NAVEGADOR,
     abrirPacote: abrirPacote, espiarPacote: espiarPacote, abrirLivrosDoArquivo: abrirLivrosDoArquivo,
+    conferirLivroPorTrechos: conferirLivroPorTrechos,
     TETO_POR_LIVRO: TETO_POR_LIVRO, sha256PorPartes: sha256PorPartes, resumo: resumo, nomeDaSerie: nomeDaSerie, mb: mb, resumoDeLivros: resumoDeLivros,
     sha256: sha256, tipoDoAsset: tipoDoAsset,
     mapaDoLivro: mapaDoLivro, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
