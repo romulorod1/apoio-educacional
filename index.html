@@ -126,8 +126,6 @@
           <button class="btn pequeno" id="limpar-busca-biblioteca" type="button" style="display:none">Limpar</button>
         </div>
       </div>
-      <!-- B12: o índice de texto dos livros sendo preparado; some quando termina -->
-      <p id="indice-livros-progresso" class="ajuda indice-livros-progresso" role="status" aria-live="polite" hidden></p>
       <!-- B12: a busca consulta o índice local sem expor o texto do livro -->
       <section id="bib-busca-livros" class="bib-busca-livros" aria-label="Buscar no texto dos livros" hidden>
         <label class="bibl-busca" role="search">
@@ -141,6 +139,8 @@
       <!-- B2: os livros do tablet por disciplina e ano, com o Continuar lendo.
            Só aparece com livro no tablet; sem livro, a aba fica como era. -->
       <div class="bibl" id="bib-livros" hidden></div>
+      <!-- B12: o andamento não empurra o atalho Continuar lendo para baixo. -->
+      <p id="indice-livros-progresso" class="ajuda indice-livros-progresso" role="status" aria-live="polite" hidden></p>
       <!-- a cabeça dos exercícios: o título (com livros no tablet), a contagem e o guia das listas -->
       <div class="bibl-exercicios-cabeca" id="bib-exercicios-cabeca">
         <h3 class="bibl-exercicios-titulo" id="bib-exercicios-titulo" hidden>Exercícios e listas</h3>
