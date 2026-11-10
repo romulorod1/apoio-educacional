@@ -69,6 +69,9 @@
   var diaComZoom = null;
   var editorAtual = null;
   var aulaEmEdicao = null;
+  var temporizadorAutosaveAula = null;
+  var promessaAutosaveAula = null;
+  var snapshotAutosaveAula = null;
   var alunoEmEdicao = null;
   /* Redesenha o resumo de etapas do alto da aba Dados. Quem marca a etapa é o
    * quadro da aba Mapeamento, e ele avisa aqui para as duas abas nunca
@@ -1404,9 +1407,9 @@
     }
     var topo = pilhaModalHistorico[pilhaModalHistorico.length - 1];
     if (!topo) return;
-    if (topo.id === 'modal-aula' && relatoEmEdicaoAlterado()) {
-      // A confirmação precisa de seu próprio Voltar. Repor a entrada da aula
-      // evita que Continuar escrevendo deixe a janela sem proteção do Android.
+    if (topo.id === 'modal-aula' && aulaTemMudancasParaAutosave()) {
+      // Repõe a entrada enquanto o autosave termina. Assim o Voltar do Android
+      // não fecha a aula antes de persistir o que ela acabou de editar.
       history.pushState({ apoioModal: topo.token }, '');
       solicitarFecharModal('modal-aula');
       return;
@@ -2602,6 +2605,16 @@
     });
 
     $('#salvar-aula').addEventListener('click', function (e) { salvarAula(e, false); });
+    var corpoAutosaveAula = $('#corpo-modal-aula');
+    ['input', 'change'].forEach(function (tipo) {
+      corpoAutosaveAula.addEventListener(tipo, function (ev) {
+        var alvo = ev.target;
+        if (!alvo || !alvo.matches || !alvo.matches(
+          '#campo-data, #campo-hora, #campo-duracao, #campo-status, #campo-cobrar, ' +
+          '#campo-nota-texto, #campo-nota-privada')) return;
+        agendarAutosaveAula();
+      });
+    });
     if ($('#salvar-preparar-aula')) {
       $('#salvar-preparar-aula').addEventListener('click', function (e) { salvarAula(e, true); });
     }
@@ -3078,17 +3091,93 @@
     } catch (e) { /* sem armazenamento */ }
   }
 
-  function relatoEmEdicaoAlterado() {
+  function valoresEditadosDaAula() {
+    if (!aulaEmEdicao) return null;
+    return {
+      data: $('#campo-data').value,
+      hora: $('#campo-hora').value,
+      duracaoMin: parseInt($('#campo-duracao').value, 10) || 60,
+      status: $('#campo-status').value,
+      cobravel: $('#campo-cobrar').checked,
+      notaTexto: $('#campo-nota-texto') ? $('#campo-nota-texto').value : (aulaEmEdicao.notaTexto || ''),
+      notaPrivada: $('#campo-nota-privada') ? $('#campo-nota-privada').value : (aulaEmEdicao.notaPrivada || '')
+    };
+  }
+
+  function aulaTemMudancasParaAutosave() {
     if (!aulaEmEdicao || !$('#modal-aula').classList.contains('aberto')) return false;
-    var texto = $('#campo-nota-texto'), privado = $('#campo-nota-privada');
-    return !!((texto && texto.value !== (aulaEmEdicao.notaTexto || '')) ||
-      (privado && privado.value !== (aulaEmEdicao.notaPrivada || '')));
+    var v = valoresEditadosDaAula();
+    var antes = snapshotAutosaveAula || {
+      data: aulaEmEdicao.data, hora: aulaEmEdicao.hora || '',
+      duracaoMin: aulaEmEdicao.duracaoMin, status: aulaEmEdicao.status || 'realizada',
+      cobravel: aulaEmEdicao.cobravel, notaTexto: aulaEmEdicao.notaTexto || '',
+      notaPrivada: aulaEmEdicao.notaPrivada || ''
+    };
+    return Object.keys(v).some(function (k) { return v[k] !== antes[k]; });
+  }
+
+  function rotuloEstadoAutosaveAula(texto) {
+    var e = $('#estado-salvamento-aula');
+    if (!e) return;
+    e.textContent = texto || '';
+    e.style.display = texto ? '' : 'none';
+  }
+
+  function gravarAutosaveAula() {
+    if (temporizadorAutosaveAula) clearTimeout(temporizadorAutosaveAula);
+    temporizadorAutosaveAula = null;
+    if (!aulaTemMudancasParaAutosave()) return Promise.resolve(true);
+    if (promessaAutosaveAula) {
+      return promessaAutosaveAula.then(function () { return gravarAutosaveAula(); });
+    }
+
+    var aula = aulaEmEdicao;
+    var valores = valoresEditadosDaAula();
+    var antes = snapshotAutosaveAula || {};
+    var mudancas = {};
+    Object.keys(valores).forEach(function (chave) {
+      if (valores[chave] !== antes[chave]) mudancas[chave] = valores[chave];
+    });
+    if (!Object.keys(mudancas).length) return Promise.resolve(true);
+    /* Autosalvar um encontro repetido destaca esta ocorrência e preserva as irmãs. */
+    Core.aplicarEdicaoAula(db, aula.id, mudancas, 'esta');
+    rotuloEstadoAutosaveAula('Salvando...');
+    promessaAutosaveAula = salvar().then(function () {
+      if (aulaEmEdicao && aulaEmEdicao.id === aula.id) {
+        limparRascunhoRelato(aula.id);
+        rotuloEstadoAutosaveAula('Salvo ' + new Date().toLocaleTimeString('pt-BR', {
+          hour: '2-digit', minute: '2-digit'
+        }));
+        snapshotAutosaveAula = Object.assign({}, valoresEditadosDaAula());
+        $('#titulo-modal-aula').textContent = 'Aula de ' + Core.ddmmaaaa(aula.data);
+        desenharAgenda();
+      }
+      return true;
+    }, function () {
+      if (aulaEmEdicao && aulaEmEdicao.id === aula.id) {
+        rotuloEstadoAutosaveAula('Não foi possível salvar. Tentando novamente.');
+      }
+      return false;
+    }).then(function (resultado) {
+      promessaAutosaveAula = null;
+      if (aulaTemMudancasParaAutosave()) return gravarAutosaveAula();
+      return resultado;
+    });
+    return promessaAutosaveAula;
+  }
+
+  function agendarAutosaveAula() {
+    if (!aulaEmEdicao || !$('#modal-aula').classList.contains('aberto')) return;
+    if (temporizadorAutosaveAula) clearTimeout(temporizadorAutosaveAula);
+    rotuloEstadoAutosaveAula('Alterações pendentes');
+    temporizadorAutosaveAula = setTimeout(function () {
+      gravarAutosaveAula();
+    }, 600);
   }
 
   function solicitarFecharModal(id) {
-    if (id === 'modal-aula' && relatoEmEdicaoAlterado()) {
-      guardarRascunhoRelato(aulaEmEdicao, $('#campo-nota-texto'), $('#campo-nota-privada'));
-      abrirModal('modal-sair-relato');
+    if (id === 'modal-aula' && aulaTemMudancasParaAutosave()) {
+      gravarAutosaveAula().then(function () { fecharModal(id); });
       return;
     }
     fecharModal(id);
@@ -3108,9 +3197,16 @@
 
     $('#titulo-modal-aula').textContent = novo ? 'Nova aula' : 'Aula de ' + Core.ddmmaaaa(aulaEmEdicao.data);
     $('#excluir-aula').style.display = novo ? 'none' : '';
-    if ($('#aviso-salvamento-aula')) $('#aviso-salvamento-aula').style.display = novo ? 'none' : '';
+    if ($('#aviso-salvamento-aula')) $('#aviso-salvamento-aula').style.display = 'none';
+    if (temporizadorAutosaveAula) clearTimeout(temporizadorAutosaveAula);
+    temporizadorAutosaveAula = null;
+    promessaAutosaveAula = null;
+    snapshotAutosaveAula = null;
+    rotuloEstadoAutosaveAula(novo ? '' : 'Salvo ' + new Date().toLocaleTimeString('pt-BR', {
+      hour: '2-digit', minute: '2-digit'
+    }));
     if ($('#salvar-preparar-aula')) $('#salvar-preparar-aula').style.display = novo ? '' : 'none';
-    $('#salvar-aula').textContent = novo ? 'Salvar na agenda' : 'Salvar';
+    $('#salvar-aula').textContent = novo ? 'Salvar na agenda' : 'Concluir registro';
     if ($('#cancelar-aula')) $('#cancelar-aula').textContent = 'Cancelar';
 
     var corpo = $('#corpo-modal-aula');
@@ -3478,14 +3574,6 @@
       areaNota.value = rascunho.notaTexto;
       areaPrivada.value = rascunho.notaPrivada;
     }
-    [areaNota, areaPrivada].forEach(function (campo) {
-      campo.addEventListener('input', function () {
-        clearTimeout(esperaRascunhoRelato);
-        esperaRascunhoRelato = setTimeout(function () {
-          guardarRascunhoRelato(aulaDoRascunho, areaNota, areaPrivada);
-        }, 600);
-      });
-    });
     grupoRegistro.appendChild(el('label', { class: 'campo' }, [
       el('div', { class: 'campo-titulo-com-destino' }, [
         el('span', { texto: 'Nota só minha', class: 'u-peso-negrito' }),
@@ -3566,6 +3654,13 @@
     corpo.appendChild(colunaRegistrar);
     corpo.appendChild(colunaArquivos);
 
+    snapshotAutosaveAula = null;
+    if (aulaEmEdicao) {
+      snapshotAutosaveAula = Object.assign({}, valoresEditadosDaAula(), {
+        notaTexto: aulaEmEdicao.notaTexto || '',
+        notaPrivada: aulaEmEdicao.notaPrivada || ''
+      });
+    }
     atualizarPrevisao();
     abrirModal('modal-aula');
   }

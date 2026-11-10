@@ -8,9 +8,9 @@
  * 5. Organização nos 3 blocos (Preparar, Registrar como foi, Arquivos da aula).
  * 6. Aviso contextual e banner condicionado ao status (aula futura vs realizada vs cancelada).
  * 7. Destinos explícitos: relato público para família vs nota privada só da professora.
- * 8. Aviso de rodapé esclarecendo que assuntos, habilidades e arquivos salvam na hora.
- * 9. Voltar sem salvar: cancelamento descarta edição pendente de notas.
- * 10. Salvar registro: persiste relato público e nota privada com destinos separados.
+ * 8. Edição de horário, situação e relatos salva sozinha com estado no rodapé.
+ * 9. Fechar descarrega alterações pendentes sem descartar dados.
+ * 10. Concluir registro fecha a aula com relatos públicos e privados persistidos.
  * 11. Habilidades e hábitos trabalhados: exemplo curto diferenciando de assunto.
  * 12. Testado exclusivamente via navegação real de UI (sem hooks globais) em 1280x800.
  * 13. Ausência de travessões na interface.
@@ -118,7 +118,7 @@ async function rodar() {
   conf('grupo de Preparar está presente', temGrupoPreparar, true);
 
   const botaoSalvarEmEdicao = await pag.$eval('#salvar-aula', e => e.textContent.trim());
-  conf('botão de salvar volta a ser Salvar simples', botaoSalvarEmEdicao, 'Salvar');
+  conf('botão de salvar fecha o registro já salvo', botaoSalvarEmEdicao, 'Concluir registro');
 
   const prepararOculto = await pag.evaluate(() => {
     const b = document.querySelector('#salvar-preparar-aula');
@@ -165,6 +165,50 @@ async function rodar() {
     return f ? f.textContent : '';
   });
   conf('indica que é aula que se repete', /Aula que se repete/i.test(faixaSerie), true);
+
+  const serieAntes = await pag.evaluate(() => new Promise(resolve => {
+    const req = indexedDB.open('apoio-educacional');
+    req.onsuccess = () => {
+      const db = req.result;
+      const get = db.transaction('dados', 'readonly').objectStore('dados').get('principal');
+      get.onsuccess = () => {
+        db.close();
+        const aulas = get.result.aulas || [];
+        const atual = aulas.find(a => a.data === '2026-06-29' && a.serieId);
+        resolve(atual ? {
+          id: atual.id,
+          serieId: atual.serieId,
+          irmas: aulas.filter(a => a.serieId === atual.serieId && a.id !== atual.id).map(a => a.id)
+        } : null);
+      };
+    };
+  }));
+  conf('a repetição tem outras aulas para proteger', !!serieAntes && serieAntes.irmas.length > 0, true);
+  await pag.evaluate(() => {
+    const hora = document.querySelector('#campo-hora');
+    hora.value = '16:30';
+    hora.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const serieDepois = await esperar('salva o horário só nesta ocorrência', () => pag.evaluate(ids =>
+    new Promise(resolve => {
+      const req = indexedDB.open('apoio-educacional');
+      req.onsuccess = () => {
+        const db = req.result;
+        const get = db.transaction('dados', 'readonly').objectStore('dados').get('principal');
+        get.onsuccess = () => {
+          db.close();
+          const aulas = get.result.aulas || [];
+          resolve({
+            atual: aulas.find(a => a.id === ids.id),
+            irmas: aulas.filter(a => a.serieId === ids.serieId && a.id !== ids.id).map(a => a.hora)
+          });
+        };
+      };
+    }), serieAntes || { id: '', serieId: '' }), v => !!v && !!v.atual && v.atual.hora === '16:30' &&
+      v.irmas.length > 0 && v.irmas.every(h => h === '16:00'), 5000);
+  conf('salvar uma aula da repetição não muda as irmãs', serieDepois.ok, true);
+  const statusAutosaveSerie = await pag.$eval('#estado-salvamento-aula', e => e.textContent.trim());
+  conf('rodapé confirma o salvamento com horário', /^Salvo \d{2}:\d{2}$/.test(statusAutosaveSerie), true);
 
   await pag.click('#modal-aula [data-fechar]');
   await esperar('modal da série fechado', () => pag.evaluate(() =>
@@ -239,41 +283,57 @@ async function rodar() {
 
   // Aviso de salvamento no rodapé
   const textoAvisoRodape = await pag.$eval('#aviso-salvamento-aula', e => e.textContent.trim());
-  conf('aviso de salvamento esclarece que habilidades também salvam na hora',
-    textoAvisoRodape.includes('habilidades'), true);
+  conf('aviso do registro explica que as alterações salvam automaticamente',
+    textoAvisoRodape.includes('automaticamente'), true);
 
   // ================================================================
-  secao('5. Voltar sem salvar: descarta edições pendentes');
+  secao('5. Alterações de horário e relato salvam automaticamente');
 
   await pag.evaluate(() => {
+    const hora = document.querySelector('#campo-hora');
+    hora.value = '10:30';
+    hora.dispatchEvent(new Event('input', { bubbles: true }));
+    hora.dispatchEvent(new Event('change', { bubbles: true }));
     const nota = document.querySelector('#campo-nota-texto');
-    nota.value = 'Texto teste pendente que deve ser descartado';
+    nota.value = 'Relato sintético salvo automaticamente.';
     nota.dispatchEvent(new Event('input', { bubbles: true }));
 
     const priv = document.querySelector('#campo-nota-privada');
-    priv.value = 'Privada pendente que deve ser descartada';
+    priv.value = 'Nota privada sintética salva automaticamente.';
     priv.dispatchEvent(new Event('input', { bubbles: true }));
   });
 
-  // Clica no Cancelar
+  // Fechar imediatamente descarrega a gravação antes do temporizador.
   await pag.click('#cancelar-aula');
-  await pag.evaluate(() => {
-    const b = document.querySelector('#descartar-relato');
-    if (b && document.querySelector('#modal-sair-relato.aberto')) b.click();
-  });
-  await esperar('modal fechado após cancelar', () => pag.evaluate(() =>
+  await esperar('modal fechou depois de descarregar o autosave', () => pag.evaluate(() =>
     !document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
+  const autosavePersistiu = await esperar('horário e notas foram gravados no banco', () => pag.evaluate(id =>
+    new Promise(resolve => {
+      const req = indexedDB.open('apoio-educacional');
+      req.onsuccess = () => {
+        const banco = req.result;
+        const get = banco.transaction('dados', 'readonly').objectStore('dados').get('principal');
+        get.onsuccess = () => {
+          banco.close();
+          const aula = (get.result.aulas || []).find(x => x.id === id);
+          resolve(aula ? { hora: aula.hora, notaTexto: aula.notaTexto, notaPrivada: aula.notaPrivada } : null);
+        };
+      };
+    }), aulaGravada1.id), v => !!v && v.hora === '10:30' &&
+      v.notaTexto === 'Relato sintético salvo automaticamente.' &&
+      v.notaPrivada === 'Nota privada sintética salva automaticamente.', 5000);
+  conf('horário, relato e nota privada salvaram sem botão', autosavePersistiu.ok, true);
 
-  // Reabre via UI e verifica que não gravou
+  // Reabre via UI e confirma que os dados continuam gravados.
   await pag.click('[data-aula-id="' + aulaGravada1.id + '"]');
   await esperar('aula reaberta via UI', () => pag.evaluate(() =>
     document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
 
   const valorNotaDescartada = await pag.$eval('#campo-nota-texto', e => e.value);
-  conf('texto do relato não foi gravado ao cancelar', valorNotaDescartada, '');
+  conf('texto do relato ficou salvo ao fechar', valorNotaDescartada, 'Relato sintético salvo automaticamente.');
 
   const valorPrivadaDescartada = await pag.$eval('#campo-nota-privada', e => e.value);
-  conf('nota privada não foi gravada ao cancelar', valorPrivadaDescartada, '');
+  conf('nota privada ficou salva ao fechar', valorPrivadaDescartada, 'Nota privada sintética salva automaticamente.');
 
   // ================================================================
   secao('6. Salvar registro pedagógico e nota privada');
