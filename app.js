@@ -4215,7 +4215,7 @@
           aoClick: function () { marcarDominioNaAula(aula, t, op.id); }
         }));
       });
-      caixa.appendChild(el('div', { class: 'item-lista item-assunto-aula' }, [
+      caixa.appendChild(el('div', { class: 'item-lista item-assunto-aula', 'data-tema-id': t.id }, [
         el('div', { class: 'cresce' }, [
           el('div', { class: 'nome' }, [
             document.createTextNode(t.titulo || t.id),

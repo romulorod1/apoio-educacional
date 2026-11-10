@@ -276,7 +276,7 @@ const ASSUNTO_COM_MATERIAL = {
     return l ? {
       nome: l.querySelector('.nome').textContent.trim(),
       detalhe: (l.querySelector('.detalhe') || {}).textContent || '',
-      botoes: Array.from(l.querySelectorAll('button')).map(b => b.textContent.trim()).join(',')
+      botoes: Array.from(l.querySelectorAll('button:not(.opcao-dominio)')).map(b => b.textContent.trim()).join(',')
     } : null;
   }, ASSUNTO_LIMPO.titulo), v => !!v && /ano|médio/i.test(v.detalhe), 10000);
   conf('o assunto aparece com o título gravado', linhaLimpa.valor && linhaLimpa.valor.nome, ASSUNTO_LIMPO.titulo);
@@ -310,7 +310,7 @@ const ASSUNTO_COM_MATERIAL = {
     const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => x.textContent.indexOf(t) >= 0);
     return l ? {
       tags: Array.from(l.querySelectorAll('.tag')).map(x => x.textContent.trim()).join(','),
-      botoes: Array.from(l.querySelectorAll('button')).map(b => b.textContent.trim()).join(',')
+      botoes: Array.from(l.querySelectorAll('button:not(.opcao-dominio)')).map(b => b.textContent.trim()).join(',')
     } : null;
   }, ASSUNTO_COM_MATERIAL.titulo), v => !!v, 10000);
   conf('a linha continua dizendo "com material pronto"', linhaAnexo.valor && linhaAnexo.valor.tags, 'com material pronto');

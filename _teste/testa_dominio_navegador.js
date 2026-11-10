@@ -6,8 +6,8 @@
  * trilha e uma aula da semana passada com uma marca anterior.
  *
  * O que se prova:
- *   1. em Registrar como foi, cada assunto da aula tem "Ainda não", "Em
- *      andamento" e "Domina", com o selo "Só você vê";
+ *   1. na aula, cada assunto tem "Ainda não", "Em andamento" e "Domina",
+ *      dentro da própria linha e com o selo "Só você vê";
  *   2. um toque marca e grava; tocar de novo no marcado desmarca e o campo
  *      sai do banco;
  *   3. a trilha: "Em andamento" NÃO fecha o passo, "Domina" fecha com a data
@@ -163,15 +163,15 @@ const doBanco = pag => pag.evaluate(async (a) => {
 // o que a TELA mostra marcado, por assunto
 const naTela = pag => pag.evaluate(() => {
   const r = {};
-  document.querySelectorAll('#bloco-dominio .item-dominio').forEach(l => {
+  document.querySelectorAll('#lista-temas-aula .item-assunto-aula[data-tema-id]').forEach(l => {
     const ativo = l.querySelector('.opcao-dominio.ativa');
-    r[l.dataset.chave] = ativo ? ativo.dataset.estado : '';
+    r[l.dataset.temaId] = ativo ? ativo.dataset.estado : '';
   });
   return r;
 });
 
 const tocar = (pag, chave, estado) => pag.evaluate((c, e) => {
-  const b = document.querySelector('#bloco-dominio .item-dominio[data-chave="' + c + '"] .opcao-dominio[data-estado="' + e + '"]');
+  const b = document.querySelector('#lista-temas-aula .item-assunto-aula[data-tema-id="' + c + '"] .opcao-dominio[data-estado="' + e + '"]');
   if (!b) return false;
   b.click();
   return true;
@@ -189,7 +189,7 @@ async function abrirAulaDeHoje(pag) {
     if (!alvo) return false; alvo.click(); return true;
   }, HOJE);
   const r = await esperar('aula de hoje aberta', () => pag.evaluate(() =>
-    document.querySelector('#modal-aula').classList.contains('aberto') && !!document.querySelector('#bloco-dominio')), v => v === true, 8000);
+    document.querySelector('#modal-aula').classList.contains('aberto') && !!document.querySelector('#lista-temas-aula .item-assunto-aula .opcao-dominio')), v => v === true, 8000);
   return ok && r.ok;
 }
 
@@ -265,27 +265,28 @@ async function printDe(pag, seletor, nome, folga) {
   await RELOGIO.conferir(pag);
 
   // ================================================================
-  secao('1. Em Registrar como foi, os três estados embaixo de cada assunto');
+  secao('1. Controles de domínio em cada linha da aula');
   const semente = await semear(pag);
   conf('a trilha foi montada com os dois passos da aula', semente.passos.slice(0, 2).join(','), T1 + ',' + T2);
   await H.abrirApp(pag, amb.ORIGEM);
   conf('a aula de hoje abriu', await abrirAulaDeHoje(pag), true);
   const bloco = await pag.evaluate(() => {
-    const b = document.querySelector('#bloco-dominio');
+    const b = document.querySelector('#lista-temas-aula');
     return {
-      dentroDoRegistro: !!b.closest('#grupo-registro'),
-      linhas: Array.from(b.querySelectorAll('.item-dominio')).map(l => ({
-        chave: l.dataset.chave, nome: l.querySelector('.nome').textContent,
+      linhas: Array.from(b.querySelectorAll('.item-assunto-aula[data-tema-id]')).map(l => ({
+        chave: l.dataset.temaId, nome: l.querySelector('.nome').textContent,
         botoes: Array.from(l.querySelectorAll('.opcao-dominio')).map(x => x.textContent.trim())
       })),
-      selo: (b.querySelector('.destino-privado') || {}).textContent
+      controlesNaLinha: Array.from(b.querySelectorAll('.item-assunto-aula[data-tema-id]')).every(l =>
+        !!l.querySelector('.dominio-assunto-controles') && l.querySelectorAll('.opcao-dominio').length === 3),
+      selo: (b.querySelector('.dominio-assuntos-privado') || {}).textContent
     };
   });
-  conf('o bloco mora em Registrar como foi', bloco.dentroDoRegistro, true);
+  conf('os controles ficam na própria linha de cada assunto', bloco.controlesNaLinha, true);
   conf('uma linha por assunto da aula', bloco.linhas.map(l => l.chave), [T1, T2]);
   conf('com o título do assunto', bloco.linhas[0].nome, semente.t1);
   conf('três botões, na ordem', bloco.linhas[0].botoes, ['Ainda não', 'Em andamento', 'Domina']);
-  conf('com o selo "Só você vê"', bloco.selo, 'Só você vê');
+  conf('com o selo "Só você vê"', bloco.selo, 'Domínio por assunto · Só você vê');
   conf('nada marcado de começo', await naTela(pag), { [T1]: '', [T2]: '' });
 
   // ================================================================
@@ -295,7 +296,7 @@ async function printDe(pag, seletor, nome, folga) {
   conf('um toque grava "Em andamento"', g.valor.dom[T1], 'andamento');
   conf('e a tela mostra marcado', (await naTela(pag))[T1], 'andamento');
   conf('o botão marcado diz aria-pressed', await pag.evaluate(c =>
-    document.querySelector('#bloco-dominio .item-dominio[data-chave="' + c + '"] .opcao-dominio.ativa').getAttribute('aria-pressed'), T1), 'true');
+    document.querySelector('#lista-temas-aula .item-assunto-aula[data-tema-id="' + c + '"] .opcao-dominio.ativa').getAttribute('aria-pressed'), T1), 'true');
   await tocar(pag, T1, 'andamento');
   g = await esperar('desmarcado no banco', () => doBanco(pag), v => v.dom[T1] === '(sem campo)', 5000);
   conf('tocar de novo no marcado desmarca, e o campo sai do banco', g.valor.dom[T1], '(sem campo)');
@@ -330,7 +331,7 @@ async function printDe(pag, seletor, nome, folga) {
   await tocar(pag, T1, 'domina');
   g = await esperar('passo 1 fechado de novo', () => doBanco(pag), v => !!v.p1.feitoEm, 5000);
   conf('e marcar de novo fecha de novo', g.valor.p1.feitoEm, HOJE);
-  await printDe(pag, '#bloco-dominio', '01_registrar_como_foi_dominio.png', 16);
+  await printDe(pag, '#lista-temas-aula', '01_assunto_com_dominio.png', 16);
 
   // ================================================================
   secao('4. Tudo sobrevive a recarregar');
