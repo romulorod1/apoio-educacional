@@ -949,7 +949,8 @@
       }
       return proximo().then(function () {
           return { manifest: manifest, livros: livros.filter(function (l) { return !!l.blob; }),
-            idsDoPacote: livros.map(function (l) { return l.meta.id; }), erros: erros, bytesTotais: bytesTotais,
+            idsDoPacote: livros.map(function (l) { return l.meta.id; }).concat(recusados.map(function (l) { return l.id; })),
+            erros: erros, bytesTotais: bytesTotais,
             recusados: recusados };
       });
     }).catch(function (e) {

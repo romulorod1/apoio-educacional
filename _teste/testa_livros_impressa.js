@@ -176,6 +176,7 @@ function carregarFuncoesDeTela(Bib) {
   let ultimoDesenho = null;
   let ultimoLeitorPdf = null;
   let ultimaPosicaoGravada = null;
+  let idsPreservadosNaGravacao = null;
   const livrosGuardados = {};
   const posicoesGuardadas = {};
   const ctx = {
@@ -187,7 +188,10 @@ function carregarFuncoesDeTela(Bib) {
       listarLivros: () => Promise.resolve(Object.keys(livrosGuardados).map(k => livrosGuardados[k])),
       estimarEspaco: () => Promise.resolve(null),
       tornarPersistente: () => Promise.resolve(),
-      gravarLivros: () => Promise.resolve({ novos: 1, atualizados: 0, iguais: 0, maisNovos: 0, removidos: 0, posicoesSoltas: 0, deOutroPacote: [] })
+      gravarLivros: (aberto, preservarIds) => {
+        idsPreservadosNaGravacao = preservarIds;
+        return Promise.resolve({ novos: 1, atualizados: 0, iguais: 0, maisNovos: 0, removidos: 0, posicoesSoltas: 0, deOutroPacote: [] });
+      }
     },
     Core: { materiaPorId: () => ({ rotulo: 'Matemática' }), MATERIA_PADRAO: 'matematica' },
     SERIES_NOMES: [['06', '6º ano'], ['07', '7º ano']],
@@ -229,6 +233,7 @@ function carregarFuncoesDeTela(Bib) {
     elementos,
     livrosGuardados,
     posicoesGuardadas,
+    lerIdsPreservadosNaGravacao: () => idsPreservadosNaGravacao,
     lerUltimoDesenho: () => ultimoDesenho,
     lerUltimoLeitorPdf: () => ultimoLeitorPdf,
     lerUltimaPosicaoGravada: () => ultimaPosicaoGravada
@@ -423,6 +428,7 @@ const LIVRO_SEM_NUMERACAO = {
     ['estilo desconhecido', [{ de: 2, ate: 10, inicio: 1, estilo: 'grego' }], /estilo desconhecido/],
     ['numeracao que não é lista', { de: 2, ate: 10, inicio: 1, estilo: 'arabico' }, /não é uma lista/]
   ];
+  let ultimoAbertoMisto = null;
 
   for (const [nome, numInvalida, padrao] of invalidos) {
     const ruim = Object.assign({}, LIVRO_COM_NUMERACAO, {
@@ -437,10 +443,12 @@ const LIVRO_SEM_NUMERACAO = {
     const espiadoMisto = await Biblioteca.espiarPacote(blobMisto);
     let abertoMisto = null, erroMisto = null;
     try { abertoMisto = await Biblioteca.abrirLivrosDoArquivo(espiadoMisto); } catch (e) { erroMisto = e; }
+    ultimoAbertoMisto = abertoMisto;
     const soRuimRecusado = !erroMisto && abertoMisto && abertoMisto.livros.length === 1 &&
       abertoMisto.livros[0].meta.id === bom.id &&
       abertoMisto.recusados && abertoMisto.recusados.length === 1 &&
       abertoMisto.recusados[0].id === 'livro-ruim' &&
+      abertoMisto.idsDoPacote.includes('livro-ruim') &&
       padrao.test(abertoMisto.recusados[0].motivo);
     conf('pacote misto (' + nome + '): recusa só o livro inválido e preserva o válido', soRuimRecusado, true);
 
@@ -465,6 +473,9 @@ const LIVRO_SEM_NUMERACAO = {
   const avisoParcial = resultadoParcial.linhas.join(' ');
   conf('importacao mista avisa que o livro recusado nao entrou',
     /livro n\u00e3o foi importado por numera\u00e7\u00e3o impressa inv\u00e1lida/i.test(avisoParcial) && /livro-ruim/.test(avisoParcial), true);
+  await tela.importarLivros(ultimoAbertoMisto, () => {});
+  conf('a gravação do pacote recebe o ID recusado para preservar a cópia instalada',
+    tela.lerIdsPreservadosNaGravacao().includes('livro-ruim'), true);
 
   if (qualVeneno) {
     console.log('\n=== Modo envenenado: ' + qualVeneno + ' ===');
