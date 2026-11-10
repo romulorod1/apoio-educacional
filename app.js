@@ -5,6 +5,9 @@
   'use strict';
 
   var VERSAO = '1.42.46';
+  /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
+   * Versões posteriores do app podem trazer apenas ajustes de interface. */
+  var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -24252,7 +24255,9 @@
     });
     var linhas = linhasDoDiaCelular(dia), aulas = linhas.filter(function (l) { return l.tipo === 'aula'; });
     var grupos = [], grupo = null;
-    aulas.filter(function (l) { return l.aula.status !== 'cancelada'; }).sort(function (a, b) { return a.ini - b.ini; }).forEach(function (l) {
+    /* A cancelada não ocupa horário livre, mas ainda precisa de uma faixa
+     * visual quando coincide com uma aula ativa, para não sumir por baixo. */
+    aulas.sort(function (a, b) { return a.ini - b.ini; }).forEach(function (l) {
       if (!grupo || l.ini >= grupo.fim) { grupo = { fim: l.fim, itens: [] }; grupos.push(grupo); }
       grupo.fim = Math.max(grupo.fim, l.fim);
       grupo.itens.push(l);
@@ -24276,6 +24281,10 @@
     linhas.filter(function (l) { return l.tipo === 'livre'; }).forEach(function (l) {
       var ini = Math.max(inicioGrade, l.ini), fim = Math.min(fimGrade, l.fim);
       if (fim - ini < 30) return;
+      /* No celular da dona, o cartão livre contém uma descrição e botões de
+       * pelo menos 48 px. Gaps curtos não comportam o conjunto sem invadir a
+       * próxima aula; no modo de consulta permanece o resumo textual curto. */
+      if (edita && posicao(fim) - posicao(ini) < 84) return;
       var linha = linhaProporcional('livre', ini, fim, 26);
       linha.querySelector('.cel-tempo-item').appendChild(buracoLivreCelular({ ini: ini, fim: fim }, dia, edita));
       caixa.appendChild(linha);
@@ -24285,7 +24294,7 @@
       if (fim <= inicioGrade || inicio >= fimGrade) return;
       var topo = posicao(inicio), baixo = posicao(fim);
       var bloco = blocoDaAulaCelular(l.aula, marcas[l.aula.id], !!semRegistro[l.aula.id]);
-      var g = l.aula.status === 'cancelada' ? null : grupos.find(function (x) { return x.itens.indexOf(l) >= 0; });
+      var g = grupos.find(function (x) { return x.itens.indexOf(l) >= 0; });
       var faixas = g ? g.faixas : 1, faixa = g ? l.faixa : 0;
       bloco.classList.add('cel-tempo-bloco-grade');
       bloco.style.cssText += ';top:0;height:100%;left:' + (100 * faixa / faixas) + '%;width:' + (100 / faixas) + '%;z-index:' + (l.aula.status === 'cancelada' ? 2 : 3);
@@ -25986,17 +25995,14 @@
     return Promise.race([lida, espera]);
   }
 
-  /* Um tablet numa versão anterior a esta não conhece a regra da mensagem do
-   * mês (vence a escrita mais recente) e, com uma edição dele mais velha na
-   * fila, cobriria a do celular. Enquanto o tablet não atualiza, o celular não
-   * edita a mensagem. */
+  /* Um tablet anterior ao protocolo da mensagem do mês (1.42.40) não conhece
+   * a regra de escrita mais recente e poderia cobrir a edição do celular. A
+   * versão atual do app é independente desse mínimo, pois pode mudar só a UI. */
   function abrirMensagemCelular(alunoId, mes) {
     if (!podeEditarMensagemCelular()) return;
     return versaoDoTabletCelular().then(function (v) {
-      /* A regra da mensagem do mês está estável desde 1.42.40. Exigir a
-       * versão inteira do app bloqueava tablets mais antigos compatíveis. */
-      if (v && Core.versaoAntes(v.app, '1.42.40') === true) {
-        avisar('Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão ' + v.app + ', e esta é a ' + VERSAO + '.');
+      if (v && Core.versaoAntes(v.app, VERSAO_MINIMA_PROTOCOLO_MENSAGEM) === true) {
+        avisar('Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão ' + v.app + ', e precisa estar na versão ' + VERSAO_MINIMA_PROTOCOLO_MENSAGEM + ' ou mais recente.');
         return;
       }
       abrirEditorDaMensagemCelular(alunoId, mes);
