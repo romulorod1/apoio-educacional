@@ -359,6 +359,27 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     return;
   }
   conf('tocar no capítulo 2 abre o leitor na página 3 do arquivo', r2.valor, '3');
+  const continuo = await pag.evaluate(() => ({
+    paginas: document.querySelectorAll('#corpo-modal-leitor-pdf .leitor-pdf-pagina').length,
+    sliderMax: document.querySelector('#leitor-slider-pagina').max,
+    pagina3: !!document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="3"] canvas')
+  }));
+  conf('o leitor do livro prepara as seis páginas em rolagem contínua', continuo.paginas, 6);
+  conf('a barra de página cobre o livro inteiro', continuo.sliderMax, '6');
+  conf('a página aberta está desenhada', continuo.pagina3, true);
+  await pag.evaluate(() => document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="5"]').scrollIntoView({ block: 'start' }));
+  const r5 = await esperar('rolagem contínua até a página 5', () => paginaDesenhada(pag), v => v === '5', 5000);
+  conf('rolar atualiza a página guardada', r5.valor, '5');
+  await pag.evaluate(() => {
+    const slider = document.querySelector('#leitor-slider-pagina');
+    slider.value = '6';
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const r6 = await esperar('a barra leva à página 6', () => paginaDesenhada(pag), v => v === '6', 5000);
+  conf('a barra leva à página escolhida', r6.valor, '6');
+  await pag.evaluate(() => document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="3"]').scrollIntoView({ block: 'start' }));
+  const volta3 = await esperar('rolagem contínua de volta à página 3', () => paginaDesenhada(pag), v => v === '3', 5000);
+  conf('a página do capítulo continua sendo a atual', volta3.valor, '3');
   await fecharModal(pag, 'modal-leitor-pdf');
   await esperar('a tela do livro com a posição nova', () => lerLivro(pag), v => v.visivel && /p\. 3/.test(v.continuar), 5000);
   await clicar(pag, '#bib-livro .bibl-sec[data-n="3"]');
