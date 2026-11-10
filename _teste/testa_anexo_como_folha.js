@@ -23,6 +23,11 @@
 'use strict';
 const path = require('path');
 const H = require('./_bib_navegador');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const amb = H.criarAmbiente(8858, 'nath_c3_anexo_como_folha');
 const { conf, secao, esperar, pausa } = H;
 const SALVAR = process.env.SALVAR_PRINTS || '';
@@ -32,7 +37,7 @@ const AULA = 'aula_c3_1';
 const FOTO = { id: 'anexo_c3_foto', nome: 'lista_escola_alfa_foto.png' };
 const PDF = { id: 'anexo_c3_pdf', nome: 'lista_escola_alfa.pdf' };
 const DOCX = { id: 'anexo_c3_docx', nome: 'redacao_alfa_teste.docx' };
-const hojeIso = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+const hojeIso = RELOGIO.dia(0);
 
 /* O PDF de duas páginas: um retângulo grande de uma cor por página (vermelho,
  * azul). A cor é o que se procura no canvas da folha: fundo branco não prova
@@ -188,8 +193,10 @@ const perguntou = pag => pag.evaluate(() => window.__perguntou);
 (async () => {
   await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
   await H.abrirApp(pag, amb.ORIGEM);
+  await RELOGIO.conferir(pag);
 
   const pdf = pdfDeTeste();
   await pag.evaluate(async (dados) => {

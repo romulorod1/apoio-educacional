@@ -139,8 +139,11 @@
  * Versão silenciosa. O v105 (N2 fatia 1) traz as folhas por página na nuvem
  * (app.js, nuvem.js, store.js, draw.js e styles.css), com a lista igual. O v106 (sistema visual) traz os tokens, a escala de letras e o conjunto de ícones (app.js, index.html e styles.css), com a lista igual. O v107 traz o celular sem transbordo: o aviso de versão em
  * duas linhas, a barra de cima menor e a trava de transbordo (app.js e
- * styles.css), com a lista igual. O v108 (índice dos livros) traz o indexador em segundo plano, indice-livros.js, na lista de arquivos (app.js, index.html, store.js e sw.js). O v109 (N2 fatia 2) traz PDFs e fotos anexados a aulas para a sincronização na nuvem. */
-var CACHE = 'apoio-educacional-v109';
+ * styles.css), com a lista igual. O v108 (índice dos livros) traz o indexador
+ * em segundo plano, indice-livros.js, na lista de arquivos (app.js, index.html,
+ * store.js e sw.js). O v109 fixa a altura da linha de proposta entre
+ * plataformas. O v110 (N2 fatia 2) sincroniza PDFs e fotos anexados a aulas. */
+var CACHE = 'apoio-educacional-v110';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

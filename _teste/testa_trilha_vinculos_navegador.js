@@ -1,13 +1,20 @@
 /* C7: o índice atualizado prevalece sobre vínculo antigo gravado na trilha. */
 'use strict';
 const H = require('./_bib_navegador');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const amb = H.criarAmbiente(8872, 'nath_c7_vinculos');
 const { conf, esperar } = H;
 
 (async () => {
   await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   await H.abrirApp(pag, amb.ORIGEM);
+  await RELOGIO.conferir(pag);
   await pag.evaluate(async () => {
     const dados = await Store.carregar();
     const passos = [
@@ -135,6 +142,7 @@ const { conf, esperar } = H;
   conf('Voltar confirmado fecha só a proposta', descartou.ok, true);
 
   const semIndice = await amb.pagina();
+  await RELOGIO.naPagina(semIndice);
   await semIndice.evaluateOnNewDocument(() => {
     const original = window.fetch;
     window.fetch = function (url) {
