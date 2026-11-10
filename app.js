@@ -2721,6 +2721,10 @@
         if (ev.key === 'Enter') { ev.preventDefault(); irParaPaginaDoLeitor(this.value); }
       });
     }
+    $('#corpo-modal-leitor-pdf').addEventListener('scroll', rolarLeitorContinuo, { passive: true });
+    $('#leitor-slider-pagina').addEventListener('input', function () {
+      if (leitor && leitor.continuo) irAProximaPaginaDoLeitor(+this.value, true);
+    });
     $('#epub-anterior').addEventListener('click', function () { andarNoEpub(-1); });
     $('#epub-proximo').addEventListener('click', function () { andarNoEpub(1); });
     $('#epub-sumario').addEventListener('click', alternarSumarioEpub);
@@ -16368,7 +16372,7 @@
         titulo: tituloDoLivro(reg.meta), nome: reg.id + '.pdf',
         pagina: (destino && destino.pagina) || Biblioteca.paginaDaPosicao(reg.meta, pos) || 1,
         sumario: sumario, livro: reg,
-        dica: sumario.length ? '' : 'Este livro não tem sumário: use Anterior e Próxima.',
+        dica: sumario.length ? '' : 'Este livro não tem sumário: role as páginas ou use a barra de página.',
         aoMudarPagina: function (n) {
           Store.gravarPosicaoLivro({ id: id, pagina: n }).catch(function () { /* a leitura segue; só a posição não fica */ });
           mostrarCobre('pdf', reg, n);
@@ -16957,10 +16961,40 @@
     // o que exportar: o capítulo à vista, ou (no PDF) as páginas que ela escrever
     var radioCap = el('input', { type: 'radio', name: 'livro-exportar-o-que', id: 'livro-exportar-capitulo', value: 'capitulo' });
     var radioPag = el('input', { type: 'radio', name: 'livro-exportar-o-que', id: 'livro-exportar-paginas', value: 'paginas' });
-    var campoPag = el('input', { type: 'text', id: 'livro-exportar-quais', autocomplete: 'off', inputmode: 'numeric',
-      value: epub ? '' : String(origem.pagina || 1), placeholder: 'por exemplo 3-5, 8' });
+    var paginaInicial = epub ? '' : (Biblioteca.paginaImpressa(meta, origem.pagina) ||
+      (meta.numeracao && meta.numeracao.length ? 'arquivo ' + (origem.pagina || 1) : (origem.pagina || 1)));
+    var campoPag = el('input', { type: 'text', id: 'livro-exportar-quais', autocomplete: 'off', inputmode: 'text',
+      value: String(paginaInicial), placeholder: 'por exemplo 45-48, 52' });
     var opcoes = el('div', { class: 'livro-exportar-opcoes' });
     var partesDoCap = entrada ? Biblioteca.partesDoCapitulo(meta, entrada, false).capitulo : [];
+    var paginasMarcadas = {};
+    var gradePaginas = el('div', { class: 'livro-exportar-grade', id: 'livro-exportar-grade-paginas', hidden: true,
+      'aria-label': 'Páginas do capítulo' });
+    if (!epub) {
+      var paginaAtualArquivo = Number(origem.pagina) || 1;
+      paginasMarcadas[paginaAtualArquivo] = true;
+      if (partesDoCap.length) {
+        gradePaginas.appendChild(el('p', { class: 'ajuda', texto: 'Toque para marcar. Os números são os da página impressa.' }));
+        var botoesPaginas = el('div', { class: 'livro-exportar-grade-botoes' });
+        var paginasDaGrade = partesDoCap.slice();
+        if (paginasDaGrade.indexOf(paginaAtualArquivo) < 0) paginasDaGrade.push(paginaAtualArquivo);
+        paginasDaGrade.sort(function (a, b) { return a - b; }).forEach(function (paginaArquivo) {
+          var impressa = Biblioteca.paginaImpressa(meta, paginaArquivo);
+          var rotulo = impressa || paginaArquivo;
+          var b = el('button', { type: 'button', class: 'livro-exportar-pagina',
+            'aria-label': (impressa ? 'Página impressa ' + rotulo : 'Página do arquivo ' + rotulo),
+            'aria-pressed': paginasMarcadas[paginaArquivo] ? 'true' : 'false', 'data-pagina-arquivo': paginaArquivo,
+            texto: impressa || (meta.numeracao && meta.numeracao.length ? 'arq. ' + paginaArquivo : String(rotulo)) });
+          b.addEventListener('click', function () {
+            if (paginasMarcadas[paginaArquivo]) delete paginasMarcadas[paginaArquivo];
+            else paginasMarcadas[paginaArquivo] = true;
+            sincronizarCampoPaginas();
+          });
+          botoesPaginas.appendChild(b);
+        });
+        gradePaginas.appendChild(botoesPaginas);
+      }
+    }
     if (entrada && partesDoCap.length) {
       opcoes.appendChild(el('label', { class: 'bib-marcar' }, [radioCap,
         el('span', { texto: 'O capítulo: ' + entrada.titulo + ' (' + Biblioteca.descreverUnidades(partesDoCap, nomeUnidade) + ')' })]));
@@ -16968,10 +17002,71 @@
     if (!epub) {
       opcoes.appendChild(el('label', { class: 'bib-marcar' }, [radioPag, el('span', { texto: 'Páginas escolhidas' })]));
       opcoes.appendChild(el('label', { class: 'campo livro-exportar-quais' }, [
-        el('span', { texto: 'Quais páginas (o livro vai da 1 à ' + (meta.paginas || '?') + ')' }), campoPag]));
+        el('span', { texto: (meta.numeracao && meta.numeracao.length ? 'Quais páginas impressas' : 'Quais páginas') + ' (o livro vai da 1 à ' + (meta.paginas || '?') + ')' }), campoPag]));
     }
     if (entrada && partesDoCap.length) radioCap.checked = true; else radioPag.checked = true;
     corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'O que exportar' }), opcoes]));
+    if (!epub && partesDoCap.length) corpo.appendChild(gradePaginas);
+
+    function lerPaginasDoCampo() {
+      if (!meta.numeracao || !meta.numeracao.length) return Biblioteca.paginasEscolhidas(campoPag.value, meta.paginas || 0);
+      var texto = String(campoPag.value || '').trim();
+      if (!texto) return { erro: 'Escreva as páginas, por exemplo 45-48, 52.' };
+      var itens = texto.split(/[,;]+|\s+e\s+/i), paginas = [];
+      for (var i = 0; i < itens.length; i++) {
+        var m = /^(?:(arquivo)\s+)?([\da-z]+)(?:\s*(?:-|a|até)\s*(?:(arquivo)\s+)?([\da-z]+))?$/i.exec(itens[i].trim());
+        if (!m) return { erro: 'Não entendi "' + itens[i].trim() + '". Escreva páginas impressas, por exemplo 45-48, 52.' };
+        var aTexto = m[2], bTexto = m[4] || m[2];
+        var arquivoExplicito = !!m[1] || !!m[3];
+        if (arquivoExplicito && ((m[3] && !m[1]) || (m[1] && m[3] && !m[4]))) return { erro: 'Use o mesmo tipo de página no intervalo.' };
+        if (arquivoExplicito) {
+          var arqA = parseInt(aTexto, 10), arqZ = parseInt(bTexto, 10);
+          if (!/^\d+$/.test(aTexto) || !/^\d+$/.test(bTexto) || arqA < 1 || arqZ < 1) return { erro: 'A página do arquivo deve ser um número positivo.' };
+          if (arqA > arqZ) { var trocaArq = arqA; arqA = arqZ; arqZ = trocaArq; }
+          if (arqZ > (meta.paginas || 0)) return { erro: 'O livro vai da página 1 à ' + (meta.paginas || '?') + '.' };
+          for (var pArq = arqA; pArq <= arqZ; pArq++) {
+            if (paginas.indexOf(pArq) < 0) paginas.push(pArq);
+            if (paginas.length > Biblioteca.TETO_DE_PAGINAS_EXPORTADAS) return { erro: 'No máximo ' + Biblioteca.TETO_DE_PAGINAS_EXPORTADAS + ' páginas por PDF.' };
+          }
+          continue;
+        }
+        var romano = /[ivxlcdm]/i.test(aTexto + bTexto);
+        if (romano !== /[ivxlcdm]/i.test(aTexto) || romano !== /[ivxlcdm]/i.test(bTexto)) return { erro: 'Use páginas do mesmo tipo no intervalo.' };
+        var estilo = romano ? 'romano' : 'arabico';
+        var a = romano ? Biblioteca.deRomano(aTexto) : parseInt(aTexto, 10);
+        var z = romano ? Biblioteca.deRomano(bTexto) : parseInt(bTexto, 10);
+        if (!a || !z) return { erro: 'Essa página impressa não existe no livro.' };
+        if (a > z) { var troca = a; a = z; z = troca; }
+        for (var n = a; n <= z; n++) {
+          var impressa = estilo === 'romano' ? Biblioteca.paraRomano(n) : n;
+          var arquivo = Biblioteca.paginaDoArquivo(meta, impressa, estilo);
+          if (arquivo === null) return { erro: 'A página impressa ' + impressa + ' não existe no livro.' };
+          if (paginas.indexOf(arquivo) < 0) paginas.push(arquivo);
+          if (paginas.length > Biblioteca.TETO_DE_PAGINAS_EXPORTADAS) return { erro: 'No máximo ' + Biblioteca.TETO_DE_PAGINAS_EXPORTADAS + ' páginas por PDF.' };
+        }
+      }
+      return paginas.length ? { paginas: paginas.sort(function (x, y) { return x - y; }) } : { erro: 'Escreva as páginas impressas.' };
+    }
+    function sincronizarCampoPaginas() {
+      var escolhidas = Object.keys(paginasMarcadas).map(Number).sort(function (a, b) { return a - b; });
+      campoPag.value = escolhidas.map(function (n) {
+        return Biblioteca.paginaImpressa(meta, n) || (meta.numeracao && meta.numeracao.length ? 'arquivo ' + n : n);
+      }).join(', ');
+      $$('#livro-exportar-grade-paginas [data-pagina-arquivo]').forEach(function (b) {
+        b.setAttribute('aria-pressed', paginasMarcadas[b.dataset.paginaArquivo] ? 'true' : 'false');
+      });
+      atualizarTamanho();
+    }
+    campoPag.addEventListener('input', function () {
+      var r = lerPaginasDoCampo();
+      if (!r.erro) {
+        paginasMarcadas = {};
+        r.paginas.forEach(function (n) { paginasMarcadas[n] = true; });
+        $$('#livro-exportar-grade-paginas [data-pagina-arquivo]').forEach(function (b) {
+          b.setAttribute('aria-pressed', paginasMarcadas[b.dataset.paginaArquivo] ? 'true' : 'false');
+        });
+      }
+    });
 
     // o gabarito do capítulo, no mesmo PDF
     var caixaGab = el('input', { type: 'checkbox', id: 'livro-exportar-gabarito' });
@@ -17001,6 +17096,7 @@
       motivoGab.dataset.estado = !temGabarito ? 'sem_no_livro' : doCapitulo ? 'tem' : 'sem_no_capitulo';
       // o campo das páginas só vale com "Páginas escolhidas" marcada (painel cego)
       campoPag.disabled = !radioPag.checked;
+      gradePaginas.hidden = !radioPag.checked;
       atualizarTamanho();
     }
     /* O TAMANHO ESTIMADO, antes de gerar: cada página do livro vira uma imagem
@@ -17079,7 +17175,7 @@
         var p = Biblioteca.partesDoCapitulo(meta, entrada, caixaGab.checked && !caixaGab.disabled);
         return { capitulo: p.capitulo, gabarito: p.gabarito, titulo: entrada.titulo, entrada: entrada };
       }
-      var r = Biblioteca.paginasEscolhidas(campoPag.value, meta.paginas || 0);
+      var r = lerPaginasDoCampo();
       if (r.erro) return { erro: r.erro };
       var e1 = Biblioteca.entradaDoMapa(mapa, 'pdf', r.paginas[0]);
       // as páginas escolhidas, todas de um capítulo só, levam o nome dele no rodapé
@@ -22536,6 +22632,8 @@
     $('#leitor-sumario').hidden = !(opcoes.sumario && opcoes.sumario.length);
     // "Exportar em PDF" (C15.4) e "Ir para a página" (B3) só no livro
     $('#leitor-exportar').hidden = !opcoes.livro;
+    $('#leitor-exportar').textContent = 'Exportar páginas';
+    $('#leitor-pdf-navegacao').hidden = !opcoes.livro;
     if ($('#leitor-ir-caixa')) $('#leitor-ir-caixa').hidden = !opcoes.livro;
     fecharSumarioDoLeitor();
     // "Este capítulo cobre" (C15.2) nasce escondido: só o livro o mostra, a cada página
@@ -22566,7 +22664,7 @@
       estado.doc = doc;
       estado.total = doc.numPages;
       estado.pagina = Math.min(estado.pagina, estado.total);
-      return desenharPaginaDoLeitor(true);
+      return opcoes.livro ? abrirLeitorContinuo(estado) : desenharPaginaDoLeitor(true);
     }).catch(function () {
       if (vez !== leitorVez) return false;
       mostrarFalhaDoLeitor(falha || 'pdf');
@@ -22646,6 +22744,11 @@
     var meta = tem && leitor.opcoes && leitor.opcoes.livro ? leitor.opcoes.livro.meta : null;
     var imp = meta ? Biblioteca.paginaImpressa(meta, leitor.pagina) : null;
     $('#leitor-contador').textContent = tem ? textoDoContadorDoLeitor(meta, leitor.pagina, leitor.total) : '';
+    var slider = $('#leitor-slider-pagina');
+    if (slider) {
+      slider.disabled = !tem || !leitor.continuo;
+      if (tem) { slider.min = '1'; slider.max = String(leitor.total); slider.value = String(leitor.pagina); }
+    }
     var ir = $('#leitor-ir-pagina');
     if (ir) {
       ir.disabled = !tem;
@@ -22670,8 +22773,8 @@
       return false;
     }
     fecharSumarioDoLeitor();
-    leitor.pagina = destino;
-    desenharPaginaDoLeitor(true);
+    if (leitor.continuo) irAProximaPaginaDoLeitor(destino, false);
+    else { leitor.pagina = destino; desenharPaginaDoLeitor(true); }
     return true;
   }
 
@@ -22691,8 +22794,9 @@
     desenharSumario(lista, sumario, entradaAtualDoSumario(sumario, 'pagina', leitor.pagina), function (e) {
       fecharSumarioDoLeitor();
       if (!leitor || !leitor.doc) return;
-      leitor.pagina = Math.max(1, Math.min(leitor.total, e.pagina));
-      desenharPaginaDoLeitor(true);
+      var destino = Math.max(1, Math.min(leitor.total, e.pagina));
+      if (leitor.continuo) irAProximaPaginaDoLeitor(destino, false);
+      else { leitor.pagina = destino; desenharPaginaDoLeitor(true); }
     }, meta);
     lista.hidden = false;
     $('#leitor-sumario').setAttribute('aria-expanded', 'true');
@@ -22707,6 +22811,7 @@
   function desenharPaginaDoLeitor(paraOAlto) {
     var estado = leitor;
     if (!estado || !estado.doc) return Promise.resolve(false);
+    if (estado.continuo) return redimensionarLeitorContinuo(paraOAlto);
     var vez = ++leitorDesenho;
     var n = estado.pagina;
     if (leitorTarefa) { leitorTarefa.cancel(); leitorTarefa = null; }
@@ -22748,12 +22853,175 @@
     });
   }
 
+  /* O livro inteiro é uma faixa contínua. Os espaços mantêm o tamanho das
+   * páginas; IntersectionObserver desenha só as que estão perto da tela e
+   * libera as distantes para que livros grandes não mantenham centenas de
+   * canvases na memória. Anexos de aula continuam no leitor de página única. */
+  function abrirLeitorContinuo(estado) {
+    var corpo = $('#corpo-modal-leitor-pdf');
+    estado.continuo = true;
+    estado.paginas = [];
+    corpo.innerHTML = '';
+    return estado.doc.getPage(1).then(function (primeira) {
+      if (estado !== leitor) return false;
+      var base = primeira.getViewport({ scale: 1 });
+      estado.proporcaoPagina = base.height / base.width;
+      var largura = Math.max(160, corpo.clientWidth - 36);
+      var frag = document.createDocumentFragment();
+      for (var n = 1; n <= estado.total; n++) {
+        var caixa = el('div', { class: 'leitor-pdf-pagina', 'data-pagina-arquivo': String(n),
+          'aria-label': 'Página ' + n + ' de ' + estado.total });
+        caixa.style.width = Math.floor(largura * estado.zoom) + 'px';
+        caixa.style.height = Math.ceil(largura * estado.zoom * estado.proporcaoPagina) + 'px';
+        caixa.appendChild(el('div', { class: 'leitor-pdf-pagina-vazia', 'aria-hidden': 'true' }));
+        var registro = { n: n, caixa: caixa, visivel: false, tarefa: null, desenhando: false };
+        estado.paginas.push(registro);
+        frag.appendChild(caixa);
+      }
+      corpo.appendChild(frag);
+      estado.observadorPaginas = typeof IntersectionObserver === 'function' ? new IntersectionObserver(function (entradas) {
+        entradas.forEach(function (e) {
+          var pagina = estado.paginas[+e.target.dataset.paginaArquivo - 1];
+          if (!pagina) return;
+          pagina.visivel = e.isIntersecting;
+          if (e.isIntersecting) desenharPaginaContinua(estado, pagina);
+          else if (Math.abs(pagina.n - estado.pagina) > 1) liberarPaginaContinua(pagina);
+        });
+      }, { root: corpo, rootMargin: '700px 0px' }) : null;
+      estado.paginas.forEach(function (p) { if (estado.observadorPaginas) estado.observadorPaginas.observe(p.caixa); });
+      corpo.dataset.paginaDesenhada = String(estado.pagina);
+      atualizarBarraDoLeitor();
+      return irAProximaPaginaDoLeitor(estado.pagina, false).then(function () {
+        return !!corpo.querySelector('[data-pagina-arquivo="' + estado.pagina + '"] canvas');
+      });
+    }).catch(function () { mostrarFalhaDoLeitor('pdf'); return false; });
+  }
+
+  function desenharPaginaContinua(estado, registro) {
+    if (registro.desenhando) return registro.promessa || Promise.resolve(false);
+    if (registro.caixa.querySelector('canvas')) return Promise.resolve(true);
+    if (estado !== leitor) return Promise.resolve(false);
+    registro.desenhando = true;
+    var tarefaDaPagina = null;
+    registro.promessa = estado.doc.getPage(registro.n).then(function (pagina) {
+      if (estado !== leitor) return null;
+      var corpo = $('#corpo-modal-leitor-pdf');
+      var base = pagina.getViewport({ scale: 1 });
+      var largura = Math.max(160, corpo.clientWidth - 36) * estado.zoom;
+      var vp = pagina.getViewport({ scale: largura / base.width });
+      registro.caixa.style.width = Math.floor(vp.width) + 'px';
+      registro.caixa.style.height = Math.ceil(vp.height) + 'px';
+      var densidade = Math.min(window.devicePixelRatio || 1, Math.sqrt(LEITOR_MAX_PIXELS / (vp.width * vp.height)));
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.floor(vp.width * densidade));
+      canvas.height = Math.max(1, Math.floor(vp.height * densidade));
+      canvas.style.width = Math.floor(vp.width) + 'px';
+      canvas.style.height = Math.floor(vp.height) + 'px';
+      canvas.setAttribute('aria-label', 'Página ' + registro.n + ' de ' + estado.total);
+      var tarefa = pagina.render({ canvasContext: canvas.getContext('2d'), canvas: canvas, viewport: vp,
+        transform: densidade !== 1 ? [densidade, 0, 0, densidade, 0, 0] : null });
+      tarefaDaPagina = tarefa;
+      registro.tarefa = tarefa;
+      return tarefa.promise.then(function () {
+        if (estado !== leitor || !registro.visivel || registro.tarefa !== tarefa) { canvas.width = 0; canvas.height = 0; return false; }
+        registro.caixa.innerHTML = '';
+        registro.caixa.appendChild(canvas);
+        return true;
+      });
+    }).catch(function (e) {
+      if (e && e.name !== 'RenderingCancelledException' && estado === leitor) mostrarFalhaDoLeitor('pdf');
+      return false;
+    }).then(function () {
+      if (!tarefaDaPagina || registro.tarefa === tarefaDaPagina) {
+        registro.tarefa = null;
+        registro.desenhando = false;
+      }
+    });
+    return registro.promessa;
+  }
+
+  function liberarPaginaContinua(registro) {
+    if (registro.tarefa) { registro.tarefa.cancel(); registro.tarefa = null; }
+    var c = registro.caixa.querySelector('canvas');
+    if (c) { c.width = 0; c.height = 0; registro.caixa.removeChild(c); }
+    registro.caixa.innerHTML = '';
+    registro.caixa.appendChild(el('div', { class: 'leitor-pdf-pagina-vazia', 'aria-hidden': 'true' }));
+    registro.desenhando = false;
+  }
+
+  function paginaMaisProximaDoCentro(estado) {
+    var corpo = $('#corpo-modal-leitor-pdf'), caixas = estado.paginas || [];
+    var centro = corpo.getBoundingClientRect().top + corpo.clientHeight / 2, melhor = estado.pagina, distancia = Infinity;
+    caixas.forEach(function (p) {
+      var r = p.caixa.getBoundingClientRect(), d = centro < r.top ? r.top - centro : centro > r.bottom ? centro - r.bottom : 0;
+      if (d < distancia) { distancia = d; melhor = p.n; }
+    });
+    return melhor;
+  }
+
+  var leitorRolarAgendado = false;
+  function rolarLeitorContinuo() {
+    if (!leitor || !leitor.continuo || leitorRolarAgendado) return;
+    leitorRolarAgendado = true;
+    window.requestAnimationFrame(function () {
+      leitorRolarAgendado = false;
+      if (!leitor || !leitor.continuo) return;
+      var n = paginaMaisProximaDoCentro(leitor);
+      if (n !== leitor.pagina) {
+        leitor.pagina = n;
+        $('#corpo-modal-leitor-pdf').dataset.paginaDesenhada = String(n);
+        atualizarBarraDoLeitor();
+        if (typeof leitor.opcoes.aoMudarPagina === 'function') {
+          try { leitor.opcoes.aoMudarPagina(n); } catch (e) { /* posição é auxiliar */ }
+        }
+      }
+    });
+  }
+
+  function irAProximaPaginaDoLeitor(n, suave) {
+    if (!leitor || !leitor.doc) return Promise.resolve(false);
+    leitor.pagina = Math.max(1, Math.min(leitor.total, n));
+    atualizarBarraDoLeitor();
+    if (typeof leitor.opcoes.aoMudarPagina === 'function') {
+      try { leitor.opcoes.aoMudarPagina(leitor.pagina); } catch (e) { /* posição é auxiliar */ }
+    }
+    if (leitor.continuo && leitor.paginas) {
+      $('#corpo-modal-leitor-pdf').dataset.paginaDesenhada = String(leitor.pagina);
+      var p = leitor.paginas[leitor.pagina - 1];
+      if (!p) return Promise.resolve(false);
+      p.visivel = true;
+      p.caixa.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'start' });
+      if (typeof IntersectionObserver !== 'function') {
+        leitor.paginas.slice(Math.max(0, leitor.pagina - 2), leitor.pagina + 1).forEach(function (visivel) {
+          visivel.visivel = true;
+          desenharPaginaContinua(leitor, visivel);
+        });
+      }
+      return desenharPaginaContinua(leitor, p).then(function () { return !!p.caixa.querySelector('canvas'); });
+    }
+    desenharPaginaDoLeitor(true);
+    return Promise.resolve(true);
+  }
+
+  function redimensionarLeitorContinuo(paraOAlto) {
+    if (!leitor || !leitor.continuo) return Promise.resolve(false);
+    var corpo = $('#corpo-modal-leitor-pdf'), largura = Math.max(160, corpo.clientWidth - 36) * leitor.zoom;
+    leitor.paginas.forEach(function (p) {
+      liberarPaginaContinua(p);
+      p.caixa.style.width = Math.floor(largura) + 'px';
+      p.caixa.style.height = Math.ceil(largura * leitor.proporcaoPagina) + 'px';
+    });
+    if (paraOAlto) irAProximaPaginaDoLeitor(leitor.pagina, false);
+    else leitor.paginas.slice(Math.max(0, leitor.pagina - 2), leitor.pagina + 1).forEach(function (p) { desenharPaginaContinua(leitor, p); });
+    return Promise.resolve(true);
+  }
+
   function andarNoLeitorPdf(passo) {
     if (!leitor || !leitor.doc) return;
     var nova = leitor.pagina + passo;
     if (nova < 1 || nova > leitor.total) return;
-    leitor.pagina = nova;
-    desenharPaginaDoLeitor(true);
+    if (leitor.continuo) irAProximaPaginaDoLeitor(nova, true);
+    else { leitor.pagina = nova; desenharPaginaDoLeitor(true); }
   }
 
   // fator 0 é "Ajustar à largura"; os outros multiplicam, dentro dos limites
@@ -22808,6 +23076,8 @@
     leitorVez++;
     leitorDesenho++;
     if (leitorTarefa) { leitorTarefa.cancel(); leitorTarefa = null; }
+    if (leitor && leitor.observadorPaginas) leitor.observadorPaginas.disconnect();
+    if (leitor && leitor.paginas) leitor.paginas.forEach(liberarPaginaContinua);
     leitor = null;
     fecharSumarioDoLeitor();
     esconderCobre('pdf');
