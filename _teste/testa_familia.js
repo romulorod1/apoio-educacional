@@ -23,6 +23,10 @@
  * anotação particular, que é justamente o que não pode aparecer.
  */
 const puppeteer = require('puppeteer-core');
+const H = require('./_bib_navegador');
+/* O relógio da rodada (segunda, 16/11/2026, 11:00), no processo e na página: a
+ * prova não depende do dia em que roda (a virada anual abre sozinha em janeiro). */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 
 const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const URL_APP = 'http://127.0.0.1:8777/index.html';
@@ -60,6 +64,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
     defaultViewport: { width: 1280, height: 900, hasTouch: true }
   });
   const pag = await navegador.newPage();
+  await RELOGIO.naPagina(pag);
   const errosDePagina = [];
   pag.on('pageerror', e => errosDePagina.push(e.message));
   pag.on('console', m => { if (m.type() === 'error') errosDePagina.push('console: ' + m.text()); });
@@ -87,6 +92,7 @@ async function tocarFormato(pag, ehDoAluno, texto) {
 
   await pag.goto(URL_APP, { waitUntil: 'networkidle0' });
   await espera(1800);
+  await RELOGIO.conferir(pag, conf);
 
   // ---------------------------------------------------------------- a base
   await pag.evaluate(async (semente) => {

@@ -24,6 +24,11 @@
 const fs = require('fs');
 const path = require('path');
 const H = require('./_bib_navegador.js');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8798;
@@ -64,7 +69,7 @@ conf('banco/topicos/matematica.json com os 148 assuntos de matemática', banco.t
 
 // ---------------------------------------------------------------- navegador
 const amb = H.criarAmbiente(PORTA, 'perfil_limpeza_acervo', trocas);
-const hojeIso = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+const hojeIso = RELOGIO.dia(0);
 const ASSUNTO_ACERVO = { id: 'acervo-mat-funcoes', titulo: 'Funções: domínio e imagem', fonte: 'acervo', disciplina: 'matematica', acervoId: 'acervo-mat-funcoes' };
 
 (async () => {
@@ -74,6 +79,7 @@ const ASSUNTO_ACERVO = { id: 'acervo-mat-funcoes', titulo: 'Funções: domínio 
   }
   await amb.subir();
   const pag = await amb.pagina();
+  await RELOGIO.naPagina(pag);
   // um tablet vindo da 1.24.0: o cache v37 tinha o acervo no pacote e uma série que ela baixou
   amb.extras['/vazio.html'] = { tipo: 'text/html; charset=utf-8', corpo: '<!doctype html><title>vazio</title><link rel="icon" href="data:,">' };
   await pag.goto(amb.ORIGEM + '/vazio.html');
@@ -134,6 +140,7 @@ const ASSUNTO_ACERVO = { id: 'acervo-mat-funcoes', titulo: 'Funções: domínio 
   }, hojeIso, ASSUNTO_ACERVO);
   await pag.reload({ waitUntil: 'networkidle0' });
   await H.abrirApp(pag, amb.ORIGEM);
+  await RELOGIO.conferir(pag);
   await H.irParaAba(pag, 'agenda');
   for (let i = 0; i < 24; i++) {
     if (await pag.evaluate(h => !!document.querySelector('[data-dia="' + h + '"]'), hojeIso)) break;

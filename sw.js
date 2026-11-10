@@ -139,8 +139,8 @@
  * Versão silenciosa. O v105 (N2 fatia 1) traz as folhas por página na nuvem
  * (app.js, nuvem.js, store.js, draw.js e styles.css), com a lista igual. O v106 (sistema visual) traz os tokens, a escala de letras e o conjunto de ícones (app.js, index.html e styles.css), com a lista igual. O v107 traz o celular sem transbordo: o aviso de versão em
  * duas linhas, a barra de cima menor e a trava de transbordo (app.js e
- * styles.css), com a lista igual. O v108 (índice dos livros) traz o indexador em segundo plano, indice-livros.js, na lista de arquivos (app.js, index.html, store.js e sw.js). O v109 (navegação com a Biblioteca) traz o trilho lateral do tablet e a barra de baixo do celular (app.js, index.html e styles.css), com a lista igual. O v110 (Biblioteca por disciplina e ano) traz a tela dos livros, o sumário clicável e o Continuar lendo (app.js, index.html e styles.css), com a lista igual. O v111 (assunto lado a lado) traz a tabela de comparação do assunto entre os livros (app.js, index.html e styles.css), com a lista igual. */
-var CACHE = 'apoio-educacional-v111';
+ * styles.css), com a lista igual. O v108 adicionou o indexador de livros; o v109 trouxe a navegação da Biblioteca; o v110 trouxe a tela por disciplina e ano; o v111 sincronizou esses assets com a main atualizada. O v112 traz o assunto lado a lado (app.js, index.html e styles.css), com a lista igual. */
+var CACHE = 'apoio-educacional-v112';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

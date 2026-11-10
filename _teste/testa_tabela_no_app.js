@@ -42,6 +42,10 @@
  * Precisa do servidor em 127.0.0.1:8777 (o portão levanta o dele).
  */
 const puppeteer = require('puppeteer-core');
+const H = require('./_bib_navegador');
+/* O relógio da rodada (segunda, 16/11/2026, 11:00), no processo e na página: a
+ * prova não depende do dia em que roda (a virada anual abre sozinha em janeiro). */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const path = require('path');
 const fs = require('fs');
 const Core = require('../core.js');
@@ -165,9 +169,11 @@ async function esperarControle(p) {
     () => p.evaluate(() => !!navigator.serviceWorker.controller), v => v === true, 15000);
   await esperarApp(p);
 }
+let relogioConferido = false;
 async function abrirComBanco(p, mexer) {
   await p.goto(URL_APP, { waitUntil: 'networkidle0' });
   await esperarControle(p);
+  if (!relogioConferido) { relogioConferido = true; await RELOGIO.conferir(p, conf); }
   /* Na primeira abertura o app grava o banco de novo 900 ms depois de desenhar
    * (mostrarNovidades registra a versao do perfil novo, T03), com o banco que
    * ELE tem na memoria. Gravar o banco de prova antes disso e perder a corrida:
@@ -306,6 +312,7 @@ async function escolherSerie(p, serie) {
 async function paginaEnvenenada(navegador, trocas) {
   const ctx = await navegador.createBrowserContext();
   const p = await ctx.newPage();
+  await RELOGIO.naPagina(p);
   p.setDefaultTimeout(60000);
   p.on('dialog', async d => { try { await d.accept(); } catch (e) { /* ok */ } });
   await p.setBypassServiceWorker(true);
@@ -345,6 +352,7 @@ async function paginaEnvenenada(navegador, trocas) {
     defaultViewport: { width: 1280, height: 800, hasTouch: true }
   });
   const pag = await navegador.newPage();
+  await RELOGIO.naPagina(pag);
   pag.setDefaultTimeout(60000);
   const errosDePagina = [];
   pag.on('pageerror', e => errosDePagina.push(e.message));

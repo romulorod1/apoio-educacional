@@ -5,6 +5,14 @@
 const puppeteer = require('puppeteer-core');
 const fs = require('fs');
 const path = require('path');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (relogioDaRodada do _bib_navegador; o resto da prova segue com o puppeteer
+ * dela). A prova não depende do dia em que roda: a virada anual que o app abre
+ * sozinho em janeiro não cobre os toques, e o botão Hoje cai sempre no mesmo
+ * mês. */
+const RELOGIO = require('./_bib_navegador').relogioDaRodada('2026-11-16', '11:00');
+const isoDoProcesso = () => { const d = new Date(), q = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + q(d.getMonth() + 1) + '-' + q(d.getDate()); };
 
 const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const URL_APP = 'http://127.0.0.1:8777/index.html';
@@ -34,6 +42,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   });
 
   const pag = await navegador.newPage();
+  await RELOGIO.naPagina(pag);
   const errosDePagina = [];
   global.__errosPag = errosDePagina;
   pag.on('pageerror', e => errosDePagina.push(e.message));
@@ -68,6 +77,8 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 
   await pag.goto(URL_APP, { waitUntil: 'networkidle0' });
   await espera(1200);
+  conf('(arranjo) a página e o processo estão no dia da rodada (' + RELOGIO.iso + ')',
+    (await pag.evaluate(() => Core.hojeIso())) + ' ' + isoDoProcesso(), RELOGIO.iso + ' ' + RELOGIO.iso);
 
   // ---------- utilidades de interação ----------
 

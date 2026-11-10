@@ -39,6 +39,11 @@
 const puppeteer = require('puppeteer-core');
 const path = require('path');
 const Core = require('../core.js');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (relogioDaRodada do _bib_navegador; o resto da prova segue com o
+ * puppeteer dela). O Core.hojeIso daqui e o da página dizem o mesmo dia, e a
+ * prova não depende do dia nem da hora em que roda. */
+const RELOGIO = require('./_bib_navegador').relogioDaRodada('2026-11-16', '11:00');
 
 const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const URL_APP = 'http://127.0.0.1:8777/index.html';
@@ -76,6 +81,7 @@ function textoDoPdf(bytes) {
     defaultViewport: { width: 1280, height: 800, hasTouch: true }
   });
   const pag = await navegador.newPage();
+  await RELOGIO.naPagina(pag);
   const errosDePagina = [];
   pag.on('pageerror', e => errosDePagina.push(e.message));
   pag.on('console', m => { if (m.type() === 'error') errosDePagina.push('console: ' + m.text()); });
@@ -110,6 +116,8 @@ function textoDoPdf(bytes) {
 
   await pag.goto(URL_APP, { waitUntil: 'networkidle0' });
   await espera(1600);
+  conf('(arranjo) a página e o processo estão no dia da rodada (' + RELOGIO.iso + ')',
+    (await pag.evaluate(() => Core.hojeIso())) + ' ' + Core.hojeIso(), RELOGIO.iso + ' ' + RELOGIO.iso);
 
   // ---------------- ferramentas ----------------
 

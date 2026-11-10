@@ -43,6 +43,11 @@ const os = require('os');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
+/* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
+ * (H.relogioDaRodada). A prova não depende do dia nem da hora em que roda:
+ * nem da meia-noite no meio da rodada, nem da virada do ano (o app abre a
+ * virada anual sozinho em janeiro), nem do fim do mês. */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const { conf, secao, pausa, esperar } = H;
 
 const MODOS = ['--envenenado-sem-55', '--envenenado-texto-errado', '--envenenado-abre-sozinho', '--envenenado-campo-obrigatorio',
@@ -181,6 +186,7 @@ const amb = H.criarAmbiente(PORTA_APP, 'nath_d6c2_celular_ficha', trocas);
  * o WhatsApp e o mapa não abrem de verdade na prova) e os pedidos a wa.me. */
 async function prepararPagina(pag, movel) {
   pag.setDefaultTimeout(60000);
+  await RELOGIO.naPagina(pag);
   if (movel) await pag.setViewport({ width: 390, height: 844, hasTouch: true, isMobile: true });
   pag.errosDePagina = [];
   pag.on('pageerror', e => pag.errosDePagina.push(e.message));
@@ -331,14 +337,14 @@ const medirTela = (pag) => pag.evaluate((reEdicao) => {
 const telaBoa = m => m.pequenos.join('; ') + (m.rolaDeLado ? ' ROLA DE LADO' : '');
 
 function isoDe(d) { const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
-const AGORA = new Date();
+const AGORA = new Date(RELOGIO.fixo);
 const HOJE = isoDe(AGORA);
 /* A aula de hoje de Alfa ainda não acabou quando a prova roda (a próxima
  * hora cheia de 15 em 15 minutos, no máximo 23:00): é a que leva o "Estou 10
  * minutos atrasada" e o "Chegando". */
 const HORA_HOJE = (() => { const m = Math.min(Math.ceil((AGORA.getHours() * 60 + AGORA.getMinutes() + 1) / 15) * 15, 23 * 60);
   return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); })();
-const ONTEM = (() => { const d = new Date(AGORA); d.setDate(d.getDate() - 1); return isoDe(d); })();
+const ONTEM = RELOGIO.dia(-1);
 /* Telefones fictícios (DDD 11 e 21, prefixo 9 0000). */
 const TEL_ALFA = '(11) 90000-0001', WA_ALFA = '5511900000001';
 const TEL_VELHO = '(21) 90000-0002', WA_VELHO = '5521900000002';
@@ -355,6 +361,7 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   const pagA = await amb.pagina();
   await prepararPagina(pagA, false);
   await H.abrirApp(pagA, amb.ORIGEM);
+  await RELOGIO.conferir(pagA);
   await pagA.evaluate(async (c) => {
     const d = Store.bancoVazio();
     const preco = (v) => [{ id: 'p-' + v, inicio: '2026-01-01', fim: null, valorHora: v }];

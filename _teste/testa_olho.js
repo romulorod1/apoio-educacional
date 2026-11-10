@@ -1,6 +1,10 @@
 /* O botão que esconde os valores da tela.
    O que importa: some da interface, lembra a escolha, e nunca afeta o PDF. */
 const puppeteer = require('puppeteer-core');
+const H = require('./_bib_navegador');
+/* O relógio da rodada (segunda, 16/11/2026, 11:00), no processo e na página: a
+ * prova não depende do dia em que roda (a virada anual abre sozinha em janeiro). */
+const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 let f = 0, p = 0;
 function conf(r, o, e) {
   const ok = String(o) === String(e);
@@ -15,6 +19,7 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
     headless: 'new', args: ['--no-sandbox'], defaultViewport: { width: 1280, height: 1000 }
   });
   const pag = await b.newPage();
+  await RELOGIO.naPagina(pag);
   pag.on('dialog', async d => { try { await d.accept(); } catch (e) { } });
   await pag.evaluateOnNewDocument(() => {
     window.__gerados = [];
@@ -33,6 +38,7 @@ const esp = ms => new Promise(r => setTimeout(r, ms));
   });
   await pag.goto('http://127.0.0.1:8777/index.html', { waitUntil: 'networkidle0' });
   await esp(1600);
+  await RELOGIO.conferir(pag, conf);
 
   const receber = () => pag.$$eval('#numeros-mes .numero', es => {
     const c = es.find(e => e.querySelector('.rotulo').textContent.includes('receber'));
