@@ -137,7 +137,7 @@ const ANCORAS = {
   [V_EMPILHADOS]: ['app.js', "var aberto = painelDosAvisosAberto, classeDoPainel = 'cel-avisos cel-avisos-sobre';",
     "var aberto = true, classeDoPainel = 'cel-avisos';"],
   // o selinho numa linha só dele, entre a data e os dias
-  [V_EMPURRA]: ['app.js', "topo.insertBefore(selo, topo.querySelector('#cel-semana-seguinte'));",
+  [V_EMPURRA]: ['app.js', "topo.insertBefore(selo, topo.querySelector('#cel-dia-seguinte'));",
     "faixa.insertBefore(el('div', { class: 'cel-avisos-linha' }, [selo]), faixa.querySelector('.cel-semana-dias'));"],
   // os dispensados de todo dia valem hoje
   [V_SEMPRE]: ['app.js', '    return e.dispensados[hoje] || [];',
@@ -976,6 +976,15 @@ const medePainel = pag => pag.evaluate(() => {
   conf('(arranjo) a fila do celular está vazia antes de dispensar', flush.erroE + ' ' + (await pagC.evaluate(() => Store.estadoDaFila().then(e => e.pendentes))), 'null 0');
   const tituloDaSemana = () => texto(pagC, '#cel-dia-titulo');
   const titulo0 = await tituloDaSemana();
+  const navega = await pagC.evaluate(() => ({
+    anterior: document.querySelector('#cel-dia-anterior').textContent.replace(/\s+/g, ' ').trim(),
+    seguinte: document.querySelector('#cel-dia-seguinte').textContent.replace(/\s+/g, ' ').trim(),
+    rotuloAnterior: document.querySelector('#cel-dia-anterior').getAttribute('aria-label'),
+    rotuloSeguinte: document.querySelector('#cel-dia-seguinte').getAttribute('aria-label'),
+    dia: document.querySelector('#cel-semana-dias .cel-semana-dia.ativo').dataset.dia
+  }));
+  conf('as setas mostram que avançam ou voltam um dia', navega.anterior + '|' + navega.seguinte + '|' + navega.rotuloAnterior + '|' + navega.rotuloSeguinte,
+    '1 dia|1 dia|Dia anterior, voltar um dia|Dia seguinte, avançar um dia');
   await deslizar(pagC, cdp, REG, 30, 0);
   await deslizar(pagC, cdp, REG, 20, 140);
   conf('o arrasto curto (30 px) e o de pé (mais vertical que de lado) não dispensam', (await selinho(pagC)).numero + ' ' + (await existe(pagC, REG)), '3 true');
@@ -1022,8 +1031,11 @@ const medePainel = pag => pag.evaluate(() => {
   const aos13 = await desfazerAberto();
   conf('o "Desfazer" do dispensar segue à vista aos 10,5 s e aos 11,5 s e some até 12,9 s (' + [aos10, aos11, aos13].join(', ') + ')', [aos10, aos11, aos13].join(','), 'true,true,false');
   await fecharPainel(pagC);
-  conf('a faixa da semana continua andando: a seta leva à semana seguinte e "Hoje" volta', (await tocar(pagC, cdp, '#cel-semana-seguinte')) + ' ' +
-    ((await tituloDaSemana()) !== titulo0) + ' ' + (await tocar(pagC, cdp, '#cel-dia-hoje')) + ' ' + ((await tituloDaSemana()) === titulo0), 'true true true true');
+  const tocouDia = await tocar(pagC, cdp, '#cel-dia-seguinte');
+  const diaSeguinte = await pagC.evaluate(() => document.querySelector('#cel-semana-dias .cel-semana-dia.ativo').dataset.dia);
+  const salto = (Date.parse(diaSeguinte + 'T00:00:00Z') - Date.parse(navega.dia + 'T00:00:00Z')) / 86400000;
+  conf('a seta abre o dia seguinte, inclusive para ver amanhã', tocouDia + '|' + salto + '|' + ((await tituloDaSemana()) !== titulo0), 'true|1|true');
+  conf('"Hoje" volta à data inicial', (await tocar(pagC, cdp, '#cel-dia-hoje')) + ' ' + ((await tituloDaSemana()) === titulo0), 'true true');
   avC = await momento(pagC, ...CENA);
   await abrirPainel(pagC);
   await deslizar(pagC, cdp, REG, 160, 6);
