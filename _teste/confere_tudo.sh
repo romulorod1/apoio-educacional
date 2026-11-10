@@ -501,6 +501,17 @@ roda "navegacao biblioteca --envenenado-rotulo-corta" node "_teste/testa_navegac
 # capitulo na pagina 1, e a prova tem de ver.
 roda "biblioteca livros tela"                   node "_teste/testa_biblioteca_livros_tela.js"
 roda "biblioteca livros tela --envenenado-capitulo-abre-pagina-errada" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-capitulo-abre-pagina-errada
+# B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
+# 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
+# revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
+# (aba, painel do capitulo, aula), a busca que atravessa
+# os anos e a correcao dela. Os venenos trocam as duas ausencias, contam o mapa
+# vazio como revisado e o livro parcialmente confirmado como revisado; a prova
+# tem de ver cada um.
+roda "assunto lado a lado"                      node "_teste/testa_assunto_lado_a_lado.js"
+roda "assunto lado a lado --envenenado-nao-trata-vira-sem-mapa" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-nao-trata-vira-sem-mapa
+roda "assunto lado a lado --envenenado-mapa-vazio-nao-trata" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-mapa-vazio-nao-trata
+roda "assunto lado a lado --envenenado-parcial-nao-trata" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-parcial-nao-trata
 # C12: os pacotes de provas (OBMEP Mirim por nivel e ENEM) importam, as abas vao
 # do 2o ao 5o ano e os assuntos do aplicativo aparecem como modulos. O modo
 # envenenado serve o app.js que so espalhava o Banco pelas series equivalentes.
