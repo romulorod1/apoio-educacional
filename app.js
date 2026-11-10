@@ -22960,6 +22960,7 @@
   }
 
   var leitorRolarAgendado = false;
+  var leitorRolarDestinoTimer = null;
   function rolarLeitorContinuo() {
     if (!leitor || !leitor.continuo || leitorRolarAgendado) return;
     leitorRolarAgendado = true;
@@ -22967,6 +22968,14 @@
       leitorRolarAgendado = false;
       if (!leitor || !leitor.continuo) return;
       var n = paginaMaisProximaDoCentro(leitor);
+      // Em uma navegação suave, o meio da tela ainda passa por páginas
+      // anteriores. Não grave esse trecho intermediário como a última página.
+      if (leitor.rolagemProgramaticaAte && n !== leitor.rolagemProgramaticaAte) return;
+      if (leitor.rolagemProgramaticaAte === n) {
+        leitor.rolagemProgramaticaAte = 0;
+        clearTimeout(leitorRolarDestinoTimer);
+        leitorRolarDestinoTimer = null;
+      }
       if (n !== leitor.pagina) {
         leitor.pagina = n;
         $('#corpo-modal-leitor-pdf').dataset.paginaDesenhada = String(n);
@@ -22990,6 +22999,16 @@
       var p = leitor.paginas[leitor.pagina - 1];
       if (!p) return Promise.resolve(false);
       p.visivel = true;
+      if (suave) {
+        leitor.rolagemProgramaticaAte = leitor.pagina;
+        clearTimeout(leitorRolarDestinoTimer);
+        leitorRolarDestinoTimer = setTimeout(function () {
+          leitorRolarDestinoTimer = null;
+          if (!leitor || !leitor.continuo) return;
+          leitor.rolagemProgramaticaAte = 0;
+          rolarLeitorContinuo();
+        }, 900);
+      }
       p.caixa.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'start' });
       if (typeof IntersectionObserver !== 'function') {
         leitor.paginas.slice(Math.max(0, leitor.pagina - 2), leitor.pagina + 1).forEach(function (visivel) {
@@ -23077,6 +23096,8 @@
     leitorDesenho++;
     if (leitorTarefa) { leitorTarefa.cancel(); leitorTarefa = null; }
     if (leitor && leitor.observadorPaginas) leitor.observadorPaginas.disconnect();
+    clearTimeout(leitorRolarDestinoTimer);
+    leitorRolarDestinoTimer = null;
     if (leitor && leitor.paginas) leitor.paginas.forEach(liberarPaginaContinua);
     leitor = null;
     fecharSumarioDoLeitor();
