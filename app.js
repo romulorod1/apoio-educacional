@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.34';
+  var VERSAO = '1.42.35';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -81,6 +81,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.35',
+      itens: [
+        'No celular, a ficha do aluno permite atualizar nome, responsável, telefone e local da aula. Valores e informações pedagógicas continuam preservados.'
+      ]
+    },
     {
       versao: '1.42.34',
       itens: [
@@ -1739,7 +1745,7 @@
   function salvar() {
     /* O celular só lê (D6): nada chega ao banco por aqui. A recusa é dita uma
      * vez, sem a faixa de falha de gravação, que mandaria tentar de novo.
-     * O celular da DONA (D6, parte 2) grava daqui só dentro de uma das quatro
+     * O celular da DONA (D6, parte 2) grava daqui só dentro de uma das cinco
      * ações dele (comoAcaoDoCelular): qualquer outro caminho que chegue aqui
      * no celular continua recusado. */
     if (aparelhoSoLe() && !(gravacaoDoCelular > 0 && celularEdita())) {
@@ -22839,12 +22845,13 @@
    * deixaria de editar. A tela do aparelho e a marca não giram. Fora disso, o
    * aplicativo fica exatamente como sempre foi.
    *
-   * O CELULAR DA DONA EDITA, e só em quatro ações (D6, parte 2): marcar e
-   * cancelar aula, "Registrar como foi", cadastrar aluno com o essencial e o
+   * O CELULAR DA DONA EDITA só nas ações autorizadas (D6, parte 2): marcar e
+    * cancelar aula, "Registrar como foi", cadastrar aluno, editar os dados
+    * essenciais da ficha e o
    * "pago em". Cada uma grava pelo salvar() de sempre, dentro de
    * comoAcaoDoCelular, e a mudança entra na fila de registros na mesma
    * transação e sobe pelo sincronizar. O resto continua do tablet, com as
-   * travas de sempre: nada grava no banco fora das quatro ações e do que vem
+   * travas de sempre: nada grava no banco fora dessas cinco ações e do que vem
    * da nuvem (Store.somenteLeitura e as três portas do celular, na porta das
    * transações, e o salvar() daqui); a CÓPIA COMPLETA nunca sobe deste
    * aparelho, nem ao fechar, nem uma vez por dia, nem pelo toque (o commit do
@@ -22886,7 +22893,7 @@
   function celularEdita() {
     return modoCelular && temNuvem() && Nuvem.celularDaDona() && !leOutraConta();
   }
-  /* As quatro ações do celular gravam por aqui, e só elas: o salvar() aceita
+  /* As cinco ações do celular gravam por aqui, e só elas: o salvar() aceita
    * no celular enquanto a ação corre (o comDesfazer guarda a permissão para a
    * gravação dele, que vem depois, e para o Desfazer). */
   var gravacaoDoCelular = 0;
@@ -24800,7 +24807,7 @@
     return el('a', atributos);
   }
 
-  /* A ficha mínima: o que ela precisa na rua. A ficha completa fica no tablet. */
+  /* A ficha mostra o essencial na rua; a edição dos campos básicos fica na aba Alunos. */
   function fichaMinimaCelular(aluno, aula) {
     var caixa = el('div', { class: 'cel-ficha', id: 'cel-ficha', 'data-aluno': aluno.id });
     var resp = String(aluno.responsavel || '').trim();
@@ -24816,10 +24823,14 @@
         ]));
       }
       /* Sem o campo telefone válido, nenhum link: ela confere no tablet. O fixo só liga. */
-      if (!ligar) caixa.appendChild(el('p', { class: 'faixa-aviso', id: 'cel-ficha-confira', texto: 'Confira o telefone no tablet: só o campo Telefone da ficha liga e abre o WhatsApp.' }));
+      if (!ligar) caixa.appendChild(el('p', { class: 'faixa-aviso', id: 'cel-ficha-confira', texto: celularEdita()
+        ? 'Para cadastrar ou corrigir, abra Alunos e toque em Editar ficha.'
+        : 'Confira o telefone no tablet: só o campo Telefone da ficha liga e abre o WhatsApp.' }));
       else if (!whats) caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-ficha-fixo', texto: 'Telefone fixo: o WhatsApp precisa de um celular.' }));
     } else {
-      caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-ficha-sem-telefone', texto: 'Sem telefone do responsável. Ele se põe no tablet, na ficha do aluno.' }));
+      caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-ficha-sem-telefone', texto: celularEdita()
+        ? 'Sem telefone do responsável. Para cadastrar, abra Alunos e toque em Editar ficha.'
+        : 'Sem telefone do responsável. Ele se põe no tablet, na ficha do aluno.' }));
     }
     if (whats) {
       /* "Estou 10 minutos atrasada" e "Chegando" só valem para a aula de HOJE
@@ -24860,12 +24871,15 @@
       relato.appendChild(el('div', { texto: 'Ainda sem relato de aula.' }));
     }
     caixa.appendChild(relato);
-    caixa.appendChild(el('p', { class: 'ajuda', texto: 'A ficha completa fica no tablet.' }));
+    caixa.appendChild(el('p', { class: 'ajuda', texto: celularEdita()
+      ? 'Edite nome e contato pela aba Alunos. Valores e ficha pedagógica continuam no tablet.'
+      : 'A ficha completa fica no tablet.' }));
     return caixa;
   }
 
-  /* A aba Alunos: a lista dos ativos e, com um toque no nome, a ficha mínima. */
+  /* A aba Alunos: lista, ficha e edição dos dados essenciais pelo celular da dona. */
   var alunoCelular = null; // o aluno da ficha aberta na aba Alunos
+  var editandoFichaAlunoCelular = false;
   /* B1: a Biblioteca é destino da barra de baixo, mas os livros e as
    * questões moram no tablet (o pacote importado fica no aparelho dele). A
    * busca do celular é outra fatia; por ora a tela diz onde abrir. */
@@ -24884,14 +24898,22 @@
       caixa.appendChild(el('div', { class: 'cel-folha-cabeca', style: '--cor-aluno:' + corDoAlunoCelular(aberto) }, [
         el('h2', { class: 'cel-titulo', id: 'cel-ficha-nome', texto: aberto.nome })
       ]));
+      if (editandoFichaAlunoCelular && celularEdita()) {
+        desenharEdicaoFichaAlunoCelular(caixa, aberto);
+        return;
+      }
+      editandoFichaAlunoCelular = false;
       caixa.appendChild(fichaMinimaCelular(aberto, aulaDeContextoDoAluno(aberto.id)));
       caixa.appendChild(el('div', { class: 'barra' }, [
+        celularEdita() ? botaoDeAcaoCelular('editar-ficha-aluno', { class: 'btn', id: 'cel-alunos-editar-ficha', texto: 'Editar ficha',
+          aoClick: function () { editandoFichaAlunoCelular = true; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } }) : null,
         el('button', { type: 'button', class: 'btn', id: 'cel-alunos-voltar', texto: 'Voltar à lista',
-          aoClick: function () { alunoCelular = null; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } })
+          aoClick: function () { alunoCelular = null; editandoFichaAlunoCelular = false; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } })
       ]));
       return;
     }
     alunoCelular = null;
+    editandoFichaAlunoCelular = false;
     caixa.appendChild(el('h2', { class: 'cel-titulo', texto: 'Alunos' }));
     var ativos = db.alunos.filter(function (al) { return al.ativo !== false; })
       .sort(function (x, y) { return String(x.nome).localeCompare(String(y.nome)); });
@@ -24900,7 +24922,7 @@
       var detalhe = [String(al.responsavel || '').trim(), ONDE_E_A_AULA[al.local] || '', telefoneDoAluno(al) ? '' : 'sem telefone cadastrado'].filter(Boolean).join(' · ');
       return el('button', { type: 'button', class: 'cel-aluno-item', 'data-aluno': al.id, style: '--cor-aluno:' + corDoAlunoCelular(al),
         'aria-label': 'Ver a ficha de ' + al.nome + (detalhe ? ', ' + detalhe : ''),
-        aoClick: function () { alunoCelular = al.id; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } }, [
+        aoClick: function () { alunoCelular = al.id; editandoFichaAlunoCelular = false; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } }, [
         el('span', { class: 'cel-aluno-nome', texto: al.nome }),
         detalhe ? el('span', { class: 'cel-aluno-detalhe', texto: detalhe }) : null
       ]);
@@ -24914,6 +24936,59 @@
           aoClick: function () { irParaTelaCelular('hoje'); abrirFormularioCelular({ tipo: 'aluno' }); } })
       ]));
     }
+  }
+
+  /* Edita só nome e contato/local já existentes. Valores, aulas, observações,
+   * mapas e demais campos da ficha não passam por esta ação e são preservados. */
+  function desenharEdicaoFichaAlunoCelular(caixa, aluno) {
+    caixa.appendChild(el('h3', { class: 'cel-subtitulo', id: 'cel-editar-ficha-titulo', texto: 'Editar ficha' }));
+    var nome = el('input', { type: 'text', id: 'cel-ficha-edicao-nome', autocomplete: 'off' });
+    nome.value = String(aluno.nome || '');
+    var responsavel = el('input', { type: 'text', id: 'cel-ficha-edicao-responsavel', autocomplete: 'off' });
+    responsavel.value = String(aluno.responsavel || '');
+    var telefone = el('input', { type: 'tel', id: 'cel-ficha-edicao-telefone', autocomplete: 'off', inputmode: 'tel', placeholder: 'Com DDD, por exemplo (11) 98765-4321' });
+    telefone.value = String(aluno.telefone || '');
+    var local = el('select', { id: 'cel-ficha-edicao-local' }, [['', 'Ainda não sei'], ['casa', ONDE_E_A_AULA.casa], ['online', ONDE_E_A_AULA.online]].map(function (o) {
+      return el('option', { value: o[0], texto: o[1], selected: o[0] === (aluno.local || '') ? 'selected' : null });
+    }));
+    var endereco = el('input', { type: 'text', id: 'cel-ficha-edicao-endereco', autocomplete: 'off', placeholder: 'Rua, número, bairro' });
+    endereco.value = String(aluno.endereco || '');
+    var link = el('input', { type: 'url', id: 'cel-ficha-edicao-link', autocomplete: 'off', inputmode: 'url', placeholder: 'https://meet.google.com/...' });
+    link.value = String(aluno.linkOnline || '');
+    var campoEndereco = campoCelular('Endereço (abre no mapa)', endereco), campoLink = campoCelular('Link da aula online', link);
+    var atualizarLocal = function () { campoEndereco.hidden = local.value !== 'casa'; campoLink.hidden = local.value !== 'online'; };
+    local.addEventListener('change', atualizarLocal);
+    caixa.appendChild(campoCelular('Nome do aluno', nome));
+    caixa.appendChild(campoCelular('Responsável', responsavel));
+    caixa.appendChild(campoCelular('Telefone do responsável', telefone));
+    caixa.appendChild(campoCelular('Onde é a aula', local));
+    caixa.appendChild(campoEndereco);
+    caixa.appendChild(campoLink);
+    caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-ficha-edicao-limites', texto: 'O valor por hora, as aulas e os demais dados continuam como estão.' }));
+    atualizarLocal();
+    caixa.appendChild(el('div', { class: 'barra cel-rodape-form' }, [
+      botaoDeAcaoCelular('editar-ficha-aluno', { class: 'btn principal', id: 'cel-ficha-edicao-salvar', texto: 'Salvar ficha', aoClick: function () {
+        var atual = alunoPorId(aluno.id), n = nome.value.trim(), t = telefone.value.trim();
+        if (!celularEdita()) { editandoFichaAlunoCelular = false; desenharAlunosCelular(); avisar('Este celular só lê. Para mudar alguma coisa, use o tablet.'); return; }
+        if (!atual) { editandoFichaAlunoCelular = false; desenharAlunosCelular(); avisar('Este aluno não está mais neste aparelho.'); return; }
+        if (!n) { avisar('Informe o nome do aluno.'); return; }
+        if (t && !telefoneValidado(t)) { avisar(FRASE_TELEFONE_INVALIDO + '.'); return; }
+        comoAcaoDoCelular(function () {
+          atual.nome = n;
+          atual.responsavel = responsavel.value.trim();
+          gravarLugarEContato(atual, { telefone: t, local: local.value,
+            endereco: local.value === 'casa' ? endereco.value : '', linkOnline: local.value === 'online' ? link.value : '' });
+          return salvarEDepois(function (gravou) {
+            editandoFichaAlunoCelular = false;
+            desenharAlunosCelular();
+            if (gravou) avisar('Ficha atualizada.');
+          });
+        });
+      } }),
+      el('button', { type: 'button', class: 'btn', id: 'cel-ficha-edicao-cancelar', texto: 'Cancelar', aoClick: function () {
+        editandoFichaAlunoCelular = false; desenharAlunosCelular();
+      } })
+    ]));
   }
 
   // ---------- Fechamento ----------

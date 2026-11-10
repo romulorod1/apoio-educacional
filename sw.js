@@ -142,7 +142,7 @@
  * styles.css), com a lista igual. O v108 adicionou o indexador de livros; o
  * v109 e o v110 trouxeram navegação e Biblioteca por disciplina e ano. O v111
  * atualiza esses assets após sincronizar a Biblioteca com a main atualizada. */
-var CACHE = 'apoio-educacional-v111';
+var CACHE = 'apoio-educacional-v112';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
