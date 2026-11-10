@@ -141,7 +141,8 @@
  * duas linhas, a barra de cima menor e a trava de transbordo (app.js e
  * styles.css), com a lista igual. O v108 adicionou o indexador de livros; o
  * v109 e o v110 trouxeram navegação e Biblioteca por disciplina e ano. O v111
- * atualiza esses assets após sincronizar a Biblioteca com a main atualizada. */
+ * atualiza esses assets após sincronizar a Biblioteca com a main atualizada e
+ * traz a linha do tempo do Hoje no celular e o atalho + Aula. */
 var CACHE = 'apoio-educacional-v111';
 var BAIXADOS = 'apoio-educacional-baixados';
 

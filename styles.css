@@ -3286,6 +3286,32 @@ body.modo-celular .celular .cel-aviso .cel-aviso-acao.principal { background: va
   box-shadow: var(--sombra-forte);
 }
 
+/* F2: agenda proporcional do celular, das 07:00 às 20:00. */
+.cel-tempo-proporcional { position: relative; box-sizing: border-box; min-height: 0; margin: 8px 0 18px; overflow: visible; }
+.cel-tempo-proporcional .cel-tempo-linha { position: absolute; box-sizing: border-box; left: 0; right: 0; display: block; margin: 0; }
+.cel-tempo-proporcional .cel-tempo-hora { position: absolute; top: 2px; left: 0; width: 44px; padding: 0; font-size: var(--letra-12); line-height: 1.2; text-align: right; }
+.cel-tempo-proporcional .cel-tempo-item { position: absolute; top: 0; right: 0; bottom: 0; left: 48px; display: block; overflow: visible; }
+.cel-tempo-grade-linha { position: absolute; z-index: 0; left: 48px; right: 0; border-top: 1px solid var(--fio-claro); pointer-events: none; }
+.cel-tempo-grade-hora { position: absolute; z-index: 1; left: 0; width: 44px; transform: translateY(-50%); text-align: right; font-size: var(--letra-12); line-height: 1.2; color: var(--novidades-subtitulo); pointer-events: none; }
+.cel-tempo-sem-hora { position: absolute; z-index: 4; display: flex; gap: 8px; left: 0; right: 0; height: 56px; }
+.cel-tempo-sem-hora .cel-tempo-hora { position: static; flex: 0 0 44px; color: var(--novidades-subtitulo); }
+.cel-tempo-sem-hora .cel-tempo-item { position: static; display: flex; flex: 1; min-width: 0; }
+.cel-tempo-sem-hora .cel-bloco { position: relative; flex: 1; min-height: 48px; }
+.cel-tempo-proporcional > .cel-tempo-linha .cel-tempo-hora { color: transparent; }
+.cel-tempo-proporcional .cel-bloco { position: absolute; box-sizing: border-box; min-height: 48px; margin: 0; overflow: hidden; }
+.cel-tempo-proporcional .cel-livre { position: relative; box-sizing: border-box; top: 0; left: 0; width: 100%; height: 100%; min-height: 26px; margin: 0; overflow: hidden; }
+.cel-tempo-proporcional .cel-bloco { padding: 4px 6px; border-radius: 8px; gap: 1px; }
+.cel-tempo-proporcional .cel-bloco-nome { font-size: var(--letra-14); line-height: 1.15; }
+.cel-tempo-proporcional .cel-bloco-hora,
+.cel-tempo-proporcional .cel-bloco-situacao { font-size: var(--letra-12); line-height: 1.15; }
+.cel-tempo-proporcional .cel-bloco-marca { font-size: var(--letra-12); line-height: 1.1; padding: 0 4px; }
+.cel-tempo-proporcional .cel-livre { z-index: 1; padding: 3px 6px; border-radius: 8px; background: var(--branco-a60); }
+.cel-tempo-proporcional .cel-livre-texto { font-size: var(--letra-12); line-height: 1.2; }
+.cel-tempo-proporcional .cel-livre-horas { gap: 2px; }
+.cel-tempo-proporcional .cel-livre-hora { min-height: 48px; padding: 2px 6px; font-size: var(--letra-12); }
+.cel-agora-grade { left: 0; right: 0; z-index: 5; }
+.cel-agora-grade .cel-agora-hora { left: -48px; }
+
 /* A folha de baixo da aula: botões grandes, sobre um véu. */
 .cel-folha-fundo {
   position: fixed;
@@ -3698,6 +3724,7 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
   border-top: 1px solid var(--nav-fio);
 }
 .cel-abas[hidden] { display: none; }
+.cel-abas.muitas { min-height: 72px; }
 .cel-aba {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   min-width: 0; height: 64px; padding: 0;
@@ -3706,10 +3733,14 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
   color: var(--nav-texto);
 }
 .cel-aba[hidden] { display: none; }
+.cel-abas.muitas .cel-aba { height: 72px; }
 .cel-aba .nav-ind { width: 100%; max-width: 56px; height: 28px; }
 .cel-aba.ativa { color: var(--nav-ativo-texto); font-weight: 600; }
+.cel-abas.muitas .nav-rotulo { white-space: normal; overflow-wrap: anywhere; line-height: 1.05; }
 .cel-aba.ativa .nav-ind { background: var(--nav-ativo-fundo); }
 .cel-aba:focus-visible { outline: 2px solid var(--nav-ativo-texto); outline-offset: -2px; border-radius: 12px; }
+.cel-aba-mais .nav-ind { width: 40px; height: 32px; color: var(--nav-mais-traco); background: var(--nav-mais-fundo); border-radius: 16px; }
+.cel-aba-mais .nav-rotulo { color: var(--nav-ativo-texto); font-weight: 600; }
 /* ==================== B1: navegação (fim) ==================== */
 
 /* ==================== B2: a Biblioteca por disciplina e ano ====================
