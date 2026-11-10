@@ -144,7 +144,7 @@
  * store.js e sw.js). O v109 fixa a altura da linha de proposta entre
  * plataformas. O v110 traz a navegação com a Biblioteca, o trilho lateral do
  * tablet e a barra de baixo do celular (app.js, index.html e styles.css). */
-var CACHE = 'apoio-educacional-v111';
+var CACHE = 'apoio-educacional-v112';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
