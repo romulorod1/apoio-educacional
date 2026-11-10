@@ -16230,11 +16230,18 @@
     }).then(function (contas) {
       var linhas = ['Livros importados.'].concat(Biblioteca.resumoDeLivros(contas),
         ['Para ler, abra a aba Biblioteca e toque no livro.']);
-      if (aberto.erros.length) {
-        linhas.push(aberto.erros.length + (aberto.erros.length === 1
-          ? ' livro foi pulado; os demais foram processados:'
-          : ' livros foram pulados; os demais foram processados:'));
-        aberto.erros.forEach(function (e) { linhas.push(e.titulo + ': ' + e.mensagem); });
+        if (aberto.erros.length) {
+          linhas.push(aberto.erros.length + (aberto.erros.length === 1
+            ? ' livro foi pulado; os demais foram processados:'
+            : ' livros foram pulados; os demais foram processados:'));
+          aberto.erros.forEach(function (e) { linhas.push(e.titulo + ': ' + e.mensagem); });
+        }
+        var recusados = aberto.recusados || [];
+        if (recusados.length) {
+          linhas.push('Aten\u00e7\u00e3o: ' + recusados.length + (recusados.length === 1 ? ' livro n\u00e3o foi importado' : ' livros n\u00e3o foram importados') +
+            ' por numera\u00e7\u00e3o impressa inv\u00e1lida.');
+          recusados.forEach(function (livro) { if (livro.motivo) linhas.push(livro.motivo); });
+        }
       }
       // livro que SAIU do pacote novo também é gravação (some do tablet com a posição de leitura)
       var entrou = contas.novos + contas.atualizados + contas.removidos > 0;

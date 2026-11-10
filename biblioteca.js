@@ -221,7 +221,10 @@
     if (!Array.isArray(l.numeracao)) {
       return 'A numeração do livro ' + id + ' não é uma lista.';
     }
-    var limite = inteiro(l.paginas) && l.paginas >= 1 ? l.paginas : null;
+    if (!inteiro(l.paginas) || l.paginas < 1) {
+      return 'O livro ' + id + ' precisa ter um total de p\u00e1ginas v\u00e1lido para usar numera\u00e7\u00e3o impressa.';
+    }
+    var limite = l.paginas;
     var fimAnterior = 0;
     for (var i = 0; i < l.numeracao.length; i++) {
       var t = l.numeracao[i];

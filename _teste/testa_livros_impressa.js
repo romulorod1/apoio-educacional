@@ -96,12 +96,15 @@ const Biblioteca = carregarBiblioteca();
  * sobre o Biblioteca carregado acima (inclusive quando envenenado). */
 function carregarFuncoesDeTela(Bib) {
   const appCodigo = fs.readFileSync(path.join(RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
+  const html = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
+  conf('campo Ir p. usa teclado de texto para aceitar algarismos romanos', /id="leitor-ir-pagina"[^>]*inputmode="text"/.test(html), true);
   function extrair(inicio, fim) {
     const i = appCodigo.indexOf(inicio);
     const j = appCodigo.indexOf(fim, i);
     if (i < 0 || j < 0) throw new Error('Trecho não encontrado em app.js: ' + inicio);
     return appCodigo.slice(i, j);
   }
+  const trechoImportarLivros = extrair('  function importarLivros(aberto, andamento) {', '  function tituloDoLivro(meta)');
   const trechoBib = extrair('  var ROTULO_COM_NUMERO =', '  function mostrarSecaoDeLivros');
   const trechoTelaLivro = extrair('  function entradaDoMapaDoCapitulo(', '  /* ---- B6: o assunto lado a lado');
   const trechoAbrirLivro = extrair('  function tituloDoLivro(', '  /* ---------------------------------- "Este capítulo cobre"');
@@ -174,7 +177,10 @@ function carregarFuncoesDeTela(Bib) {
       lerLivro: id => Promise.resolve(livrosGuardados[id] || null),
       lerPosicaoLivro: id => Promise.resolve(posicoesGuardadas[id] || null),
       gravarPosicaoLivro: pos => { ultimaPosicaoGravada = pos; posicoesGuardadas[pos.id] = pos; return Promise.resolve(); },
-      listarLivros: () => Promise.resolve(Object.keys(livrosGuardados).map(k => livrosGuardados[k]))
+      listarLivros: () => Promise.resolve(Object.keys(livrosGuardados).map(k => livrosGuardados[k])),
+      estimarEspaco: () => Promise.resolve(null),
+      tornarPersistente: () => Promise.resolve(),
+      gravarLivros: () => Promise.resolve({ novos: 1, atualizados: 0, iguais: 0, maisNovos: 0, removidos: 0, posicoesSoltas: 0, deOutroPacote: [] })
     },
     Core: { materiaPorId: () => ({ rotulo: 'Matemática' }), MATERIA_PADRAO: 'matematica' },
     SERIES_NOMES: [['06', '6º ano'], ['07', '7º ano']],
@@ -194,6 +200,7 @@ function carregarFuncoesDeTela(Bib) {
     carregarAssuntosDosLivros: () => Promise.resolve({ porId: {}, lista: [] }),
     fecharTelaDoLivro: () => {},
     desenharLivrosDaBiblioteca: () => Promise.resolve(),
+    desenharLivrosAjustes: () => Promise.resolve(),
     abrirLadoALado: () => {},
     icone: nome => criarNo('svg', { 'data-icone-nome': nome }),
     avisar: () => {},
@@ -218,7 +225,7 @@ function carregarFuncoesDeTela(Bib) {
     lerUltimoLeitorPdf: () => ultimoLeitorPdf,
     lerUltimaPosicaoGravada: () => ultimaPosicaoGravada
   };
-  vm.runInNewContext([trechoPlural, trechoBib, trechoTelaLivro, trechoAbrirLivro, trechoEntradaSumario, trechoContador].join('\n'), ctx, { filename: 'app_b3_trecho.js' });
+  vm.runInNewContext([trechoPlural, trechoImportarLivros, trechoBib, trechoTelaLivro, trechoAbrirLivro, trechoEntradaSumario, trechoContador].join('\n'), ctx, { filename: 'app_b3_trecho.js' });
   return ctx;
 }
 
@@ -437,6 +444,16 @@ const LIVRO_SEM_NUMERACAO = {
     conf('pacote de 1 livro (' + nome + '): recusa com frase clara',
       !!(erroSoRuim && erroSoRuim.recusa && erroSoRuim.tipo === 'defeito' && padrao.test(erroSoRuim.message)), true);
   }
+
+  const semTotalDePaginas = Object.assign({}, LIVRO_COM_NUMERACAO, { paginas: undefined });
+  conf('numeracao exige total de paginas valido', !!Biblioteca.conferirNumeracao(semTotalDePaginas), true);
+  const resultadoParcial = await tela.importarLivros({
+    bytesTotais: 0,
+    recusados: [{ id: 'livro-ruim', motivo: 'Numeracao impressa invalida no livro-ruim.' }]
+  }, () => {});
+  const avisoParcial = resultadoParcial.linhas.join(' ');
+  conf('importacao mista avisa que o livro recusado nao entrou',
+    /livro n\u00e3o foi importado por numera\u00e7\u00e3o impressa inv\u00e1lida/i.test(avisoParcial) && /livro-ruim/.test(avisoParcial), true);
 
   if (qualVeneno) {
     console.log('\n=== Modo envenenado: ' + qualVeneno + ' ===');
