@@ -502,9 +502,9 @@ roda "navegacao biblioteca --envenenado-rotulo-corta" node "_teste/testa_navegac
 roda "biblioteca livros tela"                   node "_teste/testa_biblioteca_livros_tela.js"
 roda "biblioteca livros tela --envenenado-capitulo-abre-pagina-errada" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-capitulo-abre-pagina-errada
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
-# 6o ano (um trata em dois capitulos, um nao trata, um sem mapa revisado): o
-# capitulo e as paginas do arquivo em cada celula, "nao trata" e "sem mapa"
-# ditos, as tres entradas (aba, painel do capitulo, aula), a busca que atravessa
+# 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
+# revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
+# (aba, painel do capitulo, aula), a busca que atravessa
 # os anos e a correcao dela. Os venenos trocam as duas ausencias, contam o mapa
 # vazio como revisado e o livro parcialmente confirmado como revisado; a prova
 # tem de ver cada um.

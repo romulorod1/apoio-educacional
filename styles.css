@@ -3986,8 +3986,8 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .lado-pg-texto { display: flex; flex-direction: column; min-width: 0; }
 .lado-pg-cap { font-size: var(--letra-14); font-weight: var(--peso-forte); overflow-wrap: anywhere; }
 .lado-pg-p { font-size: var(--letra-14); color: var(--muted); }
-/* a ausência dita: "não trata" é fato do mapa, em âmbar; "sem mapa", cinza */
-.lado-nao { font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--aviso-texto); }
+/* Não haver vínculo no mapa não prova ausência do assunto no livro. */
+.lado-sem-vinculo { font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--texto); }
 .lado-sem { font-size: var(--letra-14); color: var(--muted); }
 .lado-pe { padding-top: 10px; }
 .lado-abrir { width: 100%; background: var(--acao-clara); border-color: var(--acao-clara); color: var(--acao); }

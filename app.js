@@ -84,7 +84,8 @@
     {
       versao: '1.42.38',
       itens: [
-        'Nova tela na Biblioteca para comparar um assunto entre os livros: uma tabela mostra, para cada livro do tablet, em que capítulo e páginas o assunto aparece, e diz com todas as letras onde o livro não trata o assunto ou ainda não tem o mapa revisado.',
+        'Nova tela na Biblioteca para comparar um assunto entre os livros: uma tabela mostra, para cada livro do tablet, em que capítulo e páginas o assunto aparece, indica onde não há vínculo no mapa e avisa quando o mapa ainda não foi revisado.',
+        'Quando um assunto não aparece no mapa, a Biblioteca mostra “sem vínculo no mapa”; isso não significa que o livro não aborda o assunto, pois o mapa pode estar incompleto. As contagens se referem aos vínculos registrados.',
         'Você chega a ela pela aba Biblioteca (Comparar livros por assunto, com uma busca de assunto que atravessa os anos), pelo painel do capítulo de um livro e pela aula (Ver em todos os livros).'
       ]
     },
@@ -403,7 +404,7 @@
           'espaço cada livro ocupa e pode remover.',
         'Ao abrir um capítulo, o aplicativo mostra "Este capítulo cobre:" com o assunto. Confirme ou corrija com um toque; ' +
           'a sua correção fica guardada e vai na cópia de segurança.',
-        'No assunto da aula, "Abrir no livro" lista os livros do ano do aluno que têm aquele assunto e abre o capítulo certo.'
+        'No assunto da aula, "Abrir no livro" lista os livros do ano do aluno em que o assunto está mapeado e abre o capítulo ligado.'
       ]
     },
     {
@@ -4153,7 +4154,7 @@
           aoClick: function () { abrirLivrosDoAssunto(t, nosLivros); }
         }) : null,
         /* B6: nenhum livro do ano tem capítulo do assunto: a tabela diz isso
-         * livro a livro ("não trata" ou "sem mapa"), no lugar do "Abrir no
+         * livro a livro ("sem vínculo no mapa" ou "sem mapa"), no lugar do "Abrir no
          * livro" que não existe. */
         !nosLivros.length && t.id && livrosDoTablet && livrosDoTablet.length ? el('button', {
           type: 'button', class: 'btn pequeno' + (podeMaterial ? ' u-margem-esq-8' : ''), texto: 'Ver em todos os livros', 'data-ver-nos-livros': t.id,
@@ -16407,20 +16408,23 @@
     return anoEscolarDe(aluno) || Core.serieParaTemas((registro && registro.serie) || t.grupo || '') || null;
   }
 
-  /* A lista dos livros com o assunto, na janela dos livros, por cima da aula.
+  /* A lista dos livros em que o mapa tem vínculo para o assunto, na janela dos livros, por cima da aula.
    * Um toque abre o leitor no começo do capítulo: o PDF na página, o EPUB no
    * capítulo. A obra inteira (literatura) abre onde ela parou. */
   function abrirLivrosDoAssunto(t, achados) {
     var corpo = $('#corpo-modal-livros');
     $('#titulo-modal-livros').textContent = 'Abrir no livro';
     corpo.innerHTML = '';
+    var sugestoesPendentes = achados.some(function (a) { return a.entrada.estado === 'a_confirmar'; });
     corpo.appendChild(el('p', { class: 'ajuda', id: 'livros-do-assunto',
-      texto: 'Os livros do ano com um capítulo de "' + (t.titulo || t.id) + '". O toque abre o livro no começo do capítulo.' }));
+      texto: 'Os livros do ano com vínculo no mapa para "' + (t.titulo || t.id) + '". O toque abre o trecho mapeado.' +
+        (sugestoesPendentes ? ' Há sugestões a confirmar.' : '') }));
     achados.forEach(function (a) {
       var e = a.entrada;
       var epub = a.meta.formato === 'epub';
-      var onde = e.obraInteira ? 'O livro inteiro trata deste assunto' :
-        'Capítulo: ' + e.titulo + (epub ? '' : ', página ' + e.pagina);
+      var onde = e.obraInteira ? 'Vínculo no mapa: livro inteiro' :
+        'Vínculo no mapa: capítulo ' + e.titulo + (epub ? '' : ', página ' + e.pagina);
+      if (e.estado === 'a_confirmar') onde += ' · sugestão a confirmar';
       var linha = linhaBib(tituloDoLivro(a.meta), onde, function () {
         fecharModal('modal-livros');
         abrirLivro(a.id, e.obraInteira ? null : (epub ? { capitulo: e.capitulo, ancora: e.ancora } : { pagina: e.pagina }));
@@ -16429,8 +16433,8 @@
       linha.setAttribute('data-capitulo', String(e.n));
       corpo.appendChild(linha);
     });
-    /* B6: o mesmo assunto em todos os livros do ano, lado a lado, com o que
-     * cada um não trata dito; o Voltar de lá volta à aula. */
+    /* B6: o mesmo assunto em todos os livros do ano, lado a lado, com os
+     * vínculos encontrados em cada mapa; o Voltar de lá volta à aula. */
     if (t.id) {
       corpo.appendChild(el('button', { type: 'button', class: 'btn u-margem-topo-12', id: 'livros-ver-todos', icone: 'comparar',
         texto: 'Ver em todos os livros', aoClick: function () {
@@ -18030,7 +18034,7 @@
       if (!mapa.length) assuntos = [el('p', { class: 'bibl-falta-texto', texto: 'Este livro ainda não tem mapa de assuntos.' })];
       else if (!ma || !ma.assuntos.length) assuntos = [el('p', { class: 'bibl-falta-texto', texto: 'Nenhum assunto ligado ainda.' })];
       else {
-        // B6: quantos livros do tablet tratam cada assunto, e o atalho para a comparação lado a lado
+        // B6: quantos mapas dos livros do tablet têm vínculo para cada assunto, e o atalho para a comparação
         var contar = nomes ? livrosPorAssunto(Object.keys(bibLivrosCache || {}).map(function (k) { return bibLivrosCache[k]; })) : null;
         assuntos = ma.assuntos.map(function (id) {
           var a = nomes && nomes.porId[id];
@@ -18038,8 +18042,8 @@
           return el('div', { class: 'bibl-assunto', 'data-assunto': id }, [
             el('span', { class: 'cresce', texto: nomeDoAssunto(id) }),
             n ? el('button', { type: 'button', class: 'bibl-n-livros', 'data-comparar': id,
-              'aria-label': 'Comparar ' + a.titulo + (n > 1 ? ' em ' + n + ' livros' : ': só este livro trata'),
-              aoClick: function () { abrirLadoALado(id); } }, [icone('comparar'), n > 1 ? n + ' livros' : 'só neste']) : null
+              'aria-label': 'Comparar ' + a.titulo + ': ' + livrosComVinculoNoMapa(n),
+              aoClick: function () { abrirLadoALado(id); } }, [icone('comparar'), livrosComVinculoNoMapa(n)]) : null
           ]);
         });
       }
@@ -18075,20 +18079,17 @@
    * assuntos irmãos (o mesmo tema do índice: a unidade na matemática, o bloco
    * nas outras matérias), as colunas são os livros do tablet daquela matéria e
    * daquele ano, e cada célula diz o capítulo e as páginas do arquivo onde o
-   * mapa liga o assunto ao livro. Onde não liga, a célula diz com todas as
-   * letras:
-   *   "não trata"  o mapa do livro foi REVISADO e não liga o assunto: é fato
-   *                do mapa;
-   *   "sem mapa"   o livro não tem mapa, ou tem capítulo do passe automático
-   *                que ela ainda não confirmou: a ausência ali não é
-   *                confiável, e por isso não vira "não trata".
+   * mapa liga o assunto ao livro. Onde não liga, a célula distingue o mapa
+   * ainda não revisado ("sem mapa") de um mapa revisado sem vínculo explícito
+   * para o assunto ("sem vínculo no mapa"). A ausência de vínculo nunca prova
+   * que o livro não aborda o assunto, pois o mapa pode estar incompleto.
    * Só lê: o mapa (com as correções dela), o índice de assuntos e a lista dos
    * livros (Store.listarLivros, referências de Blob). Nada é gravado e nenhum
    * livro é aberto para desenhar a tabela. */
   var ladoAtual = null;   // { disciplina, serie, tema, escolhido, so, aula, deEscolha, origem }
   var ladoVez = 0;
 
-  /* O mapa revisado: tem capítulo, e nenhum veio do passe automático sem a
+  /* Os vínculos registrados revisados: tem capítulo, e nenhum veio do passe automático sem a
    * palavra dela (o mapa da orquestradora, o que ela confirmou e o que ela
    * corrigiu valem; o 'a_confirmar' não). */
   function mapaFoiRevisado(mapa) {
@@ -18097,7 +18098,7 @@
   function celulaDoLadoALado(mapa, revisado, assuntoId) {
     var achadas = mapa.filter(function (e) { return e.assuntos.indexOf(assuntoId) >= 0; });
     if (achadas.length) return { tipo: 'trata', entradas: achadas };
-    return { tipo: revisado ? 'nao-trata' : 'sem-mapa' };
+    return { tipo: revisado ? 'sem-vinculo' : 'sem-mapa' };
   }
   var DISCIPLINA_DA_MATERIA = { filosofia: 'filosofia-sociologia', sociologia: 'filosofia-sociologia' };
   function disciplinaDoMapa(meta) {
@@ -18113,10 +18114,10 @@
     var m = Core.materiaPorId(id);
     return (m && m.rotulo) || (a && a.disciplinaNome) || id;
   }
-  /* Quantos livros tratam cada assunto: um passe pelos mapas. Conta todo
-   * livro cujo mapa liga o assunto, também o de ano vizinho (o gerador liga
-   * capítulo a assunto da série vizinha): é o mesmo critério das colunas da
-   * tabela, que trazem os livros do ano e os que ligam alguma linha. */
+  /* Quantos livros têm vínculo registrado para cada assunto: um passe pelos
+   * mapas. Conta também o livro de ano vizinho cujo mapa liga o assunto da
+   * série vizinha. Isso conta vínculos encontrados, não comprova cobertura
+   * completa do conteúdo do livro. */
   function livrosPorAssunto(livros) {
     var porAssunto = Object.create(null);
     var correcoes = correcoesDosLivros();
@@ -18132,9 +18133,12 @@
     };
   }
   function pluralLivros(n) { return n ? plural(n, 'livro', 'livros') : 'nenhum livro'; }
+  function livrosComVinculoNoMapa(n) {
+    return n ? n + (n === 1 ? ' livro com vínculo no mapa' : ' livros com vínculo no mapa') : 'nenhum vínculo nos mapas';
+  }
 
   /* Na aba: "Comparar livros por assunto, 6º ano", com os assuntos do ano que
-   * mais livros tratam e o "Todos os N assuntos", que abre a busca de assunto
+   * têm mais vínculos registrados e o "Todos os N assuntos", que abre a busca
    * por todos os anos. */
   var secaoCompararPediuIndice = false;
   function secaoComparar(disc, ano, livros, redesenhar) {
@@ -18158,7 +18162,7 @@
       el('div', { class: 'bibl-comparar-lista' }, mais.map(function (x) {
         return el('button', { type: 'button', class: 'bibl-comparar-chip', 'data-comparar': x.a.id,
           aoClick: function () { abrirLadoALado(x.a.id); } }, [
-          icone('comparar'), el('span', { class: 'bibl-comparar-nome', texto: x.a.titulo }), el('span', { class: 'bibl-apoio', texto: pluralLivros(x.n) })
+          icone('comparar'), el('span', { class: 'bibl-comparar-nome', texto: x.a.titulo }), el('span', { class: 'bibl-apoio', texto: livrosComVinculoNoMapa(x.n) })
         ]);
       }).concat([
         el('button', { type: 'button', class: 'bibl-comparar-chip', id: 'bib-comparar-todos', iconeDepois: 'chr',
@@ -18244,12 +18248,15 @@
     var serieNome = serieDoAssunto(base);
     var titulo = (base.temaNome || base.titulo) + (serieNome ? ', ' + serieNome : '');
     var vizinhos = colunas.filter(function (c) { return c.vizinho; }).length;
-    var aConfirmar = colunas.filter(function (c) { return !c.revisado; }).length;
-    // o resumo não afirma o que não é: diz quantos livros têm o mapa ainda não revisado
+    var aConfirmar = colunas.filter(function (c) { return c.mapa.length && !c.revisado; }).length;
+    var semMapa = colunas.filter(function (c) { return !c.mapa.length; }).length;
+    // Descreve cada estado sem sugerir que os mapas confirmados cobrem o livro inteiro.
     var resumo = !colunas.length ? 'nenhum livro no tablet' : [
       pluralLivros(colunas.length) + (vizinhos ? '' : serieNome ? ' do ' + serieNome : ''),
       vizinhos ? vizinhos + ' de outro ano, com capítulo ligado' : null,
-      aConfirmar ? aConfirmar + ' com o mapa ainda não revisado' : colunas.length > 1 ? 'todos com o mapa revisado' : 'com o mapa revisado'
+      aConfirmar ? aConfirmar + (aConfirmar === 1 ? ' com sugestão a confirmar' : ' com sugestões a confirmar') : null,
+      semMapa ? semMapa + (semMapa === 1 ? ' sem mapa de assuntos' : ' sem mapa de assuntos') : null,
+      !aConfirmar && !semMapa ? (colunas.length > 1 ? 'vínculos registrados revisados em todos' : 'vínculos registrados revisados') : null
     ].filter(Boolean).join('; ');
 
     var tela = mostrarTelaDoLado('tabela');
@@ -18306,8 +18313,8 @@
       el('span', { class: 'bibl-apoio', texto: 'Mostrar' }),
       el('div', { class: 'bibl-anos lado-chips' }, chips),
       el('p', { class: 'lado-legenda', id: 'lado-legenda' }, [
-        el('span', { class: 'lado-legenda-item' }, [icone('alerta'), el('span', {}, [el('strong', { class: 'lado-nao', texto: 'não trata' }), ': o mapa revisado não liga'])]),
-        el('span', { class: 'lado-legenda-item' }, [el('span', {}, [el('strong', { class: 'lado-sem', texto: 'sem mapa' }), ': o mapa do livro ainda não foi revisado'])])
+        el('span', { class: 'lado-legenda-item' }, [el('span', {}, [el('strong', { class: 'lado-sem-vinculo', texto: 'sem vínculo no mapa' }), ': o mapa revisado não liga este assunto'])]),
+        el('span', { class: 'lado-legenda-item' }, [el('span', {}, [el('strong', { class: 'lado-sem', texto: 'sem mapa' }), ': o livro não tem mapa ou há sugestões pendentes'])])
       ])
     ]));
 
@@ -18323,12 +18330,12 @@
     // a cabeça: um livro por coluna
     var cabeca = [el('div', { class: 'lado-canto', role: 'columnheader' })];
     colunas.forEach(function (c) {
-      var nTrata = linhas.filter(function (a) { return c.mapa.some(function (e) { return e.assuntos.indexOf(a.id) >= 0; }); }).length;
+      var nComVinculo = linhas.filter(function (a) { return c.mapa.some(function (e) { return e.assuntos.indexOf(a.id) >= 0; }); }).length;
       cabeca.push(el('div', { class: 'lado-livro', role: 'columnheader', 'data-livro': c.id }, [
         capaDoLivro(c, true),
         el('div', { class: 'lado-livro-texto' }, [
           el('span', { class: 'bibl-forte', texto: tituloDoLivro(c.meta) }),
-          el('span', { class: 'bibl-apoio', texto: nTrata + ' de ' + linhas.length + (linhas.length === 1 ? ' assunto' : ' assuntos') }),
+          el('span', { class: 'bibl-apoio', texto: nComVinculo + ' de ' + linhas.length + ' com vínculo no mapa' }),
           c.vizinho ? el('span', { class: 'bibl-apoio', 'data-vizinho': 'sim', texto: 'de outro ano' }) : null,
           !c.mapa.length ? el('span', { class: 'tag lado-tag', 'data-falta': 'mapa', texto: 'sem mapa de assuntos' }) :
             !c.revisado ? el('span', { class: 'tag lado-tag', 'data-falta': 'revisao', texto: 'mapa a confirmar' }) : null
@@ -18338,11 +18345,10 @@
     grade.appendChild(el('div', { class: 'lado-linha lado-linha-cabeca', role: 'row' }, cabeca));
     visiveis.forEach(function (a, i) {
       var cs = celulas[i];
-      var falha = cs.some(function (x) { return x.tipo === 'nao-trata'; });
       var todos = cs.every(function (x) { return x.tipo === 'trata'; });
       var ehEscolhido = escolhido && a.id === escolhido.id;
       var rotulo = el('div', { class: 'lado-rotulo', role: 'rowheader' }, [
-        el('span', { class: 'lado-sinal' }, [falha ? icone('alerta', 'algum livro não trata') : todos ? icone('check', 'todos os livros tratam') : null]),
+        el('span', { class: 'lado-sinal' }, [todos ? icone('check', 'todos os livros têm vínculo no mapa') : null]),
         el('span', { class: 'lado-rotulo-texto' }, [
           el('span', { class: 'lado-assunto', texto: a.titulo }),
           ehEscolhido ? el('span', { class: 'bibl-apoio lado-escolhido', texto: 'o assunto escolhido' }) : null,
@@ -18371,14 +18377,14 @@
               icone('chr')
             ]);
           });
-        } else if (x.tipo === 'nao-trata') {
-          conteudo = [el('span', { class: 'lado-nao', texto: 'não trata' })];
+        } else if (x.tipo === 'sem-vinculo') {
+          conteudo = [el('span', { class: 'lado-sem-vinculo', texto: 'sem vínculo no mapa' })];
         } else {
-          conteudo = [el('span', { class: 'lado-sem', 'aria-label': 'sem mapa revisado', texto: 'sem mapa' })];
+          conteudo = [el('span', { class: 'lado-sem', texto: 'sem mapa' })];
         }
         linha.push(el('div', { class: 'lado-celula', role: 'cell', 'data-livro': c.id, 'data-tipo': x.tipo }, conteudo));
       });
-      grade.appendChild(el('div', { class: 'lado-linha' + (ehEscolhido ? ' escolhido' : '') + (falha ? ' com-falha' : ''), role: 'row', 'data-assunto': a.id,
+      grade.appendChild(el('div', { class: 'lado-linha' + (ehEscolhido ? ' escolhido' : ''), role: 'row', 'data-assunto': a.id,
         'aria-current': ehEscolhido ? 'true' : null }, linha));
     });
     // o pé: abrir cada livro no primeiro capítulo ligado ao que está à vista
@@ -18429,7 +18435,7 @@
   /* A busca de assunto que ATRAVESSA OS ANOS: sem termo, os assuntos da
    * matéria e do ano de onde ela veio; com termo, os de todos os anos e
    * matérias que têm o termo no título, cada um com o ano e quantos livros do
-   * tablet o tratam. O toque abre a comparação, e o Voltar dela volta aqui. */
+   * tablet têm vínculo registrado no mapa. O toque abre a comparação, e o Voltar dela volta aqui. */
   var LIMITE_DA_ESCOLHA = 60;
   function abrirEscolhaDoAssunto(disciplina, serie, termo) {
     ladoAtual = null;
@@ -18468,7 +18474,7 @@
               el('span', { class: 'bibl-apoio', texto: [a.temaNome, onde].filter(Boolean).join(' · ') })
             ]),
             el('span', { class: 'tag lado-ano', texto: serieDoAssunto(a) }),
-            el('span', { class: n ? 'bibl-apoio lado-n' : 'bibl-falta-texto lado-n', texto: pluralLivros(n) }),
+            el('span', { class: n ? 'bibl-apoio lado-n' : 'bibl-falta-texto lado-n', texto: livrosComVinculoNoMapa(n) }),
             icone('chr')
           ]));
         });
@@ -18484,7 +18490,7 @@
         el('button', { type: 'button', class: 'btn bibl-voltar-livro', id: 'lado-voltar', icone: 'chl', texto: 'Voltar', aoClick: fecharLadoALado }),
         el('div', { class: 'cresce lado-nome' }, [
           el('h2', { class: 'bibl-titulo-livro', id: 'lado-titulo', texto: 'Comparar livros por assunto' }),
-          el('p', { class: 'bibl-apoio', texto: 'Escolha o assunto: a comparação mostra em que capítulo cada livro o trata.' })
+          el('p', { class: 'bibl-apoio', texto: 'Escolha o assunto: a comparação mostra os vínculos registrados nos mapas e em que capítulo aparecem.' })
         ])
       ]));
       tela.appendChild(el('div', { class: 'lado-filtro' }, [
