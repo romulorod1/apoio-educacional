@@ -144,8 +144,8 @@
  * updates these assets after syncing the library with the current main.
  * v118 adds day-by-day mobile navigation; v119 updates the map legend.
  * v120 isolates per-book checks in a timed Worker; v121 adds Mark paid; v122,
- * printed page support. v123 adds mobile profile edits; v124 adds continuous book reading/export. */
-var CACHE = 'apoio-educacional-v124';
+ * printed page support. v123 adds mobile profile edits; v124 adds continuous book reading/export; v125 adds text search in the book library. */
+var CACHE = 'apoio-educacional-v125';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
