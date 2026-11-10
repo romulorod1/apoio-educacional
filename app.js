@@ -3201,6 +3201,10 @@
 
     var aula = aulaEmEdicao;
     var valores = valoresEditadosDaAula();
+    if (!valores.data) {
+      rotuloEstadoAutosaveAula('Informe a data antes de salvar.');
+      return Promise.resolve(false);
+    }
     var antes = snapshotAutosaveAula || {};
     var revisaoNoInicio = revisaoAutosaveAula;
     var mudancas = {};
@@ -3248,7 +3252,9 @@
 
   function solicitarFecharModal(id) {
     if (id === 'modal-aula' && aulaTemMudancasParaAutosave()) {
-      gravarAutosaveAula().then(function () { fecharModal(id); });
+      gravarAutosaveAula().then(function (gravou) {
+        if (gravou) fecharModal(id);
+      });
       return;
     }
     fecharModal(id);

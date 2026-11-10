@@ -289,6 +289,40 @@ async function rodar() {
   // ================================================================
   secao('5. Alterações de horário e relato salvam automaticamente');
 
+  const dataAntesDeLimpar = await pag.$eval('#campo-data', e => e.value);
+  await pag.evaluate(() => {
+    const data = document.querySelector('#campo-data');
+    data.value = '';
+    data.dispatchEvent(new Event('input', { bubbles: true }));
+    data.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await pausa(800);
+  const dataVaziaNaoGravou = await pag.evaluate(id => new Promise(resolve => {
+    const req = indexedDB.open('apoio-educacional');
+    req.onsuccess = () => {
+      const banco = req.result;
+      const get = banco.transaction('dados', 'readonly').objectStore('dados').get('principal');
+      get.onsuccess = () => {
+        banco.close();
+        const aula = (get.result.aulas || []).find(x => x.id === id);
+        resolve(aula && aula.data);
+      };
+    };
+  }), aulaGravada1.id);
+  conf('data vazia não é gravada na aula existente', dataVaziaNaoGravou, dataAntesDeLimpar);
+  await pag.click('#cancelar-aula');
+  await pausa(100);
+  const modalPermaneceComDataObrigatoria = await pag.evaluate(() =>
+    document.querySelector('#modal-aula').classList.contains('aberto') &&
+    document.querySelector('#estado-salvamento-aula').textContent.includes('Informe a data'));
+  conf('modal não fecha enquanto a data obrigatória estiver vazia', modalPermaneceComDataObrigatoria, true);
+  await pag.evaluate(valor => {
+    const data = document.querySelector('#campo-data');
+    data.value = valor;
+    data.dispatchEvent(new Event('input', { bubbles: true }));
+    data.dispatchEvent(new Event('change', { bubbles: true }));
+  }, dataAntesDeLimpar);
+
   await pag.evaluate(() => {
     const hora = document.querySelector('#campo-hora');
     hora.value = '10:30';
