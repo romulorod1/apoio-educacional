@@ -16015,8 +16015,9 @@
     if (!resumo) return;
     Promise.all([Store.listarPacotesBiblioteca(), Store.listarLivros()]).then(function (r) {
       var pacotes = r[0].length, livros = r[1].length;
-      resumo.textContent = (pacotes ? pacotes + (pacotes === 1 ? ' pacote' : ' pacotes') : 'Nenhum pacote') +
-        ' · ' + livros + (livros === 1 ? ' livro' : ' livros') + ' neste tablet';
+      var resumoPacotes = pacotes ? pacotes + (pacotes === 1 ? ' pacote de exercícios' : ' pacotes de exercícios') : 'nenhum pacote de exercícios';
+      var resumoLivros = livros + (livros === 1 ? ' livro' : ' livros') + ' neste tablet';
+      resumo.textContent = pacotes ? resumoPacotes + ' · ' + resumoLivros : resumoLivros + ' · ' + resumoPacotes;
     }).catch(function () { resumo.textContent = 'Conteúdo instalado neste tablet'; });
   }
 

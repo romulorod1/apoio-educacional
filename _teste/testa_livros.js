@@ -354,6 +354,11 @@ async function printar(pag, nome) {
   conf('e nenhum foi para os pacotes de exercícios', await H.contarDeposito(p, 'biblioteca_pacotes'), 0);
   conf('a gestão começa recolhida para encurtar a tela de Ajustes',
     await p.evaluate(() => document.querySelector('#lista-instalados-biblioteca').open), false);
+  conf('o resumo diferencia livros de pacotes de exercÃ­cios',
+    await p.evaluate(() => document.querySelector('#resumo-instalados-biblioteca').textContent),
+    '4 livros neste tablet · nenhum pacote de exercícios');
+  await p.evaluate(() => document.querySelector('#lista-instalados-biblioteca').scrollIntoView({ block: 'center' }));
+  await printar(p, 'c15_gestao_livros_recolhida.png');
   await p.evaluate(() => { document.querySelector('#lista-instalados-biblioteca').open = true; });
   const gestao = await p.evaluate(() => ({
     linhas: Array.from(document.querySelectorAll('#lista-livros-biblioteca [data-livro]')).map(x => x.innerText.replace(/\s+/g, ' ')),
