@@ -71,9 +71,7 @@ if (filho) {
   const puppeteer = require(caminhoPup);
   const lancarNovo = async function (...a) {
     const nav = await puppeteer.launch(...a);
-    const novaPagina = nav.newPage.bind(nav);
-    nav.newPage = async function (...b) {
-      const p = await novaPagina(...b);
+    const marcarMundo = async function (p) {
       await p.evaluateOnNewDocument(desl => {
         const R = Date, T = performance.timeOrigin;
         function M(...x) {
@@ -86,6 +84,23 @@ if (filho) {
       }, DESLOC);
       return p;
     };
+    const novaPagina = nav.newPage.bind(nav);
+    nav.newPage = async function (...b) {
+      return marcarMundo(await novaPagina(...b));
+    };
+    if (typeof nav.createBrowserContext === 'function') {
+      const criarContexto = nav.createBrowserContext.bind(nav);
+      nav.createBrowserContext = async function (...b) {
+        const ctx = await criarContexto(...b);
+        if (ctx && typeof ctx.newPage === 'function') {
+          const novaPaginaCtx = ctx.newPage.bind(ctx);
+          ctx.newPage = async function (...c) {
+            return marcarMundo(await novaPaginaCtx(...c));
+          };
+        }
+        return ctx;
+      };
+    }
     return nav;
   };
   require.cache[caminhoPup].exports = new Proxy(puppeteer, {
@@ -198,6 +213,11 @@ if (filho) {
         await outra.goto(amb.ORIGEM + '/index.html', { waitUntil: 'domcontentloaded' });
         saida.diretaIso = await outra.evaluate(() => { const d = new Date(), q = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + q(d.getMonth() + 1) + '-' + q(d.getDate()); });
         saida.diretaPadrao = await outra.evaluate(() => window.__DataDaRodadaPadrao === true);
+        const ctx = await pag.browser().createBrowserContext();
+        const deContexto = await ctx.newPage();
+        await deContexto.goto(amb.ORIGEM + '/index.html', { waitUntil: 'domcontentloaded' });
+        saida.contextoIso = await deContexto.evaluate(() => { const d = new Date(), q = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + q(d.getMonth() + 1) + '-' + q(d.getDate()); });
+        saida.contextoPadrao = await deContexto.evaluate(() => window.__DataDaRodadaPadrao === true);
       }
       console.log(MARCA + JSON.stringify(saida));
     } catch (e) {
@@ -265,6 +285,7 @@ if (filho) {
       confBanco(r1, 'com o padrão');
       confAnda(r1, 'com o padrão');
       conf('a página aberta direto com nav.newPage() também nasce no padrão', r1 ? [r1.diretaIso, r1.diretaPadrao].join(' ') : null, '2026-11-16 true');
+      conf('a página aberta noutro contexto (createBrowserContext().newPage()) também nasce no padrão', r1 ? [r1.contextoIso, r1.contextoPadrao].join(' ') : null, '2026-11-16 true');
 
       secao('2. O controle: o mesmo mundo com { relogioReal: true }, a virada ABRE');
       const r2 = rodarFilho('real');

@@ -12,7 +12,7 @@
  * envenenados, sem cópia nenhuma em disco.
  *
  * O RELÓGIO FIXO É O PADRÃO. Toda página que uma prova abre por aqui
- * (amb.pagina() ou o nav.newPage() do amb.subir()) já nasce com o relógio da
+ * (amb.pagina(), nav.newPage() ou ctx.newPage() de nav.createBrowserContext()) já nasce com o relógio da
  * rodada: segunda, 16/11/2026, às 11:00, andando no passo do relógio do sistema.
  * O Date do PROCESSO também é posto no mesmo dia, no criarAmbiente, para a
  * prova que monta datas com new Date() concordar com a página. Ninguém precisa
@@ -187,12 +187,27 @@ function criarAmbiente(porta, nomePerfil, trocas, opcoes) {
       /* O relógio fixo padrão entra em TODA página aberta por este navegador,
        * inclusive a que a prova pede direto com nav.newPage(), antes de
        * qualquer script dela e do documento. */
-      const novaPagina = nav.newPage.bind(nav);
-      nav.newPage = async function (...a) {
-        const p = await novaPagina(...a);
+      const instalarRelogioSePadrao = async function (p) {
         if (RELOGIO_PADRAO_LIGADO && !opcoes.relogioReal && !semPadraoNaProxima) await relogioPadrao().naPagina(p);
         return p;
       };
+      const novaPagina = nav.newPage.bind(nav);
+      nav.newPage = async function (...a) {
+        return instalarRelogioSePadrao(await novaPagina(...a));
+      };
+      if (typeof nav.createBrowserContext === 'function') {
+        const criarContexto = nav.createBrowserContext.bind(nav);
+        nav.createBrowserContext = async function (...a) {
+          const ctx = await criarContexto(...a);
+          if (ctx && typeof ctx.newPage === 'function') {
+            const novaPaginaCtx = ctx.newPage.bind(ctx);
+            ctx.newPage = async function (...b) {
+              return instalarRelogioSePadrao(await novaPaginaCtx(...b));
+            };
+          }
+          return ctx;
+        };
+      }
       return nav;
     },
     async pagina(opcoesPagina) {
