@@ -3857,7 +3857,7 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bibl-ano:hover { background: var(--soft); }
 .bibl-ano.ativo { background: var(--navy); border-color: var(--navy); color: var(--branco); font-weight: var(--peso-forte); }
 .bibl-tipos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.bibl-tipo { min-height: 34px; padding: 5px 10px; border: 1px solid var(--fio); border-radius: 999px; background: var(--branco); font: inherit; font-size: var(--letra-13); color: var(--texto); cursor: pointer; }
+.bibl-tipo { min-height: 34px; padding: 5px 10px; border: 1px solid var(--fio); border-radius: 999px; background: var(--branco); font: inherit; font-size: var(--letra-14); color: var(--texto); cursor: pointer; }
 .bibl-tipo:hover { background: var(--soft); }
 .bibl-tipo.ativo { border-color: var(--navy); background: var(--acao-clara); color: var(--navy); font-weight: var(--peso-forte); }
 .bibl-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 16px; margin-top: 12px; }

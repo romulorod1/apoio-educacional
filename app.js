@@ -17763,7 +17763,7 @@
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     if (/\b(prova|simulado|questoes|avaliacao|lista de exercicios)\b/.test(titulo)) return 'avaliacao';
     if (/\b(projeto|sequencia didatica)\b/.test(titulo)) return 'projeto';
-    if (/\b(aula\s*\d+\s*[-–:]\s*(guia do aluno|material do professor)|experimento|atividade experimental|pratica experimental|roteiro experimental|laboratorio|teste do biureto)\b/.test(titulo)) return 'pratica';
+    if (/\b(aula\s*\d+\s*[-\u2013:]\s*(guia do aluno|material do professor)|experimento|atividade experimental|pratica experimental|roteiro experimental|laboratorio|teste do biureto)\b/.test(titulo)) return 'pratica';
     if (/\b(capitulo|modulo|apostila|caderno de atividades)\b/.test(titulo)) return 'capitulo-apostila';
     if (/\b(guia|manual|referencia|para professores|formacao docente)\b/.test(titulo)) return 'guia-referencia';
     if (/\b(livro didatico|colecao|volume [ivx0-9]+)\b/.test(titulo)) return 'livro-didatico';
