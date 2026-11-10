@@ -2543,6 +2543,7 @@
   // ================= navegação =================
 
   function ligarEventos() {
+    ligarBuscaDeTextoLivros();
     $$('#abas .aba').forEach(function (b) {
       b.addEventListener('click', function () {
         $$('#abas .aba').forEach(function (x) { x.classList.remove('ativa'); x.removeAttribute('aria-current'); });
@@ -17742,6 +17743,8 @@
   var bibLivrosNav = { disciplina: null, ano: null };
   var bibLivrosVez = 0;
   var bibLivrosCache = Object.create(null);   // id -> { id, meta, pos, cor }, do último desenho
+  var buscaTextoLivrosVez = 0;
+  var buscaTextoLivrosEspera = null;
   var bibLivroAberto = null;                   // o id do livro na tela do livro
   // as cores das capas são as do protótipo (styles.css, --capa-*), todas com letra branca a 4,5:1 ou mais
   var CORES_DAS_CAPAS = ['var(--capa-alfa)', 'var(--capa-beta)', 'var(--capa-gama)', 'var(--capa-delta)', 'var(--capa-zeta)'];
@@ -17903,6 +17906,91 @@
     if (x) x.classList.toggle('bibl-na-busca', !!buscando);
   }
 
+  function ligarBuscaDeTextoLivros() {
+    var campo = $('#bib-busca-livros-campo');
+    var limpar = $('#bib-busca-livros-limpar');
+    if (!campo || campo._ouvindo) return;
+    campo._ouvindo = true;
+    campo.addEventListener('input', function () {
+      clearTimeout(buscaTextoLivrosEspera);
+      limpar.hidden = !campo.value;
+      buscaTextoLivrosEspera = setTimeout(function () { buscarTextoNosLivros(campo.value); }, 250);
+    });
+    limpar.addEventListener('click', function () {
+      campo.value = '';
+      limpar.hidden = true;
+      buscarTextoNosLivros('');
+      campo.focus();
+    });
+  }
+
+  function rotuloDePaginaDoLivro(meta, pagina) {
+    var impressa = Biblioteca.paginaImpressa(meta || {}, pagina);
+    return impressa || (meta && meta.numeracao && meta.numeracao.length ? 'arquivo ' + pagina : String(pagina));
+  }
+
+  function buscarTextoNosLivros(termo) {
+    var status = $('#bib-busca-livros-status');
+    var resultados = $('#bib-busca-livros-resultados');
+    if (!status || !resultados) return;
+    var consulta = String(termo || '').trim();
+    var vez = ++buscaTextoLivrosVez;
+    resultados.innerHTML = '';
+    resultados.setAttribute('aria-busy', 'false');
+    if (consulta.length < 2) {
+      status.textContent = consulta ? 'Digite ao menos duas letras para buscar.' : 'Busque palavras nos livros deste tablet.';
+      return;
+    }
+    if (!window.IndiceLivros || !window.IndiceLivros.buscarNosLivros) {
+      status.textContent = 'A busca no texto dos livros não está disponível neste aparelho.';
+      return;
+    }
+    status.textContent = 'Buscando nos livros deste tablet...';
+    resultados.setAttribute('aria-busy', 'true');
+    window.IndiceLivros.buscarNosLivros(consulta).then(function (res) {
+      if (vez !== buscaTextoLivrosVez) return;
+      resultados.setAttribute('aria-busy', 'false');
+      var total = 0;
+      (res.livros || []).forEach(function (livro) {
+        var meta = bibLivrosCache[livro.id] ? bibLivrosCache[livro.id].meta : {};
+        var grupos = livro.capitulos && livro.capitulos.length ? livro.capitulos : [{ titulo: null, paginas: livro.paginas || [] }];
+        var cartao = el('article', { class: 'bib-busca-livro', 'data-livro': livro.id });
+        cartao.appendChild(el('h3', { class: 'bib-busca-livro-titulo', texto: livro.titulo || tituloDoLivro(meta) || livro.id }));
+        if (livro.volume || meta.volume) cartao.appendChild(el('p', { class: 'bib-busca-livro-volume', texto: livro.volume || meta.volume }));
+        grupos.forEach(function (grupo) {
+          var paginas = grupo.paginas || [];
+          if (!paginas.length) return;
+          total += paginas.length;
+          var rotulos = paginas.slice(0, 16).map(function (n) { return rotuloDePaginaDoLivro(meta, n); });
+          if (paginas.length > rotulos.length) rotulos.push('+' + (paginas.length - 16));
+          var unidade = livro.formato === 'epub' ? 'parte' : 'página';
+          var primeira = paginas[0];
+          var acao = livro.formato === 'epub' ? 'Abrir na parte ' + primeira : 'Abrir na p. ' + rotuloDePaginaDoLivro(meta, primeira);
+          cartao.appendChild(el('div', { class: 'bib-busca-livro-grupo' }, [
+            el('div', { class: 'bib-busca-livro-paginas' }, [
+              el('strong', { texto: grupo.titulo || 'Fora dos capítulos do sumário' }),
+              el('div', { texto: rotulos.join(', ') + ' · ' + plural(paginas.length, unidade, unidade + 's') })
+            ]),
+            el('button', { type: 'button', class: 'btn', texto: acao, aoClick: function () {
+              abrirLivro(livro.id, livro.formato === 'epub' ? { capitulo: primeira } : { pagina: primeira });
+            } })
+          ]));
+        });
+        resultados.appendChild(cartao);
+      });
+      if (res.livros && res.livros.length) status.textContent = plural(total, 'página encontrada', 'páginas encontradas') + ' em ' + plural(res.livros.length, 'livro', 'livros') + '.';
+      else status.textContent = res.pendentes && res.pendentes.length ? 'Ainda não encontrei esse termo nos livros já lidos.' : 'Não encontrei esse termo nos livros deste tablet.';
+      var avisos = [];
+      if (res.pendentes && res.pendentes.length) avisos.push('A busca ainda está sendo preparada em ' + plural(res.pendentes.length, 'livro', 'livros') + '.');
+      if (res.naoLidos && res.naoLidos.length) avisos.push('Não foi possível ler todo o texto de ' + plural(res.naoLidos.length, 'livro', 'livros') + '.');
+      if (avisos.length) resultados.appendChild(el('p', { class: 'ajuda bib-busca-livros-aviso', texto: avisos.join(' ') }));
+    }).catch(function () {
+      if (vez !== buscaTextoLivrosVez) return;
+      resultados.setAttribute('aria-busy', 'false');
+      status.textContent = 'Não consegui consultar o índice agora. Tente de novo.';
+    });
+  }
+
   function desenharLivrosDaBiblioteca() {
     var caixa = $('#bib-livros');
     if (!caixa) return Promise.resolve();
@@ -17919,10 +18007,23 @@
           return reg;
         });
         if (bibLivroAberto && !bibLivrosCache[bibLivroAberto]) fecharTelaDoLivro();
-        if (!livros.length) { caixa.innerHTML = ''; mostrarSecaoDeLivros(false); return; }
+        var busca = $('#bib-busca-livros');
+        if (busca) busca.hidden = !livros.length;
+        if (!livros.length) {
+          var campoBusca = $('#bib-busca-livros-campo');
+          if (campoBusca) campoBusca.value = '';
+          var limparBusca = $('#bib-busca-livros-limpar');
+          if (limparBusca) limparBusca.hidden = true;
+          buscarTextoNosLivros('');
+          caixa.innerHTML = '';
+          mostrarSecaoDeLivros(false);
+          return;
+        }
         montarSecaoDeLivros(caixa, livros);
         mostrarSecaoDeLivros(true);
         livrosNaBusca(!!bibTermo.trim());
+        var campoBuscaAtual = $('#bib-busca-livros-campo');
+        if (campoBuscaAtual && campoBuscaAtual.value.trim()) buscarTextoNosLivros(campoBuscaAtual.value);
       });
     }).catch(function () {
       if (vez !== bibLivrosVez) return;

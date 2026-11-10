@@ -3791,6 +3791,15 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bibl-busca input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; padding: 10px 0; font: inherit; font-size: var(--letra-16); color: var(--texto); }
 .bibl-busca input::placeholder { color: var(--muted); }
 .bibl-exercicios-cabeca { display: flex; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; margin: 0 0 12px; }
+.bib-busca-livros { margin: 0 0 16px; min-width: 0; }
+.bib-busca-livros > .bibl-busca { max-width: 52rem; }
+.bib-busca-livro { margin-top: 8px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
+.bib-busca-livro-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); overflow-wrap: anywhere; }
+.bib-busca-livro-volume { margin: 0 0 8px; font-size: var(--letra-14); color: var(--muted); }
+.bib-busca-livro-grupo { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--fio); }
+.bib-busca-livro-paginas { flex: 1 1 12rem; min-width: 0; font-size: var(--letra-14); overflow-wrap: anywhere; }
+.bib-busca-livro-grupo .btn { min-height: var(--alvo); }
+.bib-busca-livros-aviso { margin-top: 8px; }
 .bibl-exercicios-cabeca .cresce { flex: 1; }
 .bibl-exercicios-titulo { font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); margin: 0; }
 .bibl-exercicios-titulo[hidden] { display: none; }
