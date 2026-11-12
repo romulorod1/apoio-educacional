@@ -18394,6 +18394,7 @@
     var diz = function (t) { g.contagem.textContent = t; if (g.resumo) g.resumo.diz('livros', t); };
     modo = modo || {};
     resultados.innerHTML = '';
+    g.desenhadoPara = null;
     var livros = resultadosDosLivros(porCapitulo, res ? res.livros : []);
     var paginas = 0, capitulos = 0, todos = [], obras = [], obraPorChave = Object.create(null);
     livros.forEach(function (l) {
@@ -18513,13 +18514,19 @@
     }
     // a consulta anterior para no meio: a varredura confere a vez entre um lote e outro
     var cancelada = function () { return vez !== buscaTextoLivrosVez; };
-    if (porCapitulo.length) desenharResultadosDosLivros(g, porCapitulo, null, { buscando: true });
+    /* Os capítulos aparecem na hora, enquanto o texto vem. Se o grupo já mostra
+     * o resultado inteiro deste mesmo termo (a busca refeita porque um livro
+     * terminou de ser lido, ou porque o leitor fechou), ele fica como está até
+     * o texto chegar: redesenhar só com os capítulos tiraria as páginas debaixo
+     * do dedo dela. */
+    if (porCapitulo.length && g.desenhadoPara !== consulta) desenharResultadosDosLivros(g, porCapitulo, null, { buscando: true });
     else if (!resultados.childNodes.length) status.textContent = 'Buscando nos livros deste tablet...';
     resultados.setAttribute('aria-busy', 'true');
     window.IndiceLivros.buscarNosLivros(consulta, {}, { cancelada: cancelada }).then(function (res) {
       if (cancelada() || (res && res.cancelada)) return;
       resultados.setAttribute('aria-busy', 'false');
       desenharResultadosDosLivros(g, porCapitulo, res || {}, {});
+      g.desenhadoPara = consulta;
     }).catch(function () {
       if (cancelada()) return;
       resultados.setAttribute('aria-busy', 'false');
