@@ -91,6 +91,12 @@
       ]
     },
     {
+      versao: '1.42.60',
+      itens: [
+        'Em Matemática entraram 22 assuntos novos, para escolher na aula e procurar na Biblioteca: 14 do 6º ao 9º ano (como construções geométricas, simetria, contagem e juros compostos) e 8 do ensino médio (como lógica, geometria de posição, equações trigonométricas e derivada).'
+      ]
+    },
+    {
       versao: '1.42.59',
       itens: [
         'Na Biblioteca, busque palavras no texto dos livros e abra o resultado no capítulo e página encontrados. A busca não altera o livro nem a aula.'
