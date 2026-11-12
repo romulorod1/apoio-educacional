@@ -502,6 +502,7 @@ roda "navegacao biblioteca --envenenado-rotulo-corta" node "_teste/testa_navegac
 # capitulo na pagina 1, e a prova tem de ver.
 roda "biblioteca livros tela"                   node "_teste/testa_biblioteca_livros_tela.js"
 roda "biblioteca livros tela --envenenado-capitulo-abre-pagina-errada" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-capitulo-abre-pagina-errada
+roda "biblioteca livros tela --envenenado-zoom-sem-ancora" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-zoom-sem-ancora
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
