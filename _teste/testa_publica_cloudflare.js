@@ -101,6 +101,9 @@ function defeitosDoPublica(texto) {
   if (deps < 0) d.push('sem o npm ci --prefix functions (o wrangler nao acharia o SDK do endpoint)');
   else if (deps > ps.indexOf(envio)) d.push('as dependencias do endpoint vem depois do envio');
   if (ps.some(p => /npm install/.test(p))) d.push('npm install no deploy: a versao tem de vir do lock (npm ci)');
+  // O wrangler acha functions/ pelo diretorio de trabalho (a raiz). Um
+  // working-directory no envio publicaria o site sem o endpoint, calado.
+  if (/working-directory:/.test(envio)) d.push('o envio tem working-directory: o wrangler nao acharia functions/');
 
   const c = blocoJob(texto, 'conferencia') || '';
   if (!/needs: publica/.test(c) || !/uses: \.\/\.github\/workflows\/conferencia-no-ar\.yml/.test(c) ||
@@ -149,7 +152,14 @@ const venenos = [
   ['ramo de preview', PUBLICA.replace('--branch main', '--branch prova')],
   ['sem a conferencia', PUBLICA.replace('uses: ./.github/workflows/conferencia-no-ar.yml', 'uses: ./outro.yml')],
   ['sem as dependencias do endpoint', PUBLICA.replace('npm ci --prefix functions', 'echo pulei')],
-  ['npm install no lugar do npm ci', PUBLICA.replace('npm ci --prefix functions', 'npm install --prefix functions')]
+  ['npm install no lugar do npm ci', PUBLICA.replace('npm ci --prefix functions', 'npm install --prefix functions')],
+  ['dependencias do endpoint depois do envio', (() => {
+    const m = PUBLICA.match(/      - name: Dependencias do endpoint de IA \(functions\/\)\n(?:        .*\n)+/);
+    if (!m) return PUBLICA;
+    const sem = PUBLICA.replace(m[0], '');
+    return sem.replace(/(        run: \|\n          npx --yes wrangler@[\s\S]*?publicou=sim" >> "\$GITHUB_OUTPUT"\n)/, '$1' + m[0]);
+  })()],
+  ['envio com working-directory', PUBLICA.replace(/(id: envio\n)/, '$1        working-directory: _site\n')]
 ];
 venenos.forEach(([nome, texto]) => {
   conf('veneno "' + nome + '" foi aplicado', texto !== PUBLICA);

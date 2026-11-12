@@ -92,11 +92,54 @@ const SIMPLES = { rota: 'teste', messages: [{ role: 'user', content: 'diga oi ' 
     await N.atender(pedido({ rota: 'planejamento', max_tokens: 2000, messages: SIMPLES.messages }), b.dep);
     conf('max_tokens abaixo do teto é respeitado (controle do lado que passa)', (b.chamadas[0] || {}).max_tokens === 2000);
     const c = novoAmbiente();
-    const rc = await N.atender(pedido({ rota: 'teste', esforco: 'max', messages: SIMPLES.messages }), c.dep);
+    const rc = await N.atender(pedido({ rota: 'planejamento', esforco: 'max', messages: SIMPLES.messages }), c.dep);
     conf('esforço fora da lista (max) é recusado', rc.status === 400 && c.chamadas.length === 0);
     const d = novoAmbiente();
-    await N.atender(pedido({ rota: 'teste', esforco: 'high', messages: SIMPLES.messages }), d.dep);
-    conf('esforço da lista (high) passa', (d.chamadas[0] || {}).output_config.effort === 'high');
+    await N.atender(pedido({ rota: 'planejamento', esforco: 'high', messages: SIMPLES.messages }), d.dep);
+    conf('esforço permitido na rota (planejamento, high) passa', ((d.chamadas[0] || {}).output_config || {}).effort === 'high');
+    const e = novoAmbiente();
+    const re = await N.atender(pedido({ rota: 'teste', esforco: 'high', messages: SIMPLES.messages }), e.dep);
+    conf('rota teste tem esforço fixo: high é recusado', re.status === 400 && re.corpo.codigo === 'nao_permitido' && e.chamadas.length === 0);
+    const f = novoAmbiente();
+    const rf = await N.atender(pedido({ rota: 'assistente', esforco: 'high', messages: SIMPLES.messages }), f.dep);
+    conf('rota assistente: high é recusado, medium passa', rf.status === 400 &&
+      (await N.atender(pedido({ rota: 'assistente', esforco: 'medium', messages: SIMPLES.messages }), novoAmbiente().dep)).status === 200);
+  }
+
+  console.log('\n=== só o que não custa por fora: ferramentas e blocos ===');
+  {
+    const img = { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'AAAA' } };
+    const barrados = [
+      ['ferramenta de servidor (web_search)', { rota: 'assistente', tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 99 }], messages: SIMPLES.messages }],
+      ['ferramenta de servidor (code_execution)', { rota: 'assistente', tools: [{ type: 'code_execution_20250825', name: 'code_execution' }], messages: SIMPLES.messages }],
+      ['documento por URL', { rota: 'planejamento', messages: [{ role: 'user', content: [{ type: 'document', source: { type: 'url', url: 'https://x/y.pdf' } }] }] }],
+      ['documento em base64 (fora da fase 1)', { rota: 'planejamento', messages: [{ role: 'user', content: [{ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: 'AA' } }] }] }],
+      ['imagem por URL', { rota: 'planejamento', messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'url', url: 'https://x/y.png' } }] }] }],
+      ['imagem com tipo estranho', { rota: 'planejamento', messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/svg+xml', data: 'AA' } }] }] }],
+      ['cache_control vindo do aparelho num bloco', { rota: 'planejamento', messages: [{ role: 'user', content: [{ type: 'text', text: 'x', cache_control: { type: 'ephemeral', ttl: '1h' } }] }] }],
+      ['bloco desconhecido no assistente', { rota: 'assistente', messages: [{ role: 'user', content: 'x' }, { role: 'assistant', content: [{ type: 'server_tool_use', id: 'a', name: 'web_search', input: {} }] }, { role: 'user', content: 'y' }] }],
+      ['documento escondido no tool_result', { rota: 'assistente', messages: [{ role: 'user', content: 'x' }, { role: 'assistant', content: [{ type: 'tool_use', id: 't', name: 'f', input: {} }] }, { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't', content: [{ type: 'document', source: { type: 'url', url: 'https://x' } }] }] }] }]
+    ];
+    for (const [nome, corpo] of barrados) {
+      const a = novoAmbiente();
+      const r = await N.atender(pedido(corpo), a.dep);
+      conf(nome + ': 400 nao_permitido sem chamar o modelo', r.status === 400 && r.corpo.codigo === 'nao_permitido' && a.chamadas.length === 0, JSON.stringify(r.corpo));
+    }
+    const ok = novoAmbiente();
+    const rok = await N.atender(pedido({ rota: 'assistente', tools: [{ name: 'listar_aulas', description: 'lista', input_schema: { type: 'object' }, strict: true, max_uses: 9, cache_control: { type: 'ephemeral' } }],
+      messages: [{ role: 'user', content: [img, { type: 'text', text: 'x' }] },
+        { role: 'assistant', content: [{ type: 'thinking', thinking: '', signature: 's' }, { type: 'tool_use', id: 't', name: 'listar_aulas', input: {} }] },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't', content: [{ type: 'text', text: 'aulas' }] }] }] }), ok.dep);
+    const tools = ((ok.chamadas[0] || {}).tools || []);
+    conf('controle: ferramenta do cliente, imagem base64, thinking e tool_result passam', rok.status === 200, JSON.stringify(rok.corpo));
+    conf('da ferramenta do cliente só passam name, description, input_schema e strict',
+      tools.length === 1 && JSON.stringify(Object.keys(tools[0]).sort()) === JSON.stringify(['description', 'input_schema', 'name', 'strict']));
+    const longo = novoAmbiente();
+    const rl = await N.atender(pedido({ rota: 'planejamento', system: 's'.repeat(N.LIMITES.texto), messages: SIMPLES.messages }), longo.dep);
+    conf('texto acima do teto (sistema mais mensagens): 400 texto_demais', rl.status === 400 && rl.corpo.codigo === 'texto_demais' && longo.chamadas.length === 0);
+    const justo = novoAmbiente();
+    const rj = await N.atender(pedido({ rota: 'planejamento', system: 's'.repeat(N.LIMITES.texto - 1000), messages: SIMPLES.messages }), justo.dep);
+    conf('texto logo abaixo do teto passa (controle)', rj.status === 200, rj.status);
   }
 
   console.log('\n=== método, chave e login ===');
@@ -133,20 +176,69 @@ const SIMPLES = { rota: 'teste', messages: [{ role: 'user', content: 'diga oi ' 
         : { ok: false, json: async () => ({ error: { message: 'INVALID_ID_TOKEN' } }) };
     };
     const cache = new Map();
-    const uid = await N.verificarTokenFirebase('tk1', fetchFalso(true), cache, 1000);
+    const P = [UID_OK];
+    const uid = await N.verificarTokenFirebase('tk1', fetchFalso(true), cache, 1000, P);
     conf('token aceito devolve o localId', uid === UID_OK);
     conf('o pedido vai ao accounts:lookup do projeto, com o idToken no corpo',
       /accounts:lookup\?key=AIza/.test(pedidos[0].url) && pedidos[0].corpo.idToken === 'tk1');
-    await N.verificarTokenFirebase('tk1', fetchFalso(true), cache, 2000);
+    await N.verificarTokenFirebase('tk1', fetchFalso(true), cache, 2000, P);
     conf('segunda vez em menos de 5 min vem do cache (sem novo pedido)', pedidos.length === 1);
-    await N.verificarTokenFirebase('tk1', fetchFalso(true), cache, 1000 + 5 * 60 * 1000 + 1);
+    await N.verificarTokenFirebase('tk1', fetchFalso(true), cache, 1000 + 5 * 60 * 1000 + 1, P);
     conf('depois de 5 min confere de novo', pedidos.length === 2);
-    const nulo = await N.verificarTokenFirebase('tk2', fetchFalso(false), new Map(), 1000);
+    const cacheFora = new Map();
+    await N.verificarTokenFirebase('tkFora', fetchFalso(true), cacheFora, 1000, ['outro-uid']);
+    conf('uid fora da lista não entra no cache (não expulsa o login dela)', cacheFora.size === 0);
+    // idToken com exp a 1 min: o cache não pode durar 5 min
+    const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+    const jwt = b64({ alg: 'RS256' }) + '.' + b64({ exp: Math.floor((100000 + 60000) / 1000) }) + '.assinatura';
+    const cacheExp = new Map();
+    const antes = pedidos.length;
+    await N.verificarTokenFirebase(jwt, fetchFalso(true), cacheExp, 100000, P);
+    await N.verificarTokenFirebase(jwt, fetchFalso(true), cacheExp, 100000 + 30000, P);
+    conf('com exp a 1 min, 30 s depois ainda vem do cache', pedidos.length === antes + 1);
+    await N.verificarTokenFirebase(jwt, fetchFalso(true), cacheExp, 100000 + 61000, P);
+    conf('passado o exp (61 s), confere de novo no Firebase, antes dos 5 min', pedidos.length === antes + 2);
+    const nulo = await N.verificarTokenFirebase('tk2', fetchFalso(false), new Map(), 1000, P);
     conf('token recusado pelo Firebase devolve null', nulo === null);
-    const desab = await N.verificarTokenFirebase('tk3', async () => ({ ok: true, json: async () => ({ users: [{ localId: UID_OK, disabled: true }] }) }), new Map(), 1);
+    const desab = await N.verificarTokenFirebase('tk3', async () => ({ ok: true, json: async () => ({ users: [{ localId: UID_OK, disabled: true }] }) }), new Map(), 1, P);
     conf('conta desativada devolve null', desab === null);
-    const quebra = await N.verificarTokenFirebase('tk4', async () => { throw new Error('sem rede'); }, new Map(), 1);
+    const quebra = await N.verificarTokenFirebase('tk4', async () => { throw new Error('sem rede'); }, new Map(), 1, P);
     conf('sem rede até o Firebase devolve null (não deixa passar)', quebra === null);
+  }
+
+  console.log('\n=== o corpo só é lido depois do login ===');
+  {
+    let lido = 0, conferido = 0;
+    const comLeitura = (token, tamanho) => ({ metodo: 'POST', autorizacao: 'Bearer ' + token, tamanhoDeclarado: tamanho,
+      lerCorpo: async () => { lido++; return JSON.stringify(SIMPLES); } });
+    const a = novoAmbiente();
+    const verif = a.dep.verificarToken;
+    a.dep.verificarToken = async (t, p) => { conferido++; return verif(t, p); };
+    const r1 = await N.atender(comLeitura(TOKEN_OUTRO, '100'), a.dep);
+    conf('observador (403): o corpo nem é lido', r1.status === 403 && lido === 0);
+    const r2 = await N.atender(comLeitura('lixo', '100'), a.dep);
+    conf('token inválido (401): o corpo nem é lido', r2.status === 401 && lido === 0);
+    const antes = conferido;
+    const r3 = await N.atender(comLeitura(TOKEN_OK, String(N.LIMITES.bytes + 1)), a.dep);
+    conf('Content-Length acima de 8 MB: 413 antes de conferir o login e de ler', r3.status === 413 && conferido === antes && lido === 0);
+    const r4 = await N.atender(comLeitura(TOKEN_OK, '100'), a.dep);
+    conf('controle: permitido, com tamanho normal, lê o corpo e responde 200', r4.status === 200 && lido === 1);
+  }
+
+  console.log('\n=== exceção nunca vira 500 sem registro ===');
+  {
+    const a = novoAmbiente();
+    a.dep.verificarToken = async () => { throw new Error('quebrou'); };
+    const r = await N.atender(pedido(SIMPLES), a.dep);
+    conf('exceção no meio: 500 interno', r.status === 500 && r.corpo.codigo === 'interno');
+    conf('e fica registrada', a.log.length === 1 && JSON.parse(a.log[0]).codigo === 'interno');
+    const b = novoAmbiente();
+    b.dep.chamarModelo = async () => null;
+    const rb = await N.atender(pedido(SIMPLES), b.dep);
+    conf('resposta vazia do modelo: 502 resposta_vazia', rb.status === 502 && rb.corpo.codigo === 'resposta_vazia');
+    const c = novoAmbiente();
+    const rc = await N.atender(pedido({ rota: ['teste'], messages: SIMPLES.messages }), c.dep);
+    conf('rota que não é texto (array): rota_desconhecida', rc.status === 400 && rc.corpo.codigo === 'rota_desconhecida');
   }
 
   console.log('\n=== limites do pedido ===');
@@ -155,9 +247,11 @@ const SIMPLES = { rota: 'teste', messages: [{ role: 'user', content: 'diga oi ' 
     const a = novoAmbiente();
     const ra = await N.atender(pedido({ rota: 'teste', messages: [{ role: 'user', content: grande }] }), a.dep);
     conf('corpo acima de 8 MB: 413', ra.status === 413 && a.chamadas.length === 0);
-    const quase = 'x'.repeat(N.LIMITES.bytes - 200);
+    // O controle do lado que passa: quase 8 MB de IMAGEM (o texto tem teto próprio).
+    const quase = 'A'.repeat(N.LIMITES.bytes - 400);
     const b = novoAmbiente();
-    const rb = await N.atender(pedido({ rota: 'teste', messages: [{ role: 'user', content: quase }] }), b.dep);
+    const rb = await N.atender(pedido({ rota: 'planejamento', messages: [{ role: 'user', content: [
+      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: quase } }, { type: 'text', text: 'oi' }] }] }), b.dep);
     conf('corpo logo abaixo de 8 MB passa (controle do limite)', rb.status === 200, rb.status);
     const img = { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'AAAA' } };
     const dez = novoAmbiente();

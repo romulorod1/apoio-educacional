@@ -22,17 +22,24 @@ const logins = new Map();
 
 export async function onRequest(context) {
   const { request, env } = context;
-  const corpoTexto = request.method === 'POST' ? await request.text() : '';
+  // O corpo só é lido pelo núcleo DEPOIS do login e da lista de uids.
   const r = await atender(
-    { metodo: request.method, autorizacao: request.headers.get('Authorization') || '', corpoTexto },
+    {
+      metodo: request.method,
+      autorizacao: request.headers.get('Authorization') || '',
+      tamanhoDeclarado: request.headers.get('Content-Length'),
+      lerCorpo: () => request.text()
+    },
     {
       env,
       taxa,
       agora: () => Date.now(),
       registrar: o => console.log(JSON.stringify({ ia: o })),
-      verificarToken: t => verificarTokenFirebase(t, fetch, logins, Date.now()),
+      verificarToken: (t, permitidos) => verificarTokenFirebase(t, fetch, logins, Date.now(), permitidos),
       chamarModelo: params => {
-        const cliente = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 1, timeout: 120000 });
+        // Sem nova tentativa automática: uma chamada que venceu o prazo pode
+        // ter sido cobrada, e repetir cobraria duas vezes. O aparelho decide.
+        const cliente = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 0, timeout: 120000 });
         return cliente.beta.messages.create(params);
       },
       classificar: e => classificarErroDaApi(e, Anthropic)
