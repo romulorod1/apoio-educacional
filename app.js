@@ -25405,14 +25405,20 @@
     corpo.appendChild(el('p', { class: 'cel-folha-pergunta', texto: 'Ajustar duração desta aula' }));
     var serie = Core.serieDe(db, a);
     if (serie) corpo.appendChild(el('p', { class: 'ajuda', id: 'cel-duracao-serie', texto: 'Esta aula é de uma repetição: muda só esta. As outras continuam com a duração de sempre.' }));
-    var duracao = el('select', { id: 'cel-ajustar-duracao', 'aria-label': 'Duração desta aula' }, DURACOES.map(function (m) {
-      return el('option', { value: String(m), texto: Core.fmtDuracao(m), selected: m === (Number(a.duracaoMin) || 60) ? 'selected' : null });
+    /* A duração atual entra na lista e vem marcada, como no Remarcar e no
+     * formulário do tablet: a aula dividida (23/22, 75/75) não pode abrir
+     * mostrando a primeira opção, que o Salvar gravaria. */
+    var atual = Number(a.duracaoMin) || 60;
+    var opcoes = DURACOES.slice();
+    if (opcoes.indexOf(atual) < 0) { opcoes.push(atual); opcoes.sort(function (x, y) { return x - y; }); }
+    var duracao = el('select', { id: 'cel-ajustar-duracao', 'aria-label': 'Duração desta aula' }, opcoes.map(function (m) {
+      return el('option', { value: String(m), texto: Core.fmtDuracao(m), selected: m === atual ? 'selected' : null });
     }));
     corpo.appendChild(campoCelular('Duração desta aula', duracao));
     folha.appendChild(el('div', { class: 'barra cel-rodape-form' }, [
       botaoDeAcaoCelular('ajustar-duracao', { class: 'btn principal', id: 'cel-ajustar-duracao-salvar', texto: 'Salvar duração', aoClick: function () {
         var minutos = parseInt(duracao.value, 10) || 60;
-        if (minutos === (Number(a.duracaoMin) || 60)) { irAoPassoDaFolha('acoes'); return; }
+        if (minutos === atual) { irAoPassoDaFolha('acoes'); return; } // nada mudou: só fecha o passo, sem gravar
         var proposta = Object.assign({}, a, { duracaoMin: minutos });
         var choques = choquesDaAulaCelular(proposta);
         if (!confirmaSalvarComChoque(choques)) return;
