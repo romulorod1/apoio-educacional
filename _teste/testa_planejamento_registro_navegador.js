@@ -22,7 +22,8 @@
  *
  * Veneno, que TEM de reprovar a parte 3:
  *   --envenenado-cascata-deixa-plano   a exclusão do aluno não tira os planos
- *                                      dele (a linha do store.js neutralizada).
+ *                                      dele nem os órfãos (a linha do store.js
+ *                                      neutralizada).
  *
  * Porta 8972. O service worker é contornado.
  */
@@ -35,7 +36,7 @@ const { conf, secao } = H;
 const PORTA = 8972;
 const PAI = '1f0b839';
 const VENENO = process.argv.indexOf('--envenenado-cascata-deixa-plano') >= 0;
-const ANCORA_CASCATA = 'if (k.indexOf(PREFIXO_PLANEJAMENTO) === 0 && v && v.alunoId === alunoId) delete novo.ajustes[k];';
+const ANCORA_CASCATA = 'if (k.indexOf(PREFIXO_PLANEJAMENTO) === 0 && (!v || v.alunoId === alunoId || !ficam[v.alunoId])) delete novo.ajustes[k];';
 
 function prop(rotulo, ok) {
   if (VENENO) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
@@ -128,6 +129,8 @@ async function rodada(pag, recebidos) {
   const cascata = await pag.evaluate(async plano => {
     const db = await Store.carregar();
     db.ajustes['planejamento:p3'] = { id: 'p3', alunoId: 'a2', criadoEm: '2026-11-16T11:00:00.000Z', atualizadoEm: '2026-11-16T11:00:00.000Z', plano: Object.assign({}, plano, { alunoId: 'a2' }) };
+    // o órfão: plano de um aluno que já não existe (um tablet antigo excluiu o aluno)
+    db.ajustes['planejamento:p4'] = { id: 'p4', alunoId: 'a-que-sumiu', criadoEm: '2026-11-16T11:00:00.000Z', atualizadoEm: '2026-11-16T11:00:00.000Z', plano: Object.assign({}, plano, { alunoId: 'a-que-sumiu' }) };
     await Store.salvar(db);
     const depois = await Store.excluirAlunoEmCascata(db, 'a1');
     const regs = await Store.lerRegistros();
@@ -135,13 +138,14 @@ async function rodada(pag, recebidos) {
     const vivo = id => { const x = regs.find(y => y.id === id); return x ? !x.apagadoEm : null; };
     const naFila = id => { const e = fila.find(y => y.id === id); return e ? (e.apagadoEm ? 'lapide' : 'viva') : 'fora'; };
     const carregado = await Store.carregar();
-    return { p1: vivo('ajuste:planejamento:p1'), filaP1: naFila('ajuste:planejamento:p1'), p3: vivo('ajuste:planejamento:p3'),
+    return { p1: vivo('ajuste:planejamento:p1'), filaP1: naFila('ajuste:planejamento:p1'), p3: vivo('ajuste:planejamento:p3'), p4: vivo('ajuste:planejamento:p4'), filaP4: naFila('ajuste:planejamento:p4'),
       noDoc: Object.keys(carregado.ajustes).filter(k => k.indexOf('planejamento:') === 0).sort(), devolvido: !!depois };
   }, PLANO);
   console.log('   ' + JSON.stringify(cascata));
   prop('excluir o aluno leva o plano dele: lápide no registro e na fila', cascata.p1 === false && cascata.filaP1 === 'lapide');
   prop('no documento fica só o plano do outro aluno', JSON.stringify(cascata.noDoc) === JSON.stringify(['planejamento:p3']));
   conf('o plano do outro aluno continua vivo', cascata.p3, true);
+  prop('o órfão (aluno que já não existe) também sai: lápide no registro e na fila', cascata.p4 === false && cascata.filaP4 === 'lapide');
   conf('a página do código novo não deu erro', pag.errosDePagina, []);
   await pag.close();
   if (VENENO) throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true });

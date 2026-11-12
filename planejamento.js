@@ -189,14 +189,19 @@
     var hoje = o.hoje;
     if (!dataValida(hoje)) throw new Error('hoje inválido');
     var imagens = (o.imagens || []).slice(0, MAX_IMAGENS);
-    var linhasAlunos = (o.alunos || []).map(function (a) {
+    /* Com o aluno já escolhido (veio da ficha, ou é o ajuste de um plano
+     * salvo), só ele vai: o nome e os horários dos outros não saem do
+     * aparelho. A lista inteira é só para o atalho sem aluno. */
+    var alunos = o.alunos || [];
+    if (o.alunoFixoId) alunos = alunos.filter(function (a) { return a.id === o.alunoFixoId; });
+    var linhasAlunos = alunos.map(function (a) {
       var h = horariosPorExtenso(a.horarios);
       return '- id ' + a.id + ': ' + primeiroNome(a.nome) + (h ? ' (aulas fixas: ' + h + ')' : ' (sem horário fixo)');
     });
     var partes = [
       'Hoje é ' + DIAS_LONGO[diaDaSemana(hoje)] + ', ' + ddmm(hoje) + '/' + hoje.slice(0, 4) + ' (' + hoje + ').',
       '',
-      'Alunos da professora:',
+      o.alunoFixoId ? 'O aluno deste plano:' : 'Alunos da professora:',
       linhasAlunos.length ? linhasAlunos.join('\n') : '(nenhum aluno cadastrado)'
     ];
     if (o.alunoFixoId) {

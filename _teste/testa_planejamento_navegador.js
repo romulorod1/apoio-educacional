@@ -40,7 +40,10 @@ const amb = H.criarAmbiente(PORTA, 'perfil_planejamento_nav', {});
 
 const DB = {
   versao: 1, resumos: [], pagamentos: [],
-  ajustes: { cargaInicial: true, versaoVista: '9.9.9', ultimoAnoLetivoAtualizado: 2026 },
+  ajustes: { cargaInicial: true, versaoVista: '9.9.9', ultimoAnoLetivoAtualizado: 2026,
+    // um plano que veio quebrado (provas null): a ficha abre do mesmo jeito, sem ele na lista
+    'planejamento:quebrado': { id: 'quebrado', alunoId: 'al1', criadoEm: '2026-11-10T10:00:00.000Z', atualizadoEm: '2026-11-10T10:00:00.000Z',
+      plano: { alunoId: 'al1', periodo: { inicio: '2026-11-10', fim: '2026-11-12' }, provas: null, grade: null } } },
   alunos: [
     { id: 'al1', nome: 'Zélia Sobrenomeum', ativo: true, cor: '#2E7D6B', precos: [], mapeamentos: [], obs: '' },
     { id: 'al2', nome: 'Bruno Sobrenomedois', ativo: true, cor: '#1F3A5F', precos: [], mapeamentos: [], obs: '' }
@@ -74,7 +77,7 @@ function respostaFalsa(plano) {
 }
 
 /* O falso do endpoint: a próxima resposta, o atraso, e os pedidos que chegaram. */
-const falso = { status: 200, corpo: null, atraso: 0, pedidos: [] };
+const falso = { status: 200, corpo: null, atraso: 0, pedidos: [], fila: [] };
 
 function textoDoPdf(base64) {
   const bruto = Buffer.from(base64, 'base64').toString('latin1');
@@ -135,26 +138,47 @@ async function transbordo(pag) {
     if (req.url().indexOf('/api/ia') < 0) { req.continue().catch(() => {}); return; }
     let corpo = null; try { corpo = JSON.parse(req.postData() || 'null'); } catch (e) { corpo = 'nao-json'; }
     falso.pedidos.push({ corpo, autorizacao: req.headers().authorization || '' });
-    const responder = () => req.respond({ status: falso.status, contentType: 'application/json', body: JSON.stringify(falso.corpo) }).catch(() => {});
+    // a fila, quando há, responde na ordem; senão, a resposta corrente
+    const vez = falso.fila.length ? falso.fila.shift() : { status: falso.status, corpo: falso.corpo };
+    const responder = () => req.respond({ status: vez.status, contentType: 'application/json', body: JSON.stringify(vez.corpo) }).catch(() => {});
     if (falso.atraso) setTimeout(responder, falso.atraso); else responder();
   });
   await H.abrirApp(pag, amb.ORIGEM);
   await pag.evaluate(async d => { await Store.salvar(d); }, DB);
   await pag.reload({ waitUntil: 'networkidle0' });
   await H.abrirApp(pag, amb.ORIGEM);
-  /* O login da nuvem vira um token falso: quem confere o login é o endpoint, falso aqui. */
-  const stub = () => pag.evaluate(() => { Nuvem.tokenParaIA = function () { return Promise.resolve('token-falso-da-prova'); }; });
-  await stub();
   conf('(arranjo) os dois alunos sintéticos estão no banco', await pag.evaluate(() => Store.carregar().then(d => d.alunos.map(a => a.id).sort().join(','))), 'al1,al2');
+
+  // ================================================================
+  secao('0. Sem a conta da nuvem, o botão não aparece (e com ela, aparece)');
+  await H.irParaAba(pag, 'alunos');
+  await clicar(pag, '#lista-alunos .item-lista[data-aluno="al1"]');
+  await esperar('a ficha abriu', () => aberta(pag, 'modal-aluno'), v => v === true, 10000);
+  conf('sem login: a ficha sem a seção Planejamentos', await pag.evaluate(() => !document.querySelector('#plan-secao')), true);
+  await pag.evaluate(() => document.querySelector('#modal-aluno .fechar').click());
+  await esperar('a ficha fechou', () => aberta(pag, 'modal-aluno'), v => v === false, 10000);
+  await clicar(pag, '#nav-marcar-aula');
+  await esperar('a aula nova abriu', () => aberta(pag, 'modal-aula'), v => v === true, 10000);
+  conf('sem login: a aula nova sem o atalho', await pag.evaluate(() => !document.querySelector('#aula-planejamento')), true);
+  await pag.evaluate(() => document.querySelector('#modal-aula .fechar').click());
+  await esperar('a aula nova fechou', () => aberta(pag, 'modal-aula'), v => v === false, 10000);
+  /* O login da nuvem: a sessão à vista (Nuvem.estado) e um token falso (quem
+   * confere o login é o endpoint, falso aqui). */
+  await pag.evaluate(() => {
+    const deVerdade = Nuvem.estado;
+    Nuvem.estado = function () { return Object.assign({}, deVerdade(), { entrada: { uid: 'conta-sintetica', email: 'teste@exemplo' } }); };
+    Nuvem.tokenParaIA = function () { return Promise.resolve('token-falso-da-prova'); };
+  });
 
   // ================================================================
   secao('1. Da ficha do aluno até a prévia, o ajuste, o salvar e o compartilhar');
   await H.irParaAba(pag, 'alunos');
   await clicar(pag, '#lista-alunos .item-lista[data-aluno="al1"]');
   await esperar('a ficha abriu', () => aberta(pag, 'modal-aluno'), v => v === true, 10000);
-  conf('a ficha tem a seção Planejamentos, vazia, com o botão', await pag.evaluate(() => {
+  conf('com login: a ficha tem a seção Planejamentos, vazia, com o botão', await pag.evaluate(() => {
     const s = document.querySelector('#plan-secao'); return !!s && !!s.querySelector('#plan-novo') && !s.querySelector('.plan-item');
   }), true);
+  conf('o plano quebrado do banco fica fora da lista, e a ficha abriu sem erro', [await pag.evaluate(() => !document.querySelector('[data-plano="quebrado"]')), pag.errosDePagina.length], [true, 0]);
   await clicar(pag, '#plan-novo');
   await esperar('a janela do planejamento abriu', () => aberta(pag, 'modal-planejamento'), v => v === true, 10000);
   conf('ela diz para quem é (o aluno da ficha)', await pag.evaluate(() => document.querySelector('#plan-para').textContent), 'Para Zélia Sobrenomeum.');
@@ -185,6 +209,7 @@ async function transbordo(pag) {
   const texto1 = conteudo1.find(c => c.type === 'text').text;
   conf('só o primeiro nome vai, nunca o sobrenome', [texto1.indexOf('Zélia') >= 0, /Sobrenome/.test(texto1)], [true, false]);
   conf('o pedido diz que o aluno já está escolhido', texto1.indexOf('O aluno já está escolhido: id al1.') >= 0, true);
+  conf('com o aluno da ficha, o outro aluno não vai no pedido', [texto1.indexOf('Bruno') < 0, texto1.indexOf('al2') < 0], [true, true]);
   conf('o texto dela vai', texto1.indexOf('Provas de novembro. Uma matéria por dia.') >= 0, true);
   conf('sem a pergunta do aluno (veio da ficha)', await pag.evaluate(() => !document.querySelector('#plan-quem')), true);
   conf('os incertos ficam acima da prévia, fora da folha', await pag.evaluate(() => {
@@ -207,11 +232,21 @@ async function transbordo(pag) {
   conf('o turno novo é o ajuste dela', p2.messages[2].content[0].text.indexOf('põe Geografia no dia 21') >= 0, true);
   conf('o system é o mesmo (o cache pega)', p2.system === p1.system, true);
 
+  // a conversa passou do teto do endpoint: recomeça sozinha com o plano como texto
+  falso.fila = [{ status: 400, corpo: { ok: false, codigo: 'texto_demais' } }, { status: 200, corpo: respostaFalsa(plano2) }];
+  await pag.type('#plan-ajuste', 'mantém tudo');
+  await clicar(pag, '#plan-ajustar');
+  await esperar('o ajuste recomeçado voltou', () => pag.evaluate(() => !!document.querySelector('#plan-previa canvas.plan-previa-folha')).then(v => v && falso.pedidos.length === 4), v => v === true, 30000);
+  const p3 = falso.pedidos[2].corpo, p4 = falso.pedidos[3].corpo;
+  conf('texto_demais: o primeiro pedido levava a conversa (5 turnos), o segundo recomeça com um só, com o plano atual', [p3.messages.length, p4.messages.length,
+    p4.messages[0].content[0].text.indexOf('Este é o plano atual') >= 0, p4.messages[0].content[0].text.indexOf('mantém tudo') >= 0], [5, 1, true, true]);
+  conf('e ela não viu a frase de encurtar', await pag.evaluate(() => !document.querySelector('#plan-erro') && !/encurtar/.test(document.querySelector('#aviso-texto').textContent)), true);
+
   // salvar na ficha
   await clicar(pag, '#plan-salvar');
   await esperar('salvo', () => pag.evaluate(() => { const b = document.querySelector('#plan-salvar'); return b && b.textContent; }), v => v === 'Salvo na ficha', 10000);
   const salvo = await pag.evaluate(() => Store.carregar().then(d => {
-    const k = Object.keys(d.ajustes).filter(x => x.indexOf('planejamento:') === 0);
+    const k = Object.keys(d.ajustes).filter(x => x.indexOf('planejamento:') === 0 && x !== 'planejamento:quebrado');
     return { chaves: k.length, reg: k.length ? d.ajustes[k[0]] : null };
   }));
   conf('o plano entrou em ajustes["planejamento:<id>"], do aluno al1', [salvo.chaves, salvo.reg && salvo.reg.alunoId, salvo.reg && salvo.reg.id && ('planejamento:' + salvo.reg.id)], [1, 'al1', salvo.reg && ('planejamento:' + salvo.reg.id)]);
@@ -246,7 +281,20 @@ async function transbordo(pag) {
   await clicar(pag, '#plan-secao .plan-item');
   await esperar('o salvo abre direto na prévia', () => pag.evaluate(() => !!document.querySelector('#plan-previa canvas.plan-previa-folha')), v => v === true, 30000);
   conf('e já diz "Salvo na ficha"', await pag.evaluate(() => document.querySelector('#plan-salvar').textContent), 'Salvo na ficha');
-  conf('nenhum pedido novo para abrir o salvo', falso.pedidos.length, 2);
+  conf('nenhum pedido novo para abrir o salvo', falso.pedidos.length, 4);
+  conf('no plano salvo, a troca de aluno e o Excluir à vista', await pag.evaluate(() => [!!document.querySelector('#plan-quem #plan-alunos'), !!document.querySelector('#plan-excluir')]), [true, true]);
+
+  // excluir o salvo: sem pergunta, com Desfazer
+  const chaves = () => pag.evaluate(() => Store.carregar().then(d => Object.keys(d.ajustes).filter(k => k.indexOf('planejamento:') === 0 && k !== 'planejamento:quebrado').length));
+  await clicar(pag, '#plan-excluir');
+  await esperar('a janela fechou e o plano saiu', () => chaves(), v => v === 0, 10000);
+  conf('excluído: a janela fechou e a ficha ficou sem o plano', await pag.evaluate(() => [document.querySelector('#modal-planejamento').classList.contains('aberto'),
+    document.querySelectorAll('#plan-secao .plan-item').length, document.querySelector('#aviso-acao').textContent]), [false, 0, 'Desfazer']);
+  await pag.evaluate(() => document.querySelector('#aviso-acao').click());
+  await esperar('o Desfazer trouxe o plano de volta', () => chaves(), v => v === 1, 10000);
+  conf('Desfazer: o plano volta para a ficha', await pag.evaluate(() => document.querySelectorAll('#plan-secao .plan-item').length), 1);
+  await clicar(pag, '#plan-secao .plan-item');
+  await esperar('o salvo abre de novo', () => pag.evaluate(() => !!document.querySelector('#plan-previa canvas.plan-previa-folha')), v => v === true, 30000);
 
   // ================================================================
   secao('7. A trava de transbordo da janela (prévia e pedido), 360, 390 e 412 px, letra normal e 130%');
@@ -287,6 +335,13 @@ async function transbordo(pag) {
   // ================================================================
   secao('3. Cancelar no meio do "montando" volta ao pedido sem perder o texto');
   await pag.type('#plan-texto', 'texto que não pode sumir');
+  // fechar com texto pergunta antes; dizer "não" deixa a janela aberta com o texto
+  await pag.evaluate(() => { window.__confirmarDeVerdade = window.confirm; window.__perguntas = []; window.confirm = q => { window.__perguntas.push(q); return false; }; });
+  await pag.evaluate(() => document.querySelector('#modal-planejamento .fechar').click());
+  await pausa(300);
+  conf('fechar com texto: pergunta, e o "não" deixa a janela aberta com o texto', await pag.evaluate(() => [window.__perguntas.length,
+    document.querySelector('#modal-planejamento').classList.contains('aberto'), document.querySelector('#plan-texto').value]), [1, true, 'texto que não pode sumir']);
+  await pag.evaluate(() => { window.confirm = window.__confirmarDeVerdade; });
   falso.atraso = 2500; falso.corpo = respostaFalsa(planoFalso('al1'));
   const antesCancelar = falso.pedidos.length;
   await clicar(pag, '#plan-montar');
@@ -338,6 +393,24 @@ async function transbordo(pag) {
   await esperar('a prévia redesenhou para Zélia', () => pag.evaluate(() => !!document.querySelector('#plan-previa canvas.plan-previa-folha')), v => v === true, 30000);
   await pag.evaluate(() => document.querySelector('#modal-planejamento .fechar').click());
   await esperar('fechou', () => aberta(pag, 'modal-planejamento'), v => v === false, 10000);
+
+  // ================================================================
+  secao('2. O plano salvo no aluno errado muda de ficha');
+  await H.irParaAba(pag, 'agenda');
+  await H.irParaAba(pag, 'alunos');
+  await clicar(pag, '#lista-alunos .item-lista[data-aluno="al1"]');
+  await esperar('a ficha abriu', () => aberta(pag, 'modal-aluno'), v => v === true, 10000);
+  await clicar(pag, '#plan-secao .plan-item');
+  await esperar('o salvo abriu', () => pag.evaluate(() => !!document.querySelector('#plan-previa canvas.plan-previa-folha')), v => v === true, 30000);
+  await clicar(pag, '#plan-alunos [data-aluno="al2"]');
+  conf('trocado: o Salvar volta a valer', await pag.evaluate(() => [document.querySelector('#plan-salvar').textContent, document.querySelector('#plan-salvar').disabled]), ['Salvar na ficha', false]);
+  await clicar(pag, '#plan-salvar');
+  await esperar('salvo no outro aluno', () => pag.evaluate(() => Store.carregar().then(d => Object.keys(d.ajustes).filter(k => k.indexOf('planejamento:') === 0 && d.ajustes[k].alunoId === 'al2').length)), v => v === 1, 10000);
+  await pag.evaluate(() => document.querySelector('#modal-planejamento .fechar').click());
+  await esperar('fechou', () => aberta(pag, 'modal-planejamento'), v => v === false, 10000);
+  conf('a ficha de Zélia ficou sem o plano, que foi para o Bruno', await pag.evaluate(() => document.querySelectorAll('#plan-secao .plan-item').length), 0);
+  await pag.evaluate(() => document.querySelector('#modal-aluno .fechar').click());
+  await esperar('a ficha fechou', () => aberta(pag, 'modal-aluno'), v => v === false, 10000);
 
   // ================================================================
   secao('6. O observador (cópia de outra conta) não vê o botão nem o atalho');

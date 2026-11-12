@@ -1412,9 +1412,13 @@
     /* Os planejamentos de estudo dele (fase 2 da IA: um ajuste por plano,
      * `planejamento:<id>`) saem junto, e viram lápide na nuvem pelo caminho
      * de sempre da diferença. */
+    /* Saem também os órfãos: planos de um aluno que já não existe (um tablet
+     * com a versão anterior excluiu o aluno sem saber dos planos). */
+    var ficam = {};
+    novo.alunos.forEach(function (a) { ficam[a.id] = true; });
     Object.keys(novo.ajustes).forEach(function (k) {
       var v = novo.ajustes[k];
-      if (k.indexOf(PREFIXO_PLANEJAMENTO) === 0 && v && v.alunoId === alunoId) delete novo.ajustes[k];
+      if (k.indexOf(PREFIXO_PLANEJAMENTO) === 0 && (!v || v.alunoId === alunoId || !ficam[v.alunoId])) delete novo.ajustes[k];
     });
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {

@@ -112,6 +112,13 @@ secao('2. O pedido ao endpoint');
   conf('sem aluno fixo, a mensagem não diz que está escolhido', textoA.indexOf('já está escolhido') < 0, true);
   const textoB = b.messages[0].content[b.messages[0].content.length - 1].text;
   conf('com aluno fixo, a mensagem diz o id escolhido', textoB.indexOf('O aluno já está escolhido: id al-sint-2.') >= 0, true);
+  // com o aluno fixo, só ele vai: o nome e os horários dos outros não saem do aparelho (dos dois lados)
+  const fixo = P.montarPedido({ texto: 'x', imagens: [], alunos: ALUNOS, alunoFixoId: 'al-sint-2', hoje: '2026-11-12' }).messages[0].content[0].text;
+  conf('aluno fixo: só ele na mensagem (o outro nome e o outro id não vão)', [fixo.indexOf('Bruno') >= 0, fixo.indexOf('Zélia') >= 0, fixo.indexOf('al-sint-1') >= 0], [true, false, false]);
+  const livre = P.montarPedido({ texto: 'x', imagens: [], alunos: ALUNOS, alunoFixoId: null, hoje: '2026-11-12' }).messages[0].content[0].text;
+  conf('sem aluno fixo (atalho): a lista inteira vai (controle)', [livre.indexOf('Bruno') >= 0, livre.indexOf('Zélia') >= 0], [true, true]);
+  const doSalvo = P.pedidoDeAjusteDoSalvo(planoBase(), 'muda', { alunos: ALUNOS, hoje: '2026-11-12' }).messages[0].content[0].text;
+  conf('ajuste do plano salvo: só o aluno do plano', [doSalvo.indexOf('Zélia') >= 0, doSalvo.indexOf('Bruno') >= 0, doSalvo.indexOf('al-sint-2') >= 0], [true, false, false]);
   const muitas = P.montarPedido({ texto: 'x', imagens: img(11), alunos: ALUNOS, hoje: '2026-11-12' });
   conf('mais de 8 prints: só os 8 primeiros vão', muitas.messages[0].content.filter(c => c.type === 'image').length, 8);
   const oito = P.montarPedido({ texto: 'x', imagens: img(8), alunos: ALUNOS, hoje: '2026-11-12' });
@@ -151,6 +158,9 @@ secao('3. A leitura da resposta (dos dois lados)');
   conf('recusa do modelo vira "recusa"', P.lerResposta(respostaDe(bom, {}).resposta ? Object.assign(respostaDe(bom), { resposta: Object.assign(respostaDe(bom).resposta, { stop_reason: 'refusal' }) }) : null, IDS).erro, 'recusa');
   conf('saída cortada (max_tokens) vira "cortado"', P.lerResposta(Object.assign(respostaDe(bom), { resposta: Object.assign(respostaDe(bom).resposta, { stop_reason: 'max_tokens' }) }), IDS).erro, 'cortado');
   conf('erro do endpoint passa o código', P.lerResposta({ ok: false, codigo: 'sem_permissao' }, IDS).erro, 'sem_permissao');
+  const quebrado = planoBase(); quebrado.provas = null;
+  let lancou = false, motivo = null; try { motivo = P.conferirPlano(quebrado, IDS); } catch (e) { lancou = true; }
+  conf('plano com provas null: a conferência recusa com motivo, sem quebrar', [lancou, motivo], [false, 'provas ausentes']);
   conf('JSON quebrado vira "sem_plano"', P.lerResposta({ ok: true, resposta: { stop_reason: 'end_turn', content: [{ type: 'text', text: '{"alunoId":' }] } }, IDS).erro, 'sem_plano');
   conf('as frases de tela dos códigos do brief', [P.fraseDoErro('limite_mensal'), P.fraseDoErro('sem_permissao'), P.fraseDoErro('sem_internet')],
     ['A IA está pausada até o dia 1.', 'Esta conta ainda não tem a IA liberada.', 'Precisa de internet para montar o planejamento.']);
