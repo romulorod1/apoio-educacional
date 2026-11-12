@@ -1068,6 +1068,7 @@ roda "celular ficha --envenenado-observador-cadastra" node "_teste/testa_celular
 # de um estranho; a tabela dos 28 casos dela), o link online com http, e o alto que nunca avisa que pode
 # estar desatualizado
 roda "celular ficha --envenenado-extracao-antiga"   node "_teste/testa_celular_ficha.js" --envenenado-extracao-antiga
+roda "celular ficha --envenenado-planejamento-solto" node "_teste/testa_celular_ficha.js" --envenenado-planejamento-solto
 roda "celular ficha --envenenado-aceita-http"       node "_teste/testa_celular_ficha.js" --envenenado-aceita-http
 roda "celular ficha --envenenado-nunca-desatualizado" node "_teste/testa_celular_ficha.js" --envenenado-nunca-desatualizado
 # D6c (lote 3): dinheiro de relance. O selo de cada familia (pago, parcial, em

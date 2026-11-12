@@ -26951,6 +26951,10 @@
               pl.alunoId = a.id;
               pl.confiancaAluno = 'alta';
               p.alunoEscolhido = a.id;
+              /* A conversa de antes era sobre outro aluno (outra lista, outras
+               * aulas): o próximo ajuste recomeça com o plano como texto e o
+               * aluno novo (pedidoDeAjusteDoSalvo). */
+              p.conversa = null;
               p.mudouDesdeSalvar = true;
               desenharPlanejamento();
             } });

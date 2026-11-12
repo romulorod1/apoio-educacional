@@ -391,6 +391,15 @@ async function transbordo(pag) {
   conf('um toque troca o aluno, outro troca "Aluno" por "Aluna"', await pag.evaluate(() => [document.querySelector('#plan-pergunta').textContent,
     document.querySelector('#plan-alunos [data-aluno="al1"]').getAttribute('aria-pressed')]), ['É a Zélia?', 'true']);
   await esperar('a prévia redesenhou para Zélia', () => pag.evaluate(() => !!document.querySelector('#plan-previa canvas.plan-previa-folha')), v => v === true, 30000);
+  // depois da troca, o ajuste recomeça a conversa com o aluno novo
+  const antesDoAjuste = falso.pedidos.length;
+  await pag.type('#plan-ajuste', 'põe Geografia no dia 21');
+  await clicar(pag, '#plan-ajustar');
+  await esperar('o ajuste depois da troca voltou', () => pag.evaluate(() => !!document.querySelector('#plan-previa canvas.plan-previa-folha')).then(v => v && falso.pedidos.length === antesDoAjuste + 1), v => v === true, 30000);
+  const pt = falso.pedidos[falso.pedidos.length - 1].corpo, tt = pt.messages[0].content[0].text;
+  conf('ajuste depois de trocar o aluno: um turno só, com o plano atual e o aluno novo (e sem o antigo)', [pt.messages.length, tt.indexOf('Este é o plano atual') >= 0,
+    tt.indexOf('O aluno já está escolhido: id al1.') >= 0, tt.indexOf('Zélia') >= 0, tt.indexOf('Bruno') < 0, tt.indexOf('"alunoId":"al1"') >= 0], [1, true, true, true, true, true]);
+  conf('e a prévia continua com Zélia', await pag.evaluate(() => document.querySelector('#plan-pergunta').textContent), 'É a Zélia?');
   await pag.evaluate(() => document.querySelector('#modal-planejamento .fechar').click());
   await esperar('fechou', () => aberta(pag, 'modal-planejamento'), v => v === false, 10000);
 
