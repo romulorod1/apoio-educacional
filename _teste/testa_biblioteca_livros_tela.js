@@ -44,7 +44,9 @@
  *      aria-label), no painel, no Abrir, no sumário do leitor, na posição
  *      atual e no Continuar lendo; o livro sem marcadores com mapa de 1
  *      entrada ("Volume") mostra a entrada; o controle, marcadores lixo sem
- *      mapa, fica como está.
+ *      mapa, fica como está. O sumário do mapa é só da tela: o JSON do
+ *      depósito livros fica idêntico depois da tela e do leitor, e
+ *      livros_posicoes só ganha a posição dos livros lidos.
  *
  * Veneno:
  *   node _teste/testa_biblioteca_livros_tela.js --envenenado-capitulo-abre-pagina-errada
@@ -548,6 +550,29 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     return c.novos;
   });
   conf('os três livros de prova entraram no depósito', gravados, 3);
+  /* O sumário do mapa é calculado NA TELA e nunca gravado: gravar mudaria o
+   * JSON do sumário, e o gravarLivros solta a posição de leitura quando o
+   * sumário muda (posicoesSoltas). O retrato é o JSON cru dos depósitos
+   * 'livros' (o registro inteiro, menos o Blob) e 'livros_posicoes'. */
+  const retrato = () => pag.evaluate(() => new Promise((ok, falha) => {
+    const q = indexedDB.open('apoio-educacional');
+    q.onerror = () => falha(q.error);
+    q.onsuccess = () => {
+      const b = q.result; const tr = b.transaction(['livros', 'livros_posicoes'], 'readonly');
+      const r = {};
+      tr.objectStore('livros').getAll().onsuccess = e => {
+        r.livros = JSON.stringify(e.target.result.map(x => Object.assign({}, x, { blob: x.blob ? x.blob.size : null })));
+      };
+      tr.objectStore('livros_posicoes').getAll().onsuccess = e => {
+        r.posicoes = {}; e.target.result.forEach(p => { r.posicoes[p.id] = JSON.stringify(p); });
+      };
+      tr.oncomplete = () => { b.close(); ok(r); };
+      tr.onerror = () => { b.close(); falha(tr.error); };
+    };
+  }));
+  const antes = await retrato();
+  conf('o retrato enxerga os livros de prova e o sumário gravado deles', /"id":"prova-marcadores-lixo"/.test(antes.livros) &&
+    /"titulo":"page40"/.test(antes.livros) && /"sumario":\[\],"sumario_origem":"nenhum"/.test(antes.livros), true);
   await H.irParaAba(pag, 'biblioteca');
   await pausa(300);
   await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
@@ -581,6 +606,9 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await esperar('a tela do livro de marcadores lixo', () => lerLivro(pag), v => v.visivel && v.livro === 'prova-marcadores-lixo', 5000);
   await esperar('os nomes dos assuntos', () => lerLivro(pag), v => !/MAT06-/.test(v.assuntosDosCapitulos), 10000);
   lv = await lerLivro(pag);
+  let depois = await retrato();
+  conf('só a tela aberta, com o sumário do mapa: o depósito livros fica idêntico (o JSON)', depois.livros === antes.livros, true);
+  conf('e livros_posicoes também', JSON.stringify(depois.posicoes) === JSON.stringify(antes.posicoes), true);
   conf('o resumo: 3 capítulos do mapa, e não 40', lv.resumo, '6 páginas · 3 capítulos · 2 assuntos ligados');
   conf('o sumário são os capítulos do mapa, cada um na página dele (o primeiro marcado)', lv.linhas, 'cap1@1[1]*,cap2@3[2],cap3@5[3]');
   conf('os títulos do mapa', await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-livro .bibl-cap .bibl-cap-titulo'))
@@ -637,6 +665,15 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('controle: sem mapa, os 40 marcadores ficam como estão', lv.resumo, '6 páginas · 40 capítulos · sem mapa de assuntos');
   await clicar(pag, '#bib-livro-voltar');
   await pausa(300);
+
+  depois = await retrato();
+  conf('depois da tela e do leitor com o sumário do mapa: o depósito livros fica idêntico (o JSON, sumário incluído)',
+    depois.livros === antes.livros, true);
+  const novas = Object.keys(depois.posicoes).filter(k => !(k in antes.posicoes)).sort().join(',');
+  // controle positivo: o retrato vê a posição que o leitor grava, como sempre gravou
+  conf('livros_posicoes ganhou só a posição dos dois livros lidos (o que o leitor sempre gravou)', novas, 'prova-marcadores-lixo,prova-sem-marcadores');
+  conf('e as posições que já estavam ficam idênticas (nenhuma solta)', Object.keys(antes.posicoes).length > 0 &&
+    Object.keys(antes.posicoes).every(k => depois.posicoes[k] === antes.posicoes[k]), true);
 
   if (PRINTS) {
     secao('Prints');
