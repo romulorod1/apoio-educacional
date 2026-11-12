@@ -89,7 +89,11 @@ disciplinas.forEach(function (d) {
   conf(d.chave + ': o índice diz ' + d.topicos + ' assuntos (é o número que a tela mostra, app.js:7985)', titulos, d.topicos);
   conf(d.chave + ': grupos do arquivo na ordem do índice', arq.grupos.map(function (g) { return g.chave; }), d.grupos.map(function (g) { return g.chave; }));
 });
-conf('total de tópicos', todosIds.length, 2513);
+/* 2524 desde 12/11/2026: a revisão dos mapas dos livros de física criou 11
+ * assuntos (FISEM1-T51 a T56, FISEM2-T49 e T50, FISEM3-T47 a T49); eram 2513.
+ * O FISEM2-T48 chegou a ser emitido e saiu na revisão (virou ligação ao
+ * FIS09-T35): fica aposentado no registro e o número não volta. */
+conf('total de tópicos', todosIds.length, 2524);
 
 secao('2. Unicidade');
 conf('nenhum id se repete nos 12 arquivos', new Set(todosIds.map(function (x) { return x.id; })).size, todosIds.length);
