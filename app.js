@@ -87,7 +87,7 @@
     {
       versao: '1.42.55',
       itens: [
-        'Em Matemática entraram 24 assuntos novos, para escolher na aula e procurar na Biblioteca: 14 do 6º ao 9º ano (como construções geométricas, simetria, inequações, contagem e juros compostos) e 10 do ensino médio (como lógica, geometria de posição, equações trigonométricas e derivada).'
+        'Em Matemática entraram 22 assuntos novos, para escolher na aula e procurar na Biblioteca: 14 do 6º ao 9º ano (como construções geométricas, simetria, contagem e juros compostos) e 8 do ensino médio (como lógica, geometria de posição, equações trigonométricas e derivada).'
       ]
     },
     {

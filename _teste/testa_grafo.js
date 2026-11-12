@@ -105,7 +105,7 @@ function analisa(lista) {
 /* ------------------------------------------------------------------ 1 a 5: o grafo de verdade */
 secao('1. O grafo gravado');
 
-conf('o índice tem os 173 assuntos (148 de 09/2026, o MAT08-15 e os 24 da revisão dos mapas)', temas.length, 173);
+conf('o índice tem os 171 assuntos (148 de 09/2026, o MAT08-15 e os 22 da revisão dos mapas)', temas.length, 171);
 conf('o cabeçalho diz que o grafo foi revisado no C7', /revisado no C7 em 30\/10\/2026/.test(indice.prerequisitos_origem || ''), true);
 conf('todo registro traz a lista de pré-requisitos', temas.every(t => Array.isArray(t.prerequisitos)), true);
 conf('nenhum assunto repete um pré-requisito na própria lista',
@@ -115,7 +115,7 @@ const g = analisa(temas);
 const arestas = temas.reduce((n, t) => n + t.prerequisitos.length, 0);
 console.log('       ' + arestas + ' arestas, ' + temas.filter(t => t.prerequisitos.length).length + ' assuntos com pré-requisito');
 conf('todo id de pré-requisito existe', g.inexistentes.join(' ') || 'todos existem', 'todos existem');
-conf('nenhum ciclo: a ordem topológica tem os 173', g.ciclo || ('completa com ' + g.ordem.length), 'completa com 173');
+conf('nenhum ciclo: a ordem topológica tem os 171', g.ciclo || ('completa com ' + g.ordem.length), 'completa com 171');
 conf('nenhum pré-requisito de ano posterior', g.posteriores.join(' ') || 'nenhum', 'nenhum');
 conf('nenhuma aresta redundante pela transitividade (fora as declaradas)', g.redundantes.slice(0, 5).join(' ; ') || 'nenhuma', 'nenhuma');
 conf('toda redundância declarada de propósito existe no grafo',
@@ -138,7 +138,7 @@ temas.forEach(t => t.prerequisitos.forEach(p => { if (posicao[p] > posicao[t.id]
 conf('na ordem topológica, todo pré-requisito vem antes de quem o cita', invertidos.join(' ') || 'nenhum invertido', 'nenhum invertido');
 
 /* ------------------------------------------------------------------ 6: ids, anos e títulos congelados */
-secao('2. Ids, anos e títulos são os de antes da revisão (82bf848)');
+secao('2. Ids, anos e títulos: os 148 de 82bf848 sem mudança, mais os acrescentados depois');
 
 const CONGELADO = [
   'MAT02-01|02|Números até 100: ler, escrever e comparar',
@@ -208,6 +208,7 @@ const CONGELADO = [
   'MAT06-16|06|Figuras não planas: poliedros, corpos redondos e planificações',
   'MAT06-17|06|Grandezas e medidas: comprimento, massa, tempo e temperatura',
   'MAT06-18|06|Plantas baixas, vistas e escala',
+  'MAT06-19|06|Ampliação e redução de figuras na malha',
   'MAT07-01|07|Números inteiros e a reta numérica',
   'MAT07-02|07|Operações com números inteiros',
   'MAT07-03|07|Números racionais e suas formas',
@@ -225,7 +226,6 @@ const CONGELADO = [
   // acrescentado em 12/11/2026, revisão dos mapas dos livros: assunto que faltava
   'MAT07-15|07|Simetria e transformações: reflexão, translação e rotação',
   'MAT07-16|07|Circunferência e círculo: elementos e construção com compasso',
-  'MAT07-17|07|Inequações do 1º grau',
   'MAT08-01|08|Potenciação e suas propriedades',
   'MAT08-02|08|Notação científica',
   'MAT08-03|08|Radiciação e raízes',
@@ -263,7 +263,7 @@ const CONGELADO = [
   'MAT09-14|09|Probabilidade de eventos sucessivos',
   // acrescentado em 12/11/2026, revisão dos mapas dos livros: assunto que faltava
   'MAT09-15|09|Vistas ortogonais e perspectiva',
-  'MAT09-16|09|Distâncias no plano: entre pontos, de ponto a reta e ponto médio',
+  'MAT09-16|09|Distância entre dois pontos e ponto médio',
   'MAT09-17|09|Porcentagens sucessivas e juros compostos',
   'MATEM1-01|em1|Conjuntos numéricos',
   'MATEM1-02|em1|Função: domínio, contradomínio e imagem',
@@ -282,8 +282,7 @@ const CONGELADO = [
   'MATEM1-15|em1|Função composta',
   // acrescentado em 12/11/2026, revisão dos mapas dos livros: assunto que faltava
   'MATEM1-16|em1|Noções de lógica: proposições e conectivos',
-  'MATEM1-17|em1|Conjuntos: operações e diagramas de Venn',
-  'MATEM1-18|em1|Equações e inequações irracionais',
+  'MATEM1-17|em1|Equações e inequações irracionais',
   'MATEM2-01|em2|Ciclo trigonométrico',
   'MATEM2-02|em2|Funções trigonométricas',
   'MATEM2-03|em2|Lei dos senos e lei dos cossenos',
@@ -301,9 +300,8 @@ const CONGELADO = [
   'MATEM2-15|em2|Identidades trigonométricas: adição de arcos e arco duplo',
   // acrescentado em 12/11/2026, revisão dos mapas dos livros: assunto que faltava
   'MATEM2-16|em2|Geometria de posição: pontos, retas e planos',
-  'MATEM2-17|em2|Poliedros: relação de Euler e poliedros regulares',
-  'MATEM2-18|em2|Equações e inequações trigonométricas',
-  'MATEM2-19|em2|Funções trigonométricas inversas',
+  'MATEM2-17|em2|Equações e inequações trigonométricas',
+  'MATEM2-18|em2|Funções trigonométricas inversas',
   'MATEM3-01|em3|Geometria analítica: ponto e distância',
   'MATEM3-02|em3|Geometria analítica: a reta',
   'MATEM3-03|em3|Geometria analítica: a circunferência',
@@ -323,13 +321,13 @@ const CONGELADO = [
   'MATEM3-16|em3|Introdução à integral',
   'MATEM3-17|em3|Lugares geométricos no plano cartesiano',
 ];
-conf('a lista congelada tem 173 linhas', CONGELADO.length, 173);
+conf('a lista congelada tem 171 linhas', CONGELADO.length, 171);
 const deHoje = temas.map(t => t.id + '|' + t.serie + '|' + t.pt.titulo);
 const diferentes = [];
 for (let i = 0; i < Math.max(deHoje.length, CONGELADO.length); i++) {
   if (deHoje[i] !== CONGELADO[i]) diferentes.push((CONGELADO[i] || '(nada)') + ' => ' + (deHoje[i] || '(nada)'));
 }
-conf('id, ano e título de cada assunto, na mesma ordem, são os de 82bf848',
+conf('id, ano e título de cada assunto, na mesma ordem: os 148 de 82bf848, o MAT08-15 e os 22 da revisão dos mapas',
   diferentes.slice(0, 3).join(' ; ') || 'iguais', 'iguais');
 
 /* ------------------------------------------------------------------ veneno */

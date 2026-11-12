@@ -34,7 +34,7 @@ const temasIx = indice.temas || indice;
 // ================================================================
 secao('1. O pré-requisito viaja no índice');
 
-conf('o índice tem os 173 assuntos (148 de 09/2026, o MAT08-15 e os 24 da revisão dos mapas)', temasIx.length, 173);
+conf('o índice tem os 171 assuntos (148 de 09/2026, o MAT08-15 e os 22 da revisão dos mapas)', temasIx.length, 171);
 conf('os ids são únicos', new Set(temasIx.map(t => t.id)).size, temasIx.length);
 conf('todo id tem a forma dos temas de sempre (MAT<ano>-<nn>)',
   temasIx.every(t => /^MAT(0[2-9]|EM[1-3])-\d{2}$/.test(t.id)), true);

@@ -3,7 +3,7 @@
  "versao": 1,
  "aviso": "Indice de assuntos, sem material: id, serie (ano), unidade, duracao, dificuldade, titulo, pre-requisitos e as palavras-chave da busca. Os ids sao os dos temas autorais de 09/2026 e nunca mudam: aulas gravadas apontam para eles.",
  "prerequisitos_origem": "revisado no C7 em 30/10/2026: pre-requisitos imediatos, cadeia pela transitividade; mudancas e motivos em banco/topicos/_grafo_c7_mudancas.md",
- "chaves_origem": "radicais de palavra-chave do banco/busca.json de 09/2026 (r: do resumo, d: destaques do conteudo), soltos e em ordem alfabetica, sem frase; so a busca le",
+ "chaves_origem": "radicais de palavra-chave do banco/busca.json de 09/2026 (r: do resumo, d: destaques do conteudo), soltos e em ordem alfabetica, sem frase; so a busca le. Nos assuntos criados depois dos 148 (MAT08-15 e os da revisao dos mapas, 12/11/2026) as chaves foram escritas a mao, no mesmo formato",
  "temas": [
   {
    "id": "MAT02-01",
@@ -1228,6 +1228,25 @@
    "modulo": null
   },
   {
+   "id": "MAT06-19",
+   "serie": "06",
+   "unidade": "geometria",
+   "duracaoMin": 60,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Ampliação e redução de figuras na malha"
+   },
+   "prerequisitos": [
+    "MAT06-10",
+    "MAT06-13"
+   ],
+   "chaves": {
+    "r": "ampliacao ampliar figura malha proporcional reducao reduzir semelhante",
+    "d": "angulo cartesiano construir coordenada dobro exemplo lado medida metade plano quadriculada vertice"
+   },
+   "modulo": null
+  },
+  {
    "id": "MAT07-01",
    "serie": "07",
    "unidade": "numeros",
@@ -1522,24 +1541,6 @@
    "chaves": {
     "r": "circulo circunferencia compasso construir corda diametro elemento raio reconhecer",
     "d": "arco centro distancia equidistante exemplo geometrico interna lugar ponto posicao regiao relativa secante tangente"
-   },
-   "modulo": null
-  },
-  {
-   "id": "MAT07-17",
-   "serie": "07",
-   "unidade": "algebra",
-   "duracaoMin": 60,
-   "dificuldade": 3,
-   "pt": {
-    "titulo": "Inequações do 1º grau"
-   },
-   "prerequisitos": [
-    "MAT07-10"
-   ],
-   "chaves": {
-    "r": "desigualdade grau incognita inequacao maior menor primeiro resolver solucao",
-    "d": "conjunto inverter lado membro multiplicar negativo numero propriedade reta sentido sinal sistema valor verdadeira"
    },
    "modulo": null
   },
@@ -2185,15 +2186,15 @@
    "duracaoMin": 90,
    "dificuldade": 3,
    "pt": {
-    "titulo": "Distâncias no plano: entre pontos, de ponto a reta e ponto médio"
+    "titulo": "Distância entre dois pontos e ponto médio"
    },
    "prerequisitos": [
     "MAT06-13",
     "MAT09-07"
    ],
    "chaves": {
-    "r": "cartesiano coordenada distancia medio plano ponto reta segmento",
-    "d": "area calcular eixo entre exemplo hipotenusa paralela perimetro perpendicular pitagoras triangulo vertice"
+    "r": "cartesiano coordenada distancia medio plano ponto segmento",
+    "d": "area calcular eixo entre exemplo hipotenusa perimetro pitagoras triangulo vertice"
    },
    "modulo": null
   },
@@ -2510,24 +2511,6 @@
   {
    "id": "MATEM1-17",
    "serie": "em1",
-   "unidade": "numeros",
-   "duracaoMin": 90,
-   "dificuldade": 2,
-   "pt": {
-    "titulo": "Conjuntos: operações e diagramas de Venn"
-   },
-   "prerequisitos": [
-    "MATEM1-16"
-   ],
-   "chaves": {
-    "r": "conjunto diagrama diferenca elemento intersecao operacao uniao venn",
-    "d": "complementar contido elementos exemplo partes pertence problema quantos subconjunto universo vazio"
-   },
-   "modulo": null
-  },
-  {
-   "id": "MATEM1-18",
-   "serie": "em1",
    "unidade": "algebra",
    "duracaoMin": 90,
    "dificuldade": 4,
@@ -2538,7 +2521,7 @@
     "MATEM1-05"
    ],
    "chaves": {
-    "r": "equacao inequacao irracional quadrado radical raiz resolver verificar",
+    "r": "equacao irracional quadrado radical raiz resolver verificar",
     "d": "ambos condicao elevar estranha exemplo existencia indice lado membro raizes solucao verificacao"
    },
    "modulo": null
@@ -2842,25 +2825,6 @@
   {
    "id": "MATEM2-17",
    "serie": "em2",
-   "unidade": "geometria",
-   "duracaoMin": 90,
-   "dificuldade": 4,
-   "pt": {
-    "titulo": "Poliedros: relação de Euler e poliedros regulares"
-   },
-   "prerequisitos": [
-    "MAT06-16",
-    "MATEM2-16"
-   ],
-   "chaves": {
-    "r": "aresta convexo euler face platao poliedro regular relacao vertice",
-    "d": "cubo dodecaedro exemplo hexaedro icosaedro numero octaedro poligono quantas tetraedro"
-   },
-   "modulo": null
-  },
-  {
-   "id": "MATEM2-18",
-   "serie": "em2",
    "unidade": "algebra",
    "duracaoMin": 90,
    "dificuldade": 5,
@@ -2872,13 +2836,13 @@
     "MATEM2-15"
    ],
    "chaves": {
-    "r": "cosseno equacao inequacao intervalo resolver seno solucao tangente trigonometrica",
+    "r": "cosseno equacao intervalo resolver seno solucao tangente trigonometrica",
     "d": "arco ciclo conjunto determinado exemplo fundamental geral periodo quadrante raiz volta"
    },
    "modulo": null
   },
   {
-   "id": "MATEM2-19",
+   "id": "MATEM2-18",
    "serie": "em2",
    "unidade": "algebra",
    "duracaoMin": 90,

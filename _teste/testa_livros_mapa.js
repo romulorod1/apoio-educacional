@@ -272,7 +272,7 @@ async function printar(pag, nome) {
   conf('as opções são só de matemática do 6º ao 9º ano (o ano do livro)',
     opcoes.filter(x => x).every(x => /^MAT0[6-9]-/.test(x)), true);
   // 57 desde 12/11/2026, com o MAT08-15 (volume do 8º ano); 71 desde a revisão dos mapas dos
-  // livros, que criou 14 assuntos do 6º ao 9º (MAT06-15 a 18, MAT07-15 a 17, MAT08-16 a 19, MAT09-15 a 17)
+  // livros, que criou 14 assuntos do 6º ao 9º (MAT06-15 a 19, MAT07-15 e 16, MAT08-16 a 19, MAT09-15 a 17)
   conf('com os 71 assuntos desses anos, e "Nenhum assunto do índice"', opcoes.filter(x => x).length + '+' + opcoes.filter(x => !x).length, '71+1');
   conf('o assunto atual do capítulo vem marcado na lista, e só ele', await marcados(p), 'MAT06-05 ✓');
   const rolagem = await p.evaluate(() => {
