@@ -93,6 +93,7 @@ NOTA_SO_NO_PE = True   # nota de rodape so no pe da coluna (ver marcadores); Fal
 # o bloco "Comentario para professores" sai do enunciado e vai, como ultimo pedaco,
 # para a solucao do mesmo item (ver titulo_de_comentario); False so no veneno
 COMENTARIO_AO_PROFESSOR = True
+COMENTARIO_SO_NO_ENUNCIADO = True  # o comentario dentro das solucoes nao corta nada (detectar); False so no veneno
 ESTENDE_BORDA = True   # recorte passa da borda direita quando a fonte passa (ver detectar); False so no veneno
 LEVA_NOTA = True       # nota de rodape vai com o item que a chama (notas_de_rodape); False so no veneno
 ALTURA_MIN_ENUNCIADO = 20.0
@@ -445,7 +446,7 @@ def marcadores(els, geo, em_solucoes, ja_teve_enunciado=False, secao_1_abre_solu
         if COMENTARIO_AO_PROFESSOR and titulo_de_comentario(e, txt):
             out.append({'tipo': 'comentario', 'col': e['col'], 'el': e})
             continue
-        vizinhos =sorted([o for o in txt if o is not e and o['col'] == e['col']
+        vizinhos = sorted([o for o in txt if o is not e and o['col'] == e['col']
                            and abs(centro_y(o['bb']) - centro_y(e['bb'])) < 3
                            and 0 <= o['bb'][0] - e['bb'][2] < 60], key=lambda o: o['bb'][0])
         solucoes_agora = em_solucoes or virou_solucoes is not None
@@ -477,7 +478,7 @@ def marcadores(els, geo, em_solucoes, ja_teve_enunciado=False, secao_1_abre_solu
 # decisao D2 do dono e sobre o comentario ao professor.
 TITULO_COMENTARIO = re.compile(
     r'^(?:(?:comentarios?|observac(?:ao|oes)|obs\.?|notas?|sugest(?:ao|oes)|orientac(?:ao|oes)|dicas?)'
-    r'(?:para|ao|aos|a|as|do|dos|da|das)|para|ao|aos)(?:os|as|o|a)?professor')
+    r'(?:para|ao|aos|a|as|do|dos|da|das)|para|ao|aos)(?:os|as|o|a)?(?:\((?:a|as|os)\))?professor')
 
 
 def titulo_de_comentario(e, txt):
@@ -825,7 +826,7 @@ def detectar(doc, secao_1_abre_solucoes=True):
         # Pela ordem de leitura (coluna, altura), contra o titulo das solucoes
         # desta pagina, e nao pela ordem em que os spans vem do PDF
         tits = [(m['col'], m['el']['bb'][1]) for m in marcs if m['tipo'] == 'titulo_solucoes']
-        marcs = [m for m in marcs if m['tipo'] != 'comentario'
+        marcs = [m for m in marcs if m['tipo'] != 'comentario' or not COMENTARIO_SO_NO_ENUNCIADO
                  or not (em_solucoes or any((m['col'], m['el']['bb'][1]) > t for t in tits))]
         for col in (0, 1):
             cx0, cx1 = faixa_da_coluna(col, geo, pg)
@@ -1901,6 +1902,11 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                 # dono, 12/11/2026): sai do enunciado, que e a folha do aluno, e vai
                 # como ultimo pedaco da solucao, que so a professora ve
                 p_com = det['pedacos']['comentario'].get(ch, [])
+                # lista sem secao de solucoes: nao ha gabarito para levar o comentario,
+                # e ele nao volta para o enunciado (fica fora, com nota, mais abaixo)
+                com_fora = bool(p_com) and not p_sol
+                if com_fora:
+                    p_com = []
                 vaza = [p for p in p_enun + p_sol + p_com if p.get('transborda')]
                 if not motivo and vaza:
                     motivo = ('na pagina %d a fonte passa conteudo por cima do fio entre as colunas, na altura deste '
@@ -1934,12 +1940,9 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                     continue
                 if nota:
                     rel['notas'].append({'id': iid, 'nota': nota})
-                if p_com and not p_sol:
-                    # lista sem secao de solucoes: nao ha gabarito para levar o
-                    # comentario, e ele nao volta para o enunciado
+                if com_fora:
                     rel['notas'].append({'id': iid, 'nota': 'comentario ao professor fora do pacote: o item nao '
                                                             'tem solucao para levar o comentario'})
-                    p_com = []
                 # a solucao com o comentario no fim; o primeiro pedaco continua sendo o
                 # da solucao (o rotulo e a regra "comeca pelo numero" sao dele)
                 ps_sol = p_sol + [dict(p, comentario=True) for p in p_com]
@@ -1950,7 +1953,9 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                 for tipo, ps, minimo in (('enunciado', p_enun, ALTURA_MIN_ENUNCIADO), ('solucao', ps_sol, ALTURA_MIN_SOLUCAO)):
                     if not ps:
                         continue
-                    h_total = sum(p['rect'][3] - p['rect'][1] for p in ps)
+                    # a altura minima e da solucao propria: o comentario nao salva
+                    # uma solucao quase vazia
+                    h_total = sum(p['rect'][3] - p['rect'][1] for p in ps if not p.get('comentario'))
                     if h_total < minimo:
                         ruim = '%s com %.1f pt de altura, abaixo de %d' % (tipo, h_total, minimo)
                     for p in ps:

@@ -1871,11 +1871,15 @@ def trava_notas(p):
 
 # O titulo do comentario ao professor, lido no texto da pagina (sem acento, em
 # minusculas), escrito aqui e nao importado do gerador: a prova nao confia na regra
-# que ela confere. Precisa de uma palavra de titulo antes ("comentario para
-# professores"); "um presente para o professor" e "ajuda para o professor Piraldo",
+# que ela confere. As mesmas variantes do gerador, e com os dois pontos que fecham
+# o titulo (as 16 ocorrencias medidas nas 7 series os tem): "um presente para o
+# professor", "ajuda para o professor Piraldo" e "entregou a nota ao professor",
 # frases de enunciado, nao casam.
-TITULO_NO_TEXTO = re.compile(r'(comentarios?|observac(ao|oes)|notas?|sugest(ao|oes)|orientac(ao|oes))\s*'
-                             r'(para|ao|aos|a|as)\s*(os\s*|as\s*|o\s*|a\s*)?professor')
+_PROFESSOR = r'\s*((os|as|o|a)\s*)?(\((a|as|os)\)\s*)?professor(a|as|es)?\s*(\((a|as|es)\)\s*)?:'
+TITULO_NO_TEXTO = re.compile(r'(?<![a-z])(comentarios?|observac(ao|oes)|obs\.?|notas?|sugest(ao|oes)|orientac(ao|oes)|'
+                             r'dicas?)\s*(para|ao|aos|a|as|do|dos|da|das)' + _PROFESSOR)
+# so no COMECO do pedaco do comentario: o titulo curto ("Para o professor:")
+TITULO_CURTO = re.compile(r'(para|ao|aos)' + _PROFESSOR)
 
 
 def trava_comentario_fora_do_enunciado(p):
@@ -1906,7 +1910,7 @@ def trava_comentario_fora_do_enunciado(p):
             erros.append('%s: a solucao comeca pelo comentario, e nao pela solucao' % it['id'])
         pg0 = doc[ps[marcados[0]]['pagina'] - 1]
         comeco = re.sub(r'\s+', ' ', portal.para_busca(pg0.get_text('text', clip=pymupdf.Rect(ps[marcados[0]]['bbox']))))
-        if not TITULO_NO_TEXTO.match(comeco):
+        if not (TITULO_NO_TEXTO.match(comeco) or TITULO_CURTO.match(comeco)):
             erros.append('%s: o pedaco do comentario nao comeca pelo titulo: %r' % (it['id'], comeco[:40]))
         for k in range(marcados[0], len(ps)):
             if k not in marcados and not so_miudo(doc[ps[k]['pagina'] - 1], ps[k]['bbox']):
@@ -1951,10 +1955,13 @@ def trava_comentario_amostra(p):
     # sem espacos: o titulo e o texto vem em spans diferentes, e a juncao varia
     if 'observacao:noxadrez' not in re.sub(r'\s+', '', i3['texto']):
         erros.append('a "Observacao:" do aluno saiu do enunciado 3')
-    if any(pz.get('comentario') for pz in pedacos(i3, 'solucao')) or len(pedacos(i3, 'solucao')) != 1:
-        erros.append('a solucao 3, que ja tinha o comentario, foi cortada')
-    if 'fica onde esta' not in texto_dos_pedacos(p, i3, 'solucao'):
-        erros.append('o comentario que ja estava na solucao 3 saiu dela')
+    # dois pedacos, um por pagina, e nenhum marcado: o comentario dentro das
+    # solucoes (na coluna da direita e na pagina que ja abre nas solucoes) nao corta
+    if any(pz.get('comentario') for pz in pedacos(i3, 'solucao')) or len(pedacos(i3, 'solucao')) != 2:
+        erros.append('a solucao 3, que ja tinha os comentarios, foi cortada: %d pedaco(s)' % len(pedacos(i3, 'solucao')))
+    s3 = texto_dos_pedacos(p, i3, 'solucao')
+    if 'fica onde esta' not in s3 or 'tambem fica na solucao' not in s3:
+        erros.append('um comentario que ja estava na solucao 3 saiu dela')
     regs = [c for l in p.relatorio['listas'] if l['aula'] == 'lista-comentario' for c in l.get('comentarios_ao_professor', [])]
     if [(c.get('id'), c.get('na_solucao')) for c in regs] != [(i2['id'], True)]:
         erros.append('o relatorio nao registra um comentario so, o do item 2, levado a solucao: %r' % regs)
@@ -1993,6 +2000,17 @@ def comentario_ao_professor(temp, placar, cur, navegador=True):
                     'comentario ao professor no enunciado')
     placar.conferir('gabarito sem o comentario (gerador antigo)', trava_comentario_amostra(v), True,
                     'a solucao 2 nao leva o comentario')
+    # veneno: sem o filtro das solucoes, o comentario que ja esta no gabarito corta a
+    # solucao 3 (na coluna da direita e na pagina que ja abre nas solucoes)
+    antes_s = gerar_pacote.COMENTARIO_SO_NO_ENUNCIADO
+    gerar_pacote.COMENTARIO_SO_NO_ENUNCIADO = False
+    try:
+        gerar(pdfs, os.path.join(temp, 'v_comentario_solucao'), cur)
+    finally:
+        gerar_pacote.COMENTARIO_SO_NO_ENUNCIADO = antes_s
+    placar.conferir('comentario das solucoes cortando a solucao',
+                    trava_comentario_amostra(Pacote(os.path.join(temp, 'v_comentario_solucao'), pdfs)), True,
+                    'a solucao 3, que ja tinha os comentarios, foi cortada')
     # veneno: a regra solta, que toma todo titulo "Comentario" ou "Observacao" por
     # comentario ao professor, sem exigir o professor, leva a "Observacao:" do
     # aluno para o gabarito

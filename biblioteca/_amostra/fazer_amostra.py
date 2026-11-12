@@ -547,8 +547,10 @@ def lista_comentario(caminho):
       sem ele; a solucao 2, com ele no fim, nos dois pedacos;
     - exercicio 3: "Observacao:" em negrito na margem, que fala com o aluno: fica
       no enunciado;
-    - solucao 3: um "Comentario para professores:" que ja esta no gabarito: nao
-      corta a solucao e nao vai para lugar nenhum.
+    - solucao 3, na coluna da direita (o titulo das solucoes esta na da
+      esquerda), e continuando numa terceira pagina, que ja abre nas solucoes:
+      um "Comentario para professores:" em cada uma das duas partes, que ja
+      estao no gabarito: nao cortam a solucao e nao vao para lugar nenhum.
     """
     g = MODELOS['cm']
     X0, X1, T = g['x0'], g['x1'], g['topo']
@@ -591,12 +593,21 @@ def lista_comentario(caminho):
     p.texto(X0 + 14, T + 70, ['7 · 8 = 56.'])
     p.numero_solucao(X0, T + 100, 2)
     p.texto(X0 + 14, T + 100, ['Com x alunos, 20x mais 60 é o preço.'])
-    p.numero_solucao(X0, T + 130, 3)
-    p.texto(X0 + 14, T + 130, ['O rei anda uma casa.'])
+    # a solucao 3 na coluna da direita, com o titulo das solucoes na da esquerda: o
+    # comentario dela vem depois do titulo pela ordem de leitura (coluna, altura)
+    p.numero_solucao(X1, T + 40, 3)
+    p.texto(X1 + 14, T + 40, ['O rei anda uma casa.'])
     largura = pymupdf.get_text_length(titulo, fontname='hebo', fontsize=10)
-    p.pg.insert_text((X0, T + 154), titulo, fontname='hebo', fontsize=10)
-    p.pg.insert_text((X0 + largura + 4, T + 154), 'este já', fontname='helv', fontsize=10)
-    p.texto(X0, T + 166, ['está no gabarito e fica onde está.'])
+    p.pg.insert_text((X1, T + 64), titulo, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X1 + largura + 4, T + 64), 'este já', fontname='helv', fontsize=10)
+    p.texto(X1, T + 76, ['está no gabarito e fica onde está.'])
+    # e continua numa pagina que ja abre nas solucoes, com outro comentario
+    p = Pagina(doc, g)
+    p.fios(3)
+    p.texto(X0, T + 20, ['Continuação da solução 3, numa casa por vez.'])
+    p.pg.insert_text((X0, T + 44), titulo, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X0 + largura + 4, T + 44), 'este', fontname='helv', fontsize=10)
+    p.texto(X0, T + 56, ['também fica na solução.'])
     p.texto(X1 + 30, T + 40, ['Elaborado por Autor da Amostra', 'Produzido por Amostra Sintética'])
     doc.set_metadata(FIXO)
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
