@@ -57,7 +57,7 @@ function planoBase(o) {
   return Object.assign({
     alunoId: 'al-sint-1', confiancaAluno: 'alta', tratamento: 'Aluna',
     periodo: { inicio, fim }, grade, provas,
-    aulaAConfirmar: [], feriados: [], observacoes: []
+    aulaAConfirmar: [], aulasRemovidas: [], aulasExtras: [], feriados: [], observacoes: []
   }, o.extra || {});
 }
 function respostaDe(plano, extra) {
@@ -88,7 +88,11 @@ secao('1. O esquema serve à saída estruturada');
   })(P.ESQUEMA, 'ESQUEMA');
   conf('todo objeto tem additionalProperties:false e required com todas as propriedades, sem restrição que a API não aceita', ruins, []);
   conf('os campos do plano são os do brief (mais tratamento e deManha)', Object.keys(P.ESQUEMA.properties).sort(),
-    ['alunoId', 'aulaAConfirmar', 'confiancaAluno', 'feriados', 'grade', 'observacoes', 'periodo', 'provas', 'tratamento']);
+    ['alunoId', 'aulaAConfirmar', 'aulasExtras', 'aulasRemovidas', 'confiancaAluno', 'feriados', 'grade', 'observacoes', 'periodo', 'provas', 'tratamento']);
+  conf('aulasRemovidas e aulasExtras são exigidas na saída (podem vir vazias), e a extra é { data, hora }', [
+    P.ESQUEMA.required.indexOf('aulasRemovidas') >= 0, P.ESQUEMA.required.indexOf('aulasExtras') >= 0,
+    P.ESQUEMA.properties.aulasExtras.items.required.slice().sort(), P.ESQUEMA.properties.aulasExtras.items.additionalProperties],
+    [true, true, ['data', 'hora'], false]);
 })();
 
 // ================================================================
@@ -310,6 +314,137 @@ secao('8. O fuso de São Paulo e as horas');
   conf('horas coladas', ['15:30', '11:00', '09:05', ''].map(P.horaCurta), ['15h30', '11h', '9h05', '']);
   conf('"Prova de" sem duplicar quando o modelo já escreveu "Prova de"', [P.rotuloDaProva('Prova de História'), P.rotuloDaProva('Cambridge Movers'), P.rotuloDaProva('Math')],
     ['Prova de História', 'Prova Cambridge Movers', 'Prova de Math']);
+})();
+
+// ================================================================
+secao('9. Aulas tiradas e postas na folha (aulasRemovidas, aulasExtras), dos dois lados');
+(function () {
+  // a agenda sintética do período 09/11 a 20/11: 10/11 11h, 12/11 15h30, 18/11 10h
+  const AG = [{ data: '2026-11-10', hora: '11:00' }, { data: '2026-11-12', hora: '15:30' }, { data: '2026-11-18', hora: '10:00' }];
+  const nAulas = (plano) => contar(textoDoPdf(P.desenharFolha(plano, { nome: 'Ana', aulas: AG }, G).bytes), 'Aula com a Nath');
+
+  // remover
+  const sem18 = planoBase({ extra: { aulasRemovidas: ['2026-11-18'] } });
+  conf('controle: sem exceção, as 3 aulas da agenda estão na lista e na folha', [Object.keys(P.aulasNaFolha(planoBase(), AG).aulas), nAulas(planoBase())],
+    [['2026-11-10', '2026-11-12', '2026-11-18'], 3]);
+  conf('aulasRemovidas 18/11: sai da LISTA da folha', Object.keys(P.aulasNaFolha(sem18, AG).aulas), ['2026-11-10', '2026-11-12']);
+  conf('aulasRemovidas 18/11: sai da FOLHA (2 de 3), e o "às 10h" some com ela', [nAulas(sem18),
+    textoDoPdf(P.desenharFolha(sem18, { nome: 'Ana', aulas: AG }, G).bytes).indexOf('às 10h') >= 0], [2, false]);
+  conf('a agenda que chega não é mexida (a exceção é só da folha)', AG.length === 3 && AG[2].data === '2026-11-18', true);
+
+  // acrescentar
+  const com21 = planoBase({ inicio: '2026-11-09', fim: '2026-11-22', extra: { aulasExtras: [{ data: '2026-11-21', hora: '10:00' }, { data: '2026-11-13', hora: null }] } });
+  const t21 = textoDoPdf(P.desenharFolha(com21, { nome: 'Ana', aulas: AG }, G).bytes);
+  conf('aulasExtras: põe a aula na lista (com a hora, e sem hora)', P.aulasNaFolha(com21, AG).aulas, { '2026-11-10': '11:00', '2026-11-12': '15:30', '2026-11-18': '10:00', '2026-11-21': '10:00', '2026-11-13': '' });
+  conf('aulasExtras: "Aula com a Nath" na folha (3 da agenda + 2 extras), com "às 10h"', [contar(t21, 'Aula com a Nath'), contar(t21, 'às 10h')], [5, 2]);
+  conf('controle: sem a extra, a folha fica com as 3 da agenda', nAulas(planoBase({ inicio: '2026-11-09', fim: '2026-11-22' })), 3);
+  const troca = planoBase({ extra: { aulasRemovidas: ['2026-11-18'], aulasExtras: [{ data: '2026-11-18', hora: '16:00' }] } });
+  conf('troca de horário (tirou a da agenda e pôs outra no mesmo dia): uma aula só, na hora nova', [nAulas(troca), P.aulasNaFolha(troca, AG).aulas['2026-11-18']], [3, '16:00']);
+  const extraEConfirmar = planoBase({ extra: { aulaAConfirmar: ['2026-11-13'], aulasExtras: [{ data: '2026-11-13', hora: null }] } });
+  conf('extra e "Aula com a Nath?" no mesmo dia, sem arrumar: a folha mostra a aula, sem o "?"', P.aulasNaFolha(extraEConfirmar, AG).aConfirmar, {});
+
+  // o plano salvo ANTES desta mudança: sem os dois campos, como está em ajustes['planejamento:<id>']
+  const antigo = planoBase(); delete antigo.aulasRemovidas; delete antigo.aulasExtras;
+  const registro = { id: 'planejamento:pl-sint-1', alunoId: 'al-sint-1', plano: antigo, criadoEm: '2026-11-12T10:00:00.000Z', atualizadoEm: '2026-11-12T10:00:00.000Z' };
+  const copia = JSON.parse(JSON.stringify(registro.plano)); // o que o abrirPlanejamento faz
+  conf('plano antigo: o formato do registro gravado não tem os campos (o veneno é real)', ['aulasRemovidas' in copia, 'aulasExtras' in copia], [false, false]);
+  conf('plano antigo: passa na conferência (abre na ficha)', P.conferirPlano(copia, ['al-sint-1']), null);
+  const fa = P.desenharFolha(copia, { nome: 'Ana', aulas: AG }, G);
+  conf('plano antigo: desenha, com as 3 aulas da agenda', [!!fa.bytes, fa.erro, contar(textoDoPdf(fa.bytes), 'Aula com a Nath')], [true, undefined, 3]);
+  const ajAntigo = P.pedidoDeAjusteDoSalvo(copia, 'tira a aula do dia 18', { alunos: ALUNOS, hoje: '2026-11-12',
+    aulasDaAgenda: { de: '2026-11-09', ate: '2026-12-20', aulas: AG } });
+  const txAntigo = ajAntigo.messages[0].content[0].text;
+  conf('plano antigo: o ajuste monta o pedido, com as listas vazias no plano e as aulas da agenda', [txAntigo.indexOf('"aulasRemovidas":[]') >= 0, txAntigo.indexOf('"aulasExtras":[]') >= 0,
+    txAntigo.indexOf('- 2026-11-18 (quarta, 18/11) às 10h') >= 0, txAntigo.indexOf('Ajuste pedido pela professora: tira a aula do dia 18') >= 0], [true, true, true, true]);
+  conf('plano antigo: o pedido não mexeu no plano guardado', 'aulasRemovidas' in copia, false);
+  const novoDoAntigo = planoBase({ extra: { aulasRemovidas: ['2026-11-18'] } });
+  const lidoDoAntigo = P.lerResposta(respostaDe(novoDoAntigo), IDS, copia);
+  conf('plano antigo: a resposta do ajuste é lida, e o resumo diz a aula que saiu', [!!lidoDoAntigo.plano, P.resumoDaMudanca(copia, lidoDoAntigo.plano)],
+    [true, 'Mudou: saiu a aula com a Nath do dia 18/11.']);
+  conf('plano antigo e o mesmo plano com as listas vazias: "O plano ficou igual."', P.resumoDaMudanca(copia, planoBase()), 'O plano ficou igual.');
+  const lidoAntigo = P.lerResposta(respostaDe(copia), IDS);
+  conf('a resposta sem os campos (modelo antigo) é lida, e ganha as duas listas vazias', [!!lidoAntigo.plano, lidoAntigo.plano && lidoAntigo.plano.aulasRemovidas, lidoAntigo.plano && lidoAntigo.plano.aulasExtras], [true, [], []]);
+
+  // data inválida e fora do período: ignoradas (o plano vale); formato errado: recusado
+  const ruins = planoBase({ extra: { aulasRemovidas: ['2026-02-30', '2026-12-01', 'amanhã', '2026-11-18', '2026-11-18'],
+    aulasExtras: [{ data: '2026-11-31', hora: '10:00' }, { data: '2026-11-30', hora: '10:00' }, { data: '2026-11-19', hora: '10h' }, { data: '2026-11-16', hora: 'de manhã' }] } });
+  const lr = P.lerResposta(respostaDe(ruins), IDS);
+  conf('datas inválidas (30/02, 31/11, "amanhã") e fora do período: o plano é lido', !!lr.plano, true);
+  conf('e elas saem das listas; a repetida fica uma vez; "10h" vira "10:00"; hora que não se lê vira null', [lr.plano.aulasRemovidas, lr.plano.aulasExtras],
+    [['2026-11-18'], [{ data: '2026-11-16', hora: null }, { data: '2026-11-19', hora: '10:00' }]]);
+  const foraNaFolha = planoBase({ extra: { aulasExtras: [{ data: '2026-11-30', hora: '10:00' }, { data: '2026-02-30', hora: null }] } });
+  conf('na folha, sem arrumar: a extra fora do período ou com data que não existe não entra (3, as da agenda)', nAulas(foraNaFolha), 3);
+  conf('controle: a mesma extra DENTRO do período entra (4)', nAulas(planoBase({ extra: { aulasExtras: [{ data: '2026-11-19', hora: '10:00' }] } })), 4);
+  conf('aulasRemovidas que não é lista: recusa', P.lerResposta(respostaDe(planoBase({ extra: { aulasRemovidas: '2026-11-18' } })), IDS).erro, 'plano_invalido');
+  conf('aulasRemovidas com item que não é texto: recusa', P.lerResposta(respostaDe(planoBase({ extra: { aulasRemovidas: [18] } })), IDS).erro, 'plano_invalido');
+  conf('aulasExtras com hora que não é texto: recusa', P.lerResposta(respostaDe(planoBase({ extra: { aulasExtras: [{ data: '2026-11-19', hora: 10 }] } })), IDS).erro, 'plano_invalido');
+  conf('aulasExtras com item que não é objeto: recusa', P.lerResposta(respostaDe(planoBase({ extra: { aulasExtras: ['2026-11-19'] } })), IDS).erro, 'plano_invalido');
+  conf('controle: aulasExtras boa, com hora null: aceita', !!P.lerResposta(respostaDe(planoBase({ extra: { aulasExtras: [{ data: '2026-11-19', hora: null }] } })), IDS).plano, true);
+  conf('as horas', ['10:00', '9:05', '10h', '10h30', '24:00', '10:60', '', null, 'manhã'].map(P.horaValida), ['10:00', '09:05', '10:00', '10:30', null, null, null, null, null]);
+
+  // a coerência com aulaAConfirmar: vale o pedido mais recente
+  const comConfirmar = planoBase({ extra: { aulaAConfirmar: ['2026-11-18'] } });
+  const pediuTirar = planoBase({ extra: { aulaAConfirmar: ['2026-11-18'], aulasRemovidas: ['2026-11-18'] } });
+  const n1 = P.normalizarAulas(pediuTirar, comConfirmar);
+  conf('antes "Aula com a Nath?" no 18, agora pediu tirar (as duas vieram): vale a remoção', [n1.aulasRemovidas, n1.aulaAConfirmar], [['2026-11-18'], []]);
+  const tirada = planoBase({ extra: { aulasRemovidas: ['2026-11-18'] } });
+  const n2 = P.normalizarAulas(pediuTirar, tirada);
+  conf('antes tirada no 18, agora pediu "Aula com a Nath?" (as duas vieram): vale o "?"', [n2.aulasRemovidas, n2.aulaAConfirmar], [[], ['2026-11-18']]);
+  const n3 = P.normalizarAulas(pediuTirar, null);
+  conf('sem plano de antes (as duas novas): vence a remoção, e nunca ficam as duas', [n3.aulasRemovidas, n3.aulaAConfirmar], [['2026-11-18'], []]);
+  conf('pela leitura da resposta, com o plano de antes: o mesmo', P.lerResposta(respostaDe(pediuTirar), IDS, tirada).plano.aulaAConfirmar, ['2026-11-18']);
+  const extraVelha = planoBase({ extra: { aulasExtras: [{ data: '2026-11-19', hora: '10:00' }] } });
+  const tirouExtra = planoBase({ extra: { aulasExtras: [{ data: '2026-11-19', hora: '10:00' }], aulasRemovidas: ['2026-11-19'] } });
+  conf('a extra era a velha e agora veio a remoção do mesmo dia: a extra sai (e a folha tira a aula)', [P.normalizarAulas(tirouExtra, extraVelha).aulasExtras, nAulas(P.normalizarAulas(tirouExtra, extraVelha))], [[], 3]);
+  conf('controle: remoção e extra novas no mesmo dia (troca de horário): ficam as duas', P.normalizarAulas(troca, planoBase()).aulasExtras, [{ data: '2026-11-18', hora: '16:00' }]);
+  conf('normalizar não muda o plano recebido', [pediuTirar.aulaAConfirmar, pediuTirar.aulasRemovidas], [['2026-11-18'], ['2026-11-18']]);
+
+  // o resumo da mudança
+  conf('resumo: saiu a aula', P.resumoDaMudanca(planoBase(), sem18), 'Mudou: saiu a aula com a Nath do dia 18/11.');
+  conf('resumo: entrou a aula, com a hora', P.resumoDaMudanca(planoBase(), planoBase({ extra: { aulasExtras: [{ data: '2026-11-19', hora: '10:00' }] } })),
+    'Mudou: entrou a aula com a Nath no dia 19/11 às 10h.');
+  conf('resumo: voltou a aula tirada', P.resumoDaMudanca(sem18, planoBase()), 'Mudou: voltou a aula com a Nath do dia 18/11.');
+  conf('resumo: a extra mudou de hora', P.resumoDaMudanca(extraVelha, planoBase({ extra: { aulasExtras: [{ data: '2026-11-19', hora: '11:30' }] } })),
+    'Mudou: a aula com a Nath do dia 19/11 agora é às 11h30.');
+  conf('resumo: aula e matéria juntas, em ordem de dia', P.resumoDaMudanca(planoBase(), (() => { const x = planoBase({ extra: { aulasRemovidas: ['2026-11-18'] } }); x.grade[2].estudo = ['Matemática', 'Geografia']; return x; })()),
+    'Mudou: entrou Geografia no dia 11/11 e saiu a aula com a Nath do dia 18/11.');
+  conf('resumo: a extra que sai pela remoção é dita uma vez só', P.resumoDaMudanca(extraVelha, P.normalizarAulas(tirouExtra, extraVelha)), 'Mudou: saiu a aula com a Nath do dia 19/11.');
+})();
+
+// ================================================================
+secao('10. O pedido: as aulas da agenda e a revisão');
+(function () {
+  const AG = [{ data: '2026-11-18', hora: '10:00' }, { data: '2026-11-12', hora: '15:30' }, { data: '2026-11-12', hora: '15:30' }, { data: '2027-01-30', hora: '10:00' }];
+  const agenda = { de: '2026-11-12', ate: '2026-12-23', aulas: AG };
+  const fixo = P.montarPedido({ texto: 'x', imagens: [], alunos: ALUNOS, alunoFixoId: 'al-sint-1', hoje: '2026-11-12', aulasDaAgenda: agenda });
+  const tf = fixo.messages[0].content[0].text;
+  conf('com o aluno fixo, as aulas da agenda vão no turno do usuário, em ordem, sem repetir e só as da janela', [
+    tf.indexOf('Aulas com a Nath na agenda, de 12/11 a 23/12'), tf.indexOf('- 2026-11-12 (quinta, 12/11) às 15h30') < tf.indexOf('- 2026-11-18 (quarta, 18/11) às 10h'),
+    tf.split('2026-11-12 (quinta').length - 1, tf.indexOf('2027-01-30') >= 0].map((v, i) => i === 0 ? v >= 0 : v), [true, true, 1, false]);
+  const livre = P.montarPedido({ texto: 'x', imagens: [], alunos: ALUNOS, alunoFixoId: null, hoje: '2026-11-12', aulasDaAgenda: agenda });
+  conf('sem aluno fixo (atalho), as aulas não vão (a agenda dos outros não sai do aparelho)', livre.messages[0].content[0].text.indexOf('Aulas com a Nath na agenda') >= 0, false);
+  const vazia = P.montarPedido({ texto: 'x', imagens: [], alunos: ALUNOS, alunoFixoId: 'al-sint-1', hoje: '2026-11-12', aulasDaAgenda: { de: '2026-11-12', ate: '2026-12-23', aulas: [] } });
+  conf('agenda vazia: diz que não há aula', vazia.messages[0].content[0].text.indexOf('(nenhuma aula na agenda nesses dias)') >= 0, true);
+  conf('o system continua igual com ou sem as aulas (o cache pega)', fixo.system === livre.system && fixo.system === P.SISTEMA, true);
+  conf('nada das aulas no system', ['18/11', '15h30', '2026-11-18'].filter(v => fixo.system.indexOf(v) >= 0), []);
+  const conteudo = respostaDe(planoBase()).resposta.content;
+  const aj = P.pedidoDeAjuste({ pedido: fixo, conteudo }, 'tira a aula com a Nath do dia 18', agenda);
+  const ta = aj.messages[aj.messages.length - 1].content[0].text;
+  conf('no ajuste, as aulas vão no turno novo, antes do pedido dela', [ta.indexOf('- 2026-11-18 (quarta, 18/11) às 10h') >= 0, ta.indexOf('Aulas com a Nath') < ta.indexOf('Ajuste pedido')], [true, true]);
+  conf('controle: sem a agenda, o turno do ajuste fica como era', P.pedidoDeAjuste({ pedido: fixo, conteudo }, 'x').messages[2].content[0].text.indexOf('Aulas com a Nath') >= 0, false);
+  conf('o system ensina as listas de aula e a revisão', ['"aulasRemovidas"', '"aulasExtras"', 'não a agenda', 'Revisão de Matemática (30min)', 'segunda 2h, terça 1h30'].map(v => P.SISTEMA.indexOf(v) >= 0),
+    [true, true, true, true, true]);
+  conf('o system não manda mais dizer que a aula se tira na agenda', /se tira na agenda/.test(P.SISTEMA), false);
+  conf('o system sem travessão', TRAVESSAO.test(P.SISTEMA), false);
+  // a revisão conta como estudo da matéria (a conferência do app não acusa falta de estudo)
+  const g = (data, estudo) => ({ data, prova: null, estudo, deManha: false });
+  const so = l => l.filter(i => i.tipo === 'estudo').map(i => i.texto);
+  conf('"Revisão de História (30min)" antes da prova conta como estudo de História', so(P.conferenciasDoPlano({ grade: [g('2026-11-11', ['Revisão de História (30min)'])],
+    provas: [{ data: '2026-11-12', disciplina: 'História', conteudo: 'x', material: null, incerto: false }] })), []);
+  conf('controle: "Revisão de Geografia" não conta como História', so(P.conferenciasDoPlano({ grade: [g('2026-11-11', ['Revisão de Geografia (30min)'])],
+    provas: [{ data: '2026-11-12', disciplina: 'História', conteudo: 'x', material: null, incerto: false }] })).length, 1);
+  const rev = planoBase(); rev.grade.find(x => x.data === '2026-11-14').estudo = ['Revisão de História (30min)', 'Math (30min)'];
+  conf('"Revisão de História (30min)" sai na folha como está (quebrada em duas linhas na coluna)', textoDoPdf(P.desenharFolha(rev, { nome: 'Ana' }, G).bytes).join(' ').replace(/\s+/g, ' ').indexOf('Revisão de História (30min)') >= 0, true);
 })();
 
 console.log('\n' + passes + ' verificacoes passaram, ' + falhas + ' falharam');

@@ -10,8 +10,10 @@
  * e mostra a prévia é o app.js.
  *
  * As regras de conteúdo que moram aqui:
- *   - as aulas com a Nath vêm da agenda do app, nunca do modelo; o modelo só
- *     marca "Aula com a Nath?" (aulaAConfirmar) quando ela pede;
+ *   - as aulas com a Nath vêm da agenda do app, nunca inventadas pelo modelo;
+ *     o modelo só marca "Aula com a Nath?" (aulaAConfirmar) e as exceções da
+ *     folha (aulasRemovidas, aulasExtras) quando ela pede, e nenhuma delas
+ *     mexe na agenda;
  *   - conteúdo de prova nunca é inventado: sem conteúdo no aviso, null, e a
  *     folha imprime "Conteúdo ainda não enviado pela escola.";
  *   - o que o modelo não leu com certeza vem com incerto: true e aparece no
@@ -46,7 +48,7 @@
   var ESQUEMA = {
     type: 'object',
     additionalProperties: false,
-    required: ['alunoId', 'confiancaAluno', 'tratamento', 'periodo', 'grade', 'provas', 'aulaAConfirmar', 'feriados', 'observacoes'],
+    required: ['alunoId', 'confiancaAluno', 'tratamento', 'periodo', 'grade', 'provas', 'aulaAConfirmar', 'aulasRemovidas', 'aulasExtras', 'feriados', 'observacoes'],
     properties: {
       alunoId: textoOuNulo('O id do aluno, copiado da lista de alunos. null se não der para saber.'),
       confiancaAluno: { type: 'string', enum: ['alta', 'baixa'] },
@@ -82,6 +84,15 @@
         }
       },
       aulaAConfirmar: { type: 'array', items: DATA, description: 'Datas em que ela pediu "Aula com a Nath?". Vazio se ela não pediu.' },
+      aulasRemovidas: { type: 'array', items: DATA, description: 'Datas em que ela pediu para tirar da folha a aula com a Nath que está na agenda. Só muda a folha. Vazio se ela não pediu.' },
+      aulasExtras: {
+        type: 'array',
+        description: 'Aulas com a Nath que ela pediu para pôr na folha, fora da agenda. Só muda a folha. Vazio se ela não pediu.',
+        items: {
+          type: 'object', additionalProperties: false, required: ['data', 'hora'],
+          properties: { data: DATA, hora: textoOuNulo('A hora no formato HH:MM (24 horas), ou null se ela não disse.') }
+        }
+      },
       feriados: { type: 'array', items: DATA },
       observacoes: { type: 'array', items: { type: 'string' }, description: 'Dúvidas curtas para ela conferir. Vazio se não há.' }
     }
@@ -102,7 +113,13 @@
     '2. Prova que aparece só no pedido ou num rascunho da professora, sem aviso da escola, entra em "provas" com conteudo null.',
     '3. Transcreva o conteúdo e o material como estão no aviso, com as abreviações de sempre: "Cap. 7 (Egito Antigo); cap. 8 (...)". Lista longa de vídeos pode ser resumida, terminando em "(lista no aviso)".',
     '4. Marque "incerto": true na prova cuja data, disciplina ou conteúdo você não leu com certeza (print cortado, borrado, dois avisos que se contradizem). Explique a dúvida em uma frase curta em "observacoes".',
-    '5. Nunca ponha aula com a professora na grade: as aulas vêm da agenda do aplicativo. Só use "aulaAConfirmar" quando ela pedir "Aula com a Nath?" numa data.',
+    '5. Nunca ponha aula com a professora no "estudo" da grade: as aulas com a Nath vêm da agenda do aplicativo, e são a base da folha. Quando a mensagem traz as aulas da agenda, elas estão lá só para você saber quais existem.',
+    '   - Quando ela pedir para tirar, esconder ou cancelar a aula com a Nath de um dia, ponha a data em "aulasRemovidas".',
+    '   - Quando ela pedir para pôr ou acrescentar uma aula com a Nath num dia, ponha em "aulasExtras" a data e a hora ("HH:MM", ou null se ela não disse).',
+    '   - Isso muda só a folha, não a agenda. Não precisa avisar em "observacoes".',
+    '   - Só use "aulaAConfirmar" quando ela pedir "Aula com a Nath?" numa data.',
+    '   - Uma data não fica em "aulasRemovidas" e em "aulaAConfirmar" ao mesmo tempo, nem em "aulasRemovidas" e "aulasExtras" ao mesmo tempo, a não ser que ela troque o horário da aula daquele dia: vale o pedido mais recente.',
+    '   - Nos ajustes, mantenha as listas como estavam, mudando só o que ela pediu. Se ela pedir para voltar a aula que tinha tirado, tire a data de "aulasRemovidas".',
     '6. Escreva em português do Brasil, com acentos. Nunca use travessão (nem o traço longo nem o médio): use dois-pontos, vírgula ou ponto.',
     '7. Hora e minuto colados ao número: "2h", "30min", "1h30". Nunca "2 h" nem "30 min".',
     '8. Nomes de disciplina como a escola escreve. Science, ELA, Math e Writing ficam em inglês.',
@@ -122,10 +139,12 @@
     '- "estudo" é a lista do que estudar naquele dia, uma matéria por item ("Português", "História (2h)", "Math (30min)"). Pode ser vazia.',
     '- Se ela mandou um rascunho do próprio aluno, transcreva as escolhas dela, dia a dia, com as durações que ela escreveu.',
     '- Sem rascunho, siga a regra do pedido (por exemplo, uma disciplina por dia, cerca de 1h, revisão na manhã da prova). Sem regra, distribua as matérias nos dias antes de cada prova, a mais próxima primeiro, no máximo duas por dia.',
+    '- Siga à risca as regras de tempo e de quantidade de matérias por dia que ela der, dia a dia, com a duração em cada item. Exemplo de regra: segunda 2h, terça 1h30, nos outros dias 2 matérias de 30min, e em dia de prova uma das matérias é a revisão da prova.',
+    '- Quando o pedido falar em REVISÃO ("uma das matérias é a revisão da prova", "revisa antes da prova"), o item diz que é revisão e de quê: "Revisão de Matemática (30min)", nunca só "Matemática".',
     '- "deManha" é true no dia de prova em que o estudo é a revisão da manhã daquela prova; nos outros dias, false.',
     '- "feriados": as datas de feriado ou de dia sem aula na escola que o aviso ou o pedido citam. Vazio se não há.',
     '',
-    'Ajustes: depois do primeiro plano, ela pode pedir mudanças ("põe Geografia no dia 21", "tira a aula do dia 20"). Devolva o plano INTEIRO de novo, mudando só o que ela pediu. "Tira a aula" de um dia que vem da agenda não é com você: diga em "observacoes" que a aula da agenda se tira na agenda.',
+    'Ajustes: depois do primeiro plano, ela pode pedir mudanças ("põe Geografia no dia 21", "tira a aula com a Nath do dia 20", "põe aula com a Nath no dia 21 às 10h"). Devolva o plano INTEIRO de novo, mudando só o que ela pediu. Tirar ou pôr aula com a Nath é com "aulasRemovidas" e "aulasExtras" (regra 5).',
     'Observações: frases curtas, só o que ela precisa conferir. Nada de explicar o que você fez.'
   ].join('\n');
 
@@ -177,13 +196,44 @@
 
   function primeiroNome(nome) { return String(nome || '').trim().split(/\s+/)[0] || ''; }
 
+  /* As aulas da agenda, para o modelo saber quais existem (e poder tirar uma
+   * da folha). `agenda` é { de, ate, aulas: [{ data, hora }] }, já do aluno
+   * do plano. Uma linha por aula, em ordem, sem repetir; null sem agenda. */
+  function blocoDasAulas(agenda) {
+    if (!agenda || !dataValida(agenda.de) || !dataValida(agenda.ate)) return null;
+    var vistas = {}, linhas = [];
+    (agenda.aulas || []).filter(function (a) { return a && dataValida(a.data) && a.data >= agenda.de && a.data <= agenda.ate; })
+      .map(function (a) { return { data: a.data, hora: horaValida(a.hora) || '' }; })
+      .sort(function (x, y) { return (x.data + x.hora) < (y.data + y.hora) ? -1 : (x.data + x.hora) > (y.data + y.hora) ? 1 : 0; })
+      .forEach(function (a) {
+        var k = a.data + '@' + a.hora;
+        if (vistas[k]) return;
+        vistas[k] = true;
+        linhas.push('- ' + a.data + ' (' + DIAS_LONGO[diaDaSemana(a.data)].replace('-feira', '') + ', ' + ddmm(a.data) + ')' + (a.hora ? ' às ' + horaCurta(a.hora) : ''));
+      });
+    return 'Aulas com a Nath na agenda, de ' + ddmm(agenda.de) + ' a ' + ddmm(agenda.ate) + ' (o aplicativo põe na folha; não vão no "estudo"):\n' +
+      (linhas.length ? linhas.join('\n') : '(nenhuma aula na agenda nesses dias)');
+  }
+
+  /* "HH:MM" de verdade, ou null. Aceita "10h", "10h30" e "9:05", que o
+   * modelo às vezes escreve, e devolve sempre "10:00", "10:30", "09:05". */
+  function horaValida(hora) {
+    var m = /^\s*(\d{1,2})\s*(?::|h)\s*(\d{2})?\s*$/i.exec(String(hora == null ? '' : hora));
+    if (!m) return null;
+    var h = Number(m[1]), mi = m[2] === undefined ? 0 : Number(m[2]);
+    if (h > 23 || mi > 59) return null;
+    return pad2(h) + ':' + pad2(mi);
+  }
+
   /* O corpo do POST /api/ia.
    *   texto        o que ela escreveu ou ditou
    *   imagens      [{ media_type, data }] já reduzidas e em base64 (até 8)
    *   alunos       [{ id, nome, horarios: [{ dias: [0..6], hora: 'HH:MM' }] }]
    *                (só o primeiro nome sai daqui: nunca sobrenome, escola ou série)
    *   alunoFixoId  o aluno da ficha de onde ela veio, ou null (atalho do +)
-   *   hoje         AAAA-MM-DD no fuso de São Paulo */
+   *   hoje         AAAA-MM-DD no fuso de São Paulo
+   *   aulasDaAgenda { de, ate, aulas: [{ data, hora }] } do aluno fixo, ou
+   *                nada (só vai com o aluno fixo; ver blocoDasAulas) */
   function montarPedido(o) {
     o = o || {};
     var hoje = o.hoje;
@@ -206,6 +256,10 @@
     ];
     if (o.alunoFixoId) {
       partes.push('', 'O aluno já está escolhido: id ' + o.alunoFixoId + '. Use esse id.');
+      /* As aulas da agenda só com o aluno escolhido: sem ele, seriam as de
+       * todos os alunos, e a agenda dos outros não sai do aparelho. */
+      var bloco = blocoDasAulas(o.aulasDaAgenda);
+      if (bloco) partes.push('', bloco);
     }
     if (imagens.length) partes.push('', 'Junto vão ' + imagens.length + (imagens.length === 1 ? ' print' : ' prints') + ' do aviso da escola.');
     partes.push('', 'Pedido da professora:', String(o.texto || '').trim() || '(sem texto; só os prints)');
@@ -228,20 +282,27 @@
    * pedido de ajuste. `conversa` é { pedido, conteudo }: o corpo enviado e o
    * content que voltou. Nada do que já foi é copiado ou reescrito: os objetos
    * vão por referência. */
-  function pedidoDeAjuste(conversa, texto) {
+  /* `aulasDaAgenda` (opcional): as aulas da agenda no período do plano, que
+   * vão no turno novo, para o modelo saber o que pode tirar da folha. */
+  function pedidoDeAjuste(conversa, texto, aulasDaAgenda) {
     if (!conversa || !conversa.pedido || !Array.isArray(conversa.conteudo)) throw new Error('conversa inválida');
     var p = conversa.pedido;
     var mensagens = p.messages.slice();
     mensagens.push({ role: 'assistant', content: conversa.conteudo });
-    mensagens.push({ role: 'user', content: [{ type: 'text', text:
+    var bloco = blocoDasAulas(aulasDaAgenda);
+    mensagens.push({ role: 'user', content: [{ type: 'text', text: (bloco ? bloco + '\n\n' : '') +
       'Ajuste pedido pela professora: ' + String(texto || '').trim() + '\nDevolva o plano inteiro, mudando só o que ela pediu.' }] });
     return { rota: p.rota, system: p.system, formato: p.formato, esforco: p.esforco, max_tokens: p.max_tokens, messages: mensagens };
   }
 
   /* Ajustar um plano SALVO, quando a conversa de antes já não existe: o plano
-   * vai como texto, e o modelo devolve o plano inteiro. */
+   * vai como texto, e o modelo devolve o plano inteiro. Um plano salvo antes
+   * de aulasRemovidas e aulasExtras vai com as duas listas vazias, para o
+   * modelo ver o formato de agora. */
   function pedidoDeAjusteDoSalvo(plano, texto, contexto) {
-    var base = montarPedido({ texto: '', imagens: [], alunos: contexto.alunos, alunoFixoId: plano.alunoId, hoje: contexto.hoje });
+    plano = comListasDeAulas(plano);
+    var base = montarPedido({ texto: '', imagens: [], alunos: contexto.alunos, alunoFixoId: plano.alunoId, hoje: contexto.hoje,
+      aulasDaAgenda: contexto.aulasDaAgenda });
     var t = base.messages[0].content[0].text.replace(/\nPedido da professora:[\s\S]*$/, '');
     base.messages[0].content = [{ type: 'text', text: t + '\nEste é o plano atual, já conferido por ela:\n' + JSON.stringify(plano) +
       '\n\nAjuste pedido pela professora: ' + String(texto || '').trim() + '\nDevolva o plano inteiro, mudando só o que ela pediu.' }];
@@ -289,13 +350,119 @@
       if (!Array.isArray(l)) return listas[j] + ' ausente';
       for (var n = 0; n < l.length; n++) if (!dentro(l[n])) return listas[j] + ' com data fora do período (' + l[n] + ')';
     }
+    /* aulasRemovidas e aulasExtras: o plano salvo antes delas não as tem, e
+     * vale (ausente é lista vazia). Presentes, o formato é conferido; a data
+     * inválida ou fora do período não derruba o plano (um ajuste que encurta
+     * o período deixa a aula tirada do lado de fora): é ignorada pela folha e
+     * sai na arrumação (normalizarAulas). */
+    if (plano.aulasRemovidas !== undefined) {
+      if (!Array.isArray(plano.aulasRemovidas)) return 'aulasRemovidas inválidas';
+      if (plano.aulasRemovidas.some(function (d) { return typeof d !== 'string'; })) return 'aulasRemovidas inválidas';
+    }
+    if (plano.aulasExtras !== undefined) {
+      if (!Array.isArray(plano.aulasExtras)) return 'aulasExtras inválidas';
+      if (plano.aulasExtras.some(function (a) {
+        return !a || typeof a !== 'object' || typeof a.data !== 'string' || (a.hora !== null && a.hora !== undefined && typeof a.hora !== 'string');
+      })) return 'aulasExtras inválidas';
+    }
     if (!Array.isArray(plano.observacoes) || plano.observacoes.some(function (s) { return typeof s !== 'string'; })) return 'observações inválidas';
     return null;
   }
 
+  /* O plano com as duas listas de aula sempre presentes (o plano salvo antes
+   * delas ganha as duas vazias). Não muda o objeto recebido. */
+  function comListasDeAulas(plano) {
+    if (!plano || typeof plano !== 'object') return plano;
+    var c = {};
+    Object.keys(plano).forEach(function (k) { c[k] = plano[k]; });
+    if (!Array.isArray(c.aulasRemovidas)) c.aulasRemovidas = [];
+    if (!Array.isArray(c.aulasExtras)) c.aulasExtras = [];
+    return c;
+  }
+
+  /* As listas de aula de um plano já conferido, arrumadas:
+   *   - data inválida ou fora do período sai; data repetida fica uma vez (na
+   *     aulasExtras, vale a última); a hora vira "HH:MM" ou null;
+   *   - a COERÊNCIA com aulaAConfirmar: uma data não fica em aulasRemovidas e
+   *     em aulaAConfirmar ao mesmo tempo, e vale o pedido mais recente, que se
+   *     sabe pelo plano `anterior` (o de antes do ajuste): a lista onde a data
+   *     é NOVA vence. Sem como saber (primeiro plano, ou nova nas duas), vence
+   *     a remoção, que é a escolha explícita.
+   *   - o mesmo entre aulasExtras e aulaAConfirmar (a aula marcada vence o
+   *     "Aula com a Nath?", a não ser que o "?" seja o novo) e entre
+   *     aulasRemovidas e aulasExtras (só quando a extra é a velha e a remoção
+   *     é a nova a extra sai; senão ficam as duas, que é a troca de horário:
+   *     a folha mostra a extra).
+   * Devolve um plano novo; o recebido não muda. */
+  function normalizarAulas(plano, anterior) {
+    var c = comListasDeAulas(plano);
+    var per = c.periodo || {};
+    var dentro = function (d) { return dataValida(d) && d >= per.inicio && d <= per.fim; };
+    var rem = [];
+    c.aulasRemovidas.forEach(function (d) { if (dentro(d) && rem.indexOf(d) < 0) rem.push(d); });
+    var ext = {};
+    c.aulasExtras.forEach(function (a) { if (a && dentro(a.data)) ext[a.data] = horaValida(a.hora); });
+    var conf = Array.isArray(c.aulaAConfirmar) ? c.aulaAConfirmar.slice() : [];
+    var ant = anterior ? comListasDeAulas(anterior) : null;
+    var antes = function (lista, d) {
+      if (!ant) return false;
+      if (lista === 'rem') return (ant.aulasRemovidas || []).indexOf(d) >= 0;
+      if (lista === 'ext') return (ant.aulasExtras || []).some(function (a) { return a && a.data === d; });
+      return (ant.aulaAConfirmar || []).indexOf(d) >= 0;
+    };
+    var tira = function (d, lista) {
+      if (lista === 'rem') rem = rem.filter(function (x) { return x !== d; });
+      else if (lista === 'ext') delete ext[d];
+      else conf = conf.filter(function (x) { return x !== d; });
+    };
+    /* a e b na mesma data: sai a que já estava antes, se só ela estava;
+     * senão sai `perde` (o desempate). */
+    var resolver = function (d, a, b, perde) {
+      var va = antes(a, d), vb = antes(b, d);
+      if (va && !vb) tira(d, a);
+      else if (vb && !va) tira(d, b);
+      else tira(d, perde);
+    };
+    rem.slice().forEach(function (d) { if (conf.indexOf(d) >= 0) resolver(d, 'rem', 'conf', 'conf'); });
+    Object.keys(ext).forEach(function (d) { if (conf.indexOf(d) >= 0) resolver(d, 'ext', 'conf', 'conf'); });
+    rem.slice().forEach(function (d) { if (d in ext && antes('ext', d) && !antes('rem', d)) delete ext[d]; });
+    c.aulasRemovidas = rem.sort();
+    c.aulasExtras = Object.keys(ext).sort().map(function (d) { return { data: d, hora: ext[d] }; });
+    c.aulaAConfirmar = conf;
+    return c;
+  }
+
+  /* As aulas que a folha mostra: (as da agenda no período, menos
+   * aulasRemovidas) mais aulasExtras, uma por dia (a primeira do dia; a extra
+   * vale mais que a da agenda no mesmo dia, porque é o pedido dela). E o
+   * "Aula com a Nath?" de aulaAConfirmar, só no dia sem aula.
+   * Devolve { aulas: { data: 'HH:MM' ou '' }, aConfirmar: { data: true } }. */
+  function aulasNaFolha(plano, aulasDaAgenda) {
+    var per = plano.periodo;
+    var noPeriodo = function (d) { return dataValida(d) && d >= per.inicio && d <= per.fim; };
+    var removidas = {};
+    (Array.isArray(plano.aulasRemovidas) ? plano.aulasRemovidas : []).forEach(function (d) { if (typeof d === 'string') removidas[d] = true; });
+    var aulas = {};
+    (aulasDaAgenda || []).forEach(function (a) {
+      if (!a || !noPeriodo(a.data) || removidas[a.data]) return;
+      var h = a.hora || '';
+      if (aulas[a.data] && aulas[a.data] <= h) return; // a primeira do dia (como antes das extras)
+      aulas[a.data] = h;
+    });
+    (Array.isArray(plano.aulasExtras) ? plano.aulasExtras : []).forEach(function (a) {
+      if (!a || !noPeriodo(a.data)) return;
+      aulas[a.data] = horaValida(a.hora) || '';
+    });
+    var aConfirmar = {};
+    (plano.aulaAConfirmar || []).forEach(function (d) { if (noPeriodo(d) && !(d in aulas)) aConfirmar[d] = true; });
+    return { aulas: aulas, aConfirmar: aConfirmar };
+  }
+
   /* resposta: o JSON do endpoint ({ ok, resposta: { content, usage, stop_reason } }
    * ou { ok: false, codigo }). Devolve { plano, conteudo, uso } ou { erro, motivo }. */
-  function lerResposta(resposta, idsDeAlunos) {
+  /* `anterior` (opcional): o plano de antes, num ajuste; decide o pedido mais
+   * recente quando uma data cai em duas listas de aula (normalizarAulas). */
+  function lerResposta(resposta, idsDeAlunos, anterior) {
     if (!resposta || typeof resposta !== 'object') return { erro: 'resposta_vazia' };
     if (resposta.ok !== true) return { erro: resposta.codigo || 'interno' };
     var r = resposta.resposta || {};
@@ -311,7 +478,7 @@
     try { plano = JSON.parse(texto); } catch (e) { return { erro: 'sem_plano', motivo: 'JSON inválido' }; }
     var problema = conferirPlano(plano, idsDeAlunos);
     if (problema) return { erro: 'plano_invalido', motivo: problema };
-    return { plano: plano, conteudo: blocos, uso: r.usage || null };
+    return { plano: normalizarAulas(plano, anterior || null), conteudo: blocos, uso: r.usage || null };
   }
 
   /* As frases curtas da tela para cada código do endpoint e daqui. */
@@ -370,7 +537,7 @@
     ['historia', 'history'], ['geografia', 'geography'], ['ingles', 'english']];
   function chaveDaMateria(s) {
     var n = String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-      .replace(/\(.*?\)/g, ' ').replace(/^prova\s+(de\s+|do\s+|da\s+)?/, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+      .replace(/\(.*?\)/g, ' ').replace(/^(prova|revisao)\s+(de\s+|do\s+|da\s+|para\s+a\s+prova\s+de\s+)?/, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
     for (var i = 0; i < SINONIMOS.length; i++) {
       for (var j = 0; j < SINONIMOS[i].length; j++) if (n === SINONIMOS[i][j] || n.indexOf(SINONIMOS[i][j]) === 0) return SINONIMOS[i][0];
     }
@@ -417,7 +584,25 @@
     dias.sort();
     var acoes = [];
     var nomes = function (lista) { return (lista || []).map(limpar).filter(Boolean); };
+    /* As aulas com a Nath que o ajuste mudou na folha (o plano salvo antes
+     * das listas conta como listas vazias). */
+    var tirou = function (pl) { var m = {}; (Array.isArray(pl.aulasRemovidas) ? pl.aulasRemovidas : []).forEach(function (x) { if (typeof x === 'string') m[x] = true; }); return m; };
+    var pos = function (pl) { var m = {}; (Array.isArray(pl.aulasExtras) ? pl.aulasExtras : []).forEach(function (x) { if (x && typeof x.data === 'string') m[x.data] = horaValida(x.hora) || ''; }); return m; };
+    var ra = tirou(antes), rd = tirou(depois), xa = pos(antes), xd = pos(depois);
+    [ra, rd, xa, xd].forEach(function (m) { Object.keys(m).forEach(function (k) { if (dias.indexOf(k) < 0) dias.push(k); }); });
+    dias.sort();
+    var acoesDeAula = function (k) {
+      var s = [];
+      var hora = function (h) { return h ? ' às ' + horaCurta(h) : ''; };
+      if (k in xd && !(k in xa)) s.push('entrou a aula com a Nath no dia ' + ddmm(k) + hora(xd[k]));
+      else if (k in xd && xa[k] !== xd[k]) s.push('a aula com a Nath do dia ' + ddmm(k) + ' agora é' + (xd[k] ? hora(xd[k]) : ' sem hora'));
+      else if (k in xa && !(k in xd)) s.push('saiu a aula com a Nath do dia ' + ddmm(k));
+      if (rd[k] && !ra[k] && !(k in xd)) s.push('saiu a aula com a Nath do dia ' + ddmm(k));
+      if (ra[k] && !rd[k]) s.push('voltou a aula com a Nath do dia ' + ddmm(k));
+      return s.filter(function (x, i) { return s.indexOf(x) === i; });
+    };
     dias.forEach(function (k) {
+      acoes = acoes.concat(acoesDeAula(k));
       var ga = a[k] || { estudo: [], prova: null }, gd = d[k] || { estudo: [], prova: null };
       var ea = nomes(ga.estudo), ed = nomes(gd.estudo);
       var entrou = ed.filter(function (e) { return ea.indexOf(e) < 0; });
@@ -510,8 +695,9 @@
 
   /* desenharFolha(plano, { nome, genero, aulas: [{ data, hora }], feriados: [data] }, PDFGen)
    * Devolve { bytes } (Uint8Array do PDF de uma página) ou { erro }. As aulas
-   * são da agenda do app; o `genero` ('a' ou 'o') só vale quando o plano não
-   * traz o tratamento. */
+   * são da agenda do app, com as exceções do plano (aulasRemovidas e
+   * aulasExtras, que mudam só a folha); o `genero` ('a' ou 'o') só vale
+   * quando o plano não traz o tratamento. */
   function desenharFolha(plano, opcoes, PDFGen) {
     opcoes = opcoes || {};
     if (!PDFGen || !PDFGen.Doc) return { erro: 'sem gerador de PDF' };
@@ -524,14 +710,9 @@
     var porData = {};
     plano.grade.forEach(function (g) { porData[g.data] = g; });
     var noPeriodo = function (d) { return d >= per.inicio && d <= per.fim; };
-    var aulas = {};
-    (opcoes.aulas || []).forEach(function (a) {
-      if (!a || !dataValida(a.data) || !noPeriodo(a.data)) return;
-      if (aulas[a.data] && aulas[a.data] <= (a.hora || '')) return; // a primeira do dia
-      aulas[a.data] = a.hora || '';
-    });
-    var aConfirmar = {};
-    plano.aulaAConfirmar.forEach(function (d) { if (!(d in aulas)) aConfirmar[d] = true; });
+    // a agenda, menos as aulas que ela tirou, mais as que ela pôs (aulasNaFolha)
+    var naFolha = aulasNaFolha(plano, opcoes.aulas);
+    var aulas = naFolha.aulas, aConfirmar = naFolha.aConfirmar;
     var feriados = {};
     plano.feriados.concat(opcoes.feriados || []).forEach(function (d) { if (dataValida(d) && noPeriodo(d)) feriados[d] = true; });
 
@@ -675,6 +856,9 @@
     pedidoDeAjusteDoSalvo: pedidoDeAjusteDoSalvo,
     lerResposta: lerResposta,
     conferirPlano: conferirPlano,
+    normalizarAulas: normalizarAulas,
+    aulasNaFolha: aulasNaFolha,
+    horaValida: horaValida,
     desenharFolha: desenharFolha,
     nomeDoArquivo: nomeDoArquivo,
     fraseDoErro: fraseDoErro,
