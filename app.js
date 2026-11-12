@@ -87,7 +87,7 @@
     {
       versao: '1.42.56',
       itens: [
-        'Em Física entraram 12 assuntos novos, para escolher na aula e procurar na Biblioteca: no ensino médio, como movimento harmônico simples, instrumentos ópticos, hidrodinâmica, cosmologia, ondas eletromagnéticas e relatividade geral.'
+        'Em Física entraram 11 assuntos novos, para escolher na aula e procurar na Biblioteca: no ensino médio, como movimento harmônico simples, polarização, hidrodinâmica, cosmologia, ondas eletromagnéticas e relatividade geral.'
       ]
     },
     {

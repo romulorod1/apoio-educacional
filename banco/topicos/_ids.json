@@ -1810,7 +1810,7 @@
     "FISEM2-T45": {"disciplina":"fisica","grupo":"em2","titulo":"Máquinas térmicas na FUVEST"},
     "FISEM2-T46": {"disciplina":"fisica","grupo":"em2","titulo":"Espelhos e lentes em questão de prova"},
     "FISEM2-T47": {"disciplina":"fisica","grupo":"em2","titulo":"Ondas e som no ENEM"},
-    "FISEM2-T48": {"disciplina":"fisica","grupo":"em2","titulo":"Instrumentos ópticos: lupa, microscópio, luneta e câmera"},
+    "FISEM2-T48": {"disciplina":"fisica","grupo":"em2","titulo":"Instrumentos ópticos: lupa, microscópio, luneta e câmera","aposentado":true},
     "FISEM2-T49": {"disciplina":"fisica","grupo":"em2","titulo":"Movimento harmônico simples: massa-mola e pêndulo simples"},
     "FISEM2-T50": {"disciplina":"fisica","grupo":"em2","titulo":"Polarização de ondas"},
     "FISEM3-T01": {"disciplina":"fisica","grupo":"em3","titulo":"Carga elétrica e conservação"},
