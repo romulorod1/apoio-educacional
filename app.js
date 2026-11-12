@@ -3247,6 +3247,8 @@
     var corpo = $('#corpo-modal-aula');
     corpo.innerHTML = '';
     corpo.classList.remove('janela-aula-tablet');
+    // a tela cheia é só da aula que já existe: a Nova aula fica no modal estreito
+    $('#modal-aula').classList.remove('janela-aula-cheia');
 
     var selAluno = el('select', { id: 'campo-aluno' });
     db.alunos.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome); }).forEach(function (a) {
@@ -3686,6 +3688,8 @@
 
     // F6: a janela de edição do tablet fica em duas colunas. Os grupos são
     // apenas reorganizados no DOM; os campos e os caminhos de salvamento não mudam.
+    // Uma rolagem só por lado (no tablet, rolagem dentro de rolagem prende o
+    // dedo): à esquerda Preparar e, embaixo, Arquivos; à direita Registrar.
     var colunaPreparar = el('div', { class: 'janela-aula-coluna janela-aula-preparar', id: 'janela-aula-preparar' });
     var colunaRegistrar = el('div', { class: 'janela-aula-coluna janela-aula-registrar', id: 'janela-aula-registrar' });
     var colunaArquivos = el('div', { class: 'janela-aula-coluna janela-aula-arquivos', id: 'janela-aula-arquivos' });
@@ -3693,9 +3697,9 @@
     colunaRegistrar.appendChild(grupoRegistro);
     colunaArquivos.appendChild(grupoArquivos);
     corpo.classList.add('janela-aula-tablet');
-    corpo.appendChild(colunaPreparar);
-    corpo.appendChild(colunaRegistrar);
-    corpo.appendChild(colunaArquivos);
+    $('#modal-aula').classList.add('janela-aula-cheia');
+    corpo.appendChild(el('div', { class: 'janela-aula-lado', id: 'janela-aula-esquerda' }, [colunaPreparar, colunaArquivos]));
+    corpo.appendChild(el('div', { class: 'janela-aula-lado', id: 'janela-aula-direita' }, [colunaRegistrar]));
 
     atualizarPrevisao();
     abrirModal('modal-aula');

@@ -446,6 +446,10 @@ done
 # { relogioReal: true }; o veneno serve o helper sem o padrao e a virada tem de
 # abrir ("VENENO visto").
 roda "relogio padrao --envenenado-sem-padrao"   node "_teste/testa_relogio_padrao.js" --envenenado-sem-padrao
+# F6 (#157): a janela da aula com a grade antiga (cartoes de altura fixa, cada um
+# com rolagem propria, o "Escrever a mao" cortado). A prova de rolagem e da
+# primeira dobra tem de ve-la ("VENENO visto").
+roda "modal aula --envenenado-grade-antiga"     node "_teste/testa_modal_aula_navegador.js" --envenenado-grade-antiga
 
 # D2: o service worker com cache primeiro. Fechar o aplicativo sem tocar no
 # aviso nao troca a versao (o navegador ativa o worker em espera sozinho, e a
