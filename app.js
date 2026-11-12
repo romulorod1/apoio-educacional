@@ -4,7 +4,10 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.43';
+  var VERSAO = '1.42.50';
+  /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
+   * Versões posteriores do app podem trazer apenas ajustes de interface. */
+  var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
 
   /* O cartão "Biblioteca" de Ajustes só aparece junto com a aba que mostra o
    * que foi importado: importar sem ter onde abrir seria prometer o que não
@@ -82,48 +85,55 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.43',
+      versao: '1.42.50',
       itens: [
         'No tablet, a leitura de livros PDF segue em rolagem cont\u00ednua, e a barra permite ir diretamente a uma p\u00e1gina.',
         'Na exporta\u00e7\u00e3o, marque p\u00e1ginas com toques ou digite intervalos pela numera\u00e7\u00e3o impressa; p\u00e1ginas sem n\u00famero aparecem como "arquivo N".'
       ]
     },
     {
+      versao: '1.42.47',
+      itens: [
+        'PDFs e fotos anexados a uma aula passam a sincronizar com a nuvem. Os anexos que já estavam no tablet não sobem sozinhos.',
+        'Na Biblioteca, os materiais agora têm categorias e filtros para separar livros didáticos, capítulos e apostilas, projetos, práticas, guias e avaliações.'
+      ]
+    },
+    {
       versao: '1.42.42',
       itens: [
-        'No celular, a ficha do aluno permite atualizar nome, respons\u00e1vel, telefone e local da aula. Valores e informa\u00e7\u00f5es pedag\u00f3gicas continuam preservados.'
+        'No celular, a ficha do aluno permite atualizar nome, responsável, telefone e local da aula. Valores e informações pedagógicas continuam preservados.'
       ]
     },
     {
       versao: '1.42.41',
       itens: [
-        'A Biblioteca mostra a p\u00e1gina impressa dos livros no sum\u00e1rio e no leitor PDF, inclusive n\u00fameros romanos.'
+        'A Biblioteca mostra a página impressa dos livros no sumário e no leitor PDF, inclusive números romanos.'
       ]
     },
     {
       versao: '1.42.40',
       itens: [
-        'Em Pagamentos pendentes, cada aluno tem o atalho Marcar pago, que abre o registro daquele m\u00eas e aluno.'
+        'Em Pagamentos pendentes, cada aluno tem o atalho Marcar pago, que abre o registro daquele mês e aluno.'
       ]
     },
     {
       versao: '1.42.39',
       itens: [
-        'Em Ajustes, a lista de pacotes e livros da Biblioteca fica recolhida; os controles de importa\u00e7\u00e3o continuam no alto. Na importa\u00e7\u00e3o, cada livro tem andamento pr\u00f3prio e um arquivo que falha ou demora demais \u00e9 pulado com aviso, enquanto os seguintes continuam.'
+        'Em Ajustes, a lista de pacotes e livros da Biblioteca fica recolhida; os controles de importação continuam no alto. Na importação, cada livro tem andamento próprio e um arquivo que falha ou demora demais é pulado com aviso, enquanto os seguintes continuam.'
       ]
     },
     {
       versao: '1.42.38',
       itens: [
-        'Nova tela na Biblioteca para comparar um assunto entre os livros: uma tabela mostra, para cada livro do tablet, em que cap\u00edtulo e p\u00e1ginas o assunto aparece, indica onde n\u00e3o h\u00e1 v\u00ednculo no mapa e avisa quando o mapa ainda n\u00e3o foi revisado.',
-        'Quando um assunto n\u00e3o aparece no mapa, a Biblioteca mostra "sem v\u00ednculo no mapa"; isso n\u00e3o significa que o livro n\u00e3o aborda o assunto, pois o mapa pode estar incompleto. As contagens se referem aos v\u00ednculos registrados.',
-        'Voc\u00ea chega a ela pela aba Biblioteca (Comparar livros por assunto, com uma busca de assunto que atravessa os anos), pelo painel do cap\u00edtulo de um livro e pela aula (Ver em todos os livros).'
+        'Nova tela na Biblioteca para comparar um assunto entre os livros: uma tabela mostra, para cada livro do tablet, em que capítulo e páginas o assunto aparece, indica onde não há vínculo no mapa e avisa quando o mapa ainda não foi revisado.',
+        'Quando um assunto não aparece no mapa, a Biblioteca mostra "sem vínculo no mapa"; isso não significa que o livro não aborda o assunto, pois o mapa pode estar incompleto. As contagens se referem aos vínculos registrados.',
+        'Você chega a ela pela aba Biblioteca (Comparar livros por assunto, com uma busca de assunto que atravessa os anos), pelo painel do capítulo de um livro e pela aula (Ver em todos os livros).'
       ]
     },
     {
       versao: '1.42.37',
       itens: [
-        'No celular, as setas da agenda avan\u00e7am ou voltam um dia por vez. Assim, d\u00e1 para abrir amanh\u00e3 sem pular para a semana seguinte.'
+        'No celular, as setas da agenda avançam ou voltam um dia por vez. Assim, dá para abrir amanhã sem pular para a semana seguinte.'
       ]
     },
     {
@@ -131,7 +141,6 @@
       itens: [
         'A aba Biblioteca do tablet ficou organizada por disciplina e ano, com os livros de cada um e, no alto, o "Continuar lendo": o livro e o lugar onde você parou. Os exercícios e listas continuam logo abaixo.',
         'Cada livro tem agora uma tela própria, com o sumário: toque num capítulo para abrir o livro nele. O botão "Livros" e a janela da estante saíram: tudo isso passa pela aba Biblioteca.'
-
       ]
     },
     {
@@ -1249,6 +1258,10 @@
      * não conhece o estado; o que mudou entra na fila e sobe. */
     if (vista && self.Store && typeof Store.reconciliarFolhas === 'function') {
       Store.reconciliarFolhas().catch(function () { /* a próxima gravação da folha acerta */ });
+    }
+    // e os arquivos com estado (N2, fatia 2): o removido pela versão anterior vira lápide
+    if (vista && self.Store && typeof Store.reconciliarArquivos === 'function') {
+      Store.reconciliarArquivos().catch(function () { /* fica para a próxima abertura */ });
     }
 
     /* Quem abre o aplicativo pela primeira vez ou sem versão anterior registrada
@@ -4502,7 +4515,7 @@
       }
       var id = Core.uid();
       var registro = null;
-      Store.salvarAnexo(id, { nome: arquivo.name, tipo: arquivo.type, blob: arquivo }).then(function () {
+      Store.salvarAnexo(id, { nome: arquivo.name, tipo: arquivo.type, blob: arquivo }, { aulaId: aulaId }).then(function () {
         aula.anexos = aula.anexos || [];
         registro = { id: id, nome: arquivo.name, tamanho: arquivo.size };
         aula.anexos.push(registro);
@@ -8107,7 +8120,7 @@
         (p.itens || []).forEach(function (it) { if (it.t === 'imagem' && it.ref) refs.push(it.ref); });
       });
       return Promise.all(refs.map(function (r) {
-        return Store.lerMidia(r).then(function (m) { return { ref: r, midia: m }; });
+        return lerMidiaOuBaixar(r).then(function (m) { return { ref: r, midia: m }; });
       })).then(function (lista) {
         midiasCarregadas = {};
         lista.forEach(function (x) {
@@ -8175,7 +8188,7 @@
         (p.itens || []).forEach(function (it) { if (it.t === 'imagem' && it.ref) refs.push(it.ref); });
       });
       return Promise.all(refs.map(function (r) {
-        return Store.lerMidia(r).then(function (m) { return { ref: r, midia: m }; }, function () { return { ref: r, midia: null }; });
+        return lerMidiaOuBaixar(r).then(function (m) { return { ref: r, midia: m }; }, function () { return { ref: r, midia: null }; });
       })).then(function (lista) {
         var midias = {};
         lista.forEach(function (x) {
@@ -8713,7 +8726,7 @@
     if (!editorAtual) return;
     prepararImagem(arquivo).then(function (r) {
       var ref = Core.uid();
-      return Store.salvarMidia(ref, { dataUrl: r.dataUrl, w: r.w, h: r.h }).then(function () {
+      return Store.salvarMidia(ref, { dataUrl: r.dataUrl, w: r.w, h: r.h }, { aulaId: editorAtual && editorAtual._aulaId }).then(function () {
         editorAtual.registrarMidia(ref, r.dataUrl, r.w, r.h);
         midiasCarregadas[ref] = editorAtual.midias[ref];
         editorAtual.adicionarImagem(ref, r.w, r.h);
@@ -17490,7 +17503,27 @@
   /* O arquivo de um anexo da aula: o PDF exportado de livro mora no depósito
    * dos exportados, o resto no de anexos. */
   function lerArquivoDoAnexo(an) {
-    return an && an.exportado ? Store.lerExportado(an.id) : Store.lerAnexo(an.id);
+    if (an && an.exportado) return Store.lerExportado(an.id);
+    /* O anexo que não está neste aparelho (N2, fatia 2) vem da nuvem quando
+     * ela abre: no celular e no observador, e no tablet que ainda não o
+     * baixou. O que vem é conferido pelo sha256 antes de ser guardado. */
+    return Store.lerAnexo(an.id).then(function (r) {
+      if (r && r.blob) return r;
+      return baixarDaNuvem(Store.idDoArquivo('anexo', an.id)).then(function (b) { return b || r; });
+    });
+  }
+  /* Baixa um arquivo da nuvem (anexo ou imagem da folha), sem nunca rejeitar:
+   * sem conta, sem sinal ou sem o arquivo lá, devolve null. */
+  function baixarDaNuvem(filaId) {
+    if (!temNuvem() || typeof Nuvem.baixarArquivo !== 'function' || !(Nuvem.estado().entrada)) return Promise.resolve(null);
+    return Nuvem.baixarArquivo(filaId).catch(function () { return null; });
+  }
+  /* A imagem da folha: do aparelho, ou da nuvem quando falta. */
+  function lerMidiaOuBaixar(ref) {
+    return Store.lerMidia(ref).then(function (m) {
+      if (m && m.dataUrl) return m;
+      return baixarDaNuvem(Store.idDoArquivo('midia', ref)).then(function (b) { return b || m; });
+    });
   }
   function apagarArquivoDoAnexo(an) {
     return an && an.exportado ? Store.apagarExportado(an.id) : Store.apagarAnexo(an.id);
@@ -17739,7 +17772,7 @@
    * e o cartão "Exercícios e listas" do ano de Matemática leva até eles.
    *
    * Sem livro no tablet, a seção some e a aba fica como era. */
-  var bibLivrosNav = { disciplina: null, ano: null };
+  var bibLivrosNav = { disciplina: null, ano: null, tipo: 'todos' };
   var bibLivrosVez = 0;
   var bibLivrosCache = Object.create(null);   // id -> { id, meta, pos, cor }, do último desenho
   var bibLivroAberto = null;                   // o id do livro na tela do livro
@@ -17806,12 +17839,42 @@
     var m = Core.materiaPorId(id);
     // a matéria que o app não conhece fica com o nome dela, e cada uma no seu grupo
     var nome = (m && m.rotulo) || (meta && meta.materia_nome) ||
-      (id === 'outra' ? 'Outros livros' : id.charAt(0).toUpperCase() + id.slice(1).replace(/[-_]+/g, ' '));
+      (id === 'outra' ? 'Outros materiais' : id.charAt(0).toUpperCase() + id.slice(1).replace(/[-_]+/g, ' '));
     return { id: id, nome: nome };
   }
   function anosDoLivro(meta) {
     var s = Array.isArray(meta && meta.series) ? meta.series.filter(function (x) { return typeof x === 'string' && x; }) : [];
     return s.length ? s : [SEM_ANO];
+  }
+  // O tipo classifica o uso do material, sem misturá-lo com disciplina/ano.
+  // Pacotes podem declarar tipo_material; para acervos antigos, usamos pistas
+  // do título e deixamos como "outro" quando não há evidência suficiente.
+  var TIPOS_DE_MATERIAL = [
+    ['livro-didatico', 'Livros didáticos', 'Livro didático'],
+    ['capitulo-apostila', 'Capítulos e apostilas', 'Capítulo/apostila'],
+    ['projeto', 'Projetos e sequências', 'Projeto'],
+    ['pratica', 'Práticas e experimentos', 'Prática'],
+    ['guia-referencia', 'Guias e referências', 'Guia/referência'],
+    ['avaliacao', 'Questões e avaliações', 'Avaliação'],
+    ['complementar', 'Outros materiais', 'Outro']
+  ];
+  function tipoDoMaterial(meta) {
+    var declarado = String(meta && (meta.tipo_material || meta.tipoMaterial || '')).toLowerCase()
+      .replace(/[_\s]+/g, '-');
+    if (TIPOS_DE_MATERIAL.some(function (x) { return x[0] === declarado; })) return declarado;
+    var titulo = String(meta && (meta.titulo || meta.nome || '')).toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (/\b(prova|simulado|questoes|avaliacao|lista de exercicios)\b/.test(titulo)) return 'avaliacao';
+    if (/\b(projeto|sequencia didatica)\b/.test(titulo)) return 'projeto';
+    if (/\b(aula\s*\d+\s*[-\u2013:]\s*(guia do aluno|material do professor)|experimento|atividade experimental|pratica experimental|roteiro experimental|laboratorio|teste do biureto)\b/.test(titulo)) return 'pratica';
+    if (/\b(capitulo|modulo|apostila|caderno de atividades)\b/.test(titulo)) return 'capitulo-apostila';
+    if (/\b(guia|manual|referencia|para professores|formacao docente)\b/.test(titulo)) return 'guia-referencia';
+    if (/\b(livro didatico|colecao|volume [ivx0-9]+)\b/.test(titulo)) return 'livro-didatico';
+    return 'complementar';
+  }
+  function rotuloDoTipo(tipo, longo) {
+    var info = TIPOS_DE_MATERIAL.filter(function (x) { return x[0] === tipo; })[0];
+    return info ? info[longo ? 1 : 2] : 'Outro';
   }
   function mapaComAssuntos(l) {
     return Biblioteca.mapaDoLivro(l.meta, correcoesDosLivros()[l.id]).some(function (e) { return e.assuntos.length; });
@@ -17971,7 +18034,7 @@
     var disciplinas = disciplinasDaBiblioteca(livros);
     var comLivro = disciplinas.filter(function (d) { return d.livros.length; }).length;
     var cont = $('#bib-livros-contagem');
-    if (cont) cont.textContent = plural(livros.length, 'livro', 'livros') + ', ' + plural(comLivro, 'disciplina', 'disciplinas');
+    if (cont) cont.textContent = plural(livros.length, 'material', 'materiais') + ', ' + plural(comLivro, 'disciplina', 'disciplinas');
 
     var recentes = livros.filter(function (l) { return l.pos && l.pos.quando; })
       .sort(function (a, b) { return b.pos.quando - a.pos.quando; }).slice(0, 3);
@@ -18021,26 +18084,27 @@
       var on = d.id === disc.id;
       lista.appendChild(el('button', { type: 'button', class: 'bibl-disciplina' + (on ? ' ativa' : ''), 'data-disciplina': d.id,
         'aria-current': on ? 'true' : null,
-        aoClick: function () { bibLivrosNav.disciplina = d.id; bibLivrosNav.ano = null; redesenhar(); } }, [
+        aoClick: function () { bibLivrosNav.disciplina = d.id; bibLivrosNav.ano = null; bibLivrosNav.tipo = 'todos'; redesenhar(); } }, [
         el('span', { class: 'cresce', texto: d.nome }),
         d.temMapa ? el('span', { class: 'bibl-sinal-mapa' }, [icone('mapa', 'com mapa de assuntos')]) : null,
         el('span', { class: 'bibl-apoio', texto: String(d.livros.length) })
       ]));
     });
 
-    var painel = el('section', { class: 'bibl-painel', 'aria-label': 'Livros de ' + disc.nome });
+    var painel = el('section', { class: 'bibl-painel', 'aria-label': 'Materiais de ' + disc.nome });
     var anosComLivro = disc.listaAnos.filter(function (a) { return a !== SEM_ANO && livrosDoAno(disc, a).length; });
     var faixa = !anosComLivro.length ? '' : anosComLivro.length === 1 ? ' do ' + nomeDoAno(anosComLivro[0]) :
       ' do ' + nomeDoAno(anosComLivro[0]) + ' ao ' + nomeDoAno(anosComLivro[anosComLivro.length - 1]);
     painel.appendChild(el('div', { class: 'bibl-painel-cabeca' }, [
       el('h3', { class: 'bibl-titulo', texto: disc.nome }),
-      el('span', { class: 'bibl-apoio', texto: disc.livros.length ? plural(disc.livros.length, 'livro', 'livros') + faixa : 'nenhum livro no tablet' })
+      el('span', { class: 'bibl-apoio', texto: disc.livros.length ? plural(disc.livros.length, 'material', 'materiais') + faixa : 'nenhum material no tablet' })
     ]));
     if (disc.listaAnos.some(function (a) { return a !== SEM_ANO; })) {
       /* Grupo de rádio de verdade: um só na ordem do Tab (o escolhido), e as
        * setas trocam o ano, como no rádio do sistema. */
       var escolherAno = function (a, focar) {
         bibLivrosNav.ano = a;
+        bibLivrosNav.tipo = 'todos';
         redesenhar();
         if (focar) { var b = caixa.querySelector('.bibl-ano[data-ano="' + a + '"]'); if (b) b.focus(); }
       };
@@ -18062,14 +18126,32 @@
       });
       painel.appendChild(chips);
     }
+    var livrosDoRecorte = livrosDoAno(disc, bibLivrosNav.ano);
+    var tipos = TIPOS_DE_MATERIAL.map(function (t) {
+      return { id: t[0], nome: t[1], qtd: livrosDoRecorte.filter(function (l) { return tipoDoMaterial(l.meta) === t[0]; }).length };
+    }).filter(function (t) { return t.qtd; });
+    if (bibLivrosNav.tipo !== 'todos' && !tipos.some(function (t) { return t.id === bibLivrosNav.tipo; })) bibLivrosNav.tipo = 'todos';
+    if (tipos.length > 1) {
+      var escolherTipo = function (tipo) { bibLivrosNav.tipo = tipo; redesenhar(); };
+      var filtros = el('div', { class: 'bibl-tipos', role: 'group', 'aria-label': 'Filtrar por tipo de material' });
+      [{ id: 'todos', nome: 'Todos', qtd: livrosDoRecorte.length }].concat(tipos).forEach(function (t) {
+        var on = bibLivrosNav.tipo === t.id;
+        filtros.appendChild(el('button', { type: 'button', class: 'bibl-tipo' + (on ? ' ativo' : ''),
+          'aria-pressed': on ? 'true' : 'false', 'data-tipo': t.id,
+          texto: t.nome + ' · ' + t.qtd, aoClick: function () { escolherTipo(t.id); } }));
+      });
+      painel.appendChild(filtros);
+    } else bibLivrosNav.tipo = 'todos';
     var grade = el('div', { class: 'bibl-grade' });
-    livrosDoAno(disc, bibLivrosNav.ano).forEach(function (l) {
+    livrosDoRecorte.filter(function (l) { return bibLivrosNav.tipo === 'todos' || tipoDoMaterial(l.meta) === bibLivrosNav.tipo; }).forEach(function (l) {
       var semSumario = !(l.meta.sumario && l.meta.sumario.length);
+      var tipo = tipoDoMaterial(l.meta);
       grade.appendChild(el('button', { type: 'button', class: 'bibl-livro-cartao', 'data-livro': l.id,
         'aria-label': 'Abrir o sumário de ' + tituloDoLivro(l.meta),
         aoClick: function () { abrirTelaDoLivro(l.id); } }, [
         capaDoLivro(l),
         el('span', { class: 'bibl-livro-meta' }, [
+          el('span', { class: 'bibl-tipo-selo' + (tipo === 'pratica' ? ' pratica' : ''), texto: rotuloDoTipo(tipo, false) }),
           el('span', { class: 'bibl-forte', texto: tituloDoLivro(l.meta) }),
           el('span', { class: 'bibl-apoio', texto: tamanhoDoLivro(l.meta) }),
           semSumario ? el('span', { class: 'bibl-falta', 'data-falta': 'sumario', texto: 'sem sumário nem mapa de assuntos' }) :
@@ -18100,7 +18182,7 @@
     }
     painel.appendChild(grade);
     if (!grade.children.length) {
-      painel.appendChild(el('p', { class: 'bibl-apoio bibl-vazio', texto: 'Nenhum livro de ' + disc.nome +
+      painel.appendChild(el('p', { class: 'bibl-apoio bibl-vazio', texto: 'Nenhum material de ' + disc.nome +
         (bibLivrosNav.ano && bibLivrosNav.ano !== SEM_ANO ? ' do ' + nomeDoAno(bibLivrosNav.ano) : '') + ' neste tablet.' }));
     }
     var comparar = secaoComparar(disc, bibLivrosNav.ano, livros, redesenhar);
@@ -21591,7 +21673,7 @@
       var apagarTodos = function () { arquivos.forEach(function (a) { Store.apagarAnexo(a.id).catch(function () {}); }); };
       id = arquivos[0].id;
       return arquivos.reduce(function (p, a) {
-        return p.then(function () { return Store.salvarAnexo(a.id, { nome: a.nome, tipo: 'application/pdf', blob: a.blob }); });
+        return p.then(function () { return Store.salvarAnexo(a.id, { nome: a.nome, tipo: 'application/pdf', blob: a.blob }, { aulaId: aulaId }); });
       }, Promise.resolve()).catch(function (e) { apagarTodos(); throw e; }).then(function () {
         aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
         if (!aula) {
@@ -21780,7 +21862,7 @@
       var pos = { x: MARGEM, y: y, w: e.larguraPt * esc, h: h };
       tarefas.push(function () {
         return imagemNumerada(e, i + 1, esc).then(function (r) {
-          return Store.salvarMidia(ref, r).then(function () {
+          return Store.salvarMidia(ref, r, { aulaId: aulaId }).then(function () {
             destino.itens.push({ t: 'imagem', ref: ref, x: pos.x, y: pos.y, w: pos.w, h: pos.h });
           });
         });
@@ -22442,7 +22524,7 @@
        * recém-criada, por exemplo): sem a aula, nada é gravado. */
       aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
       if (!aula) { var sem = new Error('aula desfeita'); sem.desfeita = true; throw sem; }
-      return Store.salvarMidia(ref, { dataUrl: c.toDataURL('image/jpeg', 0.9), w: lpx, h: apx });
+      return Store.salvarMidia(ref, { dataUrl: c.toDataURL('image/jpeg', 0.9), w: lpx, h: apx }, { aulaId: aulaId });
     }).then(function () {
       return Store.lerNota(aulaId);
     }).then(function (nota) {
@@ -24527,7 +24609,9 @@
     });
     var linhas = linhasDoDiaCelular(dia), aulas = linhas.filter(function (l) { return l.tipo === 'aula'; });
     var grupos = [], grupo = null;
-    aulas.filter(function (l) { return l.aula.status !== 'cancelada'; }).sort(function (a, b) { return a.ini - b.ini; }).forEach(function (l) {
+    /* A cancelada não ocupa horário livre, mas ainda precisa de uma faixa
+     * visual quando coincide com uma aula ativa, para não sumir por baixo. */
+    aulas.sort(function (a, b) { return a.ini - b.ini; }).forEach(function (l) {
       if (!grupo || l.ini >= grupo.fim) { grupo = { fim: l.fim, itens: [] }; grupos.push(grupo); }
       grupo.fim = Math.max(grupo.fim, l.fim);
       grupo.itens.push(l);
@@ -24551,6 +24635,10 @@
     linhas.filter(function (l) { return l.tipo === 'livre'; }).forEach(function (l) {
       var ini = Math.max(inicioGrade, l.ini), fim = Math.min(fimGrade, l.fim);
       if (fim - ini < 30) return;
+      /* No celular da dona, o cartão livre contém uma descrição e botões de
+       * pelo menos 48 px. Gaps curtos não comportam o conjunto sem invadir a
+       * próxima aula; no modo de consulta permanece o resumo textual curto. */
+      if (edita && posicao(fim) - posicao(ini) < 84) return;
       var linha = linhaProporcional('livre', ini, fim, 26);
       linha.querySelector('.cel-tempo-item').appendChild(buracoLivreCelular({ ini: ini, fim: fim }, dia, edita));
       caixa.appendChild(linha);
@@ -24560,7 +24648,7 @@
       if (fim <= inicioGrade || inicio >= fimGrade) return;
       var topo = posicao(inicio), baixo = posicao(fim);
       var bloco = blocoDaAulaCelular(l.aula, marcas[l.aula.id], !!semRegistro[l.aula.id]);
-      var g = l.aula.status === 'cancelada' ? null : grupos.find(function (x) { return x.itens.indexOf(l) >= 0; });
+      var g = grupos.find(function (x) { return x.itens.indexOf(l) >= 0; });
       var faixas = g ? g.faixas : 1, faixa = g ? l.faixa : 0;
       bloco.classList.add('cel-tempo-bloco-grade');
       bloco.style.cssText += ';top:0;height:100%;left:' + (100 * faixa / faixas) + '%;width:' + (100 / faixas) + '%;z-index:' + (l.aula.status === 'cancelada' ? 2 : 3);
@@ -25229,6 +25317,26 @@
     mudarAulaNoCelular(a, { status: status, cobravel: (Core.STATUS[status] || Core.STATUS.realizada).cobravelPadrao }, mensagem);
   }
 
+  function abrirAnexoNoCelular(an, aula) {
+    return lerArquivoDoAnexo(an).then(function (r) {
+      if (!r || !r.blob) {
+        /* Sem sinal, ele não vem agora; com sinal e sem ele lá, é um anexo que
+         * ainda não foi para a nuvem (o de antes desta versão só sobe numa
+         * restauração no tablet), e esperar não o traz. */
+        avisar(typeof navigator !== 'undefined' && navigator.onLine === false
+          ? 'Sem sinal, o anexo não vem. Tente de novo com sinal.'
+          : 'Este anexo ainda não foi para a nuvem. Abra no tablet.');
+        return false;
+      }
+      if (ehPdf(r.tipo, an.nome)) {
+        fecharFolhaCelular();
+        abrirLeitorPdf(r.blob, { titulo: an.nome, nome: an.nome, aulaId: aula.id, comoFolha: false });
+      }
+      else entregarArquivo(an.nome, r.blob, an.nome);
+      return true;
+    }, function () { avisar('Não consegui abrir este arquivo. Tente de novo.'); return false; });
+  }
+
   function desenharAcoesNaFolha(folha, a, aluno, edita) {
     folha.appendChild(resumoDaAulaNaFolha(a, aluno));
     /* A FOLHA ESCRITA À MÃO (N2): a que o tablet escreveu abre daqui só para
@@ -25239,6 +25347,16 @@
         el('button', { type: 'button', class: 'btn cel-folha-botao cel-folha-largo cel-ver-folha', id: 'cel-folha-ver-folha', 'data-ver-folha': a.id, texto: 'Ver a folha escrita à mão',
           aoClick: function () { abrirFolhaParaLer(a.id); } })
       ]));
+    }
+    /* OS ANEXOS DA AULA (N2, fatia 2): o PDF ou a foto que o tablet anexou
+     * abre daqui, baixado da nuvem na hora do toque (e conferido pelo sha256).
+     * Também é leitura, não ação de edição. O PDF de livro fica no tablet. */
+    var anexosDaAula = (a.anexos || []).filter(function (an) { return an && an.id && !an.exportado; });
+    if (anexosDaAula.length) {
+      folha.appendChild(el('div', { class: 'barra u-margem-baixo-0' }, anexosDaAula.map(function (an) {
+        return el('button', { type: 'button', class: 'btn cel-folha-botao cel-folha-largo', 'data-abrir-anexo': an.id, texto: 'Abrir ' + (an.nome || 'o anexo'),
+          aoClick: function () { abrirAnexoNoCelular(an, a); } });
+      })));
     }
     if (edita) {
       var futura = a.data > Core.hojeIso();
@@ -26234,15 +26352,14 @@
     return Promise.race([lida, espera]);
   }
 
-  /* Um tablet numa versão anterior a esta não conhece a regra da mensagem do
-   * mês (vence a escrita mais recente) e, com uma edição dele mais velha na
-   * fila, cobriria a do celular. Enquanto o tablet não atualiza, o celular não
-   * edita a mensagem. */
+  /* Um tablet anterior ao protocolo da mensagem do mês (1.42.40) não conhece
+   * a regra de escrita mais recente e poderia cobrir a edição do celular. A
+   * versão atual do app é independente desse mínimo, pois pode mudar só a UI. */
   function abrirMensagemCelular(alunoId, mes) {
     if (!podeEditarMensagemCelular()) return;
     return versaoDoTabletCelular().then(function (v) {
-      if (v && Core.versaoAntes(v.app, VERSAO) === true) {
-        avisar('Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão ' + v.app + ', e esta é a ' + VERSAO + '.');
+      if (v && Core.versaoAntes(v.app, VERSAO_MINIMA_PROTOCOLO_MENSAGEM) === true) {
+        avisar('Atualize o tablet antes de editar a mensagem pelo celular. Ele está na versão ' + v.app + ', e precisa estar na versão ' + VERSAO_MINIMA_PROTOCOLO_MENSAGEM + ' ou mais recente.');
         return;
       }
       abrirEditorDaMensagemCelular(alunoId, mes);

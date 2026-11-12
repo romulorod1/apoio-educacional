@@ -13,14 +13,14 @@
  *   2. a Biblioteca abre pelo trilho; o módulo abre e o "Voltar" volta; a
  *      tela cheia do exercício cobre o trilho e fecha;
  *   3. celular a 360, 390 e 412 px, e a 360 com a letra a 130%: os destinos
- *      da barra de baixo (Hoje, Alunos, Biblioteca, Fechamento, Enviar), com
+ *      da barra de baixo (Hoje, Alunos, Livros, Fechar mês, Enviar), com
  *      ícone e rótulo, sem corte nem sobreposição, alvo de 48 px, um ativo
  *      só; a Biblioteca abre pela barra e diz onde ficam os livros.
  *
  * Veneno:
  *   node _teste/testa_navegacao_biblioteca.js --envenenado-rotulo-corta
  *     o styles.css servido deixa a coluna da barra do celular encolher abaixo
- *     do rótulo (minmax(0, 1fr)): a 360 px com a letra a 130% o "Fechamento"
+ *     do rótulo (minmax(0, 1fr)): a 360 px com a letra a 130% o "Fechar mês"
  *     estoura o botão, e a prova TEM de ver ("VENENO visto").
  */
 'use strict';
@@ -202,6 +202,7 @@ async function abrirCelular(w, h) {
     secao('VENENO: a coluna da barra encolhe abaixo do rótulo');
     const cel = await abrirCelular(360, 780);
     await letra(cel, LETRA_130);
+    await cel.evaluate(() => { document.querySelector('#cel-marcar-aula').hidden = false; });
     await pausa(300);
     const m = await medirBarra(cel);
     console.log('   360 a 130%: ' + (m.ruins.join('; ') || 'nenhum defeito'));
@@ -315,20 +316,62 @@ async function abrirCelular(w, h) {
     const nome = w + ' px' + (l ? ' com a letra a 130%' : '');
     const cel = await abrirCelular(w, h);
     await letra(cel, l);
+    /* Revela o sexto item só para medir a grade completa da dona. Não executa
+     * a ação nem altera o estado do modo de leitura desta prova. */
+    await cel.evaluate(() => { document.querySelector('#cel-marcar-aula').hidden = false; });
+    if (w === 360 && !l) {
+      const diaUx = await pag.evaluate(async () => {
+        const d = await Store.carregar();
+        const data = new Date(Core.hojeIso() + 'T12:00:00');
+        data.setDate(data.getDate() + 1);
+        const amanha = data.toISOString().slice(0, 10);
+        d.aulas = ['07:30', '09:00', '10:30', '12:00', '13:30', '15:00', '17:30', '19:00'].map((hora, i) => ({
+          id: 'ux-' + i, alunoId: 'al_alfa', serieId: null, data: amanha, hora, duracaoMin: 60,
+          status: 'agendada', cobravel: true, notaTexto: '', notaPrivada: '', temNota: false, anexos: []
+        }));
+        await Store.salvar(d);
+        return amanha;
+      });
+      await cel.click('.cel-semana-dia[data-dia="' + diaUx + '"]');
+      await pausa(250);
+      const sobreposicao = await cel.evaluate(() => {
+        const area = document.querySelector('#cel-conteudo'), faixa = document.querySelector('#cel-semana');
+        const limite = Math.max(0, area.scrollHeight - area.clientHeight);
+        for (let s = 0; s <= limite; s += 4) {
+          area.scrollTop = s;
+          const f = faixa.getBoundingClientRect();
+          const bloco = Array.from(document.querySelectorAll('#cel-tempo .cel-bloco')).find(b => {
+            const r = b.getBoundingClientRect(); return r.bottom > f.top + 3 && r.top < f.bottom - 3;
+          });
+          if (!bloco) continue;
+          const b = bloco.getBoundingClientRect(), x = Math.max(b.left + 2, Math.min(b.right - 2, f.left + f.width / 2));
+          const y = Math.max(f.top + 2, Math.min(f.bottom - 2, (Math.max(b.top, f.top) + Math.min(b.bottom, f.bottom)) / 2));
+          const alvo = document.elementFromPoint(x, y);
+          return { achouIntersecao: true, faixaRecebeToque: !!(alvo && alvo.closest('#cel-semana')) };
+        }
+        return { achouIntersecao: false, faixaRecebeToque: false };
+      });
+      conf('ao rolar um card sob a faixa de dias, ela continua recebendo o toque', sobreposicao, { achouIntersecao: true, faixaRecebeToque: true });
+    }
     await pausa(250);
     const m = await medirBarra(cel);
     console.log('   ' + nome + ': rótulos a ' + m.folga + ' px um do outro no mais apertado');
-    conf(nome + ': os destinos, na ordem', m.rotulos, 'Hoje,Alunos,Biblioteca,Fechamento,Enviar');
-    conf(nome + ': + Aula fica reservado ao celular da dona', m.maisOculto, true);
+    conf(nome + ': os destinos, na ordem, com rótulos compactos', m.rotulos, 'Hoje,Alunos,Livros,Fechar mês,Enviar');
+    conf(nome + ': os nomes completos continuam acessíveis', await cel.evaluate(() =>
+      document.querySelector('.cel-aba[data-cel="biblioteca"]').getAttribute('aria-label') + ',' +
+      document.querySelector('.cel-aba[data-cel="fechamento"]').getAttribute('aria-label')), 'Biblioteca de livros,Fechar mês: fechamento mensal');
+    conf(nome + ': a grade reservou espaço visível para + Aula', m.maisOculto, false);
     conf(nome + ': um ativo só, Hoje, com aria-current', m.ativos + '|' + m.atuais, 'hoje|hoje');
     conf(nome + ': rótulos sem corte nem sobreposição, alvo de 48 px (' + (m.ruins.join('; ') || 'nada') + ')', m.ruins.length, 0);
     let menor = m.folga;
     for (const d of ['alunos', 'biblioteca', 'fechamento', 'enviar', 'hoje']) {
       await cel.click('#cel-abas .cel-aba[data-cel="' + d + '"]');
       await pausa(200);
+      await cel.evaluate(() => { document.querySelector('#cel-marcar-aula').hidden = false; });
       const md = await medirBarra(cel);
       menor = Math.min(menor, md.folga);
       conf(nome + ', ' + d + ' ativo: um ativo só e nada corta nem sai da tela (' + (md.ruins.join('; ') || 'nada') + ')', md.atuais + '|' + md.ruins.length, d + '|0');
+      conf(nome + ', ' + d + ' ativo: a grade completa de seis itens permanece visível', md.maisOculto, false);
     }
     console.log('   ' + nome + ': com qualquer destino ativo, rótulos a ' + menor + ' px um do outro no mais apertado');
     if (w === 360 && l) {
