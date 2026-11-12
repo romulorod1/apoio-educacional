@@ -152,9 +152,10 @@
  * aula no celular. O v138 traz a leitura contínua dos livros e a exportação por página.
  * O v139 traz a busca no texto dos livros. O v140 traz os 22 assuntos novos de
  * matemática da revisão dos mapas dos livros no banco/topicos/matematica.json.
- * O v141 traz a busca da Biblioteca nos capítulos e assuntos do mapa.
+ * O v141 traz os 11 assuntos novos de física da revisão dos mapas dos livros no banco/topicos/fisica.json.
+ * O v142 traz a busca da Biblioteca nos capítulos e assuntos do mapa, com todas as palavras e os melhores resultados.
  */
-var CACHE = 'apoio-educacional-v141';
+var CACHE = 'apoio-educacional-v142';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

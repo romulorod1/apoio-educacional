@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.61';
+  var VERSAO = '1.42.62';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,10 +85,16 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.61',
+      versao: '1.42.62',
       itens: [
         'Na Biblioteca, a busca também acha os capítulos pelo nome e pelos assuntos ligados, inclusive nos livros escaneados, e o botão Abrir no capítulo leva ao começo dele.',
         'A busca nos livros pede todas as palavras digitadas e mostra primeiro os melhores resultados; o resto fica em Mais resultados, com cada capítulo numa linha só.'
+      ]
+    },
+    {
+      versao: '1.42.61',
+      itens: [
+        'Em Física entraram 11 assuntos novos, para escolher na aula e procurar na Biblioteca: no ensino médio, como movimento harmônico simples, polarização, hidrodinâmica, cosmologia, ondas eletromagnéticas e relatividade geral.'
       ]
     },
     {
