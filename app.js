@@ -18009,16 +18009,52 @@
   /* B12: UM campo só. O campo do alto da Biblioteca busca nos exercícios e,
    * com livro no tablet, também no texto dos livros. O resultado sai em dois
    * grupos rotulados e recolhíveis, "Exercícios" e depois "Nos livros", cada
-   * um com a contagem no rótulo (divulgação progressiva, padrão 1). */
+   * um com a contagem no rótulo (divulgação progressiva, padrão 1), e no alto
+   * uma linha-resumo que leva a cada grupo: os dois ficam na primeira tela. */
+  var BUSCA_LINHAS_VISIVEIS = 3;        // o grupo dos exercícios mostra 3 linhas e "Ver todos os N"
+  var BUSCA_LIVROS_POR_VEZ = 30;        // o grupo dos livros mostra 30 livros e "Mostrar mais"
+  var BUSCA_BLOCOS_POR_VEZ = 200;       // ...ou 200 capítulos, o que vier antes
+  var BUSCA_PAGINAS_POR_BLOCO = 16;     // as páginas de um capítulo, e "+N" abre o resto
+  var avisoSemTextoDispensado = '';     // os ids do aviso dispensado; volta quando entra livro novo
+
   function grupoDaBusca(chave, titulo) {
     var contagem = el('span', { class: 'bib-grupo-contagem' });
     var corpoGrupo = el('div', { class: 'bib-grupo-corpo' });
-    var grupo = el('details', { class: 'bib-grupo-busca', 'data-grupo': chave }, [
-      el('summary', { class: 'bib-grupo-cabeca' }, [el('span', { class: 'bib-grupo-titulo', texto: titulo }), contagem]),
+    var grupo = el('details', { class: 'bib-grupo-busca', 'data-grupo': chave, id: 'bib-grupo-' + chave }, [
+      el('summary', { class: 'bib-grupo-cabeca' }, [
+        el('span', { class: 'bib-grupo-seta', 'aria-hidden': 'true' }, [icone('chr')]),
+        el('span', { class: 'bib-grupo-titulo', texto: titulo }), contagem]),
       corpoGrupo
     ]);
     grupo.open = true;
     return { grupo: grupo, contagem: contagem, corpo: corpoGrupo };
+  }
+
+  /* A linha-resumo no alto: "Exercícios 9 listas · Nos livros 3 páginas em
+   * 1 livro". Cada parte é um botão que abre o grupo e rola até ele. */
+  function resumoDaBusca() {
+    var caixa = el('p', { class: 'bib-busca-resumo', id: 'bib-busca-resumo' });
+    var partes = {};
+    function parte(chave, titulo) {
+      var valor = el('span', { class: 'bib-busca-resumo-valor' });
+      var b = el('button', { type: 'button', class: 'bib-busca-resumo-parte', 'data-alvo': chave, aoClick: function () {
+        var g = document.getElementById('bib-grupo-' + chave);
+        if (!g) return;
+        g.open = true;
+        g.scrollIntoView({ block: 'start' });
+      } }, [el('span', { class: 'bib-busca-resumo-titulo', texto: titulo }), valor]);
+      partes[chave] = { botao: b, valor: valor };
+      return b;
+    }
+    return {
+      caixa: caixa,
+      montar: function (comExercicios, comLivros) {
+        if (comExercicios) caixa.appendChild(parte('exercicios', 'Exercícios'));
+        if (comExercicios && comLivros) caixa.appendChild(el('span', { class: 'bib-busca-resumo-ponto', 'aria-hidden': 'true', texto: '·' }));
+        if (comLivros) caixa.appendChild(parte('livros', 'Nos livros'));
+      },
+      diz: function (chave, texto) { if (partes[chave]) partes[chave].valor.textContent = texto; }
+    };
   }
 
   function rotuloDePaginaDoLivro(meta, pagina) {
@@ -18027,23 +18063,29 @@
   }
 
   /* O grupo "Nos livros" da busca: monta a caixa e consulta o índice local
-   * (só lê; nada é gravado). */
-  function grupoNosLivros(termo) {
+   * (só lê; nada é gravado). `resumo` e `aoVazio` vêm da busca dos dois
+   * grupos: o resumo do alto, e o estado vazio único quando nada aparece. */
+  function grupoNosLivros(termo, resumo, aoVazio) {
     var g = grupoDaBusca('livros', 'Nos livros');
     g.status = el('p', { class: 'ajuda bib-busca-livros-status', role: 'status', 'aria-live': 'polite' });
     g.resultados = el('div', { class: 'bib-busca-livros-resultados', 'aria-busy': 'false' });
+    g.resumo = resumo || null;
+    g.aoVazio = aoVazio || null;
     g.corpo.appendChild(g.status);
     g.corpo.appendChild(g.resultados);
-    buscaLivrosAtual = { termo: termo, caixa: g };
+    buscaLivrosAtual = { termo: termo, caixa: g, pronto: null };
     buscarTextoNosLivros(termo, g);
     return g.grupo;
   }
 
   /* Os livros que a busca não alcança, com o nome de cada um, recolhidos num
-   * aviso discreto: o livro sem texto pesquisável (escaneado) inteiro, e o
-   * que tem só algumas páginas sem texto. */
+   * aviso discreto, que ela pode dispensar até entrar um livro novo: o livro
+   * sem texto pesquisável (escaneado) inteiro, e o que tem só algumas páginas
+   * sem texto. */
   function avisoDosLivrosSemTexto(naoLidos) {
     if (!naoLidos || !naoLidos.length) return null;
+    var chave = naoLidos.map(function (x) { return x.id; }).sort().join('|');
+    if (avisoSemTextoDispensado && avisoSemTextoDispensado === chave) return null;
     var inteiros = naoLidos.filter(function (x) { return x.livroInteiro || (x.total && x.naoLidas >= x.total); });
     var parciais = naoLidos.filter(function (x) { return inteiros.indexOf(x) < 0; });
     var resumo = [];
@@ -18059,8 +18101,46 @@
     parciais.forEach(function (x) {
       lista.appendChild(el('li', { 'data-livro': x.id, texto: nome(x) + ': ' + plural(x.naoLidas, 'página', 'páginas') + (x.total ? ' de ' + x.total : '') }));
     });
-    return el('details', { class: 'ajuda bib-busca-livros-aviso bib-busca-livros-sem-texto' }, [
-      el('summary', { texto: resumo.join('; ') + '.' }), lista
+    var aviso = el('details', { class: 'ajuda bib-busca-livros-aviso bib-busca-livros-sem-texto' });
+    aviso.appendChild(el('summary', {}, [el('span', { class: 'bib-grupo-seta', 'aria-hidden': 'true' }, [icone('chr')]),
+      el('span', { class: 'bib-busca-livros-sem-texto-resumo', texto: resumo.join('; ') + '.' })]));
+    aviso.appendChild(lista);
+    aviso.appendChild(el('button', { type: 'button', class: 'btn pequeno bib-busca-livros-dispensar', texto: 'Dispensar', aoClick: function () {
+      avisoSemTextoDispensado = chave;
+      if (aviso.parentNode) aviso.parentNode.removeChild(aviso);
+    } }));
+    return aviso;
+  }
+
+  // um capítulo do resultado: o nome e cada página encontrada como botão que abre o leitor nela
+  function blocoDoCapitulo(livro, meta, grupo) {
+    var paginas = grupo.paginas || [];
+    var unidade = livro.formato === 'epub' ? 'parte' : 'página';
+    var abrir = function (n) {
+      return function () { abrirLivro(livro.id, livro.formato === 'epub' ? { capitulo: n } : { pagina: n }); };
+    };
+    var botao = function (n) {
+      var rotulo = livro.formato === 'epub' ? String(n) : rotuloDePaginaDoLivro(meta, n);
+      return el('button', { type: 'button', class: 'bib-busca-pagina', 'data-pagina': n,
+        'aria-label': livro.formato === 'epub' ? 'Abrir na parte ' + n : 'Abrir na p. ' + rotulo, texto: rotulo, aoClick: abrir(n) });
+    };
+    var botoes = el('div', { class: 'bib-busca-paginas' });
+    paginas.slice(0, BUSCA_PAGINAS_POR_BLOCO).forEach(function (n) { botoes.appendChild(botao(n)); });
+    if (paginas.length > BUSCA_PAGINAS_POR_BLOCO) {
+      var resto = paginas.slice(BUSCA_PAGINAS_POR_BLOCO);
+      var mais = el('button', { type: 'button', class: 'bib-busca-pagina bib-busca-pagina-mais', texto: '+' + resto.length,
+        'aria-label': 'Mostrar mais ' + plural(resto.length, unidade, unidade + 's'), aoClick: function () {
+          resto.forEach(function (n) { botoes.insertBefore(botao(n), mais); });
+          botoes.removeChild(mais);
+        } });
+      botoes.appendChild(mais);
+    }
+    return el('div', { class: 'bib-busca-livro-grupo' }, [
+      el('div', { class: 'bib-busca-livro-paginas' }, [
+        el('strong', { texto: grupo.titulo || 'Fora dos capítulos do sumário' }),
+        el('span', { class: 'bib-busca-livro-quantas', texto: plural(paginas.length, unidade, unidade + 's') })
+      ]),
+      botoes
     ]);
   }
 
@@ -18069,86 +18149,103 @@
     var status = g.status, resultados = g.resultados;
     var consulta = String(termo || '').trim();
     var vez = ++buscaTextoLivrosVez;
-    resultados.innerHTML = '';
+    var diz = function (t) { g.contagem.textContent = t; if (g.resumo) g.resumo.diz('livros', t); };
     resultados.setAttribute('aria-busy', 'false');
     if (consulta.length < 2) {
-      g.contagem.textContent = '';
+      resultados.innerHTML = '';
+      diz('');
       status.textContent = 'Digite ao menos duas letras para buscar nos livros.';
       return;
     }
     if (!window.IndiceLivros || !window.IndiceLivros.buscarNosLivros) {
-      g.contagem.textContent = '';
+      resultados.innerHTML = '';
+      diz('');
       status.textContent = 'A busca no texto dos livros não está disponível neste aparelho.';
       return;
     }
-    status.textContent = 'Buscando nos livros deste tablet...';
+    // a consulta anterior para no meio: a varredura confere a vez entre um lote e outro
+    var cancelada = function () { return vez !== buscaTextoLivrosVez; };
+    if (!resultados.childNodes.length) status.textContent = 'Buscando nos livros deste tablet...';
     resultados.setAttribute('aria-busy', 'true');
-    window.IndiceLivros.buscarNosLivros(consulta).then(function (res) {
-      if (vez !== buscaTextoLivrosVez) return;
+    window.IndiceLivros.buscarNosLivros(consulta, {}, { cancelada: cancelada }).then(function (res) {
+      if (cancelada() || (res && res.cancelada)) return;
       resultados.setAttribute('aria-busy', 'false');
+      resultados.innerHTML = '';
+      var livros = res.livros || [];
       var total = 0;
-      (res.livros || []).forEach(function (livro) {
-        var meta = bibLivrosCache[livro.id] ? bibLivrosCache[livro.id].meta : {};
-        var grupos = livro.capitulos && livro.capitulos.length ? livro.capitulos : [{ titulo: null, paginas: livro.paginas || [] }];
-        var cartao = el('article', { class: 'bib-busca-livro', 'data-livro': livro.id });
-        cartao.appendChild(el('h3', { class: 'bib-busca-livro-titulo', texto: livro.titulo || tituloDoLivro(meta) || livro.id }));
-        if (livro.volume || meta.volume) cartao.appendChild(el('p', { class: 'bib-busca-livro-volume', texto: livro.volume || meta.volume }));
-        grupos.forEach(function (grupo) {
-          var paginas = grupo.paginas || [];
-          if (!paginas.length) return;
-          total += paginas.length;
-          var rotulos = paginas.slice(0, 16).map(function (n) { return rotuloDePaginaDoLivro(meta, n); });
-          if (paginas.length > rotulos.length) rotulos.push('+' + (paginas.length - 16));
-          var unidade = livro.formato === 'epub' ? 'parte' : 'página';
-          var primeira = paginas[0];
-          var acao = livro.formato === 'epub' ? 'Abrir na parte ' + primeira : 'Abrir na p. ' + rotuloDePaginaDoLivro(meta, primeira);
-          cartao.appendChild(el('div', { class: 'bib-busca-livro-grupo' }, [
-            el('div', { class: 'bib-busca-livro-paginas' }, [
-              el('strong', { texto: grupo.titulo || 'Fora dos capítulos do sumário' }),
-              el('div', { texto: rotulos.join(', ') + ' · ' + plural(paginas.length, unidade, unidade + 's') })
-            ]),
-            el('button', { type: 'button', class: 'btn', texto: acao, aoClick: function () {
-              abrirLivro(livro.id, livro.formato === 'epub' ? { capitulo: primeira } : { pagina: primeira });
-            } })
-          ]));
-        });
-        resultados.appendChild(cartao);
-      });
+      livros.forEach(function (l) { (l.capitulos && l.capitulos.length ? l.capitulos : [{ paginas: l.paginas || [] }]).forEach(function (c) { total += (c.paginas || []).length; }); });
+      // o teto: 30 livros ou 200 capítulos por vez, e "Mostrar mais" desenha o resto
+      var proximo = 0;
+      function desenharMais() {
+        var livrosAgora = 0, blocosAgora = 0;
+        while (proximo < livros.length && livrosAgora < BUSCA_LIVROS_POR_VEZ && blocosAgora < BUSCA_BLOCOS_POR_VEZ) {
+          var livro = livros[proximo++];
+          var meta = bibLivrosCache[livro.id] ? bibLivrosCache[livro.id].meta : {};
+          var grupos = livro.capitulos && livro.capitulos.length ? livro.capitulos : [{ titulo: null, paginas: livro.paginas || [] }];
+          var cartao = el('article', { class: 'bib-busca-livro', 'data-livro': livro.id });
+          cartao.appendChild(el('h3', { class: 'bib-busca-livro-titulo', texto: livro.titulo || tituloDoLivro(meta) || livro.id }));
+          if (livro.volume || meta.volume) cartao.appendChild(el('p', { class: 'bib-busca-livro-volume', texto: livro.volume || meta.volume }));
+          grupos.forEach(function (grupo) {
+            if (!(grupo.paginas || []).length) return;
+            blocosAgora++;
+            cartao.appendChild(blocoDoCapitulo(livro, meta, grupo));
+          });
+          resultados.insertBefore(cartao, botaoMais.parentNode ? botaoMais : null);
+          livrosAgora++;
+        }
+        if (proximo < livros.length) {
+          botaoMais.textContent = 'Mostrar mais ' + plural(livros.length - proximo, 'livro', 'livros');
+          if (!botaoMais.parentNode) resultados.appendChild(botaoMais);
+        } else if (botaoMais.parentNode) botaoMais.parentNode.removeChild(botaoMais);
+      }
+      var botaoMais = el('button', { type: 'button', class: 'btn bib-busca-livros-mais', aoClick: function () { desenharMais(); } });
+      desenharMais();
       var pendentes = (res.pendentes || []).length;
-      var nLivros = (res.livros || []).length;
-      if (nLivros) {
-        g.contagem.textContent = plural(total, 'página', 'páginas');
-        status.textContent = plural(total, 'página encontrada', 'páginas encontradas') + ' em ' + plural(nLivros, 'livro', 'livros') + '.';
+      if (livros.length) {
+        diz(plural(total, 'página', 'páginas') + ' em ' + plural(livros.length, 'livro', 'livros'));
+        status.textContent = plural(total, 'página encontrada', 'páginas encontradas') + ' em ' + plural(livros.length, 'livro', 'livros') + '.';
       } else if (pendentes) {
         // a leitura dos livros ainda corre: zero aqui não quer dizer que não existe
-        g.contagem.textContent = 'preparando';
+        diz('preparando');
         status.textContent = 'A busca nos livros ainda está sendo preparada em ' + plural(pendentes, 'livro', 'livros') +
           '. O resultado aparece aqui quando a leitura terminar.';
       } else {
-        g.contagem.textContent = '0';
+        diz('0');
         status.textContent = 'Nenhum livro deste tablet tem esse termo.';
+        // nada nos dois grupos: um estado vazio só, no lugar dos dois
+        if (typeof g.aoVazio === 'function' && g.aoVazio()) return;
       }
-      if (nLivros && pendentes) {
+      if (livros.length && pendentes) {
         resultados.appendChild(el('p', { class: 'ajuda bib-busca-livros-aviso bib-busca-livros-preparando',
           texto: 'Ainda preparando ' + plural(pendentes, 'livro', 'livros') + ': podem aparecer mais resultados.' }));
       }
       var semTexto = avisoDosLivrosSemTexto(res.naoLidos);
       if (semTexto) resultados.appendChild(semTexto);
     }).catch(function () {
-      if (vez !== buscaTextoLivrosVez) return;
+      if (cancelada()) return;
       resultados.setAttribute('aria-busy', 'false');
-      g.contagem.textContent = '';
+      diz('');
       status.textContent = 'Não consegui consultar o índice agora. Tente de novo.';
     });
   }
 
   /* A leitura dos livros andou: com uma busca à vista, o grupo "Nos livros"
-   * se refaz (o "preparando" vira resultado sem ela digitar de novo). */
+   * se refaz quando um LIVRO termina (ou a leitura para), e não a cada
+   * página: com páginas a cada 500 ms, refazer a cada uma dava 120 buscas
+   * inteiras em 60 s. */
+  function precisaRefazerABusca(antes, agora) {
+    if (!agora) return false;
+    if (!antes) return true;
+    return antes.prontos !== agora.prontos || antes.total !== agora.total || antes.rodando !== agora.rodando;
+  }
   function ligarBuscaAoIndice() {
     if (ligarBuscaAoIndice.feito || !window.IndiceLivros || typeof window.IndiceLivros.aoMudar !== 'function') return;
     ligarBuscaAoIndice.feito = true;
-    var espera = null;
-    window.IndiceLivros.aoMudar(function () {
+    var visto = null, espera = null;
+    window.IndiceLivros.aoMudar(function (agora) {
+      var mudouOLivro = precisaRefazerABusca(visto, agora);
+      visto = agora ? { prontos: agora.prontos, total: agora.total, rodando: agora.rodando } : visto;
+      if (!mudouOLivro) return;
       clearTimeout(espera);
       espera = setTimeout(function () {
         var b = buscaLivrosAtual;
@@ -22198,7 +22295,8 @@
       ? (temPacotesDeExercicios() ? 'Buscar nos exercícios e nos livros' : 'Buscar nos livros')
       : 'Buscar nos exercícios';
     campo.setAttribute('aria-label', onde);
-    campo.setAttribute('placeholder', onde + (temLivrosNoTablet ? ' (frações, volume...)' : ' (bhaskara, pitágoras...)'));
+    // com livro, o texto já é longo: sem o exemplo entre parênteses, cabe a 800 px
+    campo.setAttribute('placeholder', temLivrosNoTablet ? onde : onde + ' (bhaskara, pitágoras...)');
     if (temLivrosNoTablet) { cartao.style.display = ''; ligarBuscaBiblioteca(); }
     else if (!temPacotesDeExercicios()) cartao.style.display = 'none';
   }
@@ -22340,44 +22438,73 @@
     var g = procurarNaBiblioteca(termo);
     var total = g.modulo.length + g.teoria.length + g.exercicio.length + g.banco.length;
     var corpo = corpoDaAba;
+    var vazioDaMain = function () {
+      return el('div', { class: 'vazio', texto: 'A biblioteca não tem nada com "' + termo + '". Procure por outra palavra, ou navegue pela série.' });
+    };
     buscaLivrosAtual = null;
+    var ex = null, resumo = null;
     if (temLivrosNoTablet) {
-      // dois grupos: primeiro os exercícios, depois o texto dos livros
-      var ex = grupoDaBusca('exercicios', 'Exercícios');
-      ex.contagem.textContent = String(total);
+      // dois grupos e a linha-resumo no alto: primeiro os exercícios, depois o texto dos livros
+      resumo = resumoDaBusca();
+      resumo.montar(true, true);
+      ex = grupoDaBusca('exercicios', 'Exercícios');
+      corpoDaAba.appendChild(resumo.caixa);
       corpoDaAba.appendChild(ex.grupo);
-      corpoDaAba.appendChild(grupoNosLivros(termo));
+      corpoDaAba.appendChild(grupoNosLivros(termo, resumo, function () {
+        // os livros voltaram vazios: se os exercícios também, um estado vazio só
+        if (total) return false;
+        corpoDaAba.innerHTML = '';
+        corpoDaAba.appendChild(vazioDaMain());
+        return true;
+      }));
       corpo = ex.corpo;
       if (!total) {
-        corpo.appendChild(el('p', { class: 'ajuda bib-grupo-vazio', texto: 'Nenhum exercício, teoria ou módulo com "' + termo + '".' }));
+        ex.contagem.textContent = '0';
+        resumo.diz('exercicios', '0');
+        corpo.appendChild(el('p', { class: 'ajuda bib-grupo-vazio', texto: 'Nenhum exercício com "' + termo + '".' }));
         return;
       }
     } else if (!total) {
-      corpo.appendChild(el('div', { class: 'vazio', texto: 'A biblioteca não tem nada com "' + termo + '". Procure por outra palavra, ou navegue pela série.' }));
+      corpo.appendChild(vazioDaMain());
       return;
     }
+    var linhas = [];   // as linhas que aparecem, para a contagem e o "Ver todos"
+    var porTipo = { modulo: 0, teoria: 0, lista: 0, problema: 0 };
+    function bloco(texto) {
+      var b = el('div', { class: 'bloco-exercicios', texto: texto });
+      corpo.appendChild(b);
+      return b;
+    }
+    function linha(tipo, cabeca, e) {
+      e.dataset.cabeca = cabeca;
+      linhas.push(e);
+      porTipo[tipo]++;
+      corpo.appendChild(e);
+    }
     if (g.modulo.length) {
-      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Módulos' }));
+      bloco('Módulos');
       g.modulo.forEach(function (x) {
         var m = bib.modulos[x.id];
-        corpo.appendChild(linhaBib(m.titulo, Biblioteca.nomeDaSerie(m.serie), function () {
+        linha('modulo', 'Módulos', linhaBib(m.titulo, Biblioteca.nomeDaSerie(m.serie), function () {
           abrirDaBusca({ serie: primeiraSerie(m), modulo: m.chave, aula: null });
         }));
       });
     }
     if (g.teoria.length) {
-      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Teoria' }));
+      bloco('Teoria');
       g.teoria.forEach(function (x) {
         var t = bib.teoriaPorId[x.id];
         var m = bib.modulos[t.serie + ':' + t.modulo.slug];
-        corpo.appendChild(linhaBib(t.aula.titulo, t.modulo.titulo + ', ' + Biblioteca.nomeDaSerie(t.serie) + ', ' +
+        linha('teoria', 'Teoria', linhaBib(t.aula.titulo, t.modulo.titulo + ', ' + Biblioteca.nomeDaSerie(t.serie) + ', ' +
           plural(t.paginas.length, 'página', 'páginas'), function () {
           abrirDaBusca({ serie: primeiraSerie(m), modulo: m.chave, aula: { tipo: 'teoria', id: t.id } });
         }));
       });
     }
     if (g.exercicio.length) {
-      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Exercícios' }));
+      // dentro do grupo "Exercícios", o bloco das listas não repete "Exercícios"
+      var nomeDasListas = ex ? 'Listas' : 'Exercícios';
+      bloco(nomeDasListas);
       // um por lista, na ordem em que a primeira de cada uma aparece (módulo achado, depois nota)
       var listas = [], vistas = {};
       g.exercicio.forEach(function (x) {
@@ -22389,23 +22516,44 @@
       listas.forEach(function (l) {
         var m = bib.modulos[l.it.serie + ':' + l.it.modulo.slug];
         var lista = m.listas[l.it.aula.slug];
-        corpo.appendChild(linhaBib(lista.titulo, l.it.modulo.titulo + ', ' + Biblioteca.nomeDaSerie(l.it.serie) + ', ' +
+        linha('lista', nomeDasListas, linhaBib(lista.titulo, l.it.modulo.titulo + ', ' + Biblioteca.nomeDaSerie(l.it.serie) + ', ' +
           plural(lista.itens.length, 'exercício', 'exercícios'), function () {
           abrirDaBusca({ serie: primeiraSerie(m), modulo: m.chave, aula: { tipo: 'exercicios', slug: lista.slug } });
         }));
       });
     }
     if (g.banco.length) {
-      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Banco de Questões' }));
+      bloco('Banco de Questões');
       g.banco.forEach(function (x) {
         var it = bib.itemPorId[x.id];
         var m = bib.modulos[it.serie + ':' + it.modulo.slug];
         var lista = m.listas[it.aula.slug];
-        corpo.appendChild(linhaBib(it.titulo || ('Problema ' + it.numero), it.modulo.titulo + ', ' + it.aula.titulo +
+        linha('problema', 'Banco de Questões', linhaBib(it.titulo || ('Problema ' + it.numero), it.modulo.titulo + ', ' + it.aula.titulo +
           ', problema ' + it.numero, function () {
           verNaBiblioteca({ tipo: 'exercicio', lista: lista, indice: lista.itens.indexOf(it) });
         }));
       });
+    }
+    if (!ex) return;
+    // a contagem conta o que aparece, com a unidade: "9 listas", ou "12 resultados" quando há de mais de um tipo
+    var unidades = { modulo: ['módulo', 'módulos'], teoria: ['aula de teoria', 'aulas de teoria'], lista: ['lista', 'listas'], problema: ['problema', 'problemas'] };
+    var tipos = Object.keys(porTipo).filter(function (k) { return porTipo[k]; });
+    var conta = tipos.length === 1 ? plural(linhas.length, unidades[tipos[0]][0], unidades[tipos[0]][1]) : plural(linhas.length, 'resultado', 'resultados');
+    ex.contagem.textContent = conta;
+    resumo.diz('exercicios', conta);
+    // passou de 5 linhas: o grupo mostra as primeiras e "Ver todos os N", para os livros ficarem na primeira tela
+    if (linhas.length > BUSCA_LINHAS_VISIVEIS) {
+      var escondidas = linhas.slice(BUSCA_LINHAS_VISIVEIS);
+      var cabecasVisiveis = {};
+      linhas.slice(0, BUSCA_LINHAS_VISIVEIS).forEach(function (e) { cabecasVisiveis[e.dataset.cabeca] = true; });
+      escondidas.forEach(function (e) { e.style.display = 'none'; });
+      var blocosEscondidos = Array.prototype.filter.call(corpo.querySelectorAll('.bloco-exercicios'), function (b) { return !cabecasVisiveis[b.textContent]; });
+      blocosEscondidos.forEach(function (b) { b.style.display = 'none'; });
+      corpo.appendChild(el('button', { type: 'button', class: 'btn bib-grupo-ver-todos', texto: 'Ver todos os ' + linhas.length, aoClick: function () {
+        escondidas.forEach(function (e) { e.style.display = ''; });
+        blocosEscondidos.forEach(function (b) { b.style.display = ''; });
+        this.parentNode.removeChild(this);
+      } }));
     }
   }
 

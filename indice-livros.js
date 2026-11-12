@@ -954,9 +954,10 @@
      * põe o livro inteiro (nem todos os livros) na memória de uma vez, e cada
      * lote é uma transação, o que devolve a vez à tela entre eles. */
     var LOTE_DA_BUSCA = 50;
-    function paginasComTermo(id, alvo) {
+    function paginasComTermo(id, alvo, cancelada) {
       var achadas = [];
       function lote(depoisDe) {
+        if (cancelada && cancelada()) return Promise.resolve(achadas);
         return transacao(['paginas'], 'readonly', function (t, dar) {
           var faixa = depoisDe == null ? faixaDoLivro(id) : IDBKeyRange.bound([id, depoisDe], [id, Infinity], true, false);
           var q = t.objectStore('paginas').getAll(faixa, LOTE_DA_BUSCA);
@@ -998,7 +999,9 @@
      *       lida, com acerto ou sem;
      *     pendentes: [ids dos livros do filtro ainda não indexados] }
      * Os livros vêm na ordem do tablet (título). */
-    function buscarNosLivros(termo, filtros) {
+    function buscarNosLivros(termo, filtros, opcoes) {
+      // opcoes.cancelada: função que diz que esta consulta já foi superada (a tela digitou de novo)
+      var cancelada = opcoes && typeof opcoes.cancelada === 'function' ? opcoes.cancelada : null;
       var alvo = normalizar(termo);
       var saida = { termo: String(termo == null ? '' : termo), normalizado: alvo, livros: [], naoLidos: [], pendentes: [] };
       if (!suportado || !temTexto(alvo) || !root.Store) return Promise.resolve(saida);
@@ -1023,7 +1026,7 @@
           }
           if (reg.erro) return;
           // o livro começado já responde pelas páginas lidas
-          seq = seq.then(function () { return paginasComTermo(l.id, alvo); }).then(function (paginas) {
+          seq = seq.then(function () { return cancelada && cancelada() ? [] : paginasComTermo(l.id, alvo, cancelada); }).then(function (paginas) {
             if (!paginas.length) return;
             var caps = capitulosDoLivro(l.meta, reg.total);
             var grupos = caps.map(function (c) { return { n: c.n, titulo: c.titulo, inicio: c.inicio, fim: c.fim, paginas: [] }; });
@@ -1041,7 +1044,7 @@
             });
           });
         });
-        return seq.then(function () { return saida; });
+        return seq.then(function () { if (cancelada && cancelada()) saida.cancelada = true; return saida; });
       });
     }
 
