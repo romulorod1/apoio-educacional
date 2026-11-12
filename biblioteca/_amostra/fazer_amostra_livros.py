@@ -382,6 +382,33 @@ def pdf_sem_texto(caminho, paginas=3):
     return salvar(doc, caminho)
 
 
+def pdf_leitor_400(caminho, paginas=400, por_cap=40):
+    """Livro de 400 paginas para a ancora do leitor continuo (zoom e giro):
+    cada pagina diz o numero dela em letra grande, 10 capitulos no sumario."""
+    doc = pymupdf.open()
+    toc = []
+    for n in range(1, paginas + 1):
+        cap = (n - 1) // por_cap + 1
+        if (n - 1) % por_cap == 0:
+            toc.append([1, 'Capítulo %d: Assunto %d' % (cap, cap), n])
+        pg = doc.new_page(width=W, height=H)
+        pg.insert_text((72, 90), 'Página %d do livro do leitor.' % n, fontname='helv', fontsize=20)
+        pg.draw_rect(pymupdf.Rect(72, 400, 300, 600), color=CORES[cap % 3], fill=CORES[cap % 3])
+    doc.set_toc(toc)
+    return salvar(doc, caminho)
+
+
+def fazer_leitor(pasta):
+    raiz = os.path.join(pasta, 'Leitor')
+    pdf_leitor_400(os.path.join(raiz, 'matematica', 'livro-leitor-400.pdf'))
+    planilha = os.path.join(raiz, 'livros_leitor.csv')
+    with open(planilha, 'w', encoding='utf-8-sig', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=CABECALHO)
+        w.writeheader()
+        w.writerows([linha('matematica', 'Livro do leitor', 'matematica/livro-leitor-400.pdf')])
+    return {'livros': raiz, 'planilha': planilha}
+
+
 def fazer_indice(pasta):
     raiz = os.path.join(pasta, 'Indice')
     pdf_indice_curto(os.path.join(raiz, 'matematica', 'indice-curto.pdf'))
@@ -421,6 +448,15 @@ def principal():
                                         trabalho=os.path.join(pasta, 'trabalho-gabarito'),
                                         gerado_em='2026-10-30T10:00:00-03:00', commit='prova')
         print('%d livros no pacote do gabarito' % manifest['contagens']['livros'])
+        print(rel['zip']['caminho'])
+        return
+    if '--leitor' in sys.argv:
+        import livros
+        c = fazer_leitor(pasta)
+        manifest, rel, _ = livros.gerar(c['planilha'], 'prova-leitor', 1, os.path.join(pasta, 'pacotes'),
+                                        trabalho=os.path.join(pasta, 'trabalho-leitor'),
+                                        gerado_em='2026-11-12T10:00:00-03:00', commit='prova')
+        print('%d livros no pacote do leitor' % manifest['contagens']['livros'])
         print(rel['zip']['caminho'])
         return
     if '--indice' in sys.argv:
