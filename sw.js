@@ -149,7 +149,8 @@
  * O v129 atualiza os assets de Vagos em cache exclusivo. O v134 traz o sumário do mapa
  * quando os marcadores do PDF são lixo. O v135 traz o assunto de volume do 8º ano no
  * banco/topicos/matematica.json. O v136 traz o planejamento de estudos com IA:
- * './planejamento.js' entra na lista, e o fetch deixa passar /api/.
+ * './planejamento.js' entra na lista. O endpoint de IA (/api/ia) só recebe
+ * POST, que o fetch abaixo já deixa passar sem cache.
  */
 var CACHE = 'apoio-educacional-v136';
 var BAIXADOS = 'apoio-educacional-baixados';
@@ -629,10 +630,6 @@ self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
   var url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
-  /* O endpoint de IA (/api/ia) nunca passa pelo cache, nem em GET: a resposta
-   * é de quem está logado e de agora, e um 503 "Sem conexão" do cache
-   * esconderia o erro de verdade. */
-  if (url.pathname.indexOf('/api/') === 0) return;
 
   var navegacao = e.request.mode === 'navigate';
   var daVersao = navegacao || !baixadoDuranteOUso(url.pathname);
