@@ -485,19 +485,35 @@
    * O sumário dos marcadores é INÚTIL (sumarioDosMarcadoresInutil) quando
    * vale tudo isto:
    *   1. o livro é PDF e o sumário veio dos marcadores (sumario_origem);
-   *   2. o mapa tem ao menos um capítulo com título com sentido e página inicial dentro
-   *      do livro (capitulosDoMapaParaSumario);
-   *   3. e, dos marcadores, MAIS DA METADE é sem sentido, OU os que fazem
+   *   2. o mapa tem PELO MENOS 2 capítulos com título com sentido e página
+   *      inicial dentro do livro (capitulosDoMapaParaSumario);
+   *   3. esses capítulos COBREM pelo menos 25% das páginas do livro
+   *      (coberturaDoMapa: a união das faixas pagina a pagina_fim sobre
+   *      meta.paginas; sem meta.paginas não há como medir, e os marcadores
+   *      ficam);
+   *   4. e, dos marcadores, MAIS DA METADE é sem sentido, OU os que fazem
    *      sentido são MENOS DA METADE dos capítulos do mapa (os 2 ou 4
    *      marcadores soltos de um livro de 22 capítulos).
+   * Os itens 2 e 3 existem porque os marcadores, mesmo lixo, ainda levam a
+   * algum lugar (no Praticando 9, ao manual do professor na p. 274), e um
+   * mapa que só conhece um trecho do livro tiraria esses atalhos sem pôr
+   * nada no lugar: o mapa do Praticando 9 tem UMA entrada boa, de 20 das
+   * 394 páginas (5%). Por que 25%: nos pacotes reais (11/2026), os livros
+   * em que a troca é a certa têm mapa de 9 a 36 capítulos cobrindo de 51%
+   * (Teláris 6) a 96% (Tópicos de Física) das páginas; 25% fica a meio
+   * caminho entre os 5% do mapa parcial e os 51% do pior mapa bom, longe dos
+   * dois.
    *
    * O sumário que a tela usa (sumarioDoLivro) vem do MAPA quando o livro é
-   * PDF, o mapa tem capítulo que sirva (o 2 acima) e
-   *   - o sumário do pacote está VAZIO (o PDF sem marcadores de um pacote
-   *     cujo mapa chegou depois, como um volume de uma entrada só), ou
-   *   - o sumário dos marcadores é inútil.
+   * PDF e
+   *   - o sumário do pacote está VAZIO e o mapa tem ao menos UM capítulo que
+   *     sirva, de qualquer tamanho (o PDF sem marcadores de um pacote cujo
+   *     mapa chegou depois, como o volume de uma entrada só do Araribá 8, 7
+   *     de 442 páginas): sem sumário não há atalho a perder; ou
+   *   - o sumário dos marcadores é inútil (os itens 1 a 4).
    * Fora disso fica o do pacote: EPUB, livro sem mapa (com ou sem
-   * sumário), marcadores bons e sumário que já veio do mapa.
+   * sumário), marcadores bons, mapa pequeno ou parcial diante de marcadores,
+   * e sumário que já veio do mapa.
    *
    * O sumário do mapa tem a mesma forma do gerador (sumario_do_mapa):
    * { n, nivel: 1, titulo, pagina, pagina_fim, mapa_n }, em ordem de página.
@@ -513,8 +529,10 @@
     return !/\s/.test(t) && t.indexOf('_') >= 0;
   }
   /* os capítulos do mapa que servem de sumário: número, título COM SENTIDO e
-   * página dentro do livro. Há mapa feito dos próprios marcadores lixo
-   * (Geração Alpha, Praticando 9): ele não serve, e o livro fica como está. */
+   * página dentro do livro. As entradas de mapa feitas dos próprios
+   * marcadores lixo (nomes de arquivo no Geração Alpha e no Praticando 9)
+   * não servem e ficam de fora; o que sobra ainda passa pelos itens 2 e 3
+   * acima antes de tomar o lugar de marcadores. */
   function capitulosDoMapaParaSumario(meta) {
     var total = meta && inteiro(meta.paginas) ? meta.paginas : Infinity;
     return (meta && Array.isArray(meta.mapa) ? meta.mapa : []).filter(function (e) {
@@ -522,13 +540,34 @@
         inteiro(e.pagina) && e.pagina >= 1 && e.pagina <= total;
     });
   }
+  var MINIMO_DE_CAPITULOS_DO_MAPA = 2;
+  var COBERTURA_MINIMA_DO_MAPA = 0.25;
+  /* A fração das páginas do livro dentro de algum capítulo do mapa: a união
+   * das faixas pagina a pagina_fim (sem pagina_fim, só a primeira página),
+   * cortadas no fim do livro, sobre meta.paginas. Sem meta.paginas, 0. */
+  function coberturaDoMapa(meta, caps) {
+    var total = meta && inteiro(meta.paginas) && meta.paginas > 0 ? meta.paginas : 0;
+    if (!total) return 0;
+    var faixas = caps.map(function (e) {
+      var fim = inteiro(e.pagina_fim) ? Math.max(e.pagina, e.pagina_fim) : e.pagina;
+      return [e.pagina, Math.min(total, fim)];
+    }).sort(function (a, b) { return a[0] - b[0]; });
+    var cobertas = 0, ate = 0;
+    faixas.forEach(function (f) {
+      var ini = Math.max(f[0], ate + 1);
+      if (f[1] >= ini) { cobertas += f[1] - ini + 1; ate = f[1]; }
+    });
+    return cobertas / total;
+  }
   function sumarioDosMarcadoresInutil(meta) {
     if (!meta || meta.formato === 'epub' || meta.sumario_origem !== 'marcadores') return false;
     var marcadores = Array.isArray(meta.sumario) ? meta.sumario : [];
     var caps = capitulosDoMapaParaSumario(meta);
     if (!caps.length) return false;
     if (!marcadores.length) return true;
-    var lixo = marcadores.filter(function (e) { return !e || marcadorSemSentido(e.titulo); }).length;
+    // diante de marcadores, só um mapa de verdade: 2 capítulos ou mais, cobrindo 25% do livro
+    if (caps.length < MINIMO_DE_CAPITULOS_DO_MAPA || coberturaDoMapa(meta, caps) < COBERTURA_MINIMA_DO_MAPA) return false;
+    var lixo =marcadores.filter(function (e) { return !e || marcadorSemSentido(e.titulo); }).length;
     var uteis = marcadores.length - lixo;
     return lixo * 2 > marcadores.length || uteis * 2 < caps.length;
   }
@@ -1297,6 +1336,7 @@
     resolverPaginaDoLeitor: resolverPaginaDoLeitor, conferirNumeracao: conferirNumeracao, paraRomano: paraRomano, deRomano: deRomano,
     mapaDoLivro: mapaDoLivro, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
     marcadorSemSentido: marcadorSemSentido, sumarioDosMarcadoresInutil: sumarioDosMarcadoresInutil, sumarioDoLivro: sumarioDoLivro,
+    coberturaDoMapa: coberturaDoMapa, COBERTURA_MINIMA_DO_MAPA: COBERTURA_MINIMA_DO_MAPA,
     TETO_DE_PAGINAS_EXPORTADAS: TETO_DE_PAGINAS_EXPORTADAS, livroTemGabarito: livroTemGabarito,
     estimarPdfExportado: estimarPdfExportado, AVISO_DE_TAMANHO_EXPORTADO: AVISO_DE_TAMANHO_EXPORTADO,
     partesDoCapitulo: partesDoCapitulo, paginasEscolhidas: paginasEscolhidas, descreverUnidades: descreverUnidades,

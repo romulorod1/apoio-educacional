@@ -46,6 +46,13 @@
  *   --envenenado-sumario-dos-marcadores  sumarioDoLivro devolve sempre o
  *                                 sumário do pacote, como a main antes do
  *                                 conserto: os "pageN" continuam.
+ *   6b. diante de marcadores, só um mapa de verdade os substitui: 2 capítulos
+ *      ou mais, cobrindo pelo menos 25% das páginas. O Praticando 9 (lixo e
+ *      1 entrada boa de 5%) fica; Teláris e Matemática e Realidade trocam;
+ *      o vazio com 1 entrada troca; a fronteira de 24% e 25%, e de 1 e 2
+ *      capítulos.
+ *   --envenenado-mapa-parcial-troca  sem a exigência de 2 capítulos e 25%:
+ *                                 o Praticando 9 perde os marcadores.
  *
  *   node _teste/testa_livros_regras.js [--envenenado-...]
  */
@@ -58,7 +65,7 @@ const Sintetico = require('./_pacote_sintetico.js');
 const RAIZ = path.join(__dirname, '..');
 const VENENOS = ['--envenenado-cortado-le-tudo', '--envenenado-teto-antigo', '--envenenado-sem-ano',
   '--envenenado-correcao-ignorada', '--envenenado-correcao-sem-titulo', '--envenenado-respostas-no-capitulo',
-  '--envenenado-fim-do-capitulo-tira', '--envenenado-sumario-dos-marcadores'];
+  '--envenenado-fim-do-capitulo-tira', '--envenenado-sumario-dos-marcadores', '--envenenado-mapa-parcial-troca'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 
 let passes = 0, falhas = 0;
@@ -94,6 +101,7 @@ const FILTRO_DE_ANO = 'if (!ano) return true;';
 const CORRECAO_VALE = 'var vale = !!c && c.titulo === e.titulo && Array.isArray(c.assuntos);';
 const TIRA_AS_RESPOSTAS = 'var semRespostas = todas.filter(function (u) { return respostas.indexOf(u) < 0; });';
 const SUMARIO_DO_MAPA = 'if (!doMapa) return sumario;';
+const SO_MAPA_DE_VERDADE = 'if (caps.length < MINIMO_DE_CAPITULOS_DO_MAPA || coberturaDoMapa(meta, caps) < COBERTURA_MINIMA_DO_MAPA) return false;';
 const GAB_SO_DO_LIVRO = "var doLivro = g && g.como !== 'fim_do_capitulo' ? g.faixas : [];";
 const TROCAS = {
   '--envenenado-cortado-le-tudo': [RELANCA_CORTADO, ''],
@@ -103,7 +111,8 @@ const TROCAS = {
   '--envenenado-correcao-sem-titulo': [CORRECAO_VALE, 'var vale = !!c && Array.isArray(c.assuntos);'],
   '--envenenado-respostas-no-capitulo': [TIRA_AS_RESPOSTAS, 'var semRespostas = todas;'],
   '--envenenado-fim-do-capitulo-tira': [GAB_SO_DO_LIVRO, 'var doLivro = g ? g.faixas : [], doFim = [];'],
-  '--envenenado-sumario-dos-marcadores': [SUMARIO_DO_MAPA, 'return sumario;']
+  '--envenenado-sumario-dos-marcadores': [SUMARIO_DO_MAPA, 'return sumario;'],
+  '--envenenado-mapa-parcial-troca': [SO_MAPA_DE_VERDADE, '']
 };
 const troca = TROCAS[MODO] || null;
 const Biblioteca = carregar('biblioteca.js', troca);
@@ -365,12 +374,12 @@ const Biblioteca = carregar('biblioteca.js', troca);
     // a fronteira da metade, dos dois lados
     const metade = (uteis, nCaps) => Biblioteca.sumarioDosMarcadoresInutil(livroPdf(
       marcadores(Array.from({ length: uteis }, (_, i) => 'Unidade ' + (i + 1))), 'marcadores',
-      Array.from({ length: nCaps }, (_, i) => cap(i + 1, 'Cap ' + (i + 1), 1 + i, 1 + i, []))));
+      Array.from({ length: nCaps }, (_, i) => cap(i + 1, 'Cap ' + (i + 1), 1 + 4 * i, 4 + 4 * i, []))));
     conf('5 marcadores bons para 10 capítulos (a metade): ficam os marcadores', metade(5, 10), false);
     conf('4 marcadores bons para 10 capítulos (menos da metade): vale o mapa', metade(4, 10), true);
     const misto = (lixo, bons) => Biblioteca.sumarioDosMarcadoresInutil(livroPdf(
       marcadores(Array.from({ length: lixo }, (_, i) => 'page' + i).concat(Array.from({ length: bons }, (_, i) => 'Unidade ' + i))),
-      'marcadores', [cap(1, 'Um capítulo', 1, 40, [])]));
+      'marcadores', [cap(1, 'Um capítulo', 1, 20, []), cap(2, 'Outro capítulo', 21, 40, [])]));
     conf('metade lixo e metade bom: ficam os marcadores', misto(3, 3), false);
     conf('mais da metade lixo: vale o mapa', misto(4, 3), true);
     const sem = t => Biblioteca.marcadorSemSentido(t);
@@ -378,6 +387,60 @@ const Biblioteca = carregar('biblioteca.js', troca);
       'GA_MAT_9_LP_4ED_PNLD24_OB', 'PMR9_001_272', 'livro.pdf', '  '].filter(sem).length, 13);
     conf('títulos com sentido', ['Frações', 'Capítulo 1: Números', 'Parte 1 (p.1-340)', '1', 'x', 'Paginação e leitura',
       'Página 7 de exercícios', 'Volume'].filter(sem).join(','), '');
+  }
+
+  secao('6b. Diante de marcadores, só um mapa de verdade: 2 capítulos ou mais, cobrindo 25% do livro');
+  const comPaginas = (meta, paginas) => Object.assign(meta, { paginas });
+  // o Praticando 9: 4 marcadores lixo (um deles leva ao manual do professor, na p. 274) e um mapa de 4 lixo e 1 boa
+  const praticando = comPaginas(livroPdf([{ n: 1, nivel: 1, titulo: 'PMR9_1capa', pagina: 1 },
+    { n: 2, nivel: 1, titulo: 'PMR9_001_272', pagina: 2 }, { n: 3, nivel: 1, titulo: 'PMR9_MP_001_120', pagina: 274 },
+    { n: 4, nivel: 1, titulo: 'PMR9_MP_121_120', pagina: 394 }], 'marcadores',
+  [cap(1, 'PMR9_1capa', 1, 1, []), cap(2, 'PMR9_001_272', 2, 221, []), cap(3, 'Círculo e cilindro', 222, 241, ['MAT09-12']),
+    cap(4, 'PMR9_MP_001_120', 274, 393, []), cap(5, 'PMR9_MP_121_120', 394, 394, [])]), 394);
+  const cobPrat = Biblioteca.coberturaDoMapa(praticando, [praticando.mapa[2]]);
+  if (MODO === '--envenenado-mapa-parcial-troca') {
+    secao('VENENO: o mapa parcial toma o lugar dos marcadores');
+    conf('envenenado: o Praticando 9 fica com 1 capítulo e perde o atalho da p. 274 (defeito enxergado)',
+      Biblioteca.sumarioDoLivro(praticando).length, 1);
+  } else if (MODO !== '--envenenado-sumario-dos-marcadores') {
+    // (o veneno do sumário do pacote já foi enxergado na seção 6; aqui ele desligaria a troca de todos)
+    conf('o Praticando 9: 1 entrada boa de 20 das 394 páginas (' + (100 * cobPrat).toFixed(1) + '%)', cobPrat.toFixed(4), (20 / 394).toFixed(4));
+    conf('o Praticando 9 NÃO troca: os marcadores ficam, com o atalho da p. 274',
+      Biblioteca.sumarioDoLivro(praticando) === praticando.sumario && praticando.sumario[2].pagina === 274, true);
+    // o Teláris: 600 marcadores "pageN" e 9 capítulos de 33 páginas a partir da 13 (297 de 492, 60%)
+    const telaris = comPaginas(livroPdf(Array.from({ length: 600 }, (_, i) => ({ n: i + 1, nivel: 1, titulo: 'page' + (i + 1), pagina: (i % 492) + 1 })),
+      'marcadores', Array.from({ length: 9 }, (_, i) => cap(i + 1, 'Capítulo do Teláris ' + (i + 1), 13 + 33 * i, 45 + 33 * i, []))), 492);
+    conf('o Teláris sintético cobre 297 de 492 páginas', Biblioteca.coberturaDoMapa(telaris, telaris.mapa).toFixed(4), (297 / 492).toFixed(4));
+    conf('o Teláris continua trocando: 9 capítulos', Biblioteca.sumarioDoLivro(telaris).length, 9);
+    // o Matemática e Realidade: 2 "Blank Page" e 22 capítulos de 16 páginas a partir da 14 (352 de 500, 70%)
+    const mer = comPaginas(livroPdf(marcadores(['Blank Page', 'Blank Page']), 'marcadores',
+      Array.from({ length: 22 }, (_, i) => cap(i + 1, 'Capítulo da coleção ' + (i + 1), 14 + 16 * i, 29 + 16 * i, []))), 500);
+    conf('o Matemática e Realidade continua trocando: 22 capítulos', Biblioteca.sumarioDoLivro(mer).length, 22);
+    // o Araribá 8: sumário vazio, uma entrada só, de 7 das 442 páginas (1,6%)
+    const ararib = comPaginas(livroPdf([], 'nenhum', [cap(1, 'Volume', 191, 197, ['MAT08-05'])]), 442);
+    conf('o vazio com 1 entrada de 1,6% continua trocando (sem sumário não há atalho a perder)',
+      linha(Biblioteca.sumarioDoLivro(ararib)), '1:Volume@191-197#1');
+    // a fronteira da cobertura: 100 páginas, 10 marcadores lixo, 2 capítulos
+    const fronteira = (fim2) => comPaginas(livroPdf(marcadores(Array.from({ length: 10 }, (_, i) => 'page' + (i + 1))), 'marcadores',
+      [cap(1, 'Primeiro capítulo', 1, 12, []), cap(2, 'Segundo capítulo', 51, fim2, [])]), 100);
+    const abaixo = fronteira(62), acima = fronteira(63);
+    conf('logo abaixo: 24 de 100 páginas (24%), ficam os marcadores',
+      Biblioteca.coberturaDoMapa(abaixo, abaixo.mapa) + '|' + Biblioteca.sumarioDosMarcadoresInutil(abaixo), '0.24|false');
+    conf('logo acima: 25 de 100 páginas (25%), vale o mapa',
+      Biblioteca.coberturaDoMapa(acima, acima.mapa) + '|' + Biblioteca.sumarioDosMarcadoresInutil(acima), '0.25|true');
+    conf('o limiar é 25%', Biblioteca.COBERTURA_MINIMA_DO_MAPA, 0.25);
+    // a fronteira dos capítulos: 1 capítulo do livro inteiro não troca, 2 trocam
+    const umCap = comPaginas(livroPdf(marcadores(['page1', 'page2']), 'marcadores', [cap(1, 'O livro todo', 1, 100, [])]), 100);
+    const doisCaps = comPaginas(livroPdf(marcadores(['page1', 'page2']), 'marcadores',
+      [cap(1, 'Metade um', 1, 50, []), cap(2, 'Metade dois', 51, 100, [])]), 100);
+    conf('1 capítulo cobrindo 100%: ficam os marcadores', Biblioteca.sumarioDosMarcadoresInutil(umCap), false);
+    conf('2 capítulos cobrindo 100%: vale o mapa', Biblioteca.sumarioDosMarcadoresInutil(doisCaps), true);
+    // a união das faixas: capítulos que se cruzam não contam a mesma página duas vezes
+    conf('a cobertura é a união: 1 a 20 e 10 a 30 dão 30 páginas',
+      Biblioteca.coberturaDoMapa({ paginas: 100 }, [cap(1, 'a', 1, 20, []), cap(2, 'b', 10, 30, []), cap(3, 'c', 12, 15, [])]), 0.3);
+    conf('sem meta.paginas não há como medir: 0, e os marcadores ficam',
+      Biblioteca.coberturaDoMapa({}, [cap(1, 'a', 1, 20, [])]) + '|' +
+      Biblioteca.sumarioDosMarcadoresInutil(Object.assign({}, lixo40, { paginas: undefined })), '0|false');
   }
 
   console.log('\n' + passes + ' passaram, ' + falhas + ' falharam.');

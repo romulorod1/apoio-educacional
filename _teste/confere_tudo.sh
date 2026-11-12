@@ -1270,6 +1270,7 @@ roda "livros (regras) --envenenado-respostas-no-capitulo" node "_teste/testa_liv
 roda "livros (regras) --envenenado-fim-do-capitulo-tira" node "_teste/testa_livros_regras.js" --envenenado-fim-do-capitulo-tira
 # O sumario que a tela usa: marcadores lixo e sumario vazio dao lugar ao mapa.
 roda "livros (regras) --envenenado-sumario-dos-marcadores" node "_teste/testa_livros_regras.js" --envenenado-sumario-dos-marcadores
+roda "livros (regras) --envenenado-mapa-parcial-troca" node "_teste/testa_livros_regras.js" --envenenado-mapa-parcial-troca
 # B3: a pagina impressa do livro (trechos romanos e arabicos, mudanca no meio,
 # ida e volta em todas as paginas, tela e leitor mostrando a impressa e abrindo
 # e gravando em pagina do arquivo, e recusa so do livro com numeracao invalida).
