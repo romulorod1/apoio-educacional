@@ -156,9 +156,10 @@
  * O v143 traz o planejamento de estudos com IA: './planejamento.js' entra na
  * lista. O endpoint de IA (/api/ia) só recebe POST, que o fetch abaixo já deixa
  * passar sem cache. O v148 traz o aviso de novidades do planejamento.
- * O v151 traz a correção dos módulos ligados a 14 assuntos no banco/topicos/matematica.json.
+ * O v152 reorganiza a janela da aula em duas colunas no tablet.
+ * O v153 traz a correção dos módulos ligados a 14 assuntos no banco/topicos/matematica.json.
  */
-var CACHE = 'apoio-educacional-v151';
+var CACHE = 'apoio-educacional-v153';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
