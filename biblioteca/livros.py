@@ -585,7 +585,10 @@ DENSIDADE_MINIMA = 0.2
 # O TITULO NO FIM DO TEXTO (item 12a): em alguns PDFs o cabeçalho corrido sai
 # no fim do texto extraído da página. No Praticando 8 e 9 o título "Respostas
 # dos exercícios" é a ÚLTIMA linha da primeira página da seção. Por isso o
-# título também vale nas LINHAS_DO_FIM últimas linhas da página do PDF.
+# título também vale nas LINHAS_DO_FIM últimas linhas da página do PDF. O
+# título achado SÓ ali vale apenas com número de capítulo ou de unidade nas
+# respostas (o caso 3a): sem número, o "Respostas" na última linha de um
+# sumário (o ca2, página 6, no ensaio) viraria gabarito do fim da entrada.
 LINHAS_DO_FIM = 2
 # A CONTINUAÇÃO da seção (item 12a): nesses livros o título está só na
 # primeira página, e as seguintes são só respostas, sem título. A seção segue
@@ -737,7 +740,8 @@ def propor_gabaritos(textos, capitulos, formato='pdf'):
             onde = range(len(ls))
         for k in onde:
             if TITULO_DE_RESPOSTAS.match(ls[k]):
-                titulo_em[i + 1] = (k / max(1, len(ls)), ls[k])
+                # o terceiro campo diz se o titulo so foi achado nas ultimas linhas (LINHAS_DO_FIM)
+                titulo_em[i + 1] = (k / max(1, len(ls)), ls[k], formato == 'pdf' and k >= LINHAS_DO_ALTO)
                 break
     manual = [i + 1 for i, t in enumerate(textos) if NO_MANUAL.search(' '.join(linhas[i]))]
 
@@ -868,6 +872,13 @@ def propor_gabaritos(textos, capitulos, formato='pdf'):
             continue
         # 3b. sem numero de capitulo: so vale no FIM de um capitulo, dentro dele
         cap = capitulo_de(a)
+        if titulo_em[a][2]:
+            # o titulo so nas ultimas linhas, sem numero de capitulo: no fim de
+            # um sumario ("... Respostas"), por exemplo. Ele so vale com marcas (3a)
+            saida['linhas'].append({'tipo': 'descartado', 'gabarito': [[a, b]], 'certeza': 'baixa', 'achado': evidencia,
+                                    'observacao': 'título de respostas só no fim do texto da página, sem número de capítulo '
+                                                  'nas respostas: não se sabe de que capítulo são; ignorado'})
+            continue
         if cap and capitulo_de(b) is cap and b >= cap['fim'] - 1 and a > cap['ini'] and cap['n'] not in usadas \
                 and densidade < DENSIDADE_DO_FIM_DO_CAPITULO:
             saida['linhas'].append({'tipo': 'descartado', 'gabarito': [[a, b]], 'certeza': 'baixa', 'achado': evidencia,

@@ -350,6 +350,21 @@ def titulo_no_fim(placar):
     if rv is not None:
         placar.conferir('gabarito: a entrada "Respostas" do mapa ignorada (a página rala corta a seção)',
                         esperado(rv, ESPERADO_FIM), deve_reprovar=True)
+    # o outro lado do titulo no fim: "Respostas" na ultima linha do sumario,
+    # que e denso de linhas numeradas, no fim da entrada "Paginas iniciais e
+    # sumario", NAO e gabarito (o ca2, pagina 6, no ensaio com o livro real)
+    sumario = [pag('Créditos e apresentação do livro, sem resposta nenhuma aqui.'),
+               pag('Sumário', '1. Conjuntos 10', '2. Funções 30', '3. Função afim 50', '4. Função quadrática 70',
+                   '5. Geometria 90', '6. Trigonometria 110', '7. Estatística 130', 'Respostas')]
+    sumario += [pag('Capítulo 1', CONTEUDO)] * 2 + [pag('Capítulo 2', CONTEUDO)] * 2
+    sc = caps((1, 2), (3, 4), (5, 6), numeros=[None, 1, 2])
+    r = livros.propor_gabaritos(sumario, sc)
+    placar.conferir('gabarito: "Respostas" na última linha do sumário não é gabarito da entrada do sumário',
+                    esperado(r, {}) + ([] if any('só no fim do texto' in l.get('observacao', '') for l in r['linhas'])
+                                       else ['a planilha não diz: %r' % r['linhas']]))
+    rv = com_fonte_trocada(placar, 'título só no fim', 'if titulo_em[a][2]:', 'if False:', sumario, sc)
+    if rv is not None:
+        placar.conferir('gabarito: o título só no fim aceito sem número de capítulo', esperado(rv, {}), deve_reprovar=True)
     # sem a entrada no mapa (o mapa so com as unidades), a continuacao vai pela
     # densidade de cada pagina
     densas, _ = livro_titulo_no_fim(pagina_rala=False)
