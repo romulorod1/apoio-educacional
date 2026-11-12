@@ -26517,4 +26517,3 @@
     iniciar();
   }
 })();
-// medicao do CI (#174): commit de teste, sai no commit seguinte
