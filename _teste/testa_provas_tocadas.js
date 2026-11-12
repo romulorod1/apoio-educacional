@@ -205,6 +205,8 @@ conf('nenhum nome: zero fatias', fatiasDoPlano([], tempos, med), 0);
 conf('um nome: uma fatia', fatiasDoPlano([nav.ordem[0]], tempos, med), 1);
 conf('a bateria inteira: oito fatias, nunca mais', fatiasDoPlano(nav.ordem, tempos, med), 8);
 conf('nunca mais fatias que nomes', fatiasDoPlano(nav.ordem.slice(0, 2), { [nav.ordem[0]]: 9999, [nav.ordem[1]]: 9999 }, med), 2);
+nn = nomesDaSelecao(provasTocadas(['app.js'], mapa, nav), ['app.js'], nav);
+conf('o app.js sozinho: nenhum veneno na selecao', nn.filter(ehVeneno).length, 0);
 const tApp = nn.reduce((s, n) => s + (Object.prototype.hasOwnProperty.call(tempos, n) ? tempos[n] : med), 0);
 const nApp = fatiasDoPlano(nn, tempos, med);
 conf('app.js: uma fatia a cada ' + ALVO_POR_FATIA / 60 + ' min de prova previstos (' + (tApp / 60).toFixed(1) + ' min, ' + nApp + ' fatias)',

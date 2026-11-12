@@ -56,7 +56,7 @@ const { execFileSync } = require('child_process');
 const RAIZ = path.join(__dirname, '..');
 const MAPA = path.join(__dirname, 'mapa_provas.tsv');
 const PORTAO = path.join(__dirname, 'confere_tudo.sh');
-const ALVO_POR_FATIA = 8 * 60;   // segundos de prova por fatia do nivel 1
+const ALVO_POR_FATIA = 5 * 60;   // segundos de prova por fatia do nivel 1 (5 min: relogio de uns 7 min com o preparo)
 const MAX_FATIAS = 8;
 const VENENO = /--envenenado/;
 

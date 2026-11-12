@@ -18,7 +18,7 @@
 #                      "--envenenado": os venenos sao da bateria do "pronto" e
 #                      da prova que o PR muda (POLITICA_TESTES, nivel 1). O job
 #                      portao-tocadas-plano conta o tempo previsto da selecao e
-#                      abre de 0 a 8 fatias (uma a cada 8 min de prova,
+#                      abre de 0 a 8 fatias (uma a cada 5 min de prova,
 #                      _teste/provas_tocadas.js), e o job portao-tocadas junta.
 #                      Com o rotulo "pronto" o plano abre zero fatias e o
 #                      juntador fica verde, porque a bateria inteira cobre tudo.
