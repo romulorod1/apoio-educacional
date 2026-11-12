@@ -114,7 +114,7 @@ const APAGA_ESPERANDO = "      return new Promise(function (ok) { var q = indexe
   "q.onsuccess = function () { ok(r); }; q.onerror = function () { ok(r); }; });";
 const SEM_ACENTO = ".replace(/[\\u0300-\\u036f]/g, '')";
 // 12/11/2026: a busca procura também nos capítulos e assuntos do mapa; o veneno desliga isso
-const BUSCA_NOS_CAPITULOS = 'return Biblioteca.procurarNosCapitulos(indiceDosCapitulosDaBiblioteca(), termo, normalizadorDaBusca());';
+const BUSCA_NOS_CAPITULOS = 'return Biblioteca.procurarNosCapitulos(indiceDosCapitulosDaBiblioteca(), termo, normalizadorDaBusca(), palavrasDaBuscaNosLivros());';
 
 secao('0. As âncoras e os venenos');
 conf('a lista de venenos não está vazia', VENENOS.length > 0, true);
@@ -387,8 +387,10 @@ async function importar(pag, arquivo) {
   conf('e só no Livro B', (r.livros || []).map(l => l.id).join(','), 'indice-longo');
   r = await buscar(pag, 'paragrafo 3 do capitulo 2');
   const d = (r.livros || []).find(l => l.id === 'livro-de-prova');
-  conf('o EPUB responde pela parte 2, no Capítulo 2: O meio',
-    d ? JSON.stringify([d.unidade, d.capitulos.map(c => [c.titulo, c.paginas])]) : '', JSON.stringify(['parte', [['Capítulo 2: O meio', [2]]]]));
+  // todas as palavras ficam em mais de uma parte ("Parágrafo 3 do capítulo 1" tem o 2 noutro parágrafo); a frase exata, só na parte 2
+  conf('o EPUB responde pela parte 2, no Capítulo 2: O meio, com a frase exata',
+    d ? JSON.stringify([d.unidade, d.paginas.indexOf(2) >= 0, d.capitulos.filter(c => c.paginasComFrase.length).map(c => [c.titulo, c.paginasComFrase])]) : '',
+    JSON.stringify(['parte', true, [['Capítulo 2: O meio', [2]]]]));
   r = await buscar(pag, 'paragrafo', { disciplina: 'literatura' });
   conf('o filtro de disciplina deixa só o livro de literatura', (r.livros || []).map(l => l.id).join(','), 'livro-de-prova');
   r = await buscar(pag, 'mediana', { ano: '08' });
@@ -443,6 +445,8 @@ async function importar(pag, arquivo) {
   const larguraBusca = await pag.evaluate(() => {
     document.documentElement.style.fontSize = '130%';
     const caixa = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"]');
+    const ver = caixa && caixa.querySelector('.bib-busca-ver-paginas');
+    if (ver && ver.getAttribute('aria-expanded') !== 'true') ver.click();
     const botao = caixa && caixa.querySelector('.bib-busca-pagina');
     const r = botao && botao.getBoundingClientRect();
     const medida = { rolaDeLado: document.documentElement.scrollWidth > innerWidth + 1,
@@ -477,14 +481,14 @@ async function importar(pag, arquivo) {
     const caixa = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-longo"]');
     const aviso = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-sem-texto');
     return { status: document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status').textContent,
-      livros: [...document.querySelectorAll('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados .bib-busca-livro[data-livro]')].map(x => x.dataset.livro).join(','),
+      livros: [...new Set([...document.querySelectorAll('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados .bib-busca-livro-grupo[data-livro]')].map(x => x.dataset.livro))].join(','),
       grupo: caixa ? caixa.querySelector('.bib-busca-livro-paginas').textContent : '',
-      botao: caixa && caixa.querySelector('.bib-busca-pagina') ? caixa.querySelector('.bib-busca-pagina').getAttribute('aria-label') : '',
+      botao: caixa && caixa.querySelector('.bib-busca-abrir') ? caixa.querySelector('.bib-busca-abrir').getAttribute('aria-label') : '',
       aviso: aviso ? aviso.querySelector('summary').textContent : '', avisoAberto: aviso ? aviso.open : null,
       quais: aviso ? [...aviso.querySelectorAll('li')].map(li => li.dataset.livro + '=' + li.textContent).join('|') : '' };
-  }), v => !!v && /1 página encontrada em 1 livro/.test(v.status) && /Abrir na p\. 200/.test(v.botao), 10000);
+  }), v => !!v && /1 página encontrada em 1 livro/.test(v.status) && /p\. 200$/.test(v.botao), 10000);
   conf('só o texto do Livro B tem "paralelepípedo": um livro, a parte e a página 200',
-    telaLongo.valor && telaLongo.valor.livros + ' | ' + /Parte 2/.test(telaLongo.valor.grupo) + ' | ' + /1 página$/.test(telaLongo.valor.grupo) + ' | ' + telaLongo.valor.botao, 'indice-longo | true | true | Abrir na p. 200');
+    telaLongo.valor && telaLongo.valor.livros + ' | ' + /Parte 2/.test(telaLongo.valor.grupo) + ' | ' + /1 página$/.test(telaLongo.valor.grupo) + ' | ' + telaLongo.valor.botao, 'indice-longo | true | true | Abrir na primeira página encontrada, p. 200');
   conf('o livro escaneado não aparece no resultado, e o aviso diz que há texto que não foi lido',
     telaLongo.valor && telaLongo.valor.aviso + ' | ' + telaLongo.valor.avisoAberto + ' | ' + /indice-sem-texto/.test(telaLongo.valor.livros),
     '1 livro escaneado entra só pelos capítulos e assuntos; 1 livro tem páginas sem texto. | false | false');
@@ -499,7 +503,7 @@ async function importar(pag, arquivo) {
     (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''), v => /1 página encontrada/.test(v), 10000);
   await pausa(300);
   conf('o aviso dispensado não volta na busca seguinte', await pag.evaluate(() => !document.querySelector('#bib-corpo .bib-busca-livros-sem-texto')), true);
-  await pag.evaluate(() => document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-longo"] .bib-busca-pagina').click());
+  await pag.evaluate(() => document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-longo"] .bib-busca-abrir').click());
   const leitorLongo = await esperar('o resultado abre na página 200', () => pag.evaluate(() =>
     document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada || ''), v => v === '200', 20000);
   conf('abrir o resultado do Livro B leva à página 200 do arquivo', leitorLongo.ok, true);
@@ -633,13 +637,13 @@ async function importar(pag, arquivo) {
     const g = document.querySelector('#bib-corpo [data-grupo="livros"]');
     if (!g) return null;
     const livro = id => {
-      const c = g.querySelector('.bib-busca-livros-resultados .bib-busca-livro[data-livro="' + id + '"]');
-      return c ? [...c.querySelectorAll('.bib-busca-livro-grupo')].map(b => [b.querySelector('.bib-busca-livro-paginas strong').textContent,
-        b.dataset.pelo, (b.querySelector('.bib-busca-como') || {}).textContent || '',
+      const bs = [...g.querySelectorAll('.bib-busca-livros-resultados .bib-busca-livro-grupo[data-livro="' + id + '"]')];
+      return bs.length ? bs.map(b => [b.querySelector('.bib-busca-livro-paginas strong').textContent,
+        b.dataset.pelo, (b.querySelector('.bib-busca-como') || {}).textContent || '', (b.querySelector('.bib-busca-livro-quantas') || {}).textContent || '',
         !!b.querySelector('.bib-busca-abrir-capitulo'), [...b.querySelectorAll('.bib-busca-pagina')].map(x => x.dataset.pagina).join(',')]) : null;
     };
     return { status: g.querySelector('.bib-busca-livros-status').textContent, contagem: g.querySelector('.bib-grupo-contagem').textContent,
-      livros: [...g.querySelectorAll('.bib-busca-livros-resultados .bib-busca-livro[data-livro]')].map(x => x.dataset.livro),
+      livros: [...g.querySelectorAll('.bib-busca-livros-resultados .bib-busca-livro-grupo[data-livro]')].map(x => x.dataset.livro),
       K: livro('cap-com-texto'), L: livro('cap-escaneado'),
       aviso: (g.querySelector('.bib-busca-livros-sem-texto > summary') || {}).textContent || '' };
   });
@@ -651,10 +655,10 @@ async function importar(pag, arquivo) {
   const V = vol.valor || {};
   console.log('   "volume": ' + JSON.stringify(V));
   prop('o livro escaneado aparece pelo capítulo "Volume e capacidade", com o botão "Abrir no capítulo"',
-    JSON.stringify(V.L) === JSON.stringify([['Volume e capacidade', 'capitulo', 'Pelo capítulo, assunto: ' + volume.pt.titulo, true, '']]),
+    JSON.stringify(V.L) === JSON.stringify([['Volume e capacidade', 'capitulo', 'Pelo capítulo, assunto: ' + volume.pt.titulo, '', true, '']]),
     '--envenenado-busca-sem-capitulos');
   conf('o livro com texto aparece UMA vez, com o capítulo marcado pelo capítulo e no texto, e as páginas 3 e 4',
-    JSON.stringify(V.K), JSON.stringify([['Capítulo 2: Volume e capacidade', 'capitulo texto', 'Pelo capítulo, assunto: ' + volume.pt.titulo + '·No texto', true, '3,4']]));
+    JSON.stringify(V.K), JSON.stringify([['Capítulo 2: Volume e capacidade', 'capitulo texto', 'Pelo capítulo, assunto: ' + volume.pt.titulo, 'No texto: p. 3 a 4, 2 páginas', true, '3,4']]));
   conf('cada livro aparece uma vez só', V.livros && V.livros.length === new Set(V.livros).size && V.livros.filter(x => /^cap-/.test(x)).length, 2);
   conf('a contagem do grupo e a linha-resumo dizem capítulos, páginas e livros',
     V.contagem + ' | ' + V.status + ' | ' + await pag.evaluate(() => (document.querySelector('#bib-busca-resumo') || {}).textContent || '(sem resumo)'),
@@ -663,23 +667,8 @@ async function importar(pag, arquivo) {
   await pausa(400);
   conf('buscar pelos capítulos não grava: o banco principal (meta e posição) e o índice ficam idênticos',
     (await fotoDoBanco()) === fotoAntes && JSON.stringify(await registrosDoIndice(pag)) === indiceAntes, true);
-  // os prints do resultado, só quando pedidos (PRINTS_BUSCA_CAPITULOS=<pasta>), no tablet de pé e deitado
-  if (process.env.PRINTS_BUSCA_CAPITULOS) {
-    for (const [w, h] of [[800, 1280], [1280, 800]]) {
-      await pag.setViewport({ width: w, height: h, hasTouch: true });
-      await pausa(400);
-      await pag.evaluate(() => {
-        const alvo = document.querySelector('#bib-corpo .bib-busca-livro[data-livro="cap-com-texto"]');
-        const cont = document.querySelector('.conteudo');
-        if (alvo && cont) cont.scrollTop += alvo.getBoundingClientRect().top - cont.getBoundingClientRect().top - 120;
-      });
-      await pausa(300);
-      await pag.screenshot({ path: path.join(process.env.PRINTS_BUSCA_CAPITULOS, 'busca-volume-' + w + 'x' + h + '.png') });
-    }
-    await pag.setViewport({ width: 1280, height: 1000, hasTouch: true });
-  }
   // "Abrir no capítulo" do livro escaneado abre na página em que o capítulo começa (a 2)
-  await pag.evaluate(() => document.querySelector('#bib-corpo .bib-busca-livro[data-livro="cap-escaneado"] .bib-busca-abrir-capitulo').click());
+  await pag.evaluate(() => document.querySelector('#bib-corpo .bib-busca-livro-grupo[data-livro="cap-escaneado"] .bib-busca-abrir-capitulo').click());
   const abriuCap = await esperar('o capítulo do escaneado abre na página 2', () => pag.evaluate(() =>
     (document.querySelector('#modal-leitor-pdf.aberto') && document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada) || ''), v => v === '2', 15000);
   conf('"Abrir no capítulo" abre o livro escaneado na página inicial do capítulo (2)', abriuCap.valor, '2');
@@ -690,7 +679,7 @@ async function importar(pag, arquivo) {
   const chave = await esperar('a busca pela chave do assunto', lerNosLivros, v => !!v && !/Buscando/.test(v.status) && !!v.L, 15000);
   console.log('   "' + daChave + '": ' + JSON.stringify(chave.valor));
   conf('um termo que casa só a chave do assunto acha o capítulo ligado a ele, e diz qual assunto',
-    JSON.stringify(chave.valor && chave.valor.L), JSON.stringify([['Volume e capacidade', 'capitulo', 'Pelo capítulo, assunto: ' + volume.pt.titulo, true, '']]));
+    JSON.stringify(chave.valor && chave.valor.L), JSON.stringify([['Volume e capacidade', 'capitulo', 'Pelo capítulo, assunto: ' + volume.pt.titulo, '', true, '']]));
   // o lado oposto: um termo que não está em nada não acha nada
   await digitar('zqxjkw capitulo');
   const nada = await esperar('a busca por um termo que não existe', lerNosLivros, v => !!v && !/Buscando/.test(v.status), 15000);
@@ -720,6 +709,73 @@ async function importar(pag, arquivo) {
   await pag.evaluate(() => Promise.all([Store.removerLivro('cap-com-texto'), Store.removerLivro('cap-escaneado')]).then(() => IndiceLivros.sincronizar()));
   const quatro = await esperar('o índice de volta aos quatro livros', () => estado(pag), parado(4, 4), 30000);
   conf('os livros da prova saíram, e o índice voltou aos quatro do pacote', quatro.ok, true);
+
+  secao('3.3. Todas as palavras, a relevância e o rótulo de lixo ("volume do cilindro")');
+  /* O padrão dos prints do dono (12/11/2026), com três livros SINTÉTICOS:
+   *   Livro M  o capítulo "Comprimento da circunferência, área do círculo e
+   *            volume do cilindro" (sumário e mapa, p. 2 a 3), com a frase
+   *            no texto da p. 3; volume 2 de uma obra;
+   *   Livro N  física: "volume" só numa página de calor, sem "cilindro";
+   *   Livro O  o marcador "Blank Page" como único sumário, e "o volume do
+   *            cilindro de gás" na p. 2.
+   * O 1º dos melhores resultados é o capítulo com o título; o de calor não
+   * aparece; e "Blank Page" não vira título: vai para "Outras páginas do livro". */
+  const pdfDe = (nome, paginas) => {
+    const arq = path.join(TMP, nome);
+    const r = spawnSync(PYTHON, ['-X', 'utf8', '-c', 'import sys, json, pymupdf\nd = pymupdf.open()\n' +
+      'for t in json.loads(sys.argv[2]):\n    d.new_page().insert_text((72, 90), t)\nd.save(sys.argv[1])', arq, JSON.stringify(paginas)], { encoding: 'utf8' });
+    conf('o PDF ' + nome + ' foi gerado', r.status === 0 && fs.existsSync(arq), true);
+    return fs.existsSync(arq) ? fs.readFileSync(arq) : Buffer.from('');
+  };
+  amb.extras['/rel-m.pdf'] = { tipo: 'application/pdf', corpo: pdfDe('rel-m.pdf', ['Areas de figuras planas.', 'Comprimento da circunferencia.', 'O volume do cilindro e a area da base vezes a altura.', 'Exercicios finais.']) };
+  amb.extras['/rel-n.pdf'] = { tipo: 'application/pdf', corpo: pdfDe('rel-n.pdf', ['Temperatura e escalas.', 'Calor sensivel: o gas aquece e o volume aumenta.', 'Calor latente e mudancas de estado.']) };
+  amb.extras['/rel-o.pdf'] = { tipo: 'application/pdf', corpo: pdfDe('rel-o.pdf', ['Capa.', 'Mistura de gases: o volume do cilindro de gas.', 'Fim.']) };
+  const TITULO_M = 'Comprimento da circunferência, área do círculo e volume do cilindro';
+  await gravarLivros(pag, 'prova-relevancia', [
+    { url: '/rel-m.pdf', meta: { id: 'rel-m', hash: 'sha256:m', titulo: 'Livro M de matemática', volume: 'Volume 2', paginas: 4, sumario_origem: 'marcadores',
+      sumario: [{ n: 1, nivel: 1, titulo: 'Áreas', pagina: 1 }, { n: 2, nivel: 1, titulo: TITULO_M, pagina: 2 }, { n: 3, nivel: 1, titulo: 'Exercícios', pagina: 4 }],
+      mapa: [{ n: 2, titulo: TITULO_M, pagina: 2, pagina_fim: 3, assuntos: [] }] } },
+    { url: '/rel-n.pdf', meta: { id: 'rel-n', hash: 'sha256:n', titulo: 'Livro N de física', paginas: 3, materia: 'fisica',
+      sumario: [{ n: 1, nivel: 1, titulo: 'Calor sensível e calor latente', pagina: 1 }] } },
+    { url: '/rel-o.pdf', meta: { id: 'rel-o', hash: 'sha256:o', titulo: 'Livro O com marcador lixo', paginas: 3, sumario_origem: 'marcadores',
+      sumario: [{ n: 1, nivel: 1, titulo: 'Blank Page', pagina: 1 }] } }]);
+  const sete = await esperar('os três livros da relevância lidos pelo índice', () => estado(pag), parado(7, 7), 60000);
+  conf('os três livros da relevância foram lidos pelo índice (7 de 7)', sete.ok, true);
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'biblioteca');
+  const r33 = await buscar(pag, 'volume do cilindro');
+  conf('no motor, "volume do cilindro" pede as duas palavras: o livro de calor (só "volume") não vem',
+    (r33.livros || []).map(l => l.id).filter(id => /^rel-/.test(id)).sort().join(','), 'rel-m,rel-o');
+  const m33 = (r33.livros || []).find(l => l.id === 'rel-m');
+  conf('e a frase exata em sequência vem contada à parte (a p. 3 do Livro M)', m33 ? JSON.stringify(m33.paginasComFrase) : '', '[3]');
+  await digitar('volume do cilindro');
+  const rel = await esperar('a busca "volume do cilindro" na tela', () => pag.evaluate(() => {
+    const g = document.querySelector('#bib-corpo [data-grupo="livros"]');
+    if (!g) return null;
+    const blocos = [...g.querySelectorAll('.bib-busca-livros-resultados .bib-busca-livro-grupo[data-livro]')];
+    const melhores = [...g.querySelectorAll('.bib-busca-melhores .bib-busca-livro-grupo')];
+    return { status: g.querySelector('.bib-busca-livros-status').textContent,
+      primeiro: melhores[0] ? melhores[0].dataset.livro + ' | ' + melhores[0].querySelector('.bib-busca-livro-paginas strong').textContent + ' | ' +
+        (melhores[0].querySelector('.bib-busca-obra') || {}).textContent : '',
+      livros: [...new Set(blocos.map(b => b.dataset.livro))].filter(x => /^rel-/.test(x)).sort().join(','),
+      titulosO: blocos.filter(b => b.dataset.livro === 'rel-o').map(b => b.querySelector('.bib-busca-livro-paginas strong').textContent).join('|'),
+      blankPage: /Blank Page/.test(g.textContent),
+      linhaM: (melhores[0] && melhores[0].querySelector('.bib-busca-livro-quantas') || {}).textContent || '',
+      abrirM: melhores[0] ? [...melhores[0].querySelectorAll('.bib-busca-acoes .btn')].map(b => b.textContent).join('|') : '',
+      paginasVisiveis: melhores[0] ? [...melhores[0].querySelectorAll('.bib-busca-pagina')].filter(b => b.offsetParent !== null).length : -1 };
+  }), v => !!v && !/Buscando/.test(v.status) && /rel-o/.test(v.livros), 15000);
+  const R = rel.valor || {};
+  console.log('   "volume do cilindro": ' + JSON.stringify(R));
+  conf('o 1º dos melhores resultados é o capítulo com "volume do cilindro" no título, com o volume ao lado da obra', R.primeiro,
+    'rel-m | ' + TITULO_M + ' | Livro M de matemática, vol. 2');
+  conf('o livro de calor (só "volume", sem "cilindro") não aparece', R.livros, 'rel-m,rel-o');
+  conf('"Blank Page" não vira título: a página dele vai para "Outras páginas do livro"', R.titulosO + ' | ' + R.blankPage, 'Outras páginas do livro | false');
+  conf('o capítulo mostra uma linha de páginas e um botão de abrir, sem os números soltos à vista',
+    R.linhaM + ' | ' + R.abrirM + ' | ' + R.paginasVisiveis, 'No texto: p. 3, 1 página | Abrir no capítulo|Ver páginas | 0');
+  await digitar('');
+  await pag.evaluate(() => Promise.all(['rel-m', 'rel-n', 'rel-o'].map(id => Store.removerLivro(id))).then(() => IndiceLivros.sincronizar()));
+  const quatroDeNovo = await esperar('o índice de volta aos quatro livros', () => estado(pag), parado(4, 4), 30000);
+  conf('os livros da relevância saíram, e o índice voltou aos quatro do pacote', quatroDeNovo.ok, true);
 
   secao('4. A página sem texto e a linha no fim');
   const c = depois && depois.livros['indice-sem-texto'];

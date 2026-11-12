@@ -698,27 +698,49 @@
     return saida;
   }
 
-  /* procurarNosCapitulos(indice, termo, normalizar): os capítulos achados,
-   * livro a livro, na ordem do índice:
-   *   [{ id, capitulos: [{ capitulo, peloTitulo, assuntos: [{ id, titulo, pela }] }] }]
-   * `pela` diz se o assunto casou pelo 'titulo' ou pela 'chave'. Termo de
-   * menos de duas letras não procura (a regra da busca no texto). */
-  function procurarNosCapitulos(indice, termo, normalizar) {
+  /* procurarNosCapitulos(indice, termo, normalizar, palavras): os capítulos
+   * achados, livro a livro, na ordem do índice:
+   *   [{ id, capitulos: [{ capitulo, nivel, peloTitulo, assuntos: [{ id, titulo, pela }] }] }]
+   * A regra é a da busca no texto (indice-livros.js, palavrasDaBusca): o
+   * capítulo entra quando TODAS as palavras significativas estão no título
+   * dele ou nos assuntos ligados (título ou chave), juntos. `nivel` é
+   *   'frase'    o título do capítulo, ou o de um assunto, tem a frase inteira;
+   *   'palavras' as palavras estão todas lá, mas não em sequência.
+   * `peloTitulo` diz se o título do capítulo sozinho tem a frase ou todas as
+   * palavras; `assuntos` são os que casaram ao menos uma palavra, e `pela`
+   * diz se pelo 'titulo' ou pela 'chave'. `palavras` é a função das palavras
+   * significativas (IndiceLivros.palavrasDaBusca); sem ela, todas as palavras
+   * contam. Termo de menos de duas letras não procura. */
+  function casaPalavraNoTitulo(texto, p) {
+    if (!texto) return false;
+    if (p.length > 1) return texto.indexOf(p) >= 0;
+    return new RegExp('(^|[^a-z0-9])' + p + '([^a-z0-9]|$)').test(texto);
+  }
+  function procurarNosCapitulos(indice, termo, normalizar, palavras) {
     var norm = typeof normalizar === 'function' ? normalizar : normalizarTermo;
     var alvo = norm(termo);
     var saida = [];
     if (!indice || alvo.length < 2 || !/[a-z0-9]/.test(alvo)) return saida;
-    var comeco = ' ' + alvo;
+    var lista = typeof palavras === 'function' ? palavras(alvo) : alvo.split(/[^a-z0-9]+/).filter(Boolean);
+    if (!lista.length) return saida;
     indice.livros.forEach(function (l) {
       var achados = [];
       l.capitulos.forEach(function (c) {
-        var peloTitulo = !!c.alvo && c.alvo.indexOf(alvo) >= 0;
+        var noTitulo = lista.filter(function (p) { return casaPalavraNoTitulo(c.alvo, p); });
+        var faltam = lista.filter(function (p) { return noTitulo.indexOf(p) < 0; });
+        var frase = !!c.alvo && c.alvo.indexOf(alvo) >= 0;
         var assuntos = [];
         c.assuntos.forEach(function (a) {
-          if (a.alvoTitulo.indexOf(alvo) >= 0) assuntos.push({ id: a.id, titulo: a.titulo, pela: 'titulo' });
-          else if (a.alvoChaves.indexOf(comeco) >= 0) assuntos.push({ id: a.id, titulo: a.titulo, pela: 'chave' });
+          var peloTitulo = lista.filter(function (p) { return casaPalavraNoTitulo(a.alvoTitulo, p); });
+          var pelaChave = lista.filter(function (p) { return peloTitulo.indexOf(p) < 0 && a.alvoChaves.indexOf(' ' + p) >= 0; });
+          if (a.alvoTitulo.indexOf(alvo) >= 0) frase = true;
+          if (!peloTitulo.length && !pelaChave.length) return;
+          faltam = faltam.filter(function (p) { return peloTitulo.indexOf(p) < 0 && pelaChave.indexOf(p) < 0; });
+          assuntos.push({ id: a.id, titulo: a.titulo, pela: peloTitulo.length ? 'titulo' : 'chave' });
         });
-        if (peloTitulo || assuntos.length) achados.push({ capitulo: c, peloTitulo: peloTitulo, assuntos: assuntos });
+        if (!frase && faltam.length) return;
+        achados.push({ capitulo: c, nivel: frase ? 'frase' : 'palavras', assuntos: assuntos,
+          peloTitulo: (!!c.alvo && c.alvo.indexOf(alvo) >= 0) || noTitulo.length === lista.length });
       });
       if (achados.length) saida.push({ id: l.id, capitulos: achados });
     });

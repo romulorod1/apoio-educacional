@@ -87,7 +87,8 @@
     {
       versao: '1.42.61',
       itens: [
-        'Na Biblioteca, a busca também acha os capítulos pelo nome e pelos assuntos ligados, inclusive nos livros escaneados. O botão Abrir no capítulo leva ao começo dele.'
+        'Na Biblioteca, a busca também acha os capítulos pelo nome e pelos assuntos ligados, inclusive nos livros escaneados, e o botão Abrir no capítulo leva ao começo dele.',
+        'A busca nos livros pede todas as palavras digitadas e mostra primeiro os melhores resultados; o resto fica em Mais resultados, com cada capítulo numa linha só.'
       ]
     },
     {
@@ -18165,6 +18166,10 @@
     // a mesma normalização da busca no texto; sem ela, a reserva de biblioteca.js faz o mesmo
     return window.IndiceLivros && typeof window.IndiceLivros.normalizar === 'function' ? window.IndiceLivros.normalizar : null;
   }
+  // as palavras significativas da consulta, a mesma regra da busca no texto (indice-livros.js)
+  function palavrasDaBuscaNosLivros() {
+    return window.IndiceLivros && typeof window.IndiceLivros.palavrasDaBusca === 'function' ? window.IndiceLivros.palavrasDaBusca : null;
+  }
   function indiceDosCapitulosDaBiblioteca() {
     if (indiceDosCapitulos) return indiceDosCapitulos;
     var nomes = assuntosDosLivros || nomesDosCapitulos;
@@ -18184,14 +18189,25 @@
   }
   function capitulosAchadosNaBusca(termo) {
     if (typeof Biblioteca === 'undefined' || typeof Biblioteca.procurarNosCapitulos !== 'function') return [];
-    return Biblioteca.procurarNosCapitulos(indiceDosCapitulosDaBiblioteca(), termo, normalizadorDaBusca());
+    return Biblioteca.procurarNosCapitulos(indiceDosCapitulosDaBiblioteca(), termo, normalizadorDaBusca(), palavrasDaBuscaNosLivros());
+  }
+
+  /* O título que não é capítulo nenhum: o marcador lixo do PDF ("Blank Page",
+   * "Sumário", nome de arquivo), a "Parte III" sem nome, e as páginas fora de
+   * todo capítulo (título nulo). Esses trechos não viram título no resultado:
+   * vão juntos para o fim do livro, como "Outras páginas do livro". */
+  var OUTRAS_PAGINAS = 'Outras páginas do livro';
+  function tituloSemCapitulo(titulo) {
+    var t = String(titulo == null ? '' : titulo).trim();
+    return !t || Biblioteca.marcadorSemSentido(t) || /^(parte|unidade|m[oó]dulo|volume)\s+([ivxlcdm]+|\d+)\.?$/i.test(t);
   }
 
   /* Junta, livro a livro, o que a busca achou pelo capítulo e pelo texto. O
    * livro aparece UMA vez, e o capítulo achado pelos dois caminhos vira um
    * bloco só, marcado das duas formas: o capítulo do texto e o do mapa são o
    * mesmo quando têm o mesmo começo e o mesmo título (os dois vêm do sumário
-   * da tela). Os livros ficam na ordem do tablet, e os blocos, na do livro. */
+   * da tela). Os trechos sem capítulo de verdade viram um bloco só, no fim.
+   * Os livros ficam na ordem do tablet, e os blocos, na do livro. */
   function resultadosDosLivros(porCapitulo, livrosDoTexto) {
     var ordem = Object.keys(bibLivrosCache);
     var porId = Object.create(null), lista = [];
@@ -18205,10 +18221,12 @@
     }
     (livrosDoTexto || []).forEach(function (l) {
       var r = livro(l.id, l);
-      var grupos = l.capitulos && l.capitulos.length ? l.capitulos : [{ titulo: null, inicio: null, paginas: l.paginas || [] }];
+      var grupos = l.capitulos && l.capitulos.length ? l.capitulos
+        : [{ titulo: null, inicio: null, paginas: l.paginas || [], paginasComFrase: l.paginasComFrase || [] }];
       grupos.forEach(function (g) {
         if (!(g.paginas || []).length) return;
-        r.blocos.push({ titulo: g.titulo || null, inicio: typeof g.inicio === 'number' ? g.inicio : null, paginas: g.paginas, achado: null });
+        r.blocos.push({ titulo: g.titulo || null, inicio: typeof g.inicio === 'number' ? g.inicio : null, paginas: g.paginas.slice(),
+          paginasComFrase: (g.paginasComFrase || []).slice(), achado: null });
       });
     });
     (porCapitulo || []).forEach(function (l) {
@@ -18220,12 +18238,68 @@
           return !b.achado && b.titulo !== null && b.inicio === c.inicio && norm(b.titulo) === norm(c.titulo);
         })[0];
         if (mesmo) mesmo.achado = a;
-        else r.blocos.push({ titulo: c.titulo, inicio: c.inicio, paginas: [], achado: a });
+        else r.blocos.push({ titulo: c.titulo, inicio: c.inicio, paginas: [], paginasComFrase: [], achado: a });
       });
-      r.blocos.sort(function (x, y) { return (x.inicio === null ? 1e9 : x.inicio) - (y.inicio === null ? 1e9 : y.inicio); });
+    });
+    lista.forEach(function (r) {
+      var bons = [], outras = null;
+      r.blocos.forEach(function (b) {
+        if (!tituloSemCapitulo(b.titulo)) { bons.push(b); return; }
+        if (!outras) outras = { titulo: OUTRAS_PAGINAS, outras: true, inicio: null, paginas: [], paginasComFrase: [], achado: null };
+        outras.paginas = outras.paginas.concat(b.paginas);
+        outras.paginasComFrase = outras.paginasComFrase.concat(b.paginasComFrase);
+        if (!outras.achado && b.achado) outras.achado = b.achado;
+      });
+      bons.sort(function (x, y) { return (x.inicio === null ? 1e9 : x.inicio) - (y.inicio === null ? 1e9 : y.inicio); });
+      if (outras) {
+        var crescente = function (x, y) { return x - y; };
+        outras.paginas.sort(crescente);
+        outras.paginasComFrase.sort(crescente);
+        bons.push(outras);
+      }
+      r.blocos = bons;
     });
     var lugar = function (id) { var i = ordem.indexOf(id); return i < 0 ? 1e9 : i; };
     return lista.sort(function (a, b) { return lugar(a.id) - lugar(b.id); });
+  }
+
+  /* A RELEVÂNCIA (pedido do dono, 12/11/2026). Do melhor para o pior:
+   *   0  o título do capítulo, ou um assunto ligado, tem a frase inteira;
+   *   1  o título ou os assuntos têm todas as palavras;
+   *   2  só o texto: todas as palavras numa mesma página; dentro dele, mais
+   *      páginas com a frase exata e depois mais páginas vêm primeiro.
+   * "Outras páginas do livro" não disputa o topo. Empate: a ordem do tablet. */
+  function faixaDoBloco(b) {
+    if (b.outras) return 3;
+    if (b.achado) return b.achado.nivel === 'frase' ? 0 : 1;
+    return 2;
+  }
+  function compararBlocos(x, y) {
+    return faixaDoBloco(x.bloco) - faixaDoBloco(y.bloco) ||
+      y.bloco.paginasComFrase.length - x.bloco.paginasComFrase.length ||
+      y.bloco.paginas.length - x.bloco.paginas.length || x.ordem - y.ordem;
+  }
+  var BUSCA_MELHORES = 5;               // o topo do grupo "Nos livros", de qualquer livro
+
+  // "vol. 2" a partir de "Volume 2"; o volume que não começa assim fica como veio
+  function rotuloDoVolume(volume) {
+    var v = String(volume || '').trim();
+    return v.replace(/^volume\s*/i, 'vol. ');
+  }
+  // o livro de vários volumes é uma obra só: o título, sem o volume
+  function chaveDaObra(livro, meta) {
+    var norm = normalizadorDaBusca() || function (t) { return String(t || '').toLowerCase(); };
+    return norm(livro.titulo || (meta && meta.titulo) || livro.id);
+  }
+
+  // "p. 267 a 301, 14 páginas"; com a página impressa quando o livro tem numeração
+  function faixaDePaginas(livro, meta, paginas) {
+    if (!paginas.length) return '';
+    var epub = livro.formato === 'epub';
+    var rotulo = function (n) { return epub ? String(n) : rotuloDePaginaDoLivro(meta, n); };
+    var ini = paginas[0], fim = paginas[paginas.length - 1];
+    var onde = (epub ? (paginas.length > 1 ? 'partes ' : 'parte ') : 'p. ') + rotulo(ini) + (fim !== ini ? ' a ' + rotulo(fim) : '');
+    return onde + ', ' + plural(paginas.length, epub ? 'parte' : 'página', epub ? 'partes' : 'páginas');
   }
 
   // "2 capítulos e 3 páginas em 2 livros", "3 páginas em 1 livro", "1 capítulo em 1 livro"
@@ -18234,12 +18308,14 @@
       .filter(Boolean).join(' e ') + ' em ' + plural(livros, 'livro', 'livros');
   }
 
-  /* Um capítulo do resultado: o nome, por onde foi achado e o caminho de
-   * abrir. Achado pelo mapa ("Pelo capítulo", com o assunto que casou, se foi
-   * por ele), o botão "Abrir no capítulo" abre na página em que ele começa.
-   * Achado no texto ("No texto"), cada página encontrada é um botão que abre
-   * o leitor nela. */
-  function blocoDoCapitulo(livro, meta, bloco) {
+  /* Um capítulo do resultado, compacto: o nome, por onde foi achado, UMA
+   * linha de páginas e UM botão. Achado pelo mapa ("Pelo capítulo", com o
+   * assunto que casou, se foi por ele), o botão é "Abrir no capítulo", na
+   * página em que ele começa; achado só no texto, é "Abrir", na primeira
+   * página encontrada. As páginas uma a uma ficam atrás de "Ver páginas".
+   * `obra`, quando vem, é o nome do livro (e o volume) na linha de cima: o
+   * topo mistura livros. */
+  function blocoDoCapitulo(livro, meta, bloco, obra) {
     var paginas = bloco.paginas || [];
     var epub = livro.formato === 'epub';
     var unidade = epub ? 'parte' : 'página';
@@ -18252,32 +18328,39 @@
         'aria-label': epub ? 'Abrir na parte ' + n : 'Abrir na p. ' + rotulo, texto: rotulo, aoClick: abrir(n) });
     };
     var achado = bloco.achado;
-    var como = el('p', { class: 'bib-busca-como' });
+    var filhos = [];
+    if (obra) filhos.push(el('p', { class: 'bib-busca-obra', texto: obra }));
+    filhos.push(el('div', { class: 'bib-busca-livro-paginas' }, [
+      el('strong', { texto: bloco.titulo || OUTRAS_PAGINAS }),
+      paginas.length ? el('span', { class: 'bib-busca-livro-quantas', texto: 'No texto: ' + faixaDePaginas(livro, meta, paginas) }) : null
+    ].filter(Boolean)));
     if (achado) {
       var assuntos = achado.assuntos.map(function (a) { return a.titulo; });
-      como.appendChild(el('span', { class: 'bib-busca-como-item', 'data-pelo': 'capitulo',
+      filhos.push(el('p', { class: 'bib-busca-como', 'data-pelo': 'capitulo',
         texto: 'Pelo capítulo' + (assuntos.length ? (assuntos.length === 1 ? ', assunto: ' : ', assuntos: ') + assuntos.join('; ') : '') }));
     }
-    if (paginas.length) {
-      if (achado) como.appendChild(el('span', { class: 'bib-busca-como-ponto', 'aria-hidden': 'true', texto: '·' }));
-      como.appendChild(el('span', { class: 'bib-busca-como-item', 'data-pelo': 'texto', texto: 'No texto' }));
-    }
-    var filhos = [
-      el('div', { class: 'bib-busca-livro-paginas' }, [
-        el('strong', { texto: bloco.titulo || 'Fora dos capítulos do sumário' }),
-        paginas.length ? el('span', { class: 'bib-busca-livro-quantas', texto: plural(paginas.length, unidade, unidade + 's') }) : null
-      ].filter(Boolean)),
-      como
-    ];
+    var acoes = el('div', { class: 'bib-busca-acoes' });
     if (achado) {
       var c = achado.capitulo;
       var destino = c.obraInteira || c.inicio === null ? null : epub ? { capitulo: c.inicio, ancora: c.ancora || null } : { pagina: c.inicio };
-      filhos.push(el('button', { type: 'button', class: 'btn pequeno bib-busca-abrir-capitulo',
+      acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno bib-busca-abrir-capitulo',
         'data-inicio': c.inicio === null ? '' : String(c.inicio), texto: 'Abrir no capítulo',
         'aria-label': 'Abrir no capítulo ' + (bloco.titulo || ''), aoClick: function () { abrirLivro(livro.id, destino); } }));
+    } else if (paginas.length) {
+      acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno bib-busca-abrir', 'data-pagina': paginas[0], texto: 'Abrir',
+        'aria-label': 'Abrir na primeira página encontrada, ' + (epub ? 'parte ' + paginas[0] : 'p. ' + rotuloDePaginaDoLivro(meta, paginas[0])),
+        aoClick: abrir(paginas[0]) }));
     }
-    if (paginas.length) {
-      var botoes = el('div', { class: 'bib-busca-paginas' });
+    var botoes = null;
+    if (paginas.length > 1 || (achado && paginas.length)) {
+      botoes = el('div', { class: 'bib-busca-paginas', hidden: true });
+      var ver = el('button', { type: 'button', class: 'btn pequeno bib-busca-ver-paginas', 'aria-expanded': 'false',
+        texto: 'Ver ' + (epub ? 'partes' : 'páginas'), aoClick: function () {
+          botoes.hidden = !botoes.hidden;
+          ver.setAttribute('aria-expanded', botoes.hidden ? 'false' : 'true');
+          ver.textContent = (botoes.hidden ? 'Ver ' : 'Esconder ') + (epub ? 'partes' : 'páginas');
+        } });
+      acoes.appendChild(ver);
       paginas.slice(0, BUSCA_PAGINAS_POR_BLOCO).forEach(function (n) { botoes.appendChild(botao(n)); });
       if (paginas.length > BUSCA_PAGINAS_POR_BLOCO) {
         var resto = paginas.slice(BUSCA_PAGINAS_POR_BLOCO);
@@ -18288,55 +18371,100 @@
           } });
         botoes.appendChild(mais);
       }
-      filhos.push(botoes);
     }
-    var caixa = el('div', { class: 'bib-busca-livro-grupo' }, filhos);
+    if (acoes.childNodes.length) filhos.push(acoes);
+    if (botoes) filhos.push(botoes);
+    var caixa = el('div', { class: 'bib-busca-livro-grupo', 'data-livro': livro.id }, filhos);
     caixa.setAttribute('data-pelo', [achado ? 'capitulo' : '', paginas.length ? 'texto' : ''].filter(Boolean).join(' '));
+    if (bloco.outras) caixa.setAttribute('data-outras', 'true');
     return caixa;
   }
 
   /* Desenha o grupo "Nos livros" com o que veio pelos capítulos (na hora) e
    * pelo texto (`res`, da consulta ao índice; null enquanto ela corre, ou sem
    * ela). `modo`: buscando (o texto ainda vem), semTexto (este aparelho não
-   * busca no texto) ou falhou (a consulta ao texto falhou). */
+   * busca no texto) ou falhou (a consulta ao texto falhou).
+   *
+   * No alto, "Melhores resultados": até 5 capítulos de qualquer livro, pela
+   * relevância. O resto fica em "Mais resultados (N)", recolhido, um cartão
+   * por obra (os volumes do mesmo livro juntos, com o volume ao lado do
+   * capítulo), com os tetos do #162: 30 obras ou 200 capítulos por vez. */
   function desenharResultadosDosLivros(g, porCapitulo, res, modo) {
     var status = g.status, resultados = g.resultados;
     var diz = function (t) { g.contagem.textContent = t; if (g.resumo) g.resumo.diz('livros', t); };
     modo = modo || {};
     resultados.innerHTML = '';
     var livros = resultadosDosLivros(porCapitulo, res ? res.livros : []);
-    var paginas = 0, capitulos = 0;
-    livros.forEach(function (l) { l.blocos.forEach(function (b) { paginas += b.paginas.length; if (b.achado) capitulos++; }); });
-    // o teto: 30 livros ou 200 capítulos por vez, e "Mostrar mais" desenha o resto
-    var proximo = 0;
-    function desenharMais() {
-      var livrosAgora = 0, blocosAgora = 0;
-      while (proximo < livros.length && livrosAgora < BUSCA_LIVROS_POR_VEZ && blocosAgora < BUSCA_BLOCOS_POR_VEZ) {
-        var livro = livros[proximo++];
-        var meta = bibLivrosCache[livro.id] ? bibLivrosCache[livro.id].meta : {};
-        var cartao = el('article', { class: 'bib-busca-livro', 'data-livro': livro.id });
-        cartao.appendChild(el('h3', { class: 'bib-busca-livro-titulo', texto: livro.titulo || tituloDoLivro(meta) || livro.id }));
-        if (livro.volume || meta.volume) cartao.appendChild(el('p', { class: 'bib-busca-livro-volume', texto: livro.volume || meta.volume }));
-        livro.blocos.forEach(function (bloco) {
-          blocosAgora++;
-          cartao.appendChild(blocoDoCapitulo(livro, meta, bloco));
-        });
-        resultados.insertBefore(cartao, botaoMais.parentNode ? botaoMais : null);
-        livrosAgora++;
-      }
-      if (proximo < livros.length) {
-        botaoMais.textContent = 'Mostrar mais ' + plural(livros.length - proximo, 'livro', 'livros');
-        if (!botaoMais.parentNode) resultados.appendChild(botaoMais);
-      } else if (botaoMais.parentNode) botaoMais.parentNode.removeChild(botaoMais);
+    var paginas = 0, capitulos = 0, todos = [], obras = [], obraPorChave = Object.create(null);
+    livros.forEach(function (l) {
+      var meta = bibLivrosCache[l.id] ? bibLivrosCache[l.id].meta : {};
+      var chave = chaveDaObra(l, meta);
+      if (!obraPorChave[chave]) { obraPorChave[chave] = { chave: chave, titulo: l.titulo || tituloDoLivro(meta) || l.id, volumes: [] }; obras.push(obraPorChave[chave]); }
+      obraPorChave[chave].volumes.push(l);
+      l.blocos.forEach(function (b) {
+        paginas += b.paginas.length;
+        if (b.achado) capitulos++;
+        todos.push({ livro: l, meta: meta, bloco: b, ordem: todos.length });
+      });
+    });
+    var nomeComVolume = function (l, meta) {
+      var v = l.volume || meta.volume;
+      return (l.titulo || meta.titulo || l.id) + (v ? ', ' + rotuloDoVolume(v) : '');
+    };
+    var melhores = todos.filter(function (x) { return !x.bloco.outras; }).sort(compararBlocos).slice(0, BUSCA_MELHORES);
+    if (melhores.length) {
+      var topo = el('section', { class: 'bib-busca-melhores', 'aria-label': 'Melhores resultados nos livros' }, [
+        el('h3', { class: 'bib-busca-melhores-titulo', texto: 'Melhores resultados' })]);
+      melhores.forEach(function (x) { topo.appendChild(blocoDoCapitulo(x.livro, x.meta, x.bloco, nomeComVolume(x.livro, x.meta))); });
+      resultados.appendChild(topo);
     }
-    var botaoMais = el('button', { type: 'button', class: 'btn bib-busca-livros-mais', aoClick: function () { desenharMais(); } });
-    desenharMais();
+    var noTopo = melhores.map(function (x) { return x.bloco; });
+    var restantes = todos.filter(function (x) { return noTopo.indexOf(x.bloco) < 0; });
+    if (restantes.length) {
+      var mais = el('details', { class: 'bib-busca-mais' });
+      mais.appendChild(el('summary', { class: 'bib-busca-mais-cabeca' }, [
+        el('span', { class: 'bib-grupo-seta', 'aria-hidden': 'true' }, [icone('chr')]),
+        el('span', { class: 'bib-busca-mais-titulo', texto: 'Mais resultados (' + restantes.length + ')' })]));
+      var corpoMais = el('div', { class: 'bib-busca-mais-corpo' });
+      mais.appendChild(corpoMais);
+      resultados.appendChild(mais);
+      // o teto: 30 obras ou 200 capítulos por vez, e "Mostrar mais" desenha o resto
+      var obrasComResto = obras.filter(function (o) {
+        return restantes.some(function (x) { return o.volumes.indexOf(x.livro) >= 0; });
+      });
+      var proxima = 0;
+      var botaoMais = el('button', { type: 'button', class: 'btn bib-busca-livros-mais', aoClick: function () { desenharMais(); } });
+      var desenharMais = function () {
+        var obrasAgora = 0, blocosAgora = 0;
+        while (proxima < obrasComResto.length && obrasAgora < BUSCA_LIVROS_POR_VEZ && blocosAgora < BUSCA_BLOCOS_POR_VEZ) {
+          var obra = obrasComResto[proxima++];
+          var cartao = el('article', { class: 'bib-busca-livro', 'data-obra': obra.chave });
+          cartao.appendChild(el('h3', { class: 'bib-busca-livro-titulo', texto: obra.titulo }));
+          var varios = obra.volumes.length > 1;
+          var doCartao = restantes.filter(function (x) { return obra.volumes.indexOf(x.livro) >= 0; });
+          // os capítulos primeiro (volume a volume), e as "Outras páginas" de todos os volumes juntas, no fim
+          doCartao.filter(function (x) { return !x.bloco.outras; }).concat(doCartao.filter(function (x) { return x.bloco.outras; }))
+            .forEach(function (x) {
+              blocosAgora++;
+              var v = x.livro.volume || x.meta.volume;
+              cartao.appendChild(blocoDoCapitulo(x.livro, x.meta, x.bloco, varios && v ? rotuloDoVolume(v) : null));
+            });
+          corpoMais.insertBefore(cartao, botaoMais.parentNode ? botaoMais : null);
+          obrasAgora++;
+        }
+        if (proxima < obrasComResto.length) {
+          botaoMais.textContent = 'Mostrar mais ' + plural(obrasComResto.length - proxima, 'livro', 'livros');
+          if (!botaoMais.parentNode) corpoMais.appendChild(botaoMais);
+        } else if (botaoMais.parentNode) botaoMais.parentNode.removeChild(botaoMais);
+      };
+      desenharMais();
+    }
     var pendentes = res ? (res.pendentes || []).length : 0;
     if (livros.length) {
-      var achados = descreverAchadosNosLivros(capitulos, paginas, livros.length);
+      var achados = descreverAchadosNosLivros(capitulos, paginas, obras.length);
       diz(achados);
       var frase = capitulos ? achados + '.'
-        : plural(paginas, 'página encontrada', 'páginas encontradas') + ' em ' + plural(livros.length, 'livro', 'livros') + '.';
+        : plural(paginas, 'página encontrada', 'páginas encontradas') + ' em ' + plural(obras.length, 'livro', 'livros') + '.';
       if (modo.buscando) frase += ' Buscando também no texto dos livros...';
       else if (modo.semTexto) frase += ' A busca no texto dos livros não está disponível neste aparelho.';
       else if (modo.falhou) frase += ' Não consegui consultar o texto dos livros agora.';
@@ -21554,6 +21682,7 @@
      * no cartão errado. */
     faixa.hidden = false;
     faixa.classList.toggle('vazia', !(n || m));
+    faixaDoCarrinhoNaBusca();
     if (!(n || m)) {
       faixa.appendChild(el('span', { class: 'bib-carrinho-texto', id: 'bib-carrinho-vazio',
         texto: listaAnexada() ? 'Nada marcado.' : 'Nada marcado ainda.' }));
@@ -22457,6 +22586,15 @@
     });
   }
 
+  /* A faixa do material marcado VAZIA não gruda no alto durante a busca
+   * (pedido do dono, 12/11/2026): "Nada marcado ainda" tomava o alto da tela
+   * em toda a rolagem do resultado. Ela continua no lugar dela, no começo, e
+   * rola junto; com material marcado, volta a grudar, como sempre. */
+  function faixaDoCarrinhoNaBusca() {
+    var faixa = $('#bib-carrinho');
+    if (faixa) faixa.classList.toggle('na-busca', !!String(bibTermo || '').trim());
+  }
+
   function temPacotesDeExercicios() { return !!(bib && bib.pacotes && bib.pacotes.length); }
 
   /* O campo do alto diz onde procura: com livro no tablet, nos exercícios e
@@ -22478,6 +22616,7 @@
    * antes (com os dois grupos, se há livro); só com livros, o miolo mostra
    * o grupo "Nos livros", e o campo vazio devolve a aba como era. */
   function redesenharDaBusca() {
+    faixaDoCarrinhoNaBusca();
     if (temPacotesDeExercicios()) { desenharCorpoBiblioteca(); return; }
     var corpo = $('#bib-corpo');
     if (!corpo) return;
