@@ -153,7 +153,7 @@
  * O v138 traz a leitura contínua dos livros e a exportação por página.
  * O v139 traz a busca no texto dos livros.
  */
-var CACHE = 'apoio-educacional-v139';
+var CACHE = 'apoio-educacional-v140';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

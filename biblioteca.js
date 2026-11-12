@@ -615,6 +615,116 @@
     });
   }
 
+  /* ------------------------- a busca pelos capítulos e assuntos (12/11/2026) */
+
+  /* Pedido do dono: o livro escaneado (sem texto) não aparecia na busca da
+   * Biblioteca, mesmo com capítulos mapeados e assuntos ligados. A busca passa
+   * a procurar também, em TODO livro instalado:
+   *   - nos títulos dos capítulos do sumário que a tela usa (sumarioDoLivro);
+   *   - nos títulos das entradas do mapa, já com a correção dela por cima
+   *     (mapaDoLivro);
+   *   - nos títulos e nas chaves dos assuntos ligados a cada entrada do mapa.
+   * A chave do assunto é o id dele ("MAT08-15") mais as palavras-chave que o
+   * índice de matemática guarda (chaves.r e chaves.d). Título casa por trecho,
+   * como o texto; chave casa pelo começo de uma palavra, porque são radicais
+   * soltos ("cubo", "litro"), e por trecho "de" casaria quase todas.
+   *
+   * Só lê: nada é gravado. O índice é montado UMA vez por desenho da
+   * Biblioteca (app.js), e a consulta é uma varredura em memória.
+   *
+   * indiceDeCapitulos(livros, correcoesPorLivro, nomes, normalizar)
+   *   livros: [{ id, meta }]; correcoesPorLivro: { <id>: correções };
+   *   nomes: { porId: { <id do assunto>: { titulo, chaves } } } (ou nada: o
+   *   assunto fica só com o id); normalizar: a mesma da busca no texto
+   *   (IndiceLivros.normalizar), com esta como reserva.
+   * Devolve { livros: [{ id, formato, capitulos: [...] }], capitulos: total }. */
+  function normalizarTermo(texto) {
+    return String(texto == null ? '' : texto).normalize('NFKD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+  function indiceDeCapitulos(livros, correcoesPorLivro, nomes, normalizar) {
+    var norm = typeof normalizar === 'function' ? normalizar : normalizarTermo;
+    var porId = (nomes && nomes.porId) || {};
+    var saida = { livros: [], capitulos: 0 };
+    var assuntoDoIndice = Object.create(null);
+    function assunto(id) {
+      if (assuntoDoIndice[id]) return assuntoDoIndice[id];
+      var a = porId[id];
+      var titulo = a && a.titulo ? String(a.titulo) : id;
+      var chaves = a && a.chaves ? [a.chaves.r, a.chaves.d].filter(function (x) { return typeof x === 'string'; }).join(' ') : '';
+      assuntoDoIndice[id] = { id: id, titulo: titulo, alvoTitulo: norm(titulo), alvoChaves: ' ' + norm(id + ' ' + chaves) + ' ' };
+      return assuntoDoIndice[id];
+    }
+    (livros || []).forEach(function (l) {
+      if (!l || !l.meta) return;
+      var meta = l.meta, epub = meta.formato === 'epub';
+      var chaveIni = epub ? 'capitulo' : 'pagina';
+      var caps = [], doMapa = Object.create(null);
+      mapaDoLivro(meta, (correcoesPorLivro || {})[l.id]).forEach(function (e) {
+        var c = { n: e.n, mapaN: e.n, titulo: e.titulo, inicio: inteiro(e[chaveIni]) ? e[chaveIni] : null,
+          ancora: e.ancora || null, obraInteira: !!e.obraInteira,
+          // o título lixo (nome de arquivo, "page12") não entra na busca; os assuntos dele, sim
+          alvo: marcadorSemSentido(e.titulo) ? '' : norm(e.titulo),
+          assuntos: e.assuntos.map(assunto) };
+        doMapa[e.n] = c;
+        caps.push(c);
+      });
+      var sumario = sumarioDoLivro(meta);
+      var nivel = Infinity;
+      sumario.forEach(function (s) { if (s && typeof s.nivel === 'number' && s.nivel < nivel) nivel = s.nivel; });
+      if (nivel === Infinity) nivel = 1;
+      sumario.forEach(function (s) {
+        if (!s || typeof s.titulo !== 'string' || (typeof s.nivel === 'number' ? s.nivel : nivel) !== nivel) return;
+        var ini = inteiro(s[chaveIni]) ? s[chaveIni] : null, alvo = marcadorSemSentido(s.titulo) ? '' : norm(s.titulo);
+        // o capítulo do sumário que é a mesma entrada do mapa vira uma só, com o título que a tela mostra
+        var par = s.mapa_n !== undefined && doMapa[s.mapa_n] ? doMapa[s.mapa_n] : caps.filter(function (c) {
+          return c.mapaN !== undefined && c.sumarioN === undefined && c.inicio === ini && c.alvo === alvo;
+        })[0];
+        if (par) {
+          par.sumarioN = s.n;
+          par.titulo = s.titulo;
+          if (alvo) par.alvo = alvo;
+          return;
+        }
+        caps.push({ n: s.n, sumarioN: s.n, titulo: s.titulo, inicio: ini, ancora: s.ancora || null, obraInteira: false, alvo: alvo, assuntos: [] });
+      });
+      caps.sort(function (a, b) {
+        var ia = a.inicio === null ? Infinity : a.inicio, ib = b.inicio === null ? Infinity : b.inicio;
+        return ia - ib || (a.n || 0) - (b.n || 0);
+      });
+      saida.livros.push({ id: l.id, formato: epub ? 'epub' : 'pdf', capitulos: caps });
+      saida.capitulos += caps.length;
+    });
+    return saida;
+  }
+
+  /* procurarNosCapitulos(indice, termo, normalizar): os capítulos achados,
+   * livro a livro, na ordem do índice:
+   *   [{ id, capitulos: [{ capitulo, peloTitulo, assuntos: [{ id, titulo, pela }] }] }]
+   * `pela` diz se o assunto casou pelo 'titulo' ou pela 'chave'. Termo de
+   * menos de duas letras não procura (a regra da busca no texto). */
+  function procurarNosCapitulos(indice, termo, normalizar) {
+    var norm = typeof normalizar === 'function' ? normalizar : normalizarTermo;
+    var alvo = norm(termo);
+    var saida = [];
+    if (!indice || alvo.length < 2 || !/[a-z0-9]/.test(alvo)) return saida;
+    var comeco = ' ' + alvo;
+    indice.livros.forEach(function (l) {
+      var achados = [];
+      l.capitulos.forEach(function (c) {
+        var peloTitulo = !!c.alvo && c.alvo.indexOf(alvo) >= 0;
+        var assuntos = [];
+        c.assuntos.forEach(function (a) {
+          if (a.alvoTitulo.indexOf(alvo) >= 0) assuntos.push({ id: a.id, titulo: a.titulo, pela: 'titulo' });
+          else if (a.alvoChaves.indexOf(comeco) >= 0) assuntos.push({ id: a.id, titulo: a.titulo, pela: 'chave' });
+        });
+        if (peloTitulo || assuntos.length) achados.push({ capitulo: c, peloTitulo: peloTitulo, assuntos: assuntos });
+      });
+      if (achados.length) saida.push({ id: l.id, capitulos: achados });
+    });
+    return saida;
+  }
+
   /* ------------------------------ exportar o capítulo (C15.4) e o gabarito (C15.5) */
 
   // Teto de páginas num PDF exportado: cada página vira um JPEG de algumas
@@ -1335,6 +1445,7 @@
     paginaImpressa: paginaImpressa, paginaDoArquivo: paginaDoArquivo, paginaDaPosicao: paginaDaPosicao,
     resolverPaginaDoLeitor: resolverPaginaDoLeitor, conferirNumeracao: conferirNumeracao, paraRomano: paraRomano, deRomano: deRomano,
     mapaDoLivro: mapaDoLivro, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
+    indiceDeCapitulos: indiceDeCapitulos, procurarNosCapitulos: procurarNosCapitulos,
     marcadorSemSentido: marcadorSemSentido, sumarioDosMarcadoresInutil: sumarioDosMarcadoresInutil, sumarioDoLivro: sumarioDoLivro,
     coberturaDoMapa: coberturaDoMapa, COBERTURA_MINIMA_DO_MAPA: COBERTURA_MINIMA_DO_MAPA,
     TETO_DE_PAGINAS_EXPORTADAS: TETO_DE_PAGINAS_EXPORTADAS, livroTemGabarito: livroTemGabarito,
