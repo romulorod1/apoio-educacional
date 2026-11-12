@@ -109,9 +109,16 @@ const RODA = /^roda\s+"[^"]*"\s+(?:node|python3?|sh)\s+"?([^"\s]+)"?(?:\s+--[A-Z
 function rodaDoDiff(diff) {
   if (typeof diff !== 'string') return { ok: false, linha: '(o diff do confere_tudo.sh nao foi lido)' };
   const arquivos = [];
+  const mais = [], menos = [];
   let mudancas = 0;
+  // O cabecalho ("diff --git", "index", "--- a/...", "+++ b/...") so existe
+  // ANTES do primeiro "@@" de cada arquivo. Depois dele, toda linha com + ou -
+  // e conteudo, inclusive a linha tirada que comeca com "-- " (vira "--- ").
+  let noCorpo = false;
   for (const l of diff.split(/\r?\n/)) {
-    if (!/^[+-]/.test(l) || /^(\+\+\+|---)( |$)/.test(l)) continue;
+    if (/^diff --git /.test(l)) { noCorpo = false; continue; }
+    if (/^@@/.test(l)) { noCorpo = true; continue; }
+    if (!noCorpo || !/^[+-]/.test(l)) continue;
     const corpo = l.slice(1).trim();
     mudancas++;
     if (!corpo || corpo[0] === '#') continue;
@@ -119,10 +126,15 @@ function rodaDoDiff(diff) {
     // provas que o diff nao diz: maquinaria
     const m = corpo.indexOf('$') < 0 ? RODA.exec(corpo) : null;
     if (!m) return { ok: false, linha: corpo };
+    (l[0] === '+' ? mais : menos).push(corpo.replace(/\s+/g, ' '));
     if (l[0] === '+' && arquivos.indexOf(m[1]) < 0) arquivos.push(m[1]);
   }
   if (!mudancas) return { ok: false, linha: '(diff vazio: tocado sem mudanca que eu veja)' };
-  return { ok: true, arquivos };
+  // linha roda tirada que nao volta (mudada) do lado "+": prova que saiu do portao
+  const nomeDe = c => (/^roda\s+"([^"]*)"/.exec(c) || [])[1];
+  const nomesMais = new Set(mais.map(nomeDe));
+  const removidas = menos.map(nomeDe).filter(n => !nomesMais.has(n));
+  return { ok: true, arquivos, removidas };
 }
 
 const PORTAO_REL = '_teste/confere_tudo.sh';
@@ -145,7 +157,8 @@ function provasTocadas(tocados, mapa, navegador, diffs) {
         const nav = d.arquivos.filter(p => todas.indexOf(p) >= 0);
         nav.forEach(p => { uniao.add(p); diretas.add(p); });
         motivos.push(f + ': so linhas roda e comentarios; ' + nav.length + ' provas de navegador com linha nova rodam com todos os nomes' +
-          (nav.length ? ' (' + nav.join(' ') + ')' : '') + (d.arquivos.length > nav.length ? '; as outras ficam com o portao-rapido' : ''));
+          (nav.length ? ' (' + nav.join(' ') + ')' : '') + (d.arquivos.length > nav.length ? '; as outras ficam com o portao-rapido' : '') +
+          (d.removidas.length ? '; ATENCAO: ' + d.removidas.length + ' prova(s) SAIU(RAM) do portao, confira na revisao: ' + d.removidas.join(' | ') : ''));
         return;
       }
       motivos.push(f + ': mexe na maquinaria do portao ("' + d.linha.slice(0, 80) + '"), bateria inteira');

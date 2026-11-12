@@ -181,8 +181,22 @@ conf('sem o argumento de diffs, como antes: bateria inteira', provasTocadas([POR
 dd = rodaDoDiff(cab + '+roda "merge seguro"          node _teste/testa_merge_seguro.js\n');
 conf('roda nova de prova sem navegador: ok, e o nivel 1 nao roda nada (o rapido cobre)',
   dd.ok + '/' + provasTocadas([PORTAO_REL_T], mapa, nav, { [PORTAO_REL_T]: cab + '+roda "merge seguro"          node _teste/testa_merge_seguro.js\n' }).modo, 'true/nenhuma');
-dd = rodaDoDiff(cab + '-roda "biblioteca listas --envenenado-lixeira"   node "_teste/testa_biblioteca_listas.js" --envenenado-lixeira\n');
+const linhaTirada = '-roda "biblioteca listas --envenenado-lixeira"   node "_teste/testa_biblioteca_listas.js" --envenenado-lixeira\n';
+dd = rodaDoDiff(cab + linhaTirada);
 conf('roda tirada: ok, sem prova a rodar', dd.ok + '/' + dd.arquivos.length, 'true/0');
+conf('roda tirada: o resultado diz qual prova saiu do portao', dd.removidas.join('|'), 'biblioteca listas --envenenado-lixeira');
+conf('roda tirada: o motivo avisa que uma prova saiu do portao',
+  provasTocadas([PORTAO_REL_T], mapa, nav, { [PORTAO_REL_T]: cab + linhaTirada }).motivos.some(m => /SAIU\(RAM\) do portao.*envenenado-lixeira/.test(m)), true);
+dd = rodaDoDiff(cab + linhaTirada + linhaTirada.replace(/^-/, '+').replace('" --envenenado-lixeira\n', '" --envenenado-lixeira --x\n'));
+conf('roda mudada (tirada e posta com o mesmo nome): nao avisa saida', dd.ok + '/' + dd.removidas.length, 'true/0');
+// cabecalho pela posicao: a linha tirada que comeca com "-- " vira "--- " e e conteudo
+dd = rodaDoDiff(cab + '--- linha tirada que comecava com dois tracos\n');
+conf('linha tirada "-- ..." depois do @@ e conteudo, e conta como maquinaria', dd.ok, false);
+dd = rodaDoDiff(cab + '+++ linha posta que comecava com dois mais\n');
+conf('linha posta "++ ..." depois do @@ e conteudo, e conta como maquinaria', dd.ok, false);
+conf('controle: o cabecalho de verdade (antes do @@) nao conta como mudanca', rodaDoDiff(cab + '+# so comentario\n').ok, true);
+dd = rodaDoDiff(cab + '+# comentario\n' + 'diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n+roda "x" node "_teste/testa_busca.js"\n');
+conf('segundo arquivo no mesmo diff: o cabecalho dele tambem e pulado', dd.ok + '/' + dd.arquivos.join(','), 'true/_teste/testa_busca.js');
 // as linhas roda de hoje, sem variavel: todas na forma que o rodaDoDiff aceita (o instrumento ve a forma real)
 const rodasHoje = fs.readFileSync(path.join(__dirname, 'confere_tudo.sh'), 'utf8').split(/\r?\n/).filter(l => /^\s*roda /.test(l));
 const literais = rodasHoje.filter(l => l.indexOf('$') < 0);
