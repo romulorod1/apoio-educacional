@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.48';
+  var VERSAO = '1.42.55';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -1418,7 +1418,10 @@
     alerta: '<path d="M12 4.5l8.5 15h-17z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/>',
     // o olho de esconder os valores: aberto (à mostra) e riscado (escondidos)
     olho: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
-    olho_fechado: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>'
+    olho_fechado: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>',
+    // o planejamento de estudos com IA: ditar e anexar prints
+    mic: '<rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5"/>',
+    imagem: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4.5 3.5 3 3-2.5 4.5 4"/>'
   };
   function icone(nome, rotulo, classe) {
     var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -1521,7 +1524,8 @@
     'modal-trilha': true,
     'modal-virada-anual': true,
     'modal-nuvem-restaurar': true,
-    'modal-nuvem-senha': true
+    'modal-nuvem-senha': true,
+    'modal-planejamento': true
   };
 
   function abrirModal(id) {
@@ -1578,6 +1582,8 @@
 
   function fecharModal(id, depoisDoHistorico) {
     if (id === 'modal-excluir-aluno' && exclusaoAlunoPendente) return;
+    // o planejamento fechado no meio do "montando" cancela o pedido à IA
+    if (id === 'modal-planejamento') pararPlanejamento();
     var e = $('#' + id);
     var estavaAberto = e.classList.contains('aberto');
     if (estavaAberto && !fechandoPorVoltar && MODAIS_HISTORICO[id]) {
@@ -3200,6 +3206,15 @@
 
     var corpo = $('#corpo-modal-aula');
     corpo.innerHTML = '';
+    /* O atalho do "+" para o planejamento de estudos (IA, fase 2): o mesmo
+     * fluxo da ficha, sem aluno escolhido. Só na aula nova; o toque no "+"
+     * continua abrindo a aula, que é o mais comum. */
+    if (novo && podePlanejar()) {
+      corpo.appendChild(el('div', { class: 'plan-atalho' }, [
+        el('button', { type: 'button', class: 'btn pequeno', id: 'aula-planejamento', icone: 'folha', texto: 'Planejamento de estudos',
+          aoClick: function () { fecharModal('modal-aula', function () { abrirPlanejamento({}); }); } })
+      ]));
+    }
 
     var selAluno = el('select', { id: 'campo-aluno' });
     db.alunos.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome); }).forEach(function (a) {
@@ -5409,6 +5424,9 @@
     resumoEtapas = novo ? null : desenharResumoDeEtapas(painel.dados, alunoEmEdicao, function () {
       if (botaoDaAba.mapeamento) botaoDaAba.mapeamento.click();
     });
+    /* Os planejamentos de estudo do aluno (IA, fase 2), logo abaixo das
+     * etapas: a lista dos salvos e o "Novo planejamento". */
+    if (!novo && podePlanejar()) painel.dados.appendChild(secaoPlanejamentos(alunoEmEdicao.id, false));
 
     painel.dados.appendChild(el('label', { class: 'campo' }, [
       el('span', { texto: 'Nome do aluno' }),
@@ -25440,6 +25458,13 @@
   function desenharMarcarAulaCelular(caixa) {
     var titulo = el('h2', { class: 'cel-titulo', id: 'cel-aula-titulo', texto: 'Marcar aula' });
     caixa.appendChild(titulo);
+    // o atalho do "+" para o planejamento de estudos (IA, fase 2), sem aluno escolhido
+    if (podePlanejar()) {
+      caixa.appendChild(el('div', { class: 'plan-atalho' }, [
+        el('button', { type: 'button', class: 'btn pequeno', id: 'cel-aula-planejamento', icone: 'folha', texto: 'Planejamento de estudos',
+          aoClick: function () { abrirPlanejamento({}); } })
+      ]));
+    }
     var ativos = db.alunos.filter(function (al) { return al.ativo !== false; })
       .sort(function (x, y) { return x.nome.localeCompare(y.nome); });
     if (!ativos.length) {
@@ -25804,6 +25829,7 @@
       }
       editandoFichaAlunoCelular = false;
       caixa.appendChild(fichaMinimaCelular(aberto, aulaDeContextoDoAluno(aberto.id)));
+      if (podePlanejar()) caixa.appendChild(secaoPlanejamentos(aberto.id, true));
       caixa.appendChild(el('div', { class: 'barra' }, [
         celularEdita() ? botaoDeAcaoCelular('editar-ficha-aluno', { class: 'btn', id: 'cel-alunos-editar-ficha', texto: 'Editar ficha',
           aoClick: function () { editandoFichaAlunoCelular = true; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } }) : null,
@@ -26489,6 +26515,514 @@
     sonda.motivos.forEach(function (m) { instalar.push(el('div', { class: 'faixa-aviso u-margem-topo-8 cel-motivo-navegador', texto: m })); });
     caixa.appendChild(el('div', { class: 'cartao', id: 'cel-obs-instalar' }, instalar));
     caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-obs-versao', texto: 'Versão ' + VERSAO + ', ' + sonda.rotulo + '.' }));
+  }
+
+  // ================= o planejamento de estudos com IA (fase 2) =================
+  /* Na ficha do aluno (tablet e celular), a seção "Planejamentos" com o
+   * "Novo planejamento"; e o atalho pela janela do "+" (Nova aula / Marcar
+   * aula), que abre o mesmo fluxo sem aluno escolhido. Uma janela só:
+   * o pedido (texto, ditado e prints), o "montando" que dá para cancelar, a
+   * prévia que é o próprio PDF, o ajuste por texto, o compartilhar e o salvar.
+   *
+   * Quem fala com a IA é o endpoint do próprio site (/api/ia), com o login da
+   * nuvem; o app só monta o corpo (planejamento.js). Os prints NÃO são
+   * guardados: só o plano, em ajustes['planejamento:<id>'] (o porquê está no
+   * store.js, no PREFIXO_PLANEJAMENTO). O observador não vê nada disto. */
+  var PREFIXO_PLANEJAMENTO = 'planejamento:';
+  var PRAZO_DA_IA_MS = 150000;
+  var fluxoPlano = null; // o fluxo aberto: { vez, alunoFixoId, estado, texto, imagens, conversa, plano, bytes, erro, salvoId, mudouDesdeSalvar, parar }
+  var vezDoPlanejamento = 0;
+
+  function podePlanejar() {
+    if (typeof Planejamento === 'undefined') return false;
+    if (leOutraConta()) return false;
+    if (aparelhoSoLe() && !celularEdita()) return false;
+    return true;
+  }
+
+  function planejamentosDoAluno(alunoId) {
+    var aj = (db && db.ajustes) || {};
+    return Object.keys(aj).filter(function (k) {
+      return k.indexOf(PREFIXO_PLANEJAMENTO) === 0 && aj[k] && aj[k].alunoId === alunoId && aj[k].plano;
+    }).map(function (k) { return aj[k]; }).sort(function (a, b) {
+      return String(b.atualizadoEm || '').localeCompare(String(a.atualizadoEm || ''));
+    });
+  }
+
+  /* Os horários fixos do aluno, das séries que valem hoje: é como ela
+   * descreve o aluno ("a de terça e quinta às 11h"). */
+  function horariosFixosDoAluno(alunoId, hoje) {
+    var vistos = {}, saida = [];
+    (db.series || []).forEach(function (s) {
+      if (!s || s.alunoId !== alunoId || !s.dias || !s.dias.length) return;
+      if ((s.status || 'realizada') === 'cancelada') return;
+      if (s.fim && s.fim < hoje) return;
+      var chave = s.dias.slice().sort().join(',') + '@' + (s.hora || '');
+      if (vistos[chave]) return;
+      vistos[chave] = true;
+      saida.push({ dias: s.dias.slice(), hora: s.hora || '' });
+    });
+    return saida;
+  }
+  function alunosParaIA(hoje) {
+    return db.alunos.filter(function (a) { return a.ativo !== false; }).map(function (a) {
+      return { id: a.id, nome: Planejamento.primeiroNome(a.nome), horarios: horariosFixosDoAluno(a.id, hoje) };
+    });
+  }
+
+  /* As aulas do aluno no período, da AGENDA (as gravadas e as previstas das
+   * repetições que ainda não viraram aula), sem as canceladas. */
+  function aulasDoAlunoNoPeriodo(alunoId, inicio, fim) {
+    var saida = [];
+    (db.aulas || []).forEach(function (a) {
+      if (a.alunoId !== alunoId || !a.data || a.data < inicio || a.data > fim) return;
+      if ((a.status || 'realizada') === 'cancelada') return;
+      saida.push({ data: a.data, hora: a.hora || '' });
+    });
+    for (var d = inicio, n = 0; d <= fim && n < 70; d = Planejamento.somaDias(d, 1), n++) {
+      Core.ocorrenciasPrevistasDoDia(db, d).forEach(function (o) {
+        if (o.alunoId === alunoId && (o.status || 'realizada') !== 'cancelada') saida.push({ data: o.data, hora: o.hora || '' });
+      });
+    }
+    return saida;
+  }
+  /* Os feriados nacionais do período, de segunda a sábado (no domingo não
+   * mudam nada no estudo), somados aos que o aviso citou. */
+  function feriadosDoPeriodo(inicio, fim) {
+    var saida = [];
+    for (var d = inicio, n = 0; d <= fim && n < 70; d = Planejamento.somaDias(d, 1), n++) {
+      var f = Core.feriadoEm(d);
+      if (f && f.ambito === 'nacional' && !f.facultativo && Core.diaSemana(d) !== 0) saida.push(d);
+    }
+    return saida;
+  }
+
+  function folhaDoPlano(p) {
+    var aluno = p && p.alunoId ? alunoPorId(p.alunoId) : null;
+    if (!aluno) return { erro: 'Escolha o aluno para ver a folha.' };
+    return Planejamento.desenharFolha(p, {
+      nome: aluno.nome,
+      aulas: aulasDoAlunoNoPeriodo(aluno.id, p.periodo.inicio, p.periodo.fim),
+      feriados: feriadosDoPeriodo(p.periodo.inicio, p.periodo.fim)
+    }, PDFGen);
+  }
+
+  /* A seção "Planejamentos" da ficha. `aoMudar` redesenha quem a contém. */
+  function secaoPlanejamentos(alunoId, celular) {
+    var caixa = el('div', { class: 'cartao plan-secao', id: celular ? 'cel-plan-secao' : 'plan-secao', 'data-aluno': alunoId });
+    caixa.appendChild(el('div', { class: 'plan-secao-cabeca' }, [
+      el('strong', { class: 'cresce', texto: 'Planejamentos' }),
+      el('button', { type: 'button', class: 'btn pequeno', id: celular ? 'cel-plan-novo' : 'plan-novo', icone: 'plus', texto: 'Novo planejamento',
+        aoClick: function () { abrirPlanejamento({ alunoFixoId: alunoId }); } })
+    ]));
+    var lista = planejamentosDoAluno(alunoId);
+    if (!lista.length) {
+      caixa.appendChild(el('p', { class: 'ajuda u-margem-0', texto: 'Mande o aviso da escola, e o plano de estudos sai pronto em PDF.' }));
+    } else {
+      caixa.appendChild(el('div', { class: 'plan-lista' }, lista.map(function (r) {
+        return el('button', { type: 'button', class: 'plan-item', 'data-plano': r.id,
+          aoClick: function () { abrirPlanejamento({ salvo: r }); } }, [
+          el('span', { class: 'plan-item-nome', texto: Planejamento.rotuloCurto(r.plano) }),
+          el('span', { class: 'plan-item-quando', texto: 'feito em ' + Core.ddmm(String(r.criadoEm || '').slice(0, 10) || Core.hojeIso()) })
+        ]);
+      })));
+    }
+    return caixa;
+  }
+  function redesenharSecoesDePlanejamento() {
+    if (modoCelular) { if (alunoCelular && $('#cel-plan-secao')) desenharAlunosCelular(); return; }
+    var velha = $('#plan-secao');
+    if (velha && velha.parentNode) velha.parentNode.replaceChild(secaoPlanejamentos(velha.dataset.aluno, false), velha);
+  }
+
+  /* abrirPlanejamento({ alunoFixoId }) ou ({ salvo: registro }) ou ({}) (atalho do +). */
+  function abrirPlanejamento(o) {
+    o = o || {};
+    if (!podePlanejar()) return;
+    vezDoPlanejamento++;
+    fluxoPlano = { vez: vezDoPlanejamento, alunoFixoId: o.alunoFixoId || null, estado: 'pedido', texto: '', imagens: [],
+      conversa: null, plano: null, bytes: null, erro: null, salvoId: null, mudouDesdeSalvar: false, parar: null, uso: [] };
+    if (o.salvo) {
+      fluxoPlano.estado = 'previa';
+      fluxoPlano.alunoFixoId = o.salvo.alunoId;
+      fluxoPlano.plano = JSON.parse(JSON.stringify(o.salvo.plano));
+      fluxoPlano.salvoId = o.salvo.id;
+    }
+    abrirModal('modal-planejamento');
+    desenharPlanejamento();
+  }
+  /* Fechar a janela no meio do "montando" cancela o pedido. */
+  function pararPlanejamento() {
+    if (fluxoPlano && fluxoPlano.parar) { try { fluxoPlano.parar(); } catch (e) { /* já parou */ } }
+    if (fluxoPlano) fluxoPlano.vez = -1;
+    pararDitado();
+  }
+
+  function desenharPlanejamento() {
+    var p = fluxoPlano;
+    var corpo = $('#corpo-modal-planejamento'), rodape = $('#rodape-modal-planejamento');
+    if (!p || !corpo) return;
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    if (p.estado === 'montando') return desenharMontando(p, corpo, rodape);
+    if (p.estado === 'previa') return desenharPreviaDoPlano(p, corpo, rodape);
+    desenharPedidoDoPlano(p, corpo, rodape);
+  }
+
+  function linhaDoAluno(id) {
+    var a = id ? alunoPorId(id) : null;
+    return a ? a.nome : '';
+  }
+
+  /* ---- o ditado, pela Web Speech API do navegador (pt-BR); sem ela, nada aparece ---- */
+  var ditado = null;
+  function temDitado() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
+  function pararDitado() {
+    if (ditado) { try { ditado.stop(); } catch (e) { /* já parou */ } }
+    ditado = null;
+  }
+  function botaoDeDitar(campo, id) {
+    if (!temDitado()) return null;
+    var b = el('button', { type: 'button', class: 'btn pequeno plan-ditar', id: id, icone: 'mic', texto: 'Ditar', 'aria-pressed': 'false' });
+    b.addEventListener('click', function () {
+      if (ditado) { pararDitado(); b.setAttribute('aria-pressed', 'false'); trocarComIcone(b, 'mic', 'Ditar'); return; }
+      var R = window.SpeechRecognition || window.webkitSpeechRecognition;
+      var r;
+      try { r = new R(); } catch (e) { avisar('O ditado não abriu neste aparelho. Use o microfone do teclado.'); return; }
+      r.lang = 'pt-BR';
+      r.continuous = true;
+      r.interimResults = false;
+      r.onresult = function (ev) {
+        var falado = '';
+        for (var i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) falado += ev.results[i][0].transcript;
+        if (!falado) return;
+        campo.value = (campo.value ? campo.value.replace(/\s*$/, ' ') : '') + falado.trim();
+        campo.dispatchEvent(new Event('input', { bubbles: true }));
+      };
+      r.onend = function () { if (ditado === r) { ditado = null; b.setAttribute('aria-pressed', 'false'); trocarComIcone(b, 'mic', 'Ditar'); } };
+      r.onerror = function () { avisar('O ditado parou. Toque em Ditar de novo ou use o microfone do teclado.'); };
+      try { r.start(); } catch (e) { avisar('O ditado não abriu neste aparelho. Use o microfone do teclado.'); return; }
+      ditado = r;
+      b.setAttribute('aria-pressed', 'true');
+      trocarComIcone(b, 'mic', 'Parar');
+    });
+    return b;
+  }
+
+  /* Cada print é reduzido NO APARELHO: até 1568 px no lado maior, JPEG 0,85,
+   * em base64. Economiza tokens e banda, e o original nunca sai daqui. */
+  function reduzirPrint(arquivo) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(arquivo);
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var w = img.naturalWidth, h = img.naturalHeight;
+          var k = Math.min(1, 1568 / Math.max(w, h, 1));
+          var c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(w * k));
+          c.height = Math.max(1, Math.round(h * k));
+          var ctx = c.getContext('2d');
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, c.width, c.height);
+          ctx.drawImage(img, 0, 0, c.width, c.height);
+          var dataUrl = c.toDataURL('image/jpeg', 0.85);
+          resolve({ media_type: 'image/jpeg', data: dataUrl.slice(dataUrl.indexOf(',') + 1), miniatura: dataUrl, nome: arquivo.name || 'print' });
+        } catch (e) { reject(e); } finally { URL.revokeObjectURL(url); }
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('imagem que não abre')); };
+      img.src = url;
+    });
+  }
+
+  function desenharPedidoDoPlano(p, corpo, rodape) {
+    $('#titulo-modal-planejamento').textContent = 'Novo planejamento';
+    if (p.alunoFixoId && alunoPorId(p.alunoFixoId)) {
+      corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', id: 'plan-para', texto: 'Para ' + linhaDoAluno(p.alunoFixoId) + '.' }));
+    }
+    if (p.erro) corpo.appendChild(el('div', { class: 'faixa-aviso', id: 'plan-erro', role: 'alert', texto: p.erro }));
+    var campo = el('textarea', { id: 'plan-texto', rows: '6', 'aria-label': 'O pedido do planejamento',
+      placeholder: 'Cole o aviso da escola ou dite o que precisa. Por exemplo: provas de novembro, uma matéria por dia, revisão na manhã da prova.' });
+    campo.value = p.texto || '';
+    campo.addEventListener('input', function () { p.texto = campo.value; });
+    corpo.appendChild(campo);
+
+    var entrada = el('input', { type: 'file', accept: 'image/*', multiple: 'multiple', id: 'plan-arquivos', hidden: 'hidden' });
+    var prints = el('div', { class: 'plan-prints', id: 'plan-prints' });
+    function desenharPrints() {
+      prints.innerHTML = '';
+      p.imagens.forEach(function (im, i) {
+        prints.appendChild(el('div', { class: 'plan-print' }, [
+          el('img', { src: im.miniatura, alt: 'Print ' + (i + 1) }),
+          el('button', { type: 'button', class: 'btn pequeno plan-print-tirar', icone: 'x', 'aria-label': 'Tirar o print ' + (i + 1),
+            aoClick: function () { p.imagens.splice(i, 1); desenharPrints(); } })
+        ]));
+      });
+    }
+    entrada.addEventListener('change', function () {
+      var arquivos = Array.prototype.slice.call(entrada.files || []);
+      entrada.value = '';
+      var cabem = Planejamento.MAX_IMAGENS - p.imagens.length;
+      if (arquivos.length > cabem) avisar('Cabem até ' + Planejamento.MAX_IMAGENS + ' prints. ' + (cabem > 0 ? 'Entraram os ' + cabem + ' primeiros.' : 'Tire algum para pôr outro.'));
+      arquivos.slice(0, Math.max(0, cabem)).reduce(function (fila, arq) {
+        return fila.then(function () {
+          return reduzirPrint(arq).then(function (im) { if (fluxoPlano === p) p.imagens.push(im); }, function () {
+            avisar('Um dos arquivos não abriu como imagem.');
+          });
+        });
+      }, Promise.resolve()).then(function () { if (fluxoPlano === p) desenharPrints(); });
+    });
+    corpo.appendChild(entrada);
+    corpo.appendChild(el('div', { class: 'barra plan-ferramentas' }, [
+      botaoDeDitar(campo, 'plan-ditar'),
+      el('button', { type: 'button', class: 'btn pequeno', id: 'plan-anexar', icone: 'imagem', texto: 'Anexar prints',
+        aoClick: function () { entrada.click(); } })
+    ]));
+    corpo.appendChild(prints);
+    desenharPrints();
+
+    rodape.appendChild(el('button', { type: 'button', class: 'btn', 'data-fechar': '', texto: 'Cancelar',
+      aoClick: function () { fecharModal('modal-planejamento'); } }));
+    rodape.appendChild(el('button', { type: 'button', class: 'btn principal', id: 'plan-montar', texto: 'Montar planejamento',
+      aoClick: function () {
+        if (!String(p.texto || '').trim() && !p.imagens.length) { avisar('Escreva o pedido ou anexe os prints do aviso.'); campo.focus(); return; }
+        var hoje = Planejamento.hojeEmSaoPaulo();
+        var corpoDoPedido = Planejamento.montarPedido({ texto: p.texto, imagens: p.imagens, alunos: alunosParaIA(hoje),
+          alunoFixoId: p.alunoFixoId, hoje: hoje });
+        pedirPlano(p, corpoDoPedido, 'pedido');
+      } }));
+  }
+
+  function desenharMontando(p, corpo, rodape) {
+    corpo.appendChild(el('div', { class: 'plan-montando', id: 'plan-montando', role: 'status', 'aria-live': 'polite' }, [
+      el('div', { class: 'plan-girando', 'aria-hidden': 'true' }),
+      el('strong', { texto: p.ajustando ? 'Ajustando o planejamento...' : 'Montando o planejamento...' }),
+      el('p', { class: 'ajuda u-margem-0', texto: 'Pode levar até 1 minuto.' })
+    ]));
+    rodape.appendChild(el('button', { type: 'button', class: 'btn', id: 'plan-cancelar', texto: 'Cancelar',
+      aoClick: function () { if (p.parar) p.parar(); } }));
+  }
+
+  /* A chamada ao endpoint. Devolve o JSON dele, ou { ok: false, codigo }
+   * para o que nem chegou lá (sem internet, sem login, cancelado). */
+  function chamarIA(corpoDoPedido, sinal) {
+    if (navigator.onLine === false) return Promise.resolve({ ok: false, codigo: 'sem_internet' });
+    if (!temNuvem() || typeof Nuvem.tokenParaIA !== 'function') return Promise.resolve({ ok: false, codigo: 'sem_login' });
+    return Nuvem.tokenParaIA().then(function (token) {
+      return fetch(new URL('/api/ia', location.origin).href, {
+        method: 'POST', signal: sinal,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify(corpoDoPedido)
+      }).then(function (r) {
+        return r.json().catch(function () { return { ok: false, codigo: 'indisponivel' }; });
+      }, function (e) {
+        if (e && e.name === 'AbortError') return { ok: false, codigo: sinal && sinal.motivo === 'prazo' ? 'rede' : 'cancelado' };
+        return { ok: false, codigo: navigator.onLine === false ? 'sem_internet' : 'rede' };
+      });
+    }, function (e) {
+      return { ok: false, codigo: e && e.codigo === 'SEM_REDE' ? 'sem_internet' : 'sem_login' };
+    });
+  }
+
+  /* tipo: 'pedido' (o primeiro plano) ou 'ajuste'. */
+  function pedirPlano(p, corpoDoPedido, tipo) {
+    var controle = typeof AbortController === 'function' ? new AbortController() : null;
+    var sinal = controle ? controle.signal : undefined;
+    var relogio = setTimeout(function () { if (controle) { sinal.motivo = 'prazo'; controle.abort(); } }, PRAZO_DA_IA_MS);
+    var vez = p.vez;
+    var estadoAntes = p.estado;
+    p.erro = null;
+    p.ajustando = tipo === 'ajuste';
+    p.estado = 'montando';
+    p.parar = function () { if (controle) controle.abort(); };
+    desenharPlanejamento();
+    chamarIA(corpoDoPedido, sinal).then(function (resposta) {
+      clearTimeout(relogio);
+      p.parar = null;
+      if (fluxoPlano !== p || p.vez !== vez) return; // a janela fechou ou outro fluxo abriu
+      var lido = Planejamento.lerResposta(resposta, db.alunos.map(function (a) { return a.id; }));
+      if (lido.erro) {
+        p.estado = estadoAntes;
+        p.erro = lido.erro === 'cancelado' ? null : Planejamento.fraseDoErro(lido.erro);
+        desenharPlanejamento();
+        if (p.erro && estadoAntes === 'previa') avisar(p.erro);
+        return;
+      }
+      if (lido.uso) p.uso.push(lido.uso);
+      p.conversa = { pedido: corpoDoPedido, conteudo: lido.conteudo };
+      /* O aluno da ficha vale mais que o palpite do modelo. */
+      if (p.alunoFixoId) { lido.plano.alunoId = p.alunoFixoId; lido.plano.confiancaAluno = 'alta'; }
+      /* O que ela escolheu na prévia (o aluno, Aluna ou Aluno) vale nos ajustes seguintes. */
+      else if (p.alunoEscolhido) { lido.plano.alunoId = p.alunoEscolhido; lido.plano.confiancaAluno = 'alta'; }
+      if (p.tratamentoEscolhido) lido.plano.tratamento = p.tratamentoEscolhido;
+      p.plano = lido.plano;
+      p.mudouDesdeSalvar = true;
+      p.estado = 'previa';
+      desenharPlanejamento();
+      /* Plano já salvo e ajustado: a ficha guarda a versão nova sozinha. */
+      if (p.salvoId) salvarPlanoNaFicha(p, true);
+    });
+  }
+
+  function desenharPreviaDoPlano(p, corpo, rodape) {
+    var pl = p.plano;
+    $('#titulo-modal-planejamento').textContent = 'Planejamento de estudos';
+    var aluno = pl.alunoId ? alunoPorId(pl.alunoId) : null;
+    if (!aluno) pl.alunoId = null;
+    /* O aluno: do modelo (atalho do +), com troca em um toque. */
+    if (!p.alunoFixoId || !aluno) {
+      var ativos = db.alunos.filter(function (a) { return a.ativo !== false; })
+        .sort(function (x, y) { return String(x.nome).localeCompare(String(y.nome)); });
+      var artigo = pl.tratamento === 'Aluna' ? 'a' : 'o';
+      var pergunta = aluno ? 'É ' + artigo + ' ' + Planejamento.primeiroNome(aluno.nome) + '?' : 'De qual aluno é este plano?';
+      var chips = el('div', { class: 'chips-filtro plan-alunos', id: 'plan-alunos', role: 'group', 'aria-label': 'Trocar o aluno' },
+        ativos.map(function (a) {
+          return el('button', { type: 'button', class: 'chip-filtro' + (a.id === pl.alunoId ? ' ativo' : ''), 'data-aluno': a.id,
+            'aria-pressed': a.id === pl.alunoId ? 'true' : 'false', texto: Planejamento.primeiroNome(a.nome),
+            aoClick: function () {
+              if (pl.alunoId === a.id) return;
+              pl.alunoId = a.id;
+              pl.confiancaAluno = 'alta';
+              p.alunoEscolhido = a.id;
+              p.mudouDesdeSalvar = true;
+              desenharPlanejamento();
+            } });
+        }));
+      /* "Aluna" ou "Aluno" no alto da folha: o modelo diz pelo pedido; depois
+       * de trocar o aluno, quem sabe é ela, num toque. */
+      var tratamento = el('div', { class: 'chips-filtro plan-alunos', id: 'plan-tratamento', role: 'group', 'aria-label': 'Aluna ou aluno, no alto da folha' },
+        ['Aluna', 'Aluno'].map(function (t) {
+          return el('button', { type: 'button', class: 'chip-filtro' + (pl.tratamento === t ? ' ativo' : ''), 'data-tratamento': t,
+            'aria-pressed': pl.tratamento === t ? 'true' : 'false', texto: t,
+            aoClick: function () {
+              if (pl.tratamento === t) return;
+              pl.tratamento = t;
+              p.tratamentoEscolhido = t;
+              p.mudouDesdeSalvar = true;
+              desenharPlanejamento();
+            } });
+        }));
+      corpo.appendChild(el('div', { class: 'plan-quem' + (pl.confiancaAluno === 'baixa' || !aluno ? ' plan-quem-duvida' : ''), id: 'plan-quem' }, [
+        el('strong', { id: 'plan-pergunta', texto: pergunta }),
+        el('p', { class: 'ajuda u-margem-0', texto: aluno ? 'Se não for, toque no nome certo.' : 'Toque no nome.' }),
+        chips,
+        aluno ? tratamento : null
+      ]));
+    }
+    var incertos = Planejamento.itensIncertos(pl);
+    if (incertos.length) {
+      corpo.appendChild(el('div', { class: 'faixa-info plan-incertos', id: 'plan-incertos' }, [
+        el('strong', { texto: 'Confira antes de mandar:' }),
+        el('ul', { class: 'plan-incertos-lista' }, incertos.map(function (t) { return el('li', { texto: t }); }))
+      ]));
+    }
+    var caixaPrevia = el('div', { class: 'plan-previa', id: 'plan-previa' });
+    corpo.appendChild(caixaPrevia);
+    p.bytes = null;
+    if (aluno) {
+      var folha = folhaDoPlano(pl);
+      if (folha.erro) caixaPrevia.appendChild(el('div', { class: 'faixa-aviso', id: 'plan-erro-folha', role: 'alert', texto: folha.erro }));
+      else { p.bytes = folha.bytes; desenharPreviaPdf(p, folha.bytes, caixaPrevia); }
+    }
+
+    /* O ajuste: curto, por texto ou ditado. A conversa continua (ou, no plano
+     * salvo, recomeça com o plano como está). */
+    var campoAjuste = el('input', { type: 'text', id: 'plan-ajuste', autocomplete: 'off', 'aria-label': 'O que mudar',
+      placeholder: 'O que mudar? Ex.: põe Geografia no dia 21' });
+    campoAjuste.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); ajustar(); } });
+    function ajustar() {
+      var t = campoAjuste.value.trim();
+      if (!t) { avisar('Escreva ou dite o que mudar.'); campoAjuste.focus(); return; }
+      var corpoDoAjuste;
+      if (p.conversa) corpoDoAjuste = Planejamento.pedidoDeAjuste(p.conversa, t);
+      else {
+        var hoje = Planejamento.hojeEmSaoPaulo();
+        corpoDoAjuste = Planejamento.pedidoDeAjusteDoSalvo(pl, t, { alunos: alunosParaIA(hoje), hoje: hoje });
+      }
+      pedirPlano(p, corpoDoAjuste, 'ajuste');
+    }
+    corpo.appendChild(el('div', { class: 'plan-ajuste' }, [
+      el('label', { class: 'campo u-margem-0', for: 'plan-ajuste' }, [el('span', { texto: 'Ajustar' })]),
+      campoAjuste,
+      el('div', { class: 'barra u-margem-baixo-0' }, [
+        botaoDeDitar(campoAjuste, 'plan-ajuste-ditar'),
+        el('button', { type: 'button', class: 'btn', id: 'plan-ajustar', texto: 'Ajustar', aoClick: ajustar })
+      ])
+    ]));
+
+    var podeCompartilhar = false;
+    try {
+      podeCompartilhar = !!(navigator.canShare && navigator.canShare({ files: [new File([new Uint8Array(1)], 'a.pdf', { type: 'application/pdf' })] }));
+    } catch (e) { podeCompartilhar = false; }
+    rodape.appendChild(el('button', { type: 'button', class: 'btn', id: 'plan-salvar',
+      texto: p.salvoId && !p.mudouDesdeSalvar ? 'Salvo na ficha' : 'Salvar na ficha',
+      disabled: !aluno || (p.salvoId && !p.mudouDesdeSalvar) ? 'disabled' : null,
+      aoClick: function () { salvarPlanoNaFicha(p, false); } }));
+    rodape.appendChild(el('button', { type: 'button', class: 'btn principal', id: 'plan-compartilhar',
+      icone: podeCompartilhar ? null : 'download', texto: podeCompartilhar ? 'Compartilhar PDF' : 'Baixar PDF',
+      disabled: p.bytes ? null : 'disabled',
+      aoClick: function () {
+        if (!p.bytes) return;
+        var nome = Planejamento.nomeDoArquivo(pl, aluno ? aluno.nome : '');
+        entregarArquivo(nome, new Blob([p.bytes], { type: 'application/pdf' }), nome.replace(/\.pdf$/, ''));
+      } }));
+  }
+
+  /* A prévia é o PRÓPRIO PDF, desenhado pelo leitor do app (PDF.js). */
+  function desenharPreviaPdf(p, bytes, caixa) {
+    caixa.innerHTML = '';
+    caixa.appendChild(el('p', { class: 'ajuda', texto: 'Desenhando a folha...' }));
+    var vez = p.vez;
+    carregarPdfJs().then(function (lib) {
+      return lib.getDocument({ data: bytes.slice(), isEvalSupported: false, enableXfa: false }).promise;
+    }).then(function (doc) {
+      var largura = Math.max(260, caixa.clientWidth || 320);
+      var escala = Math.min(window.devicePixelRatio || 1, 2.5);
+      var w = Math.round(largura * escala), h = Math.round(w * PDFGen.PAGINA_A / PDFGen.PAGINA_L);
+      return desenharPaginaPdfEmCanvas(doc, 1, w, h).then(function (c) {
+        soltarDocPdf(doc);
+        if (fluxoPlano !== p || p.vez !== vez || p.bytes !== bytes) return;
+        c.className = 'plan-previa-folha';
+        c.setAttribute('role', 'img');
+        c.setAttribute('aria-label', 'A folha do planejamento, como sai no PDF');
+        caixa.innerHTML = '';
+        caixa.appendChild(c);
+      });
+    }).catch(function () {
+      if (fluxoPlano !== p || p.vez !== vez) return;
+      caixa.innerHTML = '';
+      caixa.appendChild(el('p', { class: 'ajuda', id: 'plan-previa-falhou', texto: 'A prévia não abriu aqui. O PDF sai igual pelo botão de compartilhar.' }));
+    });
+  }
+
+  function salvarPlanoNaFicha(p, calado) {
+    var pl = p.plano;
+    if (!pl || !pl.alunoId || !alunoPorId(pl.alunoId)) { avisar('Escolha o aluno antes de salvar.'); return; }
+    var id = p.salvoId || Core.uid();
+    var chave = PREFIXO_PLANEJAMENTO + id;
+    var agora = new Date().toISOString();
+    db.ajustes = db.ajustes || {};
+    var antes = db.ajustes[chave];
+    var registro = { id: id, alunoId: pl.alunoId, criadoEm: antes && antes.criadoEm ? antes.criadoEm : agora, atualizadoEm: agora,
+      plano: JSON.parse(JSON.stringify(pl)) };
+    function gravar() {
+      db.ajustes[chave] = registro;
+      return salvarEDepois(function (gravou) {
+        if (!gravou) return;
+        if (fluxoPlano === p) {
+          p.salvoId = id;
+          p.alunoFixoId = pl.alunoId;
+          p.mudouDesdeSalvar = false;
+          if (p.estado === 'previa') {
+            var b = $('#plan-salvar');
+            if (b) { b.textContent = 'Salvo na ficha'; b.disabled = true; }
+          }
+        }
+        redesenharSecoesDePlanejamento();
+        if (!calado) avisar('Planejamento salvo na ficha ' + (alunoPorId(pl.alunoId) ? 'de ' + Planejamento.primeiroNome(alunoPorId(pl.alunoId).nome) : '') + '.');
+      });
+    }
+    if (modoCelular) comoAcaoDoCelular(gravar); else gravar();
   }
 
   // ================= partida =================

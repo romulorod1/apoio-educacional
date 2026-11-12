@@ -439,6 +439,16 @@
    * Lista explícita, por decisão (sincronizacao.md, 5.4): o que está fora
    * dela sincroniza. */
   var AJUSTES_DO_APARELHO = ['versaoVista', 'painelValoresAberto', 'valoresOcultos', 'ultimaCopia', 'ibge'];
+  /* Os planejamentos de estudo (fase 2 da IA) moram em `ajustes`, um por
+   * chave `planejamento:<id>`, e por isso sobem como registro do tipo
+   * `ajuste` (id `ajuste:planejamento:<id>`), e não como um tipo novo. O
+   * motivo é o aparelho com a versão ANTERIOR: ele monta o documento só com os
+   * tipos que conhece (montar) e, na gravação seguinte, a diferença põe
+   * lápide em todo registro que não está no documento (aplicarDiferenca): um
+   * tipo novo seria apagado na nuvem pelo tablet que ainda não atualizou. A
+   * chave de ajuste ele já carrega e regrava sem ler. Prova:
+   * _teste/testa_planejamento_registro_navegador.js, com o store.js da main. */
+  var PREFIXO_PLANEJAMENTO = 'planejamento:';
   /* vetor do documento -> tipo do registro, e a volta */
   var VETORES = { alunos: 'aluno', series: 'serie', aulas: 'aula', resumos: 'resumo', pagamentos: 'pagamento' };
   var VETOR_DO_TIPO = {};
@@ -1399,6 +1409,13 @@
       novo.ajustes.bibliotecaTitulos = Object.assign({}, novo.ajustes.bibliotecaTitulos);
       delete novo.ajustes.bibliotecaTitulos[alunoId];
     }
+    /* Os planejamentos de estudo dele (fase 2 da IA: um ajuste por plano,
+     * `planejamento:<id>`) saem junto, e viram lápide na nuvem pelo caminho
+     * de sempre da diferença. */
+    Object.keys(novo.ajustes).forEach(function (k) {
+      var v = novo.ajustes[k];
+      if (k.indexOf(PREFIXO_PLANEJAMENTO) === 0 && v && v.alunoId === alunoId) delete novo.ajustes[k];
+    });
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
         var t = transacao(b, DEPOSITOS_DO_DOCUMENTO.concat(['notas', 'midias', 'anexos',

@@ -4059,3 +4059,33 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
   .lado-filtro { padding: 10px 16px; }
 }
 /* ==================== B6 (fim) ==================== */
+
+/* ==================== planejamento de estudos com IA (fase 2) ==================== */
+.plan-secao { margin: 0 0 14px; }
+.plan-secao-cabeca { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.plan-lista { display: flex; flex-direction: column; gap: 6px; }
+.plan-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: var(--alvo, 44px); padding: 8px 12px; border: 1px solid var(--fio); border-radius: 10px; background: var(--branco); color: var(--texto); font-family: inherit; font-size: var(--letra-14); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.plan-item-nome { font-weight: var(--peso-forte); color: var(--navy); }
+.plan-item-quando { font-size: var(--letra-12); color: var(--muted); }
+.plan-atalho { display: flex; justify-content: flex-end; margin: 0 0 10px; }
+.plan-ferramentas { flex-wrap: wrap; margin: 10px 0; }
+.plan-prints { display: flex; flex-wrap: wrap; gap: 8px; }
+.plan-print { position: relative; width: 84px; height: 112px; border: 1px solid var(--fio); border-radius: 8px; overflow: hidden; background: var(--soft); }
+.plan-print img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.plan-print-tirar { position: absolute; top: 2px; right: 2px; padding: 4px; min-width: var(--alvo, 44px); }
+.plan-montando { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 32px 8px; text-align: center; }
+.plan-girando { width: 36px; height: 36px; border-radius: 50%; border: 4px solid var(--fio); border-top-color: var(--acao); animation: planGirando 1s linear infinite; }
+@keyframes planGirando { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .plan-girando { animation-duration: 3s; } }
+.plan-quem { margin: 0 0 12px; }
+.plan-quem-duvida { padding: 10px 12px; border-radius: 10px; background: var(--aviso-fundo); color: var(--aviso-texto); }
+.plan-alunos { margin-top: 8px; }
+.plan-alunos .chip-filtro { min-height: var(--alvo, 44px); }
+.plan-incertos-lista { margin: 6px 0 0; padding-left: 20px; }
+.plan-incertos-lista li { overflow-wrap: anywhere; }
+.plan-previa { margin: 0 0 12px; border: 1px solid var(--fio); border-radius: 6px; background: var(--branco); min-height: 120px; overflow: hidden; }
+.plan-previa-folha { display: block; width: 100%; height: auto; }
+.plan-previa > .ajuda, .plan-previa > .faixa-aviso { margin: 12px; }
+.plan-ajuste { display: flex; flex-direction: column; gap: 8px; }
+#rodape-modal-planejamento { flex-wrap: wrap; }
+/* ==================== planejamento (fim) ==================== */

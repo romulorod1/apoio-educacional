@@ -146,9 +146,12 @@
  * O v120 isola a conferência de livros; v121 traz Marcar pago; v122, página impressa;
  * v123, edição da ficha móvel; v126, encaixe da agenda no celular. O v127
  * sincroniza PDFs e fotos anexados a aulas; v128 traz os filtros de tipo na Biblioteca.
- * O v129 atualiza os assets de Vagos em cache exclusivo.
+ * O v129 atualiza os assets de Vagos em cache exclusivo. O v130 traz o
+ * planejamento de estudos com IA: './planejamento.js' entra na lista, e o
+ * fetch deixa passar /api/ (versão provisória: a definitiva é a próxima livre
+ * na hora do merge).
  */
-var CACHE = 'apoio-educacional-v129';
+var CACHE = 'apoio-educacional-v130';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -176,6 +179,10 @@ var ARQUIVOS = [
   /* A cópia na nuvem (N0): o motor e o gerador do QR da chave. Fora da lista,
    * o app.js novo abriria Ajustes sem o Nuvem depois de uma atualização. */
   './nuvem.js',
+  /* O planejamento de estudos com IA (fase 2): o pedido, a leitura do plano
+   * e o desenho da folha. Fora da lista, o app.js novo abriria o botão sem o
+   * módulo depois de uma atualização sem sinal. */
+  './planejamento.js',
   './app.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
@@ -622,6 +629,10 @@ self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
   var url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
+  /* O endpoint de IA (/api/ia) nunca passa pelo cache, nem em GET: a resposta
+   * é de quem está logado e de agora, e um 503 "Sem conexão" do cache
+   * esconderia o erro de verdade. */
+  if (url.pathname.indexOf('/api/') === 0) return;
 
   var navegacao = e.request.mode === 'navigate';
   var daVersao = navegacao || !baixadoDuranteOUso(url.pathname);

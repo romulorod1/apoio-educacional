@@ -612,6 +612,20 @@
     </div>
   </div>
 
+  <!-- O planejamento de estudos com IA (fase 2): o pedido (texto, ditado e
+       prints), o "montando", a prévia que é o próprio PDF, o ajuste, o
+       compartilhar e o salvar na ficha. O corpo e o rodapé são do app.js. -->
+  <div class="fundo-modal" id="modal-planejamento">
+    <div class="modal">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-planejamento">Planejamento de estudos</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-planejamento"></div>
+      <div class="modal-rodape" id="rodape-modal-planejamento"></div>
+    </div>
+  </div>
+
   <div class="fundo-modal" id="modal-bib-compartilhar">
     <div class="modal">
       <div class="modal-cabecalho">
@@ -890,6 +904,9 @@
        ARQUIVOS do sw.js: ela dá aula na casa das famílias, muitas vezes sem
        sinal, e arquivo que o index carrega e o cache não guarda vira 503. -->
   <script src="cartao.js"></script>
+  <!-- O planejamento de estudos com IA: do pedido ao plano e do plano à folha.
+       Puro, antes do app.js, e na lista ARQUIVOS do sw.js. -->
+  <script src="planejamento.js"></script>
   <script src="app.js"></script>
 </body>
 
