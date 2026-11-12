@@ -11,6 +11,10 @@
 # (banco/topicos/_ids.json, rascunhos). Sem as paginas de _teste/ na origem, nenhuma
 # delas roda ao lado do IndexedDB das criancas.
 #
+# Tambem ficam de fora functions/ e servidor/: o endpoint de IA (Pages Function)
+# e o nucleo dele. O wrangler os empacota como codigo do servidor a partir da
+# raiz do repositorio; como arquivo estatico, o codigo do servidor nao sobe.
+#
 # O que o aplicativo pede tem que estar aqui: a prova e o
 # _teste/testa_publica_cloudflare.js, que confere toda entrada do ARQUIVOS do
 # sw.js e os assuntos do banco/topicos dentro da pasta montada.
@@ -21,7 +25,7 @@ rm -rf "$destino"
 mkdir -p "$destino"
 git ls-files -z | tr '\0' '\n' | while IFS= read -r f; do
   case "$f" in
-    _teste/*|biblioteca/*|.github/*|README.md|*.md|*.py|*.sh) continue ;;
+    _teste/*|biblioteca/*|.github/*|functions/*|servidor/*|README.md|*.md|*.py|*.sh) continue ;;
     _*|*/_*|.*|*/.*) continue ;;
   esac
   mkdir -p "$destino/$(dirname "$f")"
