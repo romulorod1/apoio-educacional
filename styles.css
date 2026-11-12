@@ -3041,6 +3041,7 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-semana-topo .cel-abrir-vagos { flex: 0 0 auto; min-width: var(--alvo-celular); padding: 4px; }
 .cel-vagos-topo { display: flex; align-items: center; gap: 4px; margin: 0 0 8px; padding: 4px 0; border-bottom: 1px solid var(--fio-claro); }
 .cel-vagos-topo .btn { flex: 0 0 auto; min-width: var(--alvo-celular); min-height: var(--alvo-celular); padding: 4px; }
+.cel-vagos-topo .cel-vagos-voltar { display: inline-flex; align-items: center; gap: 2px; padding: 4px 8px 4px 4px; white-space: nowrap; }
 .cel-vagos-titulo { flex: 1 1 auto; min-width: 0; }
 .cel-vagos-topo .cel-titulo { margin: 0; font-size: var(--letra-20); }
 .cel-vagos-periodo { color: var(--novidades-subtitulo); font-size: var(--letra-12); }

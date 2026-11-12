@@ -297,6 +297,7 @@ roda "biblioteca (zip)" node _teste/testa_biblioteca_zip.js
 # puseram aqui. Passavam sozinhos; ninguem os rodava antes do merge.
 roda "fechamento em ordem"   node _teste/testa_fechamento_ordem_alfabetica.js
 roda "rotulos da aula"       node _teste/testa_rotulos_aula.js
+roda "vagos e repeticoes (F3)" node _teste/testa_vagos_repeticao.js
 roda "sugestoes matematica"  node _teste/testa_sugestoes_matematica.js
 roda "virada anual"          node _teste/testa_virada_anual.js
 # A regra do merge na main (_teste/merge_seguro.sh), que segura o processo
