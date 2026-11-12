@@ -2157,6 +2157,12 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-pdf-zoom { display: inline-flex; gap: 8px; margin-left: auto; }
 .leitor-pdf-quadrado { min-width: 44px; padding: 10px 0; font-size: var(--letra-20); line-height: 1; }
 .leitor-pdf-corpo { background: var(--fio-claro); overflow: auto; padding: 18px; }
+.leitor-pdf-navegacao { flex: 0 0 auto; padding: 0 18px; border-top: 1px solid var(--fio); background: var(--branco); }
+.leitor-pdf-navegacao[hidden] { display: none; }
+.leitor-pdf-navegacao input { display: block; width: 100%; min-height: var(--alvo); margin: 0; accent-color: var(--navy); }
+.leitor-pdf-pagina { position: relative; margin: 0 auto 18px; background: var(--branco); box-shadow: var(--sombra); }
+.leitor-pdf-pagina canvas { display: block; margin: 0; background: var(--branco); }
+.leitor-pdf-pagina-vazia { width: 100%; height: 100%; background: var(--branco); }
 /* A frase do C3 ("Escolha a página e toque em...") fica colada embaixo da
    barra, de ponta a ponta, sem rolar junto com a página. */
 .leitor-pdf-dica { flex-shrink: 0; margin: 0; border-radius: 0; border-width: 0 0 1px; }
@@ -2222,6 +2228,10 @@ button.alvo-rascunho:hover { background: var(--soft); }
 /* C15.4: exportar o capítulo; uma opção por linha, e o campo das páginas logo abaixo da dele */
 .livro-exportar-opcoes { display: flex; flex-direction: column; align-items: flex-start; }
 .livro-exportar-opcoes .livro-exportar-quais { margin: 0 0 4px 34px; width: calc(100% - 34px); }
+.livro-exportar-grade { margin: 0 0 1rem 34px; }
+.livro-exportar-grade-botoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 6px; }
+.livro-exportar-pagina { min-width: 48px; min-height: 48px; border: 1px solid var(--fio); border-radius: 8px; background: var(--branco); color: var(--texto); font: inherit; }
+.livro-exportar-pagina[aria-pressed="true"] { border-color: var(--navy); background: var(--acao-clara); color: var(--navy); font-weight: var(--peso-forte); }
 #modal-livro-exportar .bib-motivo { margin-top: -4px; }
 /* material desta aula: a caixa fica ao lado do cartão, e o alvo de toque tem 44 px */
 .bib-celula { display: flex; flex-direction: column; gap: 12px; }
