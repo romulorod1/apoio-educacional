@@ -65,7 +65,7 @@ conf('e os chips de filtro da Biblioteca continuam no styles.css', /\.chips-filt
  * mesmos 148. */
 secao('2. O índice de assuntos de matemática continua');
 const banco = JSON.parse(ler('banco/topicos/matematica.json'));
-conf('banco/topicos/matematica.json com os 149 assuntos de matemática (148 de 09/2026 e o MAT08-15)', banco.temas.length, 149);
+conf('banco/topicos/matematica.json com os 171 assuntos de matemática (148 de 09/2026, o MAT08-15 e os 22 da revisão dos mapas)', banco.temas.length, 171);
 
 // ---------------------------------------------------------------- navegador
 const amb = H.criarAmbiente(PORTA, 'perfil_limpeza_acervo', trocas);
