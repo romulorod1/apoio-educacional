@@ -136,6 +136,23 @@ function decidir(pr) {
     if (c.status !== 'COMPLETED') return 'EM_ANDAMENTO';
     return String(c.conclusion || '').toUpperCase();
   };
+  // FATIAS-VELHAS-INICIO
+  // O nivel 1 abre de 0 a 8 fatias, e o nome da fatia leva o N da rodada
+  // ("portao-tocadas (fatia 3 de 7)", #174). Uma fatia vermelha de uma rodada
+  // anterior no MESMO commit pode ficar sem rodada mais nova do mesmo nome: a
+  // seguinte abriu outro N, ou nenhuma fatia (o caso do "pronto"). Quem diz o
+  // resultado do nivel 1 e o juntador portao-tocadas, que so fica verde com o
+  // plano e todas as fatias DA RODADA DELE verdes. Entao a fatia que comecou
+  // antes de um juntador verde e de rodada vencida, e nao conta. Fatia vermelha
+  // mais nova que o juntador verde conta (e recusa); juntador vermelho mais novo
+  // recusa por si.
+  if (estado('portao-tocadas') === 'SUCCESS') {
+    const juntador = porNome['portao-tocadas'].quando;
+    Object.keys(porNome).forEach(nome => {
+      if (/^portao-tocadas \(fatia /.test(nome) && porNome[nome].quando < juntador) delete porNome[nome];
+    });
+  }
+  // FATIAS-VELHAS-FIM
   if (estado('portao-rapido') !== 'SUCCESS') {
     motivos.push('o check portao-rapido nao esta verde (' + estado('portao-rapido') + ')');
   }

@@ -89,9 +89,11 @@ disciplinas.forEach(function (d) {
   conf(d.chave + ': o índice diz ' + d.topicos + ' assuntos (é o número que a tela mostra, app.js:7985)', titulos, d.topicos);
   conf(d.chave + ': grupos do arquivo na ordem do índice', arq.grupos.map(function (g) { return g.chave; }), d.grupos.map(function (g) { return g.chave; }));
 });
-/* 2519 desde 12/11/2026: a revisão dos mapas dos livros de química criou 6
- * assuntos (QUIEM1-T45 e T46, QUIEM2-T52, QUIEM3-T54 a T56); eram 2513. */
-conf('total de tópicos', todosIds.length, 2519);
+/* 2530 desde 12/11/2026: a revisão dos mapas dos livros criou 11 assuntos de física
+ * (FISEM1-T51 a T56, FISEM2-T49 e T50, FISEM3-T47 a T49) e 6 de química (QUIEM1-T45 e T46,
+ * QUIEM2-T52, QUIEM3-T54 a T56); eram 2513. O FISEM2-T48 chegou a ser emitido e saiu na
+ * revisão (virou ligação ao FIS09-T35): fica aposentado no registro e o número não volta. */
+conf('total de tópicos', todosIds.length, 2530);
 
 secao('2. Unicidade');
 conf('nenhum id se repete nos 12 arquivos', new Set(todosIds.map(function (x) { return x.id; })).size, todosIds.length);
