@@ -2,33 +2,42 @@
  *
  * FILA 2b: o Voltar do aparelho dentro do aplicativo. Relato do dono em
  * 12/11: na Biblioteca, o Voltar do tablet FECHAVA o app. O histórico só
- * conhecia as janelas; agora cada passo de navegação deixa uma entrada, e o
- * Voltar devolve a tela de antes, com a rolagem.
+ * conhecia as janelas; agora cada passo de navegação deixa uma entrada com o
+ * retrato da tela no history.state, e o Voltar devolve a tela de antes, com
+ * a rolagem, inclusive depois de recarregar.
  *
- * No Chrome de verdade, com os pacotes SINTÉTICOS do 9º ano e do Banco (_pacote_sintetico.js)
- * e os livros SINTÉTICOS do gerador (fazer_amostra_livros.py --pacote). O
- * Voltar é o do navegador (history.back()), o mesmo evento do Android.
+ * No Chrome de verdade, com os pacotes SINTÉTICOS do 9º ano e do Banco
+ * (_pacote_sintetico.js) e os livros SINTÉTICOS do gerador
+ * (fazer_amostra_livros.py --pacote). O Voltar é o do navegador
+ * (history.back()), o mesmo evento do Android. Cada caminho começa numa aba
+ * nova (histórico limpo) e CONTA os toques: nenhum laço absorve Voltar morto.
  *
  * O que prova:
- *   1. aba: da Agenda para a Biblioteca, o Voltar volta à Agenda;
- *   2. série, módulo e lista na Biblioteca: cada Voltar desfaz um passo, e a
- *      rolagem da lista de módulos volta onde estava;
- *   3. a seta de voltar da própria tela não deixa entrada a mais: depois
- *      dela, o Voltar do aparelho não "volta para a frente";
- *   4. livro e capítulo: a tela do livro, e o leitor aberto pelo capítulo; o
- *      Voltar fecha o leitor e fica na tela do livro, e o seguinte fecha a
- *      tela do livro;
- *   5. janela aberta sobre uma tela (a aula): o Voltar fecha a janela e a
- *      tela de baixo fica;
- *   6. na tela inicial, o primeiro Voltar avisa "Toque em Voltar de novo
- *      para sair." e o app continua; o segundo sai;
- *   7. no celular: de Hoje para Alunos e a ficha de um aluno, cada Voltar
- *      desfaz um passo;
- *   8. nenhum erro de página.
+ *   1. aba, módulo e lista: Agenda, Biblioteca, módulo, lista; três Voltar
+ *      desfazem os três passos, a rolagem volta, e o quarto avisa "Toque em
+ *      Voltar de novo para sair." sem sair;
+ *   2. a guarda da raiz volta: depois do aviso, um toque numa aba e o Voltar
+ *      voltam à Agenda, e o Voltar seguinte avisa de novo; o outro sai;
+ *   3. a seta de voltar da própria tela tira a entrada: depois dela, o Voltar
+ *      do aparelho desfaz o passo de antes, e não reabre o módulo;
+ *   4. livro e capítulo: o Voltar fecha o leitor e fica na tela do livro, e o
+ *      seguinte fecha a tela do livro;
+ *   5. janela aberta sobre uma tela (a aula): o Voltar fecha a janela;
+ *   6. busca com termo: abrir um resultado e dar Voltar volta aos resultados,
+ *      com o termo no campo;
+ *   7. o editor de Minhas listas com rascunho: o Voltar pergunta o mesmo que a
+ *      seta; "Cancelar" fica no editor com o texto, "OK" volta à lista;
+ *   8. recarga no meio: Biblioteca, módulo, recarregar; o Voltar continua
+ *      voltando, um passo por toque, até o aviso;
+ *   9. no celular: a folha da aula de Hoje fecha pelo Voltar (sem o aviso de
+ *      sair por cima), a ficha de um aluno fecha pelo Voltar, e o formulário
+ *      com texto pergunta antes de sair;
+ *  10. nenhum erro de página.
  *
- * Veneno:
- *   --envenenado-voltar-sem-tela  o Voltar sem janela aberta não devolve a
- *     tela (o código de antes): a prova TEM de ver o Voltar sair da Biblioteca.
+ * Venenos (cada um TEM de ser visto):
+ *   --envenenado-voltar-sem-tela   o Voltar sem janela não devolve a tela (o código de antes)
+ *   --envenenado-volta-dois-passos o Voltar devolve a tela e anda mais um passo
+ *   --envenenado-seta-nao-tira     a seta de voltar da tela deixa a entrada no histórico
  */
 'use strict';
 const fs = require('fs');
@@ -40,16 +49,33 @@ const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8961;
-const VENENOS = ['--envenenado-voltar-sem-tela'];
-const VENENO = process.argv.indexOf('--envenenado-voltar-sem-tela') !== -1;
+const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
+const VENENOS_DA_PROVA = {
+  'voltar-sem-tela': ['if (!topo) { voltarDeTela(ev.state); return; }', 'if (!topo) return;'],
+  'volta-dois-passos': ['if (estado.retrato && !mesmaTela(estado.retrato, atual)) { restaurarTela(estado.retrato); return; }',
+    'if (estado.retrato && !mesmaTela(estado.retrato, atual)) { restaurarTela(estado.retrato); history.back(); return; }'],
+  'seta-nao-tira': ["      // a seta de voltar da tela levou de volta ao lugar de antes: a entrada sai\n      retornoProgramado = true;\n      history.back();\n      return;",
+    '      // veneno: a entrada fica']
+};
+const VENENOS = ['--envenenado-voltar-sem-tela', '--envenenado-volta-dois-passos', '--envenenado-seta-nao-tira'];
+const VENENO = Object.keys(VENENOS_DA_PROVA).find(k => process.argv.indexOf('--envenenado-' + k) !== -1) || null;
 const PYTHON = process.env.PYTHON || 'python';
-const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
-const ANCORA = 'if (!topo) { voltarDeTela(); return; }';
 const trocas = {};
-if (VENENO) trocas['/app.js'] = APP.split(ANCORA).join('if (!topo) return;');
+if (VENENO) trocas['/app.js'] = APP.split(VENENOS_DA_PROVA[VENENO][0]).join(VENENOS_DA_PROVA[VENENO][1]);
 const amb = H.criarAmbiente(PORTA, 'perfil_voltar_android', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'voltar_'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
+
+// no modo veneno, cada verificação marcada com o veneno TEM de reprovar; as outras não contam
+const visto = [];
+const checa = (rotulo, obtido, esperado, venenos) => {
+  if (VENENO) {
+    if ((venenos || []).indexOf(VENENO) !== -1 && String(obtido) !== String(esperado)) visto.push(rotulo);
+    return;
+  }
+  conf(rotulo, obtido, esperado);
+};
+const TODOS = ['voltar-sem-tela', 'volta-dois-passos'];
 
 function gerarLivros() {
   const r = spawnSync(PYTHON, ['-X', 'utf8', path.join(H.RAIZ, 'biblioteca', '_amostra', 'fazer_amostra_livros.py'), TMP, '--pacote'], { encoding: 'utf8' });
@@ -72,27 +98,50 @@ const tocarLinha = (pag, nome) => pag.evaluate(n => {
   const l = Array.from(document.querySelectorAll('#bib-corpo .item-lista')).find(x => x.querySelector('.nome') && x.querySelector('.nome').textContent.trim() === n);
   if (!l) return false; l.click(); return true;
 }, nome);
-// o lugar da tela: a aba, a série, o módulo, a aula, o livro e o leitor
 const lugar = pag => pag.evaluate(() => {
-  const aba = (document.querySelector('#abas .aba.ativa') || { dataset: {} }).dataset.tela || '';
   const titulo = document.querySelector('#bib-corpo .bib-titulo');
   const livro = document.querySelector('#bib-livro');
   return {
-    aba, emApp: !!document.querySelector('#abas'),
-    serie: (document.querySelector('#bib-corpo .bib-series .chip-filtro.ativo') || {}).textContent || '',
+    aba: (document.querySelector('#abas .aba.ativa') || { dataset: {} }).dataset.tela || '',
     titulo: titulo ? titulo.textContent.trim() : '',
     livro: livro && !livro.hidden ? livro.dataset.livro || '' : '',
     leitor: !!document.querySelector('#modal-leitor-pdf.aberto'),
     aula: !!document.querySelector('#modal-aula.aberto'),
+    termo: (document.querySelector('#busca-biblioteca') || {}).value || '',
+    resultados: document.querySelectorAll('#bib-corpo .item-lista').length,
+    nome: (document.querySelector('#bib-minha-nome') || {}).value,
     rolagem: Math.round(document.querySelector('.conteudo').scrollTop)
   };
 });
+// cada Voltar é um toque só; quem espera a tela é a condição, nunca um laço de toques
 const voltar = pag => pag.evaluate(() => { history.back(); });
+const avisos = pag => pag.evaluate(() => (window.__avisos || []).join('|'));
+const ouvirAvisos = pag => pag.evaluate(() => {
+  window.__avisos = [];
+  const t = document.querySelector('#aviso-texto');
+  new MutationObserver(() => window.__avisos.push(t.textContent)).observe(t, { childList: true, characterData: true, subtree: true });
+});
+let ORIGEM = '';
+async function abaNova(navegador) {
+  const p = await amb.pagina();
+  p.on('pageerror', e => erros.push(e.message));
+  p.on('dialog', d => { dialogos.push(d.message()); (p.__respostaDoDialogo === 'aceita' ? d.accept() : d.dismiss()).catch(() => {}); });
+  await p.setViewport({ width: 1280, height: 800, hasTouch: true });
+  await H.abrirApp(p, ORIGEM);
+  await ouvirAvisos(p);
+  void navegador;
+  return p;
+}
+const erros = [], dialogos = [];
+const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate(() => document.querySelectorAll('#bib-corpo .item-lista').length), v => v > 0, 10000);
 
 (async () => {
   secao('0. A prova se confere');
   conf('a lista de venenos não está vazia', VENENOS.length > 0, true);
-  conf('a âncora do veneno (sem janela, o Voltar é das telas) aparece uma vez só no app.js', APP.split(ANCORA).length - 1, 1);
+  conf('cada âncora de veneno aparece uma vez só no app.js',
+    Object.keys(VENENOS_DA_PROVA).map(k => k + ':' + (APP.split(VENENOS_DA_PROVA[k][0]).length - 1)).join(','),
+    Object.keys(VENENOS_DA_PROVA).map(k => k + ':1').join(','));
+  if (VENENO) conf('o app.js servido está envenenado (' + VENENO + ')', trocas['/app.js'].indexOf(VENENOS_DA_PROVA[VENENO][0]) === -1, true);
   const zipEx = path.join(TMP, 'pacote_9ano.zip');
   Sintetico.gerar(zipEx);
   const zipBanco = path.join(TMP, 'banco.zip');
@@ -102,13 +151,13 @@ const voltar = pag => pag.evaluate(() => { history.back(); });
   if (!zipLivros) throw Object.assign(new Error('sem pacote de livros'), { jaContado: true });
 
   await amb.subir();
-  const pag = await amb.pagina();
-  const erros = [];
-  pag.on('pageerror', e => erros.push(e.message));
-  await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
-  await H.abrirApp(pag, amb.ORIGEM);
-  const hoje = await pag.evaluate(() => Core.hojeIso());
-  await pag.evaluate(async h => {
+  ORIGEM = amb.ORIGEM;
+  const prep = await amb.pagina();
+  prep.on('pageerror', e => erros.push(e.message));
+  await prep.setViewport({ width: 1280, height: 800, hasTouch: true });
+  await H.abrirApp(prep, ORIGEM);
+  const hoje = await prep.evaluate(() => Core.hojeIso());
+  await prep.evaluate(async h => {
     const d = await Store.carregar();
     d.alunos = [{ id: 'al_alfa', nome: 'Aluno Alfa Teste', ano: '9', anoEscolar: '9º ano do Ensino Fundamental', responsavel: 'Responsável Alfa',
       grade: 'quarta-feira, 10:00', vigencias: [{ id: 'v1', inicio: '2026-01-01', fim: '2027-12-31', valorHora: 100 }] }];
@@ -116,160 +165,255 @@ const voltar = pag => pag.evaluate(() => { history.back(); });
       cobravel: true, notaTexto: '', notaPrivada: '', temNota: false, anexos: [], temas: [] }];
     await Store.salvar(d);
   }, hoje);
-  await H.abrirApp(pag, amb.ORIGEM);
-  await importar(pag, zipEx);
-  await importar(pag, zipBanco);
-  await importar(pag, zipLivros);
-  // a prova começa da Agenda, que é onde o app abre
-  await H.irParaAba(pag, 'agenda');
-  await H.abrirApp(pag, amb.ORIGEM);
-  const inicio = await lugar(pag);
-  conf('o app abre na Agenda', inicio.aba, 'agenda');
+  await H.abrirApp(prep, ORIGEM);
+  await importar(prep, zipEx);
+  await importar(prep, zipBanco);
+  await importar(prep, zipLivros);
+  // uma lista dela, para o editor de Minhas listas (seção 7)
+  const umExercicio = await prep.evaluate(() => {
+    const b = document.querySelector('#abas .aba[data-tela="biblioteca"]'); if (b) b.click();
+    return null;
+  });
+  void umExercicio;
+  await prep.evaluate(async () => {
+    await Store.gravarListaBiblioteca({ id: 'ml_prova', titulo: 'Lista de prova', nivel: null, itens: [], paginas: [], criadaEm: Date.now(), editadaEm: Date.now() });
+  });
+  await H.irParaAba(prep, 'agenda');
+  await prep.close();
 
-  secao('1. Aba: da Agenda para a Biblioteca, e o Voltar volta');
+  secao('1. Aba, módulo e lista: um Voltar por passo, e o quarto avisa');
+  let pag = await abaNova();
+  conf('a aba nova abre na Agenda', (await lugar(pag)).aba, 'agenda');
   await clicar(pag, '#abas .aba[data-tela="biblioteca"]');
-  await esperar('a Biblioteca desenhada', () => pag.evaluate(() => document.querySelectorAll('#bib-corpo .item-lista').length), v => v > 0, 10000);
-  conf('a aba Biblioteca abriu', (await lugar(pag)).aba, 'biblioteca');
-  await voltar(pag);
-  const v1 = await esperar('o Voltar da Biblioteca', () => lugar(pag), v => !!v && v.aba === 'agenda', 5000);
-  if (VENENO) {
-    secao('VENENO: o Voltar sem janela não devolve a tela');
-    const visto = !v1.ok;
-    conf('envenenado-voltar-sem-tela: o Voltar não voltou à Agenda (defeito detectado)', visto, true);
-    if (visto) console.log('VENENO visto: o Voltar não voltou à Agenda.');
-    await H.fim(amb)();
-    return;
-  }
-  conf('o Voltar do aparelho na Biblioteca volta à Agenda, sem sair do app', v1.ok && v1.valor.emApp, true);
-
-  secao('2. Série, módulo e lista: cada Voltar desfaz um passo, com a rolagem');
-  await clicar(pag, '#abas .aba[data-tela="biblioteca"]');
-  await esperar('a Biblioteca de novo', () => pag.evaluate(() => document.querySelectorAll('#bib-corpo .item-lista').length), v => v > 0, 10000);
-  await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .bib-series .chip-filtro')).find(c => c.textContent === '8º ano').click());
-  await pausa(200);
-  conf('a série do 8º ano', (await lugar(pag)).serie, '8º ano');
-  await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-corpo .bib-series .chip-filtro')).find(c => c.textContent === '9º ano').click());
-  await pausa(200);
-  await pag.evaluate(() => { document.querySelector('.conteudo').scrollTop = 0; });
-  // a rolagem antes de entrar no módulo: um pouco abaixo do alto
+  await esperarBib(pag);
   const rolagemAntes = await pag.evaluate(() => { const c = document.querySelector('.conteudo'); c.scrollTop = Math.min(180, c.scrollHeight - c.clientHeight); return Math.round(c.scrollTop); });
   conf('entrou no módulo', await tocarLinha(pag, 'Equações do Segundo Grau'), true);
   await pausa(200);
-  const noModulo = await lugar(pag);
-  conf('o módulo aberto', /Equações do Segundo Grau/.test(noModulo.titulo), true);
   conf('entrou na lista', await tocarLinha(pag, 'Soma e Produto'), true);
   await pausa(300);
-  const naLista = await lugar(pag);
-  conf('a lista aberta', /Soma e Produto/.test(naLista.titulo), true);
+  conf('a lista aberta', /Soma e Produto/.test((await lugar(pag)).titulo), true);
   await voltar(pag);
-  const vLista = await esperar('o Voltar da lista', () => lugar(pag), v => !!v && /Equações do Segundo Grau/.test(v.titulo) && !/Soma e Produto/.test(v.titulo), 5000);
-  conf('o Voltar da lista volta ao módulo', vLista.ok, true);
+  const v1 = await esperar('o Voltar da lista', () => lugar(pag), v => !!v && /Equações do Segundo Grau/.test(v.titulo), 4000);
+  checa('1º Voltar: da lista ao módulo', v1.ok, true, TODOS);
+  await pausa(300);
   await voltar(pag);
-  const vMod = await esperar('o Voltar do módulo', () => lugar(pag), v => !!v && v.titulo === '' && v.serie === '9º ano', 5000);
-  conf('o Voltar do módulo volta à lista de módulos do 9º ano', vMod.ok, true);
-  conf('e a rolagem volta onde estava (a menos de 4 px)', vMod.valor && Math.abs(vMod.valor.rolagem - rolagemAntes) <= 4, true);
-  console.log('   rolagem antes ' + rolagemAntes + ', depois ' + (vMod.valor && vMod.valor.rolagem));
-  /* ir do 9º ao 8º e de volta ao 9º é voltar: a entrada do 8º saiu na volta,
-   * e o Voltar seguinte desfaz a entrada na Biblioteca (volta à Agenda) */
+  const v2 = await esperar('o Voltar do módulo', () => lugar(pag), v => !!v && v.aba === 'biblioteca' && v.titulo === '', 4000);
+  checa('2º Voltar: do módulo à lista de módulos', v2.ok, true, TODOS);
+  checa('e a rolagem volta onde estava (a menos de 4 px)', !!v2.valor && Math.abs(v2.valor.rolagem - rolagemAntes) <= 4, true, TODOS);
+  await pausa(300);
   await voltar(pag);
-  const vSerie = await esperar('o Voltar da lista de módulos', () => lugar(pag), v => !!v && v.aba === 'agenda', 5000);
-  conf('o Voltar seguinte volta à Agenda (o 8º ano e a volta ao 9º não deixaram entrada)', vSerie.ok, true);
+  const v3 = await esperar('o Voltar da Biblioteca', () => lugar(pag), v => !!v && v.aba === 'agenda', 4000);
+  checa('3º Voltar: da Biblioteca à Agenda', v3.ok, true, TODOS);
+  await pausa(300);
+  await voltar(pag);
+  const aviso1 = await esperar('o aviso de sair', () => avisos(pag), v => /Toque em Voltar de novo para sair\./.test(v || ''), 3000);
+  checa('4º Voltar, na tela inicial: o aviso "Toque em Voltar de novo para sair."', aviso1.ok, true, ['volta-dois-passos']);
+  checa('e o app continua aberto, na Agenda', (await lugar(pag)).aba, 'agenda', ['volta-dois-passos']);
 
-  secao('3. A seta de voltar da tela não deixa entrada a mais');
+  secao('2. A guarda da raiz volta com um passo dado depois do aviso');
   await clicar(pag, '#abas .aba[data-tela="biblioteca"]');
-  await esperar('a Biblioteca de novo', () => pag.evaluate(() => document.querySelectorAll('#bib-corpo .item-lista').length), v => v > 0, 10000);
+  await esperarBib(pag);
+  await pag.evaluate(() => { window.__avisos = []; });
+  await voltar(pag);
+  const g1 = await esperar('o Voltar volta à Agenda', () => lugar(pag), v => !!v && v.aba === 'agenda', 4000);
+  checa('depois do aviso, um toque na Biblioteca e o Voltar voltam à Agenda (não sai)', g1.ok, true, TODOS);
+  await pausa(300);
+  await voltar(pag);
+  const aviso2 = await esperar('o aviso de novo', () => avisos(pag), v => /Toque em Voltar de novo para sair\./.test(v || ''), 3000);
+  checa('o Voltar seguinte avisa de novo, sem sair', aviso2.ok && (await lugar(pag)).aba === 'agenda', true, ['volta-dois-passos']);
+  const urlAntes = pag.url();
+  await pag.evaluate(() => { setTimeout(() => history.back(), 50); });
+  const saiu = await esperar('o segundo Voltar sai do app', () => Promise.resolve(pag.url()), u => u !== urlAntes, 5000);
+  checa('e o Voltar logo depois do aviso sai do app', saiu.ok, true, []);
+  await pag.close();
+
+  secao('3. A seta de voltar da tela tira a entrada');
+  pag = await abaNova();
+  await clicar(pag, '#abas .aba[data-tela="biblioteca"]');
+  await esperarBib(pag);
   await tocarLinha(pag, 'Equações do Segundo Grau');
   await pausa(200);
   await clicar(pag, '.bib-voltar');
-  await pausa(300);
-  const depoisDaSeta = await lugar(pag);
-  conf('a seta de voltar da tela leva à lista de módulos', depoisDaSeta.titulo, '');
+  await pausa(400);
+  conf('a seta da tela leva à lista de módulos', (await lugar(pag)).titulo, '');
   await voltar(pag);
-  const vSeta = await esperar('o Voltar depois da seta', () => lugar(pag), v => !!v && v.aba === 'agenda', 5000);
-  conf('depois da seta, o Voltar do aparelho desfaz o passo de antes (a entrada na Biblioteca), e não reabre o módulo', vSeta.ok, true);
+  const s1 = await esperar('o Voltar depois da seta', () => lugar(pag), v => !!v && v.aba === 'agenda', 4000);
+  checa('depois da seta, o Voltar do aparelho volta à Agenda (não reabre o módulo)', s1.ok, true, ['voltar-sem-tela', 'seta-nao-tira']);
+  await pag.close();
 
-  secao('4. Livro e capítulo: o leitor fecha, e depois a tela do livro');
+  secao('4. Livro e capítulo');
+  pag = await abaNova();
   await clicar(pag, '#abas .aba[data-tela="biblioteca"]');
-  await esperar('a Biblioteca de novo', () => pag.evaluate(() => document.querySelectorAll('#bib-corpo .item-lista').length), v => v > 0, 10000);
+  await esperarBib(pag);
   await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
   await clicar(pag, '#bib-livros .bibl-ano[data-ano="06"]');
   await pausa(200);
   await clicar(pag, '#bib-livros [data-livro="livro-com-marcadores"]');
-  const tela = await esperar('a tela do livro', () => lugar(pag), v => !!v && v.livro === 'livro-com-marcadores', 5000);
-  conf('a tela do livro abriu', tela.ok, true);
+  conf('a tela do livro abriu', (await esperar('a tela do livro', () => lugar(pag), v => !!v && v.livro === 'livro-com-marcadores', 5000)).ok, true);
   await clicar(pag, '#bib-livro .bibl-cap[data-n="2"]');
-  const leitor = await esperar('o leitor no capítulo 2', () => lugar(pag), v => !!v && v.leitor, 20000);
-  conf('o capítulo abre o leitor', leitor.ok, true);
+  conf('o capítulo abre o leitor', (await esperar('o leitor', () => lugar(pag), v => !!v && v.leitor, 20000)).ok, true);
   await pausa(500);
   await voltar(pag);
-  const vLeitor = await esperar('o Voltar do leitor', () => lugar(pag), v => !!v && !v.leitor, 5000);
-  conf('o Voltar fecha o leitor e fica na tela do livro', vLeitor.ok && vLeitor.valor.livro === 'livro-com-marcadores', true);
+  const l1 = await esperar('o Voltar do leitor', () => lugar(pag), v => !!v && !v.leitor, 4000);
+  checa('o Voltar fecha o leitor e fica na tela do livro', l1.ok && l1.valor.livro === 'livro-com-marcadores', true, ['volta-dois-passos']);
   await pausa(400);
   await voltar(pag);
-  const vLivro = await esperar('o Voltar da tela do livro', () => lugar(pag), v => !!v && v.livro === '' && v.aba === 'biblioteca', 5000);
-  conf('o Voltar seguinte fecha a tela do livro e fica na Biblioteca', vLivro.ok, true);
+  const l2 = await esperar('o Voltar da tela do livro', () => lugar(pag), v => !!v && v.livro === '' && v.aba === 'biblioteca', 4000);
+  checa('o Voltar seguinte fecha a tela do livro e fica na Biblioteca', l2.ok, true, TODOS);
+  await pag.close();
 
-  secao('5. Janela aberta sobre uma tela: o Voltar é da janela');
-  await clicar(pag, '#abas .aba[data-tela="agenda"]');
-  await pausa(300);
-  const abriuAula = await pag.evaluate(h => {
+  secao('5. Janela aberta sobre uma tela');
+  pag = await abaNova();
+  const abriu = await pag.evaluate(h => {
     const p = Array.from(document.querySelectorAll('[data-dia="' + h + '"] .pilula')).find(x => x.textContent.indexOf('10:00') === 0);
     if (!p) return false; p.click(); return true;
   }, hoje);
-  const aula = await esperar('a janela da aula', () => lugar(pag), v => !!v && v.aula, 5000);
-  conf('a aula de hoje abriu sobre a Agenda', abriuAula && aula.ok, true);
+  conf('a aula de hoje abriu sobre a Agenda', abriu && (await esperar('a janela da aula', () => lugar(pag), v => !!v && v.aula, 5000)).ok, true);
   await voltar(pag);
-  const vAula = await esperar('o Voltar da janela', () => lugar(pag), v => !!v && !v.aula, 5000);
-  conf('o Voltar fecha a janela, e a Agenda fica', vAula.ok && vAula.valor.aba === 'agenda', true);
+  const j1 = await esperar('o Voltar da janela', () => lugar(pag), v => !!v && !v.aula, 4000);
+  checa('o Voltar fecha a janela, e a Agenda fica', j1.ok && j1.valor.aba === 'agenda', true, []);
+  await pag.close();
 
-  secao('6. Na tela inicial: o primeiro Voltar avisa, o segundo sai');
-  // desfaz os passos que sobraram até a pilha esvaziar (a Agenda é a tela de partida)
-  for (let i = 0; i < 12; i++) {
-    const vazia = await pag.evaluate(() => !!(history.state && history.state.apoioGuarda));
-    if (vazia) break;
-    await voltar(pag);
-    await pausa(250);
-  }
-  conf('com a pilha vazia, o app está na guarda da tela inicial', await pag.evaluate(() => !!(history.state && history.state.apoioGuarda)), true);
-  await pag.evaluate(() => { window.__avisos = []; const t = document.querySelector('#aviso-texto'); new MutationObserver(() => window.__avisos.push(t.textContent)).observe(t, { childList: true, characterData: true, subtree: true }); });
+  secao('6. Busca: o Voltar volta aos resultados, com o termo');
+  pag = await abaNova();
+  await clicar(pag, '#abas .aba[data-tela="biblioteca"]');
+  await esperarBib(pag);
+  await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = 'bhaskara'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  await esperar('os resultados da busca', () => lugar(pag), v => !!v && v.resultados > 0 && v.titulo === '', 5000);
+  const abriuResultado = await pag.evaluate(() => { const l = document.querySelector('#bib-corpo .item-lista'); if (!l) return false; l.click(); return true; });
+  await pausa(300);
+  const noResultado = await lugar(pag);
+  conf('o resultado abriu (e o campo ficou vazio, como antes)', abriuResultado && noResultado.titulo !== '' && noResultado.termo === '', true);
   await voltar(pag);
-  const aviso = await esperar('o aviso de sair', () => pag.evaluate(() => (window.__avisos || []).join('|')), v => /Toque em Voltar de novo para sair\./.test(v || ''), 3000);
-  conf('o primeiro Voltar na tela inicial avisa "Toque em Voltar de novo para sair."', aviso.ok, true);
-  conf('e o app continua aberto', (await lugar(pag)).emApp, true);
-  const urlAntes = pag.url();
-  // o segundo Voltar sai da página: a chamada vai num temporizador, para a avaliação voltar antes
-  await pag.evaluate(() => { setTimeout(() => history.back(), 50); });
-  const saiu = await esperar('o segundo Voltar sai do app', () => Promise.resolve(pag.url()), u => u !== urlAntes, 5000);
-  conf('o segundo Voltar sai do app', saiu.ok, true);
+  const b1 = await esperar('o Voltar do resultado', () => lugar(pag), v => !!v && v.termo === 'bhaskara' && v.titulo === '' && v.resultados > 0, 4000);
+  checa('o Voltar volta aos resultados, com "bhaskara" no campo', b1.ok, true, TODOS);
+  await pag.close();
 
-  secao('7. No celular: Hoje, Alunos e a ficha');
+  secao('7. O editor de Minhas listas com rascunho');
+  pag = await abaNova();
+  await clicar(pag, '#abas .aba[data-tela="biblioteca"]');
+  await esperarBib(pag);
+  await clicar(pag, '#bib-carrinho-minhas');
+  await pausa(300);
+  const abriuEditor = await pag.evaluate(() => {
+    const b = Array.from(document.querySelectorAll('#bib-corpo [data-acao="editar"]'))[0];
+    if (!b) return false; b.click(); return true;
+  });
+  await pausa(300);
+  conf('o editor da lista abriu', abriuEditor && (await lugar(pag)).nome === 'Lista de prova', true);
+  await pag.evaluate(() => { const c = document.querySelector('#bib-minha-nome'); c.value = 'Lista de prova mudada'; c.dispatchEvent(new Event('input', { bubbles: true })); });
+  pag.__respostaDoDialogo = 'cancela';
+  const antesDoDialogo = dialogos.length;
+  await voltar(pag);
+  await pausa(600);
+  const e1 = await lugar(pag);
+  checa('o Voltar pergunta o mesmo que a seta', dialogos.slice(antesDoDialogo).join('|'), 'Sair sem guardar as mudanças desta lista?', []);
+  checa('"Cancelar": o editor fica, com o texto digitado', e1.nome, 'Lista de prova mudada', []);
+  pag.__respostaDoDialogo = 'aceita';
+  await voltar(pag);
+  const e2 = await esperar('o Voltar com "OK"', () => lugar(pag), v => !!v && v.nome === undefined, 4000);
+  checa('"OK": volta a Minhas listas, sem o editor', e2.ok, true, ['voltar-sem-tela']);
+  const gravou = await pag.evaluate(() => Store.listasDaBiblioteca().then(ls => (ls.find(l => l.id === 'ml_prova') || {}).titulo));
+  conf('e nada foi gravado: a lista continua com o nome de antes', gravou, 'Lista de prova');
+  await pag.close();
+
+  secao('8. Recarga no meio');
+  pag = await abaNova();
+  await clicar(pag, '#abas .aba[data-tela="biblioteca"]');
+  await esperarBib(pag);
+  await tocarLinha(pag, 'Equações do Segundo Grau');
+  await pausa(300);
+  await H.abrirApp(pag, ORIGEM);  // o Android descartou a aba: a página recarrega na mesma entrada
+  await ouvirAvisos(pag);
+  const depoisDaRecarga = await lugar(pag);
+  console.log('   depois de recarregar: ' + JSON.stringify(depoisDaRecarga));
+  await voltar(pag);
+  const r1 = await esperar('1º Voltar depois da recarga', () => lugar(pag), v => !!v && v.aba === 'biblioteca' && v.titulo === '', 4000);
+  checa('1º Voltar depois de recarregar: a Biblioteca, sem o módulo', r1.ok, true, TODOS);
+  await pausa(300);
+  await voltar(pag);
+  const r2 = await esperar('2º Voltar depois da recarga', () => lugar(pag), v => !!v && v.aba === 'agenda', 4000);
+  checa('2º Voltar: a Agenda', r2.ok, true, TODOS);
+  await pausa(300);
+  await voltar(pag);
+  const r3 = await esperar('3º Voltar depois da recarga', () => avisos(pag), v => /Toque em Voltar de novo para sair\./.test(v || ''), 3000);
+  checa('3º Voltar: o aviso de sair (nenhum toque morto)', r3.ok, true, ['volta-dois-passos']);
+  await pag.close();
+
+  secao('9. No celular: a folha, a ficha e o formulário');
   const cel = await amb.pagina();
   cel.on('pageerror', e => erros.push('celular: ' + e.message));
+  cel.on('dialog', d => { dialogos.push(d.message()); (cel.__respostaDoDialogo === 'aceita' ? d.accept() : d.dismiss()).catch(() => {}); });
   await cel.setViewport({ width: 412, height: 915, hasTouch: true, isMobile: true });
-  await cel.goto(amb.ORIGEM + '/index.html', { waitUntil: 'networkidle0' });
+  await cel.goto(ORIGEM + '/index.html', { waitUntil: 'networkidle0' });
   const celPronto = await esperar('o celular com as abas', () => cel.evaluate(() => document.body.classList.contains('modo-celular') && !document.querySelector('#cel-abas').hidden), v => v === true, 30000);
   conf('o celular abriu com as abas', celPronto.ok, true);
-  if (celPronto.ok) {
-    await cel.evaluate(() => { const b = document.querySelector('#entendi-novidades'); if (b && document.querySelector('#modal-novidades.aberto')) b.click(); });
-    const telaCel = () => cel.evaluate(() => ({ ativa: (document.querySelector('#cel-abas .cel-aba.ativa') || { dataset: {} }).dataset.cel || '',
-      lista: !!document.querySelector('#cel-alunos-lista'), estado: JSON.stringify(history.state), tamanho: history.length }));
-    const ficha = v => !!v && v.ativa === 'alunos' && !v.lista;
-    await cel.evaluate(() => document.querySelector('#cel-abas .cel-aba[data-cel="alunos"]').click());
-    await esperar('a lista de alunos', telaCel, v => !!v && v.ativa === 'alunos' && v.lista, 5000);
-    console.log('   na lista: ' + JSON.stringify(await telaCel()));
-    const abriuFicha = await cel.evaluate(() => { const b = document.querySelector('#cel-alunos-lista [data-aluno="al_alfa"]'); if (!b) return false; b.click(); return true; });
+  await cel.evaluate(() => { const b = document.querySelector('#entendi-novidades'); if (b && document.querySelector('#modal-novidades.aberto')) b.click(); });
+  await ouvirAvisos(cel);
+  const telaCel = () => cel.evaluate(() => ({ ativa: (document.querySelector('#cel-abas .cel-aba.ativa') || { dataset: {} }).dataset.cel || '',
+    lista: !!document.querySelector('#cel-alunos-lista'), folha: !!document.querySelector('#cel-folha'),
+    form: !!document.querySelector('[data-form-celular]'), url: location.href }));
+  // a folha da aula de Hoje
+  const abriuFolha = await cel.evaluate(() => { const b = document.querySelector('#cel-hoje .cel-bloco[data-aula="au_um"]'); if (!b) return false; b.click(); return true; });
+  await pausa(300);
+  conf('a folha da aula abriu em Hoje', abriuFolha && (await telaCel()).folha, true);
+  await cel.evaluate(() => history.back());
+  const f1 = await esperar('o Voltar da folha', telaCel, v => !!v && !v.folha, 4000);
+  checa('o Voltar fecha a folha e fica em Hoje', f1.ok && f1.valor.ativa === 'hoje', true, []);
+  checa('sem o aviso de sair por cima da folha', /Toque em Voltar de novo para sair/.test(await avisos(cel)), false, []);
+  // a ficha de um aluno
+  await cel.evaluate(() => document.querySelector('#cel-abas .cel-aba[data-cel="alunos"]').click());
+  await esperar('a lista de alunos', telaCel, v => !!v && v.ativa === 'alunos' && v.lista, 5000);
+  await cel.evaluate(() => { const b = document.querySelector('#cel-alunos-lista [data-aluno="al_alfa"]'); if (b) b.click(); });
+  await pausa(300);
+  conf('a ficha do aluno abriu', (await telaCel()).lista, false);
+  await cel.evaluate(() => history.back());
+  const c1 = await esperar('o Voltar da ficha', telaCel, v => !!v && v.ativa === 'alunos' && v.lista, 4000);
+  checa('o Voltar fecha a ficha e fica na lista de alunos', c1.ok, true, TODOS);
+  await pausa(300);
+  await cel.evaluate(() => history.back());
+  const c2 = await esperar('o Voltar de Alunos', telaCel, v => !!v && v.ativa === 'hoje', 4000);
+  checa('o Voltar seguinte volta a Hoje', c2.ok, true, TODOS);
+  /* o formulário com texto: o celular só abre formulário quando edita (a conta da
+   * dona na nuvem). Aqui a nuvem é dublada SÓ para a tela abrir o formulário;
+   * nada é gravado, e a prova não toca em nada que grave. */
+  const dublou = await cel.evaluate(() => {
+    try {
+      Nuvem.disponivel = () => true; Nuvem.celularDaDona = () => true;
+      const est = Nuvem.estado; Nuvem.estado = () => Object.assign({}, est ? est() : {}, { uidDona: null });
+      document.querySelector('#cel-abas .cel-aba[data-cel="hoje"]').click();
+      const b = document.querySelector('#cel-marcar-aula'); if (!b || b.hidden) return 'sem botão';
+      b.click(); return !!document.querySelector('[data-form-celular]');
+    } catch (e) { return 'erro: ' + e.message; }
+  });
+  if (dublou === true) {
     await pausa(300);
-    console.log('   na ficha: ' + JSON.stringify(await telaCel()));
-    conf('a ficha do aluno abriu na aba Alunos', abriuFicha && ficha(await telaCel()), true);
+    await cel.evaluate(() => {
+      const c = document.querySelector('[data-form-celular] input:not([type=hidden]), [data-form-celular] textarea');
+      if (c) { c.value = c.type === 'time' ? '17:30' : (c.type === 'date' ? '2026-12-01' : 'texto de prova'); c.dispatchEvent(new Event('input', { bubbles: true })); }
+    });
+    cel.__respostaDoDialogo = 'cancela';
+    const antes = dialogos.length;
     await cel.evaluate(() => history.back());
-    const vFicha = await esperar('o Voltar da ficha', telaCel, v => !!v && v.ativa === 'alunos' && v.lista, 5000);
-    conf('o Voltar fecha a ficha e fica na lista de alunos', vFicha.ok, true);
+    await pausa(600);
+    checa('o formulário com texto: o Voltar pergunta antes de sair', dialogos.slice(antes).join('|'), 'Sair sem guardar o que você escreveu?', []);
+    checa('"Cancelar": o formulário fica', (await telaCel()).form, true, []);
+    cel.__respostaDoDialogo = 'aceita';
     await cel.evaluate(() => history.back());
-    const vAlunos = await esperar('o Voltar de Alunos', telaCel, v => !!v && v.ativa === 'hoje', 5000);
-    conf('o Voltar seguinte volta a Hoje', vAlunos.ok, true);
+    const fm = await esperar('o Voltar do formulário com "OK"', telaCel, v => !!v && !v.form, 4000);
+    checa('"OK": o formulário sai', fm.ok, true, []);
+  } else {
+    console.log('   NÃO CONFERIDO: o formulário do celular não abriu com a nuvem dublada (' + dublou + ')');
   }
 
-  secao('8. Erros');
+  if (VENENO) {
+    secao('VENENO: ' + VENENO);
+    conf('envenenado-' + VENENO + ': a prova viu o defeito', visto.length > 0, true);
+    if (visto.length) console.log('VENENO visto: ' + visto.join(' ; '));
+    await H.fim(amb)();
+    return;
+  }
+  secao('10. Erros');
   conf('nenhum erro de página', erros.join(' | '), '');
   await H.fim(amb)();
 })().catch(H.fim(amb));

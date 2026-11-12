@@ -1497,7 +1497,7 @@
   var fechandoPorVoltar = false;
   var retornoProgramado = null;
 
-  window.addEventListener('popstate', function () {
+  window.addEventListener('popstate', function (ev) {
     if (retornoProgramado) {
       var depois = retornoProgramado;
       retornoProgramado = null;
@@ -1510,7 +1510,7 @@
     }
     var topo = pilhaModalHistorico[pilhaModalHistorico.length - 1];
     // sem janela aberta, o Voltar é das telas (FILA 2b)
-    if (!topo) { voltarDeTela(); return; }
+    if (!topo) { voltarDeTela(ev.state); return; }
     /* B6: a tabela lado a lado por cima de uma janela (a aula) não entra no
      * histórico: o Voltar fecha a TABELA, e a entrada da janela de baixo volta
      * para a pilha continuar casando com o que está aberto. */
@@ -1560,58 +1560,109 @@
    * de aba, entrar numa série, num módulo, numa lista ou na tela de um livro
    * não deixava entrada nenhuma, e o Voltar saía do app.
    *
-   * Agora cada passo de navegação deixa uma entrada { apoioTela } no histórico,
-   * com o retrato da tela de ANTES (aba, lugar na Biblioteca, livro aberto e
-   * rolagem). O Voltar do aparelho devolve esse retrato, como a seta de voltar
-   * da tela. Quem descobre o passo é o toque: o retrato é tirado na captura do
-   * clique e comparado logo depois dos ouvintes; se a tela mudou, é um passo.
-   * Quando a mudança só devolve a tela ao retrato de cima da pilha (a seta de
-   * voltar da própria tela), a entrada sai do histórico em vez de entrar outra.
+   * Cada entrada de tela do histórico GUARDA O RETRATO DA PRÓPRIA TELA no
+   * history.state ({ apoioTela, retrato, anterior }): aba, lugar na
+   * Biblioteca, termo da busca, livro aberto, aba, ficha e formulário do
+   * celular, e rolagem. O Voltar cai na entrada de baixo, e o retrato dela é
+   * a tela a devolver. Como o retrato mora no histórico do navegador, e não
+   * na memória, ele sobrevive à recarga (o Android descarta a aba do PWA e a
+   * recarrega): depois de recarregar, o Voltar continua voltando.
    *
-   * Na tela inicial (nenhum passo na pilha), o primeiro Voltar avisa "Toque em
-   * Voltar de novo para sair." e só o segundo sai: uma entrada de guarda fica
-   * sobre a raiz, e volta 3 s depois do aviso.
+   * Quem descobre o passo é o toque: o retrato é tirado na captura do clique
+   * e comparado logo depois dos ouvintes, e de novo 400 ms depois (navegação
+   * que espera uma gravação). Se a tela mudou, é um passo: a entrada de agora
+   * recebe o retrato de antes, e uma entrada nova entra com o de depois.
+   * Quando a mudança só devolve a tela ao retrato da entrada de baixo (a seta
+   * de voltar da própria tela), a entrada sai do histórico em vez de entrar
+   * outra.
+   *
+   * TRABALHO NÃO SALVO: antes de devolver a tela, o Voltar pergunta o mesmo
+   * que a seta da tela (o editor de Minhas listas, o formulário e a ficha em
+   * edição do celular). Se ela fica, a entrada volta e nada se perde. Nada
+   * é gravado aqui: no celular, gravar continua sendo só pelo comoAcaoDoCelular.
+   *
+   * Na tela inicial, o primeiro Voltar avisa "Toque em Voltar de novo para
+   * sair." e só o segundo sai: uma entrada de guarda fica sobre a raiz. A
+   * guarda volta 3,6 s depois do aviso (o tempo do aviso na tela), e também
+   * antes de qualquer passo novo dado a partir da raiz.
    *
    * As janelas continuam como eram: o passo não é registrado com janela do
    * histórico aberta, e o Voltar com janela aberta é dela (a proteção do relato,
-   * da folha, da exclusão e da trilha segue igual, no ouvinte acima). */
-  var pilhaTelas = [];
+   * da folha, da exclusão e da trilha segue igual, no ouvinte acima). A folha da
+   * aula no celular (Hoje) também é do histórico: o Voltar fecha a folha. */
   var proximoPassoTela = 0;
   var passosDepoisDoRetorno = [];
   var restaurandoTela = false;
   var guardaDaSaida = null;
+  var GUARDA_DA_SAIDA_MS = 3600;
+  var folhaNoHistorico = false;
+  var fechandoFolhaPorVoltar = false;
 
   function retratoDaTela() {
     var aba = modoCelular ? 'cel:' + telaCelular : (($('#abas .aba.ativa') || { dataset: {} }).dataset.tela || '');
     var conteudo = $(modoCelular ? '#cel-conteudo' : '.conteudo');
+    var naBib = aba === 'biblioteca';
     return {
       aba: aba,
       alunoCelular: modoCelular && alunoCelular ? String(alunoCelular) : null,
-      bib: aba === 'biblioteca' ? JSON.stringify({ s: bibNav.serie, m: bibNav.modulo, a: bibNav.aula, l: bibNav.minhas }) : null,
-      bibNav: aba === 'biblioteca' ? JSON.parse(JSON.stringify(bibNav)) : null,
-      livro: aba === 'biblioteca' ? (bibLivroAberto || null) : null,
+      fichaEditando: modoCelular && !!alunoCelular && !!editandoFichaAlunoCelular,
+      form: modoCelular && formCelular ? formCelular.tipo + ':' + (formCelular.aulaId || '') : null,
+      bib: naBib ? JSON.stringify({ s: bibNav.serie, m: bibNav.modulo, a: bibNav.aula, l: bibNav.minhas }) : null,
+      bibNav: naBib ? JSON.parse(JSON.stringify(bibNav)) : null,
+      termo: naBib ? String(bibTermo || '') : '',
+      livro: naBib ? (bibLivroAberto || null) : null,
       rolagem: conteudo ? conteudo.scrollTop : 0
     };
   }
 
-  // o que conta como "outra tela": a aba, o lugar na Biblioteca e o livro (a rolagem não)
+  // o que conta como "outra tela": a aba, o lugar e o livro (a rolagem e o termo digitado não)
   function mesmaTela(a, b) {
-    return !!a && !!b && a.aba === b.aba && a.alunoCelular === b.alunoCelular && a.bib === b.bib && a.livro === b.livro;
+    return !!a && !!b && a.aba === b.aba && a.alunoCelular === b.alunoCelular && a.fichaEditando === b.fichaEditando &&
+      a.form === b.form && a.bib === b.bib && a.livro === b.livro;
+  }
+
+  /* O trabalho não salvo da tela à vista: a pergunta que a seta da tela faz,
+   * ou null. Só lê. */
+  function perguntaDeTrabalhoNaoSalvo() {
+    if (!modoCelular && bibNav.minhas && bibNav.minhas.editar && typeof editorDeListaMudou === 'function' && editorDeListaMudou()) {
+      return 'Sair sem guardar as mudanças desta lista?';
+    }
+    if (modoCelular && (formCelular || (alunoCelular && editandoFichaAlunoCelular))) {
+      var caixa = $('#cel-conteudo');
+      var mexeu = caixa && Array.prototype.some.call(caixa.querySelectorAll('input, textarea, select'), function (c) {
+        if (c.type === 'checkbox' || c.type === 'radio') return c.checked !== c.defaultChecked;
+        if (c.tagName === 'SELECT') return Array.prototype.some.call(c.options, function (o) { return o.selected !== o.defaultSelected; });
+        return c.value !== c.defaultValue;
+      });
+      if (mexeu) return 'Sair sem guardar o que você escreveu?';
+    }
+    return null;
+  }
+
+  function guardaNaRaiz() {
+    if (history.state && history.state.apoioRaiz) {
+      clearTimeout(guardaDaSaida);
+      guardaDaSaida = null;
+      history.pushState({ apoioGuarda: true, retrato: retratoDaTela() }, '');
+    }
   }
 
   function registrarPassoDeTela(antes) {
     if (retornoProgramado) { passosDepoisDoRetorno.push(antes); return; }
-    var topo = pilhaTelas[pilhaTelas.length - 1];
     var agora = retratoDaTela();
-    if (topo && mesmaTela(topo.antes, agora)) {
+    if (mesmaTela(antes, agora)) return;
+    var estado = history.state || {};
+    if (estado.apoioTela && estado.anterior && mesmaTela(estado.anterior, agora)) {
       // a seta de voltar da tela levou de volta ao lugar de antes: a entrada sai
-      pilhaTelas.pop();
-      if (history.state && history.state.apoioTela === topo.token) { retornoProgramado = true; history.back(); }
+      retornoProgramado = true;
+      history.back();
       return;
     }
-    var token = ++proximoPassoTela;
-    pilhaTelas.push({ token: token, antes: antes });
-    history.pushState({ apoioTela: token }, '');
+    // um passo dado a partir da raiz repõe a guarda antes (o aviso de sair volta a valer)
+    guardaNaRaiz();
+    estado = history.state || {};
+    history.replaceState(Object.assign({}, estado, { retrato: antes }), '');
+    history.pushState({ apoioTela: ++proximoPassoTela, retrato: agora, anterior: antes }, '');
   }
 
   function restaurarTela(r) {
@@ -1619,7 +1670,9 @@
     try {
       if (modoCelular) {
         var tela = r.aba.indexOf('cel:') === 0 ? r.aba.slice(4) : 'hoje';
-        if (tela !== telaCelular || String(alunoCelular || '') !== String(r.alunoCelular || '')) irParaTelaCelular(tela);
+        if (tela !== telaCelular || String(alunoCelular || '') !== String(r.alunoCelular || '') || formCelular || editandoFichaAlunoCelular) {
+          irParaTelaCelular(tela);
+        }
         // a ficha de um aluno na aba Alunos: o mesmo caminho do toque na lista
         if (r.alunoCelular && db && db.alunos.some(function (a) { return String(a.id) === r.alunoCelular; })) {
           alunoCelular = r.alunoCelular;
@@ -1634,7 +1687,18 @@
         }
         if (r.aba === 'biblioteca' && r.bibNav) {
           var mudouBib = JSON.stringify({ s: bibNav.serie, m: bibNav.modulo, a: bibNav.aula, l: bibNav.minhas }) !== r.bib;
-          if (mudouBib) irNaBiblioteca({ serie: r.bibNav.serie, modulo: r.bibNav.modulo, aula: r.bibNav.aula, minhas: r.bibNav.minhas });
+          var termo = String(r.termo || '');
+          var mudouTermo = termo !== String(bibTermo || '');
+          if (mudouBib || mudouTermo) {
+            minhaEmEdicao = null;
+            // o termo da busca volta com a tela: o resultado aberto pela busca volta à lista de resultados
+            bibTermo = termo;
+            var campo = $('#busca-biblioteca'), limpar = $('#limpar-busca-biblioteca');
+            if (campo) campo.value = termo;
+            if (limpar) limpar.style.display = termo ? '' : 'none';
+            if (mudouBib) irNaBiblioteca({ serie: r.bibNav.serie, modulo: r.bibNav.modulo, aula: r.bibNav.aula, minhas: r.bibNav.minhas });
+            else desenharCorpoBiblioteca();
+          }
           if (r.livro && r.livro !== bibLivroAberto) abrirTelaDoLivro(r.livro);
           else if (!r.livro && bibLivroAberto) fecharTelaDoLivro();
         }
@@ -1650,36 +1714,88 @@
     setTimeout(rolar, 250);
   }
 
-  // o Voltar chegou sem janela aberta: devolve a tela de antes, ou, na tela inicial, avisa antes de sair
-  function voltarDeTela() {
-    var passo = pilhaTelas.pop();
-    if (passo) { restaurarTela(passo.antes); return; }
-    if (history.state && history.state.apoioRaiz) {
+  /* O Voltar chegou sem janela aberta. `estado` é a entrada em que o Voltar
+   * caiu (a de baixo), e o retrato dela é a tela a devolver. */
+  function voltarDeTela(estado) {
+    estado = estado || {};
+    // a folha da aula (celular) é do histórico: o Voltar fecha a folha
+    if (folhaNoHistorico) {
+      folhaNoHistorico = false;
+      // num passo de formulário da folha (cancelar, remarcar, duração), o Voltar volta às ações da folha
+      if (folhaCelular && folhaCelular.passo !== 'acoes' && folhaCelular.passo !== 'ficha') {
+        folhaEntrouNoHistorico();
+        var naFolha = $('#cel-folha');
+        var mexeuNaFolha = naFolha && Array.prototype.some.call(naFolha.querySelectorAll('input, textarea'), function (c) {
+          return (c.type === 'checkbox' || c.type === 'radio') ? c.checked !== c.defaultChecked : c.value !== c.defaultValue;
+        });
+        if (mexeuNaFolha && !confirmar('Sair sem guardar o que você escreveu?')) return;
+        irAoPassoDaFolha('acoes');
+        return;
+      }
+      if (folhaCelular) {
+        fechandoFolhaPorVoltar = true;
+        try { fecharFolhaCelular(); } finally { fechandoFolhaPorVoltar = false; }
+        return;
+      }
+    }
+    var atual = retratoDaTela();
+    var pergunta = perguntaDeTrabalhoNaoSalvo();
+    if (pergunta && estado.retrato && !mesmaTela(estado.retrato, atual)) {
+      // a entrada da tela à vista volta antes da pergunta: se ela ficar, o próximo Voltar ainda é desta tela
+      history.pushState({ apoioTela: ++proximoPassoTela, retrato: atual, anterior: estado.retrato }, '');
+      if (!confirmar(pergunta)) return;
+      // ela aceitou perder: a tela de baixo volta, e a entrada reposta sai sem mexer em nada
+      minhaEmEdicao = null;
+      retornoProgramado = true;
+      history.back();
+      restaurarTela(estado.retrato);
+      return;
+    }
+    if (estado.retrato && !mesmaTela(estado.retrato, atual)) { restaurarTela(estado.retrato); return; }
+    if (estado.retrato) { restaurarTela(estado.retrato); }
+    if (estado.apoioRaiz) {
       avisar('Toque em Voltar de novo para sair.');
       clearTimeout(guardaDaSaida);
       guardaDaSaida = setTimeout(function () {
         guardaDaSaida = null;
-        if (history.state && history.state.apoioRaiz) history.pushState({ apoioGuarda: true }, '');
-      }, 3000);
+        if (history.state && history.state.apoioRaiz) history.pushState({ apoioGuarda: true, retrato: retratoDaTela() }, '');
+      }, GUARDA_DA_SAIDA_MS);
     }
+  }
+
+  // a folha da aula no celular abriu: entra no histórico como uma janela
+  function folhaEntrouNoHistorico() {
+    if (folhaNoHistorico || retornoProgramado) return;
+    folhaNoHistorico = true;
+    history.pushState({ apoioFolha: true, retrato: retratoDaTela() }, '');
+  }
+  // a folha fechou por um toque (fora dela, ou uma ação que acabou): a entrada dela sai
+  function folhaSaiuDoHistorico() {
+    if (!folhaNoHistorico || fechandoFolhaPorVoltar) return;
+    folhaNoHistorico = false;
+    if (history.state && history.state.apoioFolha) { retornoProgramado = true; history.back(); }
   }
 
   function ligarVoltarDasTelas() {
     if (ligarVoltarDasTelas.feito) return;
     ligarVoltarDasTelas.feito = true;
     // a raiz e a guarda: o primeiro Voltar na tela inicial cai na raiz e avisa
-    if (!(history.state && (history.state.apoioRaiz || history.state.apoioGuarda || history.state.apoioTela || history.state.apoioModal))) {
-      history.replaceState({ apoioRaiz: true }, '');
-      history.pushState({ apoioGuarda: true }, '');
+    var e = history.state;
+    if (!(e && (e.apoioRaiz || e.apoioGuarda || e.apoioTela || e.apoioModal || e.apoioFolha))) {
+      history.replaceState({ apoioRaiz: true, retrato: retratoDaTela() }, '');
+      history.pushState({ apoioGuarda: true, retrato: retratoDaTela() }, '');
     }
     document.addEventListener('click', function () {
       if (restaurandoTela) return;
       var antes = retratoDaTela();
-      setTimeout(function () {
+      var conferir = function () {
         // com janela do histórico aberta, o toque é dela, e não um passo de tela
-        if (pilhaModalHistorico.length && !retornoProgramado) return;
-        if (!mesmaTela(antes, retratoDaTela())) registrarPassoDeTela(antes);
-      }, 0);
+        if (pilhaModalHistorico.length && !retornoProgramado) return true;
+        if (!mesmaTela(antes, retratoDaTela())) { registrarPassoDeTela(antes); return true; }
+        return false;
+      };
+      // logo depois dos ouvintes; e de novo 400 ms depois, para a navegação que espera uma gravação
+      setTimeout(function () { if (!conferir()) setTimeout(conferir, 400); }, 0);
     }, true);
   }
 
@@ -1738,6 +1854,12 @@
       if (r.height <= 0) return;
       if (limite === null || r.top < limite) limite = r.top;
     });
+    // a folha da aula no celular (Hoje) mora embaixo: o aviso para acima dela
+    var folhaCel = $('#cel-folha');
+    if (folhaCel) {
+      var rf = folhaCel.getBoundingClientRect();
+      if (rf.height > 0 && (limite === null || rf.top < limite)) limite = rf.top;
+    }
     if (limite === null) { caixa.style.removeProperty('--sobe'); return; }
     /* O aviso mora a 24 pixels do fim da tela: subir o bastante para a base
      * dele parar 12 pixels acima do rodapé. Teto de 55 por cento da tela, para
@@ -19953,6 +20075,7 @@
   var MAX_AUTOMATICAS = 3;
   var NIVEIS_DA_LISTA = [['base', 'Base'], ['regular', 'Regular'], ['aprofundamento', 'Aprofundamento']];
   var minhaEmEdicao = null;
+  var editorDeListaMudou = null;   // o mudou() do editor à vista: a guarda do Voltar do aparelho lê
   // a lista que ela carregou no material pelo cartão: o uso fica com ela, e não com outra de mesmo conteúdo
   var listaMinhaCarregada = null;
 
@@ -20303,6 +20426,7 @@
     var mudou = function () {
       return r.titulo !== (original.titulo || '') || r.nivel !== (original.nivel || null) || !mesmaLista(r, original);
     };
+    editorDeListaMudou = function () { return minhaEmEdicao === r && mudou(); };
     corpo.appendChild(voltarBib('Minhas listas', function () {
       if (mudou() && !confirmar('Sair sem guardar as mudanças desta lista?')) return;
       minhaEmEdicao = null;
@@ -24712,6 +24836,7 @@
     telaCelular = tela;
     celularPedeEntrada = false;
     formCelular = null;
+    if (folhaCelular) folhaSaiuDoHistorico();
     folhaCelular = null;
     fecharMensagemCelular(); // o que ela escreveu já está no rascunho
     alunoCelular = null; // a aba Alunos volta à lista
@@ -25966,8 +26091,10 @@
     esconderAviso(); // o aviso da ação anterior não fica sob a folha
     folhaCelular = { aulaId: aulaId, passo: 'acoes' };
     desenharFolhaCelular();
+    folhaEntrouNoHistorico();
   }
   function fecharFolhaCelular() {
+    folhaSaiuDoHistorico();
     folhaCelular = null;
     var fundo = $('#cel-folha-fundo');
     if (fundo) fundo.parentNode.removeChild(fundo);

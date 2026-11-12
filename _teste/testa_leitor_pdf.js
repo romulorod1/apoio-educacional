@@ -248,9 +248,12 @@ async function cortarRede(pag, cortar) {
   const abasAntes = (await navegador.pages()).length;
   let navegacoes = 0;
   /* a entrada do leitor no histórico (FILA 2b: o Voltar do aparelho fecha o
-   * leitor) é um pushState na mesma página: não é sair do aplicativo. Conta
-   * só a navegação que troca de documento ou de endereço. */
-  const contaNavegacao = f => { if (f === pag.mainFrame() && f.url() !== urlAntes) navegacoes++; };
+   * leitor) é um pushState na mesma página, e o puppeteer a conta como
+   * navegação. Quem diz se o documento ficou é uma marca em window, que some
+   * em qualquer recarga ou troca de página. */
+  const contaNavegacao = f => { if (f === pag.mainFrame()) navegacoes++; };
+  await pag.evaluate(() => { window.__mesmoDocumento = 'leitor-' + Date.now(); });
+  const marcaAntes = await pag.evaluate(() => window.__mesmoDocumento);
   pag.on('framenavigated', contaNavegacao);
   let alvosNovos = 0;
   const contaAlvo = t => { if (t.type() === 'page') alvosNovos++; };
@@ -265,7 +268,8 @@ async function cortarRede(pag, cortar) {
   conf('e a da página 2 (azul) não', await pixelsDaCor(pag, CANVAS, RGB[1]), 0);
   conf('o leitor foi pedido só agora', pedidosDoLeitor.length > 0, true);
   conf('nenhuma aba nova', alvosNovos + '/' + ((await navegador.pages()).length - abasAntes), '0/0');
-  conf('nenhuma navegação', navegacoes + ' ' + pag.url(), '0 ' + urlAntes);
+  conf('nenhuma navegação: o mesmo documento (a marca em window ficou) e o mesmo endereço', (await pag.evaluate(() => window.__mesmoDocumento)) === marcaAntes && pag.url() === urlAntes, true);
+  console.log('   eventos de navegação do puppeteer (o pushState do leitor conta): ' + navegacoes);
   conf('nada foi compartilhado nem baixado', await saidas(pag), '');
   /* O PDF de teste não tem imagem: o PDF.js nunca pediria um decodificador.
    * Se eles estão no BAIXADOS, foi a busca de fundo do app que os trouxe. */
