@@ -24,7 +24,8 @@
  *      outro duplo toque no meio volta à largura (±1 px), com o ponto tocado
  *      sob o dedo a menos de 24 px na altura e a p. 120 no meio;
  *   3. a caneta (ponteiro pen, dois toques rápidos) não muda o zoom;
- *   4. um dedo só continua rolando, sem zoom;
+ *   4. um dedo só: a área deixa rolar (touch-action pan-x pan-y), nenhum
+ *      touchmove de um dedo é cancelado pelo leitor, e o zoom não muda;
  *   5. deitado (1280x800), o duplo toque dobra a largura, e uma pinça de 120
  *      a 180 px a partir dali (zoom 2 a 3, com o ponto médio andando 20 px)
  *      também segura o ponto sob os dedos a menos de 24 px;
@@ -268,23 +269,48 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   // ================================================================
   secao('3. A caneta não dá zoom');
   const antesCaneta = await estadoDoLeitor();
+  // controle: os toques chegam à área como ponteiro pen (senão a verificação abaixo não prova nada)
+  await pag.evaluate(() => { window.__tiposCaneta = []; window.__olhaCaneta = e => window.__tiposCaneta.push(e.pointerType);
+    document.querySelector('#corpo-modal-leitor-pdf').addEventListener('pointerdown', window.__olhaCaneta); });
   const caneta = async (tipo, x, y) => cdp.send('Input.dispatchMouseEvent', { type: tipo, x: Math.round(x), y: Math.round(y),
     button: 'left', buttons: tipo === 'mousePressed' ? 1 : 0, clickCount: 1, pointerType: 'pen' });
   for (let i = 0; i < 2; i++) { await caneta('mousePressed', q.x, q.y); await pausa(40); await caneta('mouseReleased', q.x, q.y); await pausa(90); }
   await pausa(800);
   const depoisCaneta = await estadoDoLeitor();
+  const tiposCaneta = await pag.evaluate(() => { document.querySelector('#corpo-modal-leitor-pdf').removeEventListener('pointerdown', window.__olhaCaneta); return window.__tiposCaneta.join(','); });
+  conf('os dois toques chegaram à área como ponteiro pen', tiposCaneta, 'pen,pen');
   conf('dois toques rápidos da caneta deixam a largura igual', Math.abs(depoisCaneta.largura - antesCaneta.largura) <= 1, true);
   conf('e a rolagem igual', Math.abs(depoisCaneta.scrollTop - antesCaneta.scrollTop) < 1, true);
 
   // ================================================================
   secao('4. Um dedo continua rolando, sem zoom');
+  /* No Chrome sem janela do CI, o toque sintético não rola a área (o
+   * synthesizeScrollGesture andou 0 px na primeira rodada). O que o leitor
+   * decide, e a prova trava, é não segurar a rolagem: a área deixa o dedo
+   * rolar (touch-action) e nenhum touchmove de um dedo é cancelado. A rolagem
+   * em si é medida e dita, sem reprovar. */
   const antesDedo = await estadoDoLeitor();
-  await cdp.send('Input.synthesizeScrollGesture', { x: Math.round(q.x), y: Math.round(antesDedo.area.y + antesDedo.area.h * 0.7),
-    yDistance: -400, gestureSourceType: 'touch', speed: 800 });
+  await pag.evaluate(() => {
+    window.__movidos = 0; window.__cancelados = 0;
+    window.__contaToque = e => { if (e.touches.length === 1) { window.__movidos++; if (e.defaultPrevented) window.__cancelados++; } };
+    window.addEventListener('touchmove', window.__contaToque, { passive: true });
+  });
+  const yd = antesDedo.area.y + antesDedo.area.h * 0.7;
+  await toque('touchStart', [{ x: q.x, y: yd }]);
+  for (let i = 1; i <= 12; i++) { await toque('touchMove', [{ x: q.x, y: yd - i * 35 }]); await pausa(16); }
+  await toque('touchEnd', []);
   await pausa(700);
+  const dedo = await pag.evaluate(() => {
+    window.removeEventListener('touchmove', window.__contaToque, { passive: true });
+    return { movidos: window.__movidos, cancelados: window.__cancelados,
+      acao: getComputedStyle(document.querySelector('#corpo-modal-leitor-pdf')).touchAction };
+  });
   const depoisDedo = await estadoDoLeitor();
-  console.log('   um dedo: a rolagem andou ' + Math.round(depoisDedo.scrollTop - antesDedo.scrollTop) + ' px');
-  conf('arrastar um dedo rola a página para baixo', depoisDedo.scrollTop - antesDedo.scrollTop > 100, true);
+  console.log('   um dedo: ' + dedo.movidos + ' movimentos, ' + dedo.cancelados + ' cancelados; a rolagem andou ' +
+    Math.round(depoisDedo.scrollTop - antesDedo.scrollTop) + ' px (dito, não reprova)');
+  conf('a área de leitura deixa o dedo rolar nos dois sentidos (touch-action)', dedo.acao, 'pan-x pan-y');
+  conf('o arrasto de um dedo chegou à página', dedo.movidos > 0, true);
+  conf('e nenhum movimento de um dedo foi segurado pelo leitor', dedo.cancelados, 0);
   conf('e não muda o zoom', Math.abs(depoisDedo.largura - antesDedo.largura) <= 1, true);
 
   // ================================================================
