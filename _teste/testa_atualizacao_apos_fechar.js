@@ -185,7 +185,51 @@ const servidor = http.createServer((req, res) => {
     await new Promise(resolve => servidor.listen(porta, '127.0.0.1', resolve));
     navegador = await puppeteer.launch({ executablePath: process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe',
       headless: 'new', args: ['--no-sandbox'], defaultViewport: { width: 1280, height: 1000, hasTouch: true } });
-    const paginaComRelogio = async () => { const p = await navegador.newPage(); await RELOGIO.naPagina(p); return p; };
+    /* Cada documento anota se NASCEU sob o service worker. Na primeira instalação
+     * o app recarrega sozinho no controllerchange (o clients.claim do activate);
+     * esperar só "há controller" deixava a prova seguir no documento que estava
+     * para ser trocado, e o evaluate seguinte morria em "Execution context was
+     * destroyed" (1 em 10 no HEAD limpo, 12/11/2026). */
+    const paginaComRelogio = async () => {
+      const p = await navegador.newPage();
+      await RELOGIO.naPagina(p);
+      await p.evaluateOnNewDocument(() => { window.__nasceuControlada = !!(navigator.serviceWorker && navigator.serviceWorker.controller); });
+      return p;
+    };
+    /* O worker da versão N ativado e nada em espera, visto de DENTRO do worker
+     * (pelo nome do cache que o servidor pôs no sw.js dele), sem abrir página:
+     * uma página aberta viraria cliente do worker de antes e seguraria a troca. */
+    /* Cada sondagem tem prazo próprio de 1 s, numa sessão CDP própria que se
+     * desliga depois: o evaluate num worker que está sendo encerrado (o 1, ao
+     * virar redundante) não responde, e pelo worker() do puppeteer a chamada
+     * pendurada segurava o processo vivo por mais 30 s (o protocolTimeout).
+     * Desligar a sessão cancela a chamada e o relógio dela. */
+    const comPrazo = (promessa, ms) => Promise.race([promessa.catch(() => null),
+      new Promise(resolve => setTimeout(() => resolve(null), ms))]);
+    const sondarWorker = async (alvo, expressao) => {
+      const sessao = await comPrazo(alvo.createCDPSession(), 1000);
+      if (!sessao) return false;
+      const r = await comPrazo(sessao.send('Runtime.evaluate', { expression: expressao, returnByValue: true }), 1000);
+      await sessao.detach().catch(() => {});
+      return !!(r && r.result && r.result.value === true);
+    };
+    const esperarWorkerAtivo = async (sufixo, prazoMs) => {
+      const fim = Date.now() + prazoMs;
+      const expressao = "typeof CACHE !== 'undefined' && CACHE.endsWith(" + JSON.stringify(sufixo) + ') && ' +
+        '!self.registration.waiting && !self.registration.installing && !!self.registration.active && ' +
+        "self.registration.active.state === 'activated'";
+      while (Date.now() < fim) {
+        for (const alvo of navegador.targets().filter(t => t.type() === 'service_worker')) {
+          if (await sondarWorker(alvo, expressao)) return true;
+        }
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      return false;
+    };
+    /* A página aberta, com o #versao-app preenchido, num documento que NASCEU
+     * controlado e com o carregamento terminado. */
+    const esperarAberta = (p, ms) => p.waitForFunction(() => window.__nasceuControlada === true &&
+      document.readyState === 'complete' && !!(document.querySelector('#versao-app')?.textContent || '').trim(), { timeout: ms || 15000 });
     let pagina = await paginaComRelogio();
     pagina.on('dialog', d => d.dismiss().catch(() => {}));
     const url = 'http://127.0.0.1:' + porta + '/index.html';
@@ -193,7 +237,7 @@ const servidor = http.createServer((req, res) => {
     const prazo = Date.now() + 30000;
     let instalada = false;
     while (!instalada && Date.now() < prazo) {
-      instalada = await pagina.evaluate(() => !!navigator.serviceWorker.controller &&
+      instalada = await pagina.evaluate(() => window.__nasceuControlada === true && document.readyState === 'complete' &&
         !!document.querySelector('#versao-app')?.textContent.includes('9.0.1')).catch(() => false);
       if (!instalada) await new Promise(resolve => setTimeout(resolve, 200));
     }
@@ -250,11 +294,23 @@ const servidor = http.createServer((req, res) => {
       if (!(await pagina.evaluate(() => window.__EXTRA === 1))) throw new Error('A versão 1 não carregou o extra.js');
       await pagina.close();
       semRede = true;
+      /* Ela fechou sem tocar: sem cliente nenhum, o navegador ativa o worker 2.
+       * A prova espera ISSO, e não um tempo fixo. Antes, a página nova abria
+       * antes da ativação em 2 de 10 rodadas, virava cliente do worker 1 e o 2
+       * ficava em espera para sempre. Sem ativar em 20 s, segue e reprova
+       * abaixo, com o estado. */
+      const t0 = Date.now();
+      const PRAZO_ATIVAR = 20000;
+      const ativou = await esperarWorkerAtivo('-2', PRAZO_ATIVAR);
+      console.log('   ' + (ativou ? 'worker 2 ativado ' + (Date.now() - t0) + ' ms depois de fechar'
+        : 'worker 2 NÃO ativou em ' + (PRAZO_ATIVAR / 1000) + ' s depois de fechar'));
       pagina = await paginaComRelogio();
+      const t1 = Date.now();
       await pagina.goto(url, { waitUntil: 'load' }).catch(() => {});
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const abriu = await esperarAberta(pagina).then(() => 'aberta', () => 'NÃO abriu em 15 s');
       await pagina.reload({ waitUntil: 'load' }).catch(() => {});
-      await new Promise(resolve => setTimeout(resolve, 2500));
+      const reabriu = await esperarAberta(pagina).then(() => 'aberta', () => 'NÃO abriu em 15 s');
+      console.log('   sem rede: primeira abertura ' + abriu + ', recarga ' + reabriu + ' (' + (Date.now() - t1) + ' ms)');
       const estado = await pagina.evaluate(async () => ({
         extra: window.__EXTRA === 1,
         versao: document.querySelector('#versao-app')?.textContent,
