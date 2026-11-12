@@ -422,6 +422,34 @@ async function importar(pag, arquivo) {
   conf('abrir o resultado leva à página encontrada no livro', leitorBusca.ok, true);
   await pag.evaluate(() => document.querySelector('#modal-leitor-pdf [data-fechar]').click());
   await esperar('o leitor da busca fecha', () => pag.evaluate(() => !document.querySelector('#modal-leitor-pdf.aberto')), v => v, 5000);
+  /* a palavra que só existe no texto de um livro (a página 200 do Livro B,
+   * de 600): a tela acha, diz a parte e a página, e o toque abre nela; o
+   * livro escaneado (C) não aparece, e o aviso diz que há texto que não foi lido */
+  await pag.evaluate(() => {
+    const campo = document.querySelector('#bib-busca-livros-campo');
+    campo.value = 'Paralelepípedo';
+    campo.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const telaLongo = await esperar('a tela acha a página 200 do Livro B', () => pag.evaluate(() => {
+    const caixa = document.querySelector('#bib-busca-livros-resultados [data-livro="indice-longo"]');
+    const aviso = document.querySelector('#bib-busca-livros-resultados .bib-busca-livros-aviso');
+    return { status: document.querySelector('#bib-busca-livros-status').textContent,
+      livros: [...document.querySelectorAll('#bib-busca-livros-resultados [data-livro]')].map(x => x.dataset.livro).join(','),
+      grupo: caixa ? caixa.querySelector('.bib-busca-livro-paginas').textContent : '',
+      botao: caixa && caixa.querySelector('button') ? caixa.querySelector('button').textContent : '',
+      aviso: aviso ? aviso.textContent : '' };
+  }), v => !!v && /1 página encontrada em 1 livro/.test(v.status) && /Abrir na p\. 200/.test(v.botao), 10000);
+  conf('só o texto do Livro B tem "paralelepípedo": um livro, a parte e a página 200',
+    telaLongo.valor && telaLongo.valor.livros + ' | ' + /Parte 2/.test(telaLongo.valor.grupo) + ' | ' + /200 · 1 página/.test(telaLongo.valor.grupo), 'indice-longo | true | true');
+  conf('o livro escaneado não aparece no resultado, e o aviso diz que há texto que não foi lido',
+    telaLongo.valor && /Não foi possível ler todo o texto de 2 livros/.test(telaLongo.valor.aviso) && !/indice-sem-texto/.test(telaLongo.valor.livros), true);
+  await pag.evaluate(() => document.querySelector('#bib-busca-livros-resultados [data-livro="indice-longo"] button').click());
+  const leitorLongo = await esperar('o resultado abre na página 200', () => pag.evaluate(() =>
+    document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada || ''), v => v === '200', 20000);
+  conf('abrir o resultado do Livro B leva à página 200 do arquivo', leitorLongo.ok, true);
+  await pag.evaluate(() => document.querySelector('#modal-leitor-pdf [data-fechar]').click());
+  await esperar('o leitor do Livro B fecha', () => pag.evaluate(() => !document.querySelector('#modal-leitor-pdf.aberto')), v => v, 5000);
+  await pag.evaluate(() => { const campo = document.querySelector('#bib-busca-livros-campo'); campo.value = ''; campo.dispatchEvent(new Event('input', { bubbles: true })); });
 
   const norm = await pag.evaluate(() => [IndiceLivros.normalizar('multipli-' + String.fromCharCode(10) + 'cação'),
     IndiceLivros.normalizar('multi' + String.fromCharCode(0xAD) + 'plicação'), IndiceLivros.normalizar('Frações  EQUIVALENTES'),

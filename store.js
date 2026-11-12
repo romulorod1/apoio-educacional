@@ -742,7 +742,7 @@
     opcoes = opcoes || {};
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = transacao(b, ['saida', 'registros', 'notas', 'controle'], 'readonly');
+        var t = transacao(b, ['saida', 'registros', 'notas', 'controle', 'anexos', 'midias'], 'readonly');
         var saida = [];
         saida.adiadas = 0;
         var fila = t.objectStore('saida').getAll();
@@ -772,6 +772,24 @@
                 saida.push({ fila: entrada, registro: { id: entrada.id, tipo: 'folha', aulaId: p.aulaId, n: p.n,
                   atualizadoEm: entrada.atualizadoEm, apagadoEm: apagadoEm, pagina: apagadoEm ? null : pag,
                   hash: ePag ? ePag.hash : null, nuvem: ePag ? ePag.nuvem : null, aparelho: aparelhoId } });
+              };
+              return;
+            }
+            /* O arquivo (N2, fatia 2): o estado e o registro do depósito, na
+             * mesma leitura. Entrada viva sem arquivo no disco vira lápide. */
+            if (entrada.tipo === 'anexo') {
+              var pa = partesDoIdDoArquivo(entrada.id);
+              if (!pa) { saida.push({ fila: entrada, registro: null }); return; }
+              var valor = null;
+              t.objectStore(depositoDaOrigem(pa.origem)).get(pa.id).onsuccess = function (e) { valor = e.target.result || null; };
+              var estReq = t.objectStore('controle').get(PREFIXO_ARQUIVO + entrada.id);
+              estReq.onsuccess = function () {
+                var est = estReq.result || {};
+                var apagadoEm = entrada.apagadoEm || (!valor ? entrada.atualizadoEm : null);
+                saida.push({ fila: entrada, registro: { id: entrada.id, tipo: 'anexo', origem: pa.origem, aulaId: entrada.aulaId || est.aulaId || '',
+                  atualizadoEm: entrada.atualizadoEm, apagadoEm: apagadoEm, arquivo: apagadoEm ? null : valor,
+                  nome: est.nome || (valor && valor.nome) || '', mime: est.tipo || (valor && valor.tipo) || null, w: est.w || (valor && valor.w) || null, h: est.h || (valor && valor.h) || null,
+                  sha256: est.sha256 || null, nuvem: est.nuvem || null, aparelho: aparelhoId } });
               };
               return;
             }
@@ -825,6 +843,28 @@
           }
           if (pag && item.nuvem) {
             (folhasPorAula[pag.aulaId] = folhasPorAula[pag.aulaId] || []).push({ n: pag.n, item: item });
+            return;
+          }
+          /* O arquivo (N2, fatia 2): o carimbo e o sha256 que subiram ficam no
+           * estado dele. O que subiu vivo e já é lápide aqui (removido durante o
+           * envio) volta à fila como lápide, se outra aba a tirou. */
+          if (item.tipo === 'anexo') {
+            if (!item.nuvem) return;
+            var controleA = t.objectStore('controle');
+            var estA = controleA.get(PREFIXO_ARQUIVO + item.id);
+            estA.onsuccess = function () {
+              var e = estA.result;
+              if (!e) return;
+              e.nuvem = { updateTime: item.nuvem.updateTime || null, servidorEm: item.nuvem.servidorEm || null, apagado: !!item.apagadoEm };
+              if (item.hash && !e.apagadoEm) e.sha256 = item.hash;
+              controleA.put(e, PREFIXO_ARQUIVO + item.id);
+              if (e.apagadoEm && !item.apagadoEm) {
+                var reporA = s.get(item.id);
+                reporA.onsuccess = function () {
+                  if (!reporA.result) s.put({ id: item.id, tipo: 'anexo', atualizadoEm: e.atualizadoEm, apagadoEm: e.apagadoEm, aulaId: e.aulaId || '', origem: e.origem });
+                };
+              }
+            };
             return;
           }
           /* O carimbo do servidor que o commit devolveu fica no registro: é a
@@ -1366,6 +1406,10 @@
         var contas = null;
         var notas = t.objectStore('notas');
         var midiasExcluidas = {}, midiasMantidas = {};
+        /* Os arquivos que saem viram lápide na nuvem (N2, fatia 2), na mesma
+         * transação, salvo com a sincronização desligada. */
+        var agoraCascata = new Date().toISOString(), saidaCascata = t.objectStore('saida');
+        lerMarcaDesligada(t, function (desligada) { if (desligada) saidaCascata = null; });
         var cursorNotas = notas.openCursor();
         cursorNotas.onsuccess = function (e) {
           var c = e.target.result;
@@ -1381,12 +1425,15 @@
             return;
           }
           Object.keys(midiasExcluidas).forEach(function (id) {
-            if (!midiasMantidas[id]) t.objectStore('midias').delete(id);
+            if (midiasMantidas[id]) return;
+            t.objectStore('midias').delete(id);
+            lapidarArquivo(t, idDoArquivo('midia', id), agoraCascata, saidaCascata);
           });
           Object.keys(anexosExcluidos).forEach(function (id) {
             if (anexosMantidos[id]) return;
             t.objectStore('anexos').delete(id);
             t.objectStore('livros_posicoes').delete(PREFIXO_EXPORTADO + id);
+            lapidarArquivo(t, idDoArquivo('anexo', id), agoraCascata, saidaCascata);
           });
           var cursorUso = t.objectStore('biblioteca_uso').openCursor();
           cursorUso.onsuccess = function (evento) {
@@ -1973,17 +2020,470 @@
     });
   }
 
+  // ---------- anexos e mídias na nuvem, pelo sha256 (N2, fatia 2) ----------
+
+  /* O ARQUIVO SOBE UMA VEZ, PELO SHA256 (N2). Os depósitos `anexos` (o PDF, a
+   * foto) e `midias` (a imagem colada na folha) continuam como estão. O que a
+   * nuvem vê de cada um é o documento pequeno `anexos/{id}` (o id é o da fila:
+   * 'anexo:<id>' ou 'midia:<id>', para o anexo e a mídia de mesmo id nunca se
+   * cobrirem) e o arquivo em `arquivos/{sha256}`, que o mesmo conteúdo em duas
+   * aulas divide. O estado de sincronização mora em `controle`, chave
+   * 'arquivo:<id da fila>':
+   *   { sha256, tamanho, tipo, origem, aulaId, nome, w, h, atualizadoEm,
+   *     apagadoEm, nuvem: { updateTime, servidorEm, apagado } }
+   * O sha256 é calculado ANTES da transação (o WebCrypto é assíncrono e a
+   * transação não espera); a gravação do arquivo, o estado e a entrada da fila
+   * (tipo 'anexo') vão numa transação só. Sem banco novo e sem versão nova.
+   * O ARQUIVO DE ANTES DESTA VERSÃO (sem estado) NÃO SOBE SOZINHO: a decisão
+   * das folhas da fatia 1 (só o que for gravado de novo sobe; a subida em
+   * segundo plano é fatia própria). A miniatura da biblioteca ('bib:') é cache
+   * e fica fora. */
+  var PREFIXO_ARQUIVO = 'arquivo:';
+  function idDoArquivo(origem, id) { return (origem === 'midia' ? 'midia:' : 'anexo:') + id; }
+  function partesDoIdDoArquivo(filaId) {
+    var s = String(filaId || '');
+    if (s.indexOf('anexo:') === 0 && s.length > 6) return { origem: 'anexo', id: s.slice(6) };
+    if (s.indexOf('midia:') === 0 && s.length > 6) return { origem: 'midia', id: s.slice(6) };
+    return null;
+  }
+  function depositoDaOrigem(origem) { return origem === 'midia' ? 'midias' : 'anexos'; }
+  /* Os bytes e o tipo de um registro do depósito: o anexo é Blob; a mídia é
+   * uma dataURL (a imagem em base64), e os bytes são os da imagem. */
+  function dataUrlParaBytes(dataUrl) {
+    var s = String(dataUrl || ''), virgula = s.indexOf(',');
+    var cabeca = s.slice(0, virgula), corpo = s.slice(virgula + 1);
+    var tipo = (/^data:([^;,]+)/.exec(cabeca) || [])[1] || 'application/octet-stream';
+    var bin = /;base64$/.test(cabeca) ? atob(corpo) : decodeURIComponent(corpo);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i) & 255;
+    return { bytes: bytes, tipo: tipo };
+  }
+  function bytesParaDataUrl(bytes, tipo) {
+    var s = '';
+    for (var i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + 0x8000, bytes.length)));
+    return 'data:' + (tipo || 'application/octet-stream') + ';base64,' + btoa(s);
+  }
+  function bytesDoArquivo(origem, valor) {
+    if (!valor) return Promise.resolve(null);
+    if (origem === 'midia') {
+      if (!valor.dataUrl) return Promise.resolve(null);
+      return Promise.resolve(dataUrlParaBytes(valor.dataUrl));
+    }
+    if (!valor.blob || typeof valor.blob.arrayBuffer !== 'function') return Promise.resolve(null);
+    return valor.blob.arrayBuffer().then(function (buf) {
+      return { bytes: new Uint8Array(buf), tipo: valor.tipo || valor.blob.type || 'application/octet-stream' };
+    });
+  }
+  /* O sha256 do arquivo; null sem WebCrypto (o envio o calcula de novo, e sem
+   * WebCrypto o arquivo fica na fila, como a folha). */
+  function shaDoArquivo(origem, valor) {
+    if (!temWebCrypto()) return Promise.resolve(null);
+    return bytesDoArquivo(origem, valor).then(function (b) {
+      if (!b) return null;
+      return sha256Hex(b.bytes).then(function (sha) { return { sha256: sha, tamanho: b.bytes.length, tipo: b.tipo }; });
+    });
+  }
+  function lerMarcaDesligada(t, depois) {
+    var req = t.objectStore('controle').get('sincronizacao');
+    req.onsuccess = function () { depois(!!(req.result && req.result.desligada)); };
+  }
+  /* Grava o arquivo, o estado e a entrada da fila numa transação só. */
+  function salvarArquivo(origem, id, registro, opcoes) {
+    opcoes = opcoes || {};
+    if (origem === 'midia' && String(id).indexOf(PREFIXO_MINIATURA) === 0) return gravar('midias', id, registro);
+    var filaId = idDoArquivo(origem, id), deposito = depositoDaOrigem(origem);
+    return shaDoArquivo(origem, registro).then(function (info) {
+      return abrir().then(function (b) {
+        return new Promise(function (resolve, reject) {
+          var t = transacao(b, [deposito, 'controle', 'saida'], 'readwrite');
+          var agora = new Date().toISOString();
+          var controle = t.objectStore('controle');
+          lerMarcaDesligada(t, function (desligada) {
+            var antesReq = controle.get(PREFIXO_ARQUIVO + filaId);
+            antesReq.onsuccess = function () {
+              try {
+                var antes = antesReq.result || null;
+                var estado = { sha256: info ? info.sha256 : null, tamanho: info ? info.tamanho : null, tipo: info ? info.tipo : (registro && registro.tipo) || null,
+                  origem: origem, aulaId: opcoes.aulaId || (antes && antes.aulaId) || '', nome: origem === 'anexo' ? String((registro && registro.nome) || '') : '',
+                  w: origem === 'midia' ? (registro && registro.w) || null : null, h: origem === 'midia' ? (registro && registro.h) || null : null,
+                  atualizadoEm: agora, apagadoEm: null, nuvem: antes && antes.nuvem ? antes.nuvem : null };
+                t.objectStore(deposito).put(registro, id);
+                controle.put(estado, PREFIXO_ARQUIVO + filaId);
+                if (!desligada) enfileirar(t.objectStore('saida'), { id: filaId, tipo: 'anexo', atualizadoEm: agora, apagadoEm: null, aulaId: estado.aulaId, origem: origem });
+              } catch (e) {
+                if (!e || (e.name !== 'TransactionInactiveError' && e.name !== 'InvalidStateError')) throw e;
+              }
+            };
+          });
+          t.oncomplete = function () { avisarMudanca(deposito); resolve(); };
+          t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+          t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+        });
+      });
+    });
+  }
+  /* Lapida, dentro de `t`, o estado do arquivo que este aparelho conhece e
+   * enfileira a lápide (saida null: só o estado). O arquivo sem estado (de
+   * antes desta versão) nunca subiu: não há o que lapidar. */
+  function lapidarArquivo(t, filaId, agora, saida) {
+    var controle = t.objectStore('controle');
+    var req = controle.get(PREFIXO_ARQUIVO + filaId);
+    req.onsuccess = function () {
+      var e = req.result;
+      if (!e || e.apagadoEm) return;
+      var lapide = Object.assign({}, e, { atualizadoEm: agora, apagadoEm: agora });
+      controle.put(lapide, PREFIXO_ARQUIVO + filaId);
+      if (saida) enfileirar(saida, { id: filaId, tipo: 'anexo', atualizadoEm: agora, apagadoEm: agora, aulaId: e.aulaId || '', origem: e.origem });
+    };
+  }
+  /* "Remover", "Tirar" e a limpeza de órfãos: o arquivo sai do aparelho e a
+   * lápide entra na fila, na mesma transação. */
+  function apagarArquivo(origem, id, porta) {
+    if (origem === 'midia' && String(id).indexOf(PREFIXO_MINIATURA) === 0) return apagar('midias', id, porta);
+    var filaId = idDoArquivo(origem, id), deposito = depositoDaOrigem(origem);
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, [deposito, 'controle', 'saida'], 'readwrite', porta);
+        var agora = new Date().toISOString();
+        t.objectStore(deposito).delete(id);
+        lerMarcaDesligada(t, function (desligada) { lapidarArquivo(t, filaId, agora, desligada ? null : t.objectStore('saida')); });
+        t.oncomplete = function () { avisarMudanca(deposito); resolve(); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+  function estadoDoArquivo(filaId) {
+    return ler('controle', PREFIXO_ARQUIVO + filaId).then(function (e) { return e || null; });
+  }
+  function lerCursorAnexos() {
+    return ler('controle', 'cursorAnexos').then(function (c) { return c || null; });
+  }
+  /* Os estados dos arquivos (por id da fila), dentro de `t`. */
+  function lerEstadosDosArquivos(t, depois) {
+    var estados = {};
+    varrerControle(t, PREFIXO_ARQUIVO, function (chave, valor) { estados[String(chave).slice(PREFIXO_ARQUIVO.length)] = valor; }, function () { depois(estados); });
+  }
+  /* A RESTAURAÇÃO REFAZ O ESTADO DOS ARQUIVOS, como o das folhas
+   * (restaurarEstadoDasFolhas): lê o estado anterior inteiro, apaga por faixa,
+   * e no aparelho que escreve todo arquivo da cópia entra na fila (com
+   * `restauro` quando a cópia veio da nuvem), sem sha (o envio o calcula) e com
+   * o carimbo da nuvem que este aparelho conhecia; o arquivo que este aparelho
+   * conhecia na nuvem e a cópia não tem vira lápide. A fila de arquivos
+   * recomeça pela cópia. `arquivos`: { 'anexo:<id>' | 'midia:<id>': { aulaId, nome, tipo, w, h } }. */
+  function restaurarEstadoDosArquivos(t, arquivos, carimbo, agora, opcoes) {
+    opcoes = opcoes || {};
+    var controle = t.objectStore('controle');
+    lerMarcaDesligada(t, function (desligada) {
+      lerEstadosDosArquivos(t, function (antigos) {
+        apagarFaixaDeControle(t, PREFIXO_ARQUIVO);
+        controle.delete('cursorAnexos');
+        var saida = (desligada && !opcoes.restauro) ? null : t.objectStore('saida');
+        if (saida) {
+          saida.delete(IDBKeyRange.bound('anexo:', 'anexo:￿'));
+          saida.delete(IDBKeyRange.bound('midia:', 'midia:￿'));
+        }
+        Object.keys(arquivos || {}).forEach(function (filaId) {
+          var a = arquivos[filaId], velho = antigos[filaId], p = partesDoIdDoArquivo(filaId);
+          /* A cópia pode referenciar um arquivo cujo download ainda não
+           * terminou. Ele não está apagado: preserve o estado conhecido e
+           * deixe o recebimento completar o download. */
+          if (a.pendente) {
+            if (!velho) return;
+            controle.put(velho, PREFIXO_ARQUIVO + filaId);
+            if (!saida || velho.recebido || velho.apagadoEm) return;
+            var deposito = t.objectStore(depositoDaOrigem(p.origem));
+            deposito.count(p.id).onsuccess = function (ev) {
+              if (!ev.target.result) return;
+              var entradaPendente = { id: filaId, tipo: 'anexo', atualizadoEm: velho.atualizadoEm, apagadoEm: null,
+                aulaId: velho.aulaId || '', origem: velho.origem };
+              if (opcoes.restauro) entradaPendente.restauro = true;
+              enfileirar(saida, entradaPendente);
+            };
+            return;
+          }
+          controle.put({ sha256: null, tamanho: null, tipo: a.tipo || null, origem: p.origem, aulaId: a.aulaId || '', nome: a.nome || '',
+            w: a.w || null, h: a.h || null, atualizadoEm: carimbo, apagadoEm: null, nuvem: velho && velho.nuvem ? velho.nuvem : null }, PREFIXO_ARQUIVO + filaId);
+          if (!saida) return;
+          var entrada = { id: filaId, tipo: 'anexo', atualizadoEm: carimbo, apagadoEm: null, aulaId: a.aulaId || '', origem: p.origem };
+          if (opcoes.restauro) entrada.restauro = true;
+          enfileirar(saida, entrada);
+        });
+        Object.keys(antigos).forEach(function (filaId) {
+          if (arquivos && arquivos[filaId]) return;
+          var velho = antigos[filaId];
+          if (!velho || !velho.nuvem) return; // nunca subiu: nada a lapidar na nuvem
+          if (velho.apagadoEm) {
+            controle.put(velho, PREFIXO_ARQUIVO + filaId);
+            if (saida && !velho.nuvem.apagado) enfileirar(saida, { id: filaId, tipo: 'anexo', atualizadoEm: velho.atualizadoEm, apagadoEm: velho.apagadoEm, aulaId: velho.aulaId || '', origem: velho.origem });
+            return;
+          }
+          controle.put(Object.assign({}, velho, { atualizadoEm: agora, apagadoEm: agora }), PREFIXO_ARQUIVO + filaId);
+          if (saida) enfileirar(saida, { id: filaId, tipo: 'anexo', atualizadoEm: agora, apagadoEm: agora, aulaId: velho.aulaId || '', origem: velho.origem });
+        });
+      });
+    });
+  }
+  /* Os arquivos de uma cópia, pelo id da fila, com a aula de cada um: o anexo
+   * pela lista `anexos` da aula, a mídia pela folha que a cita. */
+  function arquivosDaCopia(dados, notas, midias, anexos) {
+    var saida = {}, aulaDoAnexo = {}, aulaDaMidia = {};
+    ((dados && dados.aulas) || []).forEach(function (a) { (a.anexos || []).forEach(function (an) {
+      var id = an.id || an;
+      aulaDoAnexo[id] = a.id;
+      saida[idDoArquivo('anexo', id)] = { aulaId: a.id || '', pendente: true };
+    }); });
+    Object.keys(notas || {}).forEach(function (aulaId) {
+      ((notas[aulaId] && notas[aulaId].paginas) || []).forEach(function (p) {
+        (p.itens || []).forEach(function (it) { if (it.t === 'imagem' && it.ref) {
+          if (!aulaDaMidia[it.ref]) aulaDaMidia[it.ref] = aulaId;
+          if (!saida[idDoArquivo('midia', it.ref)]) saida[idDoArquivo('midia', it.ref)] = { aulaId: aulaId, pendente: true };
+        } });
+      });
+    });
+    Object.keys(anexos || {}).forEach(function (id) {
+      var r = anexos[id];
+      if (!r || !r.blob) return;
+      saida[idDoArquivo('anexo', id)] = { aulaId: aulaDoAnexo[id] || '', nome: r.nome || '', tipo: r.tipo || null };
+    });
+    Object.keys(midias || {}).forEach(function (id) {
+      if (String(id).indexOf(PREFIXO_MINIATURA) === 0) return;
+      var r = midias[id];
+      if (!r || !r.dataUrl) return;
+      saida[idDoArquivo('midia', id)] = { aulaId: aulaDaMidia[id] || '', w: r.w || null, h: r.h || null };
+    });
+    return saida;
+  }
+  /* O "Apagar tudo" lapida o estado dos arquivos, fora da fila, como o das
+   * folhas: o que este aparelho conhecia na nuvem vira lápide, e quem a leva é
+   * o religar; o que nunca subiu sai. */
+  function lapidarEstadoDosArquivos(t, agora) {
+    var controle = t.objectStore('controle');
+    controle.delete('cursorAnexos');
+    lerEstadosDosArquivos(t, function (antigos) {
+      Object.keys(antigos).forEach(function (filaId) {
+        var e = antigos[filaId];
+        if (!e || !e.nuvem) { controle.delete(PREFIXO_ARQUIVO + filaId); return; }
+        if (!e.apagadoEm) controle.put(Object.assign({}, e, { atualizadoEm: agora, apagadoEm: agora }), PREFIXO_ARQUIVO + filaId);
+      });
+    });
+  }
+  /* A RECONCILIAÇÃO DOS ARQUIVOS QUE TÊM ESTADO, na abertura de uma versão
+   * nova: o arquivo removido pela versão anterior (que apaga solto, sem
+   * lápide) vira lápide e entra na fila; o gravado por ela (sem estado) fica
+   * como está, como a folha. Nada no aparelho que só lê.
+   * SÓ O QUE ESTE APARELHO GRAVOU (o estado nascido aqui, no salvarArquivo ou
+   * na restauração) pode virar lápide: o estado que veio DA NUVEM (`recebido`)
+   * sem o arquivo no disco é um download que falhou ("a baixar"), não uma
+   * remoção, e lapidá-lo apagaria o arquivo do tablet que o enviou (achado da
+   * lente B, 09/11/2026). */
+  function lapidavelNaReconciliacao(e) { return !!e && !e.apagadoEm && !e.recebido; }
+  function reconciliarArquivos() {
+    if (soLeitura) return Promise.resolve({ lapides: 0 });
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, ['anexos', 'midias', 'controle', 'saida'], 'readwrite');
+        var agora = new Date().toISOString(), contas = { lapides: 0 };
+        lerMarcaDesligada(t, function (desligada) {
+          lerEstadosDosArquivos(t, function (estados) {
+            Object.keys(estados).forEach(function (filaId) {
+              var e = estados[filaId], p = partesDoIdDoArquivo(filaId);
+              if (!lapidavelNaReconciliacao(e) || !p) return;
+              t.objectStore(depositoDaOrigem(p.origem)).count(p.id).onsuccess = function (ev) {
+                if (ev.target.result) return;
+                contas.lapides++;
+                lapidarArquivo(t, filaId, agora, desligada ? null : t.objectStore('saida'));
+              };
+            });
+          });
+        });
+        t.oncomplete = function () { resolve(contas); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+  /* APLICA OS METADADOS DOS ARQUIVOS QUE CHEGARAM (a coleção `anexos`), numa
+   * transação só, pela porta da nuvem. A regra é a das folhas: o eco anota o
+   * carimbo e tira da fila a entrada que já subiu; o carimbo igual ou mais
+   * velho que o conhecido não entra; a entrada local pendente vence (um id de
+   * arquivo nunca muda de conteúdo; quem disputa é a lápide); a lápide tira o
+   * arquivo do aparelho; o vivo vira estado, e o que falta no disco volta em
+   * `faltam`, para o tablet baixar na hora (o celular e o observador baixam
+   * quando ela abre). Item sem id só avança o cursor. */
+  /* Algum dado local ainda cita o arquivo? Referências compartilhadas e
+   * alterações ainda não sincronizadas também protegem os bytes locais. */
+  function aindaCitado(t, p, aulaId, depois) {
+    if (p.origem === 'midia') {
+      t.objectStore('notas').getAll().onsuccess = function (ev) {
+        depois((ev.target.result || []).some(function (n) { return (n.paginas || []).some(function (pg) {
+          return pg && (pg.itens || []).some(function (it) { return it && it.t === 'imagem' && it.ref === p.id; });
+        }); }));
+      };
+      return;
+    }
+    var principal, registros, restantes = 2;
+    function conferir() {
+      if (--restantes) return;
+      var citado = (principal && (principal.aulas || []).some(function (a) { return (a.anexos || []).some(function (an) { return (an.id || an) === p.id; }); })) ||
+        (registros || []).some(function (r) { return r && !r.apagadoEm && r.dados && (r.dados.anexos || []).some(function (an) { return (an.id || an) === p.id; }); });
+      depois(!!citado);
+    }
+    t.objectStore('dados').get('principal').onsuccess = function (ev) { principal = ev.target.result; conferir(); };
+    t.objectStore('registros').getAll().onsuccess = function (ev) { registros = ev.target.result; conferir(); };
+  }
+  /* Os arquivos "a baixar" (o download que falhou), que o tablet pede de novo
+   * a cada recebimento: o estado vivo que veio da nuvem e ainda não está no
+   * disco. */
+  function arquivosABaixar() {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, ['anexos', 'midias', 'controle'], 'readonly');
+        var lista = [];
+        lerEstadosDosArquivos(t, function (estados) {
+          Object.keys(estados).forEach(function (filaId) {
+            var e = estados[filaId], p = partesDoIdDoArquivo(filaId);
+            if (!p || !e || e.apagadoEm || !e.aBaixar) return;
+            t.objectStore(depositoDaOrigem(p.origem)).count(p.id).onsuccess = function (ev) { if (!ev.target.result) lista.push(filaId); };
+          });
+        });
+        t.oncomplete = function () { resolve(lista.sort()); };
+        t.onerror = function () { reject(t.error || new Error('A leitura falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A leitura foi interrompida.')); };
+      });
+    });
+  }
+  function aplicarAnexosRecebidos(lista) {
+    var agora = new Date().toISOString();
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, ['anexos', 'midias', 'controle', 'saida', 'registros', 'notas', 'dados'], 'readwrite', true);
+        var controle = t.objectStore('controle'), saida = t.objectStore('saida');
+        var contas = { aplicados: 0, ignorados: 0, apagados: 0, faltam: [], invalidos: 0, preservados: 0 };
+        var fila = {}, cursorAntes = null, desligada = false;
+        saida.getAll().onsuccess = function (e) { (e.target.result || []).forEach(function (f) { fila[f.id] = f; }); };
+        controle.get('cursorAnexos').onsuccess = function (e) { cursorAntes = e.target.result || null; };
+        var marcaReq = controle.get('sincronizacao');
+        marcaReq.onsuccess = function () {
+          desligada = !!(marcaReq.result && marcaReq.result.desligada);
+          if (desligada) { contas.pulado = 'desligada'; return; }
+          var cursorMaior = cursorAntes && cursorAntes.servidorEm ? { servidorEm: cursorAntes.servidorEm, nome: cursorAntes.nome || '' } : null;
+          (lista || []).forEach(function (c) {
+            if (c && c.servidorEm) cursorMaior = parMaior(cursorMaior, { servidorEm: c.servidorEm, nome: c.nome || '' });
+            var p = c && c.id ? partesDoIdDoArquivo(c.id) : null;
+            if (!p) return;
+            var chave = PREFIXO_ARQUIVO + c.id;
+            var req = controle.get(chave);
+            req.onsuccess = function () {
+              var local = req.result || null, pendente = fila[c.id];
+              var carimbo = { updateTime: c.updateTime || null, servidorEm: c.servidorEm || null, apagado: !!c.apagadoEm };
+              var maisNovo = !(local && local.nuvem && local.nuvem.servidorEm) || carimboNumero(local.nuvem.servidorEm) < carimboNumero(c.servidorEm);
+              if (c.eco) {
+                if (local && maisNovo) {
+                  local.nuvem = carimbo;
+                  if (c.sha256 && !local.sha256) local.sha256 = c.sha256;
+                  controle.put(local, chave);
+                  if (pendente && !pendente.quarentena && pendente.atualizadoEm === c.atualizadoEm) { saida.delete(c.id); delete fila[c.id]; }
+                }
+                return;
+              }
+              if (!maisNovo) { contas.ignorados++; return; }
+              if (local && pendente && !pendente.quarentena && !soLeitura) {
+                local.nuvem = carimbo;
+                controle.put(local, chave);
+                contas.ignorados++;
+                return;
+              }
+              var deposito = t.objectStore(depositoDaOrigem(p.origem));
+              /* O estado nascido aqui continua daqui (este aparelho teve o
+               * arquivo); o resto nasce da nuvem (`recebido`). */
+              var recebido = !(local && !local.recebido && !local.apagadoEm);
+              if (c.apagadoEm) {
+                var aulaDaLapide = c.aulaId || (local && local.aulaId) || '';
+                /* A DEFESA: a lápide de um arquivo que uma aula viva (ou a folha
+                 * dela) ainda cita não tira o arquivo do aparelho; o estado vira
+                 * lápide mesmo assim. O "Remover" legítimo tira o anexo da aula
+                 * antes, e os registros e as folhas chegam antes dos anexos no
+                 * mesmo recebimento. */
+                aindaCitado(t, p, aulaDaLapide, function (citado) {
+                  if (citado) contas.preservados = (contas.preservados || 0) + 1; else deposito.delete(p.id);
+                  controle.put(Object.assign({}, local || {}, { origem: p.origem, aulaId: aulaDaLapide,
+                    sha256: c.sha256 || (local && local.sha256) || null, atualizadoEm: c.atualizadoEm || agora, apagadoEm: c.apagadoEm, nuvem: carimbo,
+                    recebido: recebido, aBaixar: false }), chave);
+                });
+                contas.apagados++;
+                contas.aplicados++;
+                return;
+              }
+              var vivo = { sha256: c.sha256, tamanho: c.tamanho || null, tipo: c.tipo || null, origem: p.origem, aulaId: c.aulaId || '',
+                nome: c.nomeArquivo || '', w: c.largura || null, h: c.altura || null, atualizadoEm: c.atualizadoEm || agora, apagadoEm: null, nuvem: carimbo,
+                recebido: recebido, aBaixar: false };
+              contas.aplicados++;
+              /* O que falta no disco fica "a baixar": é pedido de novo (no tablet,
+               * a cada recebimento) e nunca vira lápide na reconciliação. */
+              deposito.count(p.id).onsuccess = function (ev) {
+                if (!ev.target.result) { vivo.aBaixar = true; contas.faltam.push(c.id); }
+                controle.put(vivo, chave);
+              };
+            };
+          });
+          if (cursorMaior && (!cursorAntes || cursorMaior.servidorEm !== cursorAntes.servidorEm || cursorMaior.nome !== (cursorAntes.nome || ''))) {
+            controle.put({ servidorEm: cursorMaior.servidorEm, nome: cursorMaior.nome, quando: agora }, 'cursorAnexos');
+          }
+          contas.cursor = cursorMaior ? cursorMaior.servidorEm : null;
+        };
+        t.oncomplete = function () { if (contas.apagados) { avisarMudanca('anexos'); } resolve(contas); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+  /* O ARQUIVO QUE VEIO DA NUVEM, já conferido pelo sha256 (nuvem.js), entra no
+   * depósito pela porta da nuvem: no tablet, na hora em que chega; no celular
+   * e no observador, quando ela abre. O que já virou lápide aqui não volta.
+   * Nada entra na fila (veio de lá). Devolve o registro gravado, ou null. */
+  function guardarArquivoRecebido(filaId, conteudo) {
+    var p = partesDoIdDoArquivo(filaId);
+    if (!p || !conteudo || !conteudo.bytes) return Promise.resolve(null);
+    var registro = p.origem === 'midia'
+      ? { dataUrl: bytesParaDataUrl(conteudo.bytes, conteudo.tipo), w: conteudo.w || null, h: conteudo.h || null }
+      : { nome: conteudo.nome || '', tipo: conteudo.tipo || 'application/octet-stream', blob: new Blob([conteudo.bytes], { type: conteudo.tipo || 'application/octet-stream' }) };
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, [depositoDaOrigem(p.origem), 'controle'], 'readwrite', true);
+        var gravado = null;
+        var req = t.objectStore('controle').get(PREFIXO_ARQUIVO + filaId);
+        req.onsuccess = function () {
+          var e = req.result;
+          if (e && e.apagadoEm) return;
+          t.objectStore(depositoDaOrigem(p.origem)).put(registro, p.id);
+          if (e && (e.aBaixar || (!e.sha256 && conteudo.sha256))) {
+            if (!e.sha256 && conteudo.sha256) e.sha256 = conteudo.sha256;
+            e.aBaixar = false;
+            t.objectStore('controle').put(e, PREFIXO_ARQUIVO + filaId);
+          }
+          gravado = registro;
+        };
+        t.oncomplete = function () { resolve(gravado); };
+        t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+
   // ---------- mídias (imagens coladas nas folhas) ----------
 
-  function salvarMidia(id, registro) { return gravar('midias', id, registro); }
+  /* opcoes.aulaId: a aula da folha que cita a imagem (vai no documento da nuvem). */
+  function salvarMidia(id, registro, opcoes) { return salvarArquivo('midia', id, registro, opcoes); }
   function lerMidia(id) { return ler('midias', id); }
-  function apagarMidia(id) { return apagar('midias', id); }
+  function apagarMidia(id) { return apagarArquivo('midia', id); }
 
   // ---------- anexos (arquivo do Samsung Notes, fotos) ----------
 
-  function salvarAnexo(id, registro) { return gravar('anexos', id, registro); }
+  /* opcoes.aulaId: a aula do anexo (vai no documento da nuvem). */
+  function salvarAnexo(id, registro, opcoes) { return salvarArquivo('anexo', id, registro, opcoes); }
   function lerAnexo(id) { return ler('anexos', id); }
-  function apagarAnexo(id) { return apagar('anexos', id); }
+  function apagarAnexo(id) { return apagarArquivo('anexo', id); }
 
   // ---------- biblioteca (pacotes importados) ----------
 
@@ -2586,6 +3086,26 @@
             if (chaveExterna) Object.keys(registros || {}).forEach(function (k) { s.put(registros[k], k); });
             else (registros || []).forEach(function (r) { s.put(r); });
           }
+          function trocarArquivos(nome, registros, arquivos, origem, campo) {
+            var s = t.objectStore(nome), valores = s.getAll();
+            valores.onsuccess = function () {
+              var chaves = s.getAllKeys();
+              chaves.onsuccess = function () {
+                var antes = valores.result || [], ids = chaves.result || [];
+                s.clear();
+                Object.keys(registros || {}).forEach(function (k) { s.put(registros[k], k); });
+                ids.forEach(function (id, i) {
+                  var filaId = idDoArquivo(origem, id), a = arquivos[filaId], novo = registros && registros[id];
+                  if (!a || !a.pendente || (novo && novo[campo])) return;
+                  var antigo = antes[i];
+                  if (!antigo || !antigo[campo]) return;
+                  var preservado = Object.assign({}, antigo, novo || {});
+                  preservado[campo] = antigo[campo];
+                  s.put(preservado, id);
+                });
+              };
+            };
+          }
           /* A fila: a restauração só NÃO enfileira no aparelho que só lê (o
            * celular do D6a, que nunca envia). Num aparelho que escreve, o
            * tablet novo ou reinstalado é dono do que restaurou e tudo o que
@@ -2623,8 +3143,15 @@
           var agoraIso = new Date().toISOString();
           if (daNuvem && soLeitura) limparEstadoDasFolhas(t);
           else restaurarEstadoDasFolhas(t, pacote.notas, carimbo || agoraIso, agoraIso, { restauro: daNuvem });
-          trocar('midias', pacote.midias, true);
-          trocar('anexos', anexos, true);
+          var arquivosCopia = arquivosDaCopia(pacote.dados, pacote.notas, pacote.midias, anexos);
+          trocarArquivos('midias', pacote.midias, arquivosCopia, 'midia', 'dataUrl');
+          trocarArquivos('anexos', anexos, arquivosCopia, 'anexo', 'blob');
+          /* Os arquivos (N2, fatia 2), como as folhas: o estado é refeito a
+           * partir do anterior e da cópia; no aparelho que escreve, todo arquivo
+           * da cópia entra na fila e o que a nuvem tem e a cópia não vira lápide.
+           * O celular só leitura só limpa o estado (o recebimento o refaz). */
+          if (daNuvem && soLeitura) { apagarFaixaDeControle(t, PREFIXO_ARQUIVO); t.objectStore('controle').delete('cursorAnexos'); }
+          else restaurarEstadoDosArquivos(t, arquivosCopia, carimbo || agoraIso, agoraIso, { restauro: daNuvem });
           t.objectStore('historico').clear();
           /* O estado anterior fica no histórico, depois da limpeza (os pedidos
            * respondem na ordem): cada versão que a restauração troca ou apaga
@@ -2737,6 +3264,8 @@
            * como os registros: o "Enviar cópia agora" as leva, e nenhuma página
            * fica viva na nuvem para uma aula que não existe mais. */
           lapidarEstadoDasFolhas(t, agora);
+          // e os arquivos (N2, fatia 2), do mesmo jeito: lápide fora da fila, que o religar leva
+          lapidarEstadoDosArquivos(t, agora);
         };
         t.oncomplete = function () { avisarMudanca('dados'); resolve(); };
         t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };
@@ -2794,6 +3323,14 @@
                 if (p.apagadoEm) { if (p.nuvem && !p.nuvem.apagado) saida.put({ id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: p.atualizadoEm, apagadoEm: p.apagadoEm }); }
                 else saida.put({ id: idDaPagina(aulaId, n), tipo: 'folha', atualizadoEm: p.atualizadoEm, apagadoEm: null, restauro: true });
               });
+            });
+            // e os arquivos deste aparelho (N2, fatia 2): os vivos com restauro, as lápides do que subiu como lápide
+            varrerControle(t, PREFIXO_ARQUIVO, function (chave, e) {
+              var filaId = String(chave).slice(PREFIXO_ARQUIVO.length);
+              // o "a baixar" não está no disco: não há o que levar
+              if (!e || !partesDoIdDoArquivo(filaId) || (!e.apagadoEm && e.aBaixar)) return;
+              if (e.apagadoEm) { if (e.nuvem && !e.nuvem.apagado) saida.put({ id: filaId, tipo: 'anexo', atualizadoEm: e.atualizadoEm, apagadoEm: e.apagadoEm, aulaId: e.aulaId || '', origem: e.origem }); }
+              else saida.put({ id: filaId, tipo: 'anexo', atualizadoEm: e.atualizadoEm, apagadoEm: null, aulaId: e.aulaId || '', origem: e.origem, restauro: true });
             });
           }
         };
@@ -2889,6 +3426,10 @@
     aplicarFolhasRecebidas: aplicarFolhasRecebidas, versoesAnterioresDeFolha: versoesAnterioresDeFolha,
     guardarVersaoRecebida: guardarVersaoRecebida, temWebCrypto: temWebCrypto, reconciliarFolhas: reconciliarFolhas,
     ultimaGravacaoDeFolha: function () { return ultimaGravacaoDeFolha; },
+    /* Anexos e mídias pelo sha256 (N2, fatia 2). */
+    idDoArquivo: idDoArquivo, partesDoIdDoArquivo: partesDoIdDoArquivo, bytesDoArquivo: bytesDoArquivo,
+    estadoDoArquivo: estadoDoArquivo, lerCursorAnexos: lerCursorAnexos, aplicarAnexosRecebidos: aplicarAnexosRecebidos,
+    guardarArquivoRecebido: guardarArquivoRecebido, reconciliarArquivos: reconciliarArquivos, arquivosABaixar: arquivosABaixar,
     ESPERA_FOLHA: ESPERA_FOLHA,
     montarRegistros: montar,
     aparelho: function () { return aparelhoId; },

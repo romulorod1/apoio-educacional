@@ -552,8 +552,8 @@ async function printar(pag, nome) {
   conf('e o total caiu exatamente o tamanho do livro removido', caiu.valor && totalAntes - caiu.valor.bytes, bytesDe['livro-sem-sumario']);
   conf('o livro saiu do depósito', await H.contarDeposito(p, 'livros'), 3);
   await H.irParaAba(p, 'biblioteca');
-  conf('a aba Biblioteca diz 3 livros', (await esperar('a contagem da Biblioteca', () => p.evaluate(() =>
-    (document.querySelector('#bib-livros-contagem') || {}).textContent || ''), v => /^3 livros/.test(v || ''), 10000)).ok, true);
+  conf('a aba Biblioteca diz 3 materiais', (await esperar('a contagem da Biblioteca', () => p.evaluate(() =>
+    (document.querySelector('#bib-livros-contagem') || {}).textContent || ''), v => /^3 materiais/.test(v || ''), 10000)).ok, true);
   const de_novo = await importar(p, ZIP, 'a segunda importação');
   console.log('   estado: ' + JSON.stringify(de_novo));
   conf('importar de novo devolve só o que faltava', /1 livro novo/.test(de_novo) && /3 já estavam no tablet/.test(de_novo), true);

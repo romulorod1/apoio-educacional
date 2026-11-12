@@ -12,7 +12,7 @@
  * O que prova:
  *   1. sem livro, a seção de livros não aparece e os exercícios ficam como
  *      eram;
- *   2. com os livros, a aba diz quantos livros e disciplinas há, lista as
+ *   2. com os livros, a aba diz quantos materiais e disciplinas há, lista as
  *      disciplinas na ordem do app com a quantidade e o sinal do mapa (com a
  *      legenda uma vez), e cada ano mostra os livros certos; o livro sem
  *      sumário diz isso, e o do 9º de Matemática traz o cartão dos exercícios;
@@ -263,7 +263,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await abrirBiblioteca(pag);
   await esperar('a seção de livros', () => lerSecao(pag), v => v.visivel && !!v.livros, 10000);
   s = await lerSecao(pag);
-  conf('a contagem diz livros e disciplinas', s.contagem, '4 livros, 2 disciplinas');
+  conf('a contagem diz materiais e disciplinas', s.contagem, '4 materiais, 2 disciplinas');
   conf('as disciplinas, na ordem do app, com a quantidade e o sinal do mapa', s.disciplinas, 'matematica:3:mapa,literatura:1:mapa');
   conf('a legenda do mapa aparece uma vez só', s.legendas, 1);
   conf('abre em Matemática', s.ativa, 'matematica');
@@ -366,7 +366,10 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   }));
   conf('o leitor do livro prepara as seis páginas em rolagem contínua', continuo.paginas, 6);
   conf('a barra de página cobre o livro inteiro', continuo.sliderMax, '6');
-  const canvasInicial = await esperar('o canvas da página aberta', () => pag.evaluate(() => !!document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="3"] canvas')), Boolean, 15000);
+  /* no leitor contínuo, data-pagina-desenhada marca a página atual antes de o
+   * canvas dela terminar de desenhar: espera o canvas em vez de ler na hora */
+  const canvasInicial = continuo.pagina3 ? { valor: true } : await esperar('o canvas da página aberta',
+    () => pag.evaluate(() => !!document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="3"] canvas')), Boolean, 15000);
   conf('a página aberta está desenhada', canvasInicial.valor, true);
   await pag.evaluate(() => document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="5"]').scrollIntoView({ block: 'start' }));
   const r5 = await esperar('rolagem contínua até a página 5', () => paginaDesenhada(pag), v => v === '5', 5000);
@@ -393,7 +396,9 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('without IntersectionObserver, scroll renders page 5 instead of a blank spacer', fallbackP5.ok, true);
   await fecharModal(pag, 'modal-leitor-pdf');
   await pag.evaluate(() => { window.IntersectionObserver = window.__intersectionObserverOriginal; delete window.__intersectionObserverOriginal; });
-  await esperar('a tela do livro com a posição nova', () => lerLivro(pag), v => v.visivel && /p\. 3/.test(v.continuar), 5000);
+  // a última rolagem (sem IntersectionObserver) parou na página 5: é ela a posição guardada
+  const posNova = await esperar('a tela do livro com a posição nova', () => lerLivro(pag), v => v.visivel && /p\. 5/.test(v.continuar), 5000);
+  conf('depois de fechar, a tela do livro guarda a última página lida (5)', posNova.ok, true);
   await clicar(pag, '#bib-livro .bibl-sec[data-n="3"]');
   const r3 = await esperar('o leitor na página da seção 2.1', () => paginaDesenhada(pag), v => v !== 'fechado' && v !== '', 20000);
   conf('tocar na seção 2.1 abre na página 4 do arquivo', r3.valor, '4');
