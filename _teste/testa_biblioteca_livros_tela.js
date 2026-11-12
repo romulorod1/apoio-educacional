@@ -12,7 +12,7 @@
  * O que prova:
  *   1. sem livro, a seção de livros não aparece e os exercícios ficam como
  *      eram;
- *   2. com os livros, a aba diz quantos livros e disciplinas há, lista as
+ *   2. com os livros, a aba diz quantos materiais e disciplinas há, lista as
  *      disciplinas na ordem do app com a quantidade e o sinal do mapa (com a
  *      legenda uma vez), e cada ano mostra os livros certos; o livro sem
  *      sumário diz isso, e o do 9º de Matemática traz o cartão dos exercícios;
@@ -37,11 +37,38 @@
  *      pé) com a letra a 100% e a 130%, nada transborda;
  *   8. nada novo gravado: os depósitos têm, no fim, as mesmas chaves de antes
  *      dos toques, fora a posição de leitura que os leitores já guardavam.
+ *   9. marcadores lixo e sumário vazio (livros SINTÉTICOS gravados direto no
+ *      depósito, com o PDF de 6 páginas do livro-com-marcadores): o livro de
+ *      marcadores "page1..page40" com mapa de 3 capítulos mostra os 3 do
+ *      mapa no cartão, no resumo, no sumário (página, título, assuntos,
+ *      aria-label), no painel, no Abrir, no sumário do leitor, na posição
+ *      atual e no Continuar lendo; o livro sem marcadores com mapa de 1
+ *      entrada ("Volume") mostra a entrada; o controle, marcadores lixo sem
+ *      mapa, fica como está. O sumário do mapa é só da tela: o JSON do
+ *      depósito livros fica idêntico depois da tela e do leitor, e
+ *      livros_posicoes só ganha a posição dos livros lidos.
  *
  * Veneno:
  *   node _teste/testa_biblioteca_livros_tela.js --envenenado-capitulo-abre-pagina-errada
  *     o app.js servido abre todo capítulo do sumário na página 1: o toque no
  *     capítulo 2 tem de abrir na 1, e a prova TEM de ver ("VENENO visto").
+ *   node _teste/testa_biblioteca_livros_tela.js --envenenado-sumario-dos-marcadores
+ *     o app.js servido usa sempre o sumário do pacote (a main antes deste
+ *     conserto): o livro de marcadores lixo tem de mostrar os 40 "pageN".
+ *   Os venenos do leitor contínuo (seção 9), cada um tira uma peça do app.js
+ *   servido, e a seção 9 TEM de ver o defeito ("VENENO visto"):
+ *     --envenenado-zoom-sem-ancora       o zoom e o giro sem a volta à página do meio
+ *     --envenenado-giro-sem-ancora-guardada  no giro, a âncora tirada com a janela nova
+ *     --envenenado-largura-vai-ao-alto   o "Ajustar à largura" volta ao alto da página
+ *     --envenenado-vizinhas-sem-desenho  depois do zoom e do giro, só a página do meio desenha
+ *     --envenenado-canvas-sem-soltar     a página que sai de perto da tela não solta o canvas
+ *
+ *   9. o leitor contínuo, num livro sintético de 400 páginas: o "+", o "−", o
+ *      "Ajustar à largura" e o giro de 800x1280 para 1280x800 deixam a página
+ *      no meio, com o contador nela e o ponto do meio a menos de 24 px; toda
+ *      página que encosta na tela tem canvas em até 1 s depois de cada um; e
+ *      deitado, ou em pé com zoom perto de 2, 80 passos de 400 px para baixo e
+ *      para cima deixam no máximo 4 canvases vivos.
  *
  *   --prints <pasta>   grava os prints do painel cego (tablet 1280x800 e
  *                      celular 412x915 e 360 a 130%, com escala 2).
@@ -56,16 +83,38 @@ const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8940;
-const VENENOS = ['--envenenado-capitulo-abre-pagina-errada'];
+/* Os venenos do leitor contínuo (seção 9): cada um tira uma peça do app.js
+ * servido, e a seção 9 TEM de ver o defeito que ela segura. */
+const VENENOS_LEITOR = {
+  // o zoom e o giro sem levar a rolagem de volta à página do meio
+  'zoom-sem-ancora': ['voltarParaAncoraDoLeitor(estado, ancora);', 'void 0;'],
+  // no giro, a âncora tirada com a janela NOVA (e não a da última rolagem)
+  'giro-sem-ancora-guardada': ['if (guardada && (guardada.lc !== corpo.clientWidth || guardada.ac !== corpo.clientHeight)) return guardada;', 'void 0;'],
+  // o "Ajustar à largura" volta ao alto da página em vez de manter o ponto
+  'largura-vai-ao-alto': ['leitor.zoom = Math.min(LEITOR_ZOOM_MAX, Math.max(LEITOR_ZOOM_MIN, z));\n    desenharPaginaDoLeitor(false);',
+    'leitor.zoom = Math.min(LEITOR_ZOOM_MAX, Math.max(LEITOR_ZOOM_MIN, z));\n    desenharPaginaDoLeitor(!fator);'],
+  // depois do zoom e do giro, só a página do meio é desenhada
+  'vizinhas-sem-desenho': ['    conciliarPaginasContinuas(estado, estado.pagina);\n    var p = estado.paginas[estado.pagina - 1];', '    var p = estado.paginas[estado.pagina - 1];'],
+  // a página que sai de perto da tela não solta o canvas
+  'canvas-sem-soltar': ['      } else if (pagina.visivel || pagina.desenhando || pagina.temCanvas) {', '      } else if (false) {']
+};
+const VENENOS = ['--envenenado-capitulo-abre-pagina-errada', '--envenenado-sumario-dos-marcadores', '--envenenado-zoom-sem-ancora', '--envenenado-giro-sem-ancora-guardada',
+  '--envenenado-largura-vai-ao-alto', '--envenenado-vizinhas-sem-desenho', '--envenenado-canvas-sem-soltar'];
 const VENENO_PAGINA = process.argv.indexOf('--envenenado-capitulo-abre-pagina-errada') !== -1;
+const VENENO_LEITOR = Object.keys(VENENOS_LEITOR).find(k => process.argv.indexOf('--envenenado-' + k) !== -1) || null;
+const VENENO_SUMARIO = process.argv.indexOf('--envenenado-sumario-dos-marcadores') !== -1;
 const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
 const PYTHON = process.env.PYTHON || 'python';
 
-const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
+const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 const ANCORA_PAGINA = 'return abrirLivro(l.id, { pagina: paginaDoArquivo(l.meta, e) });';
 const trocas = {};
 if (VENENO_PAGINA) trocas['/app.js'] = APP.split(ANCORA_PAGINA).join('return abrirLivro(l.id, { pagina: 1 });');
+// o sumário que a tela usa (sumarioDaTela): no veneno, sempre o do pacote, como na main antes do conserto
+const ANCORA_SUMARIO = 'return Biblioteca.sumarioDoLivro(meta);';
+if (VENENO_SUMARIO) trocas['/app.js'] = APP.split(ANCORA_SUMARIO).join('return Array.isArray(meta.sumario) ? meta.sumario : [];');
+if (VENENO_LEITOR) trocas['/app.js'] = APP.split(VENENOS_LEITOR[VENENO_LEITOR][0]).join(VENENOS_LEITOR[VENENO_LEITOR][1]);
 
 const amb = H.criarAmbiente(PORTA, 'perfil_biblioteca_livros_tela', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'b2_livros_'));
@@ -77,8 +126,8 @@ const letra = (pag, css) => pag.evaluate(c => {
   if (c) { const s = document.createElement('style'); s.id = 'prova-letra'; s.textContent = c; document.head.appendChild(s); }
 }, css);
 
-function gerarLivros() {
-  const r = spawnSync(PYTHON, ['-X', 'utf8', path.join(H.RAIZ, 'biblioteca', '_amostra', 'fazer_amostra_livros.py'), TMP, '--pacote'],
+function gerarLivros(modo, pasta) {
+  const r = spawnSync(PYTHON, ['-X', 'utf8', path.join(H.RAIZ, 'biblioteca', '_amostra', 'fazer_amostra_livros.py'), pasta || TMP, modo || '--pacote'],
     { encoding: 'utf8' });
   const linhas = String(r.stdout || '').trim().split(/\r?\n/);
   const zip = linhas[linhas.length - 1];
@@ -213,6 +262,14 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('a lista de venenos não está vazia', VENENOS.length > 0, true);
   conf('a âncora do veneno (o capítulo abre na página do arquivo) aparece uma vez só no app.js', APP.split(ANCORA_PAGINA).length - 1, 1);
   if (VENENO_PAGINA) conf('o app.js servido está envenenado', trocas['/app.js'].indexOf(ANCORA_PAGINA) === -1, true);
+  if (VENENO_SUMARIO) {
+    conf('a âncora do veneno do sumário aparece uma vez só no app.js', APP.split(ANCORA_SUMARIO).length - 1, 1);
+    conf('o app.js servido está envenenado no sumário', trocas['/app.js'].indexOf(ANCORA_SUMARIO) === -1, true);
+  }
+  conf('cada âncora dos venenos do leitor contínuo aparece uma vez só no app.js',
+    Object.keys(VENENOS_LEITOR).map(k => k + ':' + (APP.split(VENENOS_LEITOR[k][0]).length - 1)).join(','),
+    Object.keys(VENENOS_LEITOR).map(k => k + ':1').join(','));
+  if (VENENO_LEITOR) conf('o app.js servido está envenenado (' + VENENO_LEITOR + ')', trocas['/app.js'].indexOf(VENENOS_LEITOR[VENENO_LEITOR][0]) === -1, true);
   const zipEx = path.join(TMP, 'pacote_9ano.zip');
   Sintetico.gerar(zipEx);
   const zipLivros = gerarLivros();
@@ -263,7 +320,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await abrirBiblioteca(pag);
   await esperar('a seção de livros', () => lerSecao(pag), v => v.visivel && !!v.livros, 10000);
   s = await lerSecao(pag);
-  conf('a contagem diz livros e disciplinas', s.contagem, '4 livros, 2 disciplinas');
+  conf('a contagem diz materiais e disciplinas', s.contagem, '4 materiais, 2 disciplinas');
   conf('as disciplinas, na ordem do app, com a quantidade e o sinal do mapa', s.disciplinas, 'matematica:3:mapa,literatura:1:mapa');
   conf('a legenda do mapa aparece uma vez só', s.legendas, 1);
   conf('abre em Matemática', s.ativa, 'matematica');
@@ -323,6 +380,66 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   const busca = await esperar('o resultado da busca', () => pag.evaluate(() => [document.querySelector('#bib-corpo').innerText,
     !!document.querySelector('#bib-corpo .bib-titulo')]), v => !v[1] && /Equações do Segundo Grau/.test(v[0]), 5000);
   conf('a busca "bhaskara" mostra o resultado', busca.ok, true);
+  // B12: um campo só; com livro no tablet, o resultado tem dois grupos, primeiro Exercícios e depois Nos livros
+  const grupos = await esperar('os dois grupos da busca', () => pag.evaluate(() => ({
+    campo: document.querySelector('#busca-biblioteca').getAttribute('aria-label'),
+    campos: document.querySelectorAll('.bibl-busca input').length,
+    grupos: Array.from(document.querySelectorAll('#bib-corpo > .bib-grupo-busca')).map(d => d.dataset.grupo + ':' +
+      d.querySelector('.bib-grupo-titulo').textContent + ':' + d.open).join(','),
+    livros: (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''
+  })), v => !!v && /Buscando|Nenhum livro|preparada|encontrada/.test(v.livros) && !/Buscando/.test(v.livros), 10000);
+  conf('um campo de busca só, e ele diz que busca nos exercícios e nos livros',
+    grupos.valor.campos + ' | ' + grupos.valor.campo, '1 | Buscar nos exercícios e nos livros');
+  conf('o resultado tem dois grupos abertos: Exercícios e depois Nos livros', grupos.valor.grupos,
+    'exercicios:Exercícios:true,livros:Nos livros:true');
+  const leGrupoEx = () => pag.evaluate(() => {
+    const g = document.querySelector('#bib-corpo [data-grupo="exercicios"]');
+    const visiveis = Array.from(g.querySelectorAll('.item-lista')).filter(e => e.offsetParent !== null);
+    const livros = document.querySelector('#bib-corpo [data-grupo="livros"] > summary');
+    return { contagem: g.querySelector('.bib-grupo-contagem').textContent, linhas: visiveis.length, todas: g.querySelectorAll('.item-lista').length,
+      blocos: Array.from(g.querySelectorAll('.bloco-exercicios')).filter(b => b.offsetParent !== null).map(b => b.textContent).join(','),
+      resumo: (document.querySelector('#bib-busca-resumo') || {}).textContent || '',
+      verTodos: (g.querySelector('.bib-grupo-ver-todos') || {}).textContent || '',
+      livrosNoAlto: livros ? Math.round(livros.getBoundingClientRect().top) : null, altura: innerHeight };
+  });
+  const gx = await leGrupoEx();
+  conf('a contagem dos exercícios tem unidade e conta as linhas do grupo (as à vista e as do "Ver todos")',
+    /^\d+ (lista|listas|resultado|resultados|módulo|módulos|aula de teoria|aulas de teoria|problema|problemas)$/.test(gx.contagem) &&
+    parseInt(gx.contagem, 10) === gx.todas ? 'ok' : JSON.stringify(gx), 'ok');
+  conf('dentro do grupo, o bloco das listas não repete "Exercícios"', /(^|,)Exercícios(,|$)/.test(gx.blocos), false);
+  conf('a linha-resumo no alto diz os dois grupos', /^Exercícios.+·Nos livros/.test(gx.resumo), true);
+  // um termo curto e comum: muitos exercícios, e os livros continuam na primeira tela
+  for (const [w, h] of [[1280, 800], [800, 1280]]) {
+    await pag.setViewport({ width: w, height: h, hasTouch: true, deviceScaleFactor: 1 });
+    await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = 'de'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+    await esperar('a busca por "de" a ' + w + 'x' + h, () => pag.evaluate(() =>
+      (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''), v => !!v && !/Buscando/.test(v), 10000);
+    await pausa(300);
+    const gd = await leGrupoEx();
+    console.log('   "de" a ' + w + 'x' + h + ': ' + gd.contagem + ', ' + gd.linhas + ' linhas à vista, "Nos livros" a ' + gd.livrosNoAlto + ' px de ' + gd.altura);
+    conf('a ' + w + 'x' + h + ', com mais de 3 linhas, o grupo mostra 3 e "Ver todos os N"', gd.linhas + ' | ' + (gd.verTodos === 'Ver todos os ' + gd.todas), '3 | true');
+    conf('a ' + w + 'x' + h + ', o cabeçalho "Nos livros" fica na primeira tela', gd.livrosNoAlto !== null && gd.livrosNoAlto < gd.altura - 48, true);
+    const ruinsB = await medir(pag, '#bib-corpo');
+    conf('a ' + w + 'x' + h + ', o resultado não transborda', ruinsB.join('; '), '');
+  }
+  // nada nos dois grupos: um estado vazio só, com a frase e o caminho de sempre
+  await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = 'zqxjkw'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  const vazio = await esperar('o estado vazio único', () => pag.evaluate(() => ({
+    vazios: document.querySelectorAll('#bib-corpo .vazio').length, grupos: document.querySelectorAll('#bib-corpo .bib-grupo-busca').length,
+    texto: (document.querySelector('#bib-corpo .vazio') || {}).textContent || '' })), v => !!v && v.vazios === 1 && v.grupos === 0, 10000);
+  conf('sem nada nos exercícios nem nos livros, uma frase só, com o caminho de procurar outra palavra',
+    vazio.ok && /Procure por outra palavra, ou navegue pela série\./.test(vazio.valor.texto), true);
+  await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = 'de'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  await pausa(500);
+  for (const w of [360, 390, 412]) {
+    await pag.setViewport({ width: w, height: 800, hasTouch: true, deviceScaleFactor: 1 });
+    await letra(pag, LETRA_130);
+    await pausa(300);
+    const ruinsB = await medir(pag, '#bib-corpo');
+    conf('a ' + w + ' px com a letra a 130%, o resultado da busca não transborda', ruinsB.join('; '), '');
+    await letra(pag, '');
+  }
+  await pag.setViewport({ width: 1280, height: 800, hasTouch: true, deviceScaleFactor: PRINTS ? 2 : 1 });
   s = await lerSecao(pag);
   conf('com termo na busca, os livros saem do caminho', s.visivel, false);
   await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); });
@@ -359,8 +476,46 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     return;
   }
   conf('tocar no capítulo 2 abre o leitor na página 3 do arquivo', r2.valor, '3');
+  const continuo = await pag.evaluate(() => ({
+    paginas: document.querySelectorAll('#corpo-modal-leitor-pdf .leitor-pdf-pagina').length,
+    sliderMax: document.querySelector('#leitor-slider-pagina').max,
+    pagina3: !!document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="3"] canvas')
+  }));
+  conf('o leitor do livro prepara as seis páginas em rolagem contínua', continuo.paginas, 6);
+  conf('a barra de página cobre o livro inteiro', continuo.sliderMax, '6');
+  /* no leitor contínuo, data-pagina-desenhada marca a página atual antes de o
+   * canvas dela terminar de desenhar: espera o canvas em vez de ler na hora */
+  const canvasInicial = continuo.pagina3 ? { valor: true } : await esperar('o canvas da página aberta',
+    () => pag.evaluate(() => !!document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="3"] canvas')), Boolean, 15000);
+  conf('a página aberta está desenhada', canvasInicial.valor, true);
+  await pag.evaluate(() => document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="5"]').scrollIntoView({ block: 'start' }));
+  const r5 = await esperar('rolagem contínua até a página 5', () => paginaDesenhada(pag), v => v === '5', 5000);
+  conf('rolar atualiza a página guardada', r5.valor, '5');
+  await pag.evaluate(() => {
+    const slider = document.querySelector('#leitor-slider-pagina');
+    slider.value = '6';
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const r6 = await esperar('a barra leva à página 6', () => paginaDesenhada(pag), v => v === '6', 5000);
+  conf('a barra leva à página escolhida', r6.valor, '6');
+  await pag.evaluate(() => document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="3"]').scrollIntoView({ block: 'start' }));
+  const volta3 = await esperar('rolagem contínua de volta à página 3', () => paginaDesenhada(pag), v => v === '3', 5000);
+  conf('a página do capítulo continua sendo a atual', volta3.valor, '3');
   await fecharModal(pag, 'modal-leitor-pdf');
-  await esperar('a tela do livro com a posição nova', () => lerLivro(pag), v => v.visivel && /p\. 3/.test(v.continuar), 5000);
+  await pag.evaluate(() => { window.__intersectionObserverOriginal = window.IntersectionObserver; window.IntersectionObserver = undefined; });
+  await clicar(pag, '#bib-livro .bibl-cap[data-n="2"]');
+  await esperar('continuous reader without IntersectionObserver', () => paginaDesenhada(pag), v => v === '3', 20000);
+  await pag.evaluate(() => document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="5"]').scrollIntoView({ block: 'start' }));
+  const fallbackP5 = await esperar('scroll without observer draws page 5', () => pag.evaluate(() => ({
+    atual: document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada,
+    desenho: !!document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="5"] canvas')
+  })), v => v && v.atual === '5' && v.desenho, 5000);
+  conf('without IntersectionObserver, scroll renders page 5 instead of a blank spacer', fallbackP5.ok, true);
+  await fecharModal(pag, 'modal-leitor-pdf');
+  await pag.evaluate(() => { window.IntersectionObserver = window.__intersectionObserverOriginal; delete window.__intersectionObserverOriginal; });
+  // a última rolagem (sem IntersectionObserver) parou na página 5: é ela a posição guardada
+  const posNova = await esperar('a tela do livro com a posição nova', () => lerLivro(pag), v => v.visivel && /p\. 5/.test(v.continuar), 5000);
+  conf('depois de fechar, a tela do livro guarda a última página lida (5)', posNova.ok, true);
   await clicar(pag, '#bib-livro .bibl-sec[data-n="3"]');
   const r3 = await esperar('o leitor na página da seção 2.1', () => paginaDesenhada(pag), v => v !== 'fechado' && v !== '', 20000);
   conf('tocar na seção 2.1 abre na página 4 do arquivo', r3.valor, '4');
@@ -505,6 +660,155 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   const ajustes = await pag.evaluate(() => Store.carregar().then(d => JSON.stringify((d.ajustes || {}).mapaDosLivros || null)));
   conf('o mapa dos livros dela continua sem correção nenhuma', ajustes, 'null');
 
+  // ================================================================
+  secao('9. Marcadores lixo e sumário vazio: a tela usa o sumário do mapa');
+  /* Três livros SINTÉTICOS gravados direto no depósito, com o PDF de 6
+   * páginas do livro-com-marcadores e um pacote próprio (não mexe nos de
+   * cima): marcadores "page1..page40" com mapa de 3 capítulos; sem marcadores
+   * com mapa de 1 entrada ("Volume", como o Araribá 8); e o controle,
+   * marcadores lixo SEM mapa, que fica como está. */
+  const gravados = await pag.evaluate(async () => {
+    const base = await Store.lerLivro('livro-com-marcadores');
+    const cap = (n, titulo, ini, fim, ids) => ({ n, titulo, pagina: ini, pagina_fim: fim,
+      assuntos: ids.map(id => ({ id, confianca: 'alta' })), origem: 'mapa' });
+    const lixo = Array.from({ length: 40 }, (_, i) => ({ n: i + 1, nivel: 1, titulo: 'page' + (i + 1), pagina: (i % 6) + 1 }));
+    const livro = (id, titulo, extra) => ({ blob: base.blob, meta: Object.assign({}, base.meta, { id, titulo, volume: '',
+      hash: 'prova-' + id, numeracao: undefined, gabarito_origem: undefined, gabarito_secoes: undefined }, extra) });
+    const c = await Store.gravarLivros({ manifest: { pacote: 'prova-sumario-do-mapa', versao: 1 }, livros: [
+      livro('prova-marcadores-lixo', 'Prova marcadores lixo', { sumario: lixo, sumario_origem: 'marcadores',
+        mapa: [cap(1, 'Números naturais', 1, 2, ['MAT06-02']), cap(2, 'Frações', 3, 4, ['MAT06-05']), cap(3, 'Geometria plana', 5, 6, [])] }),
+      livro('prova-sem-marcadores', 'Prova sem marcadores', { sumario: [], sumario_origem: 'nenhum',
+        mapa: [cap(1, 'Volume', 4, 6, ['MAT06-05'])] }),
+      livro('prova-lixo-sem-mapa', 'Prova lixo sem mapa', { sumario: lixo, sumario_origem: 'marcadores', mapa: [] })
+    ] });
+    return c.novos;
+  });
+  conf('os três livros de prova entraram no depósito', gravados, 3);
+  /* O sumário do mapa é calculado NA TELA e nunca gravado: gravar mudaria o
+   * JSON do sumário, e o gravarLivros solta a posição de leitura quando o
+   * sumário muda (posicoesSoltas). O retrato é o JSON cru dos depósitos
+   * 'livros' (o registro inteiro, menos o Blob) e 'livros_posicoes'. */
+  const retrato = () => pag.evaluate(() => new Promise((ok, falha) => {
+    const q = indexedDB.open('apoio-educacional');
+    q.onerror = () => falha(q.error);
+    q.onsuccess = () => {
+      const b = q.result; const tr = b.transaction(['livros', 'livros_posicoes'], 'readonly');
+      const r = {};
+      tr.objectStore('livros').getAll().onsuccess = e => {
+        r.livros = JSON.stringify(e.target.result.map(x => Object.assign({}, x, { blob: x.blob ? x.blob.size : null })));
+      };
+      tr.objectStore('livros_posicoes').getAll().onsuccess = e => {
+        r.posicoes = {}; e.target.result.forEach(p => { r.posicoes[p.id] = JSON.stringify(p); });
+      };
+      tr.oncomplete = () => { b.close(); ok(r); };
+      tr.onerror = () => { b.close(); falha(tr.error); };
+    };
+  }));
+  const antes = await retrato();
+  conf('o retrato enxerga os livros de prova e o sumário gravado deles', /"id":"prova-marcadores-lixo"/.test(antes.livros) &&
+    /"titulo":"page40"/.test(antes.livros) && /"sumario":\[\],"sumario_origem":"nenhum"/.test(antes.livros), true);
+  await H.irParaAba(pag, 'biblioteca');
+  await pausa(300);
+  await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  await clicar(pag, '#bib-livros .bibl-ano[data-ano="06"]');
+  await esperar('os livros de prova na aba', () => lerSecao(pag), v => /prova-marcadores-lixo/.test(v.livros), 10000);
+  const cartao = id => pag.evaluate(i => {
+    const b = document.querySelector('#bib-livros [data-livro="' + i + '"]');
+    if (!b) return '';
+    const f = b.querySelector('[data-falta]');
+    return b.querySelectorAll('.bibl-apoio')[0].textContent + '|' + (f ? 'falta:' + f.dataset.falta : (b.querySelector('[data-mapa]') ? 'mapa' : '?'));
+  }, id);
+  const cLixo = await cartao('prova-marcadores-lixo');
+
+  if (VENENO_SUMARIO) {
+    secao('VENENO: a tela usa o sumário do pacote (o da main)');
+    await clicar(pag, '#bib-livros [data-livro="prova-marcadores-lixo"]');
+    await esperar('a tela do livro de prova', () => lerLivro(pag), v => v.visivel && v.livro === 'prova-marcadores-lixo', 5000);
+    const lvv = await lerLivro(pag);
+    const visto = /40 capítulos/.test(lvv.resumo) && /^cap1@1\[1\]\*,cap2@2\[2\]/.test(lvv.linhas);
+    conf('envenenado-sumario-dos-marcadores: a tela lista os 40 "pageN" como capítulos (defeito detectado)', visto, true);
+    if (visto) console.log('VENENO visto: o sumário dos marcadores lixo voltou à tela.');
+    await H.fim(amb)();
+    return;
+  }
+
+  conf('o cartão do livro de marcadores lixo conta os capítulos do mapa', cLixo, '6 p. · 3 capítulos|mapa');
+  conf('o cartão do livro sem marcadores com mapa não diz "sem sumário"', await cartao('prova-sem-marcadores'), '6 p. · 1 capítulo|mapa');
+  conf('controle: o cartão do lixo sem mapa fica como está', await cartao('prova-lixo-sem-mapa'), '6 p. · 40 capítulos|falta:mapa');
+
+  await clicar(pag, '#bib-livros [data-livro="prova-marcadores-lixo"]');
+  await esperar('a tela do livro de marcadores lixo', () => lerLivro(pag), v => v.visivel && v.livro === 'prova-marcadores-lixo', 5000);
+  await esperar('os nomes dos assuntos', () => lerLivro(pag), v => !/MAT06-/.test(v.assuntosDosCapitulos), 10000);
+  lv = await lerLivro(pag);
+  let depois = await retrato();
+  conf('só a tela aberta, com o sumário do mapa: o depósito livros fica idêntico (o JSON)', depois.livros === antes.livros, true);
+  conf('e livros_posicoes também', JSON.stringify(depois.posicoes) === JSON.stringify(antes.posicoes), true);
+  conf('o resumo: 3 capítulos do mapa, e não 40', lv.resumo, '6 páginas · 3 capítulos · 2 assuntos ligados');
+  conf('o sumário são os capítulos do mapa, cada um na página dele (o primeiro marcado)', lv.linhas, 'cap1@1[1]*,cap2@3[2],cap3@5[3]');
+  conf('os títulos do mapa', await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-livro .bibl-cap .bibl-cap-titulo'))
+    .map(b => b.textContent).join(' | ')), 'Números naturais | Frações | Geometria plana');
+  const ass = lv.assuntosDosCapitulos.split(' | ');
+  conf('os assuntos ligados de cada capítulo (os dois primeiros com nome, o terceiro sem)', ass.length + '|' +
+    (ass[0] !== 'nenhum assunto ligado ainda' && !!ass[0]) + '|' + (ass[1] !== 'nenhum assunto ligado ainda' && !!ass[1]) + '|' + ass[2], '3|true|true|nenhum assunto ligado ainda');
+  conf('o aria-label do capítulo 2', await pag.evaluate(() => document.querySelector('#bib-livro .bibl-cap[data-n="2"]').getAttribute('aria-label')),
+    'Capítulo 2, Frações, página 3');
+  conf('o painel: Capítulo 1, as páginas, os assuntos e o Abrir na p. 1',
+    /^Capítulo 1\s+Números naturais\s+Páginas do arquivo 1 a 2 · 2 páginas[\s\S]*Assuntos ligados[\s\S]*Abrir na p\. 1$/.test(lv.painel.trim()) &&
+    !/Nenhum assunto ligado/.test(lv.painel), true);
+  await clicar(pag, '#bib-livro .bibl-cap[data-n="2"]');
+  const rl = await esperar('o leitor no capítulo 2 do mapa', () => paginaDesenhada(pag), v => v !== 'fechado' && v !== '', 20000);
+  conf('tocar no capítulo 2 abre o leitor na página 3', rl.valor, '3');
+  await clicar(pag, '#leitor-sumario');
+  await pausa(200);
+  conf('o sumário do leitor também é o do mapa, com o capítulo atual marcado', await pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#leitor-sumario-lista button')).map(b => b.dataset.entrada + (b.classList.contains('atual') ? '*' : '')).join(',')),
+  '1,2*,3');
+  await clicar(pag, '#leitor-sumario');
+  await fecharModal(pag, 'modal-leitor-pdf');
+  await esperar('a tela com a posição nova', () => lerLivro(pag), v => v.visivel && /p\. 3/.test(v.continuar), 5000);
+  lv = await lerLivro(pag);
+  conf('a posição atual: o capítulo 2 marcado e o painel nele', lv.linhas + '|' + /^Capítulo 2\s+Frações[\s\S]*Abrir na p\. 3$/.test(lv.painel.trim()),
+    'cap1@1[1],cap2@3[2]*,cap3@5[3]|true');
+  ruins = await medir(pag, '#bib-livro');
+  conf('a tela do livro de marcadores lixo não transborda', ruins.join('; '), '');
+  await clicar(pag, '#bib-livro-voltar');
+  await esperar('a aba de volta', () => lerSecao(pag), v => v.visivel && /prova-marcadores-lixo/.test(v.continuar), 5000);
+  s = await lerSecao(pag);
+  conf('o Continuar lendo diz o capítulo do mapa', /(^|,)prova-marcadores-lixo\|Cap\. 2, Frações · p\. 3(,|$)/.test(s.continuar), true);
+
+  await clicar(pag, '#bib-livros [data-livro="prova-sem-marcadores"]');
+  await esperar('a tela do livro sem marcadores', () => lerLivro(pag), v => v.visivel && v.livro === 'prova-sem-marcadores', 5000);
+  await esperar('o nome do assunto', () => lerLivro(pag), v => !/MAT06-/.test(v.assuntosDosCapitulos), 10000);
+  lv = await lerLivro(pag);
+  conf('sem marcadores e com mapa de 1 entrada: não diz que falta sumário', lv.semSumario, '');
+  conf('o resumo: 1 capítulo e 1 assunto ligado', lv.resumo, '6 páginas · 1 capítulo · 1 assunto ligado');
+  conf('o sumário é a entrada do mapa', lv.linhas + '|' + await pag.evaluate(() => document.querySelector('#bib-livro .bibl-cap .bibl-cap-titulo').textContent),
+    'cap1@4[1]*|Volume');
+  conf('com o assunto ligado', !!lv.assuntosDosCapitulos && lv.assuntosDosCapitulos !== 'nenhum assunto ligado ainda', true);
+  conf('o painel: páginas 4 a 6 e Abrir na p. 4', /^Capítulo 1\s+Volume\s+Páginas do arquivo 4 a 6 · 3 páginas[\s\S]*Abrir na p\. 4$/.test(lv.painel.trim()), true);
+  await clicar(pag, '#bib-livro-abrir-capitulo');
+  const rv = await esperar('o leitor no Volume', () => paginaDesenhada(pag), v => v !== 'fechado' && v !== '', 20000);
+  conf('o Abrir na p. 4 abre o leitor na página 4', rv.valor, '4');
+  await fecharModal(pag, 'modal-leitor-pdf');
+  await clicar(pag, '#bib-livro-voltar');
+  await pausa(300);
+
+  await clicar(pag, '#bib-livros [data-livro="prova-lixo-sem-mapa"]');
+  await esperar('a tela do lixo sem mapa', () => lerLivro(pag), v => v.visivel && v.livro === 'prova-lixo-sem-mapa', 5000);
+  lv = await lerLivro(pag);
+  conf('controle: sem mapa, os 40 marcadores ficam como estão', lv.resumo, '6 páginas · 40 capítulos · sem mapa de assuntos');
+  await clicar(pag, '#bib-livro-voltar');
+  await pausa(300);
+
+  depois = await retrato();
+  conf('depois da tela e do leitor com o sumário do mapa: o depósito livros fica idêntico (o JSON, sumário incluído)',
+    depois.livros === antes.livros, true);
+  const novas = Object.keys(depois.posicoes).filter(k => !(k in antes.posicoes)).sort().join(',');
+  // controle positivo: o retrato vê a posição que o leitor grava, como sempre gravou
+  conf('livros_posicoes ganhou só a posição dos dois livros lidos (o que o leitor sempre gravou)', novas, 'prova-marcadores-lixo,prova-sem-marcadores');
+  conf('e as posições que já estavam ficam idênticas (nenhuma solta)', Object.keys(antes.posicoes).length > 0 &&
+    Object.keys(antes.posicoes).every(k => depois.posicoes[k] === antes.posicoes[k]), true);
+
   if (PRINTS) {
     secao('Prints');
     fs.mkdirSync(PRINTS, { recursive: true });
@@ -534,6 +838,228 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     }
     console.log('   prints em ' + PRINTS);
   }
+
+  secao('9. O leitor contínuo: a página não foge, as vizinhas aparecem e o canvas solta');
+  /* Livro sintético de 400 páginas. Antes: o "+" na p. 206 deixava a p. 165
+   * no meio; o giro na p. 266 mostrava a p. 164 com o contador em 266; depois
+   * do zoom e do giro, as vizinhas ficavam em branco; e deitado, 80 passos de
+   * rolagem deixavam 19 canvases vivos (cerca de 150 Mpx). Em modo veneno,
+   * cada verificação marcada com o nome do veneno TEM de reprovar. */
+  const visto = {};
+  const checa = (rotulo, obtido, esperado, veneno) => {
+    if (VENENO_LEITOR) {
+      if (veneno === VENENO_LEITOR && String(obtido) !== String(esperado)) {
+        visto[veneno] = (visto[veneno] ? visto[veneno] + ' ; ' : '') + rotulo + ' [obtido: ' + obtido + ']';
+      }
+      return;
+    }
+    conf(rotulo, obtido, esperado);
+  };
+  const pastaLeitor = path.join(TMP, 'leitor');
+  fs.mkdirSync(pastaLeitor, { recursive: true });
+  const zipLeitor = gerarLivros('--leitor', pastaLeitor);
+  conf('o livro sintético de 400 páginas foi gerado', !!zipLeitor, true);
+  if (!zipLeitor) throw Object.assign(new Error('sem o livro do leitor'), { jaContado: true });
+  await pag.setViewport({ width: 800, height: 1280, hasTouch: true, deviceScaleFactor: 1 });
+  await importar(pag, zipLeitor);
+  await abrirBiblioteca(pag);
+  await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  let achou = false;
+  for (const ano of await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-livros .bibl-ano')).map(b => b.dataset.ano))) {
+    await clicar(pag, '#bib-livros .bibl-ano[data-ano="' + ano + '"]');
+    await pausa(150);
+    if (await clicar(pag, '#bib-livros [data-livro="livro-leitor-400"]')) { achou = true; break; }
+  }
+  conf('o livro de 400 páginas está na Biblioteca', achou, true);
+  await esperar('a tela do livro de 400 páginas', () => lerLivro(pag), v => v.visivel && v.livro === 'livro-leitor-400', 5000);
+  await clicar(pag, '#bib-livro-continuar');
+  await esperar('o leitor do livro de 400 páginas', () => paginaDesenhada(pag), v => v === '1', 30000);
+  // a página no meio da área de leitura, o ponto dentro dela, o contador, as páginas à vista sem canvas e os canvases vivos
+  const meioDoLeitor = () => pag.evaluate(() => {
+    const c = document.querySelector('#corpo-modal-leitor-pdf'), r = c.getBoundingClientRect();
+    const y = r.top + c.clientHeight / 2, e = document.elementFromPoint(r.left + c.clientWidth / 2, y);
+    const caixa = e && e.closest('[data-pagina-arquivo]');
+    const rc = caixa ? caixa.getBoundingClientRect() : null;
+    const vazias = Array.from(c.querySelectorAll('.leitor-pdf-pagina')).filter(b => {
+      const q = b.getBoundingClientRect(); return q.bottom > r.top + 1 && q.top < r.top + c.clientHeight - 1 && !b.querySelector('canvas');
+    }).map(b => b.dataset.paginaArquivo);
+    return { meio: caixa ? +caixa.dataset.paginaArquivo : null, contador: document.querySelector('#leitor-contador').textContent,
+      fy: rc ? (y - rc.top) / rc.height : null, altura: rc ? rc.height : null, largura: rc ? Math.round(rc.width) : null,
+      canvas: !!(caixa && caixa.querySelector('canvas')), vazias: vazias.join(','),
+      vivos: Array.from(c.querySelectorAll('canvas')).filter(k => k.width > 0).length };
+  });
+  const irParaPagina = async n => {
+    await pag.evaluate(v => { const i = document.querySelector('#leitor-ir-pagina'); i.value = String(v); i.dispatchEvent(new Event('change')); }, n);
+    const r = await esperar('a página ' + n + ' no meio', meioDoLeitor, v => v.meio === n && v.canvas, 20000);
+    await pausa(300);
+    return r;
+  };
+  // toda página que encosta na tela tem canvas em até 1 s
+  const vizinhasDesenhadas = async rotulo => (await esperar(rotulo + ': as páginas à vista desenhadas', meioDoLeitor, v => v.vazias === '', 1000)).ok;
+  const desvio = (antes, depois) => depois.fy === null || antes.fy === null ? null : Math.abs(depois.fy - antes.fy) * depois.altura;
+  const contaDiz = (m, n) => new RegExp('(Página|p\\.) ' + n + ' de 400').test(m.contador);
+
+  // ---- arrastar a barra da p. 50 à 350: rolagem direta, quase nenhum canvas de passagem e uma gravação só, ao soltar
+  await irParaPagina(50);
+  await pausa(600);
+  await pag.evaluate(() => {
+    window.__canvasCriados = 0;
+    window.__createElementOriginal = document.createElement;
+    document.createElement = function (nome) {
+      if (String(nome).toLowerCase() === 'canvas') window.__canvasCriados++;
+      return window.__createElementOriginal.apply(document, arguments);
+    };
+    window.__posicoesGravadas = [];
+    window.__gravarPosicaoOriginal = Store.gravarPosicaoLivro;
+    Store.gravarPosicaoLivro = function (pos) { window.__posicoesGravadas.push(pos && pos.pagina); return window.__gravarPosicaoOriginal.apply(Store, arguments); };
+  });
+  await pag.evaluate(async () => {
+    const s = document.querySelector('#leitor-slider-pagina');
+    for (let v = 51; v <= 350; v++) { s.value = String(v); s.dispatchEvent(new Event('input', { bubbles: true })); await new Promise(r => setTimeout(r, 16)); }
+    s.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await pausa(1500);
+  const arrasto = await pag.evaluate(() => {
+    const r = { criados: window.__canvasCriados, gravadas: window.__posicoesGravadas.join(','),
+      contador: document.querySelector('#leitor-contador').textContent };
+    document.createElement = window.__createElementOriginal;
+    Store.gravarPosicaoLivro = window.__gravarPosicaoOriginal;
+    return r;
+  });
+  const m350 = await meioDoLeitor();
+  console.log('   barra de 50 a 350: ' + arrasto.criados + ' canvases criados; posições gravadas: ' + arrasto.gravadas);
+  conf('arrastar a barra de 50 a 350 cria no máximo 12 canvases (sem desenhar o caminho)', arrasto.criados <= 12, true);
+  conf('e grava a posição uma vez só, a 350, ao soltar', arrasto.gravadas, '350');
+  conf('e a página 350 fica no meio, com o contador nela', m350.meio + '|' + contaDiz(m350, 350), '350|true');
+
+  // ---- o "+" na p. 206
+  const a206 = await irParaPagina(206);
+  conf('o Ir p. leva à página 206, no meio da tela', a206.ok, true);
+  await clicar(pag, '#leitor-mais');
+  const z = await esperar('o "+" na página 206', meioDoLeitor, v => v.largura > a206.valor.largura && v.canvas, 8000);
+  await pausa(300);
+  const dz = await meioDoLeitor();
+  conf('o "+" aumentou a página (o zoom aconteceu)', z.ok, true);
+  checa('depois do "+", a página 206 continua no meio', dz.meio, 206, 'zoom-sem-ancora');
+  checa('e o contador diz 206', contaDiz(dz, 206), true, 'zoom-sem-ancora');
+  const dvz = desvio(a206.valor, dz);
+  checa('o ponto do meio se desloca menos de 24 px no "+"', dvz !== null && dvz < 24, true, 'zoom-sem-ancora');
+  console.log('   zoom na p. 206: o ponto do meio andou ' + (dvz === null ? '?' : Math.round(dvz)) + ' px');
+  checa('depois do "+", toda página à vista tem canvas em até 1 s', await vizinhasDesenhadas('o "+"'), true, 'vizinhas-sem-desenho');
+
+  // ---- o "Ajustar à largura", com o ponto do meio fora do alto da página
+  await pag.evaluate(() => { document.querySelector('#corpo-modal-leitor-pdf').scrollTop += 300; });
+  await pausa(500);
+  const antesL = await meioDoLeitor();
+  await clicar(pag, '#leitor-largura');
+  const dl = await esperar('o "Ajustar à largura" na página 206', meioDoLeitor, v => v.largura < antesL.largura && v.canvas, 8000);
+  await pausa(300);
+  const dlv = await meioDoLeitor();
+  const dvl = desvio(antesL, dlv);
+  conf('o "Ajustar à largura" voltou à largura (a troca aconteceu)', dl.ok, true);
+  checa('o "Ajustar à largura" deixa a mesma página no meio, com o contador nela',
+    dlv.meio + '|' + contaDiz(dlv, antesL.meio), antesL.meio + '|true', 'zoom-sem-ancora');
+  checa('e o ponto do meio se desloca menos de 24 px', dvl !== null && dvl < 24, true, 'largura-vai-ao-alto');
+  console.log('   ajustar à largura: o ponto do meio andou ' + (dvl === null ? '?' : Math.round(dvl)) + ' px');
+  checa('depois do "Ajustar à largura", toda página à vista tem canvas em até 1 s', await vizinhasDesenhadas('a largura'), true, 'vizinhas-sem-desenho');
+
+  // ---- o "Ajustar à largura" sem mudar nada, na divisa entre duas páginas: a rolagem nem se mexe
+  const a100 = await irParaPagina(100);
+  await pag.evaluate(() => { const c = document.querySelector('#corpo-modal-leitor-pdf'); c.scrollTop += Math.round(c.clientHeight * 0.6); });
+  await esperar('a divisa entre a 100 e a 101 à vista', meioDoLeitor, v => v.vazias === '' && v.meio >= 100, 3000);
+  await clicar(pag, '#leitor-largura');
+  await pausa(150);
+  checa('na divisa, o "Ajustar à largura" redesenha as duas páginas à vista em até 1 s', await vizinhasDesenhadas('a divisa'), true, 'vizinhas-sem-desenho');
+  void a100;
+
+  // ---- o "−" na p. 300
+  const a300 = await irParaPagina(300);
+  await clicar(pag, '#leitor-menos');
+  await esperar('o "−" na página 300', meioDoLeitor, v => v.largura < a300.valor.largura && v.canvas, 8000);
+  await pausa(300);
+  const dm = await meioDoLeitor();
+  checa('depois do "−", a página 300 continua no meio', dm.meio, 300, 'zoom-sem-ancora');
+  checa('depois do "−", toda página à vista tem canvas em até 1 s', await vizinhasDesenhadas('o "−"'), true, 'vizinhas-sem-desenho');
+  /* o redimensionamento sozinho desenha as páginas à vista, sem a ajuda do
+   * evento de rolagem: com o evento segurado antes do leitor, o "−" de novo (agora
+   * duas páginas à vista) ainda deixa as duas desenhadas */
+  await pag.evaluate(() => {
+    // o evento de rolagem do leitor para antes de chegar nele (fase de captura no documento)
+    window.__seguraRolagem = e => { if (e.target && e.target.id === 'corpo-modal-leitor-pdf') e.stopImmediatePropagation(); };
+    document.addEventListener('scroll', window.__seguraRolagem, true);
+  });
+  await clicar(pag, '#leitor-menos');
+  await pausa(150);
+  const semQuadro = await vizinhasDesenhadas('o "−" sem o evento de rolagem');
+  await pag.evaluate(() => { document.removeEventListener('scroll', window.__seguraRolagem, true); delete window.__seguraRolagem; });
+  checa('sem o evento de rolagem, o "−" também redesenha as páginas à vista em até 1 s', semQuadro, true, 'vizinhas-sem-desenho');
+  await clicar(pag, '#leitor-largura');
+  await pausa(600);
+
+  // ---- o giro na p. 266
+  const a266 = await irParaPagina(266);
+  conf('o Ir p. leva à página 266', a266.ok, true);
+  await pag.setViewport({ width: 1280, height: 800, hasTouch: true, deviceScaleFactor: 1 });
+  const g = await esperar('o giro para deitado na página 266', meioDoLeitor, v => v.largura > a266.valor.largura && v.canvas, 8000);
+  await pausa(300);
+  const dg = await meioDoLeitor();
+  const dvg = desvio(a266.valor, dg);
+  conf('o giro alargou a página (a troca de tamanho aconteceu)', g.ok, true);
+  checa('deitado, a página 266 continua no meio', dg.meio, 266, 'zoom-sem-ancora');
+  checa('e o contador diz 266', contaDiz(dg, 266), true, 'zoom-sem-ancora');
+  console.log('   giro na p. 266: o ponto do meio andou ' + (dvg === null ? '?' : Math.round(dvg)) + ' px');
+  checa('o ponto do meio se desloca menos de 24 px no giro', dvg !== null && dvg < 24, true, 'giro-sem-ancora-guardada');
+  checa('depois do giro, toda página à vista tem canvas em até 1 s', await vizinhasDesenhadas('o giro'), true, 'vizinhas-sem-desenho');
+
+  // ---- o canvas solta: deitado, 80 passos de 400 px para baixo e 80 para cima
+  const rolar = async (passo, vezes) => {
+    for (let i = 0; i < vezes; i++) {
+      await pag.evaluate(p => { document.querySelector('#corpo-modal-leitor-pdf').scrollTop += p; }, passo);
+      await pausa(60);
+    }
+    await pausa(800);
+    return meioDoLeitor();
+  };
+  const desce = await rolar(400, 80);
+  console.log('   deitado, depois de 80 passos: ' + desce.vivos + ' canvases vivos, p. ' + desce.meio);
+  checa('deitado, depois de 80 passos de 400 px, no máximo 4 canvases vivos', desce.vivos <= 4, true, 'canvas-sem-soltar');
+  const sobe = await rolar(-400, 80);
+  console.log('   deitado, depois de voltar: ' + sobe.vivos + ' canvases vivos, p. ' + sobe.meio);
+  checa('e depois de voltar, no máximo 4', sobe.vivos <= 4, true, 'canvas-sem-soltar');
+  checa('e as páginas à vista continuam desenhadas', await vizinhasDesenhadas('a volta'), true, 'canvas-sem-soltar');
+  // em pé com zoom perto de 2 (três toques no "+")
+  await pag.setViewport({ width: 800, height: 1280, hasTouch: true, deviceScaleFactor: 1 });
+  await pausa(800);
+  for (let i = 0; i < 3; i++) { await clicar(pag, '#leitor-mais'); await pausa(400); }
+  await pausa(600);
+  const desceZ = await rolar(400, 80);
+  console.log('   em pé com zoom 1,95, depois de 80 passos: ' + desceZ.vivos + ' canvases vivos');
+  checa('em pé com zoom perto de 2, depois de 80 passos, no máximo 4 canvases vivos', desceZ.vivos <= 4, true, 'canvas-sem-soltar');
+  const sobeZ = await rolar(-400, 80);
+  checa('e depois de voltar, no máximo 4', sobeZ.vivos <= 4, true, 'canvas-sem-soltar');
+  // no zoom 4 a página é muito maior que a tela: a vizinha longe não fica viva
+  for (let i = 0; i < 5; i++) { await clicar(pag, '#leitor-mais'); await pausa(400); }
+  await pausa(800);
+  let picoZ4 = 0;
+  for (let i = 0; i < 12; i++) {
+    await pag.evaluate(() => { document.querySelector('#corpo-modal-leitor-pdf').scrollTop += 300; });
+    await pausa(250);
+    picoZ4 = Math.max(picoZ4, (await meioDoLeitor()).vivos);
+  }
+  console.log('   zoom 4: pico de ' + picoZ4 + ' canvases vivos rolando de 300 em 300 px');
+  conf('no zoom 4, o pico fica em no máximo 2 canvases vivos', picoZ4 <= 2, true);
+  conf('e a página à vista segue desenhada', (await esperar('o zoom 4: a página à vista desenhada', meioDoLeitor, v => v.vazias === '', 8000)).ok, true);
+  await clicar(pag, '#leitor-largura');
+  await pausa(400);
+
+  if (VENENO_LEITOR) {
+    secao('VENENO: ' + VENENO_LEITOR);
+    conf('envenenado-' + VENENO_LEITOR + ': a seção 9 viu o defeito', !!visto[VENENO_LEITOR], true);
+    if (visto[VENENO_LEITOR]) console.log('VENENO visto: ' + visto[VENENO_LEITOR]);
+    await H.fim(amb)();
+    return;
+  }
+  await fecharModal(pag, 'modal-leitor-pdf');
 
   conf('nenhum erro de página', errosDePagina.join(' | '), '');
   await H.fim(amb)();

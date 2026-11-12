@@ -72,9 +72,20 @@
  *     gravar ele poda o histórico com uma leitura no mesmo depósito, e a
  *     leitura espera a escrita confirmar antes de rodar, então a resposta dele
  *     já chega depois da confirmação mesmo com o `escrever` envenenado.
+ *   (N2, fatia 2) o salvarMidia, o salvarAnexo e o apagarAnexo passaram a ter
+ *     transação própria (salvarArquivo e apagarArquivo) e saíram do `gravar` e
+ *     do `escrever`. Desde então o primeiro veneno alcança só a miniatura da
+ *     biblioteca ('bib:', que continua pelo `gravar`), e o segundo acusa quatro
+ *     caminhos (a miniatura, o uso, a etiqueta e o limparHistorico).
+ *   node _teste/testa_store_grava_no_commit.js --envenenado-arquivo-no-pedido
+ *     o quinto veneno: o salvarArquivo e o apagarArquivo respondem logo depois
+ *     dos pedidos, com a transação aberta. A prova tem de acusar EXATAMENTE o
+ *     salvarMidia, o salvarAnexo e o apagarAnexo, e a parte 1b tem de ver o
+ *     salvarAnexo dizer que salvou sem nada ter ficado.
  *   node _teste/testa_store_grava_no_commit.js --envenenado-nao-rejeita
- *     o `escrever` perde o `t.onabort`: a transação abortada depois do sucesso
- *     do pedido deixa a promessa pendurada, e a parte 1b tem de ver isso.
+ *     o `escrever` perde o `t.onabort`, e o salvarArquivo perde o onerror e o
+ *     onabort dele: a transação abortada depois do sucesso do pedido deixa a
+ *     promessa pendurada, e a parte 1b tem de ver isso nos dois caminhos.
  *   node _teste/testa_store_grava_no_commit.js --envenenado-nao-rele
  *     o app.js servido não relê o disco depois de uma gravação que rejeitou no
  *     meio: a parte 4 tem de ver o próximo salvar gravar o estado velho.
@@ -98,7 +109,13 @@ const VENENO_SALVAR = process.argv.indexOf('--envenenado-salvar-no-pedido') !== 
 /* O quarto veneno (N2): o salvarNota, que desde a folha por página tem
  * transação própria (notas, controle e saida), responde com ela aberta. */
 const VENENO_NOTA = process.argv.indexOf('--envenenado-nota-no-pedido') !== -1;
-const VENENO = VENENO_GRAVAR || VENENO_ESCREVER || VENENO_SALVAR || VENENO_NOTA;
+/* O quinto veneno (N2, fatia 2): o salvarMidia, o salvarAnexo e o apagarAnexo
+ * passaram a ter transação própria (o depósito, o estado em `controle` e a
+ * fila, com o sha256 calculado antes), e saíram do `gravar` e do `escrever`:
+ * os venenos de lá não os alcançam mais. Este os faz responder com a
+ * transação aberta. */
+const VENENO_ARQUIVO = process.argv.indexOf('--envenenado-arquivo-no-pedido') !== -1;
+const VENENO = VENENO_GRAVAR || VENENO_ESCREVER || VENENO_SALVAR || VENENO_NOTA || VENENO_ARQUIVO;
 const VENENO_REJEITA = process.argv.indexOf('--envenenado-nao-rejeita') !== -1;
 const VENENO_RELE = process.argv.indexOf('--envenenado-nao-rele') !== -1;
 const CONTROLE = process.argv.indexOf('--controle') !== -1;
@@ -130,11 +147,22 @@ const SALVAR_ANTIGO = 'escreverDiferenca(t, db, opcoes, function (c) { contas = 
 const NOTA_CONSERTADO = "else t.objectStore('notas').put(nota, aulaId);";
 const NOTA_ANTIGO = "else t.objectStore('notas').put(nota, aulaId); resolve();";
 const escapar = s => new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+/* O quinto veneno troca dois trechos: a gravação do arquivo (salvarArquivo) e
+ * a lápide dele (apagarArquivo) passam a responder logo depois dos pedidos. */
+const ARQ_SALVA_CONSERTADO = "if (!desligada) enfileirar(t.objectStore('saida'), { id: filaId, tipo: 'anexo', atualizadoEm: agora, apagadoEm: null, aulaId: estado.aulaId, origem: origem });";
+const ARQ_SALVA_ANTIGO = ARQ_SALVA_CONSERTADO + ' resolve();';
+const ARQ_APAGA_CONSERTADO = "lerMarcaDesligada(t, function (desligada) { lapidarArquivo(t, filaId, agora, desligada ? null : t.objectStore('saida')); });";
+const ARQ_APAGA_ANTIGO = "lerMarcaDesligada(t, function (desligada) { lapidarArquivo(t, filaId, agora, desligada ? null : t.objectStore('saida')); resolve(); });";
 const ANCORA = VENENO_SALVAR ? escapar(SALVAR_CONSERTADO) : VENENO_NOTA ? escapar(NOTA_CONSERTADO)
-  : VENENO_ESCREVER ? ESCREVER_CONSERTADO : GRAVAR_CONSERTADO;
+  : VENENO_ARQUIVO ? escapar(ARQ_SALVA_CONSERTADO) : VENENO_ESCREVER ? ESCREVER_CONSERTADO : GRAVAR_CONSERTADO;
 const trocas = {};
 let trocaFeita = false;
-if (VENENO) {
+if (VENENO_ARQUIVO) {
+  if (STORE_REPO.split(ARQ_SALVA_CONSERTADO).length === 2 && STORE_REPO.split(ARQ_APAGA_CONSERTADO).length === 2) {
+    trocas['/store.js'] = STORE_REPO.replace(ARQ_SALVA_CONSERTADO, ARQ_SALVA_ANTIGO).replace(ARQ_APAGA_CONSERTADO, ARQ_APAGA_ANTIGO);
+    trocaFeita = trocas['/store.js'] !== STORE_REPO;
+  }
+} else if (VENENO) {
   if (ANCORA.test(STORE_REPO)) {
     trocas['/store.js'] = STORE_REPO.replace(ANCORA, VENENO_SALVAR ? SALVAR_ANTIGO : VENENO_NOTA ? NOTA_ANTIGO : VENENO_ESCREVER ? ESCREVER_ANTIGO : GRAVAR_ANTIGO);
     trocaFeita = trocas['/store.js'] !== STORE_REPO;
@@ -145,8 +173,21 @@ const ONABORT = "        t.onabort = function () { reject(motivo('A gravação f
 const APP_REPO = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const RELE = '      db = lido || Store.bancoVazio();';
 let trocaNova = null;
+/* Do 2835f47 (a ferramenta parceira): o mesmo veneno tira também os dois
+ * tratamentos de falha da transação própria do salvarArquivo, e a parte 1b vê
+ * as DUAS promessas penduradas (a do escrever e a do arquivo). */
+const ONABORT_ARQUIVO = "          t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };";
+const ONERROR_ARQUIVO = "          t.onerror = function () { reject(t.error || new Error('A gravação falhou.')); };";
+const trechoEntre = (texto, inicio, fim) => {
+  const a = texto.indexOf(inicio), b = texto.indexOf(fim, a);
+  return a >= 0 && b > a ? texto.slice(a, b) : '';
+};
+const TRECHO_ESCREVER = trechoEntre(STORE_REPO, 'function escrever(', 'function gravar(');
+const TRECHO_ARQUIVO = trechoEntre(STORE_REPO, 'function salvarArquivo(', 'function lapidarArquivo(');
 if (VENENO_REJEITA) {
-  trocaNova = STORE_REPO.split(ONABORT).length - 1 === 1 ? STORE_REPO.split(ONABORT).join('') : null;
+  const arquivoOk = TRECHO_ARQUIVO.split(ONERROR_ARQUIVO).length === 2 && TRECHO_ARQUIVO.split(ONABORT_ARQUIVO).length === 2;
+  const base = arquivoOk ? STORE_REPO.replace(TRECHO_ARQUIVO, TRECHO_ARQUIVO.replace(ONERROR_ARQUIVO, '').replace(ONABORT_ARQUIVO, '')) : null;
+  trocaNova = base && base.split(ONABORT).length - 1 === 1 ? base.split(ONABORT).join('') : null;
   if (trocaNova) trocas['/store.js'] = trocaNova;
 }
 if (VENENO_RELE) {
@@ -219,21 +260,32 @@ const CAMINHOS = [
     esperado: 'depois'
   },
   {
-    nome: 'salvarMidia (imagem colada na folha)', pelo_gravar: true,
+    /* Desde a N2, fatia 2, a imagem e o anexo têm transação própria
+     * (salvarArquivo e apagarArquivo), com o quinto veneno. */
+    nome: 'salvarMidia (imagem colada na folha)', pelo_gravar: false, pelo_arquivo: true,
     prepara: () => Promise.resolve(),
     chama: ['salvarMidia', 'midia-prova-commit', { tipo: 'image/png', rotulo: 'depois' }],
     le: () => Store.lerMidia('midia-prova-commit').then(m => m ? m.rotulo : 'sem midia'),
     esperado: 'depois'
   },
   {
-    nome: 'salvarAnexo (o PDF anexado na aula)', pelo_gravar: true,
+    nome: 'salvarAnexo (o PDF anexado na aula)', pelo_gravar: false, pelo_arquivo: true,
     prepara: () => Promise.resolve(),
     chama: ['salvarAnexo', 'anexo-prova-commit', '__BLOB_2048__'],
     le: () => Store.lerAnexo('anexo-prova-commit').then(r => (r && r.blob ? r.blob.size : -1)),
     esperado: 2048
   },
   {
-    nome: 'apagarAnexo', pelo_gravar: false,
+    /* A miniatura da biblioteca ('bib:') é cache e continua pelo `gravar`:
+     * é o caminho que o primeiro veneno ainda alcança. */
+    nome: 'salvarMidia da miniatura da biblioteca (bib:)', pelo_gravar: true,
+    prepara: () => Promise.resolve(),
+    chama: ['salvarMidia', 'bib:prova-commit', { tipo: 'image/png', rotulo: 'depois' }],
+    le: () => Store.lerMidia('bib:prova-commit').then(m => m ? m.rotulo : 'sem midia'),
+    esperado: 'depois'
+  },
+  {
+    nome: 'apagarAnexo', pelo_gravar: false, pelo_arquivo: true,
     prepara: () => Store.salvarAnexo('anexo-prova-apagar', { nome: 'a.pdf', tipo: 'application/pdf', blob: new Blob([new Uint8Array(16)]) }),
     chama: ['apagarAnexo', 'anexo-prova-apagar'],
     le: () => Store.lerAnexo('anexo-prova-apagar').then(r => (r ? 'ainda la' : 'apagado')),
@@ -287,7 +339,8 @@ async function rodaCaminho(pag, c) {
   }, c.chama);
   if (r.erro) { conf(c.nome + ': a escrita respondeu sem erro', r.erro, 'sem erro'); return; }
   const lido = await pag.evaluate('(' + c.le.toString() + ')()');
-  const morde = ESPERA_PERDA && (VENENO_ESCREVER ? !c.poda_depois && !c.pelo_salvar && !c.pelo_nota : VENENO_SALVAR ? !!c.pelo_salvar : VENENO_NOTA ? !!c.pelo_nota : c.pelo_gravar);
+  const morde = ESPERA_PERDA && (VENENO_ESCREVER ? !c.poda_depois && !c.pelo_salvar && !c.pelo_nota && !c.pelo_arquivo : VENENO_SALVAR ? !!c.pelo_salvar
+    : VENENO_NOTA ? !!c.pelo_nota : VENENO_ARQUIVO ? !!c.pelo_arquivo : c.pelo_gravar);
   if (morde) {
     conf('VENENO ENXERGADO em ' + c.nome + ': respondeu com a transação ainda aberta', r.pendentes > 0, true);
     conf('VENENO ENXERGADO em ' + c.nome + ': interrompida no instante da resposta, a escrita SUMIU',
@@ -417,7 +470,8 @@ async function parteQuatro(pag) {
   console.log('MODO: ' + (VENENO_GRAVAR ? 'envenenado (gravar antigo, que responde no pedido)'
     : VENENO_ESCREVER ? 'envenenado (escrever responde no pedido)'
     : VENENO_SALVAR ? 'envenenado (o salvar do documento responde com a transação aberta)'
-    : VENENO_NOTA ? 'envenenado (o salvarNota responde com a transação aberta)' : 'normal') +
+    : VENENO_NOTA ? 'envenenado (o salvarNota responde com a transação aberta)'
+    : VENENO_ARQUIVO ? 'envenenado (o salvarArquivo e o apagarArquivo respondem com a transação aberta)' : 'normal') +
     (CONTROLE ? ', COM CONTROLE: tem de reprovar' : ''));
   if (VENENO) {
     secao('O veneno é de verdade');
@@ -429,12 +483,15 @@ async function parteQuatro(pag) {
     conf('a linha que o veneno tira casa exatamente uma vez, e a troca aconteceu', !!trocaNova, true);
     if (!trocaNova) throw Object.assign(new Error('a troca do veneno não aconteceu; nada a medir'), { jaContado: true });
   } else {
-    conf('o `onabort` do escrever existe (a âncora do veneno da rejeição)', STORE_REPO.split(ONABORT).length - 1, 1);
+    conf('o `onabort` do escrever existe (a âncora do veneno da rejeição)', TRECHO_ESCREVER.split(ONABORT).length - 1, 1);
+    conf('o onerror e o onabort do salvarArquivo existem uma vez cada (a outra âncora do veneno da rejeição)',
+      [TRECHO_ARQUIVO.split(ONERROR_ARQUIVO).length, TRECHO_ARQUIVO.split(ONABORT_ARQUIVO).length].join(','), '2,2');
     conf('a releitura do disco existe (a âncora do veneno do app)', APP_REPO.split(RELE).length - 1, 1);
     conf('o gravar do store.js passa pelo escrever (a âncora do primeiro veneno existe)', GRAVAR_CONSERTADO.test(STORE_REPO), true);
     conf('o escrever responde na transação (a âncora do segundo veneno existe)', ESCREVER_CONSERTADO.test(STORE_REPO), true);
     conf('o salvar do documento responde na transação (a âncora do terceiro veneno existe uma vez)', STORE_REPO.split(SALVAR_CONSERTADO).length, 2);
     conf('o salvarNota grava a nota dentro da transação própria (a âncora do quarto veneno existe uma vez)', STORE_REPO.split(NOTA_CONSERTADO).length, 2);
+    conf('o salvarArquivo e o apagarArquivo têm as âncoras do quinto veneno, uma vez cada', [STORE_REPO.split(ARQ_SALVA_CONSERTADO).length, STORE_REPO.split(ARQ_APAGA_CONSERTADO).length].join(','), '2,2');
   }
 
   await amb.subir();
@@ -444,7 +501,7 @@ async function parteQuatro(pag) {
   if (VENENO) {
     const servido = await pag.evaluate(() => fetch('/store.js').then(r => r.text()));
     conf('o /store.js que a página recebeu tem o veneno',
-      servido.indexOf(VENENO_SALVAR ? SALVAR_ANTIGO : VENENO_NOTA ? NOTA_ANTIGO : VENENO_ESCREVER ? 'if (req) req.onsuccess = function () { resolve(req.result); };'
+      servido.indexOf(VENENO_SALVAR ? SALVAR_ANTIGO : VENENO_NOTA ? NOTA_ANTIGO : VENENO_ARQUIVO ? ARQ_SALVA_ANTIGO : VENENO_ESCREVER ? 'if (req) req.onsuccess = function () { resolve(req.result); };'
         : "return trans(deposito, 'readwrite').then(function (s) { return comoPromessa(s.put(valor, chave)); });") >= 0, true);
   }
 
@@ -469,27 +526,41 @@ async function parteQuatro(pag) {
 
   // ---------------- 1b. o ramo da rejeição ----------------
   secao('1b. A escrita que aborta REJEITA, e não fica pendurada');
-  await armarAbort(pag, 'anexos', 'put');
-  const rej = await pag.evaluate(() => Promise.race([
-    Store.salvarAnexo('anexo-que-aborta', { nome: 'x.pdf', tipo: 'application/pdf', blob: new Blob([new Uint8Array(64)]) })
+  /* Dois caminhos: a miniatura da biblioteca, pelo `escrever` (o onabort que
+   * o veneno da rejeição tira), e o salvarAnexo, pela transação própria do
+   * arquivo (N2, fatia 2), que tem o onabort dela. */
+  const abortaNaResposta = (chamada) => pag.evaluate(ch => Promise.race([
+    (ch === 'miniatura'
+      ? Store.salvarMidia('bib:que-aborta', { tipo: 'image/png', rotulo: 'x' })
+      : Store.salvarAnexo('anexo-que-aborta', { nome: 'x.pdf', tipo: 'application/pdf', blob: new Blob([new Uint8Array(64)]) }))
       .then(() => 'resolveu', e => 'rejeitou: ' + (e && (e.name || e.message))),
     new Promise(r => setTimeout(() => r('pendurada'), 4000))
-  ]));
-  console.log('   salvarAnexo com a transação abortada depois do sucesso do pedido: ' + rej);
+  ]), chamada);
+  await armarAbort(pag, 'midias', 'put');
+  const rej = await abortaNaResposta('miniatura');
+  console.log('   miniatura (pelo escrever) com a transação abortada depois do sucesso do pedido: ' + rej);
+  conf('e nada ficou gravado na miniatura (o abort valeu)', await pag.evaluate(() => Store.lerMidia('bib:que-aborta').then(m => m ? 'ficou' : 'nada')), 'nada');
+  await armarAbort(pag, 'anexos', 'put');
+  const rejArq = await abortaNaResposta('anexo');
+  console.log('   salvarAnexo (transação própria) com a transação abortada depois do sucesso do pedido: ' + rejArq);
   const ficou = await leAnexo(pag, 'anexo-que-aborta');
-  conf('e nada ficou gravado (o abort valeu)', ficou, -1);
+  conf('e nada ficou gravado no anexo (o abort valeu)', ficou, -1);
   if (VENENO_REJEITA && !CONTROLE) {
     conf('VENENO ENXERGADO: sem o onabort, a promessa ficou pendurada', rej, 'pendurada');
+    conf('VENENO ENXERGADO: sem o onerror e o onabort do salvarArquivo, a promessa do salvarAnexo ficou pendurada', rejArq, 'pendurada');
     return;
   }
-  if (ESPERA_PERDA && !VENENO_SALVAR && !VENENO_NOTA) {
+  if (ESPERA_PERDA && (VENENO_GRAVAR || VENENO_ESCREVER)) {
     /* Os dois venenos da perda respondem no pedido, e o pedido deu certo: a
-     * promessa diz "salvo" e nada ficou. É o defeito inteiro numa linha. (Os
-     * venenos do salvar e do salvarNota não tocam o salvarAnexo desta parte:
-     * ele rejeita.) */
+     * promessa diz "salvo" e nada ficou. É o defeito inteiro numa linha. */
     conf('VENENO ENXERGADO: a promessa disse que salvou, e nada ficou', rej, 'resolveu');
   } else {
-    conf('a promessa rejeitou', /^rejeitou/.test(rej), true);
+    conf('a promessa da miniatura rejeitou', /^rejeitou/.test(rej), true);
+  }
+  if (ESPERA_PERDA && VENENO_ARQUIVO) {
+    conf('VENENO ENXERGADO: o salvarAnexo disse que salvou, e nada ficou', rejArq, 'resolveu');
+  } else {
+    conf('a promessa do salvarAnexo rejeitou', /^rejeitou/.test(rejArq), true);
   }
 
   if (!VENENO) await parteQuatro(pag);

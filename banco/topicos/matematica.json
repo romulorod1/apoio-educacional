@@ -3,7 +3,7 @@
  "versao": 1,
  "aviso": "Indice de assuntos, sem material: id, serie (ano), unidade, duracao, dificuldade, titulo, pre-requisitos e as palavras-chave da busca. Os ids sao os dos temas autorais de 09/2026 e nunca mudam: aulas gravadas apontam para eles.",
  "prerequisitos_origem": "revisado no C7 em 30/10/2026: pre-requisitos imediatos, cadeia pela transitividade; mudancas e motivos em banco/topicos/_grafo_c7_mudancas.md",
- "chaves_origem": "radicais de palavra-chave do banco/busca.json de 09/2026 (r: do resumo, d: destaques do conteudo), soltos e em ordem alfabetica, sem frase; so a busca le",
+ "chaves_origem": "radicais de palavra-chave do banco/busca.json de 09/2026 (r: do resumo, d: destaques do conteudo), soltos e em ordem alfabetica, sem frase; so a busca le. Nos assuntos criados depois dos 148 (MAT08-15 e os da revisao dos mapas, 12/11/2026) as chaves foram escritas a mao, no mesmo formato",
  "temas": [
   {
    "id": "MAT02-01",
@@ -1153,6 +1153,100 @@
    "modulo": "7ano:nocoes-basicas-de-estatistica"
   },
   {
+   "id": "MAT06-15",
+   "serie": "06",
+   "unidade": "geometria",
+   "duracaoMin": 60,
+   "dificuldade": 2,
+   "pt": {
+    "titulo": "Construções com régua e esquadro: paralelas e perpendiculares"
+   },
+   "prerequisitos": [
+    "MAT06-10"
+   ],
+   "chaves": {
+    "r": "construir esquadro paralela perpendicular quadrilatero regua reta tracar usar",
+    "d": "angulo apoiar compasso desenho deslizar exemplo figura instrumento lado medida ponto retangulo reto segmento software"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MAT06-16",
+   "serie": "06",
+   "unidade": "geometria",
+   "duracaoMin": 60,
+   "dificuldade": 2,
+   "pt": {
+    "titulo": "Figuras não planas: poliedros, corpos redondos e planificações"
+   },
+   "prerequisitos": [
+    "MAT05-08",
+    "MAT06-10"
+   ],
+   "chaves": {
+    "r": "aresta corpo face figura nao plana planificacao poliedro reconhecer redondo solido vertice",
+    "d": "base cilindro cone contar cubo esfera exemplo lateral molde piramide prisma quantas quantidade relacao superficie"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MAT06-17",
+   "serie": "06",
+   "unidade": "grandezas",
+   "duracaoMin": 60,
+   "dificuldade": 2,
+   "pt": {
+    "titulo": "Grandezas e medidas: comprimento, massa, tempo e temperatura"
+   },
+   "prerequisitos": [
+    "MAT05-10",
+    "MAT06-07"
+   ],
+   "chaves": {
+    "r": "comprimento converter grandeza massa medida medir padronizada temperatura tempo unidade",
+    "d": "celsius centimetro dia duracao grama grau hora intervalo metro minuto quilograma quilometro segundo superficie tonelada transformar"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MAT06-18",
+   "serie": "06",
+   "unidade": "grandezas",
+   "duracaoMin": 60,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Plantas baixas, vistas e escala"
+   },
+   "prerequisitos": [
+    "MAT06-11",
+    "MAT06-16"
+   ],
+   "chaves": {
+    "r": "aerea baixa desenhar escala interpretar planta real reduzir vista",
+    "d": "ampliar area casa comodo comprimento cozinha distancia exemplo mapa medida metro quarto representacao sala"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MAT06-19",
+   "serie": "06",
+   "unidade": "geometria",
+   "duracaoMin": 60,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Ampliação e redução de figuras na malha"
+   },
+   "prerequisitos": [
+    "MAT06-10",
+    "MAT06-13"
+   ],
+   "chaves": {
+    "r": "ampliacao ampliar figura malha proporcional reducao reduzir semelhante",
+    "d": "angulo cartesiano construir coordenada dobro exemplo lado medida metade plano quadriculada vertice"
+   },
+   "modulo": null
+  },
+  {
    "id": "MAT07-01",
    "serie": "07",
    "unidade": "numeros",
@@ -1413,6 +1507,44 @@
    "modulo": null
   },
   {
+   "id": "MAT07-15",
+   "serie": "07",
+   "unidade": "geometria",
+   "duracaoMin": 60,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Simetria e transformações: reflexão, translação e rotação"
+   },
+   "prerequisitos": [
+    "MAT06-10",
+    "MAT06-13"
+   ],
+   "chaves": {
+    "r": "eixo figura reconhecer reflexao rotacao simetria simetrico transformacao translacao",
+    "d": "angulo cartesiano centro composicao construir coordenada deslocamento direcao espelho giro malha obra origem plano sentido vertice"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MAT07-16",
+   "serie": "07",
+   "unidade": "geometria",
+   "duracaoMin": 60,
+   "dificuldade": 2,
+   "pt": {
+    "titulo": "Circunferência e círculo: elementos e construção com compasso"
+   },
+   "prerequisitos": [
+    "MAT06-15",
+    "MAT07-11"
+   ],
+   "chaves": {
+    "r": "circulo circunferencia compasso construir corda diametro elemento raio reconhecer",
+    "d": "arco centro distancia equidistante exemplo geometrico interna lugar ponto posicao regiao relativa secante tangente"
+   },
+   "modulo": null
+  },
+  {
    "id": "MAT08-01",
    "serie": "08",
    "unidade": "numeros",
@@ -1666,6 +1798,100 @@
    "chaves": {
     "r": "a cada calcular caso chance contando de descobrir em evento falta favoravel medir nota peso possivel que tem um valor",
     "d": "aluno azul bola caixa camisa caneta comum conta dado determine dois duas exemplo face mais mesma numa numero obteve pode preco preta qual quando quantidade real resultado retirada sempre soma total turma urna vendida vermelha"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MAT08-15",
+   "serie": "08",
+   "unidade": "grandezas",
+   "duracaoMin": 60,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Volume e capacidade: bloco retangular e cilindro"
+   },
+   "prerequisitos": [
+    "MAT06-12",
+    "MAT08-13"
+   ],
+   "chaves": {
+    "r": "bloco calcular capacidade cilindro litro medir o para prisma recipiente retangular volume",
+    "d": "agua altura area base caixa centimetro cilindrico comprimento cubico cubo exemplo largura metro mililitro qual quanto raio reservatorio tanque"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MAT08-16",
+   "serie": "08",
+   "unidade": "geometria",
+   "duracaoMin": 60,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Construções com régua e compasso: mediatriz, bissetriz e polígonos regulares"
+   },
+   "prerequisitos": [
+    "MAT07-12",
+    "MAT07-16"
+   ],
+   "chaves": {
+    "r": "angulo bissetriz compasso construir mediatriz poligono regua regular",
+    "d": "algoritmo arco central fluxograma geometrico grau hexagono lugar perpendicular ponto quadrado segmento triangulo"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MAT08-17",
+   "serie": "08",
+   "unidade": "geometria",
+   "duracaoMin": 60,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Cevianas e pontos notáveis do triângulo"
+   },
+   "prerequisitos": [
+    "MAT08-12",
+    "MAT08-16"
+   ],
+   "chaves": {
+    "r": "altura baricentro bissetriz ceviana circuncentro incentro mediana ortocentro ponto triangulo",
+    "d": "circunferencia encontro inscrita lado mediatriz medio notavel oposto perpendicular segmento vertice"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MAT08-18",
+   "serie": "08",
+   "unidade": "estatistica",
+   "duracaoMin": 60,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Contagem: árvore de possibilidades e princípio multiplicativo"
+   },
+   "prerequisitos": [
+    "MAT06-02"
+   ],
+   "chaves": {
+    "r": "arvore combinacao contagem contar diagrama multiplicativo possibilidade principio",
+    "d": "escolha exemplo formar maneira modo numero opcao quadro quantas resultado roupa tabela"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MAT08-19",
+   "serie": "08",
+   "unidade": "estatistica",
+   "duracaoMin": 60,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Pesquisa estatística: população, amostra e tipos de gráfico"
+   },
+   "prerequisitos": [
+    "MAT07-07",
+    "MAT07-14"
+   ],
+   "chaves": {
+    "r": "amostra amostragem censitaria grafico pesquisa populacao variavel",
+    "d": "adequado casual classe coleta colunas dados estratificada frequencia histograma intervalo linha planejar relatorio setor sistematica tabela"
    },
    "modulo": null
   },
@@ -1934,6 +2160,62 @@
     "d": "azul bola branca cada caminho cara carta comum dado depois duas etapa exemplo favoravel fracao honesta lancada lancado menos moeda numero pelo preta produto qual quando resultado retirada sair serem tres urna vale vermelha"
    },
    "modulo": "2em:introducao-a-probabilidade"
+  },
+  {
+   "id": "MAT09-15",
+   "serie": "09",
+   "unidade": "geometria",
+   "duracaoMin": 60,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Vistas ortogonais e perspectiva"
+   },
+   "prerequisitos": [
+    "MAT06-18"
+   ],
+   "chaves": {
+    "r": "desenhar espacial figura ortogonal perspectiva representar vista",
+    "d": "cima cubo empilhado frente fuga lado lateral objeto plano ponto projecao solido superior"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MAT09-16",
+   "serie": "09",
+   "unidade": "geometria",
+   "duracaoMin": 90,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Distância entre dois pontos e ponto médio"
+   },
+   "prerequisitos": [
+    "MAT06-13",
+    "MAT09-07"
+   ],
+   "chaves": {
+    "r": "cartesiano coordenada distancia medio plano ponto segmento",
+    "d": "area calcular eixo entre exemplo hipotenusa perimetro pitagoras triangulo vertice"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MAT09-17",
+   "serie": "09",
+   "unidade": "numeros",
+   "duracaoMin": 60,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Porcentagens sucessivas e juros compostos"
+   },
+   "prerequisitos": [
+    "MAT07-07",
+    "MAT08-01"
+   ],
+   "chaves": {
+    "r": "acrescimo composto desconto juro montante percentual porcentagem sucessivo taxa",
+    "d": "aplicacao capital emprestimo exemplo financeira mes potencia rendimento simples tempo valor"
+   },
+   "modulo": null
   },
   {
    "id": "MATEM1-01",
@@ -2207,6 +2489,42 @@
     "d": "ante cada calcule como dentro depois desconto determine diferente duas entra entrega exemplo expressao fora maquina mesma numero passa precisa quando real seja sejam todo vale valor"
    },
    "modulo": "9ano:funcoes-nocoes-basicas"
+  },
+  {
+   "id": "MATEM1-16",
+   "serie": "em1",
+   "unidade": "algebra",
+   "duracaoMin": 90,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Noções de lógica: proposições e conectivos"
+   },
+   "prerequisitos": [
+    "MAT07-09"
+   ],
+   "chaves": {
+    "r": "conectivo logica negacao proposicao quantificador tabela valor verdade",
+    "d": "bicondicional condicional conjuncao contradicao disjuncao equivalencia exemplo falsa implicacao sentenca tautologia verdadeira"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MATEM1-17",
+   "serie": "em1",
+   "unidade": "algebra",
+   "duracaoMin": 90,
+   "dificuldade": 4,
+   "pt": {
+    "titulo": "Equações e inequações irracionais"
+   },
+   "prerequisitos": [
+    "MATEM1-05"
+   ],
+   "chaves": {
+    "r": "equacao irracional quadrado radical raiz resolver verificar",
+    "d": "ambos condicao elevar estranha exemplo existencia indice lado membro raizes solucao verificacao"
+   },
+   "modulo": null
   },
   {
    "id": "MATEM2-01",
@@ -2486,6 +2804,63 @@
    "modulo": "2em:trigonometria-iii"
   },
   {
+   "id": "MATEM2-16",
+   "serie": "em2",
+   "unidade": "geometria",
+   "duracaoMin": 90,
+   "dificuldade": 4,
+   "pt": {
+    "titulo": "Geometria de posição: pontos, retas e planos"
+   },
+   "prerequisitos": [
+    "MAT08-11",
+    "MAT09-07"
+   ],
+   "chaves": {
+    "r": "paralelismo perpendicularidade plano ponto posicao postulado relativa reta",
+    "d": "concorrente determinacao distancia espaco exemplo intersecao ortogonal projecao reversa secante teorema"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MATEM2-17",
+   "serie": "em2",
+   "unidade": "algebra",
+   "duracaoMin": 90,
+   "dificuldade": 5,
+   "pt": {
+    "titulo": "Equações e inequações trigonométricas"
+   },
+   "prerequisitos": [
+    "MATEM2-02",
+    "MATEM2-15"
+   ],
+   "chaves": {
+    "r": "cosseno equacao intervalo resolver seno solucao tangente trigonometrica",
+    "d": "arco ciclo conjunto determinado exemplo fundamental geral periodo quadrante raiz volta"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MATEM2-18",
+   "serie": "em2",
+   "unidade": "algebra",
+   "duracaoMin": 90,
+   "dificuldade": 5,
+   "pt": {
+    "titulo": "Funções trigonométricas inversas"
+   },
+   "prerequisitos": [
+    "MATEM1-15",
+    "MATEM2-02"
+   ],
+   "chaves": {
+    "r": "arco arcocosseno arcoseno arcotangente funcao inversa trigonometrica",
+    "d": "cosseno dominio exemplo grafico imagem intervalo restricao seno tangente valor"
+   },
+   "modulo": null
+  },
+  {
    "id": "MATEM3-01",
    "serie": "em3",
    "unidade": "geometria",
@@ -2751,6 +3126,61 @@
     "d": "alta aluno amplitude barra cada calcule crescimento desvio diferente dois duas eixo escolheram esta exemplo fevereiro final foram grupo janeiro leram livro mais marco media mediana mensal moda mostra nota onde opcao padrao percentual peso pessoa ponto quantidade real soma todo tres usam valor venda vertical"
    },
    "modulo": "1em:estatistica-basica-i"
+  },
+  {
+   "id": "MATEM3-15",
+   "serie": "em3",
+   "unidade": "algebra",
+   "duracaoMin": 90,
+   "dificuldade": 5,
+   "pt": {
+    "titulo": "Introdução à derivada"
+   },
+   "prerequisitos": [
+    "MATEM3-09"
+   ],
+   "chaves": {
+    "r": "derivada funcao instantanea reta tangente taxa variacao",
+    "d": "crescente decrescente exemplo grafico limite maximo minimo ponto regra velocidade"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MATEM3-16",
+   "serie": "em3",
+   "unidade": "algebra",
+   "duracaoMin": 90,
+   "dificuldade": 5,
+   "pt": {
+    "titulo": "Introdução à integral"
+   },
+   "prerequisitos": [
+    "MATEM3-15"
+   ],
+   "chaves": {
+    "r": "antiderivada area curva definida integral primitiva",
+    "d": "calculo exemplo funcao fundamental grafico indefinida intervalo regiao soma teorema"
+   },
+   "modulo": null
+  },
+  {
+   "id": "MATEM3-17",
+   "serie": "em3",
+   "unidade": "geometria",
+   "duracaoMin": 90,
+   "dificuldade": 4,
+   "pt": {
+    "titulo": "Lugares geométricos no plano cartesiano"
+   },
+   "prerequisitos": [
+    "MAT08-16",
+    "MATEM3-03"
+   ],
+   "chaves": {
+    "r": "condicao equacao geometrico lugar ponto propriedade",
+    "d": "bissetriz cartesiano circunferencia distancia equidistante exemplo mediatriz parabola reta"
+   },
+   "modulo": null
   }
  ]
 }

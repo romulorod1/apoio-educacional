@@ -202,7 +202,7 @@ const contagens = pag => pag.evaluate(() => new Promise(r => {
 
 // pixels perto de uma cor no canvas do leitor de PDF, um a cada sete
 const pixelsDaCor = (pag, rgb) => pag.evaluate(cor => {
-  const c = document.querySelector('#corpo-modal-leitor-pdf canvas');
+  const c = document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="3"] canvas');
   if (!c) return -1;
   const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
   let n = 0;
@@ -404,6 +404,7 @@ async function printar(pag, nome) {
     .find(b => /Capítulo 2/.test(b.textContent)).click());
   const p3 = await esperar('a página 3 desenhada', () => paginaDesenhada(p), v => v === '3', 15000);
   conf('o toque no capítulo 2 leva à página 3', p3.ok, true);
+  await esperar('o canvas da página 3', () => p.evaluate(() => !!document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="3"] canvas')), Boolean, 15000);
   conf('a página 3 é a do capítulo 2 (o retângulo azul)', (await pixelsDaCor(p, AZUL)) > 500, true);
   conf('e o sumário fecha', await p.evaluate(() => document.querySelector('#leitor-sumario-lista').hidden), true);
   await p.evaluate(() => document.querySelector('#leitor-proxima').click());
@@ -551,8 +552,8 @@ async function printar(pag, nome) {
   conf('e o total caiu exatamente o tamanho do livro removido', caiu.valor && totalAntes - caiu.valor.bytes, bytesDe['livro-sem-sumario']);
   conf('o livro saiu do depósito', await H.contarDeposito(p, 'livros'), 3);
   await H.irParaAba(p, 'biblioteca');
-  conf('a aba Biblioteca diz 3 livros', (await esperar('a contagem da Biblioteca', () => p.evaluate(() =>
-    (document.querySelector('#bib-livros-contagem') || {}).textContent || ''), v => /^3 livros/.test(v || ''), 10000)).ok, true);
+  conf('a aba Biblioteca diz 3 materiais', (await esperar('a contagem da Biblioteca', () => p.evaluate(() =>
+    (document.querySelector('#bib-livros-contagem') || {}).textContent || ''), v => /^3 materiais/.test(v || ''), 10000)).ok, true);
   const de_novo = await importar(p, ZIP, 'a segunda importação');
   console.log('   estado: ' + JSON.stringify(de_novo));
   conf('importar de novo devolve só o que faltava', /1 livro novo/.test(de_novo) && /3 já estavam no tablet/.test(de_novo), true);
@@ -693,6 +694,19 @@ async function printar(pag, nome) {
   conf('os livros ficaram', await H.contarDeposito(p, 'livros'), livrosAntes);
   conf('e a pergunta disse que os livros ficam', /Os livros importados ficam no tablet/.test(mensagens[0] || ''), true);
 
-  secao('9. Nenhum erro de página');
+  secao('9. Livro recusado numa versao nova permanece instalado');
+  const hashLivroPreservado = await p.evaluate(() => Store.lerLivro('livro-sem-marcadores').then(l => l.meta.hash));
+  const preservacao = await p.evaluate(async (pacote, versao, idRecusado) => {
+    const atuais = await Store.listarLivros();
+    const doPacote = atuais.filter(l => l.pacote === pacote);
+    await Store.gravarLivros({ manifest: { pacote, versao },
+      livros: doPacote.filter(l => l.id !== idRecusado).map(l => ({ meta: l.meta, blob: l.blob }))
+    }, [idRecusado]);
+    return Store.lerLivro(idRecusado).then(l => ({ id: l && l.id, hash: l && l.meta.hash }));
+  }, manifest.pacote, manifest.versao + 1, 'livro-sem-marcadores');
+  conf('o registro antigo do livro recusado continua no tablet', preservacao.id, 'livro-sem-marcadores');
+  conf('e o arquivo antigo nao e apagado nem substituido', preservacao.hash, hashLivroPreservado);
+
+  secao('10. Nenhum erro de pagina');
   conf('nenhum erro', p.errosDePagina.join(' | '), '');
 })().then(() => H.fim(amb)(), e => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e)));

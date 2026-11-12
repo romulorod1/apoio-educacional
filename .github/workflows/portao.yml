@@ -13,11 +13,15 @@
 #                      tocados pelo PR (_teste/mapa_provas.tsv, decidido por
 #                      _teste/provas_tocadas.js). Prova de navegador tocada roda
 #                      ela mesma; arquivo que nao esta no mapa leva a bateria
-#                      inteira (na duvida, mais, nunca menos). Roda em oito
-#                      fatias (portao-tocadas (fatia K de 8)) so com a parte da
-#                      selecao que cai em cada uma, e o job portao-tocadas junta.
-#                      Com o rotulo "pronto" ele fica verde sem rodar, porque a
-#                      bateria inteira cobre tudo.
+#                      inteira (na duvida, mais, nunca menos). Da prova que
+#                      entrou pelo mapa (e nao foi tocada) rodam so os nomes sem
+#                      "--envenenado": os venenos sao da bateria do "pronto" e
+#                      da prova que o PR muda (POLITICA_TESTES, nivel 1). O job
+#                      portao-tocadas-plano conta o tempo previsto da selecao e
+#                      abre de 0 a 8 fatias (uma a cada 5 min de prova,
+#                      _teste/provas_tocadas.js), e o job portao-tocadas junta.
+#                      Com o rotulo "pronto" o plano abre zero fatias e o
+#                      juntador fica verde, porque a bateria inteira cobre tudo.
 #
 #   NIVEL 2, uma vez por PR, quando ele e marcado como pronto:
 #     portao-navegador  o portao inteiro, com Chrome, em oito fatias
@@ -119,68 +123,87 @@ jobs:
           path: _falhas_do_portao/
           if-no-files-found: ignore
 
-  # NIVEL 1: as provas de navegador mapeadas pelos arquivos tocados. Cada fatia
-  # (K de 8) calcula a mesma selecao e roda a parte dela; a fatia sem prova da
-  # selecao sai verde logo depois do plano, sem instalar nada.
-  portao-tocadas-fatia:
+  # NIVEL 1, o plano: quantas fatias a selecao pede (0 a 8). Um job leve, sem
+  # Chrome nem dependencias: so o git diff e o mapa. Com o rotulo "pronto", zero
+  # fatias (a bateria inteira cobre tudo).
+  portao-tocadas-plano:
     if: >-
       github.event_name == 'pull_request' && (
       github.event.action == 'synchronize' ||
       github.event.action == 'reopened' ||
       (github.event.action == 'labeled' && github.event.label.name == 'pronto') ||
       (github.event.action == 'opened' && !contains(github.event.pull_request.labels.*.name, 'pronto')))
-    name: portao-tocadas (fatia ${{ matrix.fatia }} de 8)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        fatia: [1, 2, 3, 4, 5, 6, 7, 8]
+    timeout-minutes: 10
     env:
-      CHROME: /usr/bin/google-chrome
       COM_PRONTO: ${{ contains(github.event.pull_request.labels.*.name, 'pronto') }}
+    outputs:
+      fatias: ${{ steps.plano.outputs.fatias }}
+      matriz: ${{ steps.plano.outputs.matriz }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: origin/main para a base do merge
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
-      - name: Plano do nivel 1 (quais provas de navegador, pelo mapa)
+      - name: Plano do nivel 1 (quais provas de navegador, pelo mapa, e quantas fatias)
         id: plano
         run: |
           if [ "$COM_PRONTO" = "true" ]; then
-            echo "o PR tem o rotulo pronto: a bateria inteira (portao-navegador) cobre tudo; nada a rodar aqui"
-            echo "quantas=0" >> "$GITHUB_OUTPUT"
+            echo "o PR tem o rotulo pronto: a bateria inteira (portao-navegador) cobre tudo; nada a rodar no nivel 1"
+            printf 'fatias=0\nmatriz=[]\n' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git diff --name-only origin/main...HEAD > "$RUNNER_TEMP/tocados.txt"
           echo "arquivos tocados pelo PR:"
           sed 's/^/  /' "$RUNNER_TEMP/tocados.txt"
-          node _teste/provas_tocadas.js --fatia ${{ matrix.fatia }}/8 --saida "$RUNNER_TEMP/provas.txt" < "$RUNNER_TEMP/tocados.txt"
-      - name: Nada desta selecao cai nesta fatia
-        if: steps.plano.outputs.quantas == '0'
+          node _teste/provas_tocadas.js --plano < "$RUNNER_TEMP/tocados.txt"
+
+  # NIVEL 1, as fatias: so as que o plano abriu. Cada uma refaz a selecao, confere
+  # que ela pede o mesmo numero de fatias do plano e roda a parte dela (os nomes
+  # da selecao divididos pelo tempo, divide_portao.js com PORTAO_SELECAO).
+  portao-tocadas-fatia:
+    if: needs.portao-tocadas-plano.outputs.fatias != '0' && needs.portao-tocadas-plano.outputs.fatias != ''
+    needs: portao-tocadas-plano
+    name: portao-tocadas (fatia ${{ matrix.fatia }} de ${{ needs.portao-tocadas-plano.outputs.fatias }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        fatia: ${{ fromJSON(needs.portao-tocadas-plano.outputs.matriz) }}
+    env:
+      CHROME: /usr/bin/google-chrome
+      FATIAS: ${{ needs.portao-tocadas-plano.outputs.fatias }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: origin/main para a base do merge
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+      - name: As provas desta fatia
+        id: fatia
         run: |
-          echo "nivel 1, fatia ${{ matrix.fatia }} de 8: nenhuma prova de navegador a rodar"
+          git diff --name-only origin/main...HEAD > "$RUNNER_TEMP/tocados.txt"
+          node _teste/provas_tocadas.js --fatia ${{ matrix.fatia }}/$FATIAS --saida "$RUNNER_TEMP/provas.txt" --nomes "$RUNNER_TEMP/nomes.txt" < "$RUNNER_TEMP/tocados.txt"
+          echo "PORTAO_SELECAO=$RUNNER_TEMP/nomes.txt" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
-        if: steps.plano.outputs.quantas != '0'
         with:
           node-version: '24.14.1'
       - uses: actions/setup-python@v5
-        if: steps.plano.outputs.quantas != '0'
         with:
           python-version: '3.14'
       - name: Dependencias Python
-        if: steps.plano.outputs.quantas != '0'
         run: pip install -r _teste/requirements.txt
       - name: Dependencias Node
-        if: steps.plano.outputs.quantas != '0'
         working-directory: _teste
         run: npm ci --no-audit --no-fund
       - name: Chrome do runner
-        if: steps.plano.outputs.quantas != '0'
         run: $CHROME --version
+      # so na fatia com prova que usa o emulador (o arquivo da prova cita
+      # FIREBASE_TOOLS); a prova da nuvem sem ele REPROVA, nunca passa calada
       - name: firebase-tools e Java 21 para a prova da nuvem
-        if: steps.plano.outputs.quantas != '0'
+        if: steps.fatia.outputs.nuvem == 'sim'
         run: |
           mkdir -p "$RUNNER_TEMP/firebase-tools"
           cd "$RUNNER_TEMP/firebase-tools"
@@ -189,8 +212,7 @@ jobs:
           echo "FIREBASE_TOOLS=$RUNNER_TEMP/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js" >> "$GITHUB_ENV"
           echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
       - name: Provas de navegador mapeadas, desta fatia
-        if: steps.plano.outputs.quantas != '0'
-        run: sh _teste/confere_tudo.sh --provas "$RUNNER_TEMP/provas.txt" --pedaco ${{ matrix.fatia }}/8
+        run: sh _teste/confere_tudo.sh --provas "$RUNNER_TEMP/provas.txt" --pedaco ${{ matrix.fatia }}/$FATIAS
       - name: Saida de quem reprovou
         if: failure()
         uses: actions/upload-artifact@v4
@@ -199,8 +221,9 @@ jobs:
           path: _falhas_do_portao/
           if-no-files-found: ignore
 
-  # O nivel 1, com o nome proprio que o merge_seguro ve: verde so com as oito
-  # fatias verdes. Nao e o portao inteiro e nao se passa por ele.
+  # O nivel 1, com o nome proprio que o merge_seguro ve: verde com o plano verde
+  # e todas as fatias que ele abriu verdes (ou nenhuma fatia, quando o plano abriu
+  # zero). Nao e o portao inteiro e nao se passa por ele.
   portao-tocadas:
     if: >-
       !cancelled() && github.event_name == 'pull_request' && (
@@ -208,14 +231,24 @@ jobs:
       github.event.action == 'reopened' ||
       (github.event.action == 'labeled' && github.event.label.name == 'pronto') ||
       (github.event.action == 'opened' && !contains(github.event.pull_request.labels.*.name, 'pronto')))
-    needs: portao-tocadas-fatia
+    needs: [portao-tocadas-plano, portao-tocadas-fatia]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: As oito fatias do nivel 1
+      - name: O plano e as fatias do nivel 1
+        env:
+          PLANO: ${{ needs.portao-tocadas-plano.result }}
+          FATIAS: ${{ needs.portao-tocadas-plano.outputs.fatias }}
+          RESULTADO: ${{ needs.portao-tocadas-fatia.result }}
         run: |
-          echo "resultado das fatias do nivel 1: ${{ needs.portao-tocadas-fatia.result }}"
-          test "${{ needs.portao-tocadas-fatia.result }}" = "success"
+          echo "plano: $PLANO; fatias abertas: ${FATIAS:-nenhuma saida}; resultado das fatias: $RESULTADO"
+          test "$PLANO" = "success"
+          if [ "$FATIAS" = "0" ]; then
+            test "$RESULTADO" = "skipped"
+          else
+            case "$FATIAS" in ''|*[!0-9]*) echo "o plano nao disse quantas fatias"; exit 1 ;; esac
+            test "$RESULTADO" = "success"
+          fi
 
   # NIVEL 3: so no push na main. Diz, no log, se a bateria inteira ja passou na
   # MESMA arvore (tree) e nao precisa rodar de novo.

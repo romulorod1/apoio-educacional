@@ -41,6 +41,12 @@
   function diaSemana(iso) { return dataLocal(iso).getDay(); }
   function diaSemanaCurto(iso) { return DIAS_CURTO[diaSemana(iso)]; }
   function diaSemanaLongo(iso) { return DIAS_LONGO[diaSemana(iso)]; }
+  /* "no sábado", "no domingo", "na segunda": a preposição certa para o dia
+   * dentro de uma frase (sábado e domingo são masculinos). */
+  function diaSemanaComPreposicao(iso) {
+    var d = diaSemana(iso);
+    return (d === 0 || d === 6 ? 'no ' : 'na ') + DIAS_LONGO[d];
+  }
 
   function ddmm(iso) { var p = partesData(iso); return pad2(p.d) + '/' + pad2(p.m); }
   function ddmmaaaa(iso) { var p = partesData(iso); return pad2(p.d) + '/' + pad2(p.m) + '/' + p.a; }
@@ -2983,6 +2989,81 @@
     });
   }
 
+  /* As ocorrências de repetição de um dia que ainda NÃO viraram aula.
+   *
+   * A série só vira aula até `materializadoAte` (o tablet estende ao navegar,
+   * pelo garantirSeriesAte). Quem só consulta a agenda além desse mês, como os
+   * horários vagos do celular, precisa contar essas ocorrências como ocupadas,
+   * sem gravar nada: esta função só LÊ o db e devolve aulas de mentira,
+   * marcadas com `prevista: true`, que nunca entram em db.aulas.
+   *
+   * Segue a mesma regra do materializarSerieNoMes: respeita início, fim, dias
+   * da semana e as datas apagadas ou remarcadas (serie.exclusoes), e pula a
+   * data que já tem aula daquela série. Série cancelada não ocupa horário. */
+  function ocorrenciasPrevistasDoDia(db, dataIso) {
+    var saida = [];
+    if (!db || !dataIso) return saida;
+    var mes = mesDe(dataIso);
+    var dia = diaSemana(dataIso);
+    (db.series || []).forEach(function (s) {
+      if (!s || !s.dias || s.dias.indexOf(dia) < 0) return;
+      if ((s.status || 'realizada') === 'cancelada') return;
+      if (s.materializadoAte && mes <= s.materializadoAte) return; // o mês já está em db.aulas
+      if (s.inicio && dataIso < s.inicio) return;
+      if (s.fim && dataIso > s.fim) return;
+      if ((s.exclusoes || []).indexOf(dataIso) >= 0) return;
+      var jaTem = (db.aulas || []).some(function (a) { return a.serieId === s.id && a.data === dataIso; });
+      if (jaTem) return;
+      saida.push({
+        id: s.id + '@' + dataIso, alunoId: s.alunoId, serieId: s.id, prevista: true,
+        data: dataIso, hora: s.hora || '', duracaoMin: s.duracaoMin || 60, status: s.status || 'realizada'
+      });
+    });
+    return saida;
+  }
+
+  /* Os inícios livres de um dia (de `passoMin` em `passoMin`, em ordem) em
+   * faixas contínuas: [{ de: '07:00', ate: '12:00' }], onde `ate` é o fim da
+   * aula que começa no último início da faixa. Assim a mensagem às famílias
+   * diz "das 07:00 às 12:00" em vez de dez intervalos sobrepostos. */
+  function faixasDeHorariosLivres(inicios, duracaoMin, passoMin) {
+    var dur = Number(duracaoMin) || 60, passo = Number(passoMin) || 30;
+    var faixas = [], atual = null, anterior = null;
+    (inicios || []).forEach(function (h) {
+      var m = minutosDaHora(h);
+      if (m === null) return;
+      if (atual && anterior !== null && m - anterior === passo) atual.fimMin = m + dur;
+      else { atual = { inicioMin: m, fimMin: m + dur }; faixas.push(atual); }
+      anterior = m;
+    });
+    return faixas.map(function (f) {
+      return { de: pad2(Math.floor(f.inicioMin / 60)) + ':' + pad2(f.inicioMin % 60),
+        ate: pad2(Math.floor(f.fimMin / 60)) + ':' + pad2(f.fimMin % 60) };
+    });
+  }
+
+  /* A mensagem de horários vagos para as famílias (aba Vagos do celular). */
+  function mensagemDeHorariosVagos(dataIso, inicios, duracaoMin, passoMin) {
+    var faixas = faixasDeHorariosLivres(inicios, duracaoMin, passoMin).map(function (f) {
+      return 'das ' + f.de + ' às ' + f.ate;
+    });
+    if (!faixas.length) return '';
+    var lista = faixas.length === 1 ? faixas[0]
+      : faixas.slice(0, -1).join(', ') + ' e ' + faixas[faixas.length - 1];
+    return 'Olá! Tenho horários livres para aula de ' + fmtDuracao(Number(duracaoMin) || 60) + ' ' +
+      diaSemanaComPreposicao(dataIso) + ', ' + ddmm(dataIso) + ': ' + lista + '. Qual horário funciona para você?';
+  }
+
+  /* O choque de horário contando também as repetições ainda não materializadas
+   * (ocorrenciasPrevistasDoDia). Só lê: não grava nada no db. */
+  function conflitosComRepeticoes(db, aula) {
+    var reais = conflitosDe(db, aula);
+    if (!aula || !aula.data) return reais;
+    var previstas = ocorrenciasPrevistasDoDia(db, aula.data);
+    if (!previstas.length) return reais;
+    return reais.concat(conflitosDe({ aulas: previstas }, aula));
+  }
+
   /* Divide uma aula em duas metades no mesmo dia.
    *
    * Serve para quando o encontro tratou de dois assuntos diferentes e ela quer
@@ -5601,7 +5682,7 @@
     MESES: MESES, DIAS_CURTO: DIAS_CURTO, DIAS_LONGO: DIAS_LONGO, STATUS: STATUS,
     rotuloSituacao: rotuloSituacao, rotuloDoCancelamento: rotuloDoCancelamento,
     pad2: pad2, partesData: partesData, dataLocal: dataLocal, isoDe: isoDe, hojeIso: hojeIso,
-    diaSemana: diaSemana, diaSemanaCurto: diaSemanaCurto, diaSemanaLongo: diaSemanaLongo,
+    diaSemana: diaSemana, diaSemanaCurto: diaSemanaCurto, diaSemanaLongo: diaSemanaLongo, diaSemanaComPreposicao: diaSemanaComPreposicao,
     ddmm: ddmm, ddmmaaaa: ddmmaaaa, diaEMes: diaEMes, mesExtenso: mesExtenso, mesDe: mesDe,
     diasDoMes: diasDoMes, primeiroDiaSemanaDoMes: primeiroDiaSemanaDoMes, mesAdjacente: mesAdjacente,
     fmtMoeda: fmtMoeda, fmtHoras: fmtHoras, fmtHorasDecimal: fmtHorasDecimal, fmtDuracao: fmtDuracao,
@@ -5670,7 +5751,8 @@
     prepararViradaAnual: prepararViradaAnual,
     aplicarViradaAnual: aplicarViradaAnual,
     serieParaTemas: serieParaTemas,
-    conflitosDe: conflitosDe, minutosDaHora: minutosDaHora,
+    conflitosDe: conflitosDe, minutosDaHora: minutosDaHora, ocorrenciasPrevistasDoDia: ocorrenciasPrevistasDoDia,
+    conflitosComRepeticoes: conflitosComRepeticoes, faixasDeHorariosLivres: faixasDeHorariosLivres, mensagemDeHorariosVagos: mensagemDeHorariosVagos,
     dividirAula: dividirAula, desfazerDivisao: desfazerDivisao,
     podeDividir: podeDividir, metadesDe: metadesDe, somarMinutosNaHora: somarMinutosNaHora,
     uid: uid, nomeArquivo: nomeArquivo,
