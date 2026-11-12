@@ -589,11 +589,15 @@ DENSIDADE_MINIMA = 0.2
 LINHAS_DO_FIM = 2
 # A CONTINUAÇÃO da seção (item 12a): nesses livros o título está só na
 # primeira página, e as seguintes são só respostas, sem título. A seção segue
-# pelas páginas seguintes enquanto as três condições valem: a página tem texto
-# e é feita de respostas (DENSIDADE_DA_CONTINUACAO; nas seções reais do
-# Praticando, de 60% a 80% das linhas); ela fica na mesma entrada do mapa da
-# página do título (ou fora do mapa, como ela); e a seção estendida traz
-# respostas de DOIS capítulos ou unidades, ou mais. Sem a última condição, um
+# pelas páginas seguintes enquanto as condições valem: a página tem texto; ela
+# fica na mesma entrada do mapa da página do título (ou fora do mapa, como
+# ela); e ou essa entrada do mapa tem título de respostas ("Respostas dos
+# exercícios": o mapa diz que a faixa inteira é a seção), ou a página é feita
+# de respostas (DENSIDADE_DA_CONTINUACAO; nas seções reais do Praticando, a
+# maioria das páginas fica entre 60% e 80%, mas há páginas de 20% e de 38%,
+# com figura ou fração, e por isso a densidade sozinha não basta quando o mapa
+# diz). No fim, a seção estendida tem de trazer respostas de DOIS capítulos ou
+# unidades, ou mais, senão fica como estava. Sem essa última condição, um
 # quadro de margem seguido de páginas de exercício chegaria ao fim do
 # capítulo e viraria "fim do capítulo". Só no PDF: no EPUB a parte inteira já
 # é lida.
@@ -747,6 +751,10 @@ def propor_gabaritos(textos, capitulos, formato='pdf'):
         ls = linhas[u - 1]
         return sum(1 for l in ls if PARECE_RESPOSTA.match(l)) / max(1, len(ls))
 
+    def entrada_de_respostas(c):
+        # a entrada do mapa cujo titulo E o de uma secao de respostas ("Respostas dos exercicios")
+        return bool(c) and TITULO_DE_RESPOSTAS.match(linha_normal(c.get('titulo') or '')) is not None
+
     def numeros_em(a, b):
         return {numero_de(m.group(2)) for u in range(a, b + 1) for l in linhas[u - 1]
                 for m in [MARCA_DE_CAPITULO.match(l) or MARCA_DE_UNIDADE.match(l)] if m and numero_de(m.group(2))}
@@ -758,8 +766,10 @@ def propor_gabaritos(textos, capitulos, formato='pdf'):
         com_continuacao = set(titulo_em)
         for a, b in secoes:
             cap, fim = capitulo_de(a), b
+            de_respostas = entrada_de_respostas(cap)
             while (fim + 1 <= total and fim + 1 not in titulo_em and fim + 1 not in sem_texto
-                   and capitulo_de(fim + 1) is cap and densidade_de(fim + 1) >= DENSIDADE_DA_CONTINUACAO):
+                   and capitulo_de(fim + 1) is cap
+                   and (de_respostas or densidade_de(fim + 1) >= DENSIDADE_DA_CONTINUACAO)):
                 fim += 1
             if fim > b and len(numeros_em(a, fim)) >= 2:
                 com_continuacao.update(range(b + 1, fim + 1))
