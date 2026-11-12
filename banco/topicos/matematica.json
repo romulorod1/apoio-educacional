@@ -1670,6 +1670,25 @@
    "modulo": null
   },
   {
+   "id": "MAT08-15",
+   "serie": "08",
+   "unidade": "grandezas",
+   "duracaoMin": 60,
+   "dificuldade": 3,
+   "pt": {
+    "titulo": "Volume e capacidade: bloco retangular e cilindro"
+   },
+   "prerequisitos": [
+    "MAT06-12",
+    "MAT08-13"
+   ],
+   "chaves": {
+    "r": "bloco calcular capacidade cilindro litro medir o para prisma recipiente retangular volume",
+    "d": "agua altura area base caixa centimetro cilindrico comprimento cubico cubo exemplo largura metro mililitro qual quanto raio reservatorio tanque"
+   },
+   "modulo": null
+  },
+  {
    "id": "MAT09-01",
    "serie": "09",
    "unidade": "numeros",
