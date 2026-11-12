@@ -32,6 +32,7 @@ servidor/*	-
 _teste/mapa_provas.tsv	-
 _teste/tempos_do_portao.tsv	-
 _teste/merge_seguro.*	-
+_teste/guarda_merge.sh	-
 _teste/divide_portao.js	-
 _teste/provas_tocadas.js	-
 _teste/testa_livros_impressa.js	-
