@@ -381,9 +381,19 @@ function printarPdf(bytes, indice, nome) {
   await exportar(p, '#leitor-exportar');
   await p.evaluate(() => {
     document.querySelector('#livro-exportar-paginas').click();
+    const grade = document.querySelector('#livro-exportar-grade-paginas');
+    window.__gradeExportacaoVisivel = !!grade && !grade.hidden;
+    window.__paginasDaGrade = Array.from(document.querySelectorAll('#livro-exportar-grade-paginas [data-pagina-arquivo]')).map(b => b.dataset.paginaArquivo).join(',');
+    const pagina = document.querySelector('#livro-exportar-grade-paginas [data-pagina-arquivo="4"]');
+    if (pagina) pagina.click();
+    window.__selecaoPeloToque = document.querySelector('#livro-exportar-quais').value;
     const c = document.querySelector('#livro-exportar-quais');
     c.value = '5-6';
+    c.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  conf('a grade do capítulo abre com as páginas do arquivo identificadas', await p.evaluate(() => window.__gradeExportacaoVisivel), true);
+  conf('a grade mostra as páginas do capítulo aberto', await p.evaluate(() => window.__paginasDaGrade), '3,4');
+  conf('o toque na página do capítulo acrescenta a página à seleção', await p.evaluate(() => window.__selecaoPeloToque), '3, 4');
   conf('com páginas escolhidas, o gabarito fica desligado e diz por quê', (await janela(p)).motivo, '(o gabarito acompanha o capítulo inteiro)');
   const an3 = await anexarNaAula(p, 2);
   const pg3 = lerPdf(Buffer.from((await lerAnexo(p, an3 && an3.id)) || '', 'base64'));
