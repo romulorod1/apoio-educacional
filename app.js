@@ -22998,6 +22998,7 @@
       var base = pagina.getViewport({ scale: 1 });
       var largura = Math.max(160, corpo.clientWidth - 36) * estado.zoom;
       var vp = pagina.getViewport({ scale: largura / base.width });
+      registro.proporcao = base.height / base.width;
       registro.caixa.style.width = Math.floor(vp.width) + 'px';
       registro.caixa.style.height = Math.ceil(vp.height) + 'px';
       var densidade = Math.min(window.devicePixelRatio || 1, Math.sqrt(LEITOR_MAX_PIXELS / (vp.width * vp.height)));
@@ -23067,6 +23068,7 @@
       leitorRolarAgendado = false;
       if (!leitor || !leitor.continuo) return;
       var n = paginaMaisProximaDoCentro(leitor);
+      leitor.ancora = ancoraDoLeitorContinuo(leitor, n);
       prepararPaginasSemObservador(leitor, n);
       // Em uma navegação suave, o meio da tela ainda passa por páginas
       // anteriores. Não grave esse trecho intermediário como a última página.
@@ -23117,17 +23119,65 @@
     return Promise.resolve(true);
   }
 
+  /* A âncora do zoom e do giro: a página que está no meio da tela e o ponto
+   * dentro dela (fração da altura e da largura). Mudar a altura de todas as
+   * caixas sem levar a rolagem junto deixava outra página à vista (na p. 206,
+   * o "+" mostrava a p. 165) e o contador dizendo a antiga. */
+  function ancoraDoLeitorContinuo(estado, jaMedida) {
+    var corpo = $('#corpo-modal-leitor-pdf');
+    var n = jaMedida || paginaMaisProximaDoCentro(estado), p = estado.paginas[n - 1];
+    if (!p) return null;
+    var rc = corpo.getBoundingClientRect(), r = p.caixa.getBoundingClientRect();
+    var meioY = rc.top + corpo.clientHeight / 2, meioX = rc.left + corpo.clientWidth / 2;
+    return { n: n, lc: corpo.clientWidth, ac: corpo.clientHeight,
+      fy: r.height ? Math.max(0, Math.min(1, (meioY - r.top) / r.height)) : 0,
+      fx: r.width ? Math.max(0, Math.min(1, (meioX - r.left) / r.width)) : 0.5 };
+  }
+
+  /* No giro, a janela já mudou quando o redesenho roda (250 ms depois): o
+   * meio da tela nova é outro ponto. Vale a âncora da última rolagem, tirada
+   * com a janela de antes; no zoom, a janela é a mesma e a âncora é a de agora. */
+  function ancoraParaRedimensionar(estado) {
+    var corpo = $('#corpo-modal-leitor-pdf'), guardada = estado.ancora;
+    if (guardada && (guardada.lc !== corpo.clientWidth || guardada.ac !== corpo.clientHeight)) return guardada;
+    return ancoraDoLeitorContinuo(estado);
+  }
+
+  function voltarParaAncoraDoLeitor(estado, ancora) {
+    var corpo = $('#corpo-modal-leitor-pdf'), p = estado.paginas[ancora.n - 1];
+    if (!p) return;
+    var rc = corpo.getBoundingClientRect(), r = p.caixa.getBoundingClientRect();
+    var topo = r.top - rc.top + corpo.scrollTop, esquerda = r.left - rc.left + corpo.scrollLeft;
+    corpo.scrollTop = Math.max(0, topo + ancora.fy * r.height - corpo.clientHeight / 2);
+    corpo.scrollLeft = Math.max(0, esquerda + ancora.fx * r.width - corpo.clientWidth / 2);
+  }
+
   function redimensionarLeitorContinuo(paraOAlto) {
     if (!leitor || !leitor.continuo) return Promise.resolve(false);
-    var corpo = $('#corpo-modal-leitor-pdf'), largura = Math.max(160, corpo.clientWidth - 36) * leitor.zoom;
-    leitor.paginas.forEach(function (p) {
+    var estado = leitor;
+    var corpo = $('#corpo-modal-leitor-pdf'), largura = Math.max(160, corpo.clientWidth - 36) * estado.zoom;
+    var ancora = paraOAlto ? null : ancoraParaRedimensionar(estado);
+    estado.paginas.forEach(function (p) {
       liberarPaginaContinua(p);
       p.caixa.style.width = Math.floor(largura) + 'px';
-      p.caixa.style.height = Math.ceil(largura * leitor.proporcaoPagina) + 'px';
+      // a página já lida guarda a proporção dela; as outras usam a da primeira
+      p.caixa.style.height = Math.ceil(largura * (p.proporcao || estado.proporcaoPagina)) + 'px';
     });
-    if (paraOAlto) irAProximaPaginaDoLeitor(leitor.pagina, false);
-    else prepararPaginasSemObservador(leitor, leitor.pagina);
-    return Promise.resolve(true);
+    if (paraOAlto || !ancora) { irAProximaPaginaDoLeitor(estado.pagina, false); return Promise.resolve(true); }
+    voltarParaAncoraDoLeitor(estado, ancora);
+    // o contador e a posição guardada seguem a página que está à vista
+    if (ancora.n !== estado.pagina) {
+      estado.pagina = ancora.n;
+      if (typeof estado.opcoes.aoMudarPagina === 'function') {
+        try { estado.opcoes.aoMudarPagina(ancora.n); } catch (e) { /* posição é auxiliar */ }
+      }
+    }
+    corpo.dataset.paginaDesenhada = String(estado.pagina);
+    atualizarBarraDoLeitor();
+    prepararPaginasSemObservador(estado, estado.pagina);
+    var p = estado.paginas[estado.pagina - 1];
+    p.visivel = true;
+    return desenharPaginaContinua(estado, p).then(function () { return !!p.caixa.querySelector('canvas'); });
   }
 
   function andarNoLeitorPdf(passo) {
