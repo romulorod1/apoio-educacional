@@ -682,7 +682,7 @@ async function importar(pag, arquivo) {
     JSON.stringify(chave.valor && chave.valor.L), JSON.stringify([['Volume e capacidade', 'capitulo', 'Pelo capítulo, assunto: ' + volume.pt.titulo, '', true, '']]));
   // o lado oposto: um termo que não está em nada não acha nada
   await digitar('zqxjkw capitulo');
-  const nada = await esperar('a busca por um termo que não existe', lerNosLivros, v => !!v && !/Buscando/.test(v.status), 15000);
+  const nada = await esperar('a busca por um termo que não existe', lerNosLivros, v => !!v && /Nenhum livro/.test(v.status), 15000);
   conf('um termo que não está em nada não acha capítulo nem página', nada.valor && nada.valor.livros.length + ' | ' + nada.valor.contagem, '0 | 0');
   // a busca por capítulo é instantânea: 79 livros e cerca de 1.500 capítulos, montar o índice e consultar abaixo de 50 ms
   const tempo = await pag.evaluate(() => {
@@ -979,7 +979,8 @@ async function importar(pag, arquivo) {
     '--envenenado-pagina-ruim-derruba-livro');
   r = await buscar(pag, 'paragrafo 1 do capitulo 3');
   const d3 = (r.livros || []).find(l => l.id === 'livro-de-prova');
-  conf('a busca acha o termo nas outras partes do livro (parte 3)', d3 ? JSON.stringify([d3.paginas, d3.naoLidas]) : '', '[[3],1]');
+  // todas as palavras também estão na parte 1 ("Parágrafo 3 do capítulo 1"); a frase exata, só na 3
+  conf('a busca acha o termo nas outras partes do livro (a frase exata na parte 3)', d3 ? JSON.stringify([d3.paginasComFrase, d3.paginas.indexOf(2) < 0, d3.naoLidas]) : '', '[[3],true,1]');
   const naoLidoD = (r.naoLidos || []).find(l => l.id === 'livro-de-prova');
   conf('e o livro diz 1 parte que não pôde ser lida, sem sair da busca',
     naoLidoD ? naoLidoD.naoLidas + '/' + naoLidoD.livroInteiro + '/' + naoLidoD.motivo : '', '1/false/leitura');
