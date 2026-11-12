@@ -326,6 +326,12 @@ roda "endpoint de IA"         node _teste/testa_ia_endpoint.js
 # build), antes do merge: sem ele, um import quebrado so apareceria travando
 # o deploy da main. Precisa do registro do npm; sem rede, falha.
 roda "endpoint de IA (empacota)" node _teste/testa_ia_empacota.js
+# O planejamento de estudos com IA (fase 2): o modulo puro (pedido, leitura da
+# resposta, ajuste com o content intacto, a folha de uma pagina), dados sinteticos.
+roda "planejamento com IA (fase 2)" node _teste/testa_planejamento.js
+# o salvar com a gravacao pendente: a mudanca no meio grava de novo, com o mesmo id
+roda "planejamento (salvar pendente)" node _teste/testa_planejamento_salvar.js
+roda "planejamento --envenenado-zera-sem-comparar" node _teste/testa_planejamento_salvar.js --envenenado-zera-sem-comparar
 # Politica de testes por checkpoint (09/11/2026): o nivel 1 (quais provas de
 # navegador rodam pelos arquivos tocados, com o mapa em mapa_provas.tsv) e o
 # nivel 3 (a main reaproveita a bateria inteira se o tree for igual ao da cabeca
@@ -789,6 +795,14 @@ roda "banco v5 --envenenado-restauro-sem-fila"    node "_teste/testa_banco_v5.js
 # registros, e TEM de ser visto.
 roda "rollback v4 (N1)"                           node "_teste/testa_rollback_v4.js"
 roda "rollback v4 --envenenado-registros-ressuscitam" node "_teste/testa_rollback_v4.js" --envenenado-registros-ressuscitam
+# IA, fase 2: o fluxo do planejamento no app (ficha, atalho do +, previa em PDF,
+# ajuste, salvar, compartilhar, erros, observador e transbordo), com o /api/ia falso;
+# e a pergunta de producao: o plano salvo como ajuste sobrevive ao store.js de antes
+# (1f0b839), e o tipo novo seria apagado por ele (controle).
+roda "planejamento (fluxo, IA fase 2)"              node "_teste/testa_planejamento_navegador.js"
+roda "planejamento --envenenado-salva-duplo"       node "_teste/testa_planejamento_navegador.js" --envenenado-salva-duplo
+roda "planejamento (registro e versao antiga)"      node "_teste/testa_planejamento_registro_navegador.js"
+roda "planejamento --envenenado-cascata-deixa-plano" node "_teste/testa_planejamento_registro_navegador.js" --envenenado-cascata-deixa-plano
 # N1: a volta depois do rollback. O codigo da 4 republicado com o numero novo abre
 # um banco nesse numero sem os depositos novos; o codigo novo, voltando, sonda o
 # banco, cria o que falta na versao mais um e migra. O veneno sem a deteccao TEM
@@ -895,6 +909,8 @@ roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_a
 roda "relato e Voltar"                            node "_teste/testa_relato_voltar.js"
 roda "Voltar do aparelho nas telas"              node "_teste/testa_voltar_android.js"
 roda "Voltar do aparelho --envenenado-voltar-sem-tela" node "_teste/testa_voltar_android.js" --envenenado-voltar-sem-tela
+roda "Voltar do aparelho --envenenado-volta-dois-passos" node "_teste/testa_voltar_android.js" --envenenado-volta-dois-passos
+roda "Voltar do aparelho --envenenado-seta-nao-tira" node "_teste/testa_voltar_android.js" --envenenado-seta-nao-tira
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
 # N0: a copia na nuvem contra o Firebase Emulator Suite: as regras nos tres
 # casos (dona, observador, estranho), a ida e volta entre dois aparelhos pela
@@ -1085,6 +1101,7 @@ roda "celular ficha --envenenado-observador-cadastra" node "_teste/testa_celular
 # de um estranho; a tabela dos 28 casos dela), o link online com http, e o alto que nunca avisa que pode
 # estar desatualizado
 roda "celular ficha --envenenado-extracao-antiga"   node "_teste/testa_celular_ficha.js" --envenenado-extracao-antiga
+roda "celular ficha --envenenado-planejamento-solto" node "_teste/testa_celular_ficha.js" --envenenado-planejamento-solto
 roda "celular ficha --envenenado-aceita-http"       node "_teste/testa_celular_ficha.js" --envenenado-aceita-http
 roda "celular ficha --envenenado-nunca-desatualizado" node "_teste/testa_celular_ficha.js" --envenenado-nunca-desatualizado
 # D6c (lote 3): dinheiro de relance. O selo de cada familia (pago, parcial, em
