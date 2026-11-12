@@ -5,6 +5,8 @@
  *
  *   node _teste/divide_portao.js K N     imprime, uma por linha, o nome das
  *                                        provas da fatia K de N
+ *                                        (com PORTAO_SELECAO=ARQ, so os nomes
+ *                                        de ARQ, um por linha: o nivel 1)
  *   node _teste/divide_portao.js --estima N
  *                                        o tempo previsto de cada fatia
  *
@@ -86,8 +88,26 @@ if (require.main === module) {
   } else {
     const k = Number(a[0]), n = Number(a[1]);
     if (!(Number.isInteger(k) && Number.isInteger(n) && k >= 1 && k <= n)) falha('uso: divide_portao.js K N (K de 1 a N)');
-    const nomes = nomesDoPortao();
+    let nomes = nomesDoPortao();
     if (!nomes.length) falha('o portao nao listou prova nenhuma');
+    // Nivel 1 (provas_tocadas.js, job portao-tocadas): PORTAO_SELECAO aponta
+    // para a lista de NOMES que o nivel 1 escolheu, e so eles se dividem em N
+    // fatias, na ordem do portao. So o job do nivel 1 a define (o
+    // testa_provas_tocadas confere no portao.yml que a bateria nunca a tem).
+    // Nome que o portao nao tem, ou lista vazia: falha, nunca a bateria inteira
+    // nem "nenhuma prova" calada.
+    const sel = process.env.PORTAO_SELECAO;
+    if (sel) {
+      let txt;
+      try { txt = fs.readFileSync(sel, 'utf8'); } catch (e) { falha('PORTAO_SELECAO ilegivel: ' + sel); }
+      const quero = txt.split(/\r?\n/).filter(Boolean);
+      if (!quero.length) falha('PORTAO_SELECAO vazia: ' + sel);
+      const fora = quero.filter(x => nomes.indexOf(x) < 0);
+      if (fora.length) falha('PORTAO_SELECAO cita prova que o portao nao tem: ' + fora.join(' | '));
+      const q = new Set(quero);
+      nomes = nomes.filter(x => q.has(x));
+      process.stderr.write('divide_portao: nivel 1, so os ' + nomes.length + ' nomes de PORTAO_SELECAO\n');
+    }
     const r = divide(nomes, leTempos(), n);
     // sem saida de erro calada: fatia vazia sai com erro, nao como fatia verde
     if (!r.fatias[k - 1].length) falha('a fatia ' + k + ' de ' + n + ' ficou sem prova');

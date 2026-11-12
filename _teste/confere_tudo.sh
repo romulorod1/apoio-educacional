@@ -525,6 +525,11 @@ roda "navegacao biblioteca --envenenado-rotulo-corta" node "_teste/testa_navegac
 # capitulo na pagina 1, e a prova tem de ver.
 roda "biblioteca livros tela"                   node "_teste/testa_biblioteca_livros_tela.js"
 roda "biblioteca livros tela --envenenado-capitulo-abre-pagina-errada" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-capitulo-abre-pagina-errada
+roda "biblioteca livros tela --envenenado-zoom-sem-ancora" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-zoom-sem-ancora
+roda "biblioteca livros tela --envenenado-giro-sem-ancora-guardada" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-giro-sem-ancora-guardada
+roda "biblioteca livros tela --envenenado-largura-vai-ao-alto" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-largura-vai-ao-alto
+roda "biblioteca livros tela --envenenado-vizinhas-sem-desenho" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-vizinhas-sem-desenho
+roda "biblioteca livros tela --envenenado-canvas-sem-soltar" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-canvas-sem-soltar
 roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-sumario-dos-marcadores
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
@@ -1070,6 +1075,10 @@ roda "celular edita --envenenado-cobranca-volta"    node "_teste/testa_celular_e
 # (portao de 09/11) a rolagem inicial com o relogio fixo em varias horas: a folga antiga deixa
 # a linha de agora cortada sob a faixa dos dias as 00:30 e as 06:00
 roda "celular edita --envenenado-rolagem-antiga"   node "_teste/testa_celular_edita.js" --envenenado-rolagem-antiga
+# (#168) Ajustar duracao: gravar com escopo todas muda a repeticao inteira e o dinheiro do mes; a
+# lista fixa faz a aula de 1h15 abrir marcando outra duracao
+roda "celular edita --envenenado-ajuste-todas"     node "_teste/testa_celular_edita.js" --envenenado-ajuste-todas
+roda "celular edita --envenenado-ajuste-lista-fixa" node "_teste/testa_celular_edita.js" --envenenado-ajuste-lista-fixa
 # D6c (lote 2): a aba Alunos e a ficha minima (ligar, WhatsApp, valor por hora,
 # ultimo relato, casa ou online), as mensagens prontas em wa.me, os campos
 # opcionais que sobem pela fila e chegam ao tablet, e a cobranca do "Escrever
@@ -1752,9 +1761,12 @@ fi
 
 printf '\n'
 if [ -n "$pn" ] && [ -n "$provas_lista" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
-  # o nivel 1 em fatias: a fatia pode nao ter prova da lista, e isso e verde
-  printf 'FATIA %s DE %s: nenhuma prova da lista cai nesta fatia; nada a rodar.\n' "$pk" "$pn"
-  exit 0
+  # o nivel 1 em fatias (#174): o plano so abre a fatia que tem prova da
+  # selecao (provas_tocadas.js e divide_portao.js com PORTAO_SELECAO). Fatia do
+  # nivel 1 sem prova e plano e fatia desencontrados, e era o unico verde sem
+  # prova nenhuma: agora falha.
+  printf 'HA FALHA. A fatia %s de %s do nivel 1 nao rodou prova nenhuma da lista: o plano e a fatia nao batem.\n' "$pk" "$pn"
+  exit 1
 fi
 if [ -n "$pn" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
   # fatia vazia nao e fatia verde: com mais fatias que provas, a conta esta errada

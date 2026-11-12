@@ -586,7 +586,8 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   await irParaDia(pagC, HOJE);
   await clicar(pagC, '.cel-bloco[data-aula="aula-velho"]');
   conf('a folha da aula do aluno sem os campos novos tem as ações de sempre', await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-folha button')).map(b => b.id).filter(Boolean).join(',')),
-    'cel-folha-ficha,cel-folha-realizada,cel-folha-faltou,cel-folha-remarcar,cel-folha-registrar,cel-folha-cancelar,cel-folha-fechar');
+    // o Ajustar duração (#168) entra depois do Remarcar, como em toda aula que ela edita
+    'cel-folha-ficha,cel-folha-realizada,cel-folha-faltou,cel-folha-remarcar,cel-folha-duracao,cel-folha-registrar,cel-folha-cancelar,cel-folha-fechar');
   await clicar(pagC, '#cel-folha-fechar');
 
   secao('6b. (revisão) Só o campo telefone liga: os contatos das observações não viram link, pela tela');
