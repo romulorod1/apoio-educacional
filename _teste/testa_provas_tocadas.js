@@ -17,7 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { leMapa, listaDoPortao, provasTocadas, daFatia, MAPA } = require('./provas_tocadas.js');
+const { leMapa, listaDoPortao, provasTocadas, nomesDaSelecao, fatiasDoPlano, daFatia, MAPA, ALVO_POR_FATIA } = require('./provas_tocadas.js');
 
 let passes = 0, falhas = 0;
 function conf(rotulo, obtido, esperado) {
@@ -119,6 +119,99 @@ conf('nenhuma fatia leva arquivo fora da selecao', soma.filter(p => sel.indexOf(
 const inteira = nav.arquivos;
 const soma2 = [].concat.apply([], [1, 2, 3, 4, 5, 6, 7, 8].map(k => daFatia(inteira, nav, k, 8)));
 conf('a bateria inteira, pelas 8 fatias, cobre todas as provas', new Set(soma2).size, inteira.length);
+
+console.log('\n=== 7b. Os nomes do nivel 1: venenos so da prova tocada (POLITICA_TESTES) ===');
+const todosOsNomes = f => nav.nomes[f] || [];
+const ehVeneno = n => /--envenenado/.test(n);
+const comVeneno = nav.arquivos.filter(f => todosOsNomes(f).some(ehVeneno) && todosOsNomes(f).some(n => !ehVeneno(n)));
+conf('o instrumento ve: ha provas com venenos e com nome base', comVeneno.length > 5, true);
+const pBusca = '_teste/testa_biblioteca_listas.js';
+conf('a prova de exemplo tem venenos', todosOsNomes(pBusca).filter(ehVeneno).length > 3, true);
+// a prova entra pelo mapa (biblioteca.js): so os nomes base dela
+let rr = provasTocadas(['biblioteca.js'], mapa, nav);
+let nn = nomesDaSelecao(rr, ['biblioteca.js'], nav);
+conf('prova que entrou pelo mapa: nenhum veneno dela', nn.filter(ehVeneno).length, 0);
+conf('prova que entrou pelo mapa: todo nome base de todo arquivo selecionado roda',
+  rr.provas.every(f => todosOsNomes(f).filter(n => !ehVeneno(n)).every(n => nn.indexOf(n) >= 0)), true);
+conf('cenario que nao e veneno (atualizacao --migracao) continua no nivel 1 quando a prova entra pelo mapa',
+  (() => { const r2 = provasTocadas(['sw.js'], mapa, nav); return nomesDaSelecao(r2, ['sw.js'], nav).indexOf('atualizacao --migracao') >= 0; })(), true);
+// a mesma prova tocada: todos os nomes, venenos inclusive (o outro lado)
+rr = provasTocadas([pBusca, 'biblioteca.js'], mapa, nav);
+nn = nomesDaSelecao(rr, [pBusca, 'biblioteca.js'], nav);
+conf('prova tocada: todos os nomes dela, venenos inclusive', todosOsNomes(pBusca).every(n => nn.indexOf(n) >= 0), true);
+conf('prova tocada nao arrasta os venenos das outras do mapa',
+  nn.filter(n => ehVeneno(n) && todosOsNomes(pBusca).indexOf(n) < 0).length, 0);
+// bateria inteira ("*" ou fora do mapa): todos os nomes, como antes
+rr = provasTocadas(['_teste/confere_tudo.sh'], mapa, nav);
+conf('mexer no portao: todos os nomes do portao, venenos inclusive', nomesDaSelecao(rr, ['_teste/confere_tudo.sh'], nav).length, nav.ordem.length);
+rr = provasTocadas(['arquivo_novo_que_ninguem_mapeou.js'], mapa, nav);
+conf('arquivo fora do mapa: todos os nomes do portao', nomesDaSelecao(rr, ['arquivo_novo_que_ninguem_mapeou.js'], nav).length, nav.ordem.length);
+conf('nada tocado: nenhum nome', nomesDaSelecao(provasTocadas([], mapa, nav), [], nav).length, 0);
+// os nomes saem na ordem do portao (e o que o divide_portao.js tambem usa)
+nn = nomesDaSelecao(provasTocadas(['app.js'], mapa, nav), ['app.js'], nav);
+conf('os nomes saem na ordem do portao', nn.join('\n'), nav.ordem.filter(n => nn.indexOf(n) >= 0).join('\n'));
+
+console.log('\n=== 7c. Quantas fatias o plano abre ===');
+const { leTempos, mediana, divide } = require('./divide_portao.js');
+const tempos = leTempos();
+const med = mediana(Object.keys(tempos).map(k => tempos[k]));
+conf('nenhum nome: zero fatias', fatiasDoPlano([], tempos, med), 0);
+conf('um nome: uma fatia', fatiasDoPlano([nav.ordem[0]], tempos, med), 1);
+conf('a bateria inteira: oito fatias, nunca mais', fatiasDoPlano(nav.ordem, tempos, med), 8);
+conf('nunca mais fatias que nomes', fatiasDoPlano(nav.ordem.slice(0, 2), { [nav.ordem[0]]: 9999, [nav.ordem[1]]: 9999 }, med), 2);
+const tApp = nn.reduce((s, n) => s + (Object.prototype.hasOwnProperty.call(tempos, n) ? tempos[n] : med), 0);
+const nApp = fatiasDoPlano(nn, tempos, med);
+conf('app.js: uma fatia a cada ' + ALVO_POR_FATIA / 60 + ' min de prova previstos (' + (tApp / 60).toFixed(1) + ' min, ' + nApp + ' fatias)',
+  nApp, Math.min(8, Math.ceil(tApp / ALVO_POR_FATIA)));
+// as fatias do plano particionam os NOMES da selecao
+const partes = [];
+for (let k = 1; k <= nApp; k++) partes.push(daFatia(provasTocadas(['app.js'], mapa, nav).provas, nav, k, nApp, nn));
+const nomesJuntos = [].concat.apply([], partes.map(p => p.nomes));
+conf('as fatias do plano juntam exatamente os nomes da selecao, cada um uma vez',
+  nomesJuntos.length + '/' + nomesJuntos.slice().sort().join('|'), nn.length + '/' + nn.slice().sort().join('|'));
+conf('nenhuma fatia do plano fica sem nome', partes.every(p => p.nomes.length > 0), true);
+conf('cada arquivo de fatia tem nome na fatia', partes.every(p => p.arquivos.every(f => todosOsNomes(f).some(n => p.nomes.indexOf(n) >= 0))), true);
+conf('o divisor das fatias e o mesmo do portao (divide sobre os nomes)', partes.map(p => p.nomes.join('|')).join('#'), divide(nn, tempos, nApp).fatias.map(f => f.join('|')).join('#'));
+
+console.log('\n=== 7d. O divide_portao.js com PORTAO_SELECAO (o que o confere_tudo.sh --pedaco usa) ===');
+const selArq = path.join(require('os').tmpdir(), 'selecao_' + process.pid + '.txt');
+const divCli = (k, n, conteudo) => {
+  if (conteudo === null) delete process.env.PORTAO_SELECAO_TESTE;
+  fs.writeFileSync(selArq, conteudo || '');
+  try {
+    const out = execFileSync('node', [path.join(__dirname, 'divide_portao.js'), String(k), String(n)],
+      { cwd: RAIZ, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: Object.assign({}, process.env, conteudo === null ? {} : { PORTAO_SELECAO: selArq }) });
+    return { codigo: 0, nomes: out.split(/\r?\n/).filter(Boolean) };
+  } catch (e) { return { codigo: e.status, nomes: [] }; }
+};
+const peqSel = nn.slice(0, 6);
+const cli = [1, 2].map(k => divCli(k, 2, peqSel.join('\n') + '\n'));
+conf('com PORTAO_SELECAO, as 2 fatias juntam so os nomes da selecao',
+  [].concat(cli[0].nomes, cli[1].nomes).sort().join('|'), peqSel.slice().sort().join('|'));
+conf('e e a mesma divisao do provas_tocadas', cli.map(c => c.nomes.join('|')).join('#'), divide(peqSel, tempos, 2).fatias.map(f => f.join('|')).join('#'));
+conf('PORTAO_SELECAO com nome que o portao nao tem sai com 2', divCli(1, 2, peqSel.join('\n') + '\nprova que nao existe\n').codigo, 2);
+conf('PORTAO_SELECAO vazia sai com 2 (nunca vira a bateria inteira calada)', divCli(1, 2, '\n').codigo, 2);
+const semSel = divCli(1, 8, null);
+conf('sem PORTAO_SELECAO, a fatia 1 de 8 e a do portao inteiro', semSel.nomes.join('|'), divide(nav.ordem, tempos, 8).fatias[0].join('|'));
+fs.rmSync(selArq, { force: true });
+
+console.log('\n=== 7e. No portao.yml, so o nivel 1 usa PORTAO_SELECAO ===');
+// sem as linhas de comentario: o que vale e o que o Actions executa
+const yml = fs.readFileSync(path.join(RAIZ, '.github', 'workflows', 'portao.yml'), 'utf8').replace(/\r/g, '')
+  .split('\n').filter(l => !/^\s*#/.test(l)).join('\n');
+const jobDe = (nome, texto) => { const t2 = texto || yml; const i = t2.indexOf('\n  ' + nome + ':\n'); if (i < 0) return ''; const r2 = t2.slice(i + 1); const j = r2.slice(1).search(/\n {2}[a-z][a-z0-9-]*:\n/); return j < 0 ? r2 : r2.slice(0, j + 1); };
+const bateria = jobDe('portao-navegador-fatia');
+const nivel1 = jobDe('portao-tocadas-fatia');
+// veneno: a mesma conferencia numa copia em que a bateria ganhou PORTAO_SELECAO
+const ymlVeneno = yml.replace('\n  portao-navegador-fatia:\n', '\n  portao-navegador-fatia:\n    env:\n      PORTAO_SELECAO: /tmp/x\n');
+conf('controle: bateria com PORTAO_SELECAO numa copia do yml e pega', /PORTAO_SELECAO/.test(jobDe('portao-navegador-fatia', ymlVeneno)), true);
+conf('controle: o job seguinte nao entra no recorte do job (o recorte para no proximo job)', /portao-navegador:\n/.test(nivel1) || /portao-tocadas:\n/.test(nivel1), false);
+conf('o instrumento ve os dois jobs', bateria.length > 200 && nivel1.length > 200, true);
+conf('a bateria (portao-navegador-fatia) nunca define PORTAO_SELECAO', /PORTAO_SELECAO/.test(bateria), false);
+conf('a bateria roda o portao inteiro em 8 fatias fixas', /fatia: \[1, 2, 3, 4, 5, 6, 7, 8\]/.test(bateria) && /confere_tudo\.sh --pedaco \$\{\{ matrix\.fatia \}\}\/8/.test(bateria), true);
+conf('o nivel 1 define PORTAO_SELECAO', /PORTAO_SELECAO=/.test(nivel1), true);
+conf('o nivel 1 roda com --provas (o confere_tudo diz que e so o nivel 1)', /confere_tudo\.sh --provas /.test(nivel1), true);
+conf('PORTAO_SELECAO so aparece no job do nivel 1', (yml.match(/PORTAO_SELECAO/g) || []).length, (nivel1.match(/PORTAO_SELECAO/g) || []).length);
 
 console.log('\n=== 8. O confere_tudo.sh --provas escolhe so as da lista ===');
 const lista = path.join(require('os').tmpdir(), 'provas_tocadas_' + process.pid + '.txt');
