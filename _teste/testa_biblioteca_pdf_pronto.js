@@ -18,7 +18,8 @@
  *      aconteceu e não tem falta registrada) já vem escolhida. Anexar grava na
  *      aula de amanhã, como sempre: dois anexos (lista e gabarito) e o uso de
  *      cada exercício. Depois do anexo, com o filtro ainda na tela, nada vem
- *      escolhido sozinho; trocar o filtro devolve a sugestão.
+ *      escolhido sozinho; trocar o filtro devolve a sugestão. Fora da lista
+ *      de exercícios (o filtro guardado, mas fora da tela), nada vem escolhido.
  *   3. PDF PRONTO. "Só gerar PDF, sem anexar" abre a janela "PDF pronto" e não
  *      baixa nada sozinho. Lista e gabarito, cada um com o nome e três botões
  *      só de símbolo (compartilhar, baixar, ver), com aria-label e title.
@@ -41,6 +42,8 @@
  *                                   de vir escolhida.
  *   --envenenado-sugere-depois      depois de anexar, a aula dela volta a vir
  *                                   escolhida sozinha (achado da revisão).
+ *   --envenenado-filtro-fora        o filtro guardado vale mesmo fora da tela
+ *                                   (achado da segunda revisão).
  *
  * Com --prints=PASTA, guarda três prints a 1280 x 800 (a janela PDF pronto, a
  * Gerar material com as próximas aulas e a etapa 4 do tutorial).
@@ -57,7 +60,7 @@ const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8853;
 const MODOS = ['--envenenado-baixa-ao-cancelar', '--envenenado-so-hoje', '--envenenado-sem-sugestao',
-  '--envenenado-sugere-depois'];
+  '--envenenado-sugere-depois', '--envenenado-filtro-fora'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const PRINTS = (process.argv.filter(a => a.indexOf('--prints=') === 0)[0] || '').slice('--prints='.length);
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
@@ -67,10 +70,12 @@ const L_CANCELA = "      if (nome === 'AbortError') { a.recusas = 0; avisar('Env
 const T_CANCELA = "      if (nome === 'AbortError') { a.recusas = 0; baixar(a.nome, a.blob); }";
 const L_LIMITE = '    var limite = isoMaisDias(hoje, DIAS_PROXIMAS_AULAS);';
 const T_LIMITE = '    var limite = hoje;';
-const L_SUGESTAO = '      if (daProxima) marcarAula(daProxima, aulas.sugerida.id, false);';
+const L_SUGESTAO = '      if (daProxima) { marcarAula(daProxima, aulas.sugerida.id, false); escolha.automatica = true; }';
 const T_SUGESTAO = '      void daProxima;';
 const L_GASTA = '&& !bibSugestaoGasta) {';
 const T_GASTA = ') {';
+const L_FORA = '    var filtroNaTela = !!(bibFiltroAluno && seletorDoFiltro && seletorDoFiltro.value === bibFiltroAluno &&';
+const T_FORA = '    var filtroNaTela = !!(bibFiltroAluno &&';
 function umaVez(texto, ancora) { return texto.split(ancora).length === 2; }
 
 const trocas = {};
@@ -78,6 +83,7 @@ if (MODO === '--envenenado-baixa-ao-cancelar') trocas['/app.js'] = APP.split(L_C
 if (MODO === '--envenenado-so-hoje') trocas['/app.js'] = APP.split(L_LIMITE).join(T_LIMITE);
 if (MODO === '--envenenado-sem-sugestao') trocas['/app.js'] = APP.split(L_SUGESTAO).join(T_SUGESTAO);
 if (MODO === '--envenenado-sugere-depois') trocas['/app.js'] = APP.split(L_GASTA).join(T_GASTA);
+if (MODO === '--envenenado-filtro-fora') trocas['/app.js'] = APP.split(L_FORA).join(T_FORA);
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'l1_pdf_pronto_'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
@@ -89,7 +95,7 @@ const HOJE = '2026-11-16';
 
 // ---------------------------------------------------------------- 0 (Node)
 secao('0. Sem navegador: as âncoras dos venenos e o texto do tutorial');
-[['cancelar', L_CANCELA], ['limite', L_LIMITE], ['sugestão', L_SUGESTAO], ['sugestão gasta', L_GASTA]]
+[['cancelar', L_CANCELA], ['limite', L_LIMITE], ['sugestão', L_SUGESTAO], ['sugestão gasta', L_GASTA], ['filtro na tela', L_FORA]]
   .forEach(([n, a]) => conf('âncora de veneno uma vez só: ' + n, umaVez(APP, a), true));
 const etapa4 = APP.slice(APP.indexOf("etapa: 'Etapa 4 de 4"), APP.indexOf("etapa: 'Etapa 4 de 4") + 900);
 conf('a etapa 4 do tutorial existe', etapa4.length > 100, true);
@@ -223,7 +229,9 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
       aula('aula-beta-cancelada', 'beta', '2026-11-18', '10:00', 'cancelada'),
       aula('aula-alfa-quinta', 'alfa', '2026-11-19', '15:30'),
       aula('aula-alfa-longe', 'alfa', '2026-11-30', '15:30'),       // daqui a duas semanas
-      aula('aula-alfa-ontem', 'alfa', '2026-11-15', '15:30')        // ontem
+      aula('aula-alfa-ontem', 'alfa', '2026-11-15', '15:30'),       // ontem
+      aula('aula-beta-mais7', 'beta', '2026-11-23', '09:00'),       // daqui a 7 dias: entra
+      aula('aula-beta-mais8', 'beta', '2026-11-24', '09:00')        // daqui a 8 dias: fica de fora
     ];
     d.resumos = [];
     d.ajustes = Object.assign({}, d.ajustes, { versaoVista: '9.9.9' });
@@ -242,13 +250,14 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
     throw fim();
   }
   conf('hoje (as que vêm e as que terminaram) e depois os próximos dias',
-    ordem1, 'aula-alfa-falta,aula-beta-hoje,aula-alfa-cedo,aula-alfa-amanha,aula-alfa-quinta');
+    ordem1, 'aula-alfa-falta,aula-beta-hoje,aula-alfa-cedo,aula-alfa-amanha,aula-alfa-quinta,aula-beta-mais7');
   conf('a linha da falta diz que a falta está registrada', await detalheDe(pag, 'aula-alfa-falta'), 'Hoje, segunda 16/11, 14:00, falta registrada');
   conf('a linha diz o dia da semana, a data e a hora', await detalheDe(pag, 'aula-alfa-amanha'), 'Amanhã, terça 17/11, 15:30');
   conf('a de hoje diz que é hoje', await detalheDe(pag, 'aula-beta-hoje'), 'Hoje, segunda 16/11, 16:00');
   conf('a de hoje que já terminou diz isso', await detalheDe(pag, 'aula-alfa-cedo'), 'Hoje, segunda 16/11, 08:00, já terminou');
   conf('a cancelada não entra', await pag.evaluate(() => !document.querySelector('#bib-gerar-aulas [data-aula="aula-beta-cancelada"]')), true);
   conf('a de daqui a duas semanas não entra', await pag.evaluate(() => !document.querySelector('#bib-gerar-aulas [data-aula="aula-alfa-longe"]')), true);
+  conf('a de daqui a 8 dias também não', await pag.evaluate(() => !document.querySelector('#bib-gerar-aulas [data-aula="aula-beta-mais8"]')), true);
   conf('a de ontem fica no bloco recolhido dos últimos dias', await pag.evaluate(() => {
     const d = document.querySelector('#bib-gerar-passadas');
     return !!d && !d.open && !!d.querySelector('[data-aula="aula-alfa-ontem"]');
@@ -278,7 +287,7 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   conf('a janela Gerar material abriu de novo', await abrirGerar(pag), true);
   const ordem2 = await ordemProximas(pag);
   console.log('   próximas: ' + ordem2);
-  conf('as aulas dela vêm primeiro', ordem2, 'aula-alfa-falta,aula-alfa-amanha,aula-alfa-quinta,aula-alfa-cedo,aula-beta-hoje');
+  conf('as aulas dela vêm primeiro', ordem2, 'aula-alfa-falta,aula-alfa-amanha,aula-alfa-quinta,aula-alfa-cedo,aula-beta-hoje,aula-beta-mais7');
   const esc2 = await escolhida(pag);
   if (MODO === '--envenenado-sem-sugestao') {
     secao('VENENO: a próxima aula dela não vem escolhida');
@@ -327,6 +336,25 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   await pausa(300);
   conf('a janela abriu de novo', await abrirGerar(pag), true);
   conf('trocar o filtro devolve a sugestão', await escolhida(pag), 'aula-alfa-amanha');
+  await pag.evaluate(() => document.querySelector('#rodape-modal-bib-gerar [data-fechar]').click());
+  await pausa(300);
+
+  /* O FILTRO GUARDADO, MAS FORA DA TELA: ela volta ao módulo (o seletor só
+   * existe na lista de exercícios) e abre o Gerar material de lá. Ela pode
+   * estar montando o material de outra criança: nada vem escolhido. */
+  await pag.evaluate(() => { const b = document.querySelector('.bib-voltar'); if (b) b.click(); });
+  await pausa(300);
+  conf('fora da lista de exercícios, o seletor do filtro não está na tela',
+    await pag.evaluate(() => !document.querySelector('#bib-filtro-aluno')), true);
+  conf('a janela abriu fora da lista', await abrirGerar(pag), true);
+  const escFora = await escolhida(pag);
+  if (MODO === '--envenenado-filtro-fora') {
+    secao('VENENO: o filtro guardado vale fora da tela');
+    conf('envenenado: a aula da Alfa veio escolhida fora da lista (defeito enxergado)', escFora, 'aula-alfa-amanha');
+    throw fim();
+  }
+  conf('com o filtro fora da tela, nada vem escolhido', escFora, '');
+  conf('e as aulas ficam na ordem de sempre, sem a Alfa na frente', (await ordemProximas(pag)).split(',')[1], 'aula-beta-hoje');
   await pag.evaluate(() => document.querySelector('#rodape-modal-bib-gerar [data-fechar]').click());
   await pausa(300);
 

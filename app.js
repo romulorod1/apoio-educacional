@@ -2556,8 +2556,8 @@
    * ou o material inteiro quando sai um só) ganha uma linha com o nome e três
    * botões só de símbolo: compartilhar (a janela do Android), baixar (vai
    * para a pasta Downloads) e ver (o leitor do próprio aplicativo). O nome de
-   * cada botão está no aria-label e no title, que o Chrome do Android mostra
-   * ao segurar o dedo.
+   * cada botão está no aria-label (o leitor de tela e o toque longo de
+   * acessibilidade) e no title (a dica de quem usa mouse ou caneta).
    *
    * Por que não o entregarArquivo de sempre: ele só abre o compartilhar e,
    * quando ela cancela (AbortError) ou o prazo do toque vence durante a
@@ -2579,25 +2579,29 @@
         navigator.canShare({ files: [new File([a.blob], a.nome, { type: 'application/pdf' })] }));
     } catch (e) { return false; }
   }
-  var compartilharPdfAberto = false;
+  var compartilharPdfAberto = 0;   // o número do envio aberto; 0 = nenhum
+  var compartilharPdfVez = 0;
   function compartilharPdfPronto(a, titulo) {
     // uma janela de compartilhar por vez: a segunda o Android recusa
-    if (compartilharPdfAberto) return;
+    if (compartilharPdfAberto) { avisar('O compartilhar ainda está aberto.'); return; }
     var envio;
     try {
       envio = navigator.share({ files: [new File([a.blob], a.nome, { type: 'application/pdf' })], title: titulo || a.nome });
     } catch (e) { envio = Promise.reject(e); }
-    compartilharPdfAberto = true;
+    var vez = ++compartilharPdfVez;
+    compartilharPdfAberto = vez;
+    // só solta a trava o envio que a pôs (um envio velho, vencido o prazo, não solta a de outro)
+    var soltar = function () { if (compartilharPdfAberto === vez) compartilharPdfAberto = 0; };
     /* Se o aparelho nunca responder, o botão não fica mudo para sempre: depois
      * de um minuto, um toque novo volta a abrir o compartilhar. */
-    var prazo = setTimeout(function () { compartilharPdfAberto = false; }, 60000);
+    var prazo = setTimeout(soltar, 60000);
     Promise.resolve(envio).then(function () {
       clearTimeout(prazo);
-      compartilharPdfAberto = false;
+      soltar();
       a.recusas = 0;
     }, function (e) {
       clearTimeout(prazo);
-      compartilharPdfAberto = false;
+      soltar();
       var nome = e && e.name;
       // nada é baixado aqui: o arquivo continua na janela, para ela escolher de novo
       if (nome === 'AbortError') { a.recusas = 0; avisar('Envio cancelado. O PDF continua aqui.'); }
@@ -22379,10 +22383,10 @@
    *
    * As aulas nascem na agenda, quase sempre com repetição, e ela prepara "a
    * aula de amanhã" do aluno. Então a janela mostra as aulas de hoje e dos
-   * próximos dias (até DIAS_PROXIMAS_AULAS), em ordem de data e hora: as que
-   * ainda vão acontecer primeiro, e as de hoje que já terminaram no fim do
-   * bloco. Com um aluno em contexto (vinda da aula, ou o filtro "Ainda não
-   * usei com"), as aulas dele vêm antes das outras.
+   * próximos dias (até DIAS_PROXIMAS_AULAS), em ordem de data e hora: as de
+   * hoje que ainda vão acontecer, as de hoje que já terminaram e depois os
+   * próximos dias. Com um aluno em contexto (vinda da aula, ou o filtro
+   * "Ainda não usei com" na tela), as aulas dele vêm antes das outras.
    *
    * Cancelada não entra: não há material para preparar. Ela continua achável
    * por "Procurar aula em outra data". As dos últimos dias (antes de hoje)
@@ -22531,18 +22535,27 @@
         'Só gerar PDF não altera nenhuma aula. Nada é enviado à família automaticamente.' }));
     caixas.lista.addEventListener('change', function () { atualizarRodape(); });
 
-    // para qual aula: as próximas, com as do aluno em contexto primeiro (D8 revista)
+    /* Para qual aula: as próximas, com as do aluno em contexto primeiro (D8
+     * revista). O filtro "Ainda não usei com" só conta como contexto quando
+     * está NA TELA, mostrando o mesmo aluno: ele só é desenhado na lista de
+     * exercícios, e o valor guardado atravessa as outras telas da Biblioteca
+     * (Minhas listas, lista pronta), onde ela pode estar montando o material
+     * de outra criança sem ver o filtro (achado da segunda revisão do L1). */
+    var seletorDoFiltro = $('#bib-filtro-aluno');
+    var filtroNaTela = !!(bibFiltroAluno && seletorDoFiltro && seletorDoFiltro.value === bibFiltroAluno &&
+      alunoPorId(bibFiltroAluno));
     var alunoEmContexto = bibContexto && !bibContexto.anexado && alunoPorId(bibContexto.alunoId) ? bibContexto.alunoId
-      : (bibFiltroAluno && alunoPorId(bibFiltroAluno) ? bibFiltroAluno : null);
+      : (filtroNaTela ? bibFiltroAluno : null);
     var aulas = proximasAulasParaMaterial(alunoEmContexto);
     var hojeIso = Core.hojeIso();
     var listaAulas = el('div', { id: 'bib-gerar-aulas' });
     function marcarAula(botao, aulaId, nova) {
-      escolha.aulaId = aulaId; escolha.nova = nova; escolha.botao = botao;
+      escolha.aulaId = aulaId; escolha.nova = nova; escolha.botao = botao; escolha.automatica = false;
       $$('#bib-gerar-aulas .item-lista').forEach(function (b) { b.classList.remove('escolhida'); b.setAttribute('aria-pressed', 'false'); });
       // a linha escolhida pode estar no bloco recolhido ou depois do "Mostrar mais": fica à vista
       var recolhida = botao.closest('details');
       if (recolhida) recolhida.open = true;
+      if (botao.hidden) { var mostrarMais = $('#bib-gerar-mais'); if (mostrarMais) mostrarMais.click(); }
       botao.hidden = false;
       botao.classList.add('escolhida');
       botao.setAttribute('aria-pressed', 'true');
@@ -22559,7 +22572,8 @@
     function linhaAula(a) {
       var aluno = alunoPorId(a.alunoId);
       var quando = a.data >= hojeIso ? quandoDaAula(a, hojeIso, aulas.terminou(a))
-        : Core.diaSemanaLongo(a.data) + ' ' + Core.ddmm(a.data) + (a.hora ? ', ' + a.hora : '');
+        : Core.diaSemanaLongo(a.data) + ' ' + Core.ddmm(a.data) + (a.hora ? ', ' + a.hora : '') +
+          (a.status === 'falta' ? ', falta registrada' : '');
       var b = linhaBib(aluno.nome, quando, function () { marcarAula(b, a.id, false); });
       b.setAttribute('data-aula', a.id);
       b.setAttribute('aria-pressed', 'false');
@@ -22690,8 +22704,9 @@
       var op = opcoesDaTela();
       if (!op.teoria && !op.lista && !op.gabarito) { avisar('Marque ao menos Teoria, Lista ou Gabarito.'); return; }
       op.folha = false;
-      // sem anexar, mas com o aluno e a data da aula escolhida no cabeçalho, se houver
-      op.cabecalhoDaAula = escolha.aulaId;
+      /* sem anexar, mas com o aluno e a data da aula escolhida no cabeçalho, se
+       * houver; a sugestão do filtro, que ela não tocou, não põe nome no PDF */
+      op.cabecalhoDaAula = escolha.automatica ? null : escolha.aulaId;
       gerarEAnexar(null, itens, paginas, op);
     });
     rodape.appendChild(el('button', { type: 'button', class: 'btn', 'data-fechar': '', texto: 'Cancelar',
@@ -22717,14 +22732,16 @@
         }
       }
       if (daAula) marcarAula(daAula, bibContexto.aulaId, false);
-    } else if (aulas.sugerida && !daSondagem && !(bibContexto && bibContexto.anexado) && !bibSugestaoGasta) {
+    } else if (aulas.sugerida && filtroNaTela && !daSondagem && !(bibContexto && bibContexto.anexado) && !bibSugestaoGasta) {
       /* Com o aluno em contexto (o filtro "Ainda não usei com"), a próxima aula
        * dele já vem escolhida: é o mesmo aluno que ela escolheu na tela. Depois
-       * de um anexo pela Biblioteca, nada vem escolhido até ela trocar o
-       * filtro: o filtro continua na tela, e o material seguinte podia ser de
-       * outra criança, ou sair duas vezes na mesma aula. */
+       * de um anexo ou de um "Só gerar" pela Biblioteca, nada vem escolhido
+       * até ela trocar o filtro: o filtro continua na tela, e o material
+       * seguinte podia ser de outra criança, ou sair duas vezes na mesma aula.
+       * Depois do anexo na aula de onde ela veio, nada vem escolhido nem com a
+       * troca do filtro: ela escolhe a aula (para o lado seguro). */
       var daProxima = listaAulas.querySelector('[data-aula="' + aulas.sugerida.id + '"]');
-      if (daProxima) marcarAula(daProxima, aulas.sugerida.id, false);
+      if (daProxima) { marcarAula(daProxima, aulas.sugerida.id, false); escolha.automatica = true; }
     }
     /* A sondagem vem do encontro de mapeamento: a aula já foi escolhida lá,
      * como no botão Material, e a Folha nasce marcada, porque a sondagem é
@@ -22909,6 +22926,8 @@
       }
       if (!aula) {
         fecharModal('modal-bib-gerar');
+        // o material saiu: a próxima abertura não sugere aula sozinha (como depois do anexo)
+        bibSugestaoGasta = true;
         // um ou dois arquivos: a janela "PDF pronto" (D1), e nada sai do tablet sem o toque dela
         abrirPdfPronto(arquivos, op.titulo);
         return null;
