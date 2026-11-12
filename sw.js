@@ -149,7 +149,7 @@
  * O v129 atualiza os assets de Vagos em cache exclusivo. O v134 traz o sumário do mapa
  * quando os marcadores do PDF são lixo.
  */
-var CACHE = 'apoio-educacional-v134';
+var CACHE = 'apoio-educacional-v999';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

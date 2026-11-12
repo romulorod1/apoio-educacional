@@ -1318,4 +1318,3 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   await ctxD.close();
   await ctxC.close();
 })().then(() => derrubarEmulador().then(H.fim(amb)), e => derrubarEmulador().then(() => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e))));
-// medicao do CI (#174): commit de teste, sai no commit seguinte
