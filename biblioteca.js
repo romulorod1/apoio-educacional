@@ -624,8 +624,9 @@
    *   - nos títulos das entradas do mapa, já com a correção dela por cima
    *     (mapaDoLivro);
    *   - nos títulos e nas chaves dos assuntos ligados a cada entrada do mapa.
-   * A chave do assunto é o id dele ("MAT08-15") mais as palavras-chave que o
-   * índice de matemática guarda (chaves.r e chaves.d). Título casa por trecho,
+   * A chave do assunto são as palavras-chave que o índice de matemática
+   * guarda (chaves.r e chaves.d); o id ("MAT08-15") não entra, porque "mat"
+   * casaria todo assunto de matemática. Título casa por trecho,
    * como o texto; chave casa pelo começo de uma palavra, porque são radicais
    * soltos ("cubo", "litro"), e por trecho "de" casaria quase todas.
    *
@@ -652,7 +653,7 @@
       var a = porId[id];
       var titulo = a && a.titulo ? String(a.titulo) : id;
       var chaves = a && a.chaves ? [a.chaves.r, a.chaves.d].filter(function (x) { return typeof x === 'string'; }).join(' ') : '';
-      assuntoDoIndice[id] = { id: id, titulo: titulo, alvoTitulo: norm(titulo), alvoChaves: ' ' + norm(id + ' ' + chaves) + ' ' };
+      assuntoDoIndice[id] = { id: id, titulo: titulo, alvoTitulo: norm(titulo), alvoChaves: ' ' + norm(chaves) + ' ' };
       return assuntoDoIndice[id];
     }
     (livros || []).forEach(function (l) {

@@ -60,7 +60,10 @@
  *                                 o erro, e o livro inteiro fica fora da busca;
  *   --envenenado-busca-sem-capitulos  o app.js servido não procura nos
  *                                 capítulos e assuntos do mapa: o livro
- *                                 escaneado some da busca (seção 3.2).
+ *                                 escaneado some da busca (seção 3.2);
+ *   --envenenado-topo-vazio        "Outras páginas do livro" nunca disputa
+ *                                 o topo: o resultado só delas deixa os
+ *                                 "Melhores resultados" vazios (seção 3.3).
  *
  * Porta 8898. Relógio fixo da rodada (relogioDaRodada).
  */
@@ -75,7 +78,7 @@ const { conf, secao, esperar, pausa } = H;
 const PORTA = 8898;
 const VENENOS = ['--envenenado-indice-na-copia', '--envenenado-refaz-indexado', '--envenenado-com-acento',
   '--envenenado-erro-vira-pronto', '--envenenado-apagar-espera-indice', '--envenenado-pagina-ruim-derruba-livro',
-  '--envenenado-busca-sem-capitulos'];
+  '--envenenado-busca-sem-capitulos', '--envenenado-topo-vazio'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const PYTHON = process.env.PYTHON || 'python';
 const relogio = H.relogioDaRodada('2026-11-16', '10:00');
@@ -114,6 +117,8 @@ const APAGA_ESPERANDO = "      return new Promise(function (ok) { var q = indexe
   "q.onsuccess = function () { ok(r); }; q.onerror = function () { ok(r); }; });";
 const SEM_ACENTO = ".replace(/[\\u0300-\\u036f]/g, '')";
 // 12/11/2026: a busca procura também nos capítulos e assuntos do mapa; o veneno desliga isso
+// a revisão do #181: com o resultado todo em "Outras páginas", elas disputam o topo; o veneno deixa o topo vazio
+const TOPO_NUNCA_VAZIO = '(capitulosDoResultado.length ? capitulosDoResultado : todos)';
 const BUSCA_NOS_CAPITULOS = 'return Biblioteca.procurarNosCapitulos(indiceDosCapitulosDaBiblioteca(), termo, normalizadorDaBusca(), palavrasDaBuscaNosLivros());';
 
 secao('0. As âncoras e os venenos');
@@ -125,6 +130,7 @@ conf('a âncora da falha permanente aparece uma vez no indice-livros.js', INDICE
 conf('a âncora da página ruim aparece uma vez no indice-livros.js', INDICE.split(PAGINA_RUIM).length - 1, 1);
 conf('a âncora do apagar sem esperar o índice aparece uma vez no store.js', (STORE.match(APAGA_SEM_ESPERAR) || []).length, 1);
 conf('a âncora da busca nos capítulos aparece uma vez no app.js', APP.split(BUSCA_NOS_CAPITULOS).length - 1, 1);
+conf('a âncora do topo nunca vazio aparece uma vez no app.js', APP.split(TOPO_NUNCA_VAZIO).length - 1, 1);
 conf('o banco principal continua na versão 6 no store.js', /var VERSAO_BANCO = 6;/.test(STORE), true);
 
 const trocas = {};
@@ -135,6 +141,7 @@ if (MODO === '--envenenado-pagina-ruim-derruba-livro') trocas['/indice-livros.js
 if (MODO === '--envenenado-erro-vira-pronto') trocas['/indice-livros.js'] = INDICE.split(PERMANENTE).join(PERMANENTE + ' return true;');
 if (MODO === '--envenenado-apagar-espera-indice') trocas['/store.js'] = STORE.replace(APAGA_SEM_ESPERAR, APAGA_ESPERANDO);
 if (MODO === '--envenenado-busca-sem-capitulos') trocas['/app.js'] = APP.split(BUSCA_NOS_CAPITULOS).join('return [];');
+if (MODO === '--envenenado-topo-vazio') trocas['/app.js'] = APP.split(TOPO_NUNCA_VAZIO).join('capitulosDoResultado');
 if (MODO) {
   const servido = trocas['/store.js'] || trocas['/indice-livros.js'] || trocas['/app.js'];
   const original = trocas['/store.js'] ? STORE : trocas['/indice-livros.js'] ? INDICE : APP;
@@ -680,6 +687,10 @@ async function importar(pag, arquivo) {
   console.log('   "' + daChave + '": ' + JSON.stringify(chave.valor));
   conf('um termo que casa só a chave do assunto acha o capítulo ligado a ele, e diz qual assunto',
     JSON.stringify(chave.valor && chave.valor.L), JSON.stringify([['Volume e capacidade', 'capitulo', 'Pelo capítulo, assunto: ' + volume.pt.titulo, '', true, '']]));
+  // o id do assunto não é chave: "mat08" casaria todo assunto do 8º ano de matemática
+  await digitar('mat08');
+  const peloId = await esperar('a busca pelo id do assunto', lerNosLivros, v => !!v && /Nenhum livro/.test(v.status), 15000);
+  conf('o id do assunto ("mat08") não acha o capítulo ligado a ele', peloId.ok && !peloId.valor.L && !peloId.valor.K, true);
   // o lado oposto: um termo que não está em nada não acha nada
   await digitar('zqxjkw capitulo');
   const nada = await esperar('a busca por um termo que não existe', lerNosLivros, v => !!v && /Nenhum livro/.test(v.status), 15000);
@@ -729,7 +740,7 @@ async function importar(pag, arquivo) {
   };
   amb.extras['/rel-m.pdf'] = { tipo: 'application/pdf', corpo: pdfDe('rel-m.pdf', ['Areas de figuras planas.', 'Comprimento da circunferencia.', 'O volume do cilindro e a area da base vezes a altura.', 'Exercicios finais.']) };
   amb.extras['/rel-n.pdf'] = { tipo: 'application/pdf', corpo: pdfDe('rel-n.pdf', ['Temperatura e escalas.', 'Calor sensivel: o gas aquece e o volume aumenta.', 'Calor latente e mudancas de estado.']) };
-  amb.extras['/rel-o.pdf'] = { tipo: 'application/pdf', corpo: pdfDe('rel-o.pdf', ['Capa.', 'Mistura de gases: o volume do cilindro de gas.', 'Fim.']) };
+  amb.extras['/rel-o.pdf'] = { tipo: 'application/pdf', corpo: pdfDe('rel-o.pdf', ['Capa.', 'Mistura de gases: o volume do cilindro de gas.', 'Estatica dos fluidos: o volume do cilindro submerso.']) };
   const TITULO_M = 'Comprimento da circunferência, área do círculo e volume do cilindro';
   await gravarLivros(pag, 'prova-relevancia', [
     { url: '/rel-m.pdf', meta: { id: 'rel-m', hash: 'sha256:m', titulo: 'Livro M de matemática', volume: 'Volume 2', paginas: 4, sumario_origem: 'marcadores',
@@ -738,7 +749,8 @@ async function importar(pag, arquivo) {
     { url: '/rel-n.pdf', meta: { id: 'rel-n', hash: 'sha256:n', titulo: 'Livro N de física', paginas: 3, materia: 'fisica',
       sumario: [{ n: 1, nivel: 1, titulo: 'Calor sensível e calor latente', pagina: 1 }] } },
     { url: '/rel-o.pdf', meta: { id: 'rel-o', hash: 'sha256:o', titulo: 'Livro O com marcador lixo', paginas: 3, sumario_origem: 'marcadores',
-      sumario: [{ n: 1, nivel: 1, titulo: 'Blank Page', pagina: 1 }] } }]);
+      sumario: [{ n: 1, nivel: 1, titulo: 'Blank Page', pagina: 1 }, { n: 2, nivel: 1, titulo: 'Parte II', pagina: 3 },
+        { n: 3, nivel: 2, titulo: 'Estática dos fluidos', pagina: 3 }] } }]);
   const sete = await esperar('os três livros da relevância lidos pelo índice', () => estado(pag), parado(7, 7), 60000);
   conf('os três livros da relevância foram lidos pelo índice (7 de 7)', sete.ok, true);
   await H.abrirApp(pag, amb.ORIGEM);
@@ -769,7 +781,23 @@ async function importar(pag, arquivo) {
   conf('o 1º dos melhores resultados é o capítulo com "volume do cilindro" no título, com o volume ao lado da obra', R.primeiro,
     'rel-m | ' + TITULO_M + ' | Livro M de matemática, vol. 2');
   conf('o livro de calor (só "volume", sem "cilindro") não aparece', R.livros, 'rel-m,rel-o');
-  conf('"Blank Page" não vira título: a página dele vai para "Outras páginas do livro"', R.titulosO + ' | ' + R.blankPage, 'Outras páginas do livro | false');
+  conf('"Blank Page" não vira título: a página dele vai para "Outras páginas do livro"', R.titulosO + ' | ' + R.blankPage,
+    'Parte II: Estática dos fluidos|Outras páginas do livro | false');
+  // "Parte II" sozinho no topo, com seção dentro, é capítulo: ganha o nome da primeira seção (o caso do Moderna Plus)
+  conf('a "Parte II" de cima não vira lixo: aparece como "Parte II: Estática dos fluidos"', /Parte II: Estática dos fluidos/.test(R.titulosO), true);
+  // o resultado todo em "Outras páginas do livro": o topo não fica vazio
+  await digitar('mistura de gases');
+  const soOutras = await esperar('a busca que só acha "Outras páginas"', () => pag.evaluate(() => {
+    const g = document.querySelector('#bib-corpo [data-grupo="livros"]');
+    if (!g) return null;
+    const topo = [...g.querySelectorAll('.bib-busca-melhores .bib-busca-livro-grupo')];
+    return { status: g.querySelector('.bib-busca-livros-status').textContent,
+      topo: topo.map(b => b.dataset.livro + ':' + b.querySelector('.bib-busca-livro-paginas strong').textContent).join('|'),
+      mais: !!g.querySelector('.bib-busca-mais') };
+  }), v => !!v && /em 1 livro/.test(v.status), 15000);
+  console.log('   "mistura de gases": ' + JSON.stringify(soOutras.valor));
+  prop('com o resultado todo em "Outras páginas do livro", elas aparecem nos melhores resultados, e nada fica escondido',
+    !!soOutras.valor && soOutras.valor.topo === 'rel-o:Outras páginas do livro' && !soOutras.valor.mais, '--envenenado-topo-vazio');
   conf('o capítulo mostra uma linha de páginas e um botão de abrir, sem os números soltos à vista',
     R.linhaM + ' | ' + R.abrirM + ' | ' + R.paginasVisiveis, 'No texto: p. 3, 1 página | Abrir no capítulo|Ver páginas | 0');
   await digitar('');

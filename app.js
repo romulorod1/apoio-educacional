@@ -18247,7 +18247,29 @@
   var OUTRAS_PAGINAS = 'Outras páginas do livro';
   function tituloSemCapitulo(titulo) {
     var t = String(titulo == null ? '' : titulo).trim();
-    return !t || Biblioteca.marcadorSemSentido(t) || /^(parte|unidade|m[oó]dulo|volume)\s+([ivxlcdm]+|\d+)\.?$/i.test(t);
+    return !t || Biblioteca.marcadorSemSentido(t);
+  }
+  /* "Parte I", "Unidade 3" sozinhos: não é lixo, é um capítulo de cima com
+   * páginas dentro (o Moderna Plus 1 a 3 tem "Parte I" a "Parte III" no topo,
+   * com 41 a 55 seções embaixo; nos 91 livros dos pacotes de 11/2026, são os
+   * únicos 9 títulos assim, e nenhum livro tem o topo todo assim). O título
+   * ganha o nome da primeira seção de dentro: "Parte I: Conjuntos". */
+  var SO_NUMERO_DE_PARTE = /^(parte|unidade|m[oó]dulo|volume)\s+([ivxlcdm]+|\d+)\.?$/i;
+  function tituloComASecaoDeDentro(meta, bloco) {
+    var t = String(bloco.titulo == null ? '' : bloco.titulo).trim();
+    if (!SO_NUMERO_DE_PARTE.test(t) || bloco.inicio === null || !meta) return bloco.titulo;
+    var chave = meta.formato === 'epub' ? 'capitulo' : 'pagina';
+    var sumario = sumarioDaTela(meta) || [];
+    var nivel = nivelDosCapitulos(sumario);
+    var fim = Infinity;
+    sumario.forEach(function (e) {
+      if ((e.nivel || nivel) === nivel && typeof e[chave] === 'number' && e[chave] > bloco.inicio && e[chave] < fim) fim = e[chave];
+    });
+    var dentro = sumario.filter(function (e) {
+      return (e.nivel || nivel) > nivel && typeof e[chave] === 'number' && e[chave] >= bloco.inicio && e[chave] < fim &&
+        !tituloSemCapitulo(e.titulo);
+    }).sort(function (a, b) { return a[chave] - b[chave]; })[0];
+    return dentro ? t + ': ' + dentro.titulo : bloco.titulo;
   }
 
   /* Junta, livro a livro, o que a busca achou pelo capítulo e pelo texto. O
@@ -18291,8 +18313,9 @@
     });
     lista.forEach(function (r) {
       var bons = [], outras = null;
+      var metaDoLivro = bibLivrosCache[r.id] ? bibLivrosCache[r.id].meta : null;
       r.blocos.forEach(function (b) {
-        if (!tituloSemCapitulo(b.titulo)) { bons.push(b); return; }
+        if (!tituloSemCapitulo(b.titulo)) { b.titulo = tituloComASecaoDeDentro(metaDoLivro, b); bons.push(b); return; }
         if (!outras) outras = { titulo: OUTRAS_PAGINAS, outras: true, inicio: null, paginas: [], paginasComFrase: [], achado: null };
         outras.paginas = outras.paginas.concat(b.paginas);
         outras.paginasComFrase = outras.paginasComFrase.concat(b.paginasComFrase);
@@ -18460,7 +18483,11 @@
       var v = l.volume || meta.volume;
       return (l.titulo || meta.titulo || l.id) + (v ? ', ' + rotuloDoVolume(v) : '');
     };
-    var melhores = todos.filter(function (x) { return !x.bloco.outras; }).sort(compararBlocos).slice(0, BUSCA_MELHORES);
+    /* "Outras páginas do livro" só disputa o topo quando não há capítulo
+     * nenhum: o resultado todo nelas não pode deixar o topo vazio e tudo
+     * escondido em "Mais resultados", fechado. */
+    var capitulosDoResultado = todos.filter(function (x) { return !x.bloco.outras; });
+    var melhores = (capitulosDoResultado.length ? capitulosDoResultado : todos).sort(compararBlocos).slice(0, BUSCA_MELHORES);
     if (melhores.length) {
       var topo = el('section', { class: 'bib-busca-melhores', 'aria-label': 'Melhores resultados nos livros' }, [
         el('h3', { class: 'bib-busca-melhores-titulo', texto: 'Melhores resultados' })]);
@@ -18510,10 +18537,10 @@
     }
     var pendentes = res ? (res.pendentes || []).length : 0;
     if (livros.length) {
-      var achados = descreverAchadosNosLivros(capitulos, paginas, obras.length);
+      var achados = descreverAchadosNosLivros(capitulos, paginas, livros.length);
       diz(achados);
       var frase = capitulos ? achados + '.'
-        : plural(paginas, 'página encontrada', 'páginas encontradas') + ' em ' + plural(obras.length, 'livro', 'livros') + '.';
+        : plural(paginas, 'página encontrada', 'páginas encontradas') + ' em ' + plural(livros.length, 'livro', 'livros') + '.';
       if (modo.buscando) frase += ' Buscando também no texto dos livros...';
       else if (modo.semTexto) frase += ' A busca no texto dos livros não está disponível neste aparelho.';
       else if (modo.falhou) frase += ' Não consegui consultar o texto dos livros agora.';
