@@ -501,6 +501,87 @@ async function percorrer(pag, telas) {
 
   secao('3. As telas da dona, nas três larguras e nas duas letras');
   const hojeCom = async () => { await momento(pagC, '2026-10-06', '14:50'); return (await nAvisosDoHoje(pagC)) > 0; };
+  await hojeCom();
+  conf('F3: Hoje tem acesso a Vagos só no celular da dona', await existe(pagC, '#cel-hoje.ativa #cel-abrir-vagos'), true);
+  await clicar(pagC, '#cel-abrir-vagos');
+  await pausa(200);
+  const vagasIniciais = await pagC.evaluate(() => ({ ativa: !!document.querySelector('#cel-vagos.ativa'), abasOcultas: document.querySelector('#cel-abas').hidden,
+    dias: document.querySelectorAll('#cel-vagos .cel-vagos-dia').length, filtros: Array.from(document.querySelectorAll('#cel-vagos .cel-vagos-chip')).map(b => b.textContent).join(','),
+    largura: document.documentElement.scrollWidth, viewport: innerWidth, horarios: document.querySelectorAll('#cel-vagos .cel-vagos-horario').length,
+    vagasDeOntem: document.querySelectorAll('#cel-vagos .cel-vagos-dia[data-dia="2026-10-05"] .cel-vagos-horario').length }));
+  conf('F3: mostra a semana de seis dias e só oculta a barra inferior na tela própria', vagasIniciais.ativa + '|' + vagasIniciais.abasOcultas + '|' + vagasIniciais.dias, 'true|true|6');
+  conf('F3: filtros de 1h, 1h30 e 2h; a página não rola de lado', vagasIniciais.filtros + '|' + vagasIniciais.largura + '/' + vagasIniciais.viewport, '1h,1h30,2h|' + vagasIniciais.viewport + '/' + vagasIniciais.viewport);
+  conf('F3: na terça, segunda-feira já passada não oferece vagas', vagasIniciais.vagasDeOntem, 0);
+  conf('F3: horários aparecem como alvos de toque com pelo menos 48 px', await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-vagos .cel-vagos-horario')).every(b => {
+    const r = b.getBoundingClientRect(); return r.width >= 48 && r.height >= 48;
+  })), true);
+  await clicar(pagC, '#cel-vagos .cel-vagos-dia[data-dia="2026-10-07"] .cel-vagos-escolher-dia');
+  await pausa(100);
+  const compartilhar = await pagC.evaluate(() => {
+    const a = document.querySelector('#cel-vagos-whatsapp');
+    return a ? { href: a.href, rotulo: a.textContent, selecionado: !!a.closest('.cel-vagos-dia.selecionado') } : null;
+  });
+  conf('F3: WhatsApp prepara somente os horários do dia selecionado, sem enviar', compartilhar && compartilhar.href.indexOf('https://wa.me/?text=') === 0 && compartilhar.selecionado, true);
+  /* A mensagem às famílias: a preposição certa do dia e os inícios contínuos
+   * em faixas ("das 07:00 às 12:00"), nunca a lista de intervalos sobrepostos. */
+  const msgVagos = await pagC.evaluate(() => {
+    const a = document.querySelector('#cel-vagos-whatsapp');
+    const texto = a ? decodeURIComponent(a.href.slice('https://wa.me/?text='.length)) : '';
+    const minutos = h => +h.slice(0, 2) * 60 + +h.slice(3);
+    const inicios = Array.from(document.querySelectorAll('#cel-vagos .cel-vagos-dia[data-dia="2026-10-07"] .cel-vagos-horario')).map(b => minutos(b.dataset.hora));
+    let faixas = 0;
+    inicios.forEach((m, i) => { if (i === 0 || m - inicios[i - 1] !== 30) faixas++; });
+    return { texto, faixas, nFaixas: (texto.match(/das \d\d:\d\d às \d\d:\d\d/g) || []).length };
+  });
+  conf('F3: a mensagem diz "na quarta, 07/10" e a duração uma vez', /^Olá! Tenho horários livres para aula de 1h na quarta, 07\/10: das /.test(msgVagos.texto), true);
+  conf('F3: a mensagem agrupa os inícios contínuos em faixas (uma "das ... às ..." por faixa)', msgVagos.nFaixas + '|' + (msgVagos.faixas > 0), msgVagos.faixas + '|true');
+  conf('F3: a mensagem não traz intervalos sobrepostos "07:00 a 08:00"', /\d\d:\d\d a \d\d:\d\d/.test(msgVagos.texto), false);
+  const topoVagos = await pagC.evaluate(() => ({ voltar: document.querySelector('#cel-vagos-voltar').textContent.trim(),
+    anterior: document.querySelector('#cel-vagos .cel-vagos-topo button[aria-label="Semana anterior"]').textContent.trim() }));
+  conf('F3: o voltar diz "Hoje" e não repete a seta da semana anterior', topoVagos.voltar + '|' + (topoVagos.voltar !== topoVagos.anterior), 'Hoje|true');
+  await clicar(pagC, '#cel-vagos .cel-vagos-chip:nth-child(2)');
+  await pausa(100);
+  const horaVaga = await pagC.evaluate(() => document.querySelector('#cel-vagos .cel-vagos-dia[data-dia="2026-10-07"] .cel-vagos-horario')?.dataset.hora || '');
+  conf('F3: a duração de 1h30 deixa horários na quarta-feira para o teste sintético', !!horaVaga, true);
+  if (horaVaga) {
+    await clicar(pagC, '#cel-vagos .cel-vagos-dia[data-dia="2026-10-07"] .cel-vagos-horario[data-hora="' + horaVaga + '"]');
+    await pausa(150);
+    const pre = await pagC.evaluate(() => ({ form: !!document.querySelector('#cel-hoje.ativa [data-form-celular="aula:"]'),
+      data: (document.querySelector('#cel-aula-data') || {}).value, hora: (document.querySelector('#cel-aula-hora') || {}).value,
+      duracao: (document.querySelector('#cel-aula-duracao') || {}).value }));
+    conf('F3: tocar no horário prepara a data, a hora e a duração escolhidas', pre.form + '|' + pre.data + '|' + pre.hora + '|' + pre.duracao, 'true|07/10/2026|' + horaVaga + '|90');
+    await clicar(pagC, '#cel-form-voltar');
+    await pausa(100);
+    const devolta = await pagC.evaluate(() => ({ vagos: !!document.querySelector('#cel-vagos.ativa'),
+      periodo: (document.querySelector('#cel-vagos-periodo') || {}).textContent,
+      dia: (document.querySelector('#cel-vagos .cel-vagos-dia.selecionado') || { dataset: {} }).dataset.dia,
+      duracao: (document.querySelector('#cel-vagos .cel-vagos-chip[aria-pressed="true"]') || {}).textContent }));
+    conf('F3: Voltar no formulário aberto de Vagos volta a Vagos na mesma semana, dia e duração',
+      devolta.vagos + '|' + devolta.periodo + '|' + devolta.dia + '|' + devolta.duracao, 'true|05/10 a 10/10|2026-10-07|1h30');
+  }
+  await clicar(pagC, '#cel-vagos-voltar');
+  await pausa(100);
+  await momento(pagC, '2026-10-11', '12:00');
+  await clicar(pagC, '#cel-abrir-vagos');
+  await pausa(150);
+  const domingoVagos = await pagC.evaluate(() => ({
+    periodo: document.querySelector('#cel-vagos-periodo').textContent,
+    dias: Array.from(document.querySelectorAll('#cel-vagos .cel-vagos-dia')).map(d => d.dataset.dia),
+    semDiasPassados: Array.from(document.querySelectorAll('#cel-vagos .cel-vagos-dia')).every(d => d.dataset.dia >= '2026-10-11')
+  }));
+  conf('F3: no domingo, Vagos começa na segunda seguinte', domingoVagos.periodo + '|' + domingoVagos.dias[0] + '|' + domingoVagos.dias[5], '12/10 a 17/10|2026-10-12|2026-10-17');
+  conf('F3: no domingo, todos os dias mostrados são futuros', domingoVagos.semDiasPassados, true);
+  await clicar(pagC, '#cel-vagos .cel-vagos-topo button[aria-label="Semana anterior"]');
+  await pausa(100);
+  const semanaPassadaVagos = await pagC.evaluate(() => ({
+    vagas: document.querySelectorAll('#cel-vagos .cel-vagos-horario').length,
+    whatsapp: document.querySelectorAll('#cel-vagos-whatsapp').length,
+    aviso: document.querySelector('.cel-vagos-dia[data-dia="2026-10-05"] .cel-vagos-sem-horario')?.textContent || ''
+  }));
+  conf('F3: ao consultar semana passada, não oferece horários nem WhatsApp', semanaPassadaVagos.vagas + '|' + semanaPassadaVagos.whatsapp + '|' + semanaPassadaVagos.aviso, '0|0|Este dia já passou.');
+  await clicar(pagC, '#cel-vagos-voltar');
+  await pausa(100);
+  await momento(pagC, '2026-10-06', '14:50');
   const folhaDe = (aula, passo, dia) => async () => {
     await hojeCom();
     if (dia) { await clicar(pagC, '.cel-semana-dia[data-dia="' + dia + '"]'); await pausa(200); }
@@ -509,6 +590,7 @@ async function percorrer(pag, telas) {
     return (await clicar(pagC, passo.botao)) && (await pausa(200), existe(pagC, passo.chegou));
   };
   const TELAS_DONA = [
+    ['Vagos', async () => { await hojeCom(); return (await clicar(pagC, '#cel-abrir-vagos')) && (await pausa(150), existe(pagC, '#cel-vagos.ativa')); }],
     ['Hoje sem aviso', async () => { await momento(pagC, '2026-10-03', '20:00'); return (await nAvisosDoHoje(pagC)) === 0 && existe(pagC, '#cel-hoje.ativa'); }],
     ['Hoje com os avisos do alto', hojeCom],
     // 18:00, mais de 2 h sem receber: a barra do alto volta, com o ↻
@@ -679,7 +761,7 @@ async function percorrer(pag, telas) {
   const telas = Array.from(new Set(registro.map(r => r.tela)));
   console.log('   ' + registro.length + ' varreduras, ' + telas.length + ' telas, ' + registro.reduce((s, r) => s + r.olhados, 0) + ' elementos olhados; ' +
     comFalha.length + ' com transbordo');
-  conf('a varredura olhou as 24 telas, cada uma nas 3 larguras e nas 2 letras (' + registro.length + ' varreduras)', registro.length, 24 * 6);
+  conf('a varredura olhou as 25 telas, cada uma nas 3 larguras e nas 2 letras (' + registro.length + ' varreduras)', registro.length, 25 * 6);
   conf('toda varredura olhou ao menos 20 elementos visíveis (a menor: ' + Math.min(...registro.map(r => r.olhados)) + ')', registro.every(r => r.olhados >= 20), true);
   conf('e ao menos 5 textos visíveis (o menor: ' + Math.min(...registro.map(r => r.textos)) + ')', registro.every(r => r.textos >= 5), true);
   const resumo = comFalha.map(r => r.tela + ' ' + r.janela + ' ' + Math.round(r.letra * 100) + '%: ' + r.falhas.map(f => f.sel + ' ' + f.px + ' px').join('; '));
