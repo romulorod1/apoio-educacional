@@ -210,6 +210,44 @@ async function rodar() {
   conf('Arquivos ficam abaixo de Preparar', gradeTablet.arquivosSobPreparar, true);
   conf('o painel cabe sem rolagem própria a 1280x800', gradeTablet.corpoSemRolagem, true);
 
+  /* F6 (#157): nada transborda de lado, nem a 1280x800 (duas colunas) nem a
+   * 800x1280 (tablet em pé: o fluxo vertical), e o Salvar continua à vista. */
+  const transbordoDaJanela = () => pag.evaluate(() => {
+    const modal = document.querySelector('#modal-aula .modal').getBoundingClientRect();
+    const largos = [];
+    document.querySelectorAll('#modal-aula .modal *').forEach(e => {
+      const r = e.getBoundingClientRect();
+      if (!r.width || !r.height || getComputedStyle(e).visibility === 'hidden') return;
+      let p = e.parentElement, rola = false;
+      while (p && p !== document.body) { // dentro de algo que rola de lado de propósito, não conta
+        const cs = getComputedStyle(p);
+        if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && p.scrollWidth > p.clientWidth + 1) { rola = true; break; }
+        p = p.parentElement;
+      }
+      if (!rola && (r.left < modal.left - 1 || r.right > modal.right + 1)) largos.push((e.id || e.className || e.tagName) + ' ' + Math.round(r.right - modal.right) + 'px');
+    });
+    const colunas = Array.from(document.querySelectorAll('.janela-aula-coluna')).filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.id);
+    const salvar = document.querySelector('#salvar-aula');
+    const rs = salvar ? salvar.getBoundingClientRect() : null;
+    const prep = document.querySelector('#janela-aula-preparar').getBoundingClientRect();
+    const reg = document.querySelector('#janela-aula-registrar').getBoundingClientRect();
+    return { largos: largos.slice(0, 5).join('; '), colunas: colunas.join(','), paginaDeLado: document.documentElement.scrollWidth > innerWidth + 1,
+      salvarAVista: !!rs && rs.top >= 0 && rs.bottom <= innerHeight + 1, lado: reg.left >= prep.right - 1, empilhado: reg.top >= prep.bottom - 1 };
+  });
+  const a1280 = await transbordoDaJanela();
+  conf('a 1280x800, nada da janela passa da borda nem rola de lado (' + a1280.largos + a1280.colunas + ')',
+    a1280.largos + '|' + a1280.colunas + '|' + a1280.paginaDeLado, '||false');
+  conf('a 1280x800, o rodapé com Salvar está à vista', a1280.salvarAVista, true);
+  await pag.setViewport({ width: 800, height: 1280, hasTouch: true });
+  await new Promise(r => setTimeout(r, 300));
+  const a800 = await transbordoDaJanela();
+  conf('a 800x1280, a janela volta ao fluxo vertical: Registrar embaixo de Preparar', a800.empilhado + '|' + a800.lado, 'true|false');
+  conf('a 800x1280, nada da janela passa da borda nem rola de lado (' + a800.largos + a800.colunas + ')',
+    a800.largos + '|' + a800.colunas + '|' + a800.paginaDeLado, '||false');
+  conf('a 800x1280, o rodapé com Salvar está à vista', a800.salvarAVista, true);
+  await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
+  await new Promise(r => setTimeout(r, 300));
+
   // Confere que memória/trilha vêm antes do bloco de quando (primeira dobra)
   const ordemInternaGrupo1 = await pag.evaluate(() => {
     const prep = document.querySelector('#grupo-preparar');
