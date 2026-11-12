@@ -130,7 +130,11 @@ function validarConteudo(m, conta) {
     if (Object.prototype.hasOwnProperty.call(b, 'cache_control')) return 'nao_permitido';
     if (m.role === 'assistant') {
       if (BLOCOS_DO_ASSISTENTE.indexOf(b.type) < 0) return 'nao_permitido';
-      if (typeof b.text === 'string') conta.texto += b.text.length;
+      /* O bloco INTEIRO conta no teto de texto (o thinking com a assinatura,
+       * o input do tool_use), e não só o campo text: senão um turno do
+       * assistente reenviado pelo aparelho carregaria texto sem limite até o
+       * teto de 8 MB do corpo. */
+      conta.texto += JSON.stringify(b).length;
       continue;
     }
     if (b.type === 'text') {

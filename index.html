@@ -547,6 +547,9 @@
         <button class="btn" data-fechar type="button">Fechar</button>
         <!-- C15.4: só no livro; o anexo da aula não exporta -->
         <button class="btn" id="leitor-exportar" type="button" hidden>Exportar em PDF</button>
+        <!-- O planejamento de estudos (IA, fase 2): a mesma saída da prévia.
+             Só aparece quando quem abre o leitor passa opcoes.aoCompartilhar. -->
+        <button class="btn principal" id="leitor-compartilhar" type="button" hidden>Compartilhar PDF</button>
         <button class="btn principal" id="leitor-como-folha" type="button">Abrir esta página como folha</button>
       </div>
     </div>
@@ -615,6 +618,50 @@
       <div class="modal-rodape" id="rodape-modal-bib-gerar"></div>
     </div>
   </div>
+
+  <!-- O planejamento de estudos com IA (fase 2): o pedido (texto, ditado e
+       prints), o "montando", a prévia que é o próprio PDF, o ajuste, o
+       compartilhar e o salvar na ficha. O corpo e o rodapé são do app.js. -->
+  <div class="fundo-modal" id="modal-planejamento">
+    <div class="modal">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-planejamento">Planejamento de estudos</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-planejamento"></div>
+      <div class="modal-rodape" id="rodape-modal-planejamento"></div>
+    </div>
+  </div>
+
+  <!-- Sair do planejamento (ou da aula nova, pelo atalho) com trabalho que
+       ainda não foi salvo: o padrão do modal-sair-relato, sem confirm(). -->
+  <div class="fundo-modal" id="modal-sair-planejamento">
+    <div class="modal">
+      <div class="modal-cabecalho"><h3 id="titulo-sair-planejamento">Sair sem salvar?</h3></div>
+      <div class="modal-corpo">
+        <p id="texto-sair-planejamento">O texto, os prints e o plano que não foi salvo se perdem.</p>
+      </div>
+      <div class="modal-rodape">
+        <button class="btn perigo esquerda" id="descartar-planejamento" type="button">Descartar</button>
+        <button class="btn principal" id="continuar-planejamento" type="button">Continuar editando</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Um print do planejamento, ampliado. -->
+  <div class="fundo-modal" id="modal-plan-print">
+    <div class="modal">
+      <div class="modal-cabecalho">
+        <h3>Print do aviso</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-plan-print"></div>
+    </div>
+  </div>
+
+  <!-- A região viva do planejamento: o leitor de tela ouve "montando", "a
+       prévia chegou" e os erros, sem o foco sair do lugar. -->
+  <div id="plan-anuncio" class="so-leitor-de-tela" aria-live="polite" role="status"></div>
 
   <div class="fundo-modal" id="modal-bib-compartilhar">
     <div class="modal">
@@ -894,6 +941,9 @@
        ARQUIVOS do sw.js: ela dá aula na casa das famílias, muitas vezes sem
        sinal, e arquivo que o index carrega e o cache não guarda vira 503. -->
   <script src="cartao.js"></script>
+  <!-- O planejamento de estudos com IA: do pedido ao plano e do plano à folha.
+       Puro, antes do app.js, e na lista ARQUIVOS do sw.js. -->
+  <script src="planejamento.js"></script>
   <script src="app.js"></script>
 </body>
 
