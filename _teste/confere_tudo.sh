@@ -303,6 +303,15 @@ roda "virada anual"          node _teste/testa_virada_anual.js
 # A regra do merge na main (_teste/merge_seguro.sh), que segura o processo
 # quando a protecao de branch do GitHub sumir com o repositorio privado.
 roda "merge seguro"          node _teste/testa_merge_seguro.js
+# CACHE do sw.js e VERSAO do app.js do PR MAIORES que os da main atual, e nao so
+# diferentes da base do merge (12/11/2026: um ramo em v130 integrado com a main
+# em v134 passava verde). A regra e a do merge_seguro; a prova a exercita dos dois
+# lados, como numero (1.42.9 contra 1.42.10), e num repositorio de mentira pelo
+# caminho real do --conferir. O veneno devolve a regra antiga, "mudou, passa", e
+# os casos de menor e de igual TEM de sair errados. A conferencia do repositorio
+# roda mais abaixo, na secao do cache.
+roda "ordem cache e versao"  node _teste/testa_ordem_versao.js
+roda "ordem cache e versao --envenenado-so-diferente" node _teste/testa_ordem_versao.js --envenenado-so-diferente
 # As fatias do portao inteiro no CI: toda prova de navegador em exatamente uma
 # fatia, para qualquer numero de fatias, com controle que reprova.
 roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
@@ -1392,6 +1401,21 @@ else
   printf '  FALHOU  %-24s a lista de ARQUIVOS mudou desde a base do merge e o cache continua %s\n' \
     "nome do cache" "$(nome_sw "$sw_agora")"
   falhou=1
+fi
+
+# A ORDEM: diferente da base nao basta. CACHE e VERSAO que o PR mexeu tem de ser
+# MAIORES que os da origin/main (a do CI e buscada no job), como numero. Igual
+# reaproveita um nome ja publicado e menor o rebaixa; nos dois o tablet ja
+# instalado pode ficar sem o codigo novo. PR que nao os mexe passa. A regra e a
+# do merge_seguro, que confere de novo contra a origin/main buscada na hora do
+# merge. Saida: 0 passou, 1 reprovou, 2 sem base (INSTAVEL, nunca ok).
+saida=$(node _teste/testa_ordem_versao.js --conferir 2>&1) && codigo=0 || codigo=$?
+printf '%s\n' "$saida"
+if [ "$codigo" = "1" ]; then
+  falhou=1
+fi
+if [ "$codigo" != "0" ] && [ "$codigo" != "1" ]; then
+  pulada=1
 fi
 
 # O CONTEUDO DOS ARQUIVOS DO CACHE, e nao so a lista.

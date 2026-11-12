@@ -48,6 +48,17 @@
  * comments nao traz as "reviews" do GitHub: revisao postada como review nunca
  * e vista por este script.
  *
+ * Por ultimo, logo antes do merge, a ORDEM do CACHE (sw.js) e da VERSAO
+ * (app.js): git fetch da origin/main e da cabeca do PR NA HORA, e cada uma das
+ * duas constantes que o PR mexeu (diferente da base do merge) tem de ser
+ * ESTRITAMENTE MAIOR que a da main atual, comparada como numero (o vNNN do
+ * cache; x.y.z da versao, campo a campo, entao 1.42.10 e maior que 1.42.9).
+ * Igual reaproveita um nome ja publicado e menor o rebaixa: nos dois casos o
+ * tablet ja instalado pode nao receber o codigo novo. PR que nao mexe na
+ * constante passa, porque o merge leva a da main. Leitura que falha recusa.
+ * A regra pura e decidirOrdens(), provada em _teste/testa_ordem_versao.js, que
+ * tambem a confere no portao contra a origin/main.
+ *
  * O merge vai com --match-head-commit: se alguem empurrar um commit entre a
  * conferencia e o merge, o GitHub recusa, em vez de mergear o que ninguem
  * conferiu.
@@ -186,6 +197,74 @@ function decidir(pr) {
   return { ok: motivos.length === 0, motivos, cabeca };
 }
 
+/* A ORDEM DO CACHE E DA VERSAO. Puras: sem git e sem gh.
+ *
+ * Ate 12/11/2026 a unica trava era a do confere_tudo.sh, e ela so exigia que o
+ * CACHE fosse DIFERENTE do da base do merge. Com PRs em paralelo, um ramo com
+ * v130 integrado depois de a main estar em v134 passava verde, e a VERSAO nao
+ * tinha trava nenhuma. Aqui a exigencia e ser MAIOR que a da main ATUAL. */
+function lerCache(sw) {
+  const m = /^var CACHE = '([^']*)';/m.exec(String(sw == null ? '' : sw).replace(/\r/g, ''));
+  return m ? m[1] : null;
+}
+function lerVersao(app) {
+  const m = /^ *var VERSAO = '([^']*)';/m.exec(String(app == null ? '' : app).replace(/\r/g, ''));
+  return m ? m[1] : null;
+}
+/* O numero do fim do nome do cache ('apoio-educacional-v134' da 134). */
+function compararCache(a, b) {
+  const x = /-v([0-9]+)$/.exec(String(a || '')), y = /-v([0-9]+)$/.exec(String(b || ''));
+  if (!x || !y) return null;
+  return Number(x[1]) - Number(y[1]);
+}
+/* x.y.z campo a campo, como numero: '1.42.10' > '1.42.9'. Formato fora de x.y.z da null. */
+function compararSemver(a, b) {
+  const pa = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(String(a || ''));
+  const pb = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(String(b || ''));
+  if (!pa || !pb) return null;
+  for (let i = 1; i <= 3; i++) {
+    const d = Number(pa[i]) - Number(pb[i]);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+/* Uma constante: o valor do PR (agora), o da base do merge e o da main atual.
+ * Devolve { ok, motivo }. */
+function decidirOrdem(nome, agora, base, main, comparar) {
+  if (agora == null || base == null || main == null) {
+    return { ok: false, motivo: 'nao consegui ler ' + nome + ' (PR:[' + agora + '] base:[' + base + '] main:[' + main + '])' };
+  }
+  if (agora === base) {
+    return { ok: true, motivo: nome + ' ' + agora + ' nao mudou desde a base do merge: o merge leva o da main (' + main + ')' };
+  }
+  const c = comparar(agora, main);
+  if (c === null) return { ok: false, motivo: nome + ' fora do formato: PR ' + agora + ', main ' + main };
+  if (c > 0) return { ok: true, motivo: nome + ' ' + agora + ' e maior que o da main atual, ' + main };
+  return { ok: false, motivo: nome + ' ' + agora + ' do PR nao e MAIOR que o da main atual, ' + main +
+    (c === 0 ? ' (igual: reaproveita o que ja foi publicado)' : ' (menor: rebaixa o que ja foi publicado)') +
+    '; suba para a proxima livre' };
+}
+/* v = { cache: { agora, base, main }, versao: { agora, base, main } } */
+function decidirOrdens(v) {
+  const r = [
+    decidirOrdem('CACHE', v.cache.agora, v.cache.base, v.cache.main, compararCache),
+    decidirOrdem('VERSAO', v.versao.agora, v.versao.base, v.versao.main, compararSemver)
+  ];
+  return { ok: r.every(x => x.ok), motivos: r.map(x => x.motivo), recusas: r.filter(x => !x.ok).map(x => x.motivo) };
+}
+
+/* Le as duas constantes na cabeca do PR, na base do merge e na origin/main
+ * buscada AGORA. Lanca se qualquer leitura falhar. */
+function lerOrdens(numero, cabeca) {
+  git(['fetch', 'origin', 'main', 'refs/pull/' + numero + '/head']);
+  const base = git(['merge-base', cabeca, 'origin/main']).trim();
+  const ler = (rev, arq) => git(['show', rev + ':' + arq]);
+  return {
+    cache: { agora: lerCache(ler(cabeca, 'sw.js')), base: lerCache(ler(base, 'sw.js')), main: lerCache(ler('origin/main', 'sw.js')) },
+    versao: { agora: lerVersao(ler(cabeca, 'app.js')), base: lerVersao(ler(base, 'app.js')), main: lerVersao(ler('origin/main', 'app.js')) }
+  };
+}
+
 /* Quantos commits a cabeca esta atras da main. Lanca se nao conseguir medir. */
 function commitsAtras(cabeca) {
   const saida = gh(['api', 'repos/' + REPO + '/compare/main...' + cabeca]);
@@ -262,6 +341,21 @@ function principal(argv) {
     return 1;
   }
   // BEHIND-FIM
+  // ORDEM-INICIO
+  let ordem;
+  try {
+    ordem = decidirOrdens(lerOrdens(numero, r.cabeca));
+  } catch (e) {
+    console.log('RECUSADO  nao consegui conferir CACHE e VERSAO contra a origin/main: ' + String(e.stderr || e.message).split('\n')[0]);
+    return 1;
+  }
+  if (!ordem.ok) {
+    console.log('RECUSADO  PR #' + numero + ':');
+    ordem.recusas.forEach(m => console.log('  - ' + m));
+    return 1;
+  }
+  ordem.motivos.forEach(m => console.log('ordem     ' + m));
+  // ORDEM-FIM
   console.log('ok        PR #' + numero + ' cumpre o processo no commit ' + r.cabeca.slice(0, 7));
   if (soConferir) return 0;
   try {
@@ -275,4 +369,4 @@ function principal(argv) {
 }
 
 if (require.main === module) process.exit(principal(process.argv.slice(2)));
-module.exports = { decidir, principal };
+module.exports = { decidir, principal, decidirOrdem, decidirOrdens, compararCache, compararSemver, lerCache, lerVersao };
