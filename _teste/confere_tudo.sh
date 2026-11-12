@@ -1748,9 +1748,12 @@ fi
 
 printf '\n'
 if [ -n "$pn" ] && [ -n "$provas_lista" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
-  # o nivel 1 em fatias: a fatia pode nao ter prova da lista, e isso e verde
-  printf 'FATIA %s DE %s: nenhuma prova da lista cai nesta fatia; nada a rodar.\n' "$pk" "$pn"
-  exit 0
+  # o nivel 1 em fatias (#174): o plano so abre a fatia que tem prova da
+  # selecao (provas_tocadas.js e divide_portao.js com PORTAO_SELECAO). Fatia do
+  # nivel 1 sem prova e plano e fatia desencontrados, e era o unico verde sem
+  # prova nenhuma: agora falha.
+  printf 'HA FALHA. A fatia %s de %s do nivel 1 nao rodou prova nenhuma da lista: o plano e a fatia nao batem.\n' "$pk" "$pn"
+  exit 1
 fi
 if [ -n "$pn" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
   # fatia vazia nao e fatia verde: com mais fatias que provas, a conta esta errada
