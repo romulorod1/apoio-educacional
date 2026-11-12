@@ -147,10 +147,11 @@
  * v123, edição da ficha móvel; v126, encaixe da agenda no celular. O v127
  * sincroniza PDFs e fotos anexados a aulas; v128 traz os filtros de tipo na Biblioteca.
  * O v129 atualiza os assets de Vagos em cache exclusivo. O v134 traz o sumário do mapa
- * quando os marcadores do PDF são lixo. O v135 inclui o ajuste pontual da duração
- * de uma aula no celular.
+ * quando os marcadores do PDF são lixo. O v135 traz o assunto de volume do 8º ano no
+ * banco/topicos/matematica.json. O v137 inclui o ajuste pontual da duração de uma
+ * aula no celular.
  */
-var CACHE = 'apoio-educacional-v135';
+var CACHE = 'apoio-educacional-v137';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

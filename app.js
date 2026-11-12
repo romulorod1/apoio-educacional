@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.54';
+  var VERSAO = '1.42.57';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,9 +85,15 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.54',
+      versao: '1.42.57',
       itens: [
         'No celular, ajuste a duração de uma aula sem alterar as demais aulas da repetição.'
+      ]
+    },
+    {
+      versao: '1.42.54',
+      itens: [
+        'No 8º ano de Matemática entrou o assunto "Volume e capacidade: bloco retangular e cilindro", para escolher na aula e procurar na Biblioteca.'
       ]
     },
     {
