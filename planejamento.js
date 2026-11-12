@@ -317,7 +317,7 @@
   /* As frases curtas da tela para cada código do endpoint e daqui. */
   var FRASES = {
     limite_mensal: 'A IA está pausada até o dia 1.',
-    sem_permissao: 'Esta conta ainda não tem a IA liberada. Peça ao Rômulo.',
+    sem_permissao: 'A IA ainda não está liberada nesta conta.',
     sem_login: 'Entre na sua conta da nuvem, em Ajustes, para usar a IA.',
     login_invalido: 'Entre de novo na sua conta da nuvem, em Ajustes, para usar a IA.',
     recusa: 'A IA não conseguiu montar este plano. Tente escrever o pedido de outro jeito.',
@@ -344,13 +344,24 @@
    * [{ texto, data }]. A data, quando há, leva o toque ao Ajustar já com o dia.
    * Junta o que a IA marcou (incerto, observações) e a conferência do app
    * (conferenciasDoPlano). Frases com verbo e alvo. */
-  function itensIncertos(plano) {
-    var itens = [];
+  function itensIncertos(plano, opcoes) {
+    opcoes = opcoes || {};
+    /* UM aviso por prova, o mais acionável: falta estudo antes dela; senão,
+     * o conteúdo que não veio; senão, a dúvida de leitura do aviso. Depois,
+     * as observações da IA, sem data. */
+    var porData = {}, ordem = [];
+    var guardar = function (item, peso) {
+      var atual = porData[item.data];
+      if (!atual) ordem.push(item.data);
+      if (!atual || peso < atual.peso) porData[item.data] = { item: item, peso: peso };
+    };
+    conferenciasDoPlano(plano, opcoes).forEach(function (item) { guardar(item, item.tipo === 'estudo' ? 0 : 1); });
     (plano.provas || []).forEach(function (p) {
-      if (p.incerto) itens.push({ texto: 'Confira no aviso a prova de ' + ddmm(p.data) + ' (' + limpar(p.disciplina) + ').', data: p.data });
+      if (p.incerto) guardar({ texto: 'Confira no aviso a prova de ' + ddmm(p.data) + ' (' + limpar(p.disciplina) + ').', data: p.data, tipo: 'incerto' }, 2);
     });
-    (plano.observacoes || []).forEach(function (o) { if (String(o).trim()) itens.push({ texto: limpar(o), data: null }); });
-    return itens.concat(conferenciasDoPlano(plano));
+    var itens = ordem.sort().map(function (d) { return porData[d].item; });
+    (plano.observacoes || []).forEach(function (o) { if (String(o).trim()) itens.push({ texto: limpar(o), data: null, tipo: 'observacao' }); });
+    return itens;
   }
 
   /* A matéria do jeito que a conta compara: sem acento, minúscula, e com os
@@ -377,7 +388,8 @@
    *     é aviso, não erro);
    *   - prova sem conteúdo vira aviso para ela dizer no Ajustar, se tiver.
    * Nada disto vai para a folha. */
-  function conferenciasDoPlano(plano) {
+  function conferenciasDoPlano(plano, opcoes) {
+    opcoes = opcoes || {};
     var itens = [];
     var grade = Array.isArray(plano.grade) ? plano.grade : [];
     (plano.provas || []).forEach(function (p) {
@@ -387,28 +399,40 @@
       });
       if (!estudou) itens.push({ texto: 'Nenhum dia de estudo de ' + limpar(p.disciplina) + ' antes da prova de ' + ddmm(p.data) + '.', data: p.data, tipo: 'estudo' });
       if (p.conteudo === null || !String(p.conteudo).trim()) {
-        itens.push({ texto: 'O conteúdo da prova de ' + ddmm(p.data) + ' (' + limpar(p.disciplina) + ') não veio no aviso. Se tiver, diga no Ajustar.', data: p.data, tipo: 'conteudo' });
+        // sem o Ajustar à mão (sem a conta da nuvem), a frase não manda para ele
+        itens.push({ texto: 'O conteúdo da prova de ' + ddmm(p.data) + ' (' + limpar(p.disciplina) + ') não veio no aviso.' +
+          (opcoes.semAjuste ? '' : ' Se tiver, diga no Ajustar.'), data: p.data, tipo: 'conteudo' });
       }
     });
     return itens;
   }
 
-  /* O que um ajuste mudou, em poucas palavras: os dias da grade e as provas
-   * que ficaram diferentes. */
+  /* O que um ajuste mudou, numa frase com a matéria e a ação: "Mudou: entrou
+   * Geografia no dia 21/11." Nada mudou: "O plano ficou igual." */
   function resumoDaMudanca(antes, depois) {
     if (!antes || !depois) return '';
-    var porData = function (lista) { var m = {}; (lista || []).forEach(function (g) { if (g && g.data) m[g.data] = JSON.stringify(g); }); return m; };
+    var porData = function (lista) { var m = {}; (lista || []).forEach(function (g) { if (g && g.data) m[g.data] = g; }); return m; };
     var a = porData(antes.grade), d = porData(depois.grade), dias = [];
-    Object.keys(a).concat(Object.keys(d)).forEach(function (k) { if (a[k] !== d[k] && dias.indexOf(k) < 0) dias.push(k); });
+    Object.keys(a).concat(Object.keys(d)).forEach(function (k) { if (dias.indexOf(k) < 0) dias.push(k); });
     dias.sort();
-    var provas = JSON.stringify(antes.provas) !== JSON.stringify(depois.provas);
-    var periodo = JSON.stringify(antes.periodo) !== JSON.stringify(depois.periodo);
-    var partes = [];
-    if (dias.length) partes.push((dias.length === 1 ? 'o dia ' : 'os dias ') + juntarComE(dias.slice(0, 6).map(ddmm)) + (dias.length > 6 ? ' e outros' : ''));
-    if (provas) partes.push('o quadro das provas');
-    if (periodo && !dias.length) partes.push('o período');
-    if (!partes.length && JSON.stringify(antes) !== JSON.stringify(depois)) partes.push('o aluno ou as observações');
-    return partes.length ? juntarComE(partes) : 'nada na folha';
+    var acoes = [];
+    var nomes = function (lista) { return (lista || []).map(limpar).filter(Boolean); };
+    dias.forEach(function (k) {
+      var ga = a[k] || { estudo: [], prova: null }, gd = d[k] || { estudo: [], prova: null };
+      var ea = nomes(ga.estudo), ed = nomes(gd.estudo);
+      var entrou = ed.filter(function (e) { return ea.indexOf(e) < 0; });
+      var saiu = ea.filter(function (e) { return ed.indexOf(e) < 0; });
+      if (entrou.length) acoes.push('entrou ' + juntarComE(entrou) + ' no dia ' + ddmm(k));
+      if (saiu.length) acoes.push('saiu ' + juntarComE(saiu) + ' do dia ' + ddmm(k));
+      if ((ga.prova || null) !== (gd.prova || null)) {
+        acoes.push(gd.prova ? 'a prova do dia ' + ddmm(k) + ' agora é ' + limpar(gd.prova) : 'saiu a prova do dia ' + ddmm(k));
+      }
+    });
+    if (JSON.stringify(antes.provas) !== JSON.stringify(depois.provas) && !acoes.some(function (x) { return /prova/.test(x); })) acoes.push('mudou o quadro das provas');
+    if (JSON.stringify(antes.periodo) !== JSON.stringify(depois.periodo)) acoes.push('mudou o período');
+    if (!acoes.length) return 'O plano ficou igual.';
+    var frase = juntarComE(acoes.slice(0, 4)) + (acoes.length > 4 ? ' e mais ' + (acoes.length - 4) + (acoes.length - 4 === 1 ? ' mudança' : ' mudanças') : '');
+    return 'Mudou: ' + frase + '.';
   }
 
   // ================= a folha =================

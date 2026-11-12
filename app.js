@@ -1487,6 +1487,12 @@
       fecharLadoALado();
       return;
     }
+    if (topo.id === 'modal-planejamento' && $('#modal-leitor-pdf').classList.contains('aberto')) {
+      // o leitor ampliado por cima do planejamento: o Voltar fecha o leitor
+      history.pushState({ apoioModal: topo.token }, '');
+      fecharModal('modal-leitor-pdf');
+      return;
+    }
     if (topo.id === 'modal-planejamento' && planejamentoTemTrabalho()) {
       // a pergunta antes de perder o pedido ou o plano não salvo; a entrada volta
       history.pushState({ apoioModal: topo.token }, '');
@@ -3190,6 +3196,7 @@
       (privado && privado.value !== (aulaEmEdicao.notaPrivada || '')));
   }
 
+  var aulaNovaMexida = false; // a aula nova já preenchida (o link do planejamento pergunta antes)
   function solicitarFecharModal(id) {
     if (id === 'modal-planejamento' && planejamentoTemTrabalho()) { perguntarSairDoPlanejamento(); return; }
     if (id === 'modal-aula' && relatoEmEdicaoAlterado()) {
@@ -3223,8 +3230,10 @@
     corpo.innerHTML = '';
     /* Ela mexeu na aula nova (aluno, data, hora...): o link do planejamento,
      * no pé, pergunta antes de fechar (IA, fase 2). */
-    var aulaNovaMexida = false;
-    if (novo) {
+    aulaNovaMexida = false;
+    if (!corpo.dataset.ouveMexida) {
+      // uma vez só: o corpo da janela é o mesmo a cada aula aberta
+      corpo.dataset.ouveMexida = '1';
       corpo.addEventListener('input', function () { aulaNovaMexida = true; });
       corpo.addEventListener('change', function () { aulaNovaMexida = true; });
     }
@@ -5446,7 +5455,7 @@
     });
     /* Os planejamentos de estudo do aluno (IA, fase 2), logo abaixo das
      * etapas: a lista dos salvos e o "Novo planejamento". */
-    if (!novo && podeVerPlanejamentos()) painel.dados.appendChild(secaoPlanejamentos(alunoEmEdicao.id, false));
+    if (!novo && mostraSecaoPlanejamentos(alunoEmEdicao.id)) painel.dados.appendChild(secaoPlanejamentos(alunoEmEdicao.id, false));
 
     painel.dados.appendChild(el('label', { class: 'campo' }, [
       el('span', { texto: 'Nome do aluno' }),
@@ -22656,6 +22665,14 @@
    *                        livro guarda onde ela parou)
    *   opcoes.livro         o registro do livro (C15.4): com ele aparece o
    *                        "Exportar em PDF"
+   *   opcoes.compacto      o PDF de uma página (o planejamento de estudos):
+   *                        some o que não serve (Anterior, Próxima, o contador,
+   *                        o Sumário, o "Ajustar à largura"); fica a barra de
+   *                        uma linha com menos, mais e fechar
+   *   opcoes.zoomInicial   o zoom com que abre (padrão: 1, ajustado à largura)
+   *   opcoes.aoCompartilhar function () do botão de saída do rodapé, com o
+   *                        rótulo opcoes.rotuloCompartilhar
+   * Sem essas três, o leitor é o de sempre (a Biblioteca e o anexo da aula).
    *
    * Devolve uma promessa: true quando a primeira página está desenhada, false
    * quando não abriu (a janela já disse por quê e ofereceu o caminho de fora). */
@@ -22664,7 +22681,16 @@
     if (leitor) soltarLeitorPdf();
     var vez = ++leitorVez;
     var nome = opcoes.nome || opcoes.titulo || 'documento.pdf';
-    leitor = { doc: null, pagina: Math.max(1, parseInt(opcoes.pagina, 10) || 1), total: 0, zoom: 1,
+    /* O modo compacto e a saída do planejamento só valem para quem os pede. */
+    $('#modal-leitor-pdf').classList.toggle('leitor-compacto', !!opcoes.compacto);
+    var saida = $('#leitor-compartilhar');
+    if (saida) {
+      saida.hidden = typeof opcoes.aoCompartilhar !== 'function';
+      saida.textContent = opcoes.rotuloCompartilhar || 'Compartilhar PDF';
+      saida.onclick = typeof opcoes.aoCompartilhar === 'function' ? function () { opcoes.aoCompartilhar(); } : null;
+    }
+    var zoomInicial = Number(opcoes.zoomInicial) > 0 ? Math.min(LEITOR_ZOOM_MAX, Math.max(LEITOR_ZOOM_MIN, Number(opcoes.zoomInicial))) : 1;
+    leitor = { doc: null, pagina: Math.max(1, parseInt(opcoes.pagina, 10) || 1), total: 0, zoom: zoomInicial,
       opcoes: opcoes, nome: nome, fonte: fonte };
     var estado = leitor;
     $('#titulo-modal-leitor-pdf').textContent = opcoes.titulo || nome;
@@ -22949,6 +22975,11 @@
     leitor = null;
     fecharSumarioDoLeitor();
     esconderCobre('pdf');
+    // o modo compacto e a saída do planejamento não ficam para o próximo PDF
+    var modalLeitor = $('#modal-leitor-pdf');
+    if (modalLeitor) modalLeitor.classList.remove('leitor-compacto');
+    var saida = $('#leitor-compartilhar');
+    if (saida) { saida.hidden = true; saida.onclick = null; }
     // o canvas de uma página com zoom passa de 40 MB: sai da tela e da memória
     var corpo = $('#corpo-modal-leitor-pdf');
     if (corpo) { corpo.innerHTML = ''; delete corpo.dataset.paginaDesenhada; }
@@ -25863,7 +25894,7 @@
       }
       editandoFichaAlunoCelular = false;
       caixa.appendChild(fichaMinimaCelular(aberto, aulaDeContextoDoAluno(aberto.id)));
-      if (podeVerPlanejamentos()) caixa.appendChild(secaoPlanejamentos(aberto.id, true));
+      if (mostraSecaoPlanejamentos(aberto.id)) caixa.appendChild(secaoPlanejamentos(aberto.id, true));
       caixa.appendChild(el('div', { class: 'barra' }, [
         celularEdita() ? botaoDeAcaoCelular('editar-ficha-aluno', { class: 'btn', id: 'cel-alunos-editar-ficha', texto: 'Editar ficha',
           aoClick: function () { editandoFichaAlunoCelular = true; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } }) : null,
@@ -26685,6 +26716,12 @@
     setTimeout(function () { r.textContent = texto; }, 30);
   }
 
+  /* A seção aparece a quem pode ver, e só quando tem algo: um plano salvo, ou
+   * o "Novo planejamento" (que pede a conta da nuvem). */
+  function mostraSecaoPlanejamentos(alunoId) {
+    return podeVerPlanejamentos() && (podeChamarIA() || planejamentosDoAluno(alunoId).length > 0);
+  }
+
   /* A seção "Planejamentos" da ficha: os 3 mais recentes, com "ver todos", e
    * o "Novo planejamento" como ação do cartão. */
   function secaoPlanejamentos(alunoId, celular) {
@@ -26708,7 +26745,7 @@
       caixa.appendChild(el('div', { class: 'plan-lista' }, mostrados.map(function (r) {
         var rotulo;
         try { rotulo = Planejamento.rotuloCurto(r.plano); } catch (e) { rotulo = 'Planejamento de estudos'; }
-        var item = botao('planejamento-salvo', { class: 'plan-item', 'data-plano': r.id, 'aria-label': rotulo + '. Abrir',
+        var item = botao('planejamento-salvo', { class: 'plan-item', id: (celular ? 'cel-plan-item-' : 'plan-item-') + r.id, 'data-plano': r.id, 'aria-label': rotulo + '. Abrir',
           aoClick: function () { abrirPlanejamento({ salvo: r }, item); } });
         item.appendChild(el('span', { class: 'plan-item-texto' }, [
           el('span', { class: 'plan-item-nome', texto: rotulo }),
@@ -26720,11 +26757,16 @@
       if (lista.length > LISTA_CURTA) {
         caixa.appendChild(el('button', { type: 'button', class: 'btn pequeno plan-ver-todos', id: celular ? 'cel-plan-ver-todos' : 'plan-ver-todos',
           'aria-expanded': inteira ? 'true' : 'false', texto: inteira ? 'Ver só os recentes' : 'Ver todos (' + lista.length + ')',
-          aoClick: function () { listaInteiraDe[alunoId] = !inteira; redesenharSecoesDePlanejamento(); } }));
+          aoClick: function () {
+            listaInteiraDe[alunoId] = !inteira;
+            redesenharSecoesDePlanejamento();
+            var b = $(celular ? '#cel-plan-ver-todos' : '#plan-ver-todos');
+            if (b) b.focus();
+          } }));
       }
     }
     if (podeChamarIA()) {
-      var novo = botao('planejamento', { class: 'btn plan-novo', id: celular ? 'cel-plan-novo' : 'plan-novo', icone: 'plus', texto: 'Novo planejamento' });
+      var novo = botao('planejamento', { class: 'btn principal plan-novo', id: celular ? 'cel-plan-novo' : 'plan-novo', icone: 'plus', texto: 'Novo planejamento' });
       novo.addEventListener('click', function () { abrirPlanejamento({ alunoFixoId: alunoId }, novo); });
       caixa.appendChild(el('div', { class: 'plan-secao-acao' }, [novo]));
     }
@@ -26810,7 +26852,13 @@
     $('#texto-sair-planejamento').textContent = texto;
     aoDescartarPlanejamento = aoDescartar;
     var continuar = $('#continuar-planejamento'), descartar = $('#descartar-planejamento');
-    continuar.onclick = function () { aoDescartarPlanejamento = null; fecharModal('modal-sair-planejamento'); };
+    var focoAntes = document.activeElement;
+    continuar.onclick = function () {
+      aoDescartarPlanejamento = null;
+      fecharModal('modal-sair-planejamento', function () {
+        if (focoAntes && document.body.contains(focoAntes) && typeof focoAntes.focus === 'function') focoAntes.focus();
+      });
+    };
     descartar.onclick = function () {
       var depois = aoDescartarPlanejamento;
       aoDescartarPlanejamento = null;
@@ -26844,14 +26892,24 @@
     var corpo = $('#corpo-modal-planejamento'), rodape = $('#rodape-modal-planejamento');
     if (!p || !corpo) return;
     pararDitado();
+    // o canvas da prévia que estava na tela sai da memória antes do redesenho
+    Array.prototype.forEach.call(corpo.querySelectorAll('canvas'), function (c) { c.width = 0; c.height = 0; });
     corpo.innerHTML = '';
     rodape.innerHTML = '';
-    p.rodapeLivreEm = Date.now() + TRAVA_DO_RODAPE_MS;
+    // a trava do rodapé só quando o estado muda (o botão nasce onde estava outro)
+    if (p.estadoDesenhado !== p.estado) p.rodapeLivreEm = Date.now() + TRAVA_DO_RODAPE_MS;
+    p.estadoDesenhado = p.estado;
     var modal = corpo.closest('.modal');
     if (modal) modal.classList.toggle('plan-largo', p.estado === 'previa');
-    if (p.estado === 'montando') return desenharMontando(p, corpo, rodape);
-    if (p.estado === 'previa') return desenharPreviaDoPlano(p, corpo, rodape);
-    desenharPedidoDoPlano(p, corpo, rodape);
+    if (p.estado === 'montando') desenharMontando(p, corpo, rodape);
+    else if (p.estado === 'previa') desenharPreviaDoPlano(p, corpo, rodape);
+    else desenharPedidoDoPlano(p, corpo, rodape);
+    // o foco volta ao controle que pediu o redesenho (o selo, por exemplo)
+    if (p.focarDepois) {
+      var alvo = $(p.focarDepois);
+      p.focarDepois = null;
+      if (alvo) alvo.focus();
+    }
   }
 
   /* ---- o ditado, pela Web Speech API do navegador (pt-BR); sem ela, nada aparece ---- */
@@ -26952,12 +27010,18 @@
       corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', id: 'plan-para', texto: 'Para ' + alunoPorId(p.alunoFixoId).nome + '.' }));
     }
     var offline = navigator.onLine === false;
+    /* Sem permissão ou sem crédito, tentar de novo não resolve: sem o botão,
+     * e o Montar desligado. O resto (rede, prazo, ocupado, sem internet) tem
+     * o "Tentar de novo". */
+    var bloqueado = !offline && (p.erroCodigo === 'sem_permissao' || p.erroCodigo === 'limite_mensal');
     if (p.erro || offline) {
       var faixa = el('div', { class: 'faixa-aviso plan-erro', id: 'plan-erro', role: 'alert' }, [
-        el('span', { class: 'cresce', texto: p.erro || Planejamento.fraseDoErro('sem_internet') })
+        el('span', { class: 'cresce', texto: offline ? Planejamento.fraseDoErro('sem_internet') : p.erro })
       ]);
-      faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'plan-tentar', texto: 'Tentar de novo',
-        aoClick: function () { p.erro = null; desenharPlanejamento(); if (navigator.onLine !== false) montar(); } }));
+      if (offline || ['rede', 'prazo', 'ocupado', 'sem_internet'].indexOf(p.erroCodigo) >= 0) {
+        faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'plan-tentar', texto: 'Tentar de novo',
+          aoClick: function () { p.erro = null; p.erroCodigo = null; desenharPlanejamento(); if (navigator.onLine !== false) montar(); } }));
+      }
       corpo.appendChild(faixa);
     }
     var campo = el('textarea', { id: 'plan-texto', rows: '6', 'aria-label': 'O pedido do planejamento',
@@ -26972,7 +27036,7 @@
     function atualizarMontar() {
       if (!montarBotao) return;
       var falta = !String(p.texto || '').trim() && !p.imagens.length;
-      montarBotao.disabled = !!(p.preparando || falta || navigator.onLine === false);
+      montarBotao.disabled = !!(p.preparando || falta || navigator.onLine === false || bloqueado);
     }
     campo.addEventListener('input', function () { p.texto = campo.value; atualizarMontar(); });
     function desenharPrints() {
@@ -27026,7 +27090,7 @@
     function montar() {
       if (p.preparando) return;
       if (!String(p.texto || '').trim() && !p.imagens.length) { avisar('Escreva o pedido ou anexe os prints do aviso.'); campo.focus(); return; }
-      if (navigator.onLine === false) { p.erro = Planejamento.fraseDoErro('sem_internet'); desenharPlanejamento(); return; }
+      if (navigator.onLine === false) { p.erro = Planejamento.fraseDoErro('sem_internet'); p.erroCodigo = 'sem_internet'; desenharPlanejamento(); return; }
       var hoje = Planejamento.hojeEmSaoPaulo();
       var corpoDoPedido = Planejamento.montarPedido({ texto: p.texto, imagens: p.imagens, alunos: alunosParaIA(hoje),
         alunoFixoId: p.alunoFixoId, hoje: hoje });
@@ -27084,10 +27148,12 @@
     pararDitado();
     p.erro = null;
     p.erroAjuste = null;
+    p.erroCodigo = null;
     p.parar = function () { if (controle) controle.abort(); };
     if (tipo === 'ajuste') {
       p.ajustando = true;
       p.textoAjuste = textoDoAjuste || '';
+      anunciar('Ajustando...');
     } else {
       p.estado = 'montando';
     }
@@ -27116,8 +27182,8 @@
           p.estado = 'pedido';
           p.erro = frase;
         }
+        p.erroCodigo = lido.erro;
         desenharPlanejamento();
-        if (frase) anunciar(frase);
         if (tipo === 'ajuste') { var c = $('#plan-ajuste'); if (c) c.focus(); }
         return;
       }
@@ -27142,7 +27208,7 @@
       p.estado = 'previa';
       desenharPlanejamento();
       focarTituloDoPlanejamento();
-      anunciar(tipo === 'ajuste' ? 'Plano ajustado. Mudou ' + p.mudou + '.' : 'O planejamento está pronto. A prévia da folha está na tela.');
+      anunciar(tipo === 'ajuste' ? 'Plano ajustado. ' + p.mudou : 'O planejamento está pronto. A prévia da folha está na tela.');
       /* Plano já salvo e ajustado: a ficha guarda a versão nova sozinha. */
       if (p.salvoId) salvarPlanoNaFicha(p, true);
     });
@@ -27192,8 +27258,8 @@
     }
     /* "Aluna" ou "Aluno" no alto da folha: sempre à vista, numa linha rotulada. */
     lado.appendChild(el('div', { class: 'plan-linha', id: 'plan-na-folha' }, [
-      el('span', { class: 'plan-rotulo', texto: 'Na folha:' }),
-      seletorUnico('plan-tratamento', 'Na folha, Aluna ou Aluno', [{ valor: 'Aluna', tratamento: 'Aluna', rotulo: 'Aluna' }, { valor: 'Aluno', tratamento: 'Aluno', rotulo: 'Aluno' }],
+      el('span', { class: 'plan-rotulo', texto: 'Tratar por:' }),
+      seletorUnico('plan-tratamento', 'Tratar por Aluna ou Aluno, no alto da folha', [{ valor: 'Aluna', tratamento: 'Aluna', rotulo: 'Aluna' }, { valor: 'Aluno', tratamento: 'Aluno', rotulo: 'Aluno' }],
         pl.tratamento, function (t) {
           pl.tratamento = t;
           p.tratamentoEscolhido = t;
@@ -27202,32 +27268,44 @@
         }, !grava)
     ]));
 
-    /* A conferência: o que a IA marcou e o que o app conferiu, num selo
-     * recolhível. Tocar num item com data leva ao Ajustar já com o dia. */
+    /* A conferência: o que a IA marcou e o que o app conferiu, UM aviso por
+     * prova, num selo recolhível, na mesma linha do "Mudar algo?". O selo só
+     * aparece com o aluno escolhido. Cada item é tocável e ACRESCENTA o dia ao
+     * que já está no campo do ajuste. */
     var campoAjuste = null;
-    var conferir = Planejamento.itensIncertos(pl);
+    var conferir = escolhido ? Planejamento.itensIncertos(pl, { semAjuste: !chamaIA }) : [];
+    var linhaAcoes = el('div', { class: 'plan-linha plan-acoes', id: 'plan-acoes' });
     if (conferir.length) {
-      var selo = el('button', { type: 'button', class: 'plan-selo', id: 'plan-conferir', 'aria-expanded': p.conferirAberto ? 'true' : 'false',
+      linhaAcoes.appendChild(el('button', { type: 'button', class: 'plan-selo', id: 'plan-conferir', 'aria-expanded': p.conferirAberto ? 'true' : 'false',
         'aria-controls': 'plan-incertos', icone: 'alerta', texto: conferir.length === 1 ? '1 item para conferir' : conferir.length + ' itens para conferir',
-        aoClick: function () { p.conferirAberto = !p.conferirAberto; desenharPlanejamento(); } });
-      lado.appendChild(selo);
-      if (p.conferirAberto) {
-        lado.appendChild(el('ul', { class: 'faixa-info plan-incertos-lista', id: 'plan-incertos' }, conferir.map(function (item) {
-          if (!item.data || !chamaIA) return el('li', { texto: item.texto });
-          return el('li', {}, [el('button', { type: 'button', class: 'plan-item-conferir', 'data-data': item.data, texto: item.texto,
-            aoClick: function () {
-              if (!campoAjuste) return;
-              campoAjuste.value = 'No dia ' + Planejamento.ddmm(item.data) + ': ';
-              campoAjuste.focus();
-              try { campoAjuste.setSelectionRange(campoAjuste.value.length, campoAjuste.value.length); } catch (e) { /* campo sem seleção */ }
-            } })]);
-        })));
-      }
+        aoClick: function () { p.conferirAberto = !p.conferirAberto; p.focarDepois = '#plan-conferir'; desenharPlanejamento(); } }));
+    }
+    if (chamaIA) {
+      linhaAcoes.appendChild(el('button', { type: 'button', class: 'btn pequeno plan-mudar-algo', id: 'plan-mudar-algo', icone: 'pencil', texto: 'Mudar algo?',
+        aoClick: function () { if (campoAjuste) { campoAjuste.scrollIntoView({ block: 'center' }); campoAjuste.focus(); } } }));
+    }
+    if (linhaAcoes.childNodes.length) lado.appendChild(linhaAcoes);
+    if (conferir.length && p.conferirAberto) {
+      lado.appendChild(el('ul', { class: 'faixa-info plan-incertos-lista', id: 'plan-incertos' }, conferir.map(function (item, i) {
+        var marcador = el('span', { class: 'plan-incerto-marca', 'aria-hidden': 'true', texto: '•' });
+        if (!chamaIA) return el('li', { class: 'plan-incerto' }, [marcador, el('span', { class: 'plan-incerto-texto', texto: item.texto })]);
+        return el('li', { class: 'plan-incerto' }, [el('button', { type: 'button', class: 'plan-item-conferir', id: 'plan-conferir-' + i, 'data-data': item.data || null,
+          aoClick: function () {
+            if (!campoAjuste) return;
+            if (item.data) {
+              var atual = campoAjuste.value.replace(/\s+$/, '');
+              campoAjuste.value = (atual ? atual + ' ' : '') + 'No dia ' + Planejamento.ddmm(item.data) + ': ';
+              p.textoAjuste = campoAjuste.value;
+            }
+            campoAjuste.focus();
+            try { campoAjuste.setSelectionRange(campoAjuste.value.length, campoAjuste.value.length); } catch (e) { /* campo sem seleção */ }
+          } }, [marcador, el('span', { class: 'plan-incerto-texto', texto: item.texto }), el('span', { class: 'plan-incerto-ir', texto: 'Ajustar ›' })])]);
+      })));
     }
     /* O que o último ajuste mudou, com o Desfazer. */
     if (p.planoAnterior && !p.ajustando) {
       lado.appendChild(el('div', { class: 'plan-linha plan-mudou', id: 'plan-mudou' }, [
-        el('span', { class: 'cresce', texto: 'Mudou: ' + p.mudou + '.' }),
+        el('span', { class: 'cresce', texto: p.mudou }),
         el('button', { type: 'button', class: 'btn pequeno', id: 'plan-desfazer-ajuste', icone: 'undo', texto: 'Desfazer ajuste',
           aoClick: function () {
             p.plano = p.planoAnterior;
@@ -27240,10 +27318,6 @@
             if (p.salvoId) salvarPlanoNaFicha(p, true);
           } })
       ]));
-    }
-    if (chamaIA) {
-      lado.appendChild(el('button', { type: 'button', class: 'btn pequeno plan-mudar-algo', id: 'plan-mudar-algo', icone: 'pencil', texto: 'Mudar algo?',
-        aoClick: function () { if (campoAjuste) { campoAjuste.scrollIntoView({ block: 'center' }); campoAjuste.focus(); } } }));
     }
 
     /* A prévia: o PRÓPRIO PDF; tocar amplia no leitor do app. */
@@ -27270,6 +27344,8 @@
     if (chamaIA) {
       campoAjuste = el('input', { type: 'text', id: 'plan-ajuste', autocomplete: 'off', placeholder: 'Ex.: Geografia no dia 21', disabled: p.ajustando ? 'disabled' : null });
       campoAjuste.value = p.textoAjuste || '';
+      // o que ela escreve sobrevive ao redesenho (selo, aluno, Aluna ou Aluno)
+      campoAjuste.addEventListener('input', function () { p.textoAjuste = campoAjuste.value; });
       var ajustar = function () {
         var t = campoAjuste.value.trim();
         if (!t) { avisar('Escreva ou dite o que mudar.'); campoAjuste.focus(); return; }
@@ -27288,7 +27364,7 @@
         campoAjuste,
         el('div', { class: 'barra u-margem-baixo-0' }, [
           p.ajustando ? null : botaoDeDitar(campoAjuste, 'plan-ajuste-ditar'),
-          el('button', { type: 'button', class: 'btn', id: 'plan-ajustar', texto: 'Ajustar', disabled: p.ajustando ? 'disabled' : null, aoClick: ajustar })
+          el('button', { type: 'button', class: 'btn principal', id: 'plan-ajustar', texto: 'Ajustar', disabled: p.ajustando ? 'disabled' : null, aoClick: ajustar })
         ])
       ]);
     }
@@ -27321,6 +27397,9 @@
    * não vira download, e o botão fica travado enquanto ela está aberta. */
   function entregarPlano(p, podeCompartilhar) {
     if (!p.bytes || p.compartilhando) return;
+    /* A família vai receber: o plano fica guardado na ficha, e fechar depois
+     * não pergunta mais. */
+    if (podeGravarPlanejamentos() && (!p.salvoId || p.mudouDesdeSalvar)) salvarPlanoNaFicha(p, true);
     var pl = p.plano, aluno = pl && pl.alunoId ? alunoPorId(pl.alunoId) : null;
     var nome = Planejamento.nomeDoArquivo(pl, aluno ? aluno.nome : '');
     var blob = new Blob([p.bytes], { type: 'application/pdf' });
@@ -27362,15 +27441,23 @@
       usado = true;
       c.className = 'plan-previa-folha';
       c.setAttribute('aria-hidden', 'true');
+      /* "Toque para ampliar" SOBRE a folha, no canto de cima: sempre à vista. */
       var ver = el('button', { type: 'button', class: 'plan-previa-ver', id: 'plan-ampliar', 'aria-label': 'Ampliar a folha',
         aoClick: function () {
           var aluno = alunoPorId(p.plano.alunoId);
           var nome = Planejamento.nomeDoArquivo(p.plano, aluno ? aluno.nome : '');
-          abrirLeitorPdf(new Blob([bytes], { type: 'application/pdf' }), { titulo: 'Planejamento de estudos', nome: nome, comoFolha: false });
-        } }, [c]);
+          /* O leitor do app no modo do planejamento: uma página, só menos, mais e
+           * fechar; no celular já abre com a letra legível; e a saída é a mesma
+           * da prévia. A Biblioteca não passa estas opções e fica como era. */
+          abrirLeitorPdf(new Blob([bytes], { type: 'application/pdf' }), {
+            titulo: 'Planejamento de estudos', nome: nome, comoFolha: false, compacto: true,
+            zoomInicial: window.innerWidth < 600 ? 1.75 : 1,
+            rotuloCompartilhar: p.rotuloEntregar || 'Compartilhar PDF',
+            aoCompartilhar: function () { entregarPlano(p, p.rotuloEntregar === 'Compartilhar PDF'); }
+          });
+        } }, [c, el('span', { class: 'plan-lupa', id: 'plan-legenda', 'aria-hidden': 'true' }, [icone('search'), el('span', { texto: 'Toque para ampliar' })])]);
       espera.remove();
       caixa.insertBefore(ver, caixa.firstChild);
-      caixa.insertBefore(el('p', { class: 'ajuda plan-legenda', id: 'plan-legenda', texto: 'Toque para ampliar' }), ver.nextSibling);
     }).catch(function () {
       if (fluxoPlano !== p || p.vez !== vez) return;
       espera.remove();

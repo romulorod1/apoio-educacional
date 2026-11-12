@@ -4083,9 +4083,9 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .plan-erro { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .plan-ferramentas { flex-wrap: wrap; margin: 10px 0; }
 .plan-preparando { margin: 0 0 8px; }
-.plan-prints { display: flex; flex-wrap: wrap; gap: 8px; }
-.plan-print { position: relative; width: 84px; height: 112px; border: 1px solid var(--fio); border-radius: 8px; overflow: hidden; background: var(--soft); }
-.plan-print-ver { display: block; width: 100%; height: 100%; padding: 0; border: none; background: transparent; cursor: zoom-in; }
+.plan-prints { display: flex; flex-wrap: wrap; gap: 16px; padding: 12px 12px 0 0; }
+.plan-print { position: relative; width: 84px; height: 112px; }
+.plan-print-ver { display: block; width: 100%; height: 100%; padding: 0; border: 1px solid var(--fio); border-radius: 8px; overflow: hidden; background: var(--soft); cursor: zoom-in; outline-offset: -3px; }
 .plan-print-ver img { width: 100%; height: 100%; object-fit: cover; display: block; }
 /* o x pequeno no canto, com o alvo invisível de 48 px em volta */
 .plan-print-tirar { position: absolute; top: -12px; right: -12px; width: 48px; height: 48px; padding: 0; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -4105,13 +4105,20 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .plan-seletor { display: flex; flex-wrap: wrap; gap: 6px; }
 .plan-opcao { min-height: var(--alvo, 44px); display: inline-flex; align-items: center; gap: 4px; }
 .plan-selo { align-self: flex-start; min-height: var(--alvo, 44px); display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--info-borda); border-radius: 999px; background: var(--acao-clara); color: var(--info-texto); font-family: inherit; font-size: var(--letra-14); font-weight: var(--peso-forte); cursor: pointer; }
-.plan-incertos-lista { margin: 0; padding: 8px 12px 8px 28px; }
-.plan-incertos-lista li { overflow-wrap: anywhere; margin: 2px 0; }
-.plan-item-conferir { min-height: var(--alvo, 44px); padding: 4px 0; border: none; background: transparent; color: inherit; font-family: inherit; font-size: var(--letra-14); text-align: left; text-decoration: underline; cursor: pointer; }
+.plan-acoes { gap: 8px; }
+.plan-incertos-lista { margin: 0; padding: 4px 8px; list-style: none; }
+.plan-incerto { display: flex; align-items: flex-start; gap: 8px; margin: 0; overflow-wrap: anywhere; }
+.plan-incerto + .plan-incerto { border-top: 1px solid var(--info-borda); }
+.plan-incerto-marca { flex: none; line-height: 1.45; }
+.plan-incerto-texto { flex: 1; min-width: 0; line-height: 1.45; }
+.plan-incerto-ir { flex: none; font-weight: var(--peso-forte); white-space: nowrap; }
+.plan-item-conferir { display: flex; align-items: flex-start; gap: 8px; width: 100%; min-height: var(--alvo, 44px); padding: 10px 2px; border: none; background: transparent; color: inherit; font-family: inherit; font-size: var(--letra-14); text-align: left; text-decoration: none; cursor: pointer; }
+.plan-incertos-lista > .plan-incerto:not(:has(button)) { padding: 10px 2px; }
 .plan-mudou { padding: 8px 10px; border-radius: 10px; background: var(--soft); }
 .plan-mudar-algo { align-self: flex-start; }
 .plan-previa { position: relative; border: 1px solid var(--fio); border-radius: 6px; background: var(--branco); min-height: 120px; overflow: hidden; }
-.plan-previa-ver { display: block; width: 100%; padding: 0; border: none; background: transparent; cursor: zoom-in; }
+.plan-previa-ver { position: relative; display: block; width: 100%; padding: 0; border: none; background: transparent; cursor: zoom-in; outline-offset: -3px; }
+.plan-lupa { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: var(--navy); color: var(--branco); font-size: var(--letra-14); font-weight: var(--peso-forte); box-shadow: var(--sombra); pointer-events: none; }
 .plan-previa-folha { display: block; width: 100%; height: auto; }
 .plan-legenda { text-align: center; margin: 4px 0 8px; }
 .plan-previa-recado, .plan-previa > .faixa-aviso { margin: 12px; }
@@ -4129,11 +4136,20 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
   .plan-largo .plan-lado { grid-area: lado; }
   .plan-largo .plan-ajuste { grid-area: ajuste; }
   .plan-largo .plan-excluir-linha { grid-area: excluir; }
+  .plan-largo .plan-mudar-algo { display: none; }
 }
 /* celular, e a letra grande: o rodapé em coluna, largura toda, o principal em cima */
 @media (max-width: 480px) {
+  .plan-incertos-lista { max-height: 38vh; overflow-y: auto; }
   #rodape-modal-planejamento { flex-direction: column-reverse; align-items: stretch; }
   #rodape-modal-planejamento .btn { width: 100%; margin: 0; }
   #rodape-modal-planejamento .esquerda { margin-right: 0; }
 }
+#modal-leitor-pdf.leitor-compacto #leitor-anterior,
+#modal-leitor-pdf.leitor-compacto #leitor-proxima,
+#modal-leitor-pdf.leitor-compacto #leitor-contador,
+#modal-leitor-pdf.leitor-compacto #leitor-sumario,
+#modal-leitor-pdf.leitor-compacto #leitor-ir-caixa,
+#modal-leitor-pdf.leitor-compacto #leitor-largura { display: none; }
+#modal-leitor-pdf.leitor-compacto .leitor-pdf-barra { flex-wrap: nowrap; justify-content: flex-end; }
 /* ==================== planejamento (fim) ==================== */

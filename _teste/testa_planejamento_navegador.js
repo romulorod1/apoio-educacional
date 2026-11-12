@@ -213,6 +213,11 @@ async function transbordo(pag) {
   // ================================================================
   secao('0. Quem vê o quê: sem login, vê os salvos e não tem o Novo; com login, tem');
   await H.irParaAba(pag, 'alunos');
+  await clicar(pag, '#lista-alunos .item-lista[data-aluno="al1"]');
+  await esperar('a ficha abriu', () => aberta(pag, 'modal-aluno'), v => v === true, 10000);
+  conf('sem login e sem plano salvo: a ficha nem mostra a seção', await pag.evaluate(() => !document.querySelector('#plan-secao')), true);
+  await pag.evaluate(() => document.querySelector('#modal-aluno .fechar').click());
+  await esperar('a ficha fechou', () => aberta(pag, 'modal-aluno'), v => v === false, 10000);
   await clicar(pag, '#lista-alunos .item-lista[data-aluno="al2"]');
   await esperar('a ficha abriu', () => aberta(pag, 'modal-aluno'), v => v === true, 10000);
   conf('sem login: a ficha mostra o plano salvo, sem o "Novo planejamento"', await pag.evaluate(() => [!!document.querySelector('#plan-secao'),
@@ -221,6 +226,8 @@ async function transbordo(pag) {
   await esperar('sem login, o salvo abre na prévia', () => temFolha(pag), v => v === true, 30000);
   conf('sem login, no salvo: a prévia e o compartilhar, sem o Ajustar', await pag.evaluate(() => [!!document.querySelector('#plan-compartilhar'),
     !document.querySelector('#plan-ajuste'), !document.querySelector('#plan-mudar-algo')]), [true, true, true]);
+  await clicar(pag, '#plan-conferir');
+  conf('sem login, a conferência não manda "dizer no Ajustar" (não há Ajustar)', await pag.evaluate(() => /Ajustar/.test(document.querySelector('#plan-incertos').textContent)), false);
   await fecharPlanejamento(pag);
   await pag.evaluate(() => document.querySelector('#modal-aluno .fechar').click());
   await esperar('a ficha fechou', () => aberta(pag, 'modal-aluno'), v => v === false, 10000);
@@ -241,8 +248,8 @@ async function transbordo(pag) {
   await H.irParaAba(pag, 'alunos');
   await clicar(pag, '#lista-alunos .item-lista[data-aluno="al1"]');
   await esperar('a ficha abriu', () => aberta(pag, 'modal-aluno'), v => v === true, 10000);
-  conf('com login: a seção tem o "Novo planejamento", e a lista vazia', await pag.evaluate(() => {
-    const s = document.querySelector('#plan-secao'); return !!s && !!s.querySelector('#plan-novo') && !s.querySelector('.plan-item');
+  conf('com login: a seção tem o "Novo planejamento" como botão principal, e a lista vazia', await pag.evaluate(() => {
+    const s = document.querySelector('#plan-secao'); return !!s && !!s.querySelector('#plan-novo.principal') && !s.querySelector('.plan-item');
   }), true);
   conf('o plano quebrado do banco fica fora da lista, e a ficha abriu sem erro', [await pag.evaluate(() => !document.querySelector('[data-plano="quebrado"]')), pag.errosDePagina.length], [true, 0]);
   await clicar(pag, '#plan-novo');
@@ -293,26 +300,55 @@ async function transbordo(pag) {
     /pronto/.test(document.querySelector('#plan-anuncio').textContent)]), ['titulo-modal-planejamento', true]);
   conf('da ficha: sem "Para qual aluno?", e com "Na folha: Aluna | Aluno" sempre à vista, Aluna marcada', await pag.evaluate(() => [!document.querySelector('#plan-quem'),
     !!document.querySelector('#plan-na-folha'), document.querySelector('#plan-tratamento [data-valor="Aluna"]').getAttribute('aria-checked')]), [true, true, 'true']);
-  conf('"Toque para ampliar" sob a folha', await pag.evaluate(() => document.querySelector('#plan-legenda').textContent), 'Toque para ampliar');
+  conf('"Toque para ampliar" SOBRE a folha, no canto de cima', await pag.evaluate(() => {
+    const l = document.querySelector('#plan-legenda'), f = document.querySelector('#plan-previa canvas').getBoundingClientRect(), r = l.getBoundingClientRect();
+    return [l.textContent, r.top >= f.top && r.bottom <= f.top + 80 && r.right <= f.right + 1];
+  }), ['Toque para ampliar', true]);
+  /* O leitor do planejamento, no celular: compacto, com a letra legível e a
+   * saída "Compartilhar PDF"; o Voltar fecha o LEITOR, e o planejamento fica. */
+  await pag.setViewport({ width: 390, height: 844, hasTouch: true });
+  await pausa(400);
   await clicar(pag, '#plan-ampliar');
-  await esperar('a folha abriu no leitor de PDF do app', () => aberta(pag, 'modal-leitor-pdf'), v => v === true, 10000);
-  await pag.evaluate(() => document.querySelector('#modal-leitor-pdf .fechar').click());
-  await esperar('o leitor fechou', () => aberta(pag, 'modal-leitor-pdf'), v => v === false, 10000);
+  await esperar('a folha abriu no leitor de PDF do app', () => pag.evaluate(() => !!document.querySelector('#corpo-modal-leitor-pdf canvas')), v => v === true, 15000);
+  conf('o leitor do planejamento: sem Anterior, Próxima, contador, Sumário nem "Ajustar à largura"; com menos, mais e "Compartilhar PDF"', await pag.evaluate(() => {
+    const vis = s => { const e = document.querySelector(s); return !!e && getComputedStyle(e).display !== 'none' && !e.hidden; };
+    return [['#leitor-anterior', '#leitor-proxima', '#leitor-contador', '#leitor-sumario', '#leitor-largura'].map(vis).join(','),
+      vis('#leitor-menos') && vis('#leitor-mais'), vis('#leitor-compartilhar') && document.querySelector('#leitor-compartilhar').textContent, vis('#leitor-exportar')];
+  }), ['false,false,false,false,false', true, 'Compartilhar PDF', false]);
+  conf('no celular, abre com zoom legível (150 a 200% da largura)', await pag.evaluate(() => {
+    const c = document.querySelector('#corpo-modal-leitor-pdf canvas'), corpo = document.querySelector('#corpo-modal-leitor-pdf');
+    const z = parseFloat(c.style.width) / Math.max(160, corpo.clientWidth - 36); return z >= 1.5 && z <= 2.01;
+  }), true);
+  await pag.evaluate(() => history.back());
+  await esperar('o Voltar fechou o leitor', () => aberta(pag, 'modal-leitor-pdf'), v => v === false, 10000);
+  conf('o Voltar fecha o LEITOR primeiro, e o planejamento (não salvo) fica aberto, sem pergunta', await pag.evaluate(() => [
+    document.querySelector('#modal-planejamento').classList.contains('aberto'), document.querySelector('#modal-sair-planejamento').classList.contains('aberto')]), [true, false]);
+  conf('fechado o leitor, ele volta a ser o de sempre (a Biblioteca não passa as opções): Anterior e Próxima à vista, sem a saída do planejamento', await pag.evaluate(() => [
+    document.querySelector('#modal-leitor-pdf').classList.contains('leitor-compacto'), getComputedStyle(document.querySelector('#leitor-anterior')).display !== 'none',
+    document.querySelector('#leitor-compartilhar').hidden]), [false, true, true]);
+  await pag.setViewport({ width: 1280, height: 1000, hasTouch: true });
+  await pausa(400);
   // o conferir: selo recolhido; aberto, traz a IA e a conferência do app
-  conf('o selo "N itens para conferir", recolhido', await pag.evaluate(() => [document.querySelector('#plan-conferir').textContent, document.querySelector('#plan-conferir').getAttribute('aria-expanded'),
-    !document.querySelector('#plan-incertos')]), ['5 itens para conferir', 'false', true]);
+  conf('o selo "N itens para conferir", recolhido, na MESMA linha do "Mudar algo?"', await pag.evaluate(() => [document.querySelector('#plan-conferir').textContent, document.querySelector('#plan-conferir').getAttribute('aria-expanded'),
+    !document.querySelector('#plan-incertos'), document.querySelector('#plan-conferir').parentNode === document.querySelector('#plan-mudar-algo').parentNode]), ['3 itens para conferir', 'false', true, true]);
+  // o que ela escreve no ajuste sobrevive ao redesenho (abrir o selo redesenha)
+  await pag.type('#plan-ajuste', 'Tira Matemática.');
   await clicar(pag, '#plan-conferir');
+  conf('o texto do ajuste sobreviveu ao redesenho, e o foco voltou ao selo', await pag.evaluate(() => [document.querySelector('#plan-ajuste').value, document.activeElement && document.activeElement.id]),
+    ['Tira Matemática.', 'plan-conferir']);
   const itens = await pag.evaluate(() => Array.from(document.querySelectorAll('#plan-incertos li')).map(l => l.textContent));
-  conf('aberto: a prova incerta, a observação, o estudo que falta antes da prova e o conteúdo que não veio', [
-    itens.indexOf('Confira no aviso a prova de 27/11 (História).') >= 0, itens.some(t => /cortado/.test(t)),
-    itens.indexOf('Nenhum dia de estudo de Cambridge antes da prova de 19/11.') >= 0, itens.indexOf('Nenhum dia de estudo de História antes da prova de 27/11.') >= 0,
-    itens.some(t => /conteúdo da prova de 19\/11 \(Cambridge\) não veio no aviso/.test(t))], [true, true, true, true, true]);
+  conf('aberto: UM aviso por prova (o mais acionável) e a observação, cada um com "Ajustar ›"', [itens.length,
+    itens[0].indexOf('Nenhum dia de estudo de Cambridge antes da prova de 19/11.') >= 0, itens[1].indexOf('Nenhum dia de estudo de História antes da prova de 27/11.') >= 0,
+    /cortado/.test(itens[2]), itens.every(t => /Ajustar ›/.test(t))], [3, true, true, true, true]);
+  conf('todos os itens com o mesmo estilo, tocáveis e sem sublinhado', await pag.evaluate(() => {
+    const b = Array.from(document.querySelectorAll('#plan-incertos .plan-item-conferir')); return [b.length, b.every(x => !/underline/.test(getComputedStyle(x).textDecorationLine))];
+  }), [3, true]);
   await clicar(pag, '#plan-incertos .plan-item-conferir[data-data="2026-11-19"]');
-  conf('tocar no aviso leva ao Ajustar já com o dia', await pag.evaluate(() => [document.querySelector('#plan-ajuste').value, document.activeElement && document.activeElement.id]),
-    ['No dia 19/11: ', 'plan-ajuste']);
-  conf('rótulos do ajuste: "O que mudar?" e "Ajustar"; e o "Mudar algo?" no alto', await pag.evaluate(() => [document.querySelector('label[for="plan-ajuste"]').textContent,
-    document.querySelector('#plan-ajustar').textContent, document.querySelector('#plan-ajuste').placeholder, !!document.querySelector('#plan-mudar-algo')]),
-    ['O que mudar?', 'Ajustar', 'Ex.: Geografia no dia 21', true]);
+  conf('tocar no aviso ACRESCENTA o dia ao que já está no campo, sem apagar', await pag.evaluate(() => [document.querySelector('#plan-ajuste').value, document.activeElement && document.activeElement.id]),
+    ['Tira Matemática. No dia 19/11: ', 'plan-ajuste']);
+  conf('rótulos do ajuste: "O que mudar?" e "Ajustar" (principal); no tablet deitado, com o campo à vista, o "Mudar algo?" some', await pag.evaluate(() => [document.querySelector('label[for="plan-ajuste"]').textContent,
+    document.querySelector('#plan-ajustar').textContent, document.querySelector('#plan-ajustar').classList.contains('principal'), document.querySelector('#plan-ajuste').placeholder,
+    getComputedStyle(document.querySelector('#plan-mudar-algo')).display]), ['O que mudar?', 'Ajustar', true, 'Ex.: Geografia no dia 21', 'none']);
 
   // o ajuste: a prévia fica, esmaecida; depois, "Mudou:" e "Desfazer ajuste"
   const plano2 = planoFalso('al1');
@@ -328,8 +364,8 @@ async function transbordo(pag) {
   const p2 = falso.pedidos[1].corpo;
   conf('o ajuste leva a conversa inteira, com o content do assistente intacto', [p2.messages.map(m => m.role).join(','), JSON.stringify(p2.messages[1].content) === JSON.stringify(resp1.resposta.content),
     JSON.stringify(p2.messages[0]) === JSON.stringify(p1.messages[0]), p2.system === p1.system], ['user,assistant,user', true, true, true]);
-  conf('"Mudou: o dia 21/11." com o "Desfazer ajuste"', await pag.evaluate(() => [document.querySelector('#plan-mudou span').textContent, !!document.querySelector('#plan-desfazer-ajuste')]),
-    ['Mudou: o dia 21/11.', true]);
+  conf('"Mudou:" diz a matéria e a ação, com o "Desfazer ajuste"', await pag.evaluate(() => [document.querySelector('#plan-mudou span').textContent, !!document.querySelector('#plan-desfazer-ajuste')]),
+    ['Mudou: entrou Geografia (1h) no dia 21/11 e saiu Matemática (1h) do dia 21/11.', true]);
   await clicar(pag, '#plan-desfazer-ajuste');
   conf('desfeito: o "Mudou:" sai', await pag.evaluate(() => !document.querySelector('#plan-mudou')), true);
   // o pedido seguinte mostra o plano de ANTES do ajuste (Matemática no dia 21): o desfazer voltou mesmo
@@ -406,6 +442,11 @@ async function transbordo(pag) {
   await esperar('o salvo abre direto na prévia', () => temFolha(pag), v => v === true, 30000);
   conf('e já diz "Salvo na ficha", sem pedido novo', [await pag.evaluate(() => document.querySelector('#plan-salvar').textContent), falso.pedidos.length], ['Salvo na ficha', antesTeto + 2]);
   conf('no salvo, "Para qual aluno?" e o "Excluir este plano"', await pag.evaluate(() => [!!document.querySelector('#plan-quem #plan-alunos'), !!document.querySelector('#plan-excluir')]), [true, true]);
+  await clicar(pag, '#plan-ampliar');
+  await esperar('o leitor abriu do salvo', () => aberta(pag, 'modal-leitor-pdf'), v => v === true, 10000);
+  await pag.evaluate(() => history.back());
+  await esperar('o Voltar fechou o leitor do salvo', () => aberta(pag, 'modal-leitor-pdf'), v => v === false, 10000);
+  conf('com o plano salvo, o Voltar também fecha só o leitor', await pag.evaluate(() => document.querySelector('#modal-planejamento').classList.contains('aberto')), true);
 
   // excluir o salvo: sem pergunta, com Desfazer
   await clicar(pag, '#plan-excluir');
@@ -490,7 +531,8 @@ async function transbordo(pag) {
   await clicar(pag, '#plan-montar');
   await esperar('a frase do erro', () => pag.evaluate(() => { const e = document.querySelector('#plan-erro span'); return e && e.textContent; }), v => !!v, 15000);
   conf('sem_permissao vira a frase dela, e o texto continua', await pag.evaluate(() => [document.querySelector('#plan-erro span').textContent, document.querySelector('#plan-texto').value]),
-    ['Esta conta ainda não tem a IA liberada. Peça ao Rômulo.', 'texto que não pode sumir']);
+    ['A IA ainda não está liberada nesta conta.', 'texto que não pode sumir']);
+  conf('sem permissão, tentar de novo não resolve: sem o botão, e o Montar desligado', await pag.evaluate(() => [!document.querySelector('#plan-tentar'), document.querySelector('#plan-montar').disabled]), [true, true]);
   const antesOffline = falso.pedidos.length;
   await pag.setOfflineMode(true);
   await esperar('a frase do sem internet', () => pag.evaluate(() => { const e = document.querySelector('#plan-erro span'); return e && e.textContent; }), v => v === 'Precisa de internet para montar o planejamento.', 15000);
@@ -531,6 +573,7 @@ async function transbordo(pag) {
   conf('"Para qual aluno?" (radiogroup); com confiança baixa, nenhum marcado e a folha espera a escolha', [await pag.evaluate(() => [document.querySelector('#plan-pergunta').textContent,
     document.querySelector('#plan-alunos').getAttribute('role'), !!document.querySelector('#plan-sem-aluno'), document.querySelector('#plan-salvar').disabled]), await marcados()],
     [['Para qual aluno?', 'radiogroup', true, true], []]);
+  conf('sem o aluno escolhido, o selo de conferir não aparece', await pag.evaluate(() => !document.querySelector('#plan-conferir')), true);
   await clicar(pag, '#plan-alunos [data-aluno="al1"]');
   conf('um toque marca UM aluno, com o ✓', [await marcados(), await pag.evaluate(() => !!document.querySelector('#plan-alunos [data-aluno="al1"] svg'))], [['al1'], true]);
   await clicar(pag, '#plan-alunos [data-aluno="al2"]');
@@ -548,7 +591,15 @@ async function transbordo(pag) {
   conf('ajuste depois de trocar o aluno: um turno só, com o plano atual e o aluno novo (e sem o antigo)', [pt.messages.length, tt.indexOf('Este é o plano atual') >= 0,
     tt.indexOf('O aluno já está escolhido: id al1.') >= 0, tt.indexOf('Zélia') >= 0, tt.indexOf('Bruno') < 0, tt.indexOf('"alunoId":"al1"') >= 0], [1, true, true, true, true, true]);
   conf('e continua marcada a Zélia', await marcados(), ['al1']);
-  await fecharPlanejamento(pag);
+  // compartilhar o plano não salvo: ele vai para a ficha, e fechar não pergunta mais
+  const antesDeCompartilhar = await planosDe(pag, 'al1');
+  await clicar(pag, '#plan-compartilhar');
+  await esperar('compartilhou e salvou', () => planosDe(pag, 'al1'), v => v === antesDeCompartilhar + 1, 10000);
+  await pausa(450);
+  await pag.evaluate(() => document.querySelector('#modal-planejamento .fechar').click());
+  await pausa(300);
+  conf('compartilhar salvou na ficha, e fechar não perguntou', await pag.evaluate(() => [document.querySelector('#modal-sair-planejamento').classList.contains('aberto'),
+    document.querySelector('#modal-planejamento').classList.contains('aberto')]), [false, false]);
 
   // ================================================================
   secao('2. O plano salvo no aluno errado muda de ficha');
@@ -563,7 +614,7 @@ async function transbordo(pag) {
   await clicar(pag, '#plan-salvar');
   await esperar('salvo no outro aluno', () => planosDe(pag, 'al2'), v => v === 2, 10000);
   await fecharPlanejamento(pag);
-  conf('a ficha de Zélia ficou sem o plano, que foi para o Bruno', [await pag.evaluate(() => document.querySelectorAll('#plan-secao .plan-item').length), await planosDe(pag, 'al1')], [0, 0]);
+  conf('o plano trocado saiu da ficha de Zélia e foi para o Bruno (fica o que veio do compartilhar)', [await pag.evaluate(() => document.querySelectorAll('#plan-secao .plan-item').length), await planosDe(pag, 'al1'), await planosDe(pag, 'al2')], [1, 1, 2]);
   await pag.evaluate(() => document.querySelector('#modal-aluno .fechar').click());
   await esperar('a ficha fechou', () => aberta(pag, 'modal-aluno'), v => v === false, 10000);
 

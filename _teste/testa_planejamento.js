@@ -163,12 +163,17 @@ secao('3. A leitura da resposta (dos dois lados)');
   conf('plano com provas null: a conferência recusa com motivo, sem quebrar', [lancou, motivo], [false, 'provas ausentes']);
   conf('JSON quebrado vira "sem_plano"', P.lerResposta({ ok: true, resposta: { stop_reason: 'end_turn', content: [{ type: 'text', text: '{"alunoId":' }] } }, IDS).erro, 'sem_plano');
   conf('as frases de tela dos códigos do brief', [P.fraseDoErro('limite_mensal'), P.fraseDoErro('sem_permissao'), P.fraseDoErro('sem_internet')],
-    ['A IA está pausada até o dia 1.', 'Esta conta ainda não tem a IA liberada. Peça ao Rômulo.', 'Precisa de internet para montar o planejamento.']);
+    ['A IA está pausada até o dia 1.', 'A IA ainda não está liberada nesta conta.', 'Precisa de internet para montar o planejamento.']);
   conf('o tempo esgotado tem frase própria, que não é "a conexão caiu"', [P.fraseDoErro('prazo'), P.fraseDoErro('prazo') === P.fraseDoErro('rede')],
     ['A IA demorou demais para responder. Tente de novo.', false]);
   const inc = P.itensIncertos(planoBase({ extra: { observacoes: ['Confira o dia ' + String.fromCharCode(0x2013) + ' 14.'] } }));
-  conf('o resumo de incertos traz a prova incerta e a observação (com verbo e alvo, sem travessão), e a data para o toque',
-    inc.slice(0, 2), [{ texto: 'Confira no aviso a prova de 14/11 (História).', data: '2026-11-14' }, { texto: 'Confira o dia: 14.', data: null }]);
+  conf('o resumo de conferir: UM aviso por prova, em ordem de data, o mais acionável; depois as observações (com verbo e alvo, sem travessão)',
+    inc.map(i => i.texto), ['Nenhum dia de estudo de Cambridge antes da prova de 12/11.', 'Confira no aviso a prova de 14/11 (História).',
+      'O conteúdo da prova de 20/11 (Science) não veio no aviso. Se tiver, diga no Ajustar.', 'Confira o dia: 14.']);
+  conf('a prova de 12/11 tinha dois avisos (estudo e conteúdo): ficou o de estudo, um só', inc.filter(i => i.data === '2026-11-12').length, 1);
+  conf('com a data para o toque, e sem data na observação', [inc[1].data, inc[3].data], ['2026-11-14', null]);
+  conf('sem o Ajustar à mão, a frase não manda dizer no Ajustar (o outro lado)',
+    P.itensIncertos(planoBase(), { semAjuste: true }).map(i => i.texto).filter(t => /Ajustar/.test(t)), []);
 })();
 
 // ================================================================
@@ -195,8 +200,11 @@ secao('3b. A conferência do app: estudo antes da prova e conteúdo que faltou (
   const comAviso = planoBase();
   conf('a conferência entra no resumo de conferir, e a folha não muda (o texto do aviso não está no PDF)',
     [P.itensIncertos(comAviso).some(i => i.tipo === 'estudo'), textoDoPdf(P.desenharFolha(comAviso, { nome: 'Ana' }, G).bytes).join(' ').indexOf('Nenhum dia de estudo') < 0], [true, true]);
-  conf('o resumo de um ajuste: os dias que mudaram', [P.resumoDaMudanca(planoBase(), (() => { const x = planoBase(); x.grade[2].estudo = ['Geografia']; return x; })()),
-    P.resumoDaMudanca(planoBase(), planoBase())], ['o dia 11/11', 'nada na folha']);
+  conf('o resumo de um ajuste diz a matéria e a ação; sem mudança, "O plano ficou igual."', [
+    P.resumoDaMudanca(planoBase(), (() => { const x = planoBase(); x.grade[2].estudo = ['Matemática', 'Geografia']; return x; })()),
+    P.resumoDaMudanca(planoBase(), (() => { const x = planoBase(); x.grade[2].estudo = []; return x; })()),
+    P.resumoDaMudanca(planoBase(), planoBase())],
+    ['Mudou: entrou Geografia no dia 11/11.', 'Mudou: saiu Matemática do dia 11/11.', 'O plano ficou igual.']);
 })();
 
 // ================================================================
