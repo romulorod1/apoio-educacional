@@ -77,7 +77,8 @@ function conf(rotulo, obtido, esperado) {
 }
 function secao(t) { console.log('\n=== ' + t + ' ==='); }
 function terminar() {
-  console.log('\n' + passes + ' ok, ' + falhas + ' falha(s)' + (MODO ? ' (modo ' + MODO + ')' : ''));
+  if (MODO) console.log('\nmodo ' + MODO);
+  console.log('\n' + passes + ' passaram, ' + falhas + ' falharam.');
   process.exit(falhas || !passes ? 1 : 0);
 }
 

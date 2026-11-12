@@ -18672,17 +18672,17 @@
    * (ligadaDe). Desfazer devolve as correções do livro byte a byte. */
   function mudarCorrecaoOrfa(l, chaveOrfa, entrada) {
     db.ajustes = db.ajustes || {};
-    var todas = db.ajustes.mapaDosLivros = db.ajustes.mapaDosLivros || {};
-    var doLivro = todas[l.id];
+    db.ajustes.mapaDosLivros = db.ajustes.mapaDosLivros || {};
+    var doLivro = db.ajustes.mapaDosLivros[l.id];
     if (!doLivro || !Object.prototype.hasOwnProperty.call(doLivro, chaveOrfa)) { desenharTelaDoLivro(l); return; }
     var antes = JSON.stringify(doLivro);
     var c = doLivro[chaveOrfa];
     delete doLivro[chaveOrfa];
     if (entrada) {
-      var registro = { titulo: entrada.titulo, assuntos: (c.assuntos || []).slice(), acao: c.acao === 'corrigiu' ? 'corrigiu' : 'confirmou',
+      var ligada = { titulo: entrada.titulo, assuntos: (c.assuntos || []).slice(), acao: c.acao === 'corrigiu' ? 'corrigiu' : 'confirmou',
         quando: new Date().toISOString(), n: entrada.n, ligadaDe: c.titulo };
-      if (entrada.chave) registro.chave = entrada.chave;
-      doLivro[Biblioteca.chaveParaGravarCorrecao(doLivro, entrada)] = registro;
+      if (entrada.chave) ligada.chave = entrada.chave;
+      doLivro[Biblioteca.chaveParaGravarCorrecao(doLivro, entrada)] = ligada;
     }
     orfaLigando[l.id] = null;
     var redesenhar = function () { if (bibLivroAberto === l.id) desenharTelaDoLivro(l); };

@@ -68,7 +68,8 @@ const PORTA = 8972;
 const STORE = fs.readFileSync(path.join(H.RAIZ, 'store.js'), 'utf8').replace(/\r\n/g, '\n');
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 const VENENOS = {
-  '--envenenado-solta-no-meta': ['store', 'contas.iguais++;', "contas.iguais++; t.objectStore('livros_posicoes').delete(l.meta.id);"],
+  '--envenenado-solta-no-meta': ['store', 'if (mesmoArquivo) {\n              contas.iguais++;',
+    "if (mesmoArquivo) {\n              contas.iguais++; t.objectStore('livros_posicoes').delete(l.meta.id);"],
   '--envenenado-solta-no-sumario': ['store', 'contas.sumariosMudados++;', "contas.sumariosMudados++; t.objectStore('livros_posicoes').delete(l.meta.id);"],
   '--envenenado-solta-na-troca': ['store', 'var nova = posicaoNoArquivoNovo(rp.result, atual.meta, l.meta);', 'var nova = null; ps.delete(l.meta.id);'],
   '--envenenado-nao-ajusta': ['store', 'if (inteiroPositivo(total) && pos.pagina > total) {', 'if (false) {'],
