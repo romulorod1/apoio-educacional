@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.64';
+  var VERSAO = '1.42.73';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -84,6 +84,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.68',
+      itens: [
+        'Na ficha de cada aluno, em Planejamentos, toque em Novo planejamento, cole ou dite o aviso de provas da escola e anexe os prints. O aplicativo monta um PDF com os dias de estudo, as provas e as suas aulas; você confere, ajusta se quiser e compartilha com a família. Precisa de internet. Também dá para começar pelo link na janela de marcar aula.'
+      ]
+    },
     {
       versao: '1.42.61',
       itens: [
