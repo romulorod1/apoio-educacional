@@ -441,7 +441,7 @@ async function importar(pag, arquivo) {
     const caixa = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-longo"]');
     const aviso = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-sem-texto');
     return { status: document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status').textContent,
-      livros: [...document.querySelectorAll('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro]')].map(x => x.dataset.livro).join(','),
+      livros: [...document.querySelectorAll('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados .bib-busca-livro[data-livro]')].map(x => x.dataset.livro).join(','),
       grupo: caixa ? caixa.querySelector('.bib-busca-livro-paginas').textContent : '',
       botao: caixa && caixa.querySelector('button') ? caixa.querySelector('button').textContent : '',
       aviso: aviso ? aviso.querySelector('summary').textContent : '', avisoAberto: aviso ? aviso.open : null,
@@ -477,6 +477,22 @@ async function importar(pag, arquivo) {
   const semSumarioEfetivo = await buscar(pag, 'paralelepipedo');
   const bCru = (semSumarioEfetivo.livros || []).find(l => l.id === 'indice-longo');
   conf('e sem ele, volta ao sumário do PDF', bCru ? JSON.stringify(bCru.capitulos.map(c => [c.titulo, c.paginas])) : '', JSON.stringify([['Parte 2: Espaço', [200]]]));
+  /* com a leitura dos livros ainda em andamento, o grupo "Nos livros" diz
+   * isso, e não "nenhum resultado" (a consulta é dublada só aqui) */
+  const preparando = await pag.evaluate(async () => {
+    const original = IndiceLivros.buscarNosLivros;
+    IndiceLivros.buscarNosLivros = () => Promise.resolve({ livros: [], pendentes: ['indice-longo'], naoLidos: [] });
+    try {
+      const c = document.querySelector('#busca-biblioteca');
+      c.value = 'termo da leitura em curso';
+      c.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 900));
+      const g = document.querySelector('#bib-corpo [data-grupo="livros"]');
+      return g ? g.querySelector('.bib-grupo-contagem').textContent + ' | ' + g.querySelector('.bib-busca-livros-status').textContent : 'sem o grupo';
+    } finally { IndiceLivros.buscarNosLivros = original; }
+  });
+  conf('com a leitura em andamento, o grupo "Nos livros" diz que está preparando, e não zero',
+    preparando, 'preparando | A busca nos livros ainda está sendo preparada em 1 livro. O resultado aparece aqui quando a leitura terminar.');
   await pag.evaluate(() => { const campo = document.querySelector('#busca-biblioteca'); campo.value = ''; campo.dispatchEvent(new Event('input', { bubbles: true })); });
 
   const norm = await pag.evaluate(() => [IndiceLivros.normalizar('multipli-' + String.fromCharCode(10) + 'cação'),
