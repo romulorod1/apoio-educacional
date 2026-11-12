@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.75';
+  var VERSAO = '1.42.78';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,7 +85,7 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.75',
+      versao: '1.42.78',
       itens: [
         'Na Biblioteca, a busca também acha os capítulos pelo nome e pelos assuntos ligados, inclusive nos livros escaneados, e o botão Abrir no capítulo leva ao começo dele.',
         'A busca nos livros pede todas as palavras digitadas e mostra primeiro os melhores resultados; o resto fica em Mais resultados, com cada capítulo numa linha só.'
