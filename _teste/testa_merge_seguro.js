@@ -319,6 +319,36 @@ fs.writeFileSync(arqSemRotulo, semRotulo);
 r = rodar(prBom(), [], 3, arqSemRotulo);
 conf('controle: ignorando o rotulo, o risco ATRAS passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge/.test(c)).length === 1, true);
 
+console.log('\n=== 3b. Fatia do nivel 1 vencida por um juntador verde mais novo (#174) ===');
+// O nome da fatia leva o N da rodada; a rodada seguinte (outro N, ou zero
+// fatias com o "pronto") nao tem fatia do mesmo nome para desbancar a vermelha.
+function comFatiaVelha(conclusaoJuntador, inicioFatia) {
+  const q = prBom();
+  q.statusCheckRollup.push(
+    { __typename: 'CheckRun', name: 'portao-tocadas (fatia 3 de 7)', status: 'COMPLETED', conclusion: 'FAILURE', startedAt: inicioFatia || '2026-10-26T12:01:00Z' },
+    { __typename: 'CheckRun', name: 'portao-tocadas (fatia ${{ matrix.fatia }} de ${{ needs.portao-tocadas-plano.outputs.fatias }})', status: 'COMPLETED', conclusion: 'SKIPPED', startedAt: '2026-10-26T12:10:00Z' },
+    { __typename: 'CheckRun', name: 'portao-tocadas', status: 'COMPLETED', conclusion: conclusaoJuntador, startedAt: '2026-10-26T12:11:00Z' });
+  return q;
+}
+conf('fatia vermelha antiga, juntador e bateria verdes mais novos: passa', decidir(comFatiaVelha('SUCCESS')).ok, true);
+r = rodar(comFatiaVelha('SUCCESS'));
+conf('ponta a ponta com o gh falso: sai 0 e chama o merge', r.codigo === 0 && r.chamadas.filter(c => /^pr merge 9 /.test(c)).length === 1, true);
+conf('controle: juntador vermelho mais novo recusa', motivo(comFatiaVelha('FAILURE'), 'portao-tocadas esta FAILURE'), true);
+r = rodar(comFatiaVelha('FAILURE'));
+conf('controle ponta a ponta: juntador vermelho sai 1 e NAO chama o merge', r.codigo === 1 && !r.chamadas.some(c => /^pr merge/.test(c)), true);
+conf('controle: fatia vermelha MAIS NOVA que o juntador verde recusa',
+  motivo(comFatiaVelha('SUCCESS', '2026-10-26T12:20:00Z'), 'portao-tocadas (fatia 3 de 7) esta FAILURE'), true);
+conf('controle: juntador em andamento nao vence a fatia vermelha',
+  (() => { const q = comFatiaVelha('SUCCESS'); const j = q.statusCheckRollup[q.statusCheckRollup.length - 1]; j.status = 'IN_PROGRESS'; j.conclusion = null; return motivo(q, 'portao-tocadas (fatia 3 de 7) esta FAILURE'); })(), true);
+conf('controle: a regra vale so para o nivel 1, nao para a fatia da bateria',
+  (() => { const q = comFatiaVelha('SUCCESS'); q.statusCheckRollup.push({ __typename: 'CheckRun', name: 'portao-navegador (fatia 2 de 8)', status: 'COMPLETED', conclusion: 'FAILURE', startedAt: '2026-10-26T12:01:00Z' }); return motivo(q, 'portao-navegador (fatia 2 de 8) esta FAILURE'); })(), true);
+const semVelhas = fonte.replace(/ *\/\/ FATIAS-VELHAS-INICIO[\s\S]*?\/\/ FATIAS-VELHAS-FIM\r?\n/, '');
+conf('controle: achei o bloco das fatias vencidas para tirar', semVelhas !== fonte, true);
+const arqSemVelhas = path.join(tmp, 'merge_seguro_sem_fatias_velhas.js');
+fs.writeFileSync(arqSemVelhas, semVelhas);
+r = rodar(comFatiaVelha('SUCCESS'), [], 0, arqSemVelhas);
+conf('controle: sem o bloco, a fatia vermelha antiga recusa o merge (o defeito da revisao)', r.codigo === 1 && /portao-tocadas \(fatia 3 de 7\) esta FAILURE/.test(r.saida), true);
+
 console.log('\n=== 4. O merge_seguro e o da main? (cópia velha recusa) ===');
 r = rodar(prBom(), ['--conferir']);
 conf('cópia igual à da main passa para as checagens seguintes', r.codigo === 0 && /^ok /m.test(r.saida), true);
