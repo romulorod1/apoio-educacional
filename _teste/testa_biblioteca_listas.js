@@ -2694,39 +2694,53 @@ async function cenarioPortas(pag) {
 
   // ================================================================
   secao('7. Comportamento de novidades da versao');
-  /* Em versoes com novidades cadastradas em NOVIDADES (como 1.28.0 com o carrossel),
-   * a janela de novidades abre ao subir da versao anterior.
-   * Em versoes silenciosas (como foi a 1.27.0 antes do texto do Romulo), a versao sobe sem abrir a janela. */
+  /* Desde o 13f a janela mostra TODAS as novidades depois da versao que ela viu,
+   * ate a atual. Subir da 1.26.0 abre (ha novidades que ela nao viu). O
+   * lancamento silencioso agora e subir da ULTIMA versao com novidade para uma
+   * versao sem entrada: a janela nao abre. E o controle de sempre: com uma
+   * entrada para esta versao, a mesma subida abre. */
   const versaoDoApp = /var VERSAO = '([^']+)';/.exec(APP_REPO)[1];
-  const temNovidadesDestaVersao = new RegExp("versao: '" + versaoDoApp.replace(/\./g, '\\.') + "'").test(APP_REPO);
-  const gravado = await pag.evaluate(async () => {
-    const d = await Store.carregar();
-    d.ajustes = d.ajustes || {};
-    d.ajustes.versaoVista = '1.26.0';
-    await Store.salvar(d);
-    const lido = await Store.carregar();
-    return (lido.ajustes || {}).versaoVista;
-  });
-  conf('a versao vista do tablet ficou na 1.26.0', gravado, '1.26.0');
-  await pag.reload({ waitUntil: 'networkidle0' });
-  let abriuAlgumaVez = false;
-  for (let i = 0; i < 20; i++) {
-    await pausa(200);
-    if (await pag.evaluate(() => !!document.querySelector('#modal-novidades.aberto'))) { abriuAlgumaVez = true; break; }
+  const NOVIDADES_DO_APP = (() => {
+    const t = APP_REPO.replace(/\r\n/g, '\n');
+    const i = t.indexOf('var NOVIDADES = [');
+    const j = t.indexOf('\n  ];', i);
+    return i < 0 || j < 0 ? [] : require('vm').runInNewContext('(' + t.slice(i + 'var NOVIDADES = '.length, j + 4) + ')');
+  })();
+  const antesDe = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let k = 0; k < 3; k++) if (x[k] !== y[k]) return x[k] < y[k]; return false; };
+  const depoisDe = v => NOVIDADES_DO_APP.filter(n => antesDe(v, n.versao) && !antesDe(versaoDoApp, n.versao) && n.itens && n.itens.length);
+  conf('li as NOVIDADES do app.js (controle: mais de 10 entradas)', NOVIDADES_DO_APP.length > 10, true);
+  async function subirDe(p, vista) {
+    const gravadoP = await p.evaluate(async v => {
+      const d = await Store.carregar();
+      d.ajustes = d.ajustes || {};
+      d.ajustes.versaoVista = v;
+      await Store.salvar(d);
+      const lido = await Store.carregar();
+      return (lido.ajustes || {}).versaoVista;
+    }, vista);
+    conf('a versao vista do tablet ficou na ' + vista, gravadoP, vista);
+    await p.reload({ waitUntil: 'networkidle0' });
+    let abriu = false;
+    for (let i = 0; i < 20; i++) {
+      await pausa(200);
+      if (await p.evaluate(() => !!document.querySelector('#modal-novidades.aberto'))) { abriu = true; break; }
+    }
+    return abriu;
   }
-  const janela = await pag.evaluate(() => {
-    const m = document.querySelector('#modal-novidades');
-    return { existe: !!m };
-  });
-  console.log('   janela de novidades abriu alguma vez em 4 s: ' + abriuAlgumaVez + ', versao do app: ' + versaoDoApp);
+  const janela = await pag.evaluate(() => ({ existe: !!document.querySelector('#modal-novidades') }));
   conf('a janela de novidades existe no aplicativo', janela.existe, true);
 
-  if (temNovidadesDestaVersao) {
-    conf('a janela abre ao subir para versao com novidades cadastradas', abriuAlgumaVez, true);
-    conf('e a janela SABE abrir: com uma entrada para esta versao, ela abre', abriuAlgumaVez, true);
-  } else {
-    conf('o app.js NAO tem entrada de novidades para esta versao', temNovidadesDestaVersao, false);
-    conf('e NAO abriu sozinha ao subir da 1.26.0 para esta versao', abriuAlgumaVez, false);
+  conf('controle: ha novidade depois da 1.26.0 no app.js', depoisDe('1.26.0').length > 0, true);
+  const abriuDe126 = await subirDe(pag, '1.26.0');
+  console.log('   subindo da 1.26.0 para ' + versaoDoApp + ': a janela abriu em 4 s: ' + abriuDe126);
+  conf('a janela abre ao subir da 1.26.0 (ha novidades que ela nao viu desde entao)', abriuDe126, true);
+
+  const ultima = NOVIDADES_DO_APP[0] && NOVIDADES_DO_APP[0].versao;
+  if (ultima && antesDe(ultima, versaoDoApp)) {
+    conf('o app.js NAO tem entrada de novidades para esta versao (' + versaoDoApp + ')', depoisDe(ultima).length, 0);
+    const abriuDaUltima = await subirDe(pag, ultima);
+    console.log('   subindo da ' + ultima + ' (a ultima com novidade) para ' + versaoDoApp + ': abriu: ' + abriuDaUltima);
+    conf('e NAO abriu sozinha ao subir da ' + ultima + ' para esta versao (lancamento silencioso)', abriuDaUltima, false);
 
     const ANCORA_NOV = '  var NOVIDADES = [' + NL_APP;
     conf('a ancora do controle casa exatamente uma vez', APP_REPO.split(ANCORA_NOV).length - 1, 1);
@@ -2738,23 +2752,25 @@ async function cenarioPortas(pag) {
     const pagC = await ambControle.pagina();
     await RELOGIO.naPagina(pagC);
     await H.abrirApp(pagC, ambControle.ORIGEM);
-    const antes = await pagC.evaluate(async () => {
+    const antes = await pagC.evaluate(async v => {
       const d = await Store.carregar();
       d.ajustes = d.ajustes || {};
-      d.ajustes.versaoVista = '1.26.0';
+      d.ajustes.versaoVista = v;
       await Store.salvar(d);
       const lido = await Store.carregar();
       return { vista: (lido.ajustes || {}).versaoVista, aulas: (lido.aulas || []).length };
-    });
+    }, ultima);
     console.log('   controle antes do reload: ' + JSON.stringify(antes));
-    conf('a versao vista ficou gravada antes do reload', antes.vista, '1.26.0');
+    conf('a versao vista ficou gravada antes do reload', antes.vista, ultima);
     await pagC.reload({ waitUntil: 'networkidle0' });
     const r = await esperar('a janela com a entrada de controle', () => pagC.evaluate(() => {
       const m = document.querySelector('#modal-novidades');
       return !!(m && m.classList.contains('aberto'));
     }), v => v === true, 12000);
-    conf('e a janela SABE abrir: com uma entrada para esta versao, ela abre', r.ok, true);
+    conf('e a janela SABE abrir: com uma entrada para esta versao, a mesma subida abre', r.ok, true);
     await ambControle.encerrar();
+  } else {
+    conf('a versao atual ' + versaoDoApp + ' tem novidade; o caso silencioso nao se aplica', true, true);
   }
 
   if (pag.errosDePagina.length) console.log('   erros de página: ' + pag.errosDePagina.join(' | ').slice(0, 400));
