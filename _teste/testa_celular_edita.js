@@ -973,10 +973,11 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   /* O dinheiro do mês antes do ajuste, pelo Core, para conferir a diferença depois. */
   const mesDoGama = (pag, id, sid, m) => pag.evaluate((id, sid, m) => Store.carregar().then(d => {
     const f = Core.calcularMesInteiro(d, m).find(x => x.aluno.id === 'gama');
-    const daSerie = d.aulas.filter(a => a.serieId === sid && a.data.slice(0, 7) === m).map(a => a.id);
     const linha = f.linhas.find(l => l.id === id);
+    /* As outras da série em TODOS os meses: as do mês seguinte são as que o
+     * escopo 'todas' mudaria sem aparecer no fechamento deste mês. */
     return { totalMin: f.totalMin, totalValor: f.totalValor, ajustada: linha && [linha.duracaoMin, linha.valor, linha.valorHora].join(' '),
-      outras: f.linhas.filter(l => daSerie.indexOf(l.id) >= 0 && l.id !== id).map(l => l.duracaoMin + ' ' + l.valor).sort().join('; ') };
+      outras: d.aulas.filter(a => a.serieId === sid && a.id !== id).map(a => a.data + ' ' + a.duracaoMin).sort().join('; ') };
   }), id, sid, m);
   const dinheiroAntes = await mesDoGama(pagC, idGama2, serieGama.id, dataGama2.slice(0, 7));
   await digitar(pagC, '#cel-ajustar-duracao', '90');
@@ -1002,7 +1003,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   prop('o fechamento soma a duração nova: a aula ajustada é 1h30 e vale 1,5 hora, o total sobe 30 min e meia hora de valor, e as outras da série seguem com 1h',
     vh > 0 && dinheiroDepois.ajustada === '90 ' + (vh * 1.5) + ' ' + vh && dinheiroDepois.totalMin - dinheiroAntes.totalMin === 30 &&
     Math.abs(dinheiroDepois.totalValor - dinheiroAntes.totalValor - vh * 0.5) < 0.005 &&
-    dinheiroDepois.outras === dinheiroAntes.outras && dinheiroDepois.outras.split('; ').every(t => t.split(' ')[0] === '60'), V_AJUSTE_TODAS);
+    !!dinheiroDepois.outras && dinheiroDepois.outras === dinheiroAntes.outras && dinheiroDepois.outras.split('; ').every(t => t.split(' ')[1] === '60'), V_AJUSTE_TODAS);
   if (MODO === V_AJUSTE_TODAS) fimDoVeneno();
   await abrirCelular(pagC);
   await esperar('a busca automática do celular terminou depois de atualizar', () => pagC.evaluate(() => !/Buscando a cópia mais nova/.test((document.querySelector('#cel-origem') || {}).textContent || '')), v => v === true, 30000);
