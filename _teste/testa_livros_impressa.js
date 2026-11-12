@@ -490,6 +490,23 @@ const LIVRO_SEM_NUMERACAO = {
     }
   }
 
+  // o campo das páginas da exportação (livro com página impressa): o intervalo
+  // sem espaço ("45a48") é o intervalo inteiro, e não só a primeira página
+  {
+    const app = fs.readFileSync(path.join(RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
+    const marca = '"45a48" (sem espaço) é o intervalo de 45 a 48\n        var m = ';
+    const i = app.indexOf(marca);
+    conf('a regra do campo das páginas aparece no app.js', i >= 0 && app.indexOf(marca, i + 1) < 0, true);
+    const linha = i >= 0 ? app.slice(i + marca.length, app.indexOf('.exec(', i)) : '/$^/';
+    const re = eval(linha); // eslint-disable-line no-eval
+    const ler = s => { const m = re.exec(s); return m ? [m[1] || '', m[2], m[3] || '', m[4] || ''].join('|') : 'recusado'; };
+    conf('"45a48" é o intervalo de 45 a 48', ler('45a48'), '|45||48');
+    conf('"45 a 48" e "45-48" também', ler('45 a 48') + ' ' + ler('45-48'), '|45||48 |45||48');
+    conf('"xii-xiv" é o intervalo romano', ler('xii-xiv'), '|xii||xiv');
+    conf('"arquivo 3a5" é o intervalo do arquivo', ler('arquivo 3a5'), 'arquivo|3||5');
+    conf('"45b" é recusado, e não lido como 45', ler('45b'), 'recusado');
+  }
+
   console.log('\n' + passes + ' passaram, ' + falhas + ' falharam.');
   process.exit(falhas ? 1 : 0);
 })();
