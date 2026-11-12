@@ -145,8 +145,9 @@
  * O v118 traz navegação dia a dia no celular; v119 ajusta a legenda do mapa.
  * O v120 isola a conferência de livros; v121 traz Marcar pago; v122, página impressa;
  * v123, edição da ficha móvel; v126, encaixe da agenda no celular. O v127
- * sincroniza PDFs e fotos anexados a aulas; v128 traz os filtros de tipo na Biblioteca. */
-var CACHE = 'apoio-educacional-v128';
+ * sincroniza PDFs e fotos anexados a aulas; v128 traz os filtros de tipo na Biblioteca; v134,
+ * o sumário do mapa quando os marcadores do PDF são lixo. */
+var CACHE = 'apoio-educacional-v134';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

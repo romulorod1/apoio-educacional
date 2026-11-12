@@ -38,6 +38,15 @@
  *      gabarito fora do livro não vale; as páginas escolhidas ("3-5, 8"); o
  *      rodapé de fonte, sem travessão.
  *
+ * O sumário que a tela usa (biblioteca.js, sumarioDoLivro, sem tela):
+ *   6. marcadores lixo ("page1..page40", "Blank Page", nome de arquivo)
+ *      e sumário vazio dão lugar ao mapa; marcadores bons, livro sem mapa,
+ *      EPUB e mapa feito do próprio lixo ficam como estão; a fronteira da
+ *      metade, dos dois lados.
+ *   --envenenado-sumario-dos-marcadores  sumarioDoLivro devolve sempre o
+ *                                 sumário do pacote, como a main antes do
+ *                                 conserto: os "pageN" continuam.
+ *
  *   node _teste/testa_livros_regras.js [--envenenado-...]
  */
 'use strict';
@@ -49,7 +58,7 @@ const Sintetico = require('./_pacote_sintetico.js');
 const RAIZ = path.join(__dirname, '..');
 const VENENOS = ['--envenenado-cortado-le-tudo', '--envenenado-teto-antigo', '--envenenado-sem-ano',
   '--envenenado-correcao-ignorada', '--envenenado-correcao-sem-titulo', '--envenenado-respostas-no-capitulo',
-  '--envenenado-fim-do-capitulo-tira'];
+  '--envenenado-fim-do-capitulo-tira', '--envenenado-sumario-dos-marcadores'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 
 let passes = 0, falhas = 0;
@@ -84,6 +93,7 @@ const TETO = 'var TETO_POR_LIVRO = 160 * 1024 * 1024;';
 const FILTRO_DE_ANO = 'if (!ano) return true;';
 const CORRECAO_VALE = 'var vale = !!c && c.titulo === e.titulo && Array.isArray(c.assuntos);';
 const TIRA_AS_RESPOSTAS = 'var semRespostas = todas.filter(function (u) { return respostas.indexOf(u) < 0; });';
+const SUMARIO_DO_MAPA = 'if (!doMapa) return sumario;';
 const GAB_SO_DO_LIVRO = "var doLivro = g && g.como !== 'fim_do_capitulo' ? g.faixas : [];";
 const TROCAS = {
   '--envenenado-cortado-le-tudo': [RELANCA_CORTADO, ''],
@@ -92,7 +102,8 @@ const TROCAS = {
   '--envenenado-correcao-ignorada': [CORRECAO_VALE, 'var vale = false;'],
   '--envenenado-correcao-sem-titulo': [CORRECAO_VALE, 'var vale = !!c && Array.isArray(c.assuntos);'],
   '--envenenado-respostas-no-capitulo': [TIRA_AS_RESPOSTAS, 'var semRespostas = todas;'],
-  '--envenenado-fim-do-capitulo-tira': [GAB_SO_DO_LIVRO, 'var doLivro = g ? g.faixas : [], doFim = [];']
+  '--envenenado-fim-do-capitulo-tira': [GAB_SO_DO_LIVRO, 'var doLivro = g ? g.faixas : [], doFim = [];'],
+  '--envenenado-sumario-dos-marcadores': [SUMARIO_DO_MAPA, 'return sumario;']
 };
 const troca = TROCAS[MODO] || null;
 const Biblioteca = carregar('biblioteca.js', troca);
@@ -299,6 +310,75 @@ const Biblioteca = carregar('biblioteca.js', troca);
   conf('e nenhum travessão nem meia-risca nele', new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']').test(fonte), false);
   conf('no EPUB, as partes', Biblioteca.fonteDoLivro({ formato: 'epub', titulo: 'Livro', ano: 2026 }, 'Parte dois', [2, 3, 5], null),
     'Fonte: Livro, 2026, Parte dois, partes 2 a 3 e 5');
+
+  secao('6. O sumário que a tela usa: marcadores lixo e sumário vazio dão lugar ao mapa');
+  /* Livros SINTÉTICOS, no feitio dos pacotes reais (nenhum livro de verdade):
+   * marcadores "page1..page40", "Blank Page" e nome de arquivo; o mapa com
+   * capítulos titulados e páginas do arquivo. */
+  const marcadores = (titulos) => titulos.map((t, i) => ({ n: i + 1, nivel: 1, titulo: t, pagina: i + 1 }));
+  const paginas40 = Array.from({ length: 40 }, (_, i) => 'page' + (i + 1));
+  const mapa3 = [cap(1, 'Números naturais', 3, 12, ['MAT06-02']), cap(2, 'Frações', 13, 25, ['MAT06-05']),
+    cap(3, 'Geometria plana', 26, 40, [])];
+  const livroPdf = (sumario, origem, mapa) => ({ formato: 'pdf', paginas: 40, titulo: 'Livro de prova', series: ['06'],
+    sumario: sumario, sumario_origem: origem, mapa: mapa });
+  const linha = s => s.map(e => e.n + ':' + e.titulo + '@' + e.pagina + '-' + (e.pagina_fim || '') + (e.mapa_n != null ? '#' + e.mapa_n : '')).join(' | ');
+
+  const lixo40 = livroPdf(marcadores(paginas40), 'marcadores', mapa3);
+  const sumLixo = Biblioteca.sumarioDoLivro(lixo40);
+  const bons = livroPdf([{ n: 1, nivel: 1, titulo: 'Capítulo 1: Números naturais', pagina: 3 },
+    { n: 2, nivel: 2, titulo: 'Leitura de números', pagina: 5 },
+    { n: 3, nivel: 1, titulo: 'Capítulo 2: Frações', pagina: 13 }, { n: 4, nivel: 1, titulo: 'Sumário', pagina: 2 },
+    { n: 5, nivel: 1, titulo: 'Capítulo 3: Geometria plana', pagina: 26 }], 'marcadores', mapa3);
+  const semMapa = livroPdf(marcadores(paginas40), 'marcadores', []);
+  const mapa22 = Array.from({ length: 22 }, (_, i) => cap(i + 1, 'Capítulo de prova ' + (i + 1), 3 + i, 3 + i, []));
+  const blank = livroPdf(marcadores(['Blank Page', 'Blank Page']), 'marcadores', mapa22);
+  const vazio1 = livroPdf([], 'nenhum', [cap(1, 'Volume', 31, 37, ['MAT06-05'])]);
+  const vazioSemMapa = livroPdf([], 'nenhum', []);
+
+  if (MODO === '--envenenado-sumario-dos-marcadores') {
+    secao('VENENO: a tela usa sempre o sumário do pacote (o da main antes deste conserto)');
+    conf('envenenado: os 40 marcadores "pageN" continuam como sumário (defeito enxergado)', sumLixo.length, 40);
+    conf('envenenado: o livro sem marcadores e com mapa de 1 entrada fica sem sumário (defeito enxergado)',
+      Biblioteca.sumarioDoLivro(vazio1).length, 0);
+  } else {
+    conf('marcadores "page1..page40" e mapa de 3 capítulos: o sumário é o do mapa', linha(sumLixo),
+      '1:Números naturais@3-12#1 | 2:Frações@13-25#2 | 3:Geometria plana@26-40#3');
+    conf('e o critério diz que os marcadores são inúteis', Biblioteca.sumarioDosMarcadoresInutil(lixo40), true);
+    conf('controle: marcadores bons (com um "Sumário" no meio) continuam', Biblioteca.sumarioDoLivro(bons) === bons.sumario, true);
+    conf('controle: sem mapa, os marcadores lixo ficam como estão', Biblioteca.sumarioDoLivro(semMapa) === semMapa.sumario, true);
+    conf('"Blank Page" com 2 itens e mapa de 22 capítulos: o do mapa', Biblioteca.sumarioDoLivro(blank).length + '|' +
+      Biblioteca.sumarioDoLivro(blank)[21].titulo, '22|Capítulo de prova 22');
+    conf('sumário vazio e mapa de 1 entrada: o sumário é a entrada do mapa', linha(Biblioteca.sumarioDoLivro(vazio1)), '1:Volume@31-37#1');
+    conf('controle: sem sumário e sem mapa, o sumário continua vazio', Biblioteca.sumarioDoLivro(vazioSemMapa).length, 0);
+    conf('controle: o EPUB fica como está, mesmo com marcadores lixo',
+      Biblioteca.sumarioDoLivro(Object.assign({}, lixo40, { formato: 'epub' })) === lixo40.sumario, true);
+    conf('controle: sumário que já veio do mapa fica como está',
+      Biblioteca.sumarioDoLivro(Object.assign({}, lixo40, { sumario_origem: 'mapa' })) === lixo40.sumario, true);
+    // o mapa feito dos próprios marcadores lixo não serve: troca lixo por lixo
+    const mapaLixo = livroPdf(marcadores(['GA_MAT_7_LP_4ED_PNLD24_OB1_U8_278A307_FECHADO', 'PMR9_1capa']), 'marcadores',
+      [cap(1, 'GA_MAT_7_LP_4ED_PNLD24_OB1_U8_278A307_FECHADO', 1, 20, []), cap(2, 'PMR9_1capa', 21, 40, [])]);
+    conf('controle: o mapa com os mesmos nomes de arquivo não substitui nada', Biblioteca.sumarioDoLivro(mapaLixo) === mapaLixo.sumario, true);
+    // poucos marcadores com sentido contra um mapa grande: "Parte 1" e "Parte 2" de um livro de 17 capítulos
+    const partes = livroPdf(marcadores(['Parte 1 (p.1-20)', 'Parte 2 (p.21-40)']), 'marcadores',
+      Array.from({ length: 17 }, (_, i) => cap(i + 1, 'Tópico ' + (i + 1), 1 + 2 * i, 2 + 2 * i, [])));
+    conf('2 marcadores com sentido e mapa de 17: menos da metade, vale o mapa', Biblioteca.sumarioDoLivro(partes).length, 17);
+    // a fronteira da metade, dos dois lados
+    const metade = (uteis, nCaps) => Biblioteca.sumarioDosMarcadoresInutil(livroPdf(
+      marcadores(Array.from({ length: uteis }, (_, i) => 'Unidade ' + (i + 1))), 'marcadores',
+      Array.from({ length: nCaps }, (_, i) => cap(i + 1, 'Cap ' + (i + 1), 1 + i, 1 + i, []))));
+    conf('5 marcadores bons para 10 capítulos (a metade): ficam os marcadores', metade(5, 10), false);
+    conf('4 marcadores bons para 10 capítulos (menos da metade): vale o mapa', metade(4, 10), true);
+    const misto = (lixo, bons) => Biblioteca.sumarioDosMarcadoresInutil(livroPdf(
+      marcadores(Array.from({ length: lixo }, (_, i) => 'page' + i).concat(Array.from({ length: bons }, (_, i) => 'Unidade ' + i))),
+      'marcadores', [cap(1, 'Um capítulo', 1, 40, [])]));
+    conf('metade lixo e metade bom: ficam os marcadores', misto(3, 3), false);
+    conf('mais da metade lixo: vale o mapa', misto(4, 3), true);
+    const sem = t => Biblioteca.marcadorSemSentido(t);
+    conf('títulos sem sentido', ['page1', 'page2_2', 'Page 12', 'p12', 'Blank Page', 'Sem nome', 'Sumário', 'SUMÁRIO', '',
+      'GA_MAT_9_LP_4ED_PNLD24_OB', 'PMR9_001_272', 'livro.pdf', '  '].filter(sem).length, 13);
+    conf('títulos com sentido', ['Frações', 'Capítulo 1: Números', 'Parte 1 (p.1-340)', '1', 'x', 'Paginação e leitura',
+      'Página 7 de exercícios', 'Volume'].filter(sem).join(','), '');
+  }
 
   console.log('\n' + passes + ' passaram, ' + falhas + ' falharam.');
   process.exit(falhas ? 1 : 0);
