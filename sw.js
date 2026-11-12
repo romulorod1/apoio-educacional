@@ -150,7 +150,7 @@
  * quando os marcadores do PDF são lixo. O v135 traz o assunto de volume do 8º ano no
  * banco/topicos/matematica.json.
  */
-var CACHE = 'apoio-educacional-v135';
+var CACHE = 'apoio-educacional-v999';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
