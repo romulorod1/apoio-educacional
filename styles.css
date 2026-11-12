@@ -4140,7 +4140,8 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 }
 /* celular, e a letra grande: o rodapé em coluna, largura toda, o principal em cima */
 @media (max-width: 480px) {
-  .plan-incertos-lista { max-height: 38vh; overflow-y: auto; }
+  /* cerca de 2 itens à vista, com rolagem própria: a folha continua na tela */
+  .plan-incertos-lista { max-height: 24vh; overflow-y: auto; }
   #rodape-modal-planejamento { flex-direction: column-reverse; align-items: stretch; }
   #rodape-modal-planejamento .btn { width: 100%; margin: 0; }
   #rodape-modal-planejamento .esquerda { margin-right: 0; }
@@ -4152,4 +4153,9 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 #modal-leitor-pdf.leitor-compacto #leitor-ir-caixa,
 #modal-leitor-pdf.leitor-compacto #leitor-largura { display: none; }
 #modal-leitor-pdf.leitor-compacto .leitor-pdf-barra { flex-wrap: nowrap; justify-content: flex-end; }
+/* o rodapé do leitor do planejamento: Fechar e Compartilhar PDF (cheio) numa linha; o Exportar repetiria o Compartilhar */
+#modal-leitor-pdf.leitor-compacto #leitor-exportar,
+#modal-leitor-pdf.leitor-compacto #leitor-como-folha { display: none; }
+#modal-leitor-pdf.leitor-compacto .modal-rodape { flex-wrap: nowrap; }
+#modal-leitor-pdf.leitor-compacto #leitor-compartilhar { flex: 1; }
 /* ==================== planejamento (fim) ==================== */

@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.56';
+  var VERSAO = '1.42.58';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -1604,6 +1604,7 @@
     if (id === 'modal-excluir-aluno' && exclusaoAlunoPendente) return;
     // o planejamento fechado no meio do "montando" cancela o pedido à IA
     if (id === 'modal-planejamento') pararPlanejamento();
+    if (id === 'modal-sair-planejamento') devolverFocoDaPergunta();
     var e = $('#' + id);
     var estavaAberto = e.classList.contains('aberto');
     if (estavaAberto && !fechandoPorVoltar && MODAIS_HISTORICO[id]) {
@@ -26755,7 +26756,7 @@
         return item;
       })));
       if (lista.length > LISTA_CURTA) {
-        caixa.appendChild(el('button', { type: 'button', class: 'btn pequeno plan-ver-todos', id: celular ? 'cel-plan-ver-todos' : 'plan-ver-todos',
+        caixa.appendChild(botao('planejamento-ver-todos', { class: 'btn pequeno plan-ver-todos', id: celular ? 'cel-plan-ver-todos' : 'plan-ver-todos',
           'aria-expanded': inteira ? 'true' : 'false', texto: inteira ? 'Ver só os recentes' : 'Ver todos (' + lista.length + ')',
           aoClick: function () {
             listaInteiraDe[alunoId] = !inteira;
@@ -26847,21 +26848,29 @@
   /* A pergunta de sair sem salvar, no padrão do modal-sair-relato: o
    * principal é "Continuar editando"; "Descartar", em vermelho, segue. */
   var aoDescartarPlanejamento = null;
+  var focoAntesDaPergunta = null;
+  /* Fechou a pergunta sem descartar (Continuar editando, o Voltar, o fundo):
+   * o foco volta para onde estava. */
+  function devolverFocoDaPergunta() {
+    var alvo = focoAntesDaPergunta;
+    focoAntesDaPergunta = null;
+    aoDescartarPlanejamento = null;
+    if (alvo && document.body.contains(alvo) && typeof alvo.focus === 'function') setTimeout(function () { try { alvo.focus(); } catch (e) { /* saiu */ } }, 0);
+  }
   function perguntarAntesDeDescartar(titulo, texto, aoDescartar) {
     $('#titulo-sair-planejamento').textContent = titulo;
     $('#texto-sair-planejamento').textContent = texto;
     aoDescartarPlanejamento = aoDescartar;
     var continuar = $('#continuar-planejamento'), descartar = $('#descartar-planejamento');
-    var focoAntes = document.activeElement;
+    focoAntesDaPergunta = document.activeElement;
     continuar.onclick = function () {
       aoDescartarPlanejamento = null;
-      fecharModal('modal-sair-planejamento', function () {
-        if (focoAntes && document.body.contains(focoAntes) && typeof focoAntes.focus === 'function') focoAntes.focus();
-      });
+      fecharModal('modal-sair-planejamento');
     };
     descartar.onclick = function () {
       var depois = aoDescartarPlanejamento;
       aoDescartarPlanejamento = null;
+      focoAntesDaPergunta = null; // descartou: o foco vai com quem segue
       fecharModal('modal-sair-planejamento', function () { if (depois) depois(); });
     };
     abrirModal('modal-sair-planejamento');
@@ -27308,7 +27317,13 @@
         el('span', { class: 'cresce', texto: p.mudou }),
         el('button', { type: 'button', class: 'btn pequeno', id: 'plan-desfazer-ajuste', icone: 'undo', texto: 'Desfazer ajuste',
           aoClick: function () {
+            /* volta a grade e as provas de antes do ajuste; o aluno e o Aluna ou
+             * Aluno escolhidos DEPOIS continuam */
+            var agora = p.plano;
             p.plano = p.planoAnterior;
+            p.plano.alunoId = agora.alunoId;
+            p.plano.confiancaAluno = agora.confiancaAluno;
+            p.plano.tratamento = agora.tratamento;
             p.planoAnterior = null;
             p.mudou = '';
             p.conversa = null; // a conversa era do plano que saiu
@@ -27399,7 +27414,7 @@
     if (!p.bytes || p.compartilhando) return;
     /* A família vai receber: o plano fica guardado na ficha, e fechar depois
      * não pergunta mais. */
-    if (podeGravarPlanejamentos() && (!p.salvoId || p.mudouDesdeSalvar)) salvarPlanoNaFicha(p, true);
+    if (podeGravarPlanejamentos() && (!p.salvoId || p.mudouDesdeSalvar)) salvarPlanoNaFicha(p, false);
     var pl = p.plano, aluno = pl && pl.alunoId ? alunoPorId(pl.alunoId) : null;
     var nome = Planejamento.nomeDoArquivo(pl, aluno ? aluno.nome : '');
     var blob = new Blob([p.bytes], { type: 'application/pdf' });
@@ -27447,11 +27462,12 @@
           var aluno = alunoPorId(p.plano.alunoId);
           var nome = Planejamento.nomeDoArquivo(p.plano, aluno ? aluno.nome : '');
           /* O leitor do app no modo do planejamento: uma página, só menos, mais e
-           * fechar; no celular já abre com a letra legível; e a saída é a mesma
+           * fechar; no celular já abre a 150% (a letra legível e a semana com
+           * pouca rolagem de lado); e a saída é a mesma
            * da prévia. A Biblioteca não passa estas opções e fica como era. */
           abrirLeitorPdf(new Blob([bytes], { type: 'application/pdf' }), {
             titulo: 'Planejamento de estudos', nome: nome, comoFolha: false, compacto: true,
-            zoomInicial: window.innerWidth < 600 ? 1.75 : 1,
+            zoomInicial: window.innerWidth < 600 ? 1.5 : 1,
             rotuloCompartilhar: p.rotuloEntregar || 'Compartilhar PDF',
             aoCompartilhar: function () { entregarPlano(p, p.rotuloEntregar === 'Compartilhar PDF'); }
           });
@@ -27500,10 +27516,14 @@
 
   /* Salvar na ficha. O id nasce UMA vez por fluxo (idParaSalvar), e a trava
    * `salvando`, ligada antes de qualquer espera, faz o segundo toque não
-   * gravar um segundo plano. Falhou: a trava sai e o botão volta. */
+   * gravar um segundo plano. Um pedido de salvar que chega com a gravação
+   * pendente não se perde: fica marcado (salvarDeNovo), e na volta, se o plano
+   * da tela não é mais o que foi gravado (ela trocou o aluno, o Aluna ou
+   * Aluno, desfez um ajuste), grava de novo com o MESMO id. Só então a tela
+   * diz "Salvo". Falhou: a trava sai e o botão volta. */
   function salvarPlanoNaFicha(p, calado) {
     var pl = p.plano;
-    if (p.salvando) return;
+    if (p.salvando) { p.salvarDeNovo = true; if (!calado) p.avisarAoSalvar = true; return; }
     if (!pl || !pl.alunoId || !alunoPorId(pl.alunoId)) { avisar('Escolha o aluno antes de salvar.'); return; }
     p.salvando = true;
     p.idParaSalvar = p.idParaSalvar || p.salvoId || Core.uid();
@@ -27520,22 +27540,35 @@
       db.ajustes[chave] = registro;
       return salvarEDepois(function (gravou) {
         p.salvando = false;
+        var deNovo = p.salvarDeNovo;
+        var avisarDeNovo = p.avisarAoSalvar;
+        p.salvarDeNovo = false;
+        p.avisarAoSalvar = false;
         if (!gravou) {
           var b = $('#plan-salvar');
           if (fluxoPlano === p && b) b.disabled = false;
           return;
         }
+        // o plano da tela ainda é o que foi gravado?
+        var igual = JSON.stringify(registro.plano) === JSON.stringify(p.plano);
         if (fluxoPlano === p) {
           p.salvoId = id;
-          p.alunoFixoId = pl.alunoId;
-          p.mudouDesdeSalvar = false;
-          if (p.estado === 'previa') {
-            var b2 = $('#plan-salvar');
-            if (b2) { b2.textContent = 'Salvo na ficha'; b2.disabled = true; }
+          p.alunoFixoId = registro.alunoId;
+          if (igual) {
+            p.mudouDesdeSalvar = false;
+            if (p.estado === 'previa') {
+              var b2 = $('#plan-salvar');
+              if (b2) { b2.textContent = 'Salvo na ficha'; b2.disabled = true; }
+            }
           }
         }
         redesenharSecoesDePlanejamento();
-        if (!calado) avisar('Planejamento salvo na ficha ' + (alunoPorId(pl.alunoId) ? 'de ' + Planejamento.primeiroNome(alunoPorId(pl.alunoId).nome) : '') + '.');
+        if (fluxoPlano === p && !igual && (deNovo || p.mudouDesdeSalvar)) {
+          // mudou no meio: grava a versão da tela, com o mesmo id
+          salvarPlanoNaFicha(p, calado && !avisarDeNovo);
+          return;
+        }
+        if (!calado || avisarDeNovo) avisar('Planejamento salvo na ficha ' + (alunoPorId(registro.alunoId) ? 'de ' + Planejamento.primeiroNome(alunoPorId(registro.alunoId).nome) : '') + '.');
       });
     }
     try {

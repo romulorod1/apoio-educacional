@@ -52,7 +52,7 @@ function prop(rotulo, ok) {
 }
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const ANCORAS_DUPLO = [
-  ['    if (p.salvando) return;\n', '\n'],
+  ['    if (p.salvando) { p.salvarDeNovo = true; if (!calado) p.avisarAoSalvar = true; return; }\n', '\n'],
   ['    p.idParaSalvar = p.idParaSalvar || p.salvoId || Core.uid();', '    p.idParaSalvar = p.salvoId || Core.uid();'],
   ['    if (botaoSalvar) botaoSalvar.disabled = true;', '']
 ];
@@ -315,14 +315,26 @@ async function transbordo(pag) {
     return [['#leitor-anterior', '#leitor-proxima', '#leitor-contador', '#leitor-sumario', '#leitor-largura'].map(vis).join(','),
       vis('#leitor-menos') && vis('#leitor-mais'), vis('#leitor-compartilhar') && document.querySelector('#leitor-compartilhar').textContent, vis('#leitor-exportar')];
   }), ['false,false,false,false,false', true, 'Compartilhar PDF', false]);
-  conf('no celular, abre com zoom legível (150 a 200% da largura)', await pag.evaluate(() => {
+  conf('no celular, abre com zoom de cerca de 150% da largura (140 a 160%)', await pag.evaluate(() => {
     const c = document.querySelector('#corpo-modal-leitor-pdf canvas'), corpo = document.querySelector('#corpo-modal-leitor-pdf');
-    const z = parseFloat(c.style.width) / Math.max(160, corpo.clientWidth - 36); return z >= 1.5 && z <= 2.01;
+    const z = parseFloat(c.style.width) / Math.max(160, corpo.clientWidth - 36); return z >= 1.4 && z <= 1.6;
   }), true);
   await pag.evaluate(() => history.back());
   await esperar('o Voltar fechou o leitor', () => aberta(pag, 'modal-leitor-pdf'), v => v === false, 10000);
   conf('o Voltar fecha o LEITOR primeiro, e o planejamento (não salvo) fica aberto, sem pergunta', await pag.evaluate(() => [
     document.querySelector('#modal-planejamento').classList.contains('aberto'), document.querySelector('#modal-sair-planejamento').classList.contains('aberto')]), [true, false]);
+  conf('o rodapé do leitor do planejamento no celular: só "Fechar" e "Compartilhar PDF", numa linha', await (async () => {
+    await clicar(pag, '#plan-ampliar');
+    await esperar('o leitor abriu de novo', () => aberta(pag, 'modal-leitor-pdf'), v => v === true, 10000);
+    const r = await pag.evaluate(() => {
+      const vis = Array.from(document.querySelectorAll('#modal-leitor-pdf .modal-rodape button')).filter(b => b.getBoundingClientRect().width > 0);
+      const topos = vis.map(b => Math.round(b.getBoundingClientRect().top));
+      return [vis.map(b => b.textContent.trim()).join('|'), new Set(topos).size, document.querySelector('#leitor-compartilhar').classList.contains('principal')];
+    });
+    await pag.evaluate(() => history.back());
+    await esperar('o Voltar fechou o leitor de novo', () => aberta(pag, 'modal-leitor-pdf'), v => v === false, 10000);
+    return r;
+  })(), ['Fechar|Compartilhar PDF', 1, true]);
   conf('fechado o leitor, ele volta a ser o de sempre (a Biblioteca não passa as opções): Anterior e Próxima à vista, sem a saída do planejamento', await pag.evaluate(() => [
     document.querySelector('#modal-leitor-pdf').classList.contains('leitor-compacto'), getComputedStyle(document.querySelector('#leitor-anterior')).display !== 'none',
     document.querySelector('#leitor-compartilhar').hidden]), [false, true, true]);
@@ -343,6 +355,12 @@ async function transbordo(pag) {
   conf('todos os itens com o mesmo estilo, tocáveis e sem sublinhado', await pag.evaluate(() => {
     const b = Array.from(document.querySelectorAll('#plan-incertos .plan-item-conferir')); return [b.length, b.every(x => !/underline/.test(getComputedStyle(x).textDecorationLine))];
   }), [3, true]);
+  conf('no celular, a lista aberta mostra cerca de 2 itens e rola por dentro (a folha fica na tela)', await (async () => {
+    await pag.setViewport({ width: 390, height: 844, hasTouch: true }); await pausa(400);
+    const r = await pag.evaluate(() => { const l = document.querySelector('#plan-incertos'); return [l.getBoundingClientRect().height <= window.innerHeight * 0.25, l.scrollHeight > l.clientHeight, getComputedStyle(l).overflowY]; });
+    await pag.setViewport({ width: 1280, height: 1000, hasTouch: true }); await pausa(400);
+    return r;
+  })(), [true, true, 'auto']);
   await clicar(pag, '#plan-incertos .plan-item-conferir[data-data="2026-11-19"]');
   conf('tocar no aviso ACRESCENTA o dia ao que já está no campo, sem apagar', await pag.evaluate(() => [document.querySelector('#plan-ajuste').value, document.activeElement && document.activeElement.id]),
     ['Tira Matemática. No dia 19/11: ', 'plan-ajuste']);
@@ -591,10 +609,14 @@ async function transbordo(pag) {
   conf('ajuste depois de trocar o aluno: um turno só, com o plano atual e o aluno novo (e sem o antigo)', [pt.messages.length, tt.indexOf('Este é o plano atual') >= 0,
     tt.indexOf('O aluno já está escolhido: id al1.') >= 0, tt.indexOf('Zélia') >= 0, tt.indexOf('Bruno') < 0, tt.indexOf('"alunoId":"al1"') >= 0], [1, true, true, true, true, true]);
   conf('e continua marcada a Zélia', await marcados(), ['al1']);
+  // o Desfazer do ajuste volta a grade, mas não a troca de aluno feita antes dele
+  await clicar(pag, '#plan-desfazer-ajuste');
+  conf('o Desfazer ajuste não desfaz a troca de aluno', await marcados(), ['al1']);
   // compartilhar o plano não salvo: ele vai para a ficha, e fechar não pergunta mais
   const antesDeCompartilhar = await planosDe(pag, 'al1');
   await clicar(pag, '#plan-compartilhar');
   await esperar('compartilhou e salvou', () => planosDe(pag, 'al1'), v => v === antesDeCompartilhar + 1, 10000);
+  conf('o Compartilhar que salvou avisa', await pag.evaluate(() => document.querySelector('#aviso-texto').textContent), 'Planejamento salvo na ficha de Zélia.');
   await pausa(450);
   await pag.evaluate(() => document.querySelector('#modal-planejamento .fechar').click());
   await pausa(300);

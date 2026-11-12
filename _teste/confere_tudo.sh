@@ -329,6 +329,9 @@ roda "endpoint de IA (empacota)" node _teste/testa_ia_empacota.js
 # O planejamento de estudos com IA (fase 2): o modulo puro (pedido, leitura da
 # resposta, ajuste com o content intacto, a folha de uma pagina), dados sinteticos.
 roda "planejamento com IA (fase 2)" node _teste/testa_planejamento.js
+# o salvar com a gravacao pendente: a mudanca no meio grava de novo, com o mesmo id
+roda "planejamento (salvar pendente)" node _teste/testa_planejamento_salvar.js
+roda "planejamento --envenenado-zera-sem-comparar" node _teste/testa_planejamento_salvar.js --envenenado-zera-sem-comparar
 # Politica de testes por checkpoint (09/11/2026): o nivel 1 (quais provas de
 # navegador rodam pelos arquivos tocados, com o mapa em mapa_provas.tsv) e o
 # nivel 3 (a main reaproveita a bateria inteira se o tree for igual ao da cabeca
