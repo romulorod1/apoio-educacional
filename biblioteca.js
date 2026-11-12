@@ -492,32 +492,47 @@
     return lista.map(function (h) {
       var ini = h.pag_arquivo_inicio_antiga;
       var seguinte = inicios.filter(function (p) { return p > ini; })[0];
-      return { antigo: tituloNormalizado(h.titulo_antigo), ini: ini, fim: seguinte ? seguinte - 1 : total };
+      return { antigo: tituloNormalizado(h.titulo_antigo), novo: tituloNormalizado(h.titulo_novo), ini: ini, fim: seguinte ? seguinte - 1 : total };
     });
   }
 
-  /* Casa cada correção dela com uma entrada do mapa de agora. A ordem:
+  /* Casa cada correção dela com uma entrada do mapa de agora. A regra que
+   * manda em tudo: NA DÚVIDA, A CORREÇÃO FICA ÓRFÃ À VISTA, nunca aplicada
+   * calada noutro capítulo. Só três passos APLICAM, nesta ordem (o primeiro
+   * que dá UMA entrada só):
    *   1. a mesma `chave` de capítulo (a chave estável que o gerador dá a cada
-   *      entrada e reaproveita a cada geração), com UMA entrada dessa chave;
+   *      entrada e reaproveita a cada geração), e com o mesmo título
+   *      normalizado, ou com o par título antigo e título novo na tabela de
+   *      herança. Chave igual com título diferente fora da tabela não aplica:
+   *      vira sugestão (o gerador que reaproveitar uma chave não move a
+   *      correção calado);
    *   2. o mesmo número E o mesmo título (a regra de antes, para as correções
    *      gravadas sem chave);
-   *   3. o mesmo título normalizado em UMA entrada só (o Praticando 9 de
-   *      12/11/2026: um capítulo entrou no meio e os de depois andaram um
-   *      número; com dois capítulos do mesmo título, nenhum: fica órfã);
-   *   4. a herança de títulos (herancaDoLivro): o título dela era um título
+   *   3. a herança de títulos (herancaDoLivro): o título dela era um título
    *      antigo da tabela, e cai no capítulo novo que começa DENTRO da faixa
    *      antiga e tem o MESMO assunto que ela escolheu, quando há um só. Com
-   *      dois, com nenhum, ou sem assunto escolhido ("nenhum"), fica órfã. A
+   *      dois, com nenhum, ou sem assunto escolhido ("nenhum"), não aplica. A
    *      herança não cai pelo começo da faixa nem pelo título novo da
    *      tabela: na unidade 8 do Geração Alpha 7 e 9 a tabela diz "Medições"
    *      e "Algumas grandezas" (o primeiro capítulo), e o volume está no
    *      seguinte.
-   * Uma entrada recebe UMA correção. A que chega a uma entrada já tomada
-   * segue para os passos seguintes; se no fim não acha outra, fica órfã
-   * (motivo 'repetida'), menos quando diz o mesmo que a que ficou (mesmos
-   * assuntos e mesma ação), que então não tem o que mostrar. Dentro de cada
-   * passo, a mais recente (`quando`) escolhe primeiro.
-   * Devolve { entradas, porN: { <n>: { chave, correcao, como } }, orfas: [...] }. */
+   * O mesmo título normalizado em UMA entrada só NÃO aplica: é só sugestão
+   * (um mapa antigo com dois "Exercícios" e um novo com um só levaria a
+   * correção do segundo para o primeiro, calada). A sugestão aparece na linha
+   * das órfãs ("Ligar a “Exercícios” (p. X)"), e ela decide com um toque.
+   *
+   * Duas correções no MESMO capítulo de destino: vence a de `quando` mais
+   * recente, qualquer que seja o passo (no empate, o passo mais forte); a
+   * outra fica órfã, com o capítulo como sugestão. A exceção é a que diz o
+   * mesmo que a vencedora (mesmos assuntos e mesma ação): não tem o que
+   * mostrar e é contada em `absorvidas`, sem sair do db.
+   *
+   * Devolve { entradas, porN: { <n>: { chave, correcao, como } },
+   * orfas: [{ chave, titulo, assuntos, acao, quando, n, sugestao }], absorvidas }.
+   * `sugestao` é { n, titulo, pagina, capitulo, ocupado } ou null; `ocupado`
+   * diz que o capítulo já tem outra correção dela.
+   * Limite conhecido: o mapa com dois capítulos de mesmo `n` (mapa
+   * defeituoso) junta os dois numa casa só. */
   function resolverCorrecoes(meta, correcoes) {
     var entradas = (meta && Array.isArray(meta.mapa) ? meta.mapa : []).filter(function (e) {
       return !!e && inteiro(e.n) && typeof e.titulo === 'string';
@@ -527,70 +542,84 @@
       var c = todas[k];
       return !!c && typeof c === 'object' && typeof c.titulo === 'string' && Array.isArray(c.assuntos);
     });
-    validas.sort(function (a, b) {
-      var qa = String(todas[a].quando || ''), qb = String(todas[b].quando || '');
-      return qa < qb ? 1 : qa > qb ? -1 : (a < b ? -1 : a > b ? 1 : 0);
-    });
-    var porN = {}, feitas = {}, absorvidas = {};
     var idsDe = function (e) {
       return (Array.isArray(e.assuntos) ? e.assuntos : []).map(function (a) { return a && a.id; })
         .filter(function (id) { return typeof id === 'string' && id; });
     };
+    var unica = function (lista) { return lista.length === 1 ? lista[0] : null; };
+    var heranca = herancaDoLivro(meta);
+    var herdaPara = function (c, e) {
+      var t = tituloNormalizado(c.titulo), te = tituloNormalizado(e.titulo);
+      return heranca.some(function (h) { return h.antigo === t && h.novo === te; });
+    };
+    var propostas = {}, sugestoes = {};
+    validas.forEach(function (k) {
+      var c = todas[k], tc = tituloNormalizado(c.titulo);
+      // 1. a chave, conferida pelo título
+      if (typeof c.chave === 'string' && c.chave) {
+        var porChave = unica(entradas.filter(function (e) { return e.chave === c.chave; }));
+        if (porChave) {
+          var mesmoTitulo = tituloNormalizado(porChave.titulo) === tc;
+          if (mesmoTitulo || herdaPara(c, porChave)) { propostas[k] = { e: porChave, como: 'chave' }; return; }
+          sugestoes[k] = porChave;
+        }
+      }
+      // 2. o mesmo número e o mesmo título
+      var porNumero = unica(entradas.filter(function (e) {
+        var mesmoNumeroETitulo = numeroDaCorrecao(k, c) === e.n && c.titulo === e.titulo;
+        return mesmoNumeroETitulo;
+      }));
+      if (porNumero) { propostas[k] = { e: porNumero, como: 'numero' }; return; }
+      // 3. a herança de títulos, pelo assunto que ela escolheu
+      var hs = heranca.filter(function (h) { return h.antigo === tc; });
+      if (hs.length === 1) {
+        var h = hs[0];
+        var naFaixa = entradas.filter(function (e) { return inteiro(e.pagina) && e.pagina >= h.ini && e.pagina <= h.fim; });
+        var escolhidos = c.assuntos.filter(function (id) { return typeof id === 'string' && id; });
+        var herdados = (function () {
+          // sem assunto escolhido ("nenhum"), não há o que comparar
+          if (!escolhidos.length) return [];
+          return naFaixa.filter(function (e) {
+            return idsDe(e).some(function (id) { return escolhidos.indexOf(id) >= 0; });
+          });
+        })();
+        var porHeranca = unica(herdados);
+        if (porHeranca) { propostas[k] = { e: porHeranca, como: 'heranca' }; return; }
+      }
+      // o mesmo título normalizado numa entrada só: SÓ sugestão, ela decide
+      if (!sugestoes[k]) {
+        var porTitulo = unica(entradas.filter(function (e) { return tituloNormalizado(e.titulo) === tc; }));
+        if (porTitulo) sugestoes[k] = porTitulo;
+      }
+    });
+    // o mesmo destino para duas: a mais recente vence (no empate, o passo mais forte)
+    var FORCA = { chave: 0, numero: 1, heranca: 2 };
+    var forca = function (k) { return FORCA[propostas[k].como]; };
+    var maisNova = function (a, b) {
+      var qa = String(todas[a].quando || ''), qb = String(todas[b].quando || '');
+      return qa < qb ? 1 : qa > qb ? -1 : 0;
+    };
+    var ordem = Object.keys(propostas);
+    ordem.sort(function (a, b) { return maisNova(a, b) || forca(a) - forca(b) || (a < b ? -1 : a > b ? 1 : 0); });
+    var porN = {}, absorvidas = {}, perdeu = {};
     var mesmoQueODaEntrada = function (c, n) {
       var outra = porN[n].correcao;
       return (outra.acao === 'corrigiu') === (c.acao === 'corrigiu') &&
         outra.assuntos.slice().sort().join('|') === c.assuntos.slice().sort().join('|');
     };
-    var heranca = herancaDoLivro(meta);
-    var passos = [
-      ['chave', function (k, c) {
-        if (typeof c.chave !== 'string' || !c.chave) return [];
-        return entradas.filter(function (e) { return e.chave === c.chave; });
-      }],
-      ['numero', function (k, c) {
-        return entradas.filter(function (e) {
-          var mesmoNumeroETitulo = numeroDaCorrecao(k, c) === e.n && c.titulo === e.titulo;
-          return mesmoNumeroETitulo;
-        });
-      }],
-      ['titulo', function (k, c) {
-        var t = tituloNormalizado(c.titulo);
-        return entradas.filter(function (e) { return tituloNormalizado(e.titulo) === t; });
-      }],
-      ['heranca', function (k, c) {
-        var t = tituloNormalizado(c.titulo);
-        var hs = heranca.filter(function (h) { return h.antigo === t; });
-        if (hs.length !== 1) return [];
-        var h = hs[0];
-        var naFaixa = entradas.filter(function (e) { return inteiro(e.pagina) && e.pagina >= h.ini && e.pagina <= h.fim; });
-        var escolhidos = c.assuntos.filter(function (id) { return typeof id === 'string' && id; });
-        // sem assunto escolhido ("nenhum"), não há o que comparar: fica órfã
-        if (!escolhidos.length) return [];
-        return naFaixa.filter(function (e) {
-          return idsDe(e).some(function (id) { return escolhidos.indexOf(id) >= 0; });
-        });
-      }]
-    ];
-    passos.forEach(function (passo) {
-      validas.forEach(function (k) {
-        if (feitas[k]) return;
-        var c = todas[k];
-        var achadas = passo[1](k, c);
-        // dois candidatos (dois capítulos de mesmo título, duas entradas da mesma chave): nenhum
-        if (achadas.length !== 1) return;
-        var e = achadas[0];
-        if (porN[e.n]) {
-          if (mesmoQueODaEntrada(c, e.n)) { feitas[k] = true; absorvidas[k] = true; }
-          return;
-        }
-        porN[e.n] = { chave: k, correcao: c, como: passo[0] };
-        feitas[k] = true;
-      });
+    ordem.forEach(function (k) {
+      var e = propostas[k].e;
+      if (!porN[e.n]) { porN[e.n] = { chave: k, correcao: todas[k], como: propostas[k].como }; return; }
+      if (mesmoQueODaEntrada(todas[k], e.n)) { absorvidas[k] = true; return; }
+      perdeu[k] = true;
+      sugestoes[k] = e;
     });
-    var orfas = validas.filter(function (k) { return !feitas[k]; }).sort().map(function (k) {
-      var c = todas[k];
+    var orfas = validas.filter(function (k) { return (!propostas[k] || perdeu[k]) && !absorvidas[k]; }).sort().map(function (k) {
+      var c = todas[k], s = sugestoes[k] || null;
       return { chave: k, titulo: c.titulo, assuntos: c.assuntos.filter(function (id) { return typeof id === 'string' && id; }),
-        acao: c.acao === 'corrigiu' ? 'corrigiu' : 'confirmou', quando: c.quando || null, n: numeroDaCorrecao(k, c) };
+        acao: c.acao === 'corrigiu' ? 'corrigiu' : 'confirmou', quando: c.quando || null, n: numeroDaCorrecao(k, c),
+        sugestao: s ? { n: s.n, titulo: s.titulo, pagina: inteiro(s.pagina) ? s.pagina : null,
+          capitulo: inteiro(s.capitulo) ? s.capitulo : null, ocupado: !!porN[s.n] } : null };
     });
     return { entradas: entradas, porN: porN, orfas: orfas, absorvidas: Object.keys(absorvidas).sort() };
   }

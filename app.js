@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.73';
+  var VERSAO = '1.42.79';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -16485,12 +16485,13 @@
   /* A posição guardada que ANDOU quando o arquivo do livro mudou (Store,
    * posicaoNoArquivoNovo): a página dela não existe mais no arquivo novo, ou
    * o EPUB virou PDF sem a página conhecida. A frase diz onde ela estava;
-   * sem ajuste, nada. A página é a do arquivo antigo (o número impresso
-   * dele já não existe). */
+   * sem ajuste, nada. A página é a do arquivo antigo, dita pelo número
+   * impresso dela quando o livro antigo tinha numeração (o Store guarda em
+   * ajustadaDe.impressa), como o resto da tela. */
   function avisoDaPosicaoAjustada(pos) {
     var de = pos && pos.ajustadaDe;
     if (!de || typeof de !== 'object') return '';
-    if (de.pagina) return 'Este livro foi atualizado. Você estava na p. ' + de.pagina + '.';
+    if (de.pagina) return 'Este livro foi atualizado. Você estava na p. ' + (de.impressa || de.pagina) + '.';
     if (de.capitulo) return 'Este livro foi atualizado. Você estava na parte ' + de.capitulo + '.';
     return '';
   }
@@ -16501,9 +16502,15 @@
       if (!reg || !reg.blob) { avisar('Este livro já não está no tablet.'); return false; }
       // a posição que andou numa troca de arquivo (fase 1a da nuvem): o aviso de onde ela estava, uma vez
       var ondeEstava = !destino ? avisoDaPosicaoAjustada(pos) : '';
+      /* o ajuste fica na posição até ela mudar de página por conta própria: a
+       * gravação automática da página aberta o repassa (o aviso volta se ela
+       * fechar sem ler), e a primeira página nova dela o tira */
+      var ajuste = ondeEstava ? { de: pos.ajustadaDe, pagina: pos.pagina, capitulo: pos.capitulo, fracao: pos.fracao || 0, mexeu: false } : null;
       if (reg.meta.formato === 'epub') {
         if (ondeEstava) avisar(ondeEstava);
-        return abrirLeitorEpub(reg, destino && destino.capitulo ? { capitulo: destino.capitulo, fracao: 0, ancora: destino.ancora || null } : pos);
+        var abrindo = abrirLeitorEpub(reg, destino && destino.capitulo ? { capitulo: destino.capitulo, fracao: 0, ancora: destino.ancora || null } : pos);
+        if (leitorEpub && leitorEpub.id === id) leitorEpub.ajuste = ajuste;
+        return abrindo;
       }
       var sumario = sumarioDaTela(reg.meta);
       return abrirLeitorPdf(reg.blob, {
@@ -16513,8 +16520,9 @@
         dica: ondeEstava || (sumario.length ? '' : 'Este livro não tem sumário: role as páginas ou use a barra de página.'),
         aoMudarPagina: function (n, como) {
           // arrastando a barra, a faixa acompanha, e a posição só grava ao soltar
+          if (ajuste && n !== ajuste.pagina) ajuste.mexeu = true;
           if (!como || como.gravar !== false) {
-            Store.gravarPosicaoLivro({ id: id, pagina: n, sha: reg.meta.hash }).catch(function () { /* a leitura segue; só a posição não fica */ });
+            Store.gravarPosicaoLivro({ id: id, pagina: n, sha: reg.meta.hash, ajustadaDe: ajuste && !ajuste.mexeu ? ajuste.de : null }).catch(function () { /* a leitura segue; só a posição não fica */ });
           }
           mostrarCobre('pdf', reg, n);
         }
@@ -16907,8 +16915,11 @@
     f = Math.round(f * 1000) / 1000;
     if (ep.salvo && ep.salvo.capitulo === ep.mostrado && Math.abs(ep.salvo.fracao - f) < 0.002) return;
     ep.salvo = { capitulo: ep.mostrado, fracao: f };
+    // o ajuste de uma troca de arquivo fica até ela mudar de parte ou rolar
+    var aj = ep.ajuste;
+    if (aj && (ep.mostrado + 1 !== aj.capitulo || Math.abs(f - aj.fracao) > 0.02)) aj.mexeu = true;
     Store.gravarPosicaoLivro({ id: ep.id, capitulo: ep.mostrado + 1, fracao: f, sha: ep.meta && ep.meta.hash,
-      ancoraVista: ancoraVistaDoEpub() }).catch(function () { /* a leitura segue */ });
+      ancoraVista: ancoraVistaDoEpub(), ajustadaDe: aj && !aj.mexeu ? aj.de : null }).catch(function () { /* a leitura segue */ });
   }
 
   /* A última âncora "page_N" que já passou do alto da tela, no EPUB feito de
@@ -18668,15 +18679,22 @@
 
   /* ---- as correções dela que ficaram órfãs (fase 1a da biblioteca na nuvem) ----
    *
-   * Depois de um mapa novo, a correção que não achou capítulo
-   * (Biblioteca.correcoesOrfas) nunca some nem cai no capítulo vizinho: a
+   * Depois de um mapa novo, a correção que não achou capítulo com certeza
+   * (Biblioteca.correcoesOrfas) nunca some nem cai calada noutro capítulo: a
    * tela do livro mostra UMA linha discreta com o número, recolhida (padrão
    * 1, divulgação progressiva). Aberta, cada correção diz o título que ela
-   * corrigiu e os assuntos que escolheu, com "Ligar a um capítulo" (a lista
-   * dos capítulos do mapa de agora) e "Descartar". As duas ações gravam e têm
-   * Desfazer (padrão 5), que devolve as correções do livro como estavam. */
+   * corrigiu e os assuntos que escolheu, com:
+   *   - a sugestão de um toque, quando há um capítulo provável (o mesmo
+   *     título, ou o capítulo da mesma chave): "Ligar a “Exercícios” (p. 11)";
+   *   - "Ligar a um capítulo" (a lista dos capítulos do mapa de agora);
+   *   - "Descartar".
+   * Ligar a um capítulo que JÁ tem correção dela pergunta antes, na própria
+   * linha ("Trocar" ou "Cancelar"). As ações gravam e têm Desfazer (padrão
+   * 5), que devolve SÓ as entradas que a ação mexeu: uma correção feita
+   * depois, em outro capítulo, fica. */
   var orfasAbertas = Object.create(null);   // livro -> a linha aberta
   var orfaLigando = Object.create(null);    // livro -> a chave da correção cuja lista de capítulos está aberta
+  var orfaTrocando = Object.create(null);   // livro -> { chave, n }: a pergunta antes de trocar a correção de um capítulo
 
   function blocoDasCorrecoesOrfas(l, orfas, mapa, nomeDoAssunto) {
     var aberto = !!orfasAbertas[l.id];
@@ -18687,25 +18705,42 @@
         orfas.length + ' correções suas não acharam o capítulo depois da atualização',
       aoClick: function () { orfasAbertas[l.id] = !aberto; desenharTelaDoLivro(l); } }));
     if (!aberto) return caixa;
+    var naPagina = function (e) { return l.meta.formato !== 'epub' && e.pagina ? ' (p. ' + paginaParaMostrar(l.meta, e.pagina) + ')' : ''; };
+    var doMapa = function (n) { return mapa.filter(function (e) { return e.n === n; })[0] || null; };
     orfas.forEach(function (o) {
       var assuntos = o.assuntos.length ? o.assuntos.map(nomeDoAssunto).join(', ') : 'nenhum assunto do índice';
+      var sugerido = o.sugestao ? doMapa(o.sugestao.n) : null;
       var item = el('div', { class: 'bibl-orfa', 'data-orfa': o.chave }, [
         el('p', { class: 'bibl-orfa-texto', texto: 'Capítulo “' + o.titulo + '”: ' + assuntos +
           (o.acao === 'corrigiu' ? ' (corrigido por você)' : ' (confirmado por você)') }),
         el('div', { class: 'bibl-orfa-acoes' }, [
+          sugerido ? el('button', { type: 'button', class: 'btn pequeno principal', 'data-sugestao': o.chave, 'data-ligar-em': String(sugerido.n),
+            texto: 'Ligar a “' + sugerido.titulo + '”' + naPagina(sugerido),
+            aoClick: function () { mudarCorrecaoOrfa(l, o.chave, sugerido); } }) : null,
           el('button', { type: 'button', class: 'btn pequeno', 'data-ligar': o.chave, texto: 'Ligar a um capítulo',
             'aria-expanded': orfaLigando[l.id] === o.chave ? 'true' : 'false',
-            aoClick: function () { orfaLigando[l.id] = orfaLigando[l.id] === o.chave ? null : o.chave; desenharTelaDoLivro(l); } }),
+            aoClick: function () { orfaLigando[l.id] = orfaLigando[l.id] === o.chave ? null : o.chave; orfaTrocando[l.id] = null; desenharTelaDoLivro(l); } }),
           el('button', { type: 'button', class: 'btn pequeno', 'data-descartar': o.chave, texto: 'Descartar',
             aoClick: function () { mudarCorrecaoOrfa(l, o.chave, null); } })
-        ])
+        ].filter(Boolean))
       ]);
+      var trocando = orfaTrocando[l.id] && orfaTrocando[l.id].chave === o.chave ? doMapa(orfaTrocando[l.id].n) : null;
+      if (trocando) {
+        item.appendChild(el('div', { class: 'bibl-orfa-pergunta', 'data-trocando': String(trocando.n) }, [
+          el('p', { class: 'bibl-orfa-texto', texto: '“' + trocando.titulo + '” já tem uma correção sua. Trocar pela desta?' }),
+          el('div', { class: 'bibl-orfa-acoes' }, [
+            el('button', { type: 'button', class: 'btn pequeno principal', 'data-trocar': o.chave, texto: 'Trocar',
+              aoClick: function () { mudarCorrecaoOrfa(l, o.chave, trocando, true); } }),
+            el('button', { type: 'button', class: 'btn pequeno', 'data-cancelar': o.chave, texto: 'Cancelar',
+              aoClick: function () { orfaTrocando[l.id] = null; desenharTelaDoLivro(l); } })
+          ])
+        ]));
+      }
       if (orfaLigando[l.id] === o.chave) {
         var escolha = el('div', { class: 'bibl-orfa-capitulos', role: 'list' });
         mapa.forEach(function (e) {
           escolha.appendChild(el('button', { type: 'button', class: 'bibl-orfa-capitulo', 'data-ligar-em': String(e.n),
-            texto: e.titulo + (l.meta.formato !== 'epub' && e.pagina ? ' (p. ' + paginaParaMostrar(l.meta, e.pagina) + ')' : ''),
-            aoClick: function () { mudarCorrecaoOrfa(l, o.chave, e); } }));
+            texto: e.titulo + naPagina(e), aoClick: function () { mudarCorrecaoOrfa(l, o.chave, e); } }));
         });
         if (!mapa.length) escolha.appendChild(el('p', { class: 'bibl-falta-texto', texto: 'Este livro não tem capítulos no mapa agora.' }));
         item.appendChild(escolha);
@@ -18716,29 +18751,46 @@
   }
 
   /* Liga a correção órfã ao capítulo `entrada` do mapa de agora, ou a
-   * descarta (entrada null). A correção ligada guarda o título de onde veio
-   * (ligadaDe). Desfazer devolve as correções do livro byte a byte. */
-  function mudarCorrecaoOrfa(l, chaveOrfa, entrada) {
+   * descarta (entrada null). O capítulo que já tem correção dela pergunta
+   * antes (`confirmado` é a resposta "Trocar"). A correção ligada guarda o
+   * título de onde veio (ligadaDe). Desfazer devolve só as entradas mexidas,
+   * como estavam, e deixa o resto do livro como está na hora do toque. */
+  function mudarCorrecaoOrfa(l, chaveOrfa, entrada, confirmado) {
     db.ajustes = db.ajustes || {};
     db.ajustes.mapaDosLivros = db.ajustes.mapaDosLivros || {};
     var doLivro = db.ajustes.mapaDosLivros[l.id];
-    if (!doLivro || !Object.prototype.hasOwnProperty.call(doLivro, chaveOrfa)) { desenharTelaDoLivro(l); return; }
-    var antes = JSON.stringify(doLivro);
+    var tem = function (k) { return !!doLivro && Object.prototype.hasOwnProperty.call(doLivro, k); };
+    if (!tem(chaveOrfa)) { desenharTelaDoLivro(l); return; }
+    if (entrada && entrada.correcaoChave && entrada.correcaoChave !== chaveOrfa && !confirmado) {
+      orfaTrocando[l.id] = { chave: chaveOrfa, n: entrada.n };
+      desenharTelaDoLivro(l);
+      return;
+    }
+    var copia = function (k) { return tem(k) ? JSON.parse(JSON.stringify(doLivro[k])) : undefined; };
+    var antes = {};
+    antes[chaveOrfa] = copia(chaveOrfa);
     var c = doLivro[chaveOrfa];
     delete doLivro[chaveOrfa];
     if (entrada) {
+      var destino = Biblioteca.chaveParaGravarCorrecao(doLivro, entrada);
+      if (!Object.prototype.hasOwnProperty.call(antes, destino)) antes[destino] = copia(destino);
       var ligada = { titulo: entrada.titulo, assuntos: (c.assuntos || []).slice(), acao: c.acao === 'corrigiu' ? 'corrigiu' : 'confirmou',
         quando: new Date().toISOString(), n: entrada.n, ligadaDe: c.titulo };
       if (entrada.chave) ligada.chave = entrada.chave;
-      doLivro[Biblioteca.chaveParaGravarCorrecao(doLivro, entrada)] = ligada;
+      doLivro[destino] = ligada;
     }
     orfaLigando[l.id] = null;
+    orfaTrocando[l.id] = null;
     var redesenhar = function () { if (bibLivroAberto === l.id) desenharTelaDoLivro(l); };
     salvar().then(redesenhar, redesenhar);
     avisar(entrada ? 'Correção ligada ao capítulo “' + entrada.titulo + '”.' : 'Correção descartada.', 'Desfazer', function () {
       db.ajustes = db.ajustes || {};
       db.ajustes.mapaDosLivros = db.ajustes.mapaDosLivros || {};
-      db.ajustes.mapaDosLivros[l.id] = JSON.parse(antes);
+      var agora = db.ajustes.mapaDosLivros[l.id] = db.ajustes.mapaDosLivros[l.id] || {};
+      Object.keys(antes).forEach(function (k) {
+        if (antes[k] === undefined) delete agora[k];
+        else agora[k] = antes[k];
+      });
       salvar().then(redesenhar, redesenhar);
     });
   }

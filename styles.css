@@ -3972,6 +3972,7 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bibl-orfa-texto { margin: 0 0 8px; font-size: var(--letra-14); color: var(--texto); overflow-wrap: anywhere; }
 .bibl-orfa-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
 .bibl-orfa-acoes .btn { max-width: 100%; white-space: normal; }
+.bibl-orfa-pergunta { margin-top: 8px; padding: 8px 12px; border-radius: var(--raio); background: var(--soft); }
 .bibl-orfa-capitulos { display: flex; flex-direction: column; margin-top: 8px; }
 .bibl-orfa-capitulo {
   min-height: var(--alvo); padding: 8px 12px; border: 0; border-top: 1px solid var(--fio-claro); background: transparent;

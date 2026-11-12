@@ -23,37 +23,39 @@
  *      g. o lado contrário: gravar o mesmo v2 de novo não muda NADA (as
  *         posições e os livros byte a byte), e livro sem posição não ganha
  *         posição;
- *      h. a regra pura (Store.posicaoNoArquivoNovo) nos casos do EPUB que
- *         encolhe e do PDF que vira EPUB;
+ *      h. a regra pura (Store.posicaoNoArquivoNovo): o EPUB que encolhe, a
+ *         ida e volta PDF, EPUB, PDF que termina na página dela, o ajuste que
+ *         volta ao lugar de verdade quando ele existe, a página impressa;
+ *      i. o livro que sai do pacote sai do tablet, e a posição dele FICA;
  *   2. o aviso: a tela do livro d diz "Você estava na p. 8" e "Continuar na
- *      p. 6"; o leitor abre na p. 6 com a mesma frase no alto; depois da
- *      leitura, o aviso não volta;
- *   3. a correção órfã na tela do livro: a linha discreta com o número, o
- *      db byte a byte igual só de abrir a tela, "Ligar a um capítulo" e
- *      "Descartar", cada um com Desfazer que devolve o db byte a byte, e a
+ *      p. 6"; o leitor abre na p. 6 com a mesma frase no alto; só abrir não
+ *      tira o ajuste; ela muda de página, e o aviso não volta;
+ *   3. a palavra nova pela faixa do leitor (Confirmar) num capítulo cujo
+ *      número guarda uma correção órfã dela: as duas ficam;
+ *   4. as órfãs na tela do livro: a linha discreta com o número, a sugestão
+ *      de um toque (só para a que tem capítulo provável), "Ligar a um
+ *      capítulo" que PERGUNTA antes de trocar a correção de um capítulo
+ *      (Cancelar não muda nada), "Descartar", o Desfazer que devolve SÓ o que
+ *      a ação mexeu (uma correção feita entre a ação e o Desfazer fica), e a
  *      trava de transbordo da linha aberta (360, 390 e 412 px, fonte a 130%);
- *   4. a palavra nova pela faixa do leitor (Confirmar) num capítulo cujo
- *      número guarda a correção de OUTRO capítulo (o mapa renumerou): as duas
- *      ficam, cada uma no seu capítulo;
  *   5. nenhum erro de página.
  *
  * Venenos (a prova TEM de ver o defeito e passa dizendo que viu):
- *   --envenenado-solta-no-meta     o store.js apaga a posição quando só o
- *                                  meta muda: o caso 1a reprova;
- *   --envenenado-solta-no-sumario  o delete do posicoesSoltas de volta: o
- *                                  caso 1b reprova;
- *   --envenenado-solta-na-troca    a posição sai em toda troca de arquivo:
- *                                  o caso 1c reprova;
- *   --envenenado-nao-ajusta        a página que não existe fica: o caso 1d
- *                                  reprova;
- *   --envenenado-sem-traducao      a âncora page_N é ignorada: o caso 1e
- *                                  reprova;
- *   --envenenado-sem-aviso         o leitor não diz onde ela estava: o 2
- *                                  reprova;
- *   --envenenado-orfa-some-da-tela a linha das órfãs não aparece: o 3
- *                                  reprova;
+ *   --envenenado-solta-no-meta     a posição sai quando só o meta muda (1a);
+ *   --envenenado-solta-no-sumario  o delete do posicoesSoltas de volta (1b);
+ *   --envenenado-solta-na-troca    a posição sai em toda troca de arquivo (1c);
+ *   --envenenado-nao-ajusta        a página que não existe fica (1d);
+ *   --envenenado-sem-traducao      a âncora page_N é ignorada (1e);
+ *   --envenenado-solta-no-removido o livro que sai do pacote leva a posição (1i);
+ *   --envenenado-sem-aviso         o leitor não diz onde ela estava (2);
+ *   --envenenado-ajuste-sai-na-abertura  o ajuste sai só de abrir (2);
  *   --envenenado-grava-por-cima-na-tela  o Confirmar grava no número do
- *                                  capítulo: o 4 vê a outra correção apagada.
+ *                                  capítulo e apaga a órfã (3);
+ *   --envenenado-orfa-some-da-tela a linha das órfãs não aparece (4);
+ *   --envenenado-troca-sem-perguntar  ligar a um capítulo com correção troca
+ *                                  sem perguntar (4);
+ *   --envenenado-desfazer-tudo     o Desfazer zera o livro e devolve só o que
+ *                                  mexeu: as outras correções somem (4).
  *
  *   node _teste/testa_livros_nuvem_posicao.js [--envenenado-...]
  */
@@ -76,7 +78,11 @@ const VENENOS = {
   '--envenenado-sem-traducao': ['store', 'var n = paginaDaAncora(pos.ancoraVista || pos.ancora);', 'var n = null;'],
   '--envenenado-sem-aviso': ['app', "var ondeEstava = !destino ? avisoDaPosicaoAjustada(pos) : '';", "var ondeEstava = '';"],
   '--envenenado-orfa-some-da-tela': ['app', 'if (orfas.length) lista.appendChild(blocoDasCorrecoesOrfas(l, orfas, mapa, nomeDoAssunto));', 'void 0;'],
-  '--envenenado-grava-por-cima-na-tela': ['app', 'doLivro[Biblioteca.chaveParaGravarCorrecao(doLivro, entrada)] = registro;', 'doLivro[String(entrada.n)] = registro;']
+  '--envenenado-grava-por-cima-na-tela': ['app', 'doLivro[Biblioteca.chaveParaGravarCorrecao(doLivro, entrada)] = registro;', 'doLivro[String(entrada.n)] = registro;'],
+  '--envenenado-solta-no-removido': ['store', '            contas.removidos++;\n', "            contas.removidos++; t.objectStore('livros_posicoes').delete(c.value.id);\n"],
+  '--envenenado-ajuste-sai-na-abertura': ['app', 'ajustadaDe: ajuste && !ajuste.mexeu ? ajuste.de : null })', 'ajustadaDe: null })'],
+  '--envenenado-troca-sem-perguntar': ['app', 'if (entrada && entrada.correcaoChave && entrada.correcaoChave !== chaveOrfa && !confirmado) {', 'if (false) {'],
+  '--envenenado-desfazer-tudo': ['app', 'var agora = db.ajustes.mapaDosLivros[l.id] = db.ajustes.mapaDosLivros[l.id] || {};', 'var agora = db.ajustes.mapaDosLivros[l.id] = {};']
 };
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && !VENENOS[a]);
@@ -144,7 +150,8 @@ const V1 = [
   livro('pos-fme', 'epub', epubMeta('pos-fme')),
   livro('pos-fme-sem-ancora', 'epub', epubMeta('pos-fme-sem-ancora')),
   livro('pos-sem-posicao', 'dez'),
-  livro('orfa-livro', 'dez', { sumario: SUM_ORFA, mapa: MAPA_ORFA })
+  livro('orfa-livro', 'dez', { sumario: SUM_ORFA, mapa: MAPA_ORFA }),
+  livro('pos-sai', 'dez')
 ];
 const V2 = [
   livro('pos-meta', 'dez', { sumario: SUM2 }),
@@ -157,8 +164,10 @@ const V2 = [
   livro('orfa-livro', 'dez', { sumario: SUM_ORFA, mapa: MAPA_ORFA })
 ];
 const CORRECOES = { 'orfa-livro': {
-  // gravada quando "Funções" era o capítulo 1: o mapa renumerou, e ela segue o título para o 2
+  // gravada quando "Funções" era o capítulo 1: o mapa renumerou; sem chave, ela fica órfã com a sugestão do 2
   1: { titulo: 'Funções', assuntos: ['MAT09-07'], acao: 'corrigiu', quando: '2026-11-10T10:00:00.000Z' },
+  // a do capítulo 3, de mesmo número e título: vale
+  3: { titulo: 'Estatística', assuntos: ['MAT09-12'], acao: 'corrigiu', quando: '2026-11-09T10:00:00.000Z' },
   // de um capítulo que saiu do mapa: órfã
   5: { titulo: 'Capítulo que saiu', assuntos: ['MAT09-04'], acao: 'corrigiu', quando: '2026-11-10T10:00:00.000Z' }
 } };
@@ -216,6 +225,8 @@ const tela = pag => pag.evaluate(() => {
     orfas: q('#bib-livro-orfas') ? q('#bib-livro-orfas').dataset.orfas : '', linha: (q('#bib-livro-orfas-linha') || {}).textContent || '',
     aberta: (q('#bib-livro-orfas-linha') || { getAttribute: () => '' }).getAttribute('aria-expanded'),
     itens: Array.from(document.querySelectorAll('#bib-livro .bibl-orfa')).map(e => e.dataset.orfa + '|' + e.querySelector('.bibl-orfa-texto').textContent).join(' ; '),
+    sugestoes: Array.from(document.querySelectorAll('#bib-livro [data-sugestao]')).map(e => e.dataset.sugestao + '=' + e.textContent).join(' ; '),
+    pergunta: Array.from(document.querySelectorAll('#bib-livro .bibl-orfa-pergunta .bibl-orfa-texto')).map(e => e.textContent).join(' ; '),
     capitulos: Array.from(document.querySelectorAll('#bib-livro .bibl-orfa-capitulo')).map(e => e.dataset.ligarEm + '=' + e.textContent).join(' ; '),
     assuntos: Array.from(document.querySelectorAll('#bib-livro .bibl-cap')).map(b => b.dataset.n + ':' + ((b.querySelector('.bibl-cap-assuntos') || {}).textContent || '')).join(' | ') };
 });
@@ -291,14 +302,15 @@ const medirOrfas = (pag, largura) => pag.evaluate(w => {
     await Store.gravarPosicaoLivro({ id: 'pos-encolhe', pagina: 8 });
     await Store.gravarPosicaoLivro({ id: 'pos-fme', capitulo: 2, fracao: 0.4, ancoraVista: 'page_7' });
     await Store.gravarPosicaoLivro({ id: 'pos-fme-sem-ancora', capitulo: 2, fracao: 0.4 });
+    await Store.gravarPosicaoLivro({ id: 'pos-sai', pagina: 3 });
     const d = await Store.carregar();
     d.ajustes = d.ajustes || {};
     d.ajustes.mapaDosLivros = c;
     await Store.salvar(d);
   }, CORRECOES);
   const antes = await retrato(pag);
-  conf('controle: o retrato enxerga as seis posições gravadas', Object.keys(antes.posicoes).sort().join(','),
-    'pos-arquivo,pos-arquivo-sumario,pos-encolhe,pos-fme,pos-fme-sem-ancora,pos-meta');
+  conf('controle: o retrato enxerga as sete posições gravadas', Object.keys(antes.posicoes).sort().join(','),
+    'pos-arquivo,pos-arquivo-sumario,pos-encolhe,pos-fme,pos-fme-sem-ancora,pos-meta,pos-sai');
   conf('controle: a âncora do EPUB ficou gravada na posição', JSON.parse(antes.posicoes['pos-fme']).ancoraVista, 'page_7');
   const c2 = await gravar(pag, 2, V2);
   console.log('   contas do v2: ' + JSON.stringify(c2));
@@ -310,8 +322,9 @@ const medirOrfas = (pag, largura) => pag.evaluate(w => {
   if (MODO === '--envenenado-solta-na-troca') { veneno('a posição do livro de arquivo novo sumiu', P('pos-arquivo') === 'nenhuma'); return H.fim(amb)(); }
   if (MODO === '--envenenado-nao-ajusta') { veneno('a posição ficou na p. 8 de um livro de 6', P('pos-encolhe') === 'p8'); return H.fim(amb)(); }
   if (MODO === '--envenenado-sem-traducao') { veneno('a âncora page_7 foi ignorada e o livro abre na p. 1', P('pos-fme') === 'p1 de:{"capitulo":2}'); return H.fim(amb)(); }
-  conf('as contas: 6 de arquivo novo, 2 de mesmo arquivo (meta novo), 4 sumários mudados, 2 posições ajustadas',
-    [c2.atualizados, c2.iguais, c2.sumariosMudados, c2.posicoesAjustadas].join('/'), '6/2/4/2');
+  if (MODO === '--envenenado-solta-no-removido') { veneno('a posição do livro que saiu do pacote sumiu sem ação dela', P('pos-sai') === 'nenhuma'); return H.fim(amb)(); }
+  conf('as contas: 6 de arquivo novo, 2 de mesmo arquivo (meta novo), 1 que saiu do pacote, 4 sumários mudados, 2 posições ajustadas',
+    [c2.atualizados, c2.iguais, c2.removidos, c2.sumariosMudados, c2.posicoesAjustadas].join('/'), '6/2/1/4/2');
   conf('a. só o meta mudou: a posição ficou byte a byte', depois.posicoes['pos-meta'] === antes.posicoes['pos-meta'], true);
   conf('a. e o meta trocou (o sumário novo entrou)', JSON.parse(depois.livros['pos-meta']).meta.sumario[0].titulo, 'Números');
   conf('b. o arquivo e o sumário mudaram, a página existe: a posição ficou na 7', P('pos-arquivo-sumario'), 'p7');
@@ -322,6 +335,7 @@ const medirOrfas = (pag, largura) => pag.evaluate(w => {
   conf('e. e o registro não guarda mais capítulo, fração nem âncora', ['capitulo', 'fracao', 'ancoraVista'].filter(k => k in JSON.parse(depois.posicoes['pos-fme'])).join(','), '');
   conf('f. sem âncora: a p. 1, com a parte onde ela estava', P('pos-fme-sem-ancora'), 'p1 de:{"capitulo":2}');
   conf('g. o livro sem posição continua sem posição', P('pos-sem-posicao'), 'nenhuma');
+  conf('i. o livro que saiu do pacote sai do tablet, e a posição dele FICA, byte a byte', !depois.livros['pos-sai'] + '|' + (depois.posicoes['pos-sai'] === antes.posicoes['pos-sai']), 'true|true');
   const c3 = await gravar(pag, 2, V2);
   const outraVez = await retrato(pag);
   conf('g. gravar o mesmo v2 de novo: tudo igual, nada regravado', c3.iguais + '/' + c3.atualizados + '/' + c3.posicoesAjustadas, V2.length + '/0/0');
@@ -329,22 +343,33 @@ const medirOrfas = (pag, largura) => pag.evaluate(w => {
   conf('g. e os livros byte a byte', JSON.stringify(outraVez.livros) === JSON.stringify(depois.livros), true);
   const pura = await pag.evaluate(() => {
     const ep = n => ({ formato: 'epub', hash: 'sha256:novo', epub: { espinha: Array.from({ length: n }, (_, i) => 'p' + i + '.xhtml') } });
+    const pdf = (n, extra) => Object.assign({ formato: 'pdf', paginas: n, hash: 'sha256:h' + n }, extra || {});
     const f = (pos, a, b) => JSON.stringify(Store.posicaoNoArquivoNovo(pos, a, b));
+    // a ida e volta: PDF p. 40, vira EPUB, volta a PDF de 100 páginas
+    const ida = Store.posicaoNoArquivoNovo({ id: 'x', pagina: 40 }, pdf(100), ep(3));
     return [
       f({ id: 'x', capitulo: 5, fracao: 0.3 }, ep(9), ep(3)),
       f({ id: 'x', capitulo: 2, fracao: 0.3 }, ep(9), ep(3)),
-      f({ id: 'x', pagina: 40 }, { formato: 'pdf', paginas: 100 }, ep(3)),
-      f({ id: 'x', pagina: 40, ajustadaDe: { pagina: 312 } }, { formato: 'pdf', paginas: 400 }, { formato: 'pdf', paginas: 30, hash: 'sha256:h' }),
-      f(null, { formato: 'pdf' }, { formato: 'pdf', paginas: 3 })
+      JSON.stringify(ida),
+      f(ida, ep(3), pdf(100)),
+      f({ id: 'x', pagina: 30, ajustadaDe: { pagina: 312 } }, pdf(30), pdf(29)),
+      f({ id: 'x', pagina: 30, ajustadaDe: { pagina: 312 } }, pdf(30), pdf(400)),
+      f({ id: 'x', pagina: 3, ajustadaDe: { capitulo: 5 } }, pdf(10), ep(9)),
+      f({ id: 'x', pagina: 8 }, pdf(10, { id: 'x', numeracao: [{ estilo: 'arabico', inicio: 1, de: 3, ate: 10 }] }), pdf(6)),
+      f(null, { formato: 'pdf' }, pdf(3))
     ].join(' ; ');
   });
-  conf('h. a regra pura: o EPUB que encolhe, o que não encolhe, o PDF que vira EPUB, o ajuste que já estava e a falta de posição', pura,
+  conf('h. a regra pura: o EPUB que encolhe, o que não encolhe, a ida e a volta, o ajuste que fica, o que volta para o lugar dela, a página impressa e a falta de posição', pura,
     '{"id":"x","capitulo":3,"fracao":0,"sha":"sha256:novo","ajustadaDe":{"capitulo":5}} ; ' +
     '{"id":"x","capitulo":2,"fracao":0.3,"sha":"sha256:novo"} ; ' +
     '{"id":"x","sha":"sha256:novo","capitulo":1,"fracao":0,"ajustadaDe":{"pagina":40}} ; ' +
-    '{"id":"x","pagina":30,"ajustadaDe":{"pagina":312},"sha":"sha256:h"} ; null');
+    '{"id":"x","sha":"sha256:h100","pagina":40} ; ' +
+    '{"id":"x","pagina":29,"ajustadaDe":{"pagina":312},"sha":"sha256:h29"} ; ' +
+    '{"id":"x","pagina":312,"sha":"sha256:h400"} ; ' +
+    '{"id":"x","sha":"sha256:novo","capitulo":5,"fracao":0} ; ' +
+    '{"id":"x","pagina":6,"sha":"sha256:h6","ajustadaDe":{"pagina":8,"impressa":"6"}} ; null');
   conf('a tela da importação diz que o livro não abre mais onde ela parou', await pag.evaluate(c => Biblioteca.resumoDeLivros(c).join(' '), c2),
-    '6 atualizados, 2 já estavam no tablet 2 livros atualizados não abrem mais onde você parou; ao abrir, cada um diz onde você estava.');
+    '6 atualizados, 2 já estavam no tablet, 1 saiu do pacote e do tablet 2 livros atualizados não abrem mais onde você parou; ao abrir, cada um diz onde você estava.');
 
   // ================================================================
   secao('2. O aviso de onde ela estava');
@@ -363,63 +388,29 @@ const medirOrfas = (pag, largura) => pag.evaluate(w => {
     return H.fim(amb)();
   }
   conf('o leitor abre na p. 6 com a frase no alto', dica, 'Este livro foi atualizado. Você estava na p. 8.');
-  const lida = await esperar('a posição regravada pela leitura', () => posicao(pag, 'pos-encolhe'), v => !!v && !/ajustadaDe/.test(v), 10000);
-  conf('depois de ler, a posição não traz mais o ajuste e leva o sha do arquivo', resumoPos(lida.valor) + ' ' + JSON.parse(lida.valor).sha, 'p6 ' + V2[3].meta.hash);
+  // a gravação automática da página aberta (leva o sha do arquivo) repassa o ajuste
+  const aberta = await esperar('a posição regravada ao abrir', () => posicao(pag, 'pos-encolhe'), v => !!v && JSON.parse(v).sha === V2[3].meta.hash, 10000);
+  if (MODO === '--envenenado-ajuste-sai-na-abertura') {
+    veneno('o ajuste saiu só de abrir o livro, sem ela mudar de página', !/ajustadaDe/.test(aberta.valor));
+    return H.fim(amb)();
+  }
+  conf('só de abrir, o ajuste fica (ela ainda não mudou de página)', resumoPos(aberta.valor), 'p6 de:{"pagina":8}');
+  await clicar(pag, '#leitor-anterior');
+  const lida = await esperar('a posição depois de ela ir para a p. 5', () => posicao(pag, 'pos-encolhe'), v => !!v && JSON.parse(v).pagina === 5, 10000);
+  conf('ela mudou de página: o ajuste sai, e o sha do arquivo fica', resumoPos(lida.valor) + ' ' + JSON.parse(lida.valor).sha, 'p5 ' + V2[3].meta.hash);
   await fecharModal(pag, 'modal-leitor-pdf');
-  await esperar('a tela do livro redesenhada sem o aviso', () => tela(pag), v => v.ondeEstava === '' && /Continuar na p\. 6/.test(v.continuar), 10000);
+  await esperar('a tela do livro redesenhada sem o aviso', () => tela(pag), v => v.ondeEstava === '' && /Continuar na p\. 5/.test(v.continuar), 10000);
   conf('o aviso não volta', (await tela(pag)).ondeEstava, '');
 
   // ================================================================
-  secao('3. A correção órfã na tela do livro');
+  secao('3. A palavra nova pela faixa do leitor, num número que guarda outra correção');
   const db0 = await db(pag);
-  conf('controle: o db tem as duas correções do livro', Object.keys(JSON.parse(db0)).join(','), '1,5');
+  conf('controle: o db tem as três correções do livro', Object.keys(JSON.parse(db0)).join(','), '1,3,5');
   await abrirTela(pag, 'orfa-livro');
-  await esperar('os nomes dos assuntos', () => tela(pag), v => !/MAT09-/.test(v.assuntos), 10000);
-  t = await tela(pag);
-  if (MODO === '--envenenado-orfa-some-da-tela') {
-    veneno('a tela do livro não mostra a correção órfã', t.orfas === '' && t.linha === '');
-    return H.fim(amb)();
-  }
-  conf('a linha discreta, recolhida, com o número', t.orfas + '|' + t.linha + '|' + t.aberta,
-    '1|1 correção sua não achou o capítulo depois da atualização|false');
   const valendo = await pag.evaluate(() => Store.lerLivro('orfa-livro').then(r => Store.carregar().then(d =>
     Biblioteca.mapaDoLivro(r.meta, d.ajustes.mapaDosLivros['orfa-livro']).map(e => e.n + ':' + e.estado + ':' + e.assuntos.join('+')).join(' '))));
-  conf('o mapa que vale: a do 1 antigo no 2, o capítulo novo do meio sem correção', valendo, '1:a_confirmar:MAT09-01 2:corrigido:MAT09-07 3:do_mapa:MAT09-11');
+  conf('o mapa que vale: a do "1" antigo (Funções) NÃO cai calada no 2; a do 3 vale', valendo, '1:a_confirmar:MAT09-01 2:do_mapa:MAT09-06 3:corrigido:MAT09-12');
   conf('só abrir a tela não muda o db', await db(pag), db0);
-  await clicar(pag, '#bib-livro-orfas-linha');
-  t = (await esperar('a linha aberta', () => tela(pag), v => v.aberta === 'true', 5000)).valor;
-  conf('aberta, ela diz o título e o que ela escolheu', /^5\|Capítulo “Capítulo que saiu”: .+ \(corrigido por você\)$/.test(t.itens) && !/MAT09-04/.test(t.itens), true);
-  await clicar(pag, '#bib-livro [data-ligar="5"]');
-  t = (await esperar('a lista dos capítulos', () => tela(pag), v => !!v.capitulos, 5000)).valor;
-  conf('"Ligar a um capítulo" lista os capítulos do mapa de agora', t.capitulos, '1=Introdução (p. 1) ; 2=Funções (p. 4) ; 3=Estatística (p. 7)');
-  await pag.evaluate(c => { const s = document.createElement('style'); s.id = 'prova-letra'; s.textContent = c; document.head.appendChild(s); }, LETRA_130);
-  for (const w of [360, 390, 412]) conf('a trava de transbordo da linha aberta a ' + w + ' px, fonte a 130%', (await medirOrfas(pag, w)).join('; '), '');
-  await pag.evaluate(() => { const s = document.querySelector('#prova-letra'); if (s) s.remove(); });
-  await clicar(pag, '#bib-livro [data-ligar-em="3"]');
-  const ligado = await esperar('a correção ligada no db', () => db(pag), v => !!v && !/"5"/.test(v), 5000);
-  const dl = JSON.parse(ligado.valor);
-  conf('ligar: a órfã sai da chave velha e entra no capítulo 3, com o que ela escolheu e de onde veio',
-    Object.keys(dl).join(',') + '|' + [dl['3'].titulo, dl['3'].assuntos.join('+'), dl['3'].acao, dl['3'].n, dl['3'].ligadaDe].join('/'),
-    '1,3|Estatística/MAT09-04/corrigiu/3/Capítulo que saiu');
-  conf('a correção do outro capítulo ficou como estava', JSON.stringify(dl['1']), JSON.stringify(JSON.parse(db0)['1']));
-  t = (await esperar('a linha das órfãs some', () => tela(pag), v => v.orfas === '', 5000)).valor;
-  conf('a linha das órfãs some da tela', t.linha, '');
-  conf('o aviso de ligar tem Desfazer', await desfazer(pag, 'ligar'), 'Correção ligada ao capítulo “Estatística”.');
-  await esperar('o db de volta', () => db(pag), v => v === db0, 5000);
-  conf('Desfazer devolve o db byte a byte', await db(pag), db0);
-  t = (await esperar('a linha de volta', () => tela(pag), v => v.orfas === '1', 5000)).valor;
-  conf('e a linha volta', t.orfas, '1');
-  if (t.aberta !== 'true') await clicar(pag, '#bib-livro-orfas-linha');
-  await esperar('a linha aberta de novo', () => tela(pag), v => v.aberta === 'true' && !!v.itens, 5000);
-  await clicar(pag, '#bib-livro [data-descartar="5"]');
-  await esperar('a correção descartada no db', () => db(pag), v => !!v && !/"5"/.test(v), 5000);
-  conf('descartar: só a órfã sai', Object.keys(JSON.parse(await db(pag))).join(','), '1');
-  conf('o aviso de descartar tem Desfazer', await desfazer(pag, 'descartar'), 'Correção descartada.');
-  await esperar('o db de volta', () => db(pag), v => v === db0, 5000);
-  conf('Desfazer devolve o db byte a byte', await db(pag), db0);
-
-  // ================================================================
-  secao('4. A palavra nova pela faixa do leitor, num número que guarda outra correção');
   await clicar(pag, '#bib-livro .bibl-cap[data-n="1"]');
   await esperar('o leitor na p. 1', () => paginaDesenhada(pag), v => v === '1', 30000);
   const faixa = await esperar('a faixa do capítulo 1 com Confirmar', () => pag.evaluate(() => {
@@ -431,16 +422,98 @@ const medirOrfas = (pag, largura) => pag.evaluate(w => {
   const gravado = await esperar('a confirmação no db', () => db(pag), v => !!v && v !== db0, 5000);
   const dg = JSON.parse(gravado.valor);
   if (MODO === '--envenenado-grava-por-cima-na-tela') {
-    veneno('o Confirmar do capítulo 1 apagou a correção de "Funções"', !Object.keys(dg).some(k => dg[k].titulo === 'Funções'));
+    veneno('o Confirmar do capítulo 1 apagou a correção órfã de "Funções"', !Object.keys(dg).some(k => dg[k].titulo === 'Funções'));
     return H.fim(amb)();
   }
-  conf('a correção de "Funções" ficou no "1", e a de "Introdução" foi para uma chave nova',
+  conf('a órfã de "Funções" ficou no "1", e a de "Introdução" foi para uma chave nova',
     Object.keys(dg).sort().join(',') + '|' + dg['1'].titulo + '|' + (dg['1~introducao'] || {}).titulo + '/' + (dg['1~introducao'] || {}).acao + '/' + (dg['1~introducao'] || {}).n,
-    '1,1~introducao,5|Funções|Introdução/confirmou/1');
-  const valendo2 = await pag.evaluate(() => Store.lerLivro('orfa-livro').then(r => Store.carregar().then(d =>
-    Biblioteca.mapaDoLivro(r.meta, d.ajustes.mapaDosLivros['orfa-livro']).map(e => e.n + ':' + e.estado + ':' + e.assuntos.join('+')).join(' '))));
-  conf('as duas valem, cada uma no seu capítulo', valendo2, '1:confirmado:MAT09-01 2:corrigido:MAT09-07 3:do_mapa:MAT09-11');
+    '1,1~introducao,3,5|Funções|Introdução/confirmou/1');
   await fecharModal(pag, 'modal-leitor-pdf');
+
+  // ================================================================
+  secao('4. A correção órfã na tela do livro');
+  const db1 = await db(pag);
+  await esperar('os nomes dos assuntos', () => tela(pag), v => !/MAT09-/.test(v.assuntos) && v.orfas !== '', 10000);
+  t = await tela(pag);
+  if (MODO === '--envenenado-orfa-some-da-tela') {
+    veneno('a tela do livro não mostra as correções órfãs', t.orfas === '' && t.linha === '');
+    return H.fim(amb)();
+  }
+  conf('a linha discreta, recolhida, com o número', t.orfas + '|' + t.linha + '|' + t.aberta,
+    '2|2 correções suas não acharam o capítulo depois da atualização|false');
+  await clicar(pag, '#bib-livro-orfas-linha');
+  t = (await esperar('a linha aberta', () => tela(pag), v => v.aberta === 'true', 5000)).valor;
+  conf('aberta, cada uma diz o título e o que ela escolheu (com o nome do assunto)',
+    /^1\|Capítulo “Funções”: .+ \(corrigido por você\) ; 5\|Capítulo “Capítulo que saiu”: .+ \(corrigido por você\)$/.test(t.itens) && !/MAT09-0/.test(t.itens), true);
+  conf('a de "Funções" traz a sugestão de um toque; a do capítulo que saiu, não', t.sugestoes, '1=Ligar a “Funções” (p. 4)');
+  // a sugestão de um toque
+  await clicar(pag, '#bib-livro [data-sugestao="1"]');
+  const sug = JSON.parse((await esperar('a sugestão aceita no db', () => db(pag), v => !!v && /"2":/.test(v), 5000)).valor);
+  conf('um toque na sugestão: a órfã vai para o capítulo 2, com de onde veio', Object.keys(sug).sort().join(',') + '|' +
+    [sug['2'].titulo, sug['2'].assuntos.join('+'), sug['2'].n, sug['2'].ligadaDe].join('/'), '1~introducao,2,3,5|Funções/MAT09-07/2/Funções');
+  conf('o Desfazer da sugestão', await desfazer(pag, 'sugestão'), 'Correção ligada ao capítulo “Funções”.');
+  if (MODO === '--envenenado-desfazer-tudo') {
+    const dv = JSON.parse((await esperar('o Desfazer envenenado', () => db(pag), v => !!v && !/"2":/.test(v), 5000)).valor);
+    veneno('o Desfazer apagou as correções do livro que a ação não mexeu', !dv['3'] && !dv['1~introducao']);
+    return H.fim(amb)();
+  }
+  await esperar('o db de volta', () => db(pag), v => v === db1, 5000);
+  conf('Desfazer devolve o db byte a byte', await db(pag), db1);
+  t = (await esperar('a linha de volta', () => tela(pag), v => v.orfas === '2', 5000)).valor;
+  if (t.aberta !== 'true') await clicar(pag, '#bib-livro-orfas-linha');
+  await esperar('a linha aberta', () => tela(pag), v => v.aberta === 'true' && !!v.itens, 5000);
+  // ligar a um capítulo que já tem correção: pergunta antes
+  await clicar(pag, '#bib-livro [data-ligar="5"]');
+  t = (await esperar('a lista dos capítulos', () => tela(pag), v => !!v.capitulos, 5000)).valor;
+  conf('"Ligar a um capítulo" lista os capítulos do mapa de agora', t.capitulos, '1=Introdução (p. 1) ; 2=Funções (p. 4) ; 3=Estatística (p. 7)');
+  await pag.evaluate(c => { const s = document.createElement('style'); s.id = 'prova-letra'; s.textContent = c; document.head.appendChild(s); }, LETRA_130);
+  for (const w of [360, 390, 412]) conf('a trava de transbordo da linha aberta a ' + w + ' px, fonte a 130%', (await medirOrfas(pag, w)).join('; '), '');
+  await pag.evaluate(() => { const s = document.querySelector('#prova-letra'); if (s) s.remove(); });
+  await clicar(pag, '#bib-livro .bibl-orfa-capitulos [data-ligar-em="3"]');
+  await pausa(300);
+  t = await tela(pag);
+  if (MODO === '--envenenado-troca-sem-perguntar') {
+    veneno('ligar ao capítulo 3 trocou a correção dela sem perguntar', /"3":\{"titulo":"Estatística","assuntos":\["MAT09-04"\]/.test(await db(pag)));
+    return H.fim(amb)();
+  }
+  conf('o capítulo 3 já tem correção dela: a linha pergunta, e o db não muda', t.pergunta + '|' + ((await db(pag)) === db1),
+    '“Estatística” já tem uma correção sua. Trocar pela desta?|true');
+  await clicar(pag, '#bib-livro [data-cancelar="5"]');
+  t = (await esperar('a pergunta some', () => tela(pag), v => v.pergunta === '', 5000)).valor;
+  conf('Cancelar: nada muda', (await db(pag)) === db1, true);
+  if (!(await tela(pag)).capitulos) await clicar(pag, '#bib-livro [data-ligar="5"]');
+  await esperar('a lista dos capítulos de novo', () => tela(pag), v => !!v.capitulos, 5000);
+  await clicar(pag, '#bib-livro .bibl-orfa-capitulos [data-ligar-em="3"]');
+  await esperar('a pergunta de novo', () => tela(pag), v => !!v.pergunta, 5000);
+  await clicar(pag, '#bib-livro [data-trocar="5"]');
+  const dt = JSON.parse((await esperar('a troca no db', () => db(pag), v => !!v && !/"5":/.test(v), 5000)).valor);
+  conf('Trocar: o capítulo 3 recebe a da órfã, e a órfã sai da chave velha', Object.keys(dt).sort().join(',') + '|' +
+    [dt['3'].titulo, dt['3'].assuntos.join('+'), dt['3'].ligadaDe].join('/'), '1,1~introducao,3|Estatística/MAT09-04/Capítulo que saiu');
+  // o Desfazer da troca, guardado; ENTRE a troca e o Desfazer, outra correção dela (a sugestão de "Funções")
+  await esperar('o Desfazer da troca à vista', () => pag.evaluate(() => {
+    const b = document.querySelector('#aviso-acao'); return !!b && b.offsetParent !== null && /Desfazer/.test(b.textContent);
+  }), v => v, 5000);
+  await pag.evaluate(() => { window.__desfazerTroca = document.querySelector('#aviso-acao').onclick; });
+  t = (await esperar('a linha com uma órfã', () => tela(pag), v => v.orfas === '1', 5000)).valor;
+  if (t.aberta !== 'true') await clicar(pag, '#bib-livro-orfas-linha');
+  await esperar('a sugestão à vista', () => tela(pag), v => /^1=/.test(v.sugestoes), 5000);
+  await clicar(pag, '#bib-livro [data-sugestao="1"]');
+  await esperar('a correção feita no meio', () => db(pag), v => !!v && /"2":/.test(v), 5000);
+  await pag.evaluate(() => window.__desfazerTroca());
+  const dd = JSON.parse((await esperar('o Desfazer da troca', () => db(pag), v => !!v && /"5":/.test(v), 5000)).valor);
+  conf('o Desfazer da troca devolve o 3 e a órfã como estavam', JSON.stringify([dd['3'], dd['5']]),
+    JSON.stringify([JSON.parse(db1)['3'], JSON.parse(db1)['5']]));
+  conf('e a correção feita no meio (a do 2) fica', !!dd['2'] && dd['2'].titulo === 'Funções' && !dd['1'], true);
+  // descartar, com Desfazer
+  t = (await esperar('a linha com a órfã do capítulo que saiu', () => tela(pag), v => v.orfas === '1', 5000)).valor;
+  if (t.aberta !== 'true') await clicar(pag, '#bib-livro-orfas-linha');
+  await esperar('o Descartar à vista', () => pag.evaluate(() => !!document.querySelector('#bib-livro [data-descartar="5"]')), v => v, 5000);
+  const dAntes = await db(pag);
+  await clicar(pag, '#bib-livro [data-descartar="5"]');
+  await esperar('a correção descartada no db', () => db(pag), v => !!v && !/"5":/.test(v), 5000);
+  conf('o aviso de descartar tem Desfazer', await desfazer(pag, 'descartar'), 'Correção descartada.');
+  await esperar('o db de volta', () => db(pag), v => v === dAntes, 5000);
+  conf('Desfazer devolve o db byte a byte', await db(pag), dAntes);
 
   secao('5. Nenhum erro de página');
   conf('nenhum erro de página', erros.join(' | '), '');

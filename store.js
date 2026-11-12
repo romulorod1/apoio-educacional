@@ -2711,7 +2711,8 @@
    *     de versão maior, só a versão e o manifest do livro são renovados,
    *     sem regravar o arquivo e sem tocar na posição de leitura
    *   livro deste pacote, de versão menor, que saiu do pacote novo: sai do
-   *     tablet, com a posição dele (removidos)
+   *     tablet (removidos); a posição dele FICA, órfã, desde a fase 1a da
+   *     nuvem (só sai quando ela tira o livro)
    *   o mesmo id vindo de OUTRO pacote: fica o que está (deOutroPacote), para
    *     um pacote não tomar o livro do outro calado.
    * Devolve as contas, para a tela dizer o que aconteceu. */
@@ -2772,7 +2773,9 @@
           if (!c) return;
           if (!noPacote[c.value.id] && c.value.versao < versao) {
             contas.removidos++;
-            t.objectStore('livros_posicoes').delete(c.value.id);
+            /* a posição FICA (fase 1a da nuvem): órfã e inofensiva, sem livro;
+             * se o livro voltar, ela volta junto. Só sai quando ela mesma tira o
+             * livro (removerLivro) ou apaga tudo. */
             c.delete();
           }
           c.continue();
@@ -2823,9 +2826,10 @@
    *                do FME): é por ela que a posição passa para a página N
    *                quando o mesmo livro chega remontado em PDF;
    *   ajustadaDe   só a posição que ANDOU numa troca de arquivo
-   *                (posicaoNoArquivoNovo): onde ela estava ({ pagina } ou
-   *                { capitulo }). O leitor e a tela do livro mostram "você
-   *                estava na p. X"; a próxima posição gravada já não o traz. */
+   *                (posicaoNoArquivoNovo): onde ela estava ({ pagina, impressa }
+   *                ou { capitulo }). O leitor e a tela do livro mostram "você
+   *                estava na p. X"; ele só sai quando ela muda de página por
+   *                conta própria (o leitor o repassa até lá). */
   function lerPosicaoLivro(id) { return ler('livros_posicoes', id); }
   function gravarPosicaoLivro(reg) {
     var r = { id: reg.id, quando: Date.now() };
@@ -2833,6 +2837,8 @@
     if (reg.capitulo != null) { r.capitulo = reg.capitulo; r.fracao = reg.fracao || 0; }
     if (typeof reg.sha === 'string' && reg.sha) r.sha = reg.sha;
     if (typeof reg.ancoraVista === 'string' && /^page_\d+$/.test(reg.ancoraVista)) r.ancoraVista = reg.ancoraVista;
+    // o leitor repassa o ajuste enquanto ela não mudou de página por conta própria
+    if (reg.ajustadaDe && typeof reg.ajustadaDe === 'object') r.ajustadaDe = reg.ajustadaDe;
     return escrever('livros_posicoes', function (s) { return s.put(r); });
   }
 
@@ -2858,17 +2864,34 @@
    *                   na p. 1 com ajustadaDe: { capitulo }.
    *   PDF para EPUB:  a parte 1, com ajustadaDe: { pagina }.
    * O registro novo leva o sha do arquivo novo. Um ajustadaDe que já estava
-   * (ela ainda não abriu o livro desde a troca anterior) é mantido: é onde
-   * ela estava de verdade. */
+   * (ela ainda não mudou de página desde a troca anterior) é mantido: é onde
+   * ela estava de verdade. E, se esse lugar de verdade existe no arquivo que
+   * chega agora (o arquivo certo depois de um errado), ela VOLTA para ele e o
+   * ajuste sai: a ida e volta PDF, EPUB, PDF termina na página dela, e não na
+   * p. 1. O ajustadaDe leva também a página impressa (impressa), lida no meta
+   * antigo, para o aviso falar a língua do resto da tela. */
   function posicaoNoArquivoNovo(pos, metaAntigo, metaNovo) {
     if (!pos || typeof pos !== 'object' || !metaNovo) return null;
     var r = {};
     Object.keys(pos).forEach(function (k) { r[k] = pos[k]; });
     if (typeof metaNovo.hash === 'string' && metaNovo.hash) r.sha = metaNovo.hash;
-    var antes = pos.ajustadaDe || null;
+    var antes = pos.ajustadaDe && typeof pos.ajustadaDe === 'object' ? pos.ajustadaDe : null;
+    // a página impressa de onde ela estava, pelo meta ANTIGO (o número impresso do novo pode ser outro)
+    var impressaDe = function (p) {
+      var B = typeof Biblioteca !== 'undefined' ? Biblioteca : null;
+      var v = B && typeof B.paginaImpressa === 'function' && metaAntigo ? B.paginaImpressa(metaAntigo, p) : null;
+      return v === null || v === undefined ? null : String(v);
+    };
     var ajustar = function (de) { r.ajustadaDe = antes || de; };
+    var semAjuste = function () { delete r.ajustadaDe; };
     if (metaNovo.formato === 'epub') {
       var partes = ((metaNovo.epub && metaNovo.epub.espinha) || []).length;
+      // o lugar de verdade, de uma troca anterior, existe de novo: ela volta para ele
+      if (antes && inteiroPositivo(antes.capitulo) && (!partes || antes.capitulo <= partes)) {
+        delete r.pagina; r.capitulo = antes.capitulo; r.fracao = 0; delete r.ancoraVista;
+        semAjuste();
+        return r;
+      }
       if (inteiroPositivo(pos.capitulo)) {
         if (partes && pos.capitulo > partes) {
           r.capitulo = partes; r.fracao = 0;
@@ -2878,15 +2901,25 @@
       } else if (inteiroPositivo(pos.pagina)) {
         delete r.pagina;
         r.capitulo = 1; r.fracao = 0;
-        ajustar({ pagina: pos.pagina });
+        var dePdf = { pagina: pos.pagina }, imp = impressaDe(pos.pagina);
+        if (imp) dePdf.impressa = imp;
+        ajustar(dePdf);
       }
       return r;
     }
     var total = metaNovo.paginas;
+    if (antes && inteiroPositivo(antes.pagina) && (!inteiroPositivo(total) || antes.pagina <= total)) {
+      delete r.capitulo; delete r.fracao; delete r.ancoraVista; delete r.ancora;
+      r.pagina = antes.pagina;
+      semAjuste();
+      return r;
+    }
     if (inteiroPositivo(pos.pagina)) {
       if (inteiroPositivo(total) && pos.pagina > total) {
         r.pagina = total;
-        ajustar({ pagina: pos.pagina });
+        var de = { pagina: pos.pagina }, impressa = impressaDe(pos.pagina);
+        if (impressa) de.impressa = impressa;
+        ajustar(de);
       }
       return r;
     }
