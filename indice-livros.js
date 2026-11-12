@@ -901,10 +901,26 @@
 
     // ------------------------------------------------------- a consulta
 
+    /* O PONTO ÚNICO que diz de onde vêm os capítulos do resultado. O sumário
+     * cru do PDF pode ser lixo ("page45", "Blank Page", nome de arquivo); o
+     * Biblioteca.sumarioDoLivro (PR #169) devolve o sumário que a tela do
+     * livro mostra, o do mapa quando os marcadores não servem. Enquanto ele
+     * não existe, vale o cru. Só lê: nada derivado do sumário é gravado. */
+    function sumarioDosCapitulos(meta) {
+      var B = root.Biblioteca;
+      if (B && typeof B.sumarioDoLivro === 'function') {
+        try {
+          var efetivo = B.sumarioDoLivro(meta);
+          if (Array.isArray(efetivo) && efetivo.length) return efetivo;
+        } catch (e) { /* cai no sumário cru */ }
+      }
+      return Array.isArray(meta.sumario) && meta.sumario.length ? meta.sumario : (Array.isArray(meta.mapa) ? meta.mapa : []);
+    }
+
     function capitulosDoLivro(meta, total) {
       var epub = meta.formato === 'epub';
       var chaveIni = epub ? 'capitulo' : 'pagina', chaveFim = epub ? 'capitulo_fim' : 'pagina_fim';
-      var fonte = Array.isArray(meta.sumario) && meta.sumario.length ? meta.sumario : (Array.isArray(meta.mapa) ? meta.mapa : []);
+      var fonte = sumarioDosCapitulos(meta);
       var validas = fonte.filter(function (e) { return e && typeof e.titulo === 'string' && Number.isInteger(e[chaveIni]); });
       if (!validas.length) return [];
       // o capítulo é o nível de cima do sumário

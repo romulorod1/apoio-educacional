@@ -449,6 +449,23 @@ async function importar(pag, arquivo) {
   conf('abrir o resultado do Livro B leva à página 200 do arquivo', leitorLongo.ok, true);
   await pag.evaluate(() => document.querySelector('#modal-leitor-pdf [data-fechar]').click());
   await esperar('o leitor do Livro B fecha', () => pag.evaluate(() => !document.querySelector('#modal-leitor-pdf.aberto')), v => v, 5000);
+  /* o ponto único dos capítulos: quando existe Biblioteca.sumarioDoLivro (o
+   * sumário que a tela do livro mostra, PR #169), o resultado usa o nome dele,
+   * e não o marcador cru do PDF; sem ele, volta ao cru. Nada é gravado. */
+  const comSumarioEfetivo = await pag.evaluate(async () => {
+    const tinha = Object.prototype.hasOwnProperty.call(Biblioteca, 'sumarioDoLivro'), antes = Biblioteca.sumarioDoLivro;
+    Biblioteca.sumarioDoLivro = meta => meta && meta.titulo === 'Livro B longo'
+      ? [{ n: 1, nivel: 1, titulo: 'Capítulo do mapa: Geometria espacial', pagina: 150, pagina_fim: 250 }] : (meta.sumario || []);
+    try {
+      const r = await buscarNosLivros('paralelepipedo', {});
+      const b = (r.livros || []).find(l => l.id === 'indice-longo');
+      return b ? JSON.stringify(b.capitulos.map(c => [c.titulo, c.paginas])) : '';
+    } finally { if (tinha) Biblioteca.sumarioDoLivro = antes; else delete Biblioteca.sumarioDoLivro; }
+  });
+  conf('com o sumário efetivo da tela, o resultado nomeia o capítulo por ele', comSumarioEfetivo, JSON.stringify([['Capítulo do mapa: Geometria espacial', [200]]]));
+  const semSumarioEfetivo = await buscar(pag, 'paralelepipedo');
+  const bCru = (semSumarioEfetivo.livros || []).find(l => l.id === 'indice-longo');
+  conf('e sem ele, volta ao sumário do PDF', bCru ? JSON.stringify(bCru.capitulos.map(c => [c.titulo, c.paginas])) : '', JSON.stringify([['Parte 2: Espaço', [200]]]));
   await pag.evaluate(() => { const campo = document.querySelector('#bib-busca-livros-campo'); campo.value = ''; campo.dispatchEvent(new Event('input', { bubbles: true })); });
 
   const norm = await pag.evaluate(() => [IndiceLivros.normalizar('multipli-' + String.fromCharCode(10) + 'cação'),
