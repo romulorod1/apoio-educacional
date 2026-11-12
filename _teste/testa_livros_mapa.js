@@ -271,8 +271,9 @@ async function printar(pag, nome) {
   console.log('   ' + opcoes.length + ' opções: ' + opcoes.slice(0, 6).join(', ') + ' ... ' + opcoes.slice(-3).join(', '));
   conf('as opções são só de matemática do 6º ao 9º ano (o ano do livro)',
     opcoes.filter(x => x).every(x => /^MAT0[6-9]-/.test(x)), true);
-  // 57 desde 12/11/2026: o MAT08-15 (volume do 8º ano) entrou no índice; eram 56 do 6º ao 9º
-  conf('com os 57 assuntos desses anos, e "Nenhum assunto do índice"', opcoes.filter(x => x).length + '+' + opcoes.filter(x => !x).length, '57+1');
+  // 57 desde 12/11/2026, com o MAT08-15 (volume do 8º ano); 71 desde a revisão dos mapas dos
+  // livros, que criou 14 assuntos do 6º ao 9º (MAT06-15 a 18, MAT07-15 a 17, MAT08-16 a 19, MAT09-15 a 17)
+  conf('com os 71 assuntos desses anos, e "Nenhum assunto do índice"', opcoes.filter(x => x).length + '+' + opcoes.filter(x => !x).length, '71+1');
   conf('o assunto atual do capítulo vem marcado na lista, e só ele', await marcados(p), 'MAT06-05 ✓');
   const rolagem = await p.evaluate(() => {
     const l = document.querySelector('#leitor-cobre .cobre-escolha');
@@ -282,7 +283,7 @@ async function printar(pag, nome) {
       atualAVista: !!m && m.offsetTop >= l.scrollTop && m.offsetTop + m.offsetHeight <= l.scrollTop + l.clientHeight };
   });
   console.log('   rolagem: ' + JSON.stringify(rolagem));
-  conf('a lista rola, e o fim dela diz isso ("Role a lista ... 58 opções")', rolagem.rola && /Role a lista.*58 opções/.test(rolagem.linha), true);
+  conf('a lista rola, e o fim dela diz isso ("Role a lista ... 72 opções")', rolagem.rola && /Role a lista.*72 opções/.test(rolagem.linha), true);
   conf('e abre com o assunto atual à vista', rolagem.atualAVista, true);
   await p.evaluate(() => document.querySelector('#leitor-cobre .cobre-escolha').scrollIntoView({ block: 'center' }));
   await printar(p, 'c15b_corrigir.png');

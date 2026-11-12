@@ -323,3 +323,51 @@ do 8º ano dela já o trazem no mesmo capítulo. Nenhum id existente mudou.
 
 O MAT09-12 continua pedindo MAT08-13 e MAT06-12, e não o MAT08-15: trocar as
 duas arestas por esta mudaria a trilha do 9º ano, e isso não foi pedido.
+
+## Assuntos novos da revisão dos mapas dos livros (12/11/2026)
+
+A revisão dos mapas dos livros de matemática (lotes L1 e L2) levantou 26
+assuntos que os livros dela trazem e o banco não tinha. Para cada um, primeiro
+se procurou no banco um assunto que cobrisse o conteúdo. Quatro itens foram
+ligados a assuntos que já existiam, e nada foi criado para eles: semelhança no
+6º ano (MAT09-08), quadriláteros do 8º (MAT07-12 e MAT06-10), potenciação do
+6º (MAT06-02) e partes proporcionais (MAT07-05). Em três itens criados, um
+livro ficou ligado ao que já existia (estatística do 6º e do 7º em MAT06-14,
+juros compostos do Teláris 7 em MAT07-07, escala do Teláris 7 em MAT07-05). Os
+22 itens restantes deram 24 assuntos, porque construções e figuras não planas
+viraram dois cada: 14 do 6º ao 9º ano e 10 do ensino médio. A série é
+a do livro que põe o conteúdo; a habilidade é a da BNCC oficial (versão final,
+600 páginas, página impressa). Nenhum id existente mudou e nenhuma aresta de
+assunto antigo foi mexida; os assuntos antigos que vêm depois de um novo (por
+exemplo MATEM2-07, contagem do médio, depois do MAT08-18) continuam com os
+pré-requisitos que tinham, porque mudar a trilha deles não foi pedido.
+
+| Assunto | BNCC | Pré-requisitos (aresta acrescentada) | Motivo |
+| --- | --- | --- | --- |
+| MAT06-15 Construções com régua e esquadro | EF06MA22, p. 303 | MAT06-10 | Constrói paralelas, perpendiculares e quadriláteros; ângulos e retas vêm por MAT06-10. |
+| MAT06-16 Figuras não planas | EF06MA17, p. 303 | MAT05-08, MAT06-10 | Continua os sólidos do 5º ano; as faces são os polígonos do 6º. |
+| MAT06-17 Grandezas e medidas | EF06MA24, p. 303 (e EF07MA29, p. 309) | MAT05-10, MAT06-07 | Conversões do 5º ano, agora com decimais. |
+| MAT06-18 Plantas baixas, vistas e escala | EF06MA28, p. 303 | MAT06-11, MAT06-16 | Planta baixa mede área; vista é de figura não plana. |
+| MAT07-15 Simetria e transformações | EF07MA20 e EF07MA21, p. 309 (e EF08MA18, p. 315) | MAT06-10, MAT06-13 | Transforma polígonos, também no plano cartesiano. |
+| MAT07-16 Circunferência e círculo: elementos e construção | EF07MA22, p. 309 | MAT06-15, MAT07-11 | Construção com instrumentos e ângulo central. |
+| MAT07-17 Inequações do 1º grau | não há habilidade de inequação no fundamental | MAT07-10 | Resolve como a equação do 1º grau, com a regra do sinal. |
+| MAT08-16 Construções com régua e compasso | EF08MA15, EF08MA16 e EF08MA17, p. 315 | MAT07-12, MAT07-16 | Polígonos regulares e triângulos; o compasso vem da circunferência. |
+| MAT08-17 Cevianas e pontos notáveis | não há habilidade própria; a mais próxima é EF08MA17, p. 315 | MAT08-12, MAT08-16 | Mediatriz e bissetriz construídas; congruência nas propriedades. |
+| MAT08-18 Contagem: árvore e princípio multiplicativo | EF08MA03, p. 313 | MAT06-02 | Só multiplicação de naturais. |
+| MAT08-19 Pesquisa estatística: população e amostra | EF08MA23, EF08MA26 e EF08MA27, p. 315 | MAT07-07, MAT07-14 | Frequência relativa em porcentagem; medidas de tendência no relatório. |
+| MAT09-15 Vistas ortogonais e perspectiva | EF09MA17, p. 319 | MAT06-18 | Continua as vistas do 6º ano. |
+| MAT09-16 Distâncias no plano | EF09MA16, p. 319 | MAT06-13, MAT09-07 | Coordenadas e Pitágoras. |
+| MAT09-17 Porcentagens sucessivas e juros compostos | EF09MA05, p. 317 | MAT07-07, MAT08-01 | Juros simples e potência. |
+| MATEM1-16 Noções de lógica | não há habilidade EM13MAT de lógica | MAT07-09 | Sentença matemática e linguagem algébrica. |
+| MATEM1-17 Conjuntos: operações e Venn | não há habilidade EM13MAT de conjuntos | MATEM1-16 | Os livros (FME 1) trazem conjuntos logo depois da lógica: união e "ou", interseção e "e". |
+| MATEM1-18 Equações e inequações irracionais | não há habilidade EM13MAT própria | MATEM1-05 | Elevar ao quadrado leva à inequação do 2º grau. |
+| MATEM2-16 Geometria de posição | não há habilidade EM13MAT própria | MAT08-11, MAT09-07 | Paralelas e perpendiculares do plano, e distância. |
+| MATEM2-17 Poliedros: Euler e regulares | não há habilidade EM13MAT; vértices, faces e arestas são EF06MA17, p. 303 | MAT06-16, MATEM2-16 | Contagem de vértices, faces e arestas, no espaço. |
+| MATEM2-18 Equações e inequações trigonométricas | não há habilidade própria; a mais próxima é EM13MAT306, p. 536 | MATEM2-02, MATEM2-15 | Funções trigonométricas e identidades. |
+| MATEM2-19 Funções trigonométricas inversas | não há habilidade EM13MAT própria | MATEM1-15, MATEM2-02 | Função inversa e funções trigonométricas. |
+| MATEM3-15 Introdução à derivada | não há habilidade EM13MAT de derivada | MATEM3-09 | Limite. |
+| MATEM3-16 Introdução à integral | não há habilidade EM13MAT de integral | MATEM3-15 | Antiderivada. |
+| MATEM3-17 Lugares geométricos no plano cartesiano | não há habilidade EM13MAT; lugar geométrico é EF07MA22 (p. 309) e EF08MA17 (p. 315) | MAT08-16, MATEM3-03 | Mediatriz e bissetriz como lugar geométrico, e a circunferência analítica. |
+
+A lista de cada item, com livro, capítulo e decisão, está no PR que criou estes
+assuntos e no arquivo de decisões da coordenação (BANCO_matematica_decisoes.json).
