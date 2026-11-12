@@ -22,6 +22,15 @@ Travas:
                titulo; EPUB com uma parte para dois capitulos (nao fecha). Venenos:
                o fim do capitulo aceito em qualquer lugar; "Resposta pessoal" como
                titulo.
+  item 12a     o titulo de respostas no FIM do texto da pagina, com as paginas
+               seguintes sem titulo (o Praticando 8 e 9): achado, por unidade,
+               certeza alta, igual ao titulo no alto. O outro lado: o quadro
+               "RESPOSTAS" da margem no meio do capitulo, seguido de exercicios
+               densos, nao continua ate o fim do capitulo; a continuacao para na
+               entrada seguinte do mapa; e o quadro da margem na ULTIMA pagina do
+               capitulo (o ga7, pagina 401) nao e gabarito. Venenos: o titulo so
+               no alto; a secao sem continuacao; a continuacao sem exigir dois
+               capitulos; o fim do capitulo com a densidade minima de antes.
   sem texto    sem camada de texto: vazio, menos confiavel, e a nota diz; com
                texto em parte do livro, a certeza baixa. Veneno: a certeza que
                nao baixa.
@@ -90,7 +99,7 @@ def trava_casamento(r, textos, capitulos, formato='pdf'):
         num = c['numero'] if c['numero'] is not None else n
         primeira = g['faixas'][0][0]
         marcas = [livros.numero_de(m.group(2)) for l in livros.linhas_de(textos[primeira - 1])
-                  for m in [livros.MARCA_DE_CAPITULO.match(l)] if m]
+                  for m in [livros.MARCA_DE_CAPITULO.match(l) or livros.MARCA_DE_UNIDADE.match(l)] if m]
         if g['como'] == 'fim_do_livro' and num not in marcas:
             erros.append('o capítulo %d (no livro %s) ganhou o gabarito que começa na %s, que só tem as marcas %r'
                          % (n, num, primeira, marcas))
@@ -232,12 +241,14 @@ def casos(placar):
     r = livros.propor_gabaritos(quadro, caps((1, 4)))
     placar.conferir('gabarito: quadro de resolução em prosa no fim do capítulo não é gabarito',
                     esperado(r, {}) + ([] if any('parecem resposta' in l.get('observacao', '') for l in r['linhas']) else ['planilha %r' % r['linhas']]))
-    guarda = livros.DENSIDADE_MINIMA
-    livros.DENSIDADE_MINIMA = 0
+    # desde o item 12a sao duas conferencias de densidade (a minima, de toda
+    # secao, e a do fim do capitulo sem numero): o veneno desliga as duas
+    guarda = livros.DENSIDADE_MINIMA, livros.DENSIDADE_DO_FIM_DO_CAPITULO
+    livros.DENSIDADE_MINIMA = livros.DENSIDADE_DO_FIM_DO_CAPITULO = 0
     try:
         rv = livros.propor_gabaritos(quadro, caps((1, 4)))
     finally:
-        livros.DENSIDADE_MINIMA = guarda
+        livros.DENSIDADE_MINIMA, livros.DENSIDADE_DO_FIM_DO_CAPITULO = guarda
     placar.conferir('gabarito: sem a conferência de que a seção é feita de respostas', esperado(rv, {}), deve_reprovar=True)
     # uma marca so, de outro capitulo, dentro de um capitulo numerado: nao fecha
     alheia = [pag('Capítulo 5', CONTEUDO)] * 3 + [pag('Respostas', 'Capítulo 6', '1. 3', '2. 4')]
@@ -270,6 +281,100 @@ def casos(placar):
     finally:
         livros.TITULO_DE_RESPOSTAS = titulo
     placar.conferir('gabarito: a regra antiga ("Resolução" sozinha como título)', erros, deve_reprovar=True)
+
+    titulo_no_fim(placar)
+    quadro_de_margem(placar)
+
+
+def livro_titulo_no_fim():
+    """O Praticando 8 e 9 (item 12a), sintético: tres unidades numeradas (1-2,
+    3-4, 5-6) e a entrada "Respostas dos exercicios" (7-9) do mapa, sem numero.
+    O titulo da secao e a ULTIMA linha do texto da pagina 7, e as paginas 8 e 9
+    nao tem titulo nenhum, so respostas. A unidade 2 comeca no meio da 8."""
+    textos = [pag('Unidade %d' % (1 + i // 2), CONTEUDO) for i in range(6)]
+    textos += [pag('UNIDADE 1', 'Exercícios', 'Página 9', '1. 12', '2. 15', '3. 18', '4. 20', 'Respostas dos exercícios'),
+               pag('5. 21', '6. 3/4', 'UNIDADE 2', 'Exercícios', 'Página 31', '1. 7', '2. 8'),
+               pag('UNIDADE 3', 'Exercícios', 'Página 52', '1. 90', '2. 45', '3. 30', '4. 15')]
+    capitulos = caps((1, 2), (3, 4), (5, 6), (7, 9), numeros=[1, 2, 3, None])
+    capitulos[3]['titulo'] = 'Respostas dos exercícios'
+    return textos, capitulos
+
+
+def titulo_no_fim(placar):
+    textos, capitulos = livro_titulo_no_fim()
+    esperado_fim = {1: [[7, 8]], 2: [[8, 8]], 3: [[9, 9]]}
+    r = livros.propor_gabaritos(textos, capitulos)
+    placar.conferir('gabarito: título no FIM do texto da página, e as páginas seguintes sem título (o Praticando)',
+                    trava_casamento(r, textos, capitulos) + esperado(r, esperado_fim) +
+                    ([] if r['secoes'] == [[7, 9]] else ['seções %r' % r['secoes']]) +
+                    ([] if all(g['como'] == 'fim_do_livro' and g['certeza'] == 'alta' for g in r['por_capitulo'].values())
+                     else ['como ou certeza %r' % r['por_capitulo']]))
+    # o titulo no alto continua achado, e o titulo no fim nao muda o EPUB
+    alto = list(textos)
+    alto[6] = pag('Respostas dos exercícios', 'UNIDADE 1', 'Exercícios', 'Página 9', '1. 12', '2. 15', '3. 18', '4. 20')
+    r = livros.propor_gabaritos(alto, capitulos)
+    placar.conferir('gabarito: o mesmo livro com o título no alto da página dá o mesmo gabarito',
+                    trava_casamento(r, alto, capitulos) + esperado(r, esperado_fim))
+    for rot, nome, valor in (('o título procurado só no alto da página (a regra antiga)', 'LINHAS_DO_FIM', 0),
+                             ('a seção sem continuação (só as páginas com o título)', 'DENSIDADE_DA_CONTINUACAO', 2)):
+        guarda = getattr(livros, nome)
+        setattr(livros, nome, valor)
+        try:
+            rv = livros.propor_gabaritos(textos, capitulos)
+        finally:
+            setattr(livros, nome, guarda)
+        placar.conferir('gabarito: ' + rot, esperado(rv, esperado_fim), deve_reprovar=True)
+
+    # o outro lado da continuacao: o quadro "RESPOSTAS" da margem no meio do
+    # capitulo, seguido de paginas de exercicio densas ("a)", "b)") ate o fim
+    # do capitulo, NAO vira gabarito do fim do capitulo
+    exercicio = pag('Atividades', '1. Calcule:', 'a) 2 + 3', 'b) 4 + 5', '2. Resolva:', 'a) x + 1 = 2', 'b) x + 2 = 5')
+    margem = [pag('Capítulo 1', CONTEUDO), pag('RESPOSTAS', '1. a) 5', 'b) 9', CONTEUDO),
+              exercicio, exercicio, exercicio, pag('Capítulo 2', CONTEUDO), pag('Capítulo 2', CONTEUDO)]
+    mc = caps((1, 5), (6, 7), numeros=[1, 2])
+    r = livros.propor_gabaritos(margem, mc)
+    placar.conferir('gabarito: quadro de margem no meio do capítulo seguido de exercícios densos não continua até o fim',
+                    esperado(r, {}) + ([] if r['secoes'] == [] and any('meio do capítulo' in l.get('observacao', '')
+                                                                       for l in r['linhas']) else ['%r %r' % (r['secoes'], r['linhas'])]))
+    fonte = open(livros.__file__, encoding='utf-8').read()
+    alvo = 'if fim > b and len(numeros_em(a, fim)) >= 2:'
+    if fonte.count(alvo) != 1:
+        placar.conferir('gabarito: a âncora do veneno da continuação existe uma vez', ['%d vezes' % fonte.count(alvo)])
+    else:
+        ns = {"__file__": livros.__file__, "__name__": "livros_envenenado"}
+        exec(compile(fonte.replace(alvo, 'if fim > b:'), livros.__file__, 'exec'), ns)
+        rv = ns['propor_gabaritos'](margem, mc)
+        placar.conferir('gabarito: a continuação sem exigir respostas de dois capítulos', esperado(rv, {}), deve_reprovar=True)
+    # e nao atravessa a entrada do mapa: as respostas no fim da ultima unidade
+    # nao continuam pelo manual do professor, mesmo denso
+    manual = list(textos) + [pag('UNIDADE 4', '1. a', '2. b', '3. c')] * 2
+    mm = caps((1, 2), (3, 4), (5, 6), (7, 9), (10, 11), numeros=[1, 2, 3, None, None])
+    r = livros.propor_gabaritos(manual, mm)
+    placar.conferir('gabarito: a continuação para na entrada seguinte do mapa',
+                    esperado(r, esperado_fim) + ([] if r['secoes'] == [[7, 9]] else ['seções %r' % r['secoes']]))
+
+
+def quadro_de_margem(placar):
+    """O ga7, página 401 (item 12a), sintético: a ultima pagina do capitulo do
+    aluno tem, na margem do professor, o quadro "RESPOSTAS" das atividades
+    dela. Um quarto das linhas tem cara de resposta; o resto e a pagina do aluno."""
+    aluno = ['Texto do capítulo para o aluno, linha %d.' % i for i in range(9)]
+    pagina = pag('RESPOSTAS', '1. As questões propostas nesta atividade', 'podem ser respondidas assim.',
+                 '2. Resposta pessoal.', '3. a) Sim.', *aluno)
+    ga = [pag('Capítulo 1', CONTEUDO)] * 3 + [pagina] + [pag('Capítulo 2', CONTEUDO)] * 2
+    gc = caps((1, 4), (5, 6), numeros=[1, 2])
+    r = livros.propor_gabaritos(ga, gc)
+    placar.conferir('gabarito: quadro "RESPOSTAS" da margem na última página do capítulo não é gabarito',
+                    esperado(r, {}) + ([] if any('quadro de respostas da margem' in l.get('observacao', '') for l in r['linhas'])
+                                       else ['a planilha não diz: %r' % r['linhas']]))
+    guarda = livros.DENSIDADE_DO_FIM_DO_CAPITULO
+    livros.DENSIDADE_DO_FIM_DO_CAPITULO = livros.DENSIDADE_MINIMA
+    try:
+        rv = livros.propor_gabaritos(ga, gc)
+    finally:
+        livros.DENSIDADE_DO_FIM_DO_CAPITULO = guarda
+    placar.conferir('gabarito: o fim do capítulo com a densidade mínima de antes (o ga7 preso em "Medições")',
+                    esperado(rv, {}), deve_reprovar=True)
 
 
 def conferir_gabarito(manifest):
