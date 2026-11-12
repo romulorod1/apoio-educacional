@@ -1132,6 +1132,8 @@
    *             ou { assunto, lista } ou { assunto, modulo }, ou as linhas do
    *             vinculos-exercicios-C1.csv lidas como estão ({ pacote, item_id,
    *             ano, assuntos, confianca, justificativa }).
+   *   modulosEquivalentes  as chaves de módulo de mesmo título que o app achou
+   *             quando a chave do índice não está no aparelho (camada 'modulo').
    *
    * Devolve { assunto, titulo, serie, teoria: [], listaBase: null|{...},
    * exercicios: [], obmep: [], vazio: null|{ motivo, texto } }. Cada fonte tem
@@ -1146,8 +1148,26 @@
    *          da lista da fonte) ou { como: 'lista-pronta', id, modulo }.
    *   anexar diz o que vai para o material: { tipo: 'itens'|'paginas', ids } ou
    *          { tipo: 'lista-pronta', id, ids }. */
-  var FONTES_DE_OLIMPIADA = { 'obmep-banco': true, 'obmep-mirim': true, enem: true };
-  var ORDEM_DA_OLIMPIADA = { 'obmep-mirim': 1, 'obmep-banco': 2, enem: 3 };
+  function tabela(o) {
+    var t = Object.create(null);
+    Object.keys(o).forEach(function (k) { t[k] = o[k]; });
+    return t;
+  }
+  var FONTES_DE_OLIMPIADA = tabela({ 'obmep-banco': true, 'obmep-mirim': true, enem: true });
+  var ORDEM_DA_OLIMPIADA = tabela({ 'obmep-mirim': 1, 'obmep-banco': 2, enem: 3 });
+  // as provas (Mirim e ENEM): nelas o módulo é o assunto, ou é o Diversos (C12)
+  var FONTES_DE_PROVA = tabela({ 'obmep-mirim': true, enem: true });
+  // a força de cada camada: quando o mesmo id chega por duas, fica a mais forte
+  var FORCA_DO_VINCULO = tabela({ modulo: 1, tema_app: 2, curadoria: 3 });
+
+  /* O módulo Diversos de uma prova não é assunto (a mesma regra do eDiversos,
+   * no core.js): nem o tema_app nem um módulo ligado pela tabela o trazem
+   * inteiro. A linha da tabela que cita o ITEM continua valendo, porque é
+   * assim que a C1 dá assunto às questões que estão no Diversos. */
+  function moduloDiversos(it) {
+    var m = (it && it.modulo) || {};
+    return /(^|-)diversos$/.test(String(m.slug || '')) || String(m.titulo || '') === 'Diversos';
+  }
 
   function chaveDoModuloDe(x) {
     return x && typeof x.serie === 'string' && x.modulo && typeof x.modulo.slug === 'string'
@@ -1166,11 +1186,11 @@
    *     (Biblioteca\curadoria, no Drive), com os assuntos separados por "|"
    *     (ou já em lista). Dessa, só a confiança alta e a média entram, como o
    *     LEIA-ME da tabela pede; a baixa fica para conferência. */
-  var CONFIANCA_QUE_VALE = { alta: true, 'média': true, media: true };
+  var CONFIANCA_QUE_VALE = tabela({ alta: true, 'média': true, media: true });
   function vinculoValeParaOAssunto(v, id) {
     if (v.confianca !== undefined && v.confianca !== null &&
         !CONFIANCA_QUE_VALE[String(v.confianca).trim().toLowerCase()]) return false;
-    if (v.assunto !== undefined) return v.assunto === id;
+    if (typeof v.assunto === 'string') return v.assunto === id;
     var lista = Array.isArray(v.assuntos) ? v.assuntos : String(v.assuntos || '').split('|');
     return lista.some(function (a) { return String(a).trim() === id; });
   }
@@ -1195,6 +1215,11 @@
       ordemDosModulos.push(chave);
     }
     if (tema) ligarModulo(tema.modulo, 'modulo');
+    /* O módulo de MESMO TÍTULO, quando a chave do índice não está no aparelho
+     * (um pacote que renomeou a chave): o app acha com o moduloDoAssuntoNoIndice
+     * (título igual, na mesma série, sem ambiguidade) e passa aqui. A conta do
+     * título é do app (Core.chaveDeBusca), e por isso ela não mora aqui. */
+    (Array.isArray(o.modulosEquivalentes) ? o.modulosEquivalentes : []).forEach(function (k) { ligarModulo(k, 'modulo'); });
     var porItem = Object.create(null), porTeoria = Object.create(null), porLista = Object.create(null);
     (Array.isArray(o.vinculos) ? o.vinculos : []).forEach(function (v) {
       if (!v || !id || !vinculoValeParaOAssunto(v, id)) return;
@@ -1213,23 +1238,44 @@
         (a.modulo.chave < b.modulo.chave ? -1 : a.modulo.chave > b.modulo.chave ? 1 : 0);
     }
 
-    // os exercícios: uma passada, e o id que já entrou não entra de novo
-    var itemPorId = Object.create(null), vistos = Object.create(null);
+    /* OS EXERCÍCIOS, em duas passadas. A primeira acha, para cada id, a cópia
+     * ligada pela camada mais forte (o mesmo exercício em dois pacotes pode
+     * chegar por camadas diferentes); no empate, a da chave de módulo menor,
+     * para a ordem da entrada não mudar a saída. A segunda monta as fontes, e
+     * o id que já entrou não entra de novo. */
+    var itemPorId = Object.create(null), melhor = Object.create(null), vistos = Object.create(null);
     var exercicios = [], obmep = [], moduloPresente = Object.create(null);
+    function vinculoDoItem(it, chave) {
+      var prova = !!FONTES_DE_PROVA[it.fonte] && moduloDiversos(it);
+      if (chave && modulos[chave] === 'modulo') return 'modulo';
+      if (id && it.tema_app === id && !prova) return 'tema_app';
+      if (chave && modulos[chave] && !prova) return modulos[chave];
+      return porItem[it.id] || null;
+    }
     itens.forEach(function (it) {
       if (!it || typeof it.id !== 'string') return;
       if (!itemPorId[it.id]) itemPorId[it.id] = it;
       var chave = chaveDoModuloDe(it);
       if (chave) moduloPresente[chave] = true;
-      var vinculo = chave && modulos[chave] === 'modulo' ? 'modulo'
-        : id && it.tema_app === id ? 'tema_app'
-        : (chave && modulos[chave]) || porItem[it.id] || null;
+      var vinculo = vinculoDoItem(it, chave);
       if (!vinculo) return;
+      var atual = melhor[it.id];
+      var forca = FORCA_DO_VINCULO[vinculo];
+      if (!atual || forca < atual.forca || (forca === atual.forca && String(chave) < String(atual.chave))) {
+        melhor[it.id] = { it: it, vinculo: vinculo, forca: forca, chave: chave };
+      }
+    });
+    itens.forEach(function (it) {
+      var m = it && typeof it.id === 'string' ? melhor[it.id] : null;
+      if (!m || m.it !== it) return;
       if (vistos[it.id]) return;
       vistos[it.id] = true;
+      var chave = m.chave, vinculo = m.vinculo;
       var olimpiada = !!FONTES_DE_OLIMPIADA[it.fonte];
       var aula = it.aula || {};
-      var dif = it.dificuldade === 1 || it.dificuldade === 2 || it.dificuldade === 3 ? it.dificuldade : null;
+      // a dificuldade neutra (o ENEM traz um 2 sem graduação, proxy.neutro) não é dificuldade
+      var neutra = !!(it.proxy && it.proxy.neutro);
+      var dif = !neutra && (it.dificuldade === 1 || it.dificuldade === 2 || it.dificuldade === 3) ? it.dificuldade : null;
       var assets = it.assets || {}, medidas = it.medidas || {};
       (olimpiada ? obmep : exercicios).push({
         tipo: olimpiada ? 'obmep' : 'exercicio', id: it.id, titulo: nomeDoExercicio(it),
@@ -1237,6 +1283,7 @@
         modulo: { chave: chave, titulo: (it.modulo && it.modulo.titulo) || '' },
         lista: { slug: aula.slug || '', titulo: aula.titulo || '', n: aula.n || 0 },
         dificuldade: dif, dificuldadeOrigem: dif ? (it.dificuldade_origem || null) : null, desafio: dif === 3,
+        dificuldadeNeutra: neutra,
         objetiva: it.formato === 'objetiva', semSolucao: !!(it.sem_solucao || !assets.solucao),
         imagem: { pacote: it.pacote || null, caminho: assets.enunciado || null, medidas: medidas.enunciado || null },
         vinculo: vinculo,
@@ -1262,8 +1309,10 @@
       var vinculo = (chave && modulos[chave]) || porTeoria[t.id] || null;
       if (!vinculo) return;
       teoriaVista[t.id] = true;
-      var paginas = Array.isArray(t.paginas) ? t.paginas : [];
-      var capa = paginas[0] || {};
+      var paginas = (Array.isArray(t.paginas) ? t.paginas : []).filter(function (p) { return p && typeof p.id === 'string'; });
+      // aula de teoria sem página nenhuma não tem o que abrir nem o que anexar
+      if (!paginas.length) return;
+      var capa = paginas[0];
       teoria.push({
         tipo: 'teoria', id: t.id, titulo: (t.aula && t.aula.titulo) || '', serie: t.serie, quantidade: paginas.length,
         modulo: { chave: chave, titulo: (t.modulo && t.modulo.titulo) || '' },
@@ -1271,7 +1320,7 @@
         imagem: { pacote: t.pacote || null, caminho: capa.asset || null, medidas: capa.medidas || null },
         vinculo: vinculo,
         abrir: { como: 'visor', tipo: 'teoria', id: t.id, indice: 0 },
-        anexar: { tipo: 'paginas', ids: paginas.map(function (p) { return p && p.id; }).filter(Boolean) }
+        anexar: { tipo: 'paginas', ids: paginas.map(function (p) { return p.id; }) }
       });
     });
     teoria.sort(function (a, b) { return porModulo(a, b) || (a.n - b.n) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); });
@@ -1307,6 +1356,9 @@
         vazio = { motivo: 'sem-pacote', texto: 'A teoria e os exercícios da Biblioteca ainda não estão neste aparelho.' };
       } else if (ordemDosModulos.some(function (k) { return !moduloPresente[k]; })) {
         vazio = { motivo: 'pacote-ausente', texto: 'O pacote com a teoria e os exercícios deste assunto ainda não está neste aparelho.' };
+      } else if (!temas.length) {
+        // sem o índice não há como saber o módulo do assunto: não dizer que não há nada
+        vazio = { motivo: 'sem-indice', texto: 'Não consegui ler a lista de assuntos agora. Tente de novo daqui a pouco.' };
       } else {
         vazio = { motivo: 'sem-vinculo', texto: 'Ainda não há teoria nem exercícios ligados a este assunto.' };
       }

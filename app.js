@@ -23588,13 +23588,20 @@
   /* As fontes de um assunto, com a Biblioteca e o índice já carregados. A
    * outra executora chama a de baixo, que carrega os dois antes. */
   function fontesDoAssuntoNoApp(assuntoId, vinculos) {
-    return Biblioteca.fontesDoAssunto(assuntoId, opcoesDasFontesDoAssunto(vinculos));
+    var opcoes = opcoesDasFontesDoAssunto(vinculos);
+    /* A chave do índice que não está no aparelho: vale o módulo de mesmo
+     * título, na mesma série e sem ambiguidade, a mesma regra do botão
+     * Material e da trilha (moduloDoAssuntoNoIndice). Só o caso exato: o
+     * caminho pela busca, que é aproximado, não entra. */
+    var achado = bib && indiceTemas ? moduloDoAssunto({ id: assuntoId }) : false;
+    opcoes.modulosEquivalentes = achado && achado.chave && !achado.direto ? [achado.chave] : [];
+    return Biblioteca.fontesDoAssunto(assuntoId, opcoes);
   }
   function carregarFontesDoAssunto(assuntoId, vinculos) {
     return Promise.all([
       carregarBiblioteca(),
       // sem o índice, o vínculo pelo módulo some, e o do tema_app continua
-      carregarIndice().catch(function () { return null; })
+      carregarIndice().catch(function () { indiceTemasFalhou = true; return null; })
     ]).then(function () { return fontesDoAssuntoNoApp(assuntoId, vinculos); });
   }
 
@@ -23641,9 +23648,20 @@
       return lp ? pedirParaUsarLista(lp) : false;
     }
     if (x.tipo !== 'itens' && x.tipo !== 'paginas') return false;
-    (x.ids || []).forEach(function (id) {
-      if (noCarrinho(x.tipo, id) !== !!marcado) marcarNoCarrinho(x.tipo, id, !!marcado);
-    });
+    var ids = (x.ids || []).filter(function (id) { return noCarrinho(x.tipo, id) !== !!marcado; });
+    if (ids.length === 1) { marcarNoCarrinho(x.tipo, ids[0], !!marcado); return true; }
+    if (!ids.length) return true;
+    /* VÁRIOS DE UMA VEZ (a aula de teoria inteira): uma troca só, como o
+     * "Marcar os N deste módulo", para não gravar página por página e não
+     * deixar a aula pela metade se uma gravação falhar no meio. Os passos são
+     * os do marcarNoCarrinho. */
+    mexeuNoMaterial();
+    var novo = { itens: bibCarrinho.itens.slice(), paginas: bibCarrinho.paginas.slice() };
+    novo[x.tipo] = marcado ? novo[x.tipo].concat(ids) : novo[x.tipo].filter(function (id) { return ids.indexOf(id) < 0; });
+    if (!trocarMaterial(novo, 'mexeu')) return false;
+    desenharCarrinho();
+    $$('#bib-corpo .bib-marcar-modulo').forEach(function (b) { if (b._desenha) b._desenha(); });
+    if (marcado && bibContexto && bibContexto.anexado) { bibContexto = null; bibFiltroAluno = ''; desenharContextoBiblioteca(); }
     return true;
   }
 
@@ -23689,8 +23707,10 @@
       : function (id) { return (bibEtiquetas && bibEtiquetas[id]) || null; };
     var f = fontes || {};
     var teoria = f.teoria || [], base = f.listaBase || null, exercicios = f.exercicios || [], obmep = f.obmep || [];
+    // o nome da seção diz as provas que estão nela: OBMEP, ENEM ou as duas
     var temEnem = obmep.some(function (x) { return x.fonte === 'enem'; });
-    var nomeDaOlimpiada = temEnem ? 'OBMEP e ENEM' : 'OBMEP';
+    var temObmep = obmep.some(function (x) { return x.fonte !== 'enem'; });
+    var nomeDaOlimpiada = temEnem && temObmep ? 'OBMEP e ENEM' : temEnem ? 'ENEM' : 'OBMEP';
 
     elemento.innerHTML = '';
     var bloco = el('section', { class: 'bte', 'aria-label': 'Teoria e exercícios' });
@@ -23701,7 +23721,7 @@
       teoria.length ? plural(teoria.length, 'aula de teoria', 'aulas de teoria') : '',
       base ? 'lista de base' : '',
       exercicios.length ? plural(exercicios.length, 'exercício', 'exercícios') : '',
-      obmep.length ? obmep.length + ' da ' + nomeDaOlimpiada : ''
+      obmep.length ? obmep.length + (nomeDaOlimpiada === 'ENEM' ? ' do ' : ' da ') + nomeDaOlimpiada : ''
     ].filter(Boolean);
     if (!resumo.length) {
       // o vazio numa linha, e com o porquê
@@ -23732,7 +23752,10 @@
 
     /* O SELO DA DIFICULDADE (D3): um a três pontos, do tom claro ao escuro, e
      * o nome ao lado. A etiqueta dela vale por cima da do pacote e vira o selo
-     * cheio, com "para mim"; o desafio segue a dificuldade que vale. */
+     * cheio, com "para mim". O DESAFIO é o do pacote (a dificuldade 3 dele), o
+     * mesmo das listas prontas ("Lista com N desafios"): o mesmo exercício não
+     * pode ser desafio aqui e não ser lá. Sem dificuldade (o ENEM, neutro) e
+     * sem etiqueta dela, não há selo. */
     function seloDeDificuldade(e) {
       var caixa = el('span', { class: 'bte-dificuldade' });
       caixa._desenha = function () {
@@ -23740,9 +23763,12 @@
         dela = dela === 1 || dela === 2 || dela === 3 ? dela : null;
         var d = dela || e.dificuldade;
         caixa.innerHTML = '';
-        if (!d) return;
+        if (!d) {
+          if (e.desafio) caixa.appendChild(el('span', { class: 'tag bib-lp-desafio bte-desafio', texto: 'desafio' }));
+          return;
+        }
         var nome = NOME_DIFICULDADE[d];
-        var origem = dela ? 'pela sua etiqueta' : e.dificuldadeOrigem === 'curadoria' ? 'revisada' : 'estimada pela posição na lista da OBMEP';
+        var origem = dela ? 'pela sua etiqueta' : e.dificuldadeOrigem === 'curadoria' ? 'revisada' : 'estimada';
         var pontos = el('span', { class: 'bte-pontos', 'aria-hidden': 'true' });
         for (var k = 1; k <= 3; k++) pontos.appendChild(el('span', { class: 'bte-ponto' + (k <= d ? ' cheio' : '') }));
         caixa.appendChild(el('span', {
@@ -23754,7 +23780,7 @@
           el('span', { class: 'bte-selo-nome', 'aria-hidden': 'true', texto: nome }),
           dela ? el('span', { class: 'bte-selo-para-mim', 'aria-hidden': 'true', texto: 'para mim' }) : null
         ]));
-        if (d === 3) caixa.appendChild(el('span', { class: 'tag bib-lp-desafio bte-desafio', texto: 'desafio' }));
+        if (e.desafio) caixa.appendChild(el('span', { class: 'tag bib-lp-desafio bte-desafio', texto: 'desafio' }));
       };
       caixa._desenha();
       return caixa;
@@ -23776,7 +23802,7 @@
         el('button', {
           type: 'button', class: 'bte-ex-abrir', 'aria-label': 'Abrir ' + e.titulo + ' em tela cheia',
           aoClick: function () { abrir(e); }
-        }, [img]),
+        }, [img || el('span', { class: 'btn bte-ex-sem-imagem', icone: 'olho', texto: 'Abrir ' + e.titulo })]),
         el('div', { class: 'bte-ex-acoes' }, [caixaNoMaterial(e, e.titulo)])
       ]);
     }
@@ -23889,11 +23915,50 @@
    * tela. O observador de lá mede pela área de rolagem da Biblioteca; fora
    * dela (no celular, ou numa caixa ainda fora do documento), elas são pedidas
    * direto, na mesma fila de três por vez. */
+  /* O BLOCO TEM O OBSERVADOR E A FILA DELE. Os da Biblioteca (bibObservador e
+   * bibFila) são desligados e esvaziados a cada desenho da tela da Biblioteca
+   * (pararMiniaturas), e isso acontece por baixo do bloco, por exemplo ao
+   * fechar a tela cheia: as miniaturas do bloco ficariam em branco para
+   * sempre. O observador é da janela (root nulo), e por isso serve dentro da
+   * Biblioteca, no celular e numa caixa que só entra no documento depois. */
+  var bteFila = [];
+  var bteDesenhando = 0;
   function observarMiniaturasDoBloco(caixa) {
-    if (!caixa.isConnected) { setTimeout(function () { if (caixa.isConnected) observarMiniaturasDoBloco(caixa); }, 0); return; }
-    var area = $('.conteudo');
-    if (area && area.contains(caixa) && !document.body.classList.contains('modo-celular')) observarMiniaturas(caixa);
-    else Array.prototype.slice.call(caixa.querySelectorAll('img.bib-mini')).forEach(pedirMiniatura);
+    var imgs = Array.prototype.slice.call(caixa.querySelectorAll('img.bib-mini'))
+      .filter(function (i) { return !i._bteObservada; });
+    if (typeof IntersectionObserver !== 'function') { imgs.forEach(pedirMiniaturaDoBloco); return; }
+    var obs = caixa._bteObservador || (caixa._bteObservador = new IntersectionObserver(function (entradas, o) {
+      entradas.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        o.unobserve(e.target);
+        pedirMiniaturaDoBloco(e.target);
+      });
+    }, { rootMargin: '300px 0px' }));
+    imgs.forEach(function (i) { i._bteObservada = true; obs.observe(i); });
+  }
+  function pedirMiniaturaDoBloco(img) {
+    if (img._btePedida) return;
+    img._btePedida = true;
+    bteFila.push(img);
+    andarFilaDoBloco();
+  }
+  function andarFilaDoBloco() {
+    while (bteDesenhando < MAX_MINIATURAS_JUNTAS && bteFila.length) {
+      var img = bteFila.shift();
+      // saiu do documento antes da vez dela: volta a poder ser pedida
+      if (!img.isConnected) { img._btePedida = false; continue; }
+      bteDesenhando++;
+      desenharMiniaturaDoBloco(img);
+    }
+  }
+  function desenharMiniaturaDoBloco(alvo) {
+    miniaturaPronta(alvo._bib).then(function (dataUrl) {
+      alvo.src = dataUrl;
+      alvo.classList.add('pronta');
+    }, function () { alvo.classList.add('falhou'); }).then(function () {
+      bteDesenhando--;
+      andarFilaDoBloco();
+    });
   }
 
   // ---------- miniaturas ----------

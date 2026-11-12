@@ -183,7 +183,7 @@ conf('assunto que não existe: sem vínculo', semNada.vazio && semNada.vazio.mot
 const vazioDeTudo = F('MAT09-04', { temas: TEMAS });
 conf('aparelho sem pacote nenhum: sem pacote', vazioDeTudo.vazio && vazioDeTudo.vazio.motivo, 'sem-pacote');
 conf('a frase do vazio é uma linha, com acento e sem travessão',
-  [fora, semNada, vazioDeTudo].every(x => x.vazio.texto && !/\n/.test(x.vazio.texto) && !/[–—]/.test(x.vazio.texto) && /[ãçáéíóú]/.test(x.vazio.texto)), true);
+  [fora, semNada, vazioDeTudo].every(x => x.vazio.texto && !/\n/.test(x.vazio.texto) && !/[\u2013\u2014]/.test(x.vazio.texto) && /[ãçáéíóú]/.test(x.vazio.texto)), true);
 conf('sem argumento nenhum não quebra', JSON.stringify(Object.keys(F())), JSON.stringify(['assunto', 'titulo', 'serie', 'teoria', 'listaBase', 'exercicios', 'obmep', 'vazio']));
 const furada = F('MAT09-04', Object.assign({}, ACERVO, { itens: ITENS.filter(it => it.id !== Sintetico.LISTA_BASE.degraus[1].item) }));
 conf('a lista de base com um exercício que saiu do aparelho NÃO aparece (como no app)', furada.listaBase, null);
@@ -226,6 +226,40 @@ conf('a baixa, a sem assunto e a de outro assunto ficam fora', csv.obmep.some(q 
 conf('e entram pela curadoria', csv.obmep.map(q => q.vinculo).join(','), 'curadoria,curadoria');
 
 // ================================================================
+secao('6b. As bordas: cópias por camadas diferentes, Diversos, ENEM neutro, teoria sem página, tabelas');
+const outraCopia = Object.assign({}, ITENS[0], { serie: '8ano', modulo: { slug: 'z', titulo: 'Outro' }, tema_app: 'MAT09-04' });
+const ida = F('MAT09-04', Object.assign({}, ACERVO, { itens: [outraCopia].concat(ITENS) }));
+const volta = F('MAT09-04', Object.assign({}, ACERVO, { itens: ITENS.concat([outraCopia]) }));
+const daCopia = r => r.exercicios.filter(e => e.id === ITENS[0].id).map(e => e.vinculo + ' ' + e.modulo.chave).join();
+conf('o mesmo id por duas camadas: fica a mais forte, em qualquer ordem da entrada', daCopia(ida) + ' | ' + daCopia(volta),
+  'modulo ' + MOD_EQ + ' | modulo ' + MOD_EQ);
+const diversos = mirim2.itens.filter(q => /diversos/.test(q.modulo.slug))[0];
+const comTemaNoDiversos = Object.assign({ pacote: 'x' }, diversos, { tema_app: 'MAT04-09' });
+const p4d = F('MAT04-09', Object.assign({}, ACERVO, { itens: ITENS.filter(it => it.id !== diversos.id).concat([comTemaNoDiversos]) }));
+conf('questão de prova no Diversos não entra pelo tema_app (a regra do eDiversos)', p4d.obmep.some(q => q.id === diversos.id), false);
+const p4c = F('MAT04-09', Object.assign({}, ACERVO, { vinculos: [{ assunto: 'MAT04-09', item: diversos.id }] }));
+conf('mas entra pela linha da tabela que cita o item (é o que a C1 faz)', p4c.obmep.filter(q => q.id === diversos.id).map(q => q.vinculo).join(), 'curadoria');
+conf('o ENEM com a dificuldade neutra não ganha dificuldade', prob.obmep.every(q => q.dificuldade === null && q.dificuldadeNeutra && !q.desafio), true);
+const p4g = F('MAT04-09', ACERVO);
+conf('a Mirim, graduada, ganha', p4g.obmep.every(q => q.dificuldade >= 1 && !q.dificuldadeNeutra), true);
+const semPagina = Object.assign({}, TEORIA[0], { id: TEORIA[0].id + '-vazia', paginas: [] });
+conf('aula de teoria sem página não aparece', F('MAT09-04', Object.assign({}, ACERVO, { teoria: TEORIA.concat([semPagina]) })).teoria.length, 4);
+const estranho = Object.assign({}, banco.itens[1], { pacote: 'x', fonte: 'constructor' });
+const tab = F('MAT09-04', Object.assign({}, ACERVO, { itens: ITENS.filter(it => it.id !== estranho.id).concat([estranho]),
+  vinculos: [{ item_id: 'banco:2020:n2:1', assuntos: 'MAT09-04', confianca: 'constructor' },
+    { assunto: 'MAT09-04', item: estranho.id }] }));
+conf('a confiança "constructor" não entra (tabela sem herança)', tab.obmep.some(q => q.id === 'banco:2020:n2:1'), false);
+conf('a fonte "constructor" não vira OBMEP', tab.exercicios.some(e => e.id === estranho.id) && !tab.obmep.some(q => q.id === estranho.id), true);
+const nulo = F('MAT09-04', Object.assign({}, ACERVO, { vinculos: [{ assunto: null, item_id: 'banco:2020:n2:3', assuntos: 'MAT09-04', confianca: 'alta' }] }));
+conf('a linha com assunto nulo e assuntos preenchido vale (leitor de CSV que preenche com null)', nulo.obmep.some(q => q.id === 'banco:2020:n2:3'), true);
+const semIndice = F('MAT09-04', Object.assign({}, ACERVO, { temas: [] }));
+conf('sem o índice de assuntos, o vazio diz isso, e não que não há nada', semIndice.vazio && semIndice.vazio.motivo, 'sem-indice');
+const renomeado = TEMAS.map(t => t.id === 'MAT09-04' ? Object.assign({}, t, { modulo: '9ano:chave-antiga' }) : t);
+const eqv = F('MAT09-04', Object.assign({}, ACERVO, { temas: renomeado, modulosEquivalentes: [MOD_EQ] }));
+conf('o módulo de mesmo título que o app achou entra pela camada do módulo', eqv.exercicios.length + ' ' + eqv.exercicios[0].vinculo, '48 modulo');
+conf('sem ele, a chave que não está no aparelho dá pacote ausente', (F('MAT09-04', Object.assign({}, ACERVO, { temas: renomeado })).vazio || {}).motivo, 'pacote-ausente');
+
+// ================================================================
 secao('7. Pura: não mexe na entrada e repete o resultado');
 const antes = JSON.stringify(ACERVO);
 const r1 = JSON.stringify(F('MAT09-04', ACERVO)), r2 = JSON.stringify(F('MAT09-04', ACERVO));
@@ -237,8 +271,9 @@ conf('a ordem da entrada não muda a ordem da saída', JSON.stringify(F('MAT09-0
 // ================================================================
 secao('8. O veneno: o mesmo item repetido aparece UMA vez só');
 const alvo = Object.assign({}, ITENS[0], { tema_app: 'MAT09-04' });   // o 1º exercício das equações
+// o MESMO objeto duas vezes (a guarda do id já visto) e mais uma cópia (a escolha da cópia mais forte)
 const repetido = Object.assign({}, ACERVO, {
-  itens: [alvo].concat(ITENS.slice(1), [Object.assign({}, alvo), Object.assign({}, alvo)]),
+  itens: [alvo].concat(ITENS.slice(1), [alvo, Object.assign({}, alvo)]),
   vinculos: [{ assunto: 'MAT09-04', item: alvo.id }, { assunto: 'MAT09-04', item: alvo.id }]
 });
 const rep = F('MAT09-04', repetido);

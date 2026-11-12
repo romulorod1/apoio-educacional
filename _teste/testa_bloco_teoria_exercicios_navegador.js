@@ -20,7 +20,8 @@
  *      px no tablet (D5), legível sem a tela cheia;
  *   3. tudo desmarcado ao abrir (D4): o bloco não põe nada no material;
  *   4. o selo graduado (D3): 1 a 3 pontos, tons diferentes, e o "Para mim"
- *      dela por cima do do pacote, com o desafio sinalizado;
+ *      dela por cima do do pacote; o desafio sinalizado é o do pacote, o mesmo
+ *      das listas prontas;
  *   5. Abrir chama a tela cheia de sempre (teoria, exercício, lista de base) e
  *      Anexar, a caixa "No material" de sempre: o carrinho e a faixa mudam, e a
  *      caixa do bloco segue o que se marca na tela cheia; "Usar esta lista"
@@ -254,7 +255,7 @@ const fecharModal = async pag => {
   const pacoteDiz = await pag.evaluate(id => (window.__provaFontes.exercicios.filter(e => e.id === id)[0] || {}).dificuldade, PARA_MIM);
   conf('o pacote diz fácil', pacoteDiz, 1);
   conf('o selo vale o dela: difícil, três pontos, "para mim"', dela.d + ' ' + dela.cheios + ' ' + /para mim/.test(dela.texto), '3 3 true');
-  conf('com o desafio sinalizado', dela.desafio, true);
+  conf('o desafio continua o do pacote, como nas listas prontas (o pacote diz fácil: sem desafio)', dela.desafio, false);
   conf('e o rótulo para quem ouve diz de quem é', /sua etiqueta/.test(dela.rotulo), true);
   await pag.evaluate(() => document.querySelector('#prova-t2 .bte-mais').click());
   await pausa(300);
@@ -274,17 +275,20 @@ const fecharModal = async pag => {
   conf('os três níveis do pacote aparecem', Object.keys(graus).sort().join(','), '1,2,3');
   conf('com 1, 2 e 3 pontos', [1, 2, 3].map(d => graus[d] && graus[d].cheios).join(','), '1,2,3');
   conf('e três tons diferentes nos pontos', new Set([1, 2, 3].map(d => graus[d] && graus[d].cor)).size, 3);
-  conf('o desafio aparece nos de nível 3', await pag.evaluate(() =>
-    Array.from(document.querySelectorAll('#prova-t2 .bte-ex')).every(c => {
-      const s = c.querySelector('.bte-selo');
-      return !s || (s.dataset.dificuldade === '3') === !!c.querySelector('.bte-desafio');
-    })), true);
+  const desafios = await pag.evaluate(() => {
+    const doPacote = {};
+    window.__provaFontes.exercicios.concat(window.__provaFontes.obmep).forEach(e => { doPacote[e.id] = e.dificuldade; });
+    const cards = Array.from(document.querySelectorAll('#prova-t2 .bte-ex'));
+    return { certos: cards.every(c => (doPacote[c.dataset.id] === 3) === !!c.querySelector('.bte-desafio')),
+      quantos: cards.filter(c => c.querySelector('.bte-desafio')).length };
+  });
+  conf('o desafio aparece exatamente nos de dificuldade 3 do pacote', desafios.certos && desafios.quantos > 0, true);
 
   secao('6. Transbordo, alvos e travessão a 1280x800, 100% e 130%');
   let v = await varrer(pag);
   conf('nada passa da borda nem rola de lado (100%)', v.total + (v.total ? ' ' + v.ruins.join('; ') : ''), '0');
   conf('a página não rola de lado', v.paginaRolaDeLado, false);
-  conf('sem travessão no bloco', /[–—]/.test(b.texto), false);
+  conf('sem travessão no bloco', /[\u2013\u2014]/.test(b.texto), false);
   await letra(pag, LETRA_130);
   v = await varrer(pag);
   conf('nada passa da borda nem rola de lado (130%)', v.total + (v.total ? ' ' + v.ruins.join('; ') : ''), '0');
@@ -355,7 +359,42 @@ const fecharModal = async pag => {
   conf('e uma linha só, com o porquê', b.vazios.join(' | '), 'O pacote com a teoria e os exercícios deste assunto ainda não está neste aparelho.');
   await desenhar(pag, 'MATEM3-11');
   b = await ler(pag);
-  conf('MATEM3-11: a seção leva o nome do ENEM quando ele está', b.secoes.join(' | '), 'obmep:OBMEP e ENEM');
+  conf('MATEM3-11 (só ENEM): a seção leva o nome do ENEM', b.secoes.join(' | '), 'obmep:ENEM');
+  conf('e o resumo também', b.resumo, '3 do ENEM');
+  conf('o ENEM, de dificuldade neutra, fica sem selo', await pag.evaluate(() =>
+    document.querySelectorAll('#prova-t2 .bte-selo').length), 0);
+  await desenhar(pag, 'MATEM3-11', [{ assunto: 'MATEM3-11', item: 'banco:2019:n2:1' }]);
+  b = await ler(pag);
+  conf('com uma questão do Banco ligada, "OBMEP e ENEM"', b.secoes.join(' | ') + ' / ' + b.resumo, 'obmep:OBMEP e ENEM / 4 da OBMEP e ENEM');
+
+  // ================================================================
+  secao('8b. As miniaturas do bloco não dependem da fila da Biblioteca');
+  // a Biblioteca por baixo, na tela de um módulo (a que se redesenha ao fechar a tela cheia)
+  await H.irParaAba(pag, 'biblioteca');
+  await pag.evaluate(() => {
+    const l = Array.from(document.querySelectorAll('#bib-corpo .item-lista'))
+      .find(x => (x.querySelector('.nome') || {}).textContent === 'Equações do Segundo Grau');
+    if (l) l.click();
+  });
+  await pausa(400);
+  conf('a Biblioteca está na tela do módulo', await pag.evaluate(() => !!document.querySelector('#bib-marcar-modulo')), true);
+  await desenhar(pag, 'MAT09-04', VINCULOS, true);
+  await esperarMiniatura(pag);
+  await pag.evaluate(() => document.querySelector('#prova-t2 .bte-mais').click());
+  await pag.evaluate(id => document.querySelector('#prova-t2 .bte-ex[data-id="' + id + '"] .bte-ex-abrir').click(), EX(1));
+  await abrirModal(pag);
+  await fecharModal(pag);
+  // rola o bloco até o fim, devagar, e toda miniatura tem de chegar
+  await pag.evaluate(async () => {
+    const c = document.querySelector('#prova-t2');
+    for (let y = 0; y <= c.scrollHeight; y += 600) { c.scrollTop = y; await new Promise(r => setTimeout(r, 120)); }
+  });
+  const todas = await esperar('todas as miniaturas do bloco', () => pag.evaluate(() => {
+    const imgs = Array.from(document.querySelectorAll('#prova-t2 img.bib-mini'));
+    return imgs.filter(i => i.classList.contains('pronta')).length + '/' + imgs.length;
+  }), v => { const [a, t] = String(v).split('/'); return +t > 0 && a === t; }, 60000);
+  conf('depois de fechar a tela cheia por cima da Biblioteca, todas as miniaturas chegam', todas.ok + ' ' + todas.valor,
+    'true 53/53');
 
   // ================================================================
   secao('9. 800x1280 (tablet em pé)');
