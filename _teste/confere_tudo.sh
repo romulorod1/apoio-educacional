@@ -307,8 +307,9 @@ roda "merge seguro"          node _teste/testa_merge_seguro.js
 # diferentes da base do merge (12/11/2026: um ramo em v130 integrado com a main
 # em v134 passava verde). A regra e a do merge_seguro; a prova a exercita dos dois
 # lados, como numero (1.42.9 contra 1.42.10), e num repositorio de mentira pelo
-# caminho real do --conferir. O veneno devolve a regra antiga, "mudou, passa", e
-# os casos de menor e de igual TEM de sair errados. A conferencia do repositorio
+# caminho real do --conferir, inclusive o ramo que trouxe a main e ficou igual a
+# ela. O veneno devolve a regra antiga, "mudou desde a base, passa", e os casos
+# de menor, de igual e o da revisao TEM de sair errados. A conferencia do repositorio
 # roda mais abaixo, na secao do cache.
 roda "ordem cache e versao"  node _teste/testa_ordem_versao.js
 roda "ordem cache e versao --envenenado-so-diferente" node _teste/testa_ordem_versao.js --envenenado-so-diferente
@@ -1403,12 +1404,14 @@ else
   falhou=1
 fi
 
-# A ORDEM: diferente da base nao basta. CACHE e VERSAO que o PR mexeu tem de ser
-# MAIORES que os da origin/main (a do CI e buscada no job), como numero. Igual
-# reaproveita um nome ja publicado e menor o rebaixa; nos dois o tablet ja
-# instalado pode ficar sem o codigo novo. PR que nao os mexe passa. A regra e a
-# do merge_seguro, que confere de novo contra a origin/main buscada na hora do
-# merge. Saida: 0 passou, 1 reprovou, 2 sem base (INSTAVEL, nunca ok).
+# A ORDEM: diferente da base nao basta. Se o HEAD leva para a origin/main (a do
+# CI e buscada no job) algum arquivo que muda o que o tablet baixa (app.js, sw.js
+# ou a lista ARQUIVOS), pela arvore do merge e nao pela base, CACHE e VERSAO tem
+# de ser MAIORES que os da origin/main, como numero. Igual reaproveita um nome ja
+# publicado e menor o rebaixa; nos dois o tablet ja instalado pode ficar sem o
+# codigo novo. PR que nao leva arquivo do app passa. A regra e a do merge_seguro,
+# que confere de novo contra a origin/main buscada na hora do merge. Le o HEAD
+# commitado, nao o disco. Saida: 0 passou, 1 reprovou, 2 sem main (INSTAVEL).
 saida=$(node _teste/testa_ordem_versao.js --conferir 2>&1) && codigo=0 || codigo=$?
 printf '%s\n' "$saida"
 if [ "$codigo" = "1" ]; then

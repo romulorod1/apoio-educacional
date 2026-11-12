@@ -49,15 +49,20 @@
  * e vista por este script.
  *
  * Por ultimo, logo antes do merge, a ORDEM do CACHE (sw.js) e da VERSAO
- * (app.js): git fetch da origin/main e da cabeca do PR NA HORA, e cada uma das
- * duas constantes que o PR mexeu (diferente da base do merge) tem de ser
- * ESTRITAMENTE MAIOR que a da main atual, comparada como numero (o vNNN do
- * cache; x.y.z da versao, campo a campo, entao 1.42.10 e maior que 1.42.9).
- * Igual reaproveita um nome ja publicado e menor o rebaixa: nos dois casos o
- * tablet ja instalado pode nao receber o codigo novo. PR que nao mexe na
- * constante passa, porque o merge leva a da main. Leitura que falha recusa.
- * A regra pura e decidirOrdens(), provada em _teste/testa_ordem_versao.js, que
- * tambem a confere no portao contra a origin/main.
+ * (app.js): git fetch da origin/main e da cabeca do PR NA HORA, e a pergunta e
+ * "o PR leva para a main algum arquivo que muda o que o tablet baixa?" (app.js,
+ * sw.js ou um arquivo da lista ARQUIVOS do sw.js). Quem responde e o diff da
+ * origin/main contra a arvore do MERGE (git merge-tree), e nao a base do merge:
+ * depois que o ramo traz a main, a base vira a ponta da main e um ramo que subiu
+ * para o MESMO valor que a main alcancou parecia "nao mudou". Se leva, CACHE e
+ * VERSAO da arvore do merge tem de ser ESTRITAMENTE MAIORES que os da main
+ * atual, como numero (o vNNN do cache; x.y.z da versao, campo a campo, entao
+ * 1.42.10 e maior que 1.42.9). Igual reaproveita um nome ja publicado e menor o
+ * rebaixa: nos dois o tablet ja instalado pode nao receber o codigo novo. Se nao
+ * leva, passa. Leitura que falha, conflito com a main, CACHE fora de
+ * apoio-educacional-vNNN ou constante declarada duas vezes recusam.
+ * A regra pura e decidirOrdens(), e a leitura e lerOrdensGit(), as duas
+ * provadas em _teste/testa_ordem_versao.js, que tambem confere o portao.
  *
  * O merge vai com --match-head-commit: se alguem empurrar um commit entre a
  * conferencia e o merge, o GitHub recusa, em vez de mergear o que ninguem
@@ -203,17 +208,36 @@ function decidir(pr) {
  * CACHE fosse DIFERENTE do da base do merge. Com PRs em paralelo, um ramo com
  * v130 integrado depois de a main estar em v134 passava verde, e a VERSAO nao
  * tinha trava nenhuma. Aqui a exigencia e ser MAIOR que a da main ATUAL. */
-function lerCache(sw) {
-  const m = /^var CACHE = '([^']*)';/m.exec(String(sw == null ? '' : sw).replace(/\r/g, ''));
+/* Le UMA declaracao real da constante. Duas declaracoes (var, let ou const no
+ * comeco da linha) devolvem null: ler a primeira e confiar seria conferir um
+ * valor que talvez nao seja o que o navegador usa. Comentario nao conta. */
+function lerConstante(texto, nome, padrao) {
+  const t = String(texto == null ? '' : texto).replace(/\r/g, '');
+  const declaracoes = t.match(new RegExp('^[ \\t]*(var|let|const)[ \\t]+' + nome + '[ \\t]*=', 'gm')) || [];
+  if (declaracoes.length !== 1) return null;
+  const m = padrao.exec(t);
   return m ? m[1] : null;
 }
-function lerVersao(app) {
-  const m = /^ *var VERSAO = '([^']*)';/m.exec(String(app == null ? '' : app).replace(/\r/g, ''));
-  return m ? m[1] : null;
+function lerCache(sw) { return lerConstante(sw, 'CACHE', /^var CACHE = '([^']*)';/m); }
+function lerVersao(app) { return lerConstante(app, 'VERSAO', /^ *var VERSAO = '([^']*)';/m); }
+/* A lista ARQUIVOS do sw.js, como caminhos do repositorio ('./' e a raiz e sai). */
+function listaArquivos(sw) {
+  const linhas = String(sw == null ? '' : sw).replace(/\r/g, '').split('\n');
+  const ini = linhas.findIndex(l => /^var ARQUIVOS = \[/.test(l));
+  if (ini < 0) return [];
+  const fora = [];
+  for (let i = ini + 1; i < linhas.length && !/^\];/.test(linhas[i]); i++) {
+    const m = /^ *'(?:\.\/)?([^']*)' *,? *$/.exec(linhas[i]);
+    if (m && m[1]) fora.push(m[1]);
+  }
+  return fora;
 }
-/* O numero do fim do nome do cache ('apoio-educacional-v134' da 134). */
+/* O numero do nome do cache. Os DOIS lados tem de casar o padrao que o sw.js
+ * reconhece (VERSAO_DO_APP = /^apoio-educacional-v\d+$/): fora dele o activate
+ * nao ve o cache novo como versao do app. */
+const NOME_DO_CACHE = /^apoio-educacional-v([0-9]+)$/;
 function compararCache(a, b) {
-  const x = /-v([0-9]+)$/.exec(String(a || '')), y = /-v([0-9]+)$/.exec(String(b || ''));
+  const x = NOME_DO_CACHE.exec(String(a || '')), y = NOME_DO_CACHE.exec(String(b || ''));
   if (!x || !y) return null;
   return Number(x[1]) - Number(y[1]);
 }
@@ -228,41 +252,63 @@ function compararSemver(a, b) {
   }
   return 0;
 }
-/* Uma constante: o valor do PR (agora), o da base do merge e o da main atual.
- * Devolve { ok, motivo }. */
-function decidirOrdem(nome, agora, base, main, comparar) {
-  if (agora == null || base == null || main == null) {
-    return { ok: false, motivo: 'nao consegui ler ' + nome + ' (PR:[' + agora + '] base:[' + base + '] main:[' + main + '])' };
-  }
-  if (agora === base) {
-    return { ok: true, motivo: nome + ' ' + agora + ' nao mudou desde a base do merge: o merge leva o da main (' + main + ')' };
+/* Uma constante: o valor da arvore do merge (agora), o da main atual e os
+ * arquivos do app que o PR leva para a main. Devolve { ok, motivo }. */
+function decidirOrdem(nome, agora, main, levados, comparar) {
+  if (agora == null || main == null) {
+    return { ok: false, motivo: 'nao consegui ler ' + nome + ' (merge:[' + agora + '] main:[' + main + ']): ' +
+      'falta a declaracao, ou ha mais de uma' };
   }
   const c = comparar(agora, main);
-  if (c === null) return { ok: false, motivo: nome + ' fora do formato: PR ' + agora + ', main ' + main };
-  if (c > 0) return { ok: true, motivo: nome + ' ' + agora + ' e maior que o da main atual, ' + main };
+  if (c === null) return { ok: false, motivo: nome + ' fora do formato: merge ' + agora + ', main ' + main };
+  if (!levados || !levados.length) {
+    return { ok: true, motivo: nome + ' ' + agora + ': o PR nao leva arquivo do app para a main' };
+  }
+  const quais = ' (leva ' + levados.slice(0, 3).join(', ') + (levados.length > 3 ? ' e mais ' + (levados.length - 3) : '') + ')';
+  if (c > 0) return { ok: true, motivo: nome + ' ' + agora + ' e maior que o da main atual, ' + main + quais };
   return { ok: false, motivo: nome + ' ' + agora + ' do PR nao e MAIOR que o da main atual, ' + main +
     (c === 0 ? ' (igual: reaproveita o que ja foi publicado)' : ' (menor: rebaixa o que ja foi publicado)') +
-    '; suba para a proxima livre' };
+    quais + '; suba para a proxima livre' };
 }
-/* v = { cache: { agora, base, main }, versao: { agora, base, main } } */
+/* v = { levados: [arquivos do app que mudam], cache: { agora, main }, versao: { agora, main } } */
 function decidirOrdens(v) {
   const r = [
-    decidirOrdem('CACHE', v.cache.agora, v.cache.base, v.cache.main, compararCache),
-    decidirOrdem('VERSAO', v.versao.agora, v.versao.base, v.versao.main, compararSemver)
+    decidirOrdem('CACHE', v.cache.agora, v.cache.main, v.levados, compararCache),
+    decidirOrdem('VERSAO', v.versao.agora, v.versao.main, v.levados, compararSemver)
   ];
   return { ok: r.every(x => x.ok), motivos: r.map(x => x.motivo), recusas: r.filter(x => !x.ok).map(x => x.motivo) };
 }
 
-/* Le as duas constantes na cabeca do PR, na base do merge e na origin/main
- * buscada AGORA. Lanca se qualquer leitura falhar. */
+/* O que o PR LEVA para a main, lido do git. g(args) devolve a saida ou lanca.
+ * A arvore do merge sai do `git merge-tree --write-tree main alvo`, que e o que
+ * a main fica depois do merge; o diff dela contra a main e o que o PR leva, sem
+ * contar o que a main andou enquanto o ramo ficou atras. Conflito (merge-tree
+ * sai 1) lanca. Arquivo do app: app.js, sw.js e a lista ARQUIVOS do sw.js da
+ * main e da arvore do merge. */
+function lerOrdensGit(g, alvo, main) {
+  let arvore;
+  try {
+    arvore = g(['merge-tree', '--write-tree', main, alvo]).split('\n')[0].trim();
+  } catch (e) {
+    const err = new Error('o PR tem conflito com a main ou o merge-tree falhou: ' + String(e.stderr || e.message).split('\n')[0]);
+    err.stderr = err.message;
+    throw err;
+  }
+  if (!/^[0-9a-f]{40,64}$/.test(arvore)) throw new Error('o merge-tree nao devolveu uma arvore: [' + arvore + ']');
+  const mudados = g(['diff', '--name-only', '-z', main, arvore]).split('\0').filter(Boolean);
+  const swMerge = g(['show', arvore + ':sw.js']), swMain = g(['show', main + ':sw.js']);
+  const app = new Set(['app.js', 'sw.js'].concat(listaArquivos(swMerge), listaArquivos(swMain)));
+  return {
+    levados: mudados.filter(f => app.has(f)),
+    cache: { agora: lerCache(swMerge), main: lerCache(swMain) },
+    versao: { agora: lerVersao(g(['show', arvore + ':app.js'])), main: lerVersao(g(['show', main + ':app.js'])) }
+  };
+}
+
+/* No merge: busca a origin/main e a cabeca do PR AGORA, e le o que ele leva. */
 function lerOrdens(numero, cabeca) {
   git(['fetch', 'origin', 'main', 'refs/pull/' + numero + '/head']);
-  const base = git(['merge-base', cabeca, 'origin/main']).trim();
-  const ler = (rev, arq) => git(['show', rev + ':' + arq]);
-  return {
-    cache: { agora: lerCache(ler(cabeca, 'sw.js')), base: lerCache(ler(base, 'sw.js')), main: lerCache(ler('origin/main', 'sw.js')) },
-    versao: { agora: lerVersao(ler(cabeca, 'app.js')), base: lerVersao(ler(base, 'app.js')), main: lerVersao(ler('origin/main', 'app.js')) }
-  };
+  return lerOrdensGit(git, cabeca, 'origin/main');
 }
 
 /* Quantos commits a cabeca esta atras da main. Lanca se nao conseguir medir. */
@@ -369,4 +415,4 @@ function principal(argv) {
 }
 
 if (require.main === module) process.exit(principal(process.argv.slice(2)));
-module.exports = { decidir, principal, decidirOrdem, decidirOrdens, compararCache, compararSemver, lerCache, lerVersao };
+module.exports = { decidir, principal, decidirOrdem, decidirOrdens, lerOrdensGit, listaArquivos, compararCache, compararSemver, lerCache, lerVersao };
