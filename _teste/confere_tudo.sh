@@ -514,6 +514,7 @@ roda "biblioteca livros tela --envenenado-giro-sem-ancora-guardada" node "_teste
 roda "biblioteca livros tela --envenenado-largura-vai-ao-alto" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-largura-vai-ao-alto
 roda "biblioteca livros tela --envenenado-vizinhas-sem-desenho" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-vizinhas-sem-desenho
 roda "biblioteca livros tela --envenenado-canvas-sem-soltar" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-canvas-sem-soltar
+roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-sumario-dos-marcadores
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
@@ -1280,6 +1281,9 @@ roda "livros (regras) --envenenado-respostas-no-capitulo" node "_teste/testa_liv
 # Revisao do C15.5: o gabarito do fim do capitulo (achado so pelo lugar) nunca
 # tira pagina do capitulo exportado. O veneno volta a regra antiga.
 roda "livros (regras) --envenenado-fim-do-capitulo-tira" node "_teste/testa_livros_regras.js" --envenenado-fim-do-capitulo-tira
+# O sumario que a tela usa: marcadores lixo e sumario vazio dao lugar ao mapa.
+roda "livros (regras) --envenenado-sumario-dos-marcadores" node "_teste/testa_livros_regras.js" --envenenado-sumario-dos-marcadores
+roda "livros (regras) --envenenado-mapa-parcial-troca" node "_teste/testa_livros_regras.js" --envenenado-mapa-parcial-troca
 # B3: a pagina impressa do livro (trechos romanos e arabicos, mudanca no meio,
 # ida e volta em todas as paginas, tela e leitor mostrando a impressa e abrindo
 # e gravando em pagina do arquivo, e recusa so do livro com numeracao invalida).

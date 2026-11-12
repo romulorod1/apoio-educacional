@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.51';
+  var VERSAO = '1.42.57';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,13 +85,13 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.51',
+      versao: '1.42.57',
       itens: [
         'Na Biblioteca, busque palavras no texto dos livros e abra o resultado no capítulo e página encontrados. A busca não altera o livro nem a aula.'
       ]
     },
     {
-      versao: '1.42.50',
+      versao: '1.42.56',
       itens: [
         'No tablet, a leitura de livros PDF segue em rolagem cont\u00ednua, e a barra permite ir diretamente a uma p\u00e1gina.',
         'Na exporta\u00e7\u00e3o, marque p\u00e1ginas com toques ou digite intervalos pela numera\u00e7\u00e3o impressa; p\u00e1ginas sem n\u00famero aparecem como "arquivo N".'
@@ -16405,14 +16405,17 @@
       if (reg.meta.formato === 'epub') {
         return abrirLeitorEpub(reg, destino && destino.capitulo ? { capitulo: destino.capitulo, fracao: 0, ancora: destino.ancora || null } : pos);
       }
-      var sumario = reg.meta.sumario || [];
+      var sumario = sumarioDaTela(reg.meta);
       return abrirLeitorPdf(reg.blob, {
         titulo: tituloDoLivro(reg.meta), nome: reg.id + '.pdf',
         pagina: (destino && destino.pagina) || Biblioteca.paginaDaPosicao(reg.meta, pos) || 1,
         sumario: sumario, livro: reg,
         dica: sumario.length ? '' : 'Este livro não tem sumário: role as páginas ou use a barra de página.',
-        aoMudarPagina: function (n) {
-          Store.gravarPosicaoLivro({ id: id, pagina: n }).catch(function () { /* a leitura segue; só a posição não fica */ });
+        aoMudarPagina: function (n, como) {
+          // arrastando a barra, a faixa acompanha, e a posição só grava ao soltar
+          if (!como || como.gravar !== false) {
+            Store.gravarPosicaoLivro({ id: id, pagina: n }).catch(function () { /* a leitura segue; só a posição não fica */ });
+          }
           mostrarCobre('pdf', reg, n);
         }
       });
@@ -17917,6 +17920,15 @@
     var nivel = nivelDosCapitulos(sumario);
     return (sumario || []).filter(function (e) { return (e.nivel || nivel) === nivel; });
   }
+  /* O sumário que a tela e o leitor usam: o dos marcadores do PDF, ou o do
+   * mapa quando os marcadores são lixo ("page1", "Blank Page", nome de
+   * arquivo). O critério mora em biblioteca.js (sumarioDoLivro). Todo lugar
+   * que conta, lista ou acha capítulo pelo sumário passa por aqui, para a
+   * tela do livro, o Continuar lendo, o leitor e o lado a lado dizerem o
+   * mesmo capítulo. */
+  function sumarioDaTela(meta) {
+    return Biblioteca.sumarioDoLivro(meta);
+  }
 
   function capaDoLivro(l, mini) {
     var capa = el('span', { class: 'bibl-capa' + (mini ? ' mini' : ''), 'aria-hidden': 'true' });
@@ -17932,7 +17944,7 @@
 
   // o tamanho do livro numa linha: "6 p. · 3 capítulos"
   function tamanhoDoLivro(meta) {
-    var caps = capitulosDoSumario(meta.sumario).length;
+    var caps = capitulosDoSumario(sumarioDaTela(meta)).length;
     return [meta.formato === 'epub' ? 'EPUB' : (meta.paginas ? meta.paginas + ' p.' : ''),
       caps ? plural(caps, 'capítulo', 'capítulos') : ''].filter(Boolean).join(' · ');
   }
@@ -17944,7 +17956,7 @@
     if (!pos) return '';
     var epub = meta.formato === 'epub';
     // os dois formatos contam pelos capítulos do sumário (o nível de cima), e não pelas seções
-    var caps = capitulosDoSumario(meta.sumario);
+    var caps = capitulosDoSumario(sumarioDaTela(meta));
     var ent = entradaAtualDoSumario(caps, epub ? 'capitulo' : 'pagina', epub ? (pos.capitulo || 1) : (pos.pagina || 1));
     var cap = '';
     if (ent) {
@@ -18336,7 +18348,7 @@
     } else bibLivrosNav.tipo = 'todos';
     var grade = el('div', { class: 'bibl-grade' });
     livrosDoRecorte.filter(function (l) { return bibLivrosNav.tipo === 'todos' || tipoDoMaterial(l.meta) === bibLivrosNav.tipo; }).forEach(function (l) {
-      var semSumario = !(l.meta.sumario && l.meta.sumario.length);
+      var semSumario = !sumarioDaTela(l.meta).length;
       var tipo = tipoDoMaterial(l.meta);
       grade.appendChild(el('button', { type: 'button', class: 'bibl-livro-cartao', 'data-livro': l.id,
         'aria-label': 'Abrir o sumário de ' + tituloDoLivro(l.meta),
@@ -18419,10 +18431,13 @@
     }, 0);
   }
 
-  // a entrada do mapa de um capítulo do sumário: pelo título, e na falta dele pelo começo
+  /* a entrada do mapa de um capítulo do sumário: o capítulo do mapa de onde
+   * ele veio (mapa_n, quando o sumário é o do mapa), depois pelo título, e
+   * na falta dele pelo começo */
   function entradaDoMapaDoCapitulo(mapa, meta, e) {
     var epub = meta.formato === 'epub';
-    return mapa.filter(function (m) { return m.titulo === e.titulo; })[0] ||
+    var doMapa = e.mapa_n != null ? mapa.filter(function (m) { return m.n === e.mapa_n; })[0] : null;
+    return doMapa || mapa.filter(function (m) { return m.titulo === e.titulo; })[0] ||
       mapa.filter(function (m) { return epub ? m.capitulo === e.capitulo && !e.ancora : m.pagina === e.pagina; })[0] || null;
   }
 
@@ -18435,7 +18450,7 @@
     var tela = $('#bib-livro');
     if (!tela) return;
     var meta = l.meta, epub = meta.formato === 'epub';
-    var sumario = Array.isArray(meta.sumario) ? meta.sumario : [];
+    var sumario = sumarioDaTela(meta);
     var mapa = Biblioteca.mapaDoLivro(meta, correcoesDosLivros()[l.id]);
     var nivel = nivelDosCapitulos(sumario);
     var capitulos = capitulosDoSumario(sumario);
@@ -18923,9 +18938,9 @@
   // "Cap. 3, Frações": o numeral do título, ou a posição do capítulo no sumário
   function rotuloDoCapituloDoMapa(meta, e) {
     if (e.obraInteira) return 'Livro inteiro';
-    var caps = capitulosDoSumario(meta.sumario);
+    var caps = capitulosDoSumario(sumarioDaTela(meta));
     var k = -1;
-    caps.forEach(function (c, i) { if (k < 0 && c.titulo === e.titulo) k = i; });
+    caps.forEach(function (c, i) { if (k < 0 && (c.mapa_n != null ? c.mapa_n === e.n : c.titulo === e.titulo)) k = i; });
     var p = partesDoCapitulo(e.titulo, k >= 0 ? k + 1 : e.n);
     return (p.palavra === 'Capítulo' ? 'Cap. ' : p.palavra + ' ') + p.numero + ', ' + p.titulo;
   }
@@ -22934,8 +22949,10 @@
    *   opcoes.sumario       os livros (C15.1): [{ n, nivel, titulo, pagina }];
    *                        com ele aparece o botão Sumário, e cada entrada
    *                        leva à página dela
-   *   opcoes.aoMudarPagina function (n) chamada a cada página desenhada (o
-   *                        livro guarda onde ela parou)
+   *   opcoes.aoMudarPagina function (n, como) chamada a cada página desenhada
+   *                        (o livro guarda onde ela parou e atualiza a faixa
+   *                        do capítulo); como.gravar === false enquanto ela
+   *                        arrasta a barra: a faixa muda, a posição só ao soltar
    *   opcoes.livro         o registro do livro (C15.4): com ele aparece o
    *                        "Exportar em PDF"
    *
@@ -23353,8 +23370,8 @@
     if (!leitor || !leitor.doc) return Promise.resolve(false);
     leitor.pagina = Math.max(1, Math.min(leitor.total, n));
     atualizarBarraDoLeitor();
-    if (!semGravar && typeof leitor.opcoes.aoMudarPagina === 'function') {
-      try { leitor.opcoes.aoMudarPagina(leitor.pagina); } catch (e) { /* posição é auxiliar */ }
+    if (typeof leitor.opcoes.aoMudarPagina === 'function') {
+      try { leitor.opcoes.aoMudarPagina(leitor.pagina, { gravar: !semGravar }); } catch (e) { /* posição é auxiliar */ }
     }
     if (leitor.continuo && leitor.paginas) {
       $('#corpo-modal-leitor-pdf').dataset.paginaDesenhada = String(leitor.pagina);

@@ -476,7 +476,7 @@ async function importar(pag, arquivo) {
   conf('com o sumário efetivo da tela, o resultado nomeia o capítulo por ele', comSumarioEfetivo, JSON.stringify([['Capítulo do mapa: Geometria espacial', [200]]]));
   const semSumarioEfetivo = await buscar(pag, 'paralelepipedo');
   const bCru = (semSumarioEfetivo.livros || []).find(l => l.id === 'indice-longo');
-  conf('e sem ele, volta ao sumário do PDF', bCru ? JSON.stringify(bCru.capitulos.map(c => [c.titulo, c.paginas])) : '', JSON.stringify([['Parte 2: Espaço', [200]]]));
+  conf('com o sumarioDoLivro de verdade, o livro de marcadores bons segue com o sumário do PDF', bCru ? JSON.stringify(bCru.capitulos.map(c => [c.titulo, c.paginas])) : '', JSON.stringify([['Parte 2: Espaço', [200]]]));
   /* com a leitura dos livros ainda em andamento, o grupo "Nos livros" diz
    * isso, e não "nenhum resultado" (a consulta é dublada só aqui) */
   const preparando = await pag.evaluate(async () => {
