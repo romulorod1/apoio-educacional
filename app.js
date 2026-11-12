@@ -2756,7 +2756,12 @@
     }
     $('#corpo-modal-leitor-pdf').addEventListener('scroll', rolarLeitorContinuo, { passive: true });
     $('#leitor-slider-pagina').addEventListener('input', function () {
-      if (leitor && leitor.continuo) irAProximaPaginaDoLeitor(+this.value, true);
+      if (leitor && leitor.continuo) irAProximaPaginaDoLeitor(+this.value, true, true);
+    });
+    // ao soltar a barra: aí sim a posição do livro é gravada, uma vez
+    $('#leitor-slider-pagina').addEventListener('change', function () {
+      if (!leitor || !leitor.continuo || typeof leitor.opcoes.aoMudarPagina !== 'function') return;
+      try { leitor.opcoes.aoMudarPagina(leitor.pagina); } catch (e) { /* posição é auxiliar */ }
     });
     $('#epub-anterior').addEventListener('click', function () { andarNoEpub(-1); });
     $('#epub-proximo').addEventListener('click', function () { andarNoEpub(1); });
@@ -17007,7 +17012,11 @@
       var paginaAtualArquivo = Number(origem.pagina) || 1;
       paginasMarcadas[paginaAtualArquivo] = true;
       if (partesDoCap.length) {
-        gradePaginas.appendChild(el('p', { class: 'ajuda', texto: 'Toque para marcar. Os números são os da página impressa.' }));
+        // a frase diz a verdade do livro: sem numeração impressa, os números são os do arquivo
+        var temImpressa = !!(meta.numeracao && meta.numeracao.length);
+        gradePaginas.appendChild(el('p', { class: 'ajuda', texto: temImpressa
+          ? 'Toque para marcar. Os números são os da página impressa; "arq." marca a página sem número impresso.'
+          : 'Toque para marcar. Os números são os das páginas do arquivo.' }));
         var botoesPaginas = el('div', { class: 'livro-exportar-grade-botoes' });
         var paginasDaGrade = partesDoCap.slice();
         if (paginasDaGrade.indexOf(paginaAtualArquivo) < 0) paginasDaGrade.push(paginaAtualArquivo);
@@ -17047,7 +17056,8 @@
       if (!texto) return { erro: 'Escreva as páginas, por exemplo 45-48, 52.' };
       var itens = texto.split(/[,;]+|\s+e\s+/i), paginas = [];
       for (var i = 0; i < itens.length; i++) {
-        var m = /^(?:(arquivo)\s+)?([\da-z]+)(?:\s*(?:-|a|até)\s*(?:(arquivo)\s+)?([\da-z]+))?$/i.exec(itens[i].trim());
+        // a página é número ou romano, nunca os dois juntos: "45a48" (sem espaço) é o intervalo de 45 a 48
+        var m = /^(?:(arquivo)\s+)?(\d+|[ivxlcdm]+)(?:\s*(?:-|a|até)\s*(?:(arquivo)\s+)?(\d+|[ivxlcdm]+))?$/i.exec(itens[i].trim());
         if (!m) return { erro: 'Não entendi "' + itens[i].trim() + '". Escreva páginas impressas, por exemplo 45-48, 52.' };
         var aTexto = m[2], bTexto = m[4] || m[2];
         var arquivoExplicito = !!m[1] || !!m[3];
@@ -17144,8 +17154,10 @@
       if (p.erro) { tamanho.textContent = ''; avisoTamanho.hidden = true; delete tamanho.dataset.bytes; return; }
       var bytes = estimarPdfDoLivro(origem.formato, p.capitulo.length + p.gabarito.length);
       tamanho.dataset.bytes = String(bytes);
-      tamanho.textContent = 'Tamanho estimado do PDF: ' + textoDeMb(bytes) + ' (' + (p.capitulo.length + p.gabarito.length) +
-        (epub ? ' partes do livro).' : ' páginas do livro).');
+      var nUnidades = p.capitulo.length + p.gabarito.length;
+      tamanho.textContent = 'Tamanho estimado do PDF: ' + textoDeMb(bytes) + ' (' + nUnidades + ' ' + (epub
+        ? (nUnidades === 1 ? 'parte do livro' : 'partes do livro')
+        : (nUnidades === 1 ? 'página do livro' : 'páginas do livro')) + ').';
       avisoTamanho.hidden = bytes <= avisoDeTamanhoExportado();
       avisoTamanho.textContent = 'Passa de 20 MB: o PDF ocupa esse espaço no tablet e pode não ir por WhatsApp ou e-mail. ' +
         'Se for mandar, prefira menos páginas.';
@@ -23191,16 +23203,6 @@
         frag.appendChild(caixa);
       }
       corpo.appendChild(frag);
-      estado.observadorPaginas = typeof IntersectionObserver === 'function' ? new IntersectionObserver(function (entradas) {
-        entradas.forEach(function (e) {
-          var pagina = estado.paginas[+e.target.dataset.paginaArquivo - 1];
-          if (!pagina) return;
-          pagina.visivel = e.isIntersecting;
-          if (e.isIntersecting) desenharPaginaContinua(estado, pagina);
-          else if (Math.abs(pagina.n - estado.pagina) > 1) liberarPaginaContinua(pagina);
-        });
-      }, { root: corpo, rootMargin: '700px 0px' }) : null;
-      estado.paginas.forEach(function (p) { if (estado.observadorPaginas) estado.observadorPaginas.observe(p.caixa); });
       corpo.dataset.paginaDesenhada = String(estado.pagina);
       atualizarBarraDoLeitor();
       return irAProximaPaginaDoLeitor(estado.pagina, false).then(function () {
@@ -23239,6 +23241,7 @@
         if (estado !== leitor || !registro.visivel || registro.tarefa !== tarefa) { canvas.width = 0; canvas.height = 0; return false; }
         registro.caixa.innerHTML = '';
         registro.caixa.appendChild(canvas);
+        registro.temCanvas = true;
         return true;
       });
     }).catch(function (e) {
@@ -23260,15 +23263,48 @@
     registro.caixa.innerHTML = '';
     registro.caixa.appendChild(el('div', { class: 'leitor-pdf-pagina-vazia', 'aria-hidden': 'true' }));
     registro.desenhando = false;
+    registro.temCanvas = false;
   }
 
-  function prepararPaginasSemObservador(estado, centro) {
-    if (typeof IntersectionObserver === 'function' || !estado || !estado.paginas) return;
-    var primeira = Math.max(1, centro - 1), ultima = Math.min(estado.total, centro + 1);
+  /* QUEM FICA DESENHADO no leitor contínuo: a página do meio e as vizinhas
+   * (centro - 1 a centro + 1) e toda página que encosta na tela, com uma
+   * folga pequena. As outras soltam o canvas. Roda a cada quadro de rolagem,
+   * na troca de página, no zoom e no giro.
+   *
+   * Antes isso era do IntersectionObserver, com margem de 700 px: deitado, a
+   * página tem cerca de 1700 px, e quando ela saía da margem ainda era vizinha
+   * da do meio; ficava, e o observador não avisava de novo (19 canvases, cerca
+   * de 150 Mpx, depois de 80 passos). E no zoom e no giro as vizinhas que já
+   * estavam na margem ficavam em branco, porque o observador não volta a
+   * avisar quem não saiu. A conciliação não depende de evento. */
+  var LEITOR_FOLGA_PX = 200;
+  function conciliarPaginasContinuas(estado, centro) {
+    if (!estado || !estado.paginas || !estado.paginas.length) return;
+    var corpo = $('#corpo-modal-leitor-pdf');
+    var rc = corpo.getBoundingClientRect();
+    var topo = rc.top - LEITOR_FOLGA_PX, fundo = rc.top + corpo.clientHeight + LEITOR_FOLGA_PX;
+    var c = Math.max(1, Math.min(estado.total, centro || estado.pagina || 1));
+    var ficam = {};
+    for (var k = c - 1; k <= c + 1; k++) if (k >= 1 && k <= estado.total) ficam[k] = true;
+    // as caixas estão em ordem, uma embaixo da outra: anda do centro para os dois lados
+    for (var cima = c; cima >= 1; cima--) {
+      var rCima = estado.paginas[cima - 1].caixa.getBoundingClientRect();
+      if (rCima.bottom < topo) break;
+      if (rCima.top <= fundo) ficam[cima] = true;
+    }
+    for (var baixo = c + 1; baixo <= estado.total; baixo++) {
+      var rBaixo = estado.paginas[baixo - 1].caixa.getBoundingClientRect();
+      if (rBaixo.top > fundo) break;
+      if (rBaixo.bottom >= topo) ficam[baixo] = true;
+    }
     estado.paginas.forEach(function (pagina) {
-      pagina.visivel = pagina.n >= primeira && pagina.n <= ultima;
-      if (pagina.visivel) desenharPaginaContinua(estado, pagina);
-      else liberarPaginaContinua(pagina);
+      if (ficam[pagina.n]) {
+        pagina.visivel = true;
+        desenharPaginaContinua(estado, pagina);
+      } else if (pagina.visivel || pagina.desenhando || pagina.temCanvas) {
+        pagina.visivel = false;
+        liberarPaginaContinua(pagina);
+      }
     });
   }
 
@@ -23292,7 +23328,7 @@
       if (!leitor || !leitor.continuo) return;
       var n = paginaMaisProximaDoCentro(leitor);
       leitor.ancora = ancoraDoLeitorContinuo(leitor, n);
-      prepararPaginasSemObservador(leitor, n);
+      conciliarPaginasContinuas(leitor, n);
       // Em uma navegação suave, o meio da tela ainda passa por páginas
       // anteriores. Não grave esse trecho intermediário como a última página.
       if (leitor.rolagemProgramaticaAte && n !== leitor.rolagemProgramaticaAte) return;
@@ -23312,11 +23348,12 @@
     });
   }
 
-  function irAProximaPaginaDoLeitor(n, suave) {
+  // semGravar: a barra de página leva a página a cada movimento e só grava a posição ao soltar
+  function irAProximaPaginaDoLeitor(n, suave, semGravar) {
     if (!leitor || !leitor.doc) return Promise.resolve(false);
     leitor.pagina = Math.max(1, Math.min(leitor.total, n));
     atualizarBarraDoLeitor();
-    if (typeof leitor.opcoes.aoMudarPagina === 'function') {
+    if (!semGravar && typeof leitor.opcoes.aoMudarPagina === 'function') {
       try { leitor.opcoes.aoMudarPagina(leitor.pagina); } catch (e) { /* posição é auxiliar */ }
     }
     if (leitor.continuo && leitor.paginas) {
@@ -23335,7 +23372,7 @@
         }, 900);
       }
       p.caixa.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'start' });
-      prepararPaginasSemObservador(leitor, p.n);
+      conciliarPaginasContinuas(leitor, p.n);
       return desenharPaginaContinua(leitor, p).then(function () { return !!p.caixa.querySelector('canvas'); });
     }
     desenharPaginaDoLeitor(true);
@@ -23397,7 +23434,7 @@
     }
     corpo.dataset.paginaDesenhada = String(estado.pagina);
     atualizarBarraDoLeitor();
-    prepararPaginasSemObservador(estado, estado.pagina);
+    conciliarPaginasContinuas(estado, estado.pagina);
     var p = estado.paginas[estado.pagina - 1];
     p.visivel = true;
     return desenharPaginaContinua(estado, p).then(function () { return !!p.caixa.querySelector('canvas'); });
@@ -23463,7 +23500,6 @@
     leitorVez++;
     leitorDesenho++;
     if (leitorTarefa) { leitorTarefa.cancel(); leitorTarefa = null; }
-    if (leitor && leitor.observadorPaginas) leitor.observadorPaginas.disconnect();
     clearTimeout(leitorRolarDestinoTimer);
     leitorRolarDestinoTimer = null;
     if (leitor && leitor.paginas) leitor.paginas.forEach(liberarPaginaContinua);

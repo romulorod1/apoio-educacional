@@ -42,15 +42,20 @@
  *   node _teste/testa_biblioteca_livros_tela.js --envenenado-capitulo-abre-pagina-errada
  *     o app.js servido abre todo capítulo do sumário na página 1: o toque no
  *     capítulo 2 tem de abrir na 1, e a prova TEM de ver ("VENENO visto").
- *   node _teste/testa_biblioteca_livros_tela.js --envenenado-zoom-sem-ancora
- *     o app.js servido muda a altura das páginas no zoom e no giro sem levar
- *     a rolagem de volta à página do meio: na seção 9, o "+" na p. 206 tem
- *     de deixar outra página no meio, e a prova TEM de ver.
+ *   Os venenos do leitor contínuo (seção 9), cada um tira uma peça do app.js
+ *   servido, e a seção 9 TEM de ver o defeito ("VENENO visto"):
+ *     --envenenado-zoom-sem-ancora       o zoom e o giro sem a volta à página do meio
+ *     --envenenado-giro-sem-ancora-guardada  no giro, a âncora tirada com a janela nova
+ *     --envenenado-largura-vai-ao-alto   o "Ajustar à largura" volta ao alto da página
+ *     --envenenado-vizinhas-sem-desenho  depois do zoom e do giro, só a página do meio desenha
+ *     --envenenado-canvas-sem-soltar     a página que sai de perto da tela não solta o canvas
  *
- *   9. o leitor contínuo, num livro sintético de 400 páginas: na p. 206, o
- *      "+" e o "Ajustar à largura" deixam a p. 206 no meio, com o contador em
- *      206 e o ponto do meio a menos de 24 px; na p. 266, girar de 800x1280
- *      para 1280x800 deixa a p. 266 no meio, com o contador em 266.
+ *   9. o leitor contínuo, num livro sintético de 400 páginas: o "+", o "−", o
+ *      "Ajustar à largura" e o giro de 800x1280 para 1280x800 deixam a página
+ *      no meio, com o contador nela e o ponto do meio a menos de 24 px; toda
+ *      página que encosta na tela tem canvas em até 1 s depois de cada um; e
+ *      deitado, ou em pé com zoom perto de 2, 80 passos de 400 px para baixo e
+ *      para cima deixam no máximo 4 canvases vivos.
  *
  *   --prints <pasta>   grava os prints do painel cego (tablet 1280x800 e
  *                      celular 412x915 e 360 a 130%, com escala 2).
@@ -65,20 +70,34 @@ const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8940;
-const VENENOS = ['--envenenado-capitulo-abre-pagina-errada', '--envenenado-zoom-sem-ancora'];
+/* Os venenos do leitor contínuo (seção 9): cada um tira uma peça do app.js
+ * servido, e a seção 9 TEM de ver o defeito que ela segura. */
+const VENENOS_LEITOR = {
+  // o zoom e o giro sem levar a rolagem de volta à página do meio
+  'zoom-sem-ancora': ['voltarParaAncoraDoLeitor(estado, ancora);', 'void 0;'],
+  // no giro, a âncora tirada com a janela NOVA (e não a da última rolagem)
+  'giro-sem-ancora-guardada': ['if (guardada && (guardada.lc !== corpo.clientWidth || guardada.ac !== corpo.clientHeight)) return guardada;', 'void 0;'],
+  // o "Ajustar à largura" volta ao alto da página em vez de manter o ponto
+  'largura-vai-ao-alto': ['leitor.zoom = Math.min(LEITOR_ZOOM_MAX, Math.max(LEITOR_ZOOM_MIN, z));\n    desenharPaginaDoLeitor(false);',
+    'leitor.zoom = Math.min(LEITOR_ZOOM_MAX, Math.max(LEITOR_ZOOM_MIN, z));\n    desenharPaginaDoLeitor(!fator);'],
+  // depois do zoom e do giro, só a página do meio é desenhada
+  'vizinhas-sem-desenho': ['    conciliarPaginasContinuas(estado, estado.pagina);\n    var p = estado.paginas[estado.pagina - 1];', '    var p = estado.paginas[estado.pagina - 1];'],
+  // a página que sai de perto da tela não solta o canvas
+  'canvas-sem-soltar': ['      } else if (pagina.visivel || pagina.desenhando || pagina.temCanvas) {', '      } else if (false) {']
+};
+const VENENOS = ['--envenenado-capitulo-abre-pagina-errada', '--envenenado-zoom-sem-ancora', '--envenenado-giro-sem-ancora-guardada',
+  '--envenenado-largura-vai-ao-alto', '--envenenado-vizinhas-sem-desenho', '--envenenado-canvas-sem-soltar'];
 const VENENO_PAGINA = process.argv.indexOf('--envenenado-capitulo-abre-pagina-errada') !== -1;
-const VENENO_ANCORA = process.argv.indexOf('--envenenado-zoom-sem-ancora') !== -1;
+const VENENO_LEITOR = Object.keys(VENENOS_LEITOR).find(k => process.argv.indexOf('--envenenado-' + k) !== -1) || null;
 const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
 const PYTHON = process.env.PYTHON || 'python';
 
-const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
+const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 const ANCORA_PAGINA = 'return abrirLivro(l.id, { pagina: paginaDoArquivo(l.meta, e) });';
 const trocas = {};
 if (VENENO_PAGINA) trocas['/app.js'] = APP.split(ANCORA_PAGINA).join('return abrirLivro(l.id, { pagina: 1 });');
-// o zoom e o giro sem levar a rolagem de volta à página do meio
-const ANCORA_ZOOM = 'voltarParaAncoraDoLeitor(estado, ancora);';
-if (VENENO_ANCORA) trocas['/app.js'] = APP.split(ANCORA_ZOOM).join('/* veneno: sem a âncora */;');
+if (VENENO_LEITOR) trocas['/app.js'] = APP.split(VENENOS_LEITOR[VENENO_LEITOR][0]).join(VENENOS_LEITOR[VENENO_LEITOR][1]);
 
 const amb = H.criarAmbiente(PORTA, 'perfil_biblioteca_livros_tela', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'b2_livros_'));
@@ -226,8 +245,10 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('a lista de venenos não está vazia', VENENOS.length > 0, true);
   conf('a âncora do veneno (o capítulo abre na página do arquivo) aparece uma vez só no app.js', APP.split(ANCORA_PAGINA).length - 1, 1);
   if (VENENO_PAGINA) conf('o app.js servido está envenenado', trocas['/app.js'].indexOf(ANCORA_PAGINA) === -1, true);
-  conf('a âncora do veneno do zoom (a rolagem volta à página do meio) aparece uma vez só no app.js', APP.split(ANCORA_ZOOM).length - 1, 1);
-  if (VENENO_ANCORA) conf('o app.js servido está envenenado sem a âncora do zoom', trocas['/app.js'].indexOf(ANCORA_ZOOM) === -1, true);
+  conf('cada âncora dos venenos do leitor contínuo aparece uma vez só no app.js',
+    Object.keys(VENENOS_LEITOR).map(k => k + ':' + (APP.split(VENENOS_LEITOR[k][0]).length - 1)).join(','),
+    Object.keys(VENENOS_LEITOR).map(k => k + ':1').join(','));
+  if (VENENO_LEITOR) conf('o app.js servido está envenenado (' + VENENO_LEITOR + ')', trocas['/app.js'].indexOf(VENENOS_LEITOR[VENENO_LEITOR][0]) === -1, true);
   const zipEx = path.join(TMP, 'pacote_9ano.zip');
   Sintetico.gerar(zipEx);
   const zipLivros = gerarLivros();
@@ -600,10 +621,20 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     console.log('   prints em ' + PRINTS);
   }
 
-  secao('9. O leitor contínuo não perde a página no zoom nem no giro');
-  /* Livro sintético de 400 páginas, tablet em pé (800x1280). Antes, o "+" na
-   * p. 206 deixava a p. 165 no meio, e o giro na p. 266 mostrava a p. 164 com
-   * o contador dizendo 266: as caixas cresciam e a rolagem ficava parada. */
+  secao('9. O leitor contínuo: a página não foge, as vizinhas aparecem e o canvas solta');
+  /* Livro sintético de 400 páginas. Antes: o "+" na p. 206 deixava a p. 165
+   * no meio; o giro na p. 266 mostrava a p. 164 com o contador em 266; depois
+   * do zoom e do giro, as vizinhas ficavam em branco; e deitado, 80 passos de
+   * rolagem deixavam 19 canvases vivos (cerca de 150 Mpx). Em modo veneno,
+   * cada verificação marcada com o nome do veneno TEM de reprovar. */
+  const visto = {};
+  const checa = (rotulo, obtido, esperado, veneno) => {
+    if (VENENO_LEITOR) {
+      if (veneno === VENENO_LEITOR && String(obtido) !== String(esperado)) visto[veneno] = rotulo + ' [obtido: ' + obtido + ']';
+      return;
+    }
+    conf(rotulo, obtido, esperado);
+  };
   const pastaLeitor = path.join(TMP, 'leitor');
   fs.mkdirSync(pastaLeitor, { recursive: true });
   const zipLeitor = gerarLivros('--leitor', pastaLeitor);
@@ -623,56 +654,133 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await esperar('a tela do livro de 400 páginas', () => lerLivro(pag), v => v.visivel && v.livro === 'livro-leitor-400', 5000);
   await clicar(pag, '#bib-livro-continuar');
   await esperar('o leitor do livro de 400 páginas', () => paginaDesenhada(pag), v => v === '1', 30000);
-  // a página no meio da área de leitura, o ponto dentro dela e o contador
+  // a página no meio da área de leitura, o ponto dentro dela, o contador, as páginas à vista sem canvas e os canvases vivos
   const meioDoLeitor = () => pag.evaluate(() => {
     const c = document.querySelector('#corpo-modal-leitor-pdf'), r = c.getBoundingClientRect();
     const y = r.top + c.clientHeight / 2, e = document.elementFromPoint(r.left + c.clientWidth / 2, y);
     const caixa = e && e.closest('[data-pagina-arquivo]');
     const rc = caixa ? caixa.getBoundingClientRect() : null;
+    const vazias = Array.from(c.querySelectorAll('.leitor-pdf-pagina')).filter(b => {
+      const q = b.getBoundingClientRect(); return q.bottom > r.top + 1 && q.top < r.top + c.clientHeight - 1 && !b.querySelector('canvas');
+    }).map(b => b.dataset.paginaArquivo);
     return { meio: caixa ? +caixa.dataset.paginaArquivo : null, contador: document.querySelector('#leitor-contador').textContent,
       fy: rc ? (y - rc.top) / rc.height : null, altura: rc ? rc.height : null, largura: rc ? Math.round(rc.width) : null,
-      canvas: !!(caixa && caixa.querySelector('canvas')) };
+      canvas: !!(caixa && caixa.querySelector('canvas')), vazias: vazias.join(','),
+      vivos: Array.from(c.querySelectorAll('canvas')).filter(k => k.width > 0).length };
   });
   const irParaPagina = async n => {
     await pag.evaluate(v => { const i = document.querySelector('#leitor-ir-pagina'); i.value = String(v); i.dispatchEvent(new Event('change')); }, n);
-    return esperar('a página ' + n + ' no meio', meioDoLeitor, v => v.meio === n && v.canvas, 20000);
+    const r = await esperar('a página ' + n + ' no meio', meioDoLeitor, v => v.meio === n && v.canvas, 20000);
+    await pausa(300);
+    return r;
   };
+  // toda página que encosta na tela tem canvas em até 1 s
+  const vizinhasDesenhadas = async rotulo => (await esperar(rotulo + ': as páginas à vista desenhadas', meioDoLeitor, v => v.vazias === '', 1000)).ok;
+  const desvio = (antes, depois) => depois.fy === null || antes.fy === null ? null : Math.abs(depois.fy - antes.fy) * depois.altura;
+  const contaDiz = (m, n) => new RegExp('(Página|p\\.) ' + n + ' de 400').test(m.contador);
+
+  // ---- o "+" na p. 206
   const a206 = await irParaPagina(206);
   conf('o Ir p. leva à página 206, no meio da tela', a206.ok, true);
   await clicar(pag, '#leitor-mais');
   const z = await esperar('o "+" na página 206', meioDoLeitor, v => v.largura > a206.valor.largura && v.canvas, 8000);
-  await pausa(400);
+  await pausa(300);
   const dz = await meioDoLeitor();
-  const desvioZoom = dz.fy === null ? null : Math.abs(dz.fy - a206.valor.fy) * dz.altura;
-  if (VENENO_ANCORA) {
-    secao('VENENO: o zoom sem a âncora');
-    const visto = dz.meio !== 206;
-    conf('envenenado-zoom-sem-ancora: depois do "+", outra página ficou no meio (defeito detectado: p. ' + dz.meio + ')', visto, true);
-    if (visto) console.log('VENENO visto: o zoom deixou a p. ' + dz.meio + ' no meio.');
-    await H.fim(amb)();
-    return;
-  }
   conf('o "+" aumentou a página (o zoom aconteceu)', z.ok, true);
-  conf('depois do "+", a página 206 continua no meio', dz.meio, 206);
-  conf('e o contador diz 206', /(Página|p\.) 206 de 400/.test(dz.contador), true);
-  conf('o ponto do meio se desloca menos de 24 px', desvioZoom !== null && desvioZoom < 24, true);
-  console.log('   zoom na p. 206: o ponto do meio andou ' + (desvioZoom === null ? '?' : Math.round(desvioZoom)) + ' px');
+  checa('depois do "+", a página 206 continua no meio', dz.meio, 206, 'zoom-sem-ancora');
+  checa('e o contador diz 206', contaDiz(dz, 206), true, 'zoom-sem-ancora');
+  const dvz = desvio(a206.valor, dz);
+  checa('o ponto do meio se desloca menos de 24 px no "+"', dvz !== null && dvz < 24, true, 'zoom-sem-ancora');
+  console.log('   zoom na p. 206: o ponto do meio andou ' + (dvz === null ? '?' : Math.round(dvz)) + ' px');
+  checa('depois do "+", toda página à vista tem canvas em até 1 s', await vizinhasDesenhadas('o "+"'), true, 'vizinhas-sem-desenho');
+
+  // ---- o "Ajustar à largura", com o ponto do meio fora do alto da página
+  await pag.evaluate(() => { document.querySelector('#corpo-modal-leitor-pdf').scrollTop += 300; });
+  await pausa(500);
+  const antesL = await meioDoLeitor();
   await clicar(pag, '#leitor-largura');
-  const dl = await esperar('o "Ajustar à largura" na página 206', meioDoLeitor, v => v.largura < dz.largura && v.canvas, 8000);
-  conf('o "Ajustar à largura" também deixa a página 206 no meio, com o contador em 206',
-    dl.valor.meio + '|' + /(Página|p\.) 206 de 400/.test(dl.valor.contador), '206|true');
+  const dl = await esperar('o "Ajustar à largura" na página 206', meioDoLeitor, v => v.largura < antesL.largura && v.canvas, 8000);
+  await pausa(300);
+  const dlv = await meioDoLeitor();
+  const dvl = desvio(antesL, dlv);
+  conf('o "Ajustar à largura" voltou à largura (a troca aconteceu)', dl.ok, true);
+  checa('o "Ajustar à largura" deixa a mesma página no meio, com o contador nela',
+    dlv.meio + '|' + contaDiz(dlv, antesL.meio), antesL.meio + '|true', 'zoom-sem-ancora');
+  checa('e o ponto do meio se desloca menos de 24 px', dvl !== null && dvl < 24, true, 'largura-vai-ao-alto');
+  console.log('   ajustar à largura: o ponto do meio andou ' + (dvl === null ? '?' : Math.round(dvl)) + ' px');
+  checa('depois do "Ajustar à largura", toda página à vista tem canvas em até 1 s', await vizinhasDesenhadas('a largura'), true, 'vizinhas-sem-desenho');
+
+  // ---- o "Ajustar à largura" sem mudar nada, na divisa entre duas páginas: a rolagem nem se mexe
+  const a100 = await irParaPagina(100);
+  await pag.evaluate(() => { const c = document.querySelector('#corpo-modal-leitor-pdf'); c.scrollTop += Math.round(c.clientHeight * 0.6); });
+  await esperar('a divisa entre a 100 e a 101 à vista', meioDoLeitor, v => v.vazias === '' && v.meio >= 100, 3000);
+  await clicar(pag, '#leitor-largura');
+  await pausa(150);
+  checa('na divisa, o "Ajustar à largura" redesenha as duas páginas à vista em até 1 s', await vizinhasDesenhadas('a divisa'), true, 'vizinhas-sem-desenho');
+  void a100;
+
+  // ---- o "−" na p. 300
+  const a300 = await irParaPagina(300);
+  await clicar(pag, '#leitor-menos');
+  await esperar('o "−" na página 300', meioDoLeitor, v => v.largura < a300.valor.largura && v.canvas, 8000);
+  await pausa(300);
+  const dm = await meioDoLeitor();
+  checa('depois do "−", a página 300 continua no meio', dm.meio, 300, 'zoom-sem-ancora');
+  checa('depois do "−", toda página à vista tem canvas em até 1 s', await vizinhasDesenhadas('o "−"'), true, 'vizinhas-sem-desenho');
+  await clicar(pag, '#leitor-largura');
+  await pausa(600);
+
+  // ---- o giro na p. 266
   const a266 = await irParaPagina(266);
   conf('o Ir p. leva à página 266', a266.ok, true);
   await pag.setViewport({ width: 1280, height: 800, hasTouch: true, deviceScaleFactor: 1 });
   const g = await esperar('o giro para deitado na página 266', meioDoLeitor, v => v.largura > a266.valor.largura && v.canvas, 8000);
-  await pausa(400);
+  await pausa(300);
   const dg = await meioDoLeitor();
-  const desvioGiro = dg.fy === null ? null : Math.abs(dg.fy - a266.valor.fy) * dg.altura;
+  const dvg = desvio(a266.valor, dg);
   conf('o giro alargou a página (a troca de tamanho aconteceu)', g.ok, true);
-  conf('deitado, a página 266 continua no meio', dg.meio, 266);
-  conf('e o contador diz 266', /(Página|p\.) 266 de 400/.test(dg.contador), true);
-  console.log('   giro na p. 266: o ponto do meio andou ' + (desvioGiro === null ? '?' : Math.round(desvioGiro)) + ' px');
-  conf('o ponto do meio se desloca menos de 24 px no giro', desvioGiro !== null && desvioGiro < 24, true);
+  checa('deitado, a página 266 continua no meio', dg.meio, 266, 'zoom-sem-ancora');
+  checa('e o contador diz 266', contaDiz(dg, 266), true, 'zoom-sem-ancora');
+  console.log('   giro na p. 266: o ponto do meio andou ' + (dvg === null ? '?' : Math.round(dvg)) + ' px');
+  checa('o ponto do meio se desloca menos de 24 px no giro', dvg !== null && dvg < 24, true, 'giro-sem-ancora-guardada');
+  checa('depois do giro, toda página à vista tem canvas em até 1 s', await vizinhasDesenhadas('o giro'), true, 'vizinhas-sem-desenho');
+
+  // ---- o canvas solta: deitado, 80 passos de 400 px para baixo e 80 para cima
+  const rolar = async (passo, vezes) => {
+    for (let i = 0; i < vezes; i++) {
+      await pag.evaluate(p => { document.querySelector('#corpo-modal-leitor-pdf').scrollTop += p; }, passo);
+      await pausa(60);
+    }
+    await pausa(800);
+    return meioDoLeitor();
+  };
+  const desce = await rolar(400, 80);
+  console.log('   deitado, depois de 80 passos: ' + desce.vivos + ' canvases vivos, p. ' + desce.meio);
+  checa('deitado, depois de 80 passos de 400 px, no máximo 4 canvases vivos', desce.vivos <= 4, true, 'canvas-sem-soltar');
+  const sobe = await rolar(-400, 80);
+  console.log('   deitado, depois de voltar: ' + sobe.vivos + ' canvases vivos, p. ' + sobe.meio);
+  checa('e depois de voltar, no máximo 4', sobe.vivos <= 4, true, 'canvas-sem-soltar');
+  checa('e as páginas à vista continuam desenhadas', await vizinhasDesenhadas('a volta'), true, 'canvas-sem-soltar');
+  // em pé com zoom perto de 2 (três toques no "+")
+  await pag.setViewport({ width: 800, height: 1280, hasTouch: true, deviceScaleFactor: 1 });
+  await pausa(800);
+  for (let i = 0; i < 3; i++) { await clicar(pag, '#leitor-mais'); await pausa(400); }
+  await pausa(600);
+  const desceZ = await rolar(400, 80);
+  console.log('   em pé com zoom 1,95, depois de 80 passos: ' + desceZ.vivos + ' canvases vivos');
+  checa('em pé com zoom perto de 2, depois de 80 passos, no máximo 4 canvases vivos', desceZ.vivos <= 4, true, 'canvas-sem-soltar');
+  const sobeZ = await rolar(-400, 80);
+  checa('e depois de voltar, no máximo 4', sobeZ.vivos <= 4, true, 'canvas-sem-soltar');
+  await clicar(pag, '#leitor-largura');
+  await pausa(400);
+
+  if (VENENO_LEITOR) {
+    secao('VENENO: ' + VENENO_LEITOR);
+    conf('envenenado-' + VENENO_LEITOR + ': a seção 9 viu o defeito', !!visto[VENENO_LEITOR], true);
+    if (visto[VENENO_LEITOR]) console.log('VENENO visto: ' + visto[VENENO_LEITOR]);
+    await H.fim(amb)();
+    return;
+  }
   await fecharModal(pag, 'modal-leitor-pdf');
 
   conf('nenhum erro de página', errosDePagina.join(' | '), '');
