@@ -244,7 +244,67 @@ const yml = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', '
  * passos, nessa ordem, um run só e literal, e nenhuma palavra que puxe o PR fora
  * do env e do if. */
 function travaYml(texto) {
+  /* O WORKFLOW APROVADO, linha a linha, sem comentário, sem linha vazia e sem
+   * espaço no fim. A trava compara o arquivo INTEIRO com isto: qualquer chave a
+   * mais (shell, working-directory, defaults, um env novo, um passo, um uses
+   * local) reprova, e mudar o workflow de propósito pede mudar este literal no
+   * mesmo PR, à vista do revisor. As conferências de propriedade abaixo ficam
+   * como segunda camada, e dizem POR QUE uma diferença importa. */
+  const LITERAL_YML = [
+    "name: guarda-merge",
+    "on:",
+    "  pull_request_target:",
+    "    branches: [main]",
+    "    types: [opened, synchronize, reopened, labeled, unlabeled]",
+    "  issue_comment:",
+    "    types: [created, edited, deleted]",
+    "  workflow_run:",
+    "    workflows: [portao]",
+    "    types: [completed]",
+    "  push:",
+    "    branches: [main]",
+    "concurrency:",
+    "  group: guarda-merge-${{ github.event_name == 'push' && 'main' || github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_branch || github.run_id }}",
+    "  cancel-in-progress: true",
+    "permissions:",
+    "  contents: read",
+    "  pull-requests: read",
+    "  checks: read",
+    "  statuses: write",
+    "jobs:",
+    "  guarda-merge:",
+    "    if: >-",
+    "      (github.event_name == 'push') ||",
+    "      (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository) ||",
+    "      (github.event_name == 'issue_comment' && github.event.issue.pull_request) ||",
+    "      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request')",
+    "    runs-on: ubuntu-latest",
+    "    timeout-minutes: 10",
+    "    steps:",
+    "      - uses: actions/checkout@v4",
+    "        with:",
+    "          fetch-depth: 0",
+    "      - uses: actions/setup-node@v4",
+    "        with:",
+    "          node-version: '24.14.1'",
+    "      - name: Julga e publica o status portao-merge",
+    "        env:",
+    "          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}",
+    "          REPO_MERGE_SEGURO: ${{ github.repository }}",
+    "          MODO: ${{ github.event_name == 'push' && 'todos' || 'um' }}",
+    "          PR_NUM: ${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || '' }}",
+    "          SHA_DO_EVENTO: ${{ github.event.workflow_run.head_sha || '' }}",
+    "          URL_DA_RODADA: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+    "        run: node _teste/guarda_merge.js"
+  ].join('\n');
+  const normalizaYml = texto => texto.replace(/\r/g, '').split('\n').map(l => l.replace(/\s+$/, ''))
+    .filter(l => l && !/^\s*#/.test(l)).join('\n');
   const v = [];
+  const n = normalizaYml(texto).split('\n'), lit = LITERAL_YML.split('\n');
+  const dif = Math.max(n.length, lit.length);
+  for (let i = 0; i < dif; i++) {
+    if (n[i] !== lit[i]) { v.push('difere do literal aprovado na linha ' + (i + 1) + ': [' + (n[i] === undefined ? 'fim' : n[i].trim()) + ']'); break; }
+  }
   const linhas = texto.replace(/\r/g, '').split('\n').filter(l => !/^\s*#/.test(l));
   const codigo = linhas.join('\n');
   if (!/^  pull_request_target:\n    branches: \[main\]\n/m.test(codigo)) v.push('pull_request_target sem branches: [main] logo abaixo');
@@ -289,6 +349,7 @@ const troca = (de, para) => { if (yml.indexOf(de) < 0) throw new Error('veneno n
 const CK = '      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n';
 const GUARDA = '      - name: Julga e publica o status portao-merge\n';
 const RUN = '        run: node _teste/guarda_merge.js';
+const ENV = '        env:\n          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n';
 const VENENOS = [
   ['with: ref: head_sha antes do uses', troca(CK, '      - with:\n          ref: ${{ github.event.workflow_run.head_sha }}\n          fetch-depth: 0\n        uses: actions/checkout@v4\n')],
   ['gh pr checkout num passo separado', troca(GUARDA, '      - run: gh pr checkout ${{ github.event.pull_request.number }}\n' + GUARDA)],
@@ -301,7 +362,15 @@ const VENENOS = [
   ['um segundo checkout', troca(GUARDA, '      - uses: actions/checkout@v4\n' + GUARDA)],
   ['refs/pull no run', troca(RUN, '        run: git fetch origin refs/pull/1/head && node _teste/guarda_merge.js')],
   ['strict', troca(CK, CK + '          strict: true\n')],
-  ['escrita além do status', troca('  statuses: write\n', '  statuses: write\n  contents: write\n')]
+  ['escrita além do status', troca('  statuses: write\n', '  statuses: write\n  contents: write\n')],
+  ['N1 ação local uses ./.github/actions/x', troca(GUARDA, '      - uses: ./.github/actions/x\n' + GUARDA)],
+  ['N2 working-directory no passo do guarda', troca(RUN, '        working-directory: ${{ github.workspace }}/pr\n' + RUN)],
+  ['N3 shell próprio com gh co (alias do checkout)', troca(RUN, "        shell: bash -c 'gh co \"$PR_NUM\" >&2 && bash {0}'\n" + RUN)],
+  ['N4 BASH_ENV com substituição de comando no env', troca(ENV, ENV + '          BASH_ENV: $(gh co \"$PR_NUM\" >&2)\n')],
+  ['N5 NODE_OPTIONS no env', troca(ENV, ENV + '          NODE_OPTIONS: --require ./pr/x.js\n')],
+  ['N6 defaults.run.shell no job', troca('    runs-on: ubuntu-latest\n', "    runs-on: ubuntu-latest\n    defaults:\n      run:\n        shell: bash -c 'gh co \"$PR_NUM\" >&2 && bash {0}'\n")],
+  ['N7 env no nível do workflow', troca('permissions:\n', 'env:\n  BASH_ENV: ./pr/x.sh\npermissions:\n')],
+  ['N8 valor do env trocado (PR_NUM com o título)', troca('          PR_NUM: ${{ github.event.pull_request.number', '          PR_NUM: ${{ github.event.pull_request.title')]
 ];
 VENENOS.forEach(([nome, texto]) => {
   const v = travaYml(texto);
