@@ -1056,6 +1056,10 @@ roda "celular edita --envenenado-cobranca-volta"    node "_teste/testa_celular_e
 # (portao de 09/11) a rolagem inicial com o relogio fixo em varias horas: a folga antiga deixa
 # a linha de agora cortada sob a faixa dos dias as 00:30 e as 06:00
 roda "celular edita --envenenado-rolagem-antiga"   node "_teste/testa_celular_edita.js" --envenenado-rolagem-antiga
+# (#168) Ajustar duracao: gravar com escopo todas muda a repeticao inteira e o dinheiro do mes; a
+# lista fixa faz a aula de 1h15 abrir marcando outra duracao
+roda "celular edita --envenenado-ajuste-todas"     node "_teste/testa_celular_edita.js" --envenenado-ajuste-todas
+roda "celular edita --envenenado-ajuste-lista-fixa" node "_teste/testa_celular_edita.js" --envenenado-ajuste-lista-fixa
 # D6c (lote 2): a aba Alunos e a ficha minima (ligar, WhatsApp, valor por hora,
 # ultimo relato, casa ou online), as mensagens prontas em wa.me, os campos
 # opcionais que sobem pela fila e chegam ao tablet, e a cobranca do "Escrever
