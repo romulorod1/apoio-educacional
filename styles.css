@@ -3010,6 +3010,10 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-semana-topo .btn { min-width: var(--alvo-celular); flex-shrink: 0; }
 .cel-semana-topo .cel-semana-passo { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 8px 7px; font-size: var(--letra-12); white-space: nowrap; }
 .cel-semana-topo .cel-titulo { min-width: 0; margin: 0; text-align: center; font-size: var(--letra-16); line-height: 1.15; }
+@media (max-width: 380px) {
+  /* Mantém a data legível no celular estreito, com as duas setas e Hoje. */
+  .cel-semana-topo .cel-semana-passo { gap: 0; padding-left: 0; padding-right: 0; }
+}
 .cel-semana-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0; }
 .cel-semana-dia {
   min-height: 56px;
@@ -3033,6 +3037,25 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-semana-dia.ativo .cel-semana-numero { color: var(--branco); }
 .cel-semana-bolinhas { display: flex; gap: 2px; min-height: 7px; }
 .cel-bolinha { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1px var(--branco); }
+.cel-abrir-vagos { margin: 0; min-height: var(--alvo-celular); }
+.cel-semana-topo .cel-abrir-vagos { flex: 0 0 auto; min-width: var(--alvo-celular); padding: 4px; }
+.cel-vagos-topo { display: flex; align-items: center; gap: 4px; margin: 0 0 8px; padding: 4px 0; border-bottom: 1px solid var(--fio-claro); }
+.cel-vagos-topo .btn { flex: 0 0 auto; min-width: var(--alvo-celular); min-height: var(--alvo-celular); padding: 4px; }
+.cel-vagos-topo .cel-vagos-voltar { display: inline-flex; align-items: center; gap: 2px; padding: 4px 8px 4px 4px; white-space: nowrap; }
+.cel-vagos-titulo { flex: 1 1 auto; min-width: 0; }
+.cel-vagos-topo .cel-titulo { margin: 0; font-size: var(--letra-20); }
+.cel-vagos-periodo { color: var(--novidades-subtitulo); font-size: var(--letra-12); }
+.cel-vagos-ajuda { margin: 8px 0 4px; }
+.cel-vagos-duracoes { display: flex; gap: 8px; padding: 4px 0 10px; }
+.cel-vagos-chip { min-height: var(--alvo-celular); min-width: 64px; justify-content: center; }
+.cel-vagos-chip.ativo { background: var(--navy); border-color: var(--navy); color: var(--branco); }
+.cel-vagos-dia { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 8px; padding: 8px 4px; border-top: 1px solid var(--fio-claro); }
+.cel-vagos-dia.selecionado { background: var(--branco-a60); box-shadow: inset 4px 0 0 var(--navy); }
+.cel-vagos-escolher-dia { min-height: var(--alvo-celular); color: var(--navy); font-weight: 600; text-transform: lowercase; }
+.cel-vagos-horarios { display: flex; flex-wrap: wrap; gap: 6px; }
+.cel-vagos-horario { min-height: var(--alvo-celular); min-width: 0; padding: 6px 10px; border: 1px solid var(--fio-claro); color: var(--navy); background: var(--branco); font-size: var(--letra-14); }
+.cel-vagos-sem-horario { margin: 10px 0; font-size: var(--letra-14); }
+.cel-vagos-mandar { width: 100%; min-height: var(--alvo-celular); margin-top: 8px; justify-content: center; }
 /* Os avisos do alto de Hoje (D6c, lote 4; selinho e painel em 09/11, o
    desenho final "cel_hoje_avisos: base C"). Recolhidos, são só o selinho
    (o sino com o número, marinho) na linha da data, com a altura de toque
