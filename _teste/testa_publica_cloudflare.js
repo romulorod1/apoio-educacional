@@ -95,6 +95,12 @@ function defeitosDoPublica(texto) {
       !/CLOUDFLARE_ACCOUNT_ID: \$\{\{ secrets\.CLOUDFLARE_ACCOUNT_ID \}\}/.test(envio))
     d.push('token ou conta fora dos secrets');
   if (ps.indexOf(envio) >= 0 && ps.indexOf(envio) < iPonta) d.push('o envio vem antes da ponta');
+  // O endpoint de IA: as dependencias de functions/ entram pelo lock (npm ci,
+  // nunca npm install, que resolveria outra versao) e ANTES do envio.
+  const deps = ps.findIndex(p => /npm ci --prefix functions/.test(p));
+  if (deps < 0) d.push('sem o npm ci --prefix functions (o wrangler nao acharia o SDK do endpoint)');
+  else if (deps > ps.indexOf(envio)) d.push('as dependencias do endpoint vem depois do envio');
+  if (ps.some(p => /npm install/.test(p))) d.push('npm install no deploy: a versao tem de vir do lock (npm ci)');
 
   const c = blocoJob(texto, 'conferencia') || '';
   if (!/needs: publica/.test(c) || !/uses: \.\/\.github\/workflows\/conferencia-no-ar\.yml/.test(c) ||
@@ -141,7 +147,9 @@ const venenos = [
   ['envio sem a guarda da ponta', PUBLICA.replace(/(id: envio\n)        if: steps\.ponta\.outputs\.publicar == 'sim'\n/, '$1')],
   ['token escrito no arquivo', PUBLICA.replace('${{ secrets.CLOUDFLARE_API_TOKEN }}', 'abc123')],
   ['ramo de preview', PUBLICA.replace('--branch main', '--branch prova')],
-  ['sem a conferencia', PUBLICA.replace('uses: ./.github/workflows/conferencia-no-ar.yml', 'uses: ./outro.yml')]
+  ['sem a conferencia', PUBLICA.replace('uses: ./.github/workflows/conferencia-no-ar.yml', 'uses: ./outro.yml')],
+  ['sem as dependencias do endpoint', PUBLICA.replace('npm ci --prefix functions', 'echo pulei')],
+  ['npm install no lugar do npm ci', PUBLICA.replace('npm ci --prefix functions', 'npm install --prefix functions')]
 ];
 venenos.forEach(([nome, texto]) => {
   conf('veneno "' + nome + '" foi aplicado', texto !== PUBLICA);
@@ -197,10 +205,17 @@ try {
       if (e.isDirectory()) anda(path.join(d, e.name), r); else todos.push(r);
     });
   })(destino, '');
-  const proibidos = todos.filter(r => /^(_teste|biblioteca|\.github)\//.test(r) || /\.(md|py|sh)$/.test(r) ||
+  const proibidos = todos.filter(r => /^(_teste|biblioteca|\.github|functions|servidor)\//.test(r) || /\.(md|py|sh)$/.test(r) ||
     r.split('/').some(p => p[0] === '_' || p[0] === '.'));
-  conf('nada de _teste, biblioteca, .github, .md, .py ou "_" no site (' + todos.length + ' arquivos)',
+  conf('nada de _teste, biblioteca, .github, functions, servidor, .md, .py ou "_" no site (' + todos.length + ' arquivos)',
     proibidos.length === 0 && todos.length > 0, proibidos.slice(0, 5).join(','));
+  // O endpoint de IA (functions/) e o nucleo dele (servidor/) sao codigo do
+  // servidor: o wrangler os empacota; como arquivo estatico, nao sobem. O
+  // controle positivo prova que eles existem no repositorio (o filtro tem o
+  // que tirar) e que nenhum arquivo do site tem o nome deles.
+  conf('controle: o repositorio tem functions/api/ia.js e servidor/ia.mjs, e o site nao',
+    fs.existsSync(path.join(RAIZ, 'functions', 'api', 'ia.js')) && fs.existsSync(path.join(RAIZ, 'servidor', 'ia.mjs')) &&
+    !tem('functions/api/ia.js') && !tem('servidor/ia.mjs') && !todos.some(r => /(^|\/)ia\.mjs$/.test(r)));
   // controle positivo do filtro: no repositorio esses caminhos existem
   conf('controle: o repositorio tem _teste/ e banco/topicos/_ids.json que o filtro tirou',
     fs.existsSync(path.join(RAIZ, '_teste', 'confere_tudo.sh')) && fs.existsSync(path.join(RAIZ, 'banco/topicos/_ids.json')) &&

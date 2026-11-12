@@ -309,6 +309,9 @@ roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
 # B4: o deploy no Cloudflare Pages so depois do portao inteiro verde na main,
 # com venenos, e o site montado com tudo o que o aplicativo pede.
 roda "publica cloudflare (B4)" node _teste/testa_publica_cloudflare.js
+# O endpoint de IA (fase 1 do projeto IA no app): login, lista de uids, limites,
+# modelo decidido no servidor, erro traduzido e registro sem conteudo. Sem rede.
+roda "endpoint de IA"         node _teste/testa_ia_endpoint.js
 # Politica de testes por checkpoint (09/11/2026): o nivel 1 (quais provas de
 # navegador rodam pelos arquivos tocados, com o mapa em mapa_provas.tsv) e o
 # nivel 3 (a main reaproveita a bateria inteira se o tree for igual ao da cabeca
