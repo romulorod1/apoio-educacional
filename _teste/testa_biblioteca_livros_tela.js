@@ -380,6 +380,66 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   const busca = await esperar('o resultado da busca', () => pag.evaluate(() => [document.querySelector('#bib-corpo').innerText,
     !!document.querySelector('#bib-corpo .bib-titulo')]), v => !v[1] && /Equações do Segundo Grau/.test(v[0]), 5000);
   conf('a busca "bhaskara" mostra o resultado', busca.ok, true);
+  // B12: um campo só; com livro no tablet, o resultado tem dois grupos, primeiro Exercícios e depois Nos livros
+  const grupos = await esperar('os dois grupos da busca', () => pag.evaluate(() => ({
+    campo: document.querySelector('#busca-biblioteca').getAttribute('aria-label'),
+    campos: document.querySelectorAll('.bibl-busca input').length,
+    grupos: Array.from(document.querySelectorAll('#bib-corpo > .bib-grupo-busca')).map(d => d.dataset.grupo + ':' +
+      d.querySelector('.bib-grupo-titulo').textContent + ':' + d.open).join(','),
+    livros: (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''
+  })), v => !!v && /Buscando|Nenhum livro|preparada|encontrada/.test(v.livros) && !/Buscando/.test(v.livros), 10000);
+  conf('um campo de busca só, e ele diz que busca nos exercícios e nos livros',
+    grupos.valor.campos + ' | ' + grupos.valor.campo, '1 | Buscar nos exercícios e nos livros');
+  conf('o resultado tem dois grupos abertos: Exercícios e depois Nos livros', grupos.valor.grupos,
+    'exercicios:Exercícios:true,livros:Nos livros:true');
+  const leGrupoEx = () => pag.evaluate(() => {
+    const g = document.querySelector('#bib-corpo [data-grupo="exercicios"]');
+    const visiveis = Array.from(g.querySelectorAll('.item-lista')).filter(e => e.offsetParent !== null);
+    const livros = document.querySelector('#bib-corpo [data-grupo="livros"] > summary');
+    return { contagem: g.querySelector('.bib-grupo-contagem').textContent, linhas: visiveis.length, todas: g.querySelectorAll('.item-lista').length,
+      blocos: Array.from(g.querySelectorAll('.bloco-exercicios')).filter(b => b.offsetParent !== null).map(b => b.textContent).join(','),
+      resumo: (document.querySelector('#bib-busca-resumo') || {}).textContent || '',
+      verTodos: (g.querySelector('.bib-grupo-ver-todos') || {}).textContent || '',
+      livrosNoAlto: livros ? Math.round(livros.getBoundingClientRect().top) : null, altura: innerHeight };
+  });
+  const gx = await leGrupoEx();
+  conf('a contagem dos exercícios tem unidade e conta as linhas do grupo (as à vista e as do "Ver todos")',
+    /^\d+ (lista|listas|resultado|resultados|módulo|módulos|aula de teoria|aulas de teoria|problema|problemas)$/.test(gx.contagem) &&
+    parseInt(gx.contagem, 10) === gx.todas ? 'ok' : JSON.stringify(gx), 'ok');
+  conf('dentro do grupo, o bloco das listas não repete "Exercícios"', /(^|,)Exercícios(,|$)/.test(gx.blocos), false);
+  conf('a linha-resumo no alto diz os dois grupos', /^Exercícios.+·Nos livros/.test(gx.resumo), true);
+  // um termo curto e comum: muitos exercícios, e os livros continuam na primeira tela
+  for (const [w, h] of [[1280, 800], [800, 1280]]) {
+    await pag.setViewport({ width: w, height: h, hasTouch: true, deviceScaleFactor: 1 });
+    await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = 'de'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+    await esperar('a busca por "de" a ' + w + 'x' + h, () => pag.evaluate(() =>
+      (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''), v => !!v && !/Buscando/.test(v), 10000);
+    await pausa(300);
+    const gd = await leGrupoEx();
+    console.log('   "de" a ' + w + 'x' + h + ': ' + gd.contagem + ', ' + gd.linhas + ' linhas à vista, "Nos livros" a ' + gd.livrosNoAlto + ' px de ' + gd.altura);
+    conf('a ' + w + 'x' + h + ', com mais de 3 linhas, o grupo mostra 3 e "Ver todos os N"', gd.linhas + ' | ' + (gd.verTodos === 'Ver todos os ' + gd.todas), '3 | true');
+    conf('a ' + w + 'x' + h + ', o cabeçalho "Nos livros" fica na primeira tela', gd.livrosNoAlto !== null && gd.livrosNoAlto < gd.altura - 48, true);
+    const ruinsB = await medir(pag, '#bib-corpo');
+    conf('a ' + w + 'x' + h + ', o resultado não transborda', ruinsB.join('; '), '');
+  }
+  // nada nos dois grupos: um estado vazio só, com a frase e o caminho de sempre
+  await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = 'zqxjkw'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  const vazio = await esperar('o estado vazio único', () => pag.evaluate(() => ({
+    vazios: document.querySelectorAll('#bib-corpo .vazio').length, grupos: document.querySelectorAll('#bib-corpo .bib-grupo-busca').length,
+    texto: (document.querySelector('#bib-corpo .vazio') || {}).textContent || '' })), v => !!v && v.vazios === 1 && v.grupos === 0, 10000);
+  conf('sem nada nos exercícios nem nos livros, uma frase só, com o caminho de procurar outra palavra',
+    vazio.ok && /Procure por outra palavra, ou navegue pela série\./.test(vazio.valor.texto), true);
+  await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = 'de'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+  await pausa(500);
+  for (const w of [360, 390, 412]) {
+    await pag.setViewport({ width: w, height: 800, hasTouch: true, deviceScaleFactor: 1 });
+    await letra(pag, LETRA_130);
+    await pausa(300);
+    const ruinsB = await medir(pag, '#bib-corpo');
+    conf('a ' + w + ' px com a letra a 130%, o resultado da busca não transborda', ruinsB.join('; '), '');
+    await letra(pag, '');
+  }
+  await pag.setViewport({ width: 1280, height: 800, hasTouch: true, deviceScaleFactor: PRINTS ? 2 : 1 });
   s = await lerSecao(pag);
   conf('com termo na busca, os livros saem do caminho', s.visivel, false);
   await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); });
