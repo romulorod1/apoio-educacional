@@ -789,6 +789,7 @@ roda "pdf pronto"                                node "_teste/testa_biblioteca_p
 roda "pdf pronto --envenenado-baixa-ao-cancelar" node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-baixa-ao-cancelar
 roda "pdf pronto --envenenado-so-hoje"           node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-so-hoje
 roda "pdf pronto --envenenado-sem-sugestao"      node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-sem-sugestao
+roda "pdf pronto --envenenado-sugere-depois"     node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-sugere-depois
 # C2a: o banco sobe de 2 para 3. A subida nao perde nada; codigo mais velho que
 # o banco diz o que fazer; a janela antiga larga o banco e avisa.
 roda "banco v3"                                   node "_teste/testa_banco_v3.js"

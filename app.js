@@ -2579,21 +2579,32 @@
         navigator.canShare({ files: [new File([a.blob], a.nome, { type: 'application/pdf' })] }));
     } catch (e) { return false; }
   }
+  var compartilharPdfAberto = false;
   function compartilharPdfPronto(a, titulo) {
-    if (a.enviando) return;
+    // uma janela de compartilhar por vez: a segunda o Android recusa
+    if (compartilharPdfAberto) return;
     var envio;
     try {
       envio = navigator.share({ files: [new File([a.blob], a.nome, { type: 'application/pdf' })], title: titulo || a.nome });
     } catch (e) { envio = Promise.reject(e); }
-    a.enviando = true;
+    compartilharPdfAberto = true;
+    /* Se o aparelho nunca responder, o botão não fica mudo para sempre: depois
+     * de um minuto, um toque novo volta a abrir o compartilhar. */
+    var prazo = setTimeout(function () { compartilharPdfAberto = false; }, 60000);
     Promise.resolve(envio).then(function () {
-      a.enviando = false;
+      clearTimeout(prazo);
+      compartilharPdfAberto = false;
+      a.recusas = 0;
     }, function (e) {
-      a.enviando = false;
+      clearTimeout(prazo);
+      compartilharPdfAberto = false;
       var nome = e && e.name;
       // nada é baixado aqui: o arquivo continua na janela, para ela escolher de novo
-      if (nome === 'AbortError') avisar('Envio cancelado. O PDF continua aqui.');
-      else if (nome === 'NotAllowedError') avisar('Toque de novo em compartilhar.');
+      if (nome === 'AbortError') { a.recusas = 0; avisar('Envio cancelado. O PDF continua aqui.'); }
+      else if (nome === 'NotAllowedError') {
+        a.recusas = (a.recusas || 0) + 1;
+        avisar(a.recusas > 1 ? 'O compartilhar não abriu. Toque em baixar para guardar o PDF no tablet.' : 'Toque de novo em compartilhar.');
+      }
       else avisar('Não consegui abrir o compartilhar. O PDF continua aqui para baixar ou ver.');
     });
   }
@@ -2618,7 +2629,7 @@
       }
       acoes.push(botao('baixar', 'download', 'Baixar ' + artigo, function () {
         baixar(a.nome, a.blob);
-        avisar('O PDF foi para a pasta Downloads do tablet.');
+        avisar('O PDF foi para a pasta Downloads.');
       }));
       acoes.push(botao('ver', 'olho', 'Ver ' + artigo, function () {
         abrirLeitorPdf(a.blob, { titulo: a.nome, nome: a.nome, comoFolha: false,
@@ -21521,6 +21532,11 @@
    * oferece escolhida, e o filtro "ainda não usei" já vem com o aluno dela. */
   var bibContexto = null;          // { aulaId, alunoId }
   var bibFiltroAluno = '';         // '' = mostrar todos
+  /* Depois de um anexo feito pela Biblioteca, a próxima aula do aluno do
+   * filtro deixa de vir escolhida sozinha, até ela trocar o filtro: o filtro
+   * fica na tela, e o material do aluno seguinte iria, com um toque, para a
+   * aula do aluno anterior (achado da revisão do L1). */
+  var bibSugestaoGasta = false;
 
   /* LIMITAÇÃO REGISTRADA: o pacote ainda não liga o módulo do Portal ao tema do
    * aplicativo (tema_app vem nulo). Até essa tabela existir, "filtrar pelo
@@ -21701,6 +21717,7 @@
    * tudo". */
   function abrirBibliotecaDoAssunto(t, aula, chaveModulo) {
     bibContexto = { aulaId: aula.id, alunoId: aula.alunoId };
+    bibSugestaoGasta = false;
     bibFiltroAluno = aula.alunoId;
     bibFiltroDif = null;
     bibTermo = chaveModulo ? '' : String(t.titulo || '').trim();
@@ -21838,7 +21855,7 @@
       .forEach(function (a) { sel.appendChild(el('option', { value: a.id, texto: a.nome })); });
     sel.value = bibFiltroAluno && alunoPorId(bibFiltroAluno) ? bibFiltroAluno : '';
     var info = el('span', { class: 'ajuda bib-filtro-info', id: 'bib-filtro-info' });
-    sel.addEventListener('change', function () { bibFiltroAluno = sel.value; aplicarFiltroDeUso(grade, info); });
+    sel.addEventListener('change', function () { bibFiltroAluno = sel.value; bibSugestaoGasta = false; aplicarFiltroDeUso(grade, info); });
     var barra = el('div', { class: 'barra bib-filtro-uso' }, [
       el('label', { class: 'bib-filtro-rotulo', for: 'bib-filtro-aluno', texto: 'Ainda não usei com:' }), sel, info
     ]);
@@ -22376,7 +22393,7 @@
   function isoMaisDias(iso, n) {
     var d = Core.dataLocal(iso);
     d.setDate(d.getDate() + n);
-    return d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1) + '-' + (d.getDate() < 10 ? '0' : '') + d.getDate();
+    return Core.isoDe(d);
   }
   function aulaJaTerminou(a, hoje, agoraMin) {
     if (a.data < hoje) return true;
@@ -22390,7 +22407,7 @@
     var agora = new Date();
     var agoraMin = agora.getHours() * 60 + agora.getMinutes();
     var limite = isoMaisDias(hoje, DIAS_PROXIMAS_AULAS);
-    var inicioPassadas = isoMaisDias(hoje, -DIAS_PROXIMAS_AULAS);
+    var inicioPassadas = isoMaisDias(hoje, -14);
     var validas = db.aulas.filter(function (a) { return alunoPorId(a.alunoId) && a.status !== 'cancelada'; });
     var cronologica = function (a, b) {
       return a.data < b.data ? -1 : a.data > b.data ? 1 : String(a.hora || '').localeCompare(String(b.hora || ''));
@@ -22400,14 +22417,21 @@
     var foi = janela.filter(function (a) { return aulaJaTerminou(a, hoje, agoraMin); });
     var dele = function (l) { return alunoId ? l.filter(function (a) { return a.alunoId === alunoId; }) : []; };
     var dosOutros = function (l) { return alunoId ? l.filter(function (a) { return a.alunoId !== alunoId; }) : l; };
-    var proximas = dele(vem).concat(dele(foi), dosOutros(vem), dosOutros(foi));
+    var deHoje = function (l) { return l.filter(function (a) { return a.data === hoje; }); };
+    var depois = function (l) { return l.filter(function (a) { return a.data > hoje; }); };
+    /* As de hoje que já terminaram ficam logo depois das de hoje que ainda vêm,
+     * e antes das dos próximos dias: anexar o material da aula que acabou de
+     * acontecer é comum, e no fim da lista ela ficaria atrás do "Mostrar mais". */
+    var proximas = dele(vem).concat(dele(foi),
+      deHoje(dosOutros(vem)), dosOutros(foi), depois(dosOutros(vem)));
     var passadas = validas.filter(function (a) { return a.data < hoje && a.data >= inicioPassadas; })
-      .sort(function (a, b) { return cronologica(b, a); }).slice(0, 8);
+      .sort(function (a, b) { return cronologica(b, a); }).slice(0, 12);
     return {
       proximas: proximas,
       terminou: function (a) { return aulaJaTerminou(a, hoje, agoraMin); },
-      // a mais próxima do aluno que ainda não aconteceu: é ela que vem escolhida
-      sugerida: dele(vem)[0] || null,
+      /* a mais próxima do aluno que ainda não aconteceu e não tem falta
+       * registrada: é ela que vem escolhida */
+      sugerida: dele(vem).filter(function (a) { return a.status !== 'falta'; })[0] || null,
       passadas: passadas
     };
   }
@@ -22417,7 +22441,8 @@
     var amanha = isoMaisDias(hoje, 1);
     var dia = Core.diaSemanaLongo(a.data) + ' ' + Core.ddmm(a.data);
     var prefixo = a.data === hoje ? 'Hoje, ' : a.data === amanha ? 'Amanhã, ' : '';
-    return prefixo + dia + (a.hora ? ', ' + a.hora : '') + (terminou && a.data === hoje ? ', já terminou' : '');
+    return prefixo + dia + (a.hora ? ', ' + a.hora : '') + (a.status === 'falta' ? ', falta registrada' : '') +
+      (terminou && a.data === hoje ? ', já terminou' : '');
   }
 
   var gerandoMaterial = false;
@@ -22677,8 +22702,10 @@
     abrirModalGerar.atualizar = atualizarRodape;
     /* A aula é escolhida por ela, mesmo quando só há uma hoje: escolhida
      * sozinha, o material podia ir para a aula de outro aluno por distração.
-     * A exceção é a aula de onde ela veio pelo botão Material: essa escolha ela
-     * já fez, e a faixa no alto da aba diz qual é. */
+     * As exceções são duas escolhas que ela já fez: a aula de onde ela veio
+     * pelo botão Material (a faixa no alto da aba diz qual é), e o aluno do
+     * filtro "Ainda não usei com", cuja próxima aula vem escolhida (D8
+     * revista) até o primeiro anexo; depois dele, ela escolhe de novo. */
     if (bibContexto && !bibContexto.anexado) {
       var daAula = listaAulas.querySelector('[data-aula="' + bibContexto.aulaId + '"]');
       if (!daAula) {
@@ -22690,12 +22717,12 @@
         }
       }
       if (daAula) marcarAula(daAula, bibContexto.aulaId, false);
-    } else if (aulas.sugerida && !daSondagem && !(bibContexto && bibContexto.anexado)) {
+    } else if (aulas.sugerida && !daSondagem && !(bibContexto && bibContexto.anexado) && !bibSugestaoGasta) {
       /* Com o aluno em contexto (o filtro "Ainda não usei com"), a próxima aula
-       * dele já vem escolhida: é o mesmo aluno que ela escolheu na tela, então
-       * não há risco de o material ir para a aula de outra criança. Depois de
-       * anexar na aula de onde ela veio, nada vem escolhido, como antes: a
-       * próxima dele podia ser a mesma aula, e o material sairia duas vezes. */
+       * dele já vem escolhida: é o mesmo aluno que ela escolheu na tela. Depois
+       * de um anexo pela Biblioteca, nada vem escolhido até ela trocar o
+       * filtro: o filtro continua na tela, e o material seguinte podia ser de
+       * outra criança, ou sair duas vezes na mesma aula. */
       var daProxima = listaAulas.querySelector('[data-aula="' + aulas.sugerida.id + '"]');
       if (daProxima) marcarAula(daProxima, aulas.sugerida.id, false);
     }
@@ -22941,6 +22968,7 @@
         });
       }).then(function () {
         anexado = true;
+        bibSugestaoGasta = true;
         etapa = 'uso';
         /* O uso: um registro por exercício que entrou na folha, só se a aula
          * ainda existe (um Desfazer pode ter caído entre o salvar e aqui). */

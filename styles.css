@@ -2337,7 +2337,7 @@ button.alvo-rascunho:hover { background: var(--soft); }
 #bib-gerar-aulas .item-lista.bib-aula-nova .nome { color: var(--muted); font-weight: 600; }
 .bib-gerar-mais { margin: 0 0 8px; }
 #bib-gerar-aulas .item-lista[hidden] { display: none; }
-#bib-gerar-passadas > summary { padding: 12px 0; cursor: pointer; font-weight: 600; color: var(--navy); }
+#bib-gerar-passadas > summary { min-height: var(--alvo, 48px); box-sizing: border-box; padding: 12px 0; cursor: pointer; font-weight: 600; color: var(--navy); }
 
 /* ---------- Minhas listas (C2a) ---------- */
 .bib-abas { margin-bottom: 12px; }

@@ -7,15 +7,18 @@
  * O que prova, no modo normal:
  *
  *   1. PRÓXIMAS AULAS. A janela "Gerar material" mostra as aulas de hoje e dos
- *      próximos sete dias, em ordem de data e hora, as que ainda vão acontecer
- *      antes das de hoje que já terminaram; cada linha diz o dia da semana, a
- *      data e a hora. A cancelada e a de daqui a duas semanas não entram; a de
- *      ontem fica no bloco recolhido dos últimos dias. Sem aluno em contexto,
- *      nada vem escolhido. "Nova aula hoje" fica no fim, discreta.
+ *      próximos sete dias, em ordem de data e hora: as de hoje que ainda vão
+ *      acontecer, as de hoje que já terminaram e depois os próximos dias; cada
+ *      linha diz o dia da semana, a data e a hora. A cancelada e a de daqui a
+ *      duas semanas não entram; a de ontem fica no bloco recolhido dos últimos
+ *      dias. Sem aluno em contexto, nada vem escolhido. "Nova aula hoje" fica
+ *      no fim, discreta.
  *   2. ALUNO EM CONTEXTO. Com o filtro "Ainda não usei com" na Aluna Alfa, as
  *      aulas dela vêm primeiro e a de AMANHÃ (a mais próxima que ainda não
- *      aconteceu) já vem escolhida. Anexar grava na aula de amanhã, como
- *      sempre: dois anexos (lista e gabarito) e o uso de cada exercício.
+ *      aconteceu e não tem falta registrada) já vem escolhida. Anexar grava na
+ *      aula de amanhã, como sempre: dois anexos (lista e gabarito) e o uso de
+ *      cada exercício. Depois do anexo, com o filtro ainda na tela, nada vem
+ *      escolhido sozinho; trocar o filtro devolve a sugestão.
  *   3. PDF PRONTO. "Só gerar PDF, sem anexar" abre a janela "PDF pronto" e não
  *      baixa nada sozinho. Lista e gabarito, cada um com o nome e três botões
  *      só de símbolo (compartilhar, baixar, ver), com aria-label e title.
@@ -36,6 +39,8 @@
  *                                   a de amanhã some.
  *   --envenenado-sem-sugestao       a próxima aula do aluno em contexto deixa
  *                                   de vir escolhida.
+ *   --envenenado-sugere-depois      depois de anexar, a aula dela volta a vir
+ *                                   escolhida sozinha (achado da revisão).
  *
  * Com --prints=PASTA, guarda três prints a 1280 x 800 (a janela PDF pronto, a
  * Gerar material com as próximas aulas e a etapa 4 do tutorial).
@@ -51,24 +56,28 @@ const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8853;
-const MODOS = ['--envenenado-baixa-ao-cancelar', '--envenenado-so-hoje', '--envenenado-sem-sugestao'];
+const MODOS = ['--envenenado-baixa-ao-cancelar', '--envenenado-so-hoje', '--envenenado-sem-sugestao',
+  '--envenenado-sugere-depois'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const PRINTS = (process.argv.filter(a => a.indexOf('--prints=') === 0)[0] || '').slice('--prints='.length);
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 
 // uma linha só: âncora de várias linhas depende do final de linha do arquivo
-const L_CANCELA = "      if (nome === 'AbortError') avisar('Envio cancelado. O PDF continua aqui.');";
-const T_CANCELA = "      if (nome === 'AbortError') baixar(a.nome, a.blob);";
+const L_CANCELA = "      if (nome === 'AbortError') { a.recusas = 0; avisar('Envio cancelado. O PDF continua aqui.'); }";
+const T_CANCELA = "      if (nome === 'AbortError') { a.recusas = 0; baixar(a.nome, a.blob); }";
 const L_LIMITE = '    var limite = isoMaisDias(hoje, DIAS_PROXIMAS_AULAS);';
 const T_LIMITE = '    var limite = hoje;';
 const L_SUGESTAO = '      if (daProxima) marcarAula(daProxima, aulas.sugerida.id, false);';
 const T_SUGESTAO = '      void daProxima;';
+const L_GASTA = '&& !bibSugestaoGasta) {';
+const T_GASTA = ') {';
 function umaVez(texto, ancora) { return texto.split(ancora).length === 2; }
 
 const trocas = {};
 if (MODO === '--envenenado-baixa-ao-cancelar') trocas['/app.js'] = APP.split(L_CANCELA).join(T_CANCELA);
 if (MODO === '--envenenado-so-hoje') trocas['/app.js'] = APP.split(L_LIMITE).join(T_LIMITE);
 if (MODO === '--envenenado-sem-sugestao') trocas['/app.js'] = APP.split(L_SUGESTAO).join(T_SUGESTAO);
+if (MODO === '--envenenado-sugere-depois') trocas['/app.js'] = APP.split(L_GASTA).join(T_GASTA);
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'l1_pdf_pronto_'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
@@ -80,7 +89,7 @@ const HOJE = '2026-11-16';
 
 // ---------------------------------------------------------------- 0 (Node)
 secao('0. Sem navegador: as âncoras dos venenos e o texto do tutorial');
-[['cancelar', L_CANCELA], ['limite', L_LIMITE], ['sugestão', L_SUGESTAO]]
+[['cancelar', L_CANCELA], ['limite', L_LIMITE], ['sugestão', L_SUGESTAO], ['sugestão gasta', L_GASTA]]
   .forEach(([n, a]) => conf('âncora de veneno uma vez só: ' + n, umaVez(APP, a), true));
 const etapa4 = APP.slice(APP.indexOf("etapa: 'Etapa 4 de 4"), APP.indexOf("etapa: 'Etapa 4 de 4") + 900);
 conf('a etapa 4 do tutorial existe', etapa4.length > 100, true);
@@ -208,6 +217,7 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
       anexos: [], temas: [], areas: [] });
     d.aulas = [
       aula('aula-alfa-cedo', 'alfa', '2026-11-16', '08:00'),        // hoje, já terminou
+      aula('aula-alfa-falta', 'alfa', '2026-11-16', '14:00', 'falta'), // hoje, com falta já registrada
       aula('aula-beta-hoje', 'beta', '2026-11-16', '16:00'),        // hoje, ainda vai acontecer
       aula('aula-alfa-amanha', 'alfa', '2026-11-17', '15:30'),      // amanhã
       aula('aula-beta-cancelada', 'beta', '2026-11-18', '10:00', 'cancelada'),
@@ -231,8 +241,9 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
     conf('envenenado: a aula de amanhã sumiu (defeito enxergado)', ordem1.split(',').indexOf('aula-alfa-amanha') < 0, true);
     throw fim();
   }
-  conf('hoje e os próximos dias, as que vêm primeiro e as de hoje que terminaram no fim',
-    ordem1, 'aula-beta-hoje,aula-alfa-amanha,aula-alfa-quinta,aula-alfa-cedo');
+  conf('hoje (as que vêm e as que terminaram) e depois os próximos dias',
+    ordem1, 'aula-alfa-falta,aula-beta-hoje,aula-alfa-cedo,aula-alfa-amanha,aula-alfa-quinta');
+  conf('a linha da falta diz que a falta está registrada', await detalheDe(pag, 'aula-alfa-falta'), 'Hoje, segunda 16/11, 14:00, falta registrada');
   conf('a linha diz o dia da semana, a data e a hora', await detalheDe(pag, 'aula-alfa-amanha'), 'Amanhã, terça 17/11, 15:30');
   conf('a de hoje diz que é hoje', await detalheDe(pag, 'aula-beta-hoje'), 'Hoje, segunda 16/11, 16:00');
   conf('a de hoje que já terminou diz isso', await detalheDe(pag, 'aula-alfa-cedo'), 'Hoje, segunda 16/11, 08:00, já terminou');
@@ -267,15 +278,16 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   conf('a janela Gerar material abriu de novo', await abrirGerar(pag), true);
   const ordem2 = await ordemProximas(pag);
   console.log('   próximas: ' + ordem2);
-  conf('as aulas dela vêm primeiro', ordem2, 'aula-alfa-amanha,aula-alfa-quinta,aula-alfa-cedo,aula-beta-hoje');
+  conf('as aulas dela vêm primeiro', ordem2, 'aula-alfa-falta,aula-alfa-amanha,aula-alfa-quinta,aula-alfa-cedo,aula-beta-hoje');
   const esc2 = await escolhida(pag);
   if (MODO === '--envenenado-sem-sugestao') {
     secao('VENENO: a próxima aula dela não vem escolhida');
     conf('envenenado: nada escolhido (defeito enxergado)', esc2, '');
     throw fim();
   }
-  conf('a de amanhã, a mais próxima que ainda não aconteceu, vem escolhida', esc2, 'aula-alfa-amanha');
+  conf('a de amanhã, a mais próxima que ainda não aconteceu e sem falta, vem escolhida', esc2, 'aula-alfa-amanha');
   conf('e o Gerar e anexar já pode', await pag.evaluate(() => !document.querySelector('#bib-gerar-anexar').disabled), true);
+  if (PRINTS) await pag.evaluate(() => document.querySelector('#bib-gerar-aulas').scrollIntoView({ block: 'start' }));
   await print(pag, 'L1-2-gerar-material-proximas-aulas.png');
   await pag.evaluate(() => document.querySelector('#bib-gerar-anexar').click());
   const anexou = await esperar('os anexos na aula de amanhã', () => pag.evaluate(() =>
@@ -289,6 +301,33 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   conf('nenhuma outra aula ganhou anexo', await pag.evaluate(() => Store.carregar().then(d =>
     d.aulas.filter(a => a.id !== 'aula-alfa-amanha' && (a.anexos || []).length).length)), 0);
   await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
+  await pausa(300);
+
+  /* DEPOIS DO ANEXO, COM O FILTRO AINDA NA TELA: ela marca outro exercício (o
+   * do próximo aluno, digamos) e abre de novo. Nada pode vir escolhido
+   * sozinho, senão um toque mandaria o material para a aula da Alfa. */
+  conf('marcou outro exercício na mesma tela', await pag.evaluate(() => {
+    const c = Array.from(document.querySelectorAll('#bib-corpo input[data-carrinho]')).find(x => !x.checked);
+    if (!c) return false; c.click(); return true;
+  }), true);
+  await pausa(300);
+  conf('o filtro continua na Alfa', await pag.$eval('#bib-filtro-aluno', e => e.value), 'alfa');
+  conf('a janela Gerar material abriu depois do anexo', await abrirGerar(pag), true);
+  const esc2b = await escolhida(pag);
+  if (MODO === '--envenenado-sugere-depois') {
+    secao('VENENO: depois do anexo, a aula dela volta escolhida sozinha');
+    conf('envenenado: a aula veio escolhida (defeito enxergado)', esc2b, 'aula-alfa-amanha');
+    throw fim();
+  }
+  conf('depois do anexo, nada vem escolhido sozinho', esc2b, '');
+  await pag.evaluate(() => document.querySelector('#rodape-modal-bib-gerar [data-fechar]').click());
+  await pausa(300);
+  await pag.select('#bib-filtro-aluno', '');
+  await pag.select('#bib-filtro-aluno', 'alfa');
+  await pausa(300);
+  conf('a janela abriu de novo', await abrirGerar(pag), true);
+  conf('trocar o filtro devolve a sugestão', await escolhida(pag), 'aula-alfa-amanha');
+  await pag.evaluate(() => document.querySelector('#rodape-modal-bib-gerar [data-fechar]').click());
   await pausa(300);
 
   // ================================================================
@@ -348,13 +387,18 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   await pausa(300);
   conf('o prazo do toque não baixa nada', (await baixados(pag)).length, 0);
   conf('e pede para tocar de novo', negou.valor, 'Toque de novo em compartilhar.');
+  await pag.evaluate(() => { document.querySelector('#aviso').classList.remove('aberto'); document.querySelector('#bib-pdf-compartilhar-gabarito').click(); });
+  const negou2 = await esperar('o aviso da segunda recusa', () => avisoAgora(pag), v => !!v, 5000);
+  await pausa(300);
+  conf('na segunda recusa seguida, sugere baixar, e ainda não baixa nada',
+    negou2.valor + ' | ' + (await baixados(pag)).length, 'O compartilhar não abriu. Toque em baixar para guardar o PDF no tablet. | 0');
 
   // baixar
   await pag.evaluate(() => document.querySelector('#bib-pdf-baixar-gabarito').click());
   await pausa(300);
   const b3 = await baixados(pag);
   conf('baixar baixa exatamente o gabarito', b3.length === 1 && /gabarito.*\.pdf$/.test(b3[0]), true);
-  conf('e diz para onde foi', await avisoAgora(pag), 'O PDF foi para a pasta Downloads do tablet.');
+  conf('e diz para onde foi', await avisoAgora(pag), 'O PDF foi para a pasta Downloads.');
 
   // ver
   await pag.evaluate(() => document.querySelector('#bib-pdf-ver-lista').click());
