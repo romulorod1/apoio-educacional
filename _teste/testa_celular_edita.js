@@ -899,6 +899,28 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('"Voltar" não grava nada: a aula continua às 11:00 do mesmo dia', await pagC.evaluate(() => Store.carregar().then(b => {
     const a = b.aulas.find(x => x.id === 'aula-terceiro'); return a.data + ' ' + a.hora; })), TERCEIRO + ' 11:00');
 
+  /* (#168) Ajustar duração usa a mesma conta de choque do celular: a aula das
+   * 14:00 esticada para 2h30 invade a do Gama às 16:00, e o "não" não grava. */
+  secao('6b2. Ajustar duração que estende e invade a aula seguinte acusa o choque');
+  const id14 = await pagC.evaluate(d => Store.carregar().then(b => {
+    const a = b.aulas.find(x => x.data === d && x.hora === '14:00' && x.alunoId === 'alfa'); return a ? a.id : null; }), TERCEIRO);
+  conf('(arranjo) há a aula das 14:00 de 1h e a do Gama às 16:00 em ' + TERCEIRO, !!id14 && (await pagC.evaluate(d => Store.carregar().then(b =>
+    b.aulas.some(x => x.data === d && x.hora === '16:00' && x.alunoId === 'gama')), TERCEIRO)), true);
+  await irParaDia(pagC, TERCEIRO);
+  await abrirFolha(pagC, id14);
+  await clicar(pagC, '#cel-folha-duracao');
+  await digitar(pagC, '#cel-ajustar-duracao', '150');
+  pagC.recusarProximo = true;
+  const dialogosDuracao = pagC.dialogos.length;
+  await clicar(pagC, '#cel-ajustar-duracao-salvar');
+  await pausa(300);
+  const avisoDuracao = pagC.dialogos.slice(dialogosDuracao).join(' ');
+  conf('esticar para 2h30 pede o sim, citando a aula do Gama às 16:00 ("' + avisoDuracao.slice(0, 120) + '")',
+    /As duas aulas vão ficar no mesmo horário/.test(avisoDuracao) && /Aluno Gama Teste às 16:00/.test(avisoDuracao), true);
+  conf('e o "não" não grava: a aula das 14:00 continua com 1h', await pagC.evaluate(id => Store.carregar().then(b => b.aulas.find(x => x.id === id).duracaoMin), id14), 60);
+  await clicar(pagC, '#cel-folha-voltar');
+  await clicar(pagC, '#cel-folha-fechar');
+
   secao('6c. Remarcar UMA aula da repetição: só esta muda, e o vínculo com a série fica');
   await abrirFolha(pagC, idGama1);
   await clicar(pagC, '#cel-folha-remarcar');
