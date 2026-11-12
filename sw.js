@@ -150,10 +150,10 @@
  * quando os marcadores do PDF são lixo. O v135 traz o assunto de volume do 8º ano no
  * banco/topicos/matematica.json. O v137 inclui o ajuste pontual da duração de uma
  * aula no celular. O v138 traz a leitura contínua dos livros e a exportação por página.
- * O v139 traz os 22 assuntos novos de matemática da revisão dos mapas dos livros no
+ * O v140 traz os 22 assuntos novos de matemática da revisão dos mapas dos livros no
  * banco/topicos/matematica.json.
  */
-var CACHE = 'apoio-educacional-v139';
+var CACHE = 'apoio-educacional-v140';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
