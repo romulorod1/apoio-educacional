@@ -155,9 +155,10 @@
  * O v141 traz os 11 assuntos novos de física da revisão dos mapas dos livros no banco/topicos/fisica.json.
  * O v143 traz o planejamento de estudos com IA: './planejamento.js' entra na
  * lista. O endpoint de IA (/api/ia) só recebe POST, que o fetch abaixo já deixa
- * passar sem cache.
+ * passar sem cache. O v150 traz o assistente só de leitura com IA: './assistente.js'
+ * entra na lista.
  */
-var CACHE = 'apoio-educacional-v143';
+var CACHE = 'apoio-educacional-v150';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -189,6 +190,8 @@ var ARQUIVOS = [
    * e o desenho da folha. Fora da lista, o app.js novo abriria o botão sem o
    * módulo depois de uma atualização sem sinal. */
   './planejamento.js',
+  /* O assistente só de leitura (fase 3): as ferramentas que leem o banco. */
+  './assistente.js',
   './app.js',
   './manifest.webmanifest',
   './icons/icon-192.png',

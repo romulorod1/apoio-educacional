@@ -4203,3 +4203,54 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 #modal-leitor-pdf.leitor-compacto .modal-rodape { flex-wrap: nowrap; }
 #modal-leitor-pdf.leitor-compacto #leitor-compartilhar { flex: 1; }
 /* ==================== planejamento (fim) ==================== */
+
+/* ==================== assistente (IA, fase 3: só leitura) ==================== */
+/* O ícone no alto do tablet, ao lado do olho, com o alvo de 48 px. */
+.olho.assistente-topo { width: 48px; height: 48px; color: var(--navy); }
+.olho.assistente-topo[hidden] { display: none; }
+@media (max-width: 720px) {
+  .olho.assistente-topo { position: absolute; top: 8px; right: 64px; }
+}
+/* No celular, o ícone na linha do dia. No celular estreito, com o
+   assistente na linha, as setas ficam só com a seta (o "1 dia" continua no
+   nome que o leitor de tela lê), para a data não quebrar em três linhas. */
+.cel-semana-topo .cel-abrir-assistente { flex: 0 0 auto; min-width: var(--alvo-celular); min-height: var(--alvo-celular); padding: 0; color: var(--navy); }
+@media (max-width: 380px) {
+  .cel-semana-topo.com-assistente .cel-semana-passo { font-size: 0; min-width: var(--alvo-celular); }
+  .cel-semana-topo.com-assistente .cel-semana-passo .ico { width: 20px; height: 20px; }
+}
+
+.ass-modal { max-width: 640px; height: 88vh; }
+.ass-conversa { display: flex; flex-direction: column; gap: 14px; }
+.ass-vez { display: flex; flex-direction: column; gap: 6px; scroll-margin-top: 8px; }
+.ass-pergunta {
+  align-self: flex-end; max-width: 85%; margin: 0;
+  background: var(--soft); border: 1px solid var(--fio); border-radius: 14px 14px 4px 14px;
+  padding: 8px 12px; font-size: var(--letra-16); color: var(--texto); overflow-wrap: anywhere;
+}
+.ass-resposta { font-size: var(--letra-16); line-height: 1.45; color: var(--texto); overflow-wrap: anywhere; }
+.ass-resposta p { margin: 0 0 4px; }
+.ass-resposta.ass-erro { color: var(--vermelho); margin: 0; }
+.ass-pensando { color: var(--muted); font-style: italic; margin: 0; }
+.ass-entendido { margin: 0; font-size: var(--letra-14); color: var(--muted); }
+.ass-cartao {
+  border: 1px solid var(--fio); border-radius: 12px; padding: 12px; background: var(--branco);
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+}
+.ass-cartao-titulo { font-weight: 600; color: var(--navy); font-size: var(--letra-14); }
+.ass-cartao-linha { font-size: var(--letra-16); overflow-wrap: anywhere; }
+.ass-cartao .ass-telefone { font-weight: 600; }
+.ass-mensagem { margin: 0; padding: 8px 12px; border-left: 3px solid var(--fio); background: var(--soft); border-radius: 4px; font-size: var(--letra-16); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; box-sizing: border-box; }
+.ass-cartao-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.ass-link { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
+.ass-exemplos { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.ass-exemplo { min-height: 48px; text-align: left; white-space: normal; max-width: 100%; }
+.ass-falha { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ass-falha .btn { min-height: 48px; }
+.modal-rodape.ass-rodape { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
+.ass-campo { display: flex; }
+.ass-texto { flex: 1; min-width: 0; min-height: 48px; resize: none; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 10px; box-sizing: border-box; }
+.ass-botoes { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
+.ass-botoes .btn { min-height: 48px; }
+.ass-botoes .esquerda, .ass-botoes .plan-ditar { margin-right: auto; }
+/* ==================== assistente (fim) ==================== */

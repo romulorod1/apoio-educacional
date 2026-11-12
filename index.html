@@ -25,6 +25,8 @@
       <span>Apoio Educacional</span>
     </div>
     <button class="olho" id="alternar-valores" type="button" title="Esconder os valores" aria-label="Esconder os valores" data-icone="olho"></button>
+    <!-- IA, fase 3: o assistente só de leitura. Some sem a conta da nuvem e no observador (app.js, podeUsarAssistente). -->
+    <button class="olho assistente-topo" id="abrir-assistente" type="button" title="Perguntar ao assistente" aria-label="Perguntar ao assistente" data-icone="mic" data-assistente="abrir" hidden></button>
     <!-- B1: o trilho lateral do tablet (o "+" no alto, os quatro destinos e Ajustes no pé).
          Os ganchos das provas ficam: #abas, .aba, .ativa e data-tela.
          O ícone de Ajustes (controles deslizantes) foi desenhado aqui, no traço 1,75 da grade 24,
@@ -633,6 +635,19 @@
     </div>
   </div>
 
+  <!-- IA, fase 3: o assistente só de leitura. A conversa no corpo; o campo,
+       o Ditar e o Perguntar no rodapé, sempre à mão. -->
+  <div class="fundo-modal" id="modal-assistente">
+    <div class="modal ass-modal">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-assistente">Assistente</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-assistente"></div>
+      <div class="modal-rodape ass-rodape" id="rodape-modal-assistente"></div>
+    </div>
+  </div>
+
   <!-- Sair do planejamento (ou da aula nova, pelo atalho) com trabalho que
        ainda não foi salvo: o padrão do modal-sair-relato, sem confirm(). -->
   <div class="fundo-modal" id="modal-sair-planejamento">
@@ -944,6 +959,7 @@
   <!-- O planejamento de estudos com IA: do pedido ao plano e do plano à folha.
        Puro, antes do app.js, e na lista ARQUIVOS do sw.js. -->
   <script src="planejamento.js"></script>
+  <script src="assistente.js"></script>
   <script src="app.js"></script>
 </body>
 

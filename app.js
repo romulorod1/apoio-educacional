@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.63';
+  var VERSAO = '1.42.70';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -1576,7 +1576,8 @@
     'modal-nuvem-senha': true,
     'modal-planejamento': true,
     'modal-sair-planejamento': true,
-    'modal-plan-print': true
+    'modal-plan-print': true,
+    'modal-assistente': true
   };
 
   function abrirModal(id) {
@@ -1636,6 +1637,8 @@
     // o planejamento fechado no meio do "montando" cancela o pedido à IA
     if (id === 'modal-planejamento') pararPlanejamento();
     if (id === 'modal-sair-planejamento') devolverFocoDaPergunta();
+    // o assistente fechado no meio de uma pergunta cancela o pedido
+    if (id === 'modal-assistente') pararAssistente();
     var e = $('#' + id);
     var estavaAberto = e.classList.contains('aberto');
     if (estavaAberto && !fechandoPorVoltar && MODAIS_HISTORICO[id]) {
@@ -2608,6 +2611,7 @@
     desenharFechamento();
     desenharAjustes();
     if (modoCelular) desenharCelular();
+    atualizarBotaoAssistente();
   }
 
   // ================= navegação =================
@@ -2825,6 +2829,7 @@
     $('#enviar-cartao').addEventListener('click', enviarCartaoDoMes);
 
     $('#alternar-valores').addEventListener('click', alternarValores);
+    $('#abrir-assistente').addEventListener('click', function (ev) { abrirAssistente(ev.currentTarget); });
     $('#versao-app').textContent = VERSAO;
     $('#procurar-atualizacao').addEventListener('click', procurarAtualizacao);
 
@@ -25012,15 +25017,10 @@
   }
 
   /* Os horários livres de um dia para uma aula de `duracao` minutos, de meia
-   * em meia hora, pela mesma conta de choque do tablet. */
+   * em meia hora, pela mesma conta de choque do tablet. A conta mora no
+   * core (Core.horariosLivresDoDia), que o assistente também usa. */
   function horariosLivresCelular(data, duracao, ignorarId) {
-    var livres = [];
-    var dur = Number(duracao) || 60;
-    for (var m = INICIO_DIA_CELULAR; m + dur <= FIM_DIA_CELULAR; m += 30) {
-      var hora = horaDeMinutosCelular(m);
-      if (!choquesDaAulaCelular({ id: ignorarId || null, data: data, hora: hora, duracaoMin: dur, status: 'realizada' }).length) livres.push(hora);
-    }
-    return livres;
+    return Core.horariosLivresDoDia(db, data, duracao, ignorarId);
   }
 
   function irParaDiaCelular(dia) {
@@ -25060,6 +25060,11 @@
         diaVagosCelular = h >= semanaVagosCelular && h <= somarDiasCelular(semanaVagosCelular, 5) ? h : semanaVagosCelular;
         irParaTelaCelular('vagos');
       } }));
+    /* IA, fase 3: o assistente, um ícone na barra do dia (o lugar da busca
+     * no padrão 2.1 do benchmark: título, busca, menu). Também no celular que
+     * só lê: perguntar é ler. */
+    var comAssistente = podeUsarAssistente();
+    if (comAssistente) topo.splice(edita ? topo.length - 1 : topo.length, 0, botaoDoAssistente('cel-assistente', 'btn pequeno cel-icone cel-abrir-assistente'));
     var inicio = somarDiasCelular(dia, -Core.diaSemana(dia));
     var dias = [];
     for (var i = 0; i < 7; i++) dias.push(somarDiasCelular(inicio, i));
@@ -25087,7 +25092,7 @@
      * (a medida da auditoria de 09/11: a semana inteira presa, com os
      * avisos, eram 295 px, 35% de 390 x 844). */
     return {
-      faixa: el('div', { class: 'cel-semana', id: 'cel-semana' }, [el('div', { class: 'barra cel-semana-topo' }, topo)]),
+      faixa: el('div', { class: 'cel-semana', id: 'cel-semana' }, [el('div', { class: 'barra cel-semana-topo' + (comAssistente ? ' com-assistente' : '') }, topo)]),
       dias: el('div', { class: 'cel-semana-dias', id: 'cel-semana-dias' }, botoes)
     };
   }
@@ -25788,11 +25793,7 @@
     for (var i = 0; i < 6; i++) dias.push(somarDiasCelular(inicio, i));
     if (!diaVagosCelular || dias.indexOf(diaVagosCelular) < 0) diaVagosCelular = dias.indexOf(hoje) >= 0 ? hoje : dias[0];
     dias.forEach(function (dia) {
-      var vagas = horariosLivresCelular(dia, duracaoVagosCelular).filter(function (hora) {
-        var inicioMinutos = Core.minutosDaHora(hora);
-        return dia >= hoje && inicioMinutos + duracaoVagosCelular <= 20 * 60 &&
-          (dia !== hoje || inicioMinutos >= minutosAgoraCelular());
-      });
+      var vagas = Core.vagasDoDia(db, dia, duracaoVagosCelular, hoje, minutosAgoraCelular());
       var selecionado = dia === diaVagosCelular;
       var conteudo = el('div', { class: 'cel-vagos-conteudo' });
       if (vagas.length) {
@@ -28433,6 +28434,220 @@
   /* Sem internet ou com ela de volta: o Montar acompanha. */
   window.addEventListener('online', function () { if (fluxoPlano && fluxoPlano.estado === 'pedido') desenharPlanejamento(); });
   window.addEventListener('offline', function () { if (fluxoPlano && fluxoPlano.estado === 'pedido') desenharPlanejamento(); });
+
+  // ================= o assistente (IA, fase 3: só leitura) =================
+
+  /* Ela pergunta, falando ou escrevendo; o modelo responde chamando as
+   * ferramentas do assistente.js, que ESTE aparelho executa sobre o banco
+   * local, e os atalhos viram cartões que ela toca. NADA GRAVA: nenhuma
+   * função daqui chama salvar(), comDesfazer ou comoAcaoDoCelular, e as
+   * ferramentas só leem (testa_assistente.js congela o banco e confere).
+   *
+   * A conversa e o histórico da tela ficam só na memória da sessão: fechar a
+   * janela guarda; recarregar o app apaga.
+   *
+   * Quem vê o botão (podeUsarAssistente): quem tem a conta da nuvem entrada,
+   * no tablet, no celular da dona e no celular que só lê (perguntar é ler).
+   * O observador de outra conta não vê; sem a conta, ninguém vê. */
+  var sessaoAssistente = null;      // a conversa com o modelo (Assistente.novaSessao)
+  var historicoAssistente = [];     // o que a tela mostra: [{ pergunta, texto, cartoes, entendido, erro }]
+  var fluxoAssistente = null;       // { vez, texto, pedindo, controle, erro, origem }
+  var vezDoAssistente = 0;
+  var EXEMPLOS_DO_ASSISTENTE = ['O que eu tenho amanhã?', 'Quem não pagou outubro?', 'Avisa a mãe do João que vou atrasar 10 min'];
+
+  function podeUsarAssistente() {
+    if (typeof Assistente === 'undefined' || !db || leOutraConta() || !temNuvem()) return false;
+    var est = Nuvem.estado();
+    return !!(est && est.entrada && est.entrada.uid);
+  }
+  function botaoDoAssistente(id, classe) {
+    return el('button', { type: 'button', class: classe, id: id, 'aria-label': 'Perguntar ao assistente', title: 'Perguntar ao assistente',
+      icone: 'mic', 'data-assistente': 'abrir', aoClick: function (ev) { abrirAssistente(ev.currentTarget); } });
+  }
+  /* O ícone do alto do tablet (ao lado do olho): aparece e some com a conta. */
+  function atualizarBotaoAssistente() {
+    var b = $('#abrir-assistente');
+    if (b) b.hidden = !podeUsarAssistente();
+  }
+
+  /* As ferramentas leem o banco pelo relógio da TELA (Core.hojeIso e os
+   * minutos do celular), e os links são os da ficha mínima do celular. */
+  function contextoDoAssistente() {
+    return {
+      db: db, Core: Core, hoje: Core.hojeIso(), agoraMin: minutosAgoraCelular(),
+      links: {
+        contato: function (a) {
+          return { responsavel: String(a.responsavel || '').trim(), telefone: telefoneDoCampo(a) || telefoneDoAluno(a),
+            endereco: a.local === 'online' ? '' : String(a.endereco || '').trim() };
+        },
+        ligar: function (a) { return linkDeLigar(telefoneDoCampo(a)); },
+        whatsapp: function (a, texto) { return linkDoWhatsapp(telefoneDoCampo(a), texto); },
+        mapa: function (a) { return a.local === 'online' ? '' : linkDoMapa(a.endereco); },
+        familiaACobrar: function (a, hoje) { return familiasACobrarCelular(hoje).filter(function (f) { return f.aluno.id === a.id; })[0] || null; },
+        mensagemDeCobranca: mensagemDeCobrancaCelular
+      }
+    };
+  }
+
+  function abrirAssistente(origem) {
+    if (!podeUsarAssistente()) return;
+    if (!sessaoAssistente) sessaoAssistente = Assistente.novaSessao();
+    vezDoAssistente++;
+    fluxoAssistente = { vez: vezDoAssistente, texto: fluxoAssistente ? fluxoAssistente.texto : '', pedindo: false, controle: null, erro: null,
+      origem: origem || document.activeElement };
+    abrirModal('modal-assistente');
+    desenharAssistente();
+    var c = $('#ass-texto');
+    if (c) c.focus();
+  }
+  /* Fechar: o pedido em curso é cancelado e o ditado para. O que ela já
+   * perguntou continua na memória para a próxima vez. */
+  function pararAssistente() {
+    var f = fluxoAssistente;
+    if (f && f.controle) { try { f.controle.abort(); } catch (e) { /* já parou */ } }
+    if (f) { f.vez = -1; f.pedindo = false; }
+    pararDitado();
+    var origem = f && f.origem;
+    if (origem && !document.body.contains(origem) && origem.id) origem = document.getElementById(origem.id);
+    if (origem && document.body.contains(origem) && typeof origem.focus === 'function') setTimeout(function () { try { origem.focus(); } catch (e) { /* saiu */ } }, 0);
+  }
+
+  function cartaoDoAssistente(c) {
+    var nome = c.nome || '';
+    var link = function (id, texto, href, principal) {
+      var a = { class: 'btn ass-link' + (principal ? ' principal' : ''), id: id, href: href, texto: texto, 'data-cartao': c.tipo };
+      if (!/^tel:/.test(href)) { a.target = '_blank'; a.rel = 'noopener'; }
+      return el('a', a);
+    };
+    var filhos = [];
+    if (c.tipo === 'whatsapp') {
+      filhos.push(el('div', { class: 'ass-cartao-titulo', texto: (c.cobranca ? 'Cobrança para a família de ' : 'Mensagem para a família de ') + nome }));
+      filhos.push(el('blockquote', { class: 'ass-mensagem', texto: c.texto }));
+      filhos.push(link('', 'Abrir no WhatsApp', c.href, true));
+      filhos.push(el('p', { class: 'ajuda u-margem-0', texto: 'Abre a conversa com o texto escrito. Quem envia é você.' }));
+    } else if (c.tipo === 'ligar') {
+      filhos.push(el('div', { class: 'ass-cartao-titulo', texto: 'Ligar para a família de ' + nome }));
+      filhos.push(link('', 'Ligar', c.href, true));
+    } else if (c.tipo === 'mapa') {
+      filhos.push(el('div', { class: 'ass-cartao-titulo', texto: 'Endereço de ' + nome }));
+      filhos.push(link('', 'Abrir no mapa', c.href, true));
+    } else if (c.tipo === 'contato') {
+      filhos.push(el('div', { class: 'ass-cartao-titulo', texto: 'Contato de ' + nome }));
+      filhos.push(el('div', { class: 'ass-cartao-linha', texto: c.responsavel ? 'Responsável: ' + c.responsavel : 'Responsável não informado.' }));
+      filhos.push(el('div', { class: 'ass-cartao-linha ass-telefone', texto: c.telefone ? 'Telefone: ' + c.telefone : 'Sem telefone cadastrado.' }));
+      if (c.endereco) filhos.push(el('div', { class: 'ass-cartao-linha', texto: c.endereco }));
+      var botoes = [c.ligar ? link('', 'Ligar', c.ligar) : null, c.whatsapp ? link('', 'WhatsApp', c.whatsapp) : null, c.mapa ? link('', 'Abrir no mapa', c.mapa) : null].filter(Boolean);
+      if (botoes.length) filhos.push(el('div', { class: 'ass-cartao-botoes' }, botoes));
+    }
+    return el('div', { class: 'ass-cartao', 'data-tipo': c.tipo }, filhos);
+  }
+
+  function desenharAssistente() {
+    var f = fluxoAssistente;
+    var corpo = $('#corpo-modal-assistente'), rodape = $('#rodape-modal-assistente');
+    if (!f || !corpo || !rodape) return;
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    var conversa = el('div', { class: 'ass-conversa', id: 'ass-conversa' });
+    if (!historicoAssistente.length && !f.pedindo) {
+      /* Na primeira pergunta da sessão, três exemplos curtos; depois somem. */
+      conversa.appendChild(el('p', { class: 'ajuda u-margem-0', id: 'ass-dica', texto: 'Pergunte sobre a agenda, os alunos ou o mês. Por exemplo:' }));
+      conversa.appendChild(el('div', { class: 'ass-exemplos', id: 'ass-exemplos' }, EXEMPLOS_DO_ASSISTENTE.map(function (t) {
+        return el('button', { type: 'button', class: 'chip-filtro ass-exemplo', texto: t, aoClick: function () {
+          var c = $('#ass-texto'); if (!c) return;
+          c.value = t; f.texto = t; c.dispatchEvent(new Event('input', { bubbles: true })); c.focus();
+        } });
+      })));
+    }
+    historicoAssistente.forEach(function (h, i) {
+      var vez = el('div', { class: 'ass-vez', id: 'ass-vez-' + i }, [el('p', { class: 'ass-pergunta', texto: h.pergunta })]);
+      if (h.erro) vez.appendChild(el('p', { class: 'ass-resposta ass-erro', texto: h.erro }));
+      else {
+        vez.appendChild(el('div', { class: 'ass-resposta' }, String(h.texto || '').split(/\n+/).map(function (linha) { return el('p', { texto: linha }); })));
+        if (h.entendido && h.entendido.length) vez.appendChild(el('p', { class: 'ass-entendido', texto: 'Entendi: ' + h.entendido.join('; ') + '.' }));
+        (h.cartoes || []).forEach(function (c) { vez.appendChild(cartaoDoAssistente(c)); });
+      }
+      conversa.appendChild(vez);
+    });
+    if (f.pedindo) {
+      conversa.appendChild(el('div', { class: 'ass-vez', id: 'ass-esperando' }, [
+        el('p', { class: 'ass-pergunta', texto: f.perguntaEmCurso }),
+        el('p', { class: 'ass-resposta ass-pensando', texto: 'Procurando no aplicativo...' })
+      ]));
+    }
+    corpo.appendChild(conversa);
+    if (f.erro) {
+      var faixa = el('div', { class: 'faixa-aviso ass-falha', id: 'ass-erro', role: 'alert' }, [el('span', { texto: f.erro.frase })]);
+      if (f.erro.tentar) faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'ass-tentar', texto: 'Tentar de novo', aoClick: function () { perguntarAoAssistente(f.erro.pergunta); } }));
+      corpo.appendChild(faixa);
+    }
+    // o campo, o Ditar e o Perguntar ficam no rodapé: à mão, sem rolar
+    var campo = el('textarea', { id: 'ass-texto', class: 'ass-texto', rows: '2', maxlength: '600', 'aria-label': 'Sua pergunta', placeholder: 'Pergunte ou toque em Ditar' });
+    campo.value = f.texto || '';
+    var semInternet = navigator.onLine === false;
+    var perguntar = el('button', { type: 'button', class: 'btn principal', id: 'ass-perguntar', texto: 'Perguntar',
+      disabled: f.pedindo || !campo.value.trim() || semInternet ? 'disabled' : null, aoClick: function () { perguntarAoAssistente(campo.value); } });
+    campo.addEventListener('input', function () { f.texto = campo.value; perguntar.disabled = f.pedindo || !campo.value.trim() || navigator.onLine === false; });
+    campo.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); if (!perguntar.disabled) perguntar.click(); }
+    });
+    if (f.pedindo) campo.disabled = true;
+    var botoes = [];
+    if (f.pedindo) botoes.push(el('button', { type: 'button', class: 'btn esquerda', id: 'ass-cancelar', texto: 'Cancelar', aoClick: function () { if (f.controle) f.controle.abort(); } }));
+    else { var d = botaoDeDitar(campo, 'ass-ditar'); if (d) botoes.push(d); }
+    botoes.push(perguntar);
+    rodape.appendChild(el('div', { class: 'ass-campo' }, [campo]));
+    rodape.appendChild(el('div', { class: 'ass-botoes' }, botoes));
+    if (semInternet && !f.pedindo) rodape.insertBefore(el('p', { class: 'ajuda u-margem-0', id: 'ass-offline', texto: 'Sem internet: o assistente volta quando a conexão voltar.' }), rodape.firstChild);
+    // a última resposta fica à vista
+    var ultima = $('#ass-esperando') || $('#ass-vez-' + (historicoAssistente.length - 1));
+    if (ultima && ultima.scrollIntoView) ultima.scrollIntoView({ block: 'start' });
+  }
+
+  function perguntarAoAssistente(texto) {
+    var f = fluxoAssistente;
+    var pergunta = String(texto || '').trim();
+    if (!f || f.pedindo || !pergunta || !podeUsarAssistente()) return;
+    pararDitado();
+    var controle = typeof AbortController === 'function' ? new AbortController() : null;
+    var vez = f.vez;
+    f.pedindo = true; f.controle = controle; f.erro = null; f.perguntaEmCurso = pergunta; f.texto = '';
+    desenharAssistente();
+    anunciar('Procurando no aplicativo...');
+    var relogio = setTimeout(function () { if (controle) { controle.signal.motivo = 'prazo'; controle.abort(); } }, PRAZO_DA_IA_MS);
+    var cancelou = function () { return !!(controle && controle.signal.aborted) || fluxoAssistente !== f || f.vez !== vez; };
+    var agoraMin = minutosAgoraCelular();
+    Assistente.perguntar(sessaoAssistente, pergunta, {
+      ctx: contextoDoAssistente(),
+      hora: horaDeMinutosCelular(agoraMin),
+      hojeBrasilia: typeof Planejamento !== 'undefined' ? Planejamento.hojeEmSaoPaulo() : null,
+      cancelado: cancelou,
+      chamar: function (corpoDoPedido) {
+        return chamarIA(corpoDoPedido, controle ? controle.signal : undefined);
+      }
+    }).then(function (r) {
+      clearTimeout(relogio);
+      if (fluxoAssistente !== f || f.vez !== vez) return; // a janela fechou no meio
+      f.pedindo = false; f.controle = null;
+      var codigo = r.erro === 'cancelado' && controle && controle.signal.motivo === 'prazo' ? 'prazo' : r.erro;
+      if (codigo === 'cancelado') { f.texto = pergunta; desenharAssistente(); anunciar('Cancelado.'); var c0 = $('#ass-texto'); if (c0) c0.focus(); return; }
+      if (codigo) {
+        f.texto = pergunta; // a pergunta volta ao campo
+        f.erro = { frase: Assistente.fraseDoErro(codigo), tentar: Assistente.daParaTentarDeNovo(codigo), pergunta: pergunta };
+        desenharAssistente();
+        var c1 = $('#ass-texto'); if (c1) c1.focus();
+        return;
+      }
+      historicoAssistente.push({ pergunta: pergunta, texto: r.texto, cartoes: r.cartoes, entendido: r.entendido });
+      if (historicoAssistente.length > 12) historicoAssistente.shift();
+      desenharAssistente();
+      anunciar(r.texto + (r.entendido.length ? ' Entendi: ' + r.entendido.join('; ') + '.' : ''));
+      var c2 = $('#ass-texto'); if (c2) c2.focus({ preventScroll: true });
+    });
+  }
+
+  window.addEventListener('online', function () { if (fluxoAssistente && !fluxoAssistente.pedindo && $('#modal-assistente.aberto')) desenharAssistente(); });
+  window.addEventListener('offline', function () { if (fluxoAssistente && !fluxoAssistente.pedindo && $('#modal-assistente.aberto')) desenharAssistente(); });
 
   // ================= partida =================
 
