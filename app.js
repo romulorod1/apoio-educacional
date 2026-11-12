@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.70';
+  var VERSAO = '1.42.75';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,9 +85,15 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.70',
+      versao: '1.42.75',
       itens: [
         'No livro aberto, dá para ampliar com dois dedos, em volta do ponto que você está olhando. Dois toques rápidos ampliam o trecho tocado, e outros dois voltam à largura da tela. A caneta não muda o zoom, e os botões de zoom continuam lá.'
+      ]
+    },
+    {
+      versao: '1.42.68',
+      itens: [
+        'Na ficha de cada aluno, em Planejamentos, toque em Novo planejamento, cole ou dite o aviso de provas da escola e anexe os prints. O aplicativo monta um PDF com os dias de estudo, as provas e as suas aulas; você confere, ajusta se quiser e compartilha com a família. Precisa de internet. Também dá para começar pelo link na janela de marcar aula.'
       ]
     },
     {
