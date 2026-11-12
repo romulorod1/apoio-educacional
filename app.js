@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.60';
+  var VERSAO = '1.42.64';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,9 +85,15 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.60',
+      versao: '1.42.64',
       itens: [
         'No tablet, a janela da aula organiza os campos em duas colunas; os mesmos campos e ações continuam disponíveis.'
+      ]
+    },
+    {
+      versao: '1.42.60',
+      itens: [
+        'Em Matemática entraram 22 assuntos novos, para escolher na aula e procurar na Biblioteca: 14 do 6º ao 9º ano (como construções geométricas, simetria, contagem e juros compostos) e 8 do ensino médio (como lógica, geometria de posição, equações trigonométricas e derivada).'
       ]
     },
     {
