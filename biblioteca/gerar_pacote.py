@@ -2131,10 +2131,14 @@ def confere_versao_do_pymupdf(versao=None):
 # biblioteca/livros.py) nao recorta nada: le a planilha dos livros, aplica o
 # teto de 160 MB por livro e monta o pacote com o sumario de cada um, no mesmo
 # contrato (manifest com hash de todo arquivo, zip deterministico, secao 8j).
-TIPOS_DE_FONTE = ('portal', 'mirim', 'enem', 'livros')
+# "cadernos-sme-sp" (C5, biblioteca/cadernos_sme.py) sao os Cadernos de Apoio e
+# Aprendizagem da SME-SP, 2o ao 9o ano, com o assunto de cada atividade lido de
+# um csv de vinculos (--vinculos), feito por leitura.
+TIPOS_DE_FONTE = ('portal', 'mirim', 'enem', 'livros', 'cadernos-sme-sp')
 # o que cada tipo exige; o resto da linha de comando vale para todos
 OBRIGATORIOS_POR_FONTE = {'portal': ('pdfs', 'serie', 'curadoria'), 'mirim': ('pdfs', 'serie', 'curadoria'),
-                          'enem': ('pdfs', 'serie', 'curadoria'), 'livros': ('planilha', 'rotulo')}
+                          'enem': ('pdfs', 'serie', 'curadoria'), 'livros': ('planilha', 'rotulo'),
+                          'cadernos-sme-sp': ('pdfs', 'vinculos', 'curadoria')}
 
 
 def principal(argv=None):
@@ -2146,7 +2150,10 @@ def principal(argv=None):
     ap.add_argument('--fonte', default='portal', choices=TIPOS_DE_FONTE,
                     help='tipo de fonte: portal (padrao, a pasta de uma serie do Portal), mirim (a pasta '
                          'PDF/matematica/obmep-mirim, com --serie m1 ou m2) ou enem (a pasta PDF/provas/enem, com '
-                         '--serie 3em) ou livros (a planilha dos livros, com --planilha e --rotulo)')
+                         '--serie 3em) ou livros (a planilha dos livros, com --planilha e --rotulo) ou '
+                         'cadernos-sme-sp (a pasta PDF/matematica/cadernos-apoio-sme-sp, com --vinculos; --serie '
+                         'opcional, por exemplo 2ano,3ano)')
+    ap.add_argument('--vinculos', help='com --fonte cadernos-sme-sp: o csv id;tema;exclusao;quem;justificativa')
     ap.add_argument('--pdfs', help='a pasta dos PDFs (com --fonte livros: a pasta de onde a coluna Arquivo parte; '
                                    'padrao, a pasta da planilha)')
     ap.add_argument('--serie')
@@ -2193,6 +2200,25 @@ def principal(argv=None):
                                 ('--mapas', a.mapas), ('--conferencia', a.conferencia)) if v]
     if a.fonte != 'livros' and so_livros:
         raise SystemExit('erro: %s so vale com --fonte livros' % ', '.join(so_livros))
+    if a.fonte != 'cadernos-sme-sp' and a.vinculos:
+        raise SystemExit('erro: --vinculos so vale com --fonte cadernos-sme-sp')
+    if a.fonte == 'cadernos-sme-sp':
+        extras = [o for o, v in (('--kits', a.kits), ('--listas', a.listas), ('--listas-aula', a.listas_aula),
+                                 ('--lista-de-base', a.lista_de_base), ('--modulos', a.modulos),
+                                 ('--anterior', a.anterior), ('--fontes-negrito', a.fontes_negrito)) if v]
+        if extras:
+            raise SystemExit('erro: %s nao vale com --fonte cadernos-sme-sp' % ', '.join(extras))
+        import cadernos_sme
+        series = [s for s in (a.serie or '').split(',') if s] or None
+        if series and any(s not in cadernos_sme.TOM for s in series):
+            raise SystemExit('erro: com --fonte cadernos-sme-sp, --serie e uma lista de 2ano a 9ano: %r' % a.serie)
+        manifest, rel, trab = cadernos_sme.gerar(a.pdfs, a.vinculos, a.versao, a.saida, a.curadoria, a.trabalho,
+                                                 a.gerado_em, a.commit, not a.sem_zip, series)
+        print(json.dumps({'contagens': manifest['contagens'], 'zip': rel['zip'], 'bytes_por_tipo': rel['bytes_por_tipo'],
+                          'excluidos': len(rel['excluidos']), 'fora_do_alvo': len(rel['fora_do_alvo']),
+                          'sem_vinculo': len(rel['sem_vinculo']), 'segundos': rel['segundos'], 'trabalho': trab},
+                         ensure_ascii=False, indent=1))
+        return
     if a.fonte == 'livros':
         # nada de recorte, lista pronta nem curadoria: num pacote de livros essas
         # opcoes nao teriam efeito, e efeito calado e pior que recusa

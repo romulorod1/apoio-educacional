@@ -681,6 +681,82 @@ function gerarProva(saida, opcoes) {
   return { zip, manifest, itens, arquivos };
 }
 
+/* Pacote sintético dos CADERNOS DE APOIO da SME-SP (item C5 da frente
+ * "Listas de exercícios"), no formato do biblioteca/cadernos_sme.py: um
+ * pacote só com DUAS séries (3º e 7º ano), o módulo é o assunto do aplicativo
+ * (tema_app), a aula é o caderno, sem solução e sem dificuldade (null), e os
+ * campos aditivos que esta versão do aplicativo não conhece: tom, licenca,
+ * atribuicao, origem_detalhe e tema_origem. A atribuição curta vai em
+ * origem_citada, que o aplicativo já desenha. Recortes de retângulos, como o
+ * resto deste arquivo: nenhum texto do caderno. */
+const ASSUNTOS_CADERNOS = [
+  ['3ano', 'MAT03-02', 'Adição com reagrupamento', 'lúdico'],
+  ['3ano', 'MAT03-11', 'Relógio e calendário', 'lúdico'],
+  ['7ano', 'MAT07-08', 'Sequências e regularidades', 'escolar']
+];
+
+function gerarCadernos(saida, opcoes) {
+  opcoes = opcoes || {};
+  const versao = opcoes.versao || 1;
+  const arquivos = {}, itens = [], docs = [];
+  const nomeSerie = { '3ano': '3º ano', '7ano': '7º ano' };
+  let numero = 0;
+  ASSUNTOS_CADERNOS.forEach(([serie, tema, titulo, tom], k) => {
+    const slug = 'sme-' + titulo.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const aula = { slug: 'cadernos-sme-sp-' + serie, titulo: 'Cadernos de Apoio e Aprendizagem, ' + nomeSerie[serie], n: Number(serie[0]) };
+    for (let j = 0; j < 2; j++) {
+      numero++;
+      const pagina = 20 + numero * 3;
+      const id = `sme:${serie}:p${String(pagina).padStart(3, '0')}`;
+      const base = `assets/${serie}/${slug}/${aula.slug}/ex-${String(numero).padStart(3, '0')}`;
+      const alt = 160 + j * 40;
+      arquivos[base + '.svg'] = { dados: Buffer.from(svgRecorte(420, alt, numero, '#3B6EA8')), metodo: 8 };
+      const atividade = 'Atividade sintética ' + numero;
+      const it = { id, fonte: 'cadernos-sme-sp', serie, modulo: { slug, titulo }, aula, numero, titulo: atividade,
+        formato: 'aberta', alternativas: null, resposta: null, subitens: ['1', '2'],
+        texto: 'atividade sintetica ' + numero + ' de ' + titulo.toLowerCase(),
+        origem_citada: `Cadernos de Apoio e Aprendizagem, SME-SP, ${nomeSerie[serie]}, p. ${pagina}. Licença não comercial (Decreto 52.681/2011)`,
+        dificuldade: null, dificuldade_origem: null, proxy: null, tema_app: tema, tema_origem: 'leitura', tom,
+        licenca: 'Uso não comercial, com atribuição e pela mesma licença (Decreto municipal 52.681/2011 de São Paulo; equivale a CC BY-NC-SA). Recorte fiel, sem alteração.',
+        atribuicao: `Cadernos de Apoio e Aprendizagem: Matemática, ${nomeSerie[serie]} (SME-SP, 2014), p. ${pagina}, atividade "${atividade}".`,
+        origem_detalhe: { caderno: 'Cadernos de Apoio e Aprendizagem: Matemática', ano: nomeSerie[serie], volume: 'único',
+          edicao: '2ª edição revisada e atualizada, SME-SP, 2014', paginas: [pagina], unidade: 1, atividade, questao: null },
+        assets: { enunciado: base + '.svg', solucao: null },
+        medidas: { enunciado: { largura_pt: 420, altura_pt: alt, rotulo: null }, solucao: null },
+        sem_solucao: true,
+        origem: { arquivo: `PDF/sintetico/cadernos/Aluno${serie[0]}Ano.pdf`, enunciado: { pagina: pagina + 1, coluna: 1, bbox: [90, 80, 510, 80 + alt] } } };
+      itens.push(it);
+      docs.push({ id, serie, tipo: 'exercicio', titulo: aula.titulo + ', ' + atividade, resumo: titulo + ' ' + aula.titulo, texto: it.texto });
+    }
+    docs.push({ id: serie + ':' + slug, serie, tipo: 'modulo', titulo, resumo: aula.titulo, texto: '' });
+  });
+  docs.sort((a, b) => a.id < b.id ? -1 : 1);
+  const indice = Busca.montarIndice(docs.map(d => ({ id: d.id, serie: d.serie, titulo: d.titulo, resumo: d.resumo, explicacao: '', enunciados: d.texto })));
+  const tipos = {}; docs.forEach(d => { tipos[d.id] = d.tipo; });
+  indice.forEach(r => { r.k = tipos[r.i]; });
+  arquivos['itens.json'] = { dados: json(itens), metodo: 8 };
+  arquivos['teoria.json'] = { dados: json([]), metodo: 8 };
+  arquivos['busca.json'] = { dados: json({ formato: 'indice-de-busca', versao: 1, tipos: { k: 'modulo, teoria ou exercicio' }, temas: indice }), metodo: 8 };
+  arquivos['apelidos.json'] = { dados: json({}), metodo: 0 };
+  const nomes = Object.keys(arquivos).sort();
+  const lista = {};
+  nomes.forEach(n => { lista[n] = sha(arquivos[n].dados); });
+  const manifest = { esquema: 1, pacote: 'matematica-sintetico-cadernos-sme-sp', versao,
+    gerado_em: '2026-11-13T12:00:00-03:00', gerador: { nome: '_teste/_pacote_sintetico.js', commit: null, pymupdf: '1.27.2.3' },
+    materia: 'matematica',
+    fonte: { id: 'cadernos-sme-sp', nome: 'Cadernos de Apoio e Aprendizagem, SME-SP (sintético)', url: 'https://example.invalid/',
+      licenca: 'licença livre para uso não comercial (Decreto municipal 52.681/2011); gerado para teste' },
+    series: ['3ano', '7ano'],
+    licenca: 'campo aditivo do C5', tom: { '3ano': 'lúdico', '7ano': 'escolar' },
+    contagens: { modulos: ASSUNTOS_CADERNOS.length, aulas_teoria: 0, paginas_teoria: 0, aulas_exercicios: ASSUNTOS_CADERNOS.length,
+      itens: itens.length, itens_com_solucao: 0, itens_excluidos: 0 },
+    arquivos: lista };
+  const zip = montarZip([{ nome: 'manifest.json', dados: json(manifest), metodo: 8 }]
+    .concat(nomes.map(n => ({ nome: n, dados: arquivos[n].dados, metodo: arquivos[n].metodo }))));
+  if (saida) fs.writeFileSync(saida, zip);
+  return { zip, manifest, itens, arquivos };
+}
+
 /* Pacote sintético da SONDAGEM (C5), para o testa_sondagem_navegador.
  *
  * A regra de escolha da sondagem mora no core.js como prefixo de id
@@ -773,7 +849,7 @@ function gerarSondagem(saida, opcoes) {
 
 const VENENOS = ['corrompido-deflate', 'corrompido-stored', 'hash', 'sobrando', 'faltando', 'asset-citado', 'esquema', 'asset-fora'];
 
-module.exports = { gerar, gerarBanco, gerarProva, ASSUNTOS_PROVA, gerarSondagem, montarZip, crc32, VENENOS, MODULOS, MODULOS_SONDAGEM, KITS, LISTAS, LISTA_BASE, EXCLUSOES };
+module.exports = { gerar, gerarBanco, gerarProva, ASSUNTOS_PROVA, gerarCadernos, ASSUNTOS_CADERNOS, gerarSondagem, montarZip, crc32, VENENOS, MODULOS, MODULOS_SONDAGEM, KITS, LISTAS, LISTA_BASE, EXCLUSOES };
 
 if (require.main === module) {
   const saida = process.argv[2];

@@ -554,6 +554,12 @@ roda "biblioteca mirim --envenenado-equivalentes" node "_teste/testa_biblioteca_
 # e o "Diversos" das provas nao vira assunto da aula: o veneno trata todo modulo
 # de prova como assunto
 roda "biblioteca mirim --envenenado-diversos"   node "_teste/testa_biblioteca_mirim.js" --envenenado-diversos
+# C5: o pacote dos Cadernos de Apoio da SME-SP (campos novos tom, licenca,
+# atribuicao e dificuldade nula) importa sem mudar o app, os assuntos viram
+# modulos do 3o e do 7o ano e a atribuicao aparece em cada cartao. O veneno
+# serve o app.js sem a origem no cartao.
+roda "biblioteca cadernos sme"                 node "_teste/testa_biblioteca_cadernos_sme.js"
+roda "biblioteca cadernos sme --envenenado-sem-origem" node "_teste/testa_biblioteca_cadernos_sme.js" --envenenado-sem-origem
 # FRENTE B: selecionar e compor. Sem navegador, o compositor do pdf.js (lista
 # renumerada, gabarito separado, sem solucao escrito, quebra entre pedacos, marca
 # por cima so nesta folha e os outros documentos byte a byte iguais aos de main).
@@ -1284,6 +1290,11 @@ roda "banco da biblioteca"                      python biblioteca/_prova_banco.p
 # C12: o tipo de fonte provas (OBMEP Mirim e ENEM), sobre provas sinteticas dos
 # dois formatos, com um veneno por regra do detector. A fidelidade e no Chrome.
 roda "provas da biblioteca"                     python biblioteca/_prova_provas.py
+# C5: o tipo de fonte cadernos-sme-sp (Cadernos de Apoio da SME-SP), sobre um
+# caderno sintetico: indice em duas colunas, atividade que atravessa a pagina,
+# foto com credito de terceiro (sai), duas colunas, revisao por questao. A
+# fidelidade e no Chrome.
+roda "cadernos sme da biblioteca"               python biblioteca/_prova_cadernos_sme.py
 # Daqui ate o fim da secao, nada abre Chrome (conferido com CHROME envenenado
 # em 26/10): o --rapido roda. O _prova_gerador e o _prova_banco acima ficam no
 # navegador porque a trava de fidelidade dos dois renderiza o SVG no Chrome
