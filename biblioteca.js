@@ -1129,7 +1129,9 @@
    *   teoria    as aulas de teoria (teoria.json);
    *   listas    as listas prontas (kits.json, ou as do app, que já trazem `ids`);
    *   vinculos  a tabela da C1: linhas { assunto, item } ou { assunto, teoria }
-   *             ou { assunto, lista } ou { assunto, modulo }.
+   *             ou { assunto, lista } ou { assunto, modulo }, ou as linhas do
+   *             vinculos-exercicios-C1.csv lidas como estão ({ pacote, item_id,
+   *             ano, assuntos, confianca, justificativa }).
    *
    * Devolve { assunto, titulo, serie, teoria: [], listaBase: null|{...},
    * exercicios: [], obmep: [], vazio: null|{ motivo, texto } }. Cada fonte tem
@@ -1158,6 +1160,21 @@
     return 'Exercício ' + it.numero;
   }
 
+  /* Uma linha da tabela de vínculos vale para o assunto? Duas formas:
+   *   { assunto, item|teoria|lista|modulo }, a de uma linha por vínculo;
+   *   { item_id, assuntos, confianca }, a linha do vinculos-exercicios-C1.csv
+   *     (Biblioteca\curadoria, no Drive), com os assuntos separados por "|"
+   *     (ou já em lista). Dessa, só a confiança alta e a média entram, como o
+   *     LEIA-ME da tabela pede; a baixa fica para conferência. */
+  var CONFIANCA_QUE_VALE = { alta: true, 'média': true, media: true };
+  function vinculoValeParaOAssunto(v, id) {
+    if (v.confianca !== undefined && v.confianca !== null &&
+        !CONFIANCA_QUE_VALE[String(v.confianca).trim().toLowerCase()]) return false;
+    if (v.assunto !== undefined) return v.assunto === id;
+    var lista = Array.isArray(v.assuntos) ? v.assuntos : String(v.assuntos || '').split('|');
+    return lista.some(function (a) { return String(a).trim() === id; });
+  }
+
   function fontesDoAssunto(assuntoId, opcoes) {
     var o = opcoes || {};
     var id = typeof assuntoId === 'string' ? assuntoId : '';
@@ -1180,9 +1197,10 @@
     if (tema) ligarModulo(tema.modulo, 'modulo');
     var porItem = Object.create(null), porTeoria = Object.create(null), porLista = Object.create(null);
     (Array.isArray(o.vinculos) ? o.vinculos : []).forEach(function (v) {
-      if (!v || v.assunto !== id || !id) return;
+      if (!v || !id || !vinculoValeParaOAssunto(v, id)) return;
       ligarModulo(v.modulo, 'curadoria');
-      if (typeof v.item === 'string') porItem[v.item] = 'curadoria';
+      var item = typeof v.item === 'string' ? v.item : v.item_id;
+      if (typeof item === 'string') porItem[item] = 'curadoria';
       if (typeof v.teoria === 'string') porTeoria[v.teoria] = 'curadoria';
       if (typeof v.lista === 'string') porLista[v.lista] = 'curadoria';
     });

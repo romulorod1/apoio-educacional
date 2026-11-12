@@ -23,7 +23,8 @@
  *   5. assunto de série sem livro (MAT04-09, 4º ano): a Mirim aparece, sem
  *      teoria e sem exercício avulso, e sem vazio;
  *   6. a tabela de vínculos da C1 (opcoes.vinculos) liga um problema do Banco
- *      ao assunto, pela camada 'curadoria';
+ *      ao assunto, pela camada 'curadoria'; e a linha do CSV da C1, no formato
+ *      dele e com dados sintéticos, entra só com confiança alta ou média;
  *   7. pura: não mexe na entrada e dá o mesmo resultado duas vezes;
  *   8. O VENENO: o mesmo item repetido na entrada, e ligado ao assunto pelas
  *      três camadas, aparece UMA vez só.
@@ -209,6 +210,20 @@ conf('o módulo ligado pela tabela traz as questões dele', comC1.obmep.filter(q
 conf('a Mirim vem antes do Banco', comC1.obmep.map(q => q.fonte).join(','), 'obmep-mirim,obmep-mirim,obmep-banco');
 conf('a linha de outro assunto não entra', comC1.obmep.some(q => q.id === 'banco:2019:n2:1'), false);
 conf('o resto não muda', comC1.exercicios.length + ' ' + comC1.teoria.length, '48 4');
+// as linhas do vinculos-exercicios-C1.csv como estão (pacote;item_id;ano;assuntos;confianca;justificativa),
+// com dados sintéticos: a tabela de verdade fica no Drive e não entra no repositório
+const LINHA = (item, assuntos, confianca) => ({ pacote: 'matematica-sintetico-banco-n2', item_id: item, ano: '9º ano',
+  assuntos, confianca, justificativa: 'linha sintética da prova' });
+const csv = F('MAT09-04', Object.assign({}, ACERVO, { vinculos: [
+  LINHA('banco:2020:n2:1', 'MAT05-07|MAT09-04', 'alta'),
+  LINHA('banco:2020:n2:2', 'MAT09-04', 'média'),
+  LINHA('banco:2020:n2:3', 'MAT09-04', 'baixa'),
+  LINHA('banco:2020:n2:5', '', 'alta'),
+  LINHA('banco:2020:n2:6', 'MAT09-05', 'alta')
+] }));
+conf('na linha da C1, alta e média entram, inclusive como segundo assunto', ids(csv.obmep).join(','), 'banco:2020:n2:1,banco:2020:n2:2');
+conf('a baixa, a sem assunto e a de outro assunto ficam fora', csv.obmep.some(q => /:(3|5|6)$/.test(q.id)), false);
+conf('e entram pela curadoria', csv.obmep.map(q => q.vinculo).join(','), 'curadoria,curadoria');
 
 // ================================================================
 secao('7. Pura: não mexe na entrada e repete o resultado');
