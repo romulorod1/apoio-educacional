@@ -399,9 +399,14 @@
       linhas.push(contas.deOutroPacote.length + (contas.deOutroPacote.length === 1 ? ' livro ficou' : ' livros ficaram') +
         ' como estava, porque já veio de outro pacote.');
     }
-    if (contas.posicoesSoltas) {
-      linhas.push(contas.posicoesSoltas + (contas.posicoesSoltas === 1 ? ' livro atualizado mudou' : ' livros atualizados mudaram') +
-        ' de sumário e vai abrir no começo.');
+    /* Desde a fase 1a da nuvem a posição de leitura não sai mais quando o
+     * sumário muda. Ela só ANDA quando a página dela deixou de existir no
+     * arquivo novo (vai para a última) ou o EPUB virou PDF sem a página
+     * conhecida (vai para a primeira), e o leitor avisa onde ela estava. */
+    if (contas.posicoesAjustadas) {
+      linhas.push(contas.posicoesAjustadas === 1 ?
+        '1 livro atualizado não abre mais onde você parou; ao abrir, ele diz onde você estava.' :
+        contas.posicoesAjustadas + ' livros atualizados não abrem mais onde você parou; ao abrir, cada um diz onde você estava.');
     }
     return linhas;
   }
@@ -414,38 +419,203 @@
    * correção mora no aplicativo (app.js, db.ajustes.mapaDosLivros) e vai na
    * cópia de segurança.
    *
-   * `correcoes` é { <n do capítulo>: { titulo, assuntos: [ids], acao, quando } }
-   * de UM livro. A correção só vale para o capítulo de mesmo número E mesmo
-   * título: se um pacote novo renumerar o sumário, a correção velha não cai
-   * calada no capítulo vizinho.
+   * `correcoes` é { <chave>: { titulo, assuntos: [ids], acao, quando, n?, chave? } }
+   * de UM livro. A <chave> do objeto é o número do capítulo (String(n)), como
+   * sempre foi, para o aparelho com a versão antiga ler como hoje; só quando
+   * esse número já guarda outra correção dela a nova vai para "<n>~<algo>"
+   * (chaveParaGravarCorrecao), que a versão antiga não procura e não estraga.
    *
-   * Devolve uma lista de { n, titulo, pagina, pagina_fim, capitulo,
-   * capitulo_fim, ancora, assuntos: [ids], origem, estado }, com estado
+   * Desde a fase 1a da biblioteca na nuvem (12/11/2026), a correção não se
+   * perde quando o mapa muda (resolverCorrecoes): ela casa com UMA entrada do
+   * mapa, nesta ordem, e a que não casa com nada fica ÓRFÃ, à vista dela na
+   * tela do livro (correcoesOrfas), e nunca é apagada nem aplicada no
+   * capítulo vizinho. Nada disto grava no db: a resolução é feita a cada
+   * leitura.
+   *
+   * Devolve uma lista de { n, chave, titulo, pagina, pagina_fim, capitulo,
+   * capitulo_fim, ancora, assuntos: [ids], origem, estado, correcaoChave },
+   * com estado
    *   'a_confirmar' do passe automático, sem palavra dela ainda;
    *   'do_mapa'     do mapa da orquestradora, sem palavra dela;
    *   'confirmado'  ela confirmou o que o mapa dizia;
-   *   'corrigido'   ela escolheu outro assunto (ou nenhum). */
+   *   'corrigido'   ela escolheu outro assunto (ou nenhum).
+   * `correcaoChave` é a chave da correção que vale ali (null sem correção):
+   * é nela que a próxima palavra dela sobre esse capítulo é gravada. */
   function mapaDoLivro(meta, correcoes) {
-    var mapa = meta && Array.isArray(meta.mapa) ? meta.mapa : [];
-    correcoes = correcoes || {};
-    var saida = [];
-    mapa.forEach(function (e) {
-      if (!e || !inteiro(e.n) || typeof e.titulo !== 'string') return;
+    var r = resolverCorrecoes(meta, correcoes);
+    return r.entradas.map(function (e) {
       var ids = (Array.isArray(e.assuntos) ? e.assuntos : []).map(function (a) { return a && a.id; })
         .filter(function (id) { return typeof id === 'string' && id; });
-      var c = Object.prototype.hasOwnProperty.call(correcoes, String(e.n)) ? correcoes[String(e.n)] : null;
-      var vale = !!c && c.titulo === e.titulo && Array.isArray(c.assuntos);
-      saida.push({
-        n: e.n, titulo: e.titulo, pagina: e.pagina, pagina_fim: e.pagina_fim, capitulo: e.capitulo,
+      var casada = r.porN[e.n] || null;
+      var c = casada ? casada.correcao : null;
+      return {
+        n: e.n, chave: typeof e.chave === 'string' && e.chave ? e.chave : null,
+        titulo: e.titulo, pagina: e.pagina, pagina_fim: e.pagina_fim, capitulo: e.capitulo,
         capitulo_fim: e.capitulo_fim, ancora: e.ancora || null, obraInteira: !!e.obra_inteira,
         // o gabarito do capítulo (C15.5), do gerador; a correção dela não mexe nele
         gabarito: gabaritoDaEntrada(meta, e),
-        assuntos: vale ? c.assuntos.filter(function (id) { return typeof id === 'string' && id; }) : ids,
+        assuntos: c ? c.assuntos.filter(function (id) { return typeof id === 'string' && id; }) : ids,
         origem: e.origem === 'auto' ? 'auto' : 'mapa',
-        estado: vale ? (c.acao === 'corrigiu' ? 'corrigido' : 'confirmado') : (e.origem === 'auto' ? 'a_confirmar' : 'do_mapa')
+        estado: c ? (c.acao === 'corrigiu' ? 'corrigido' : 'confirmado') : (e.origem === 'auto' ? 'a_confirmar' : 'do_mapa'),
+        correcaoChave: casada ? casada.chave : null
+      };
+    });
+  }
+
+  /* O título comparado sem acento, sem caixa e sem espaço sobrando: a
+   * correção de acento ("Fracoes" para "Frações") não separa a correção dela
+   * do capítulo. */
+  function tituloNormalizado(t) {
+    return String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  // o número do capítulo que a correção diz: o `n` gravado nela, ou a chave do objeto quando é só o número
+  function numeroDaCorrecao(k, c) {
+    if (inteiro(c.n)) return c.n;
+    return /^\d+$/.test(k) ? parseInt(k, 10) : null;
+  }
+
+  /* A tabela de herança de títulos do livro (meta.heranca_titulos, que o
+   * gerador copia de revisao-mapas/L1/HERANCA_L1.json): os títulos que eram
+   * lixo de origem no mapa antigo (nome de arquivo, "pageN") e o título
+   * impresso que os substituiu, com a página do arquivo onde a entrada antiga
+   * começava. A faixa antiga de cada título vai do começo dele até a página
+   * antes do começo seguinte da tabela (o último, até o fim do livro). */
+  function herancaDoLivro(meta) {
+    var lista = (meta && Array.isArray(meta.heranca_titulos) ? meta.heranca_titulos : []).filter(function (h) {
+      return h && typeof h.titulo_antigo === 'string' && h.titulo_antigo && typeof h.titulo_novo === 'string' &&
+        inteiro(h.pag_arquivo_inicio_antiga) && h.pag_arquivo_inicio_antiga >= 1;
+    });
+    var inicios = lista.map(function (h) { return h.pag_arquivo_inicio_antiga; }).sort(function (a, b) { return a - b; });
+    var total = meta && inteiro(meta.paginas) ? meta.paginas : Infinity;
+    return lista.map(function (h) {
+      var ini = h.pag_arquivo_inicio_antiga;
+      var seguinte = inicios.filter(function (p) { return p > ini; })[0];
+      return { antigo: tituloNormalizado(h.titulo_antigo), ini: ini, fim: seguinte ? seguinte - 1 : total };
+    });
+  }
+
+  /* Casa cada correção dela com uma entrada do mapa de agora. A ordem:
+   *   1. a mesma `chave` de capítulo (a chave estável que o gerador dá a cada
+   *      entrada e reaproveita a cada geração), com UMA entrada dessa chave;
+   *   2. o mesmo número E o mesmo título (a regra de antes, para as correções
+   *      gravadas sem chave);
+   *   3. o mesmo título normalizado em UMA entrada só (o Praticando 9 de
+   *      12/11/2026: um capítulo entrou no meio e os de depois andaram um
+   *      número; com dois capítulos do mesmo título, nenhum: fica órfã);
+   *   4. a herança de títulos (herancaDoLivro): o título dela era um título
+   *      antigo da tabela, e cai no capítulo novo que começa DENTRO da faixa
+   *      antiga e tem o MESMO assunto que ela escolheu, quando há um só. Com
+   *      dois, com nenhum, ou sem assunto escolhido ("nenhum"), fica órfã. A
+   *      herança não cai pelo começo da faixa nem pelo título novo da
+   *      tabela: na unidade 8 do Geração Alpha 7 e 9 a tabela diz "Medições"
+   *      e "Algumas grandezas" (o primeiro capítulo), e o volume está no
+   *      seguinte.
+   * Uma entrada recebe UMA correção. A que chega a uma entrada já tomada
+   * segue para os passos seguintes; se no fim não acha outra, fica órfã
+   * (motivo 'repetida'), menos quando diz o mesmo que a que ficou (mesmos
+   * assuntos e mesma ação), que então não tem o que mostrar. Dentro de cada
+   * passo, a mais recente (`quando`) escolhe primeiro.
+   * Devolve { entradas, porN: { <n>: { chave, correcao, como } }, orfas: [...] }. */
+  function resolverCorrecoes(meta, correcoes) {
+    var entradas = (meta && Array.isArray(meta.mapa) ? meta.mapa : []).filter(function (e) {
+      return !!e && inteiro(e.n) && typeof e.titulo === 'string';
+    });
+    var todas = correcoes && typeof correcoes === 'object' ? correcoes : {};
+    var validas = Object.keys(todas).filter(function (k) {
+      var c = todas[k];
+      return !!c && typeof c === 'object' && typeof c.titulo === 'string' && Array.isArray(c.assuntos);
+    });
+    validas.sort(function (a, b) {
+      var qa = String(todas[a].quando || ''), qb = String(todas[b].quando || '');
+      return qa < qb ? 1 : qa > qb ? -1 : (a < b ? -1 : a > b ? 1 : 0);
+    });
+    var porN = {}, feitas = {}, absorvidas = {};
+    var idsDe = function (e) {
+      return (Array.isArray(e.assuntos) ? e.assuntos : []).map(function (a) { return a && a.id; })
+        .filter(function (id) { return typeof id === 'string' && id; });
+    };
+    var mesmoQueODaEntrada = function (c, n) {
+      var outra = porN[n].correcao;
+      return (outra.acao === 'corrigiu') === (c.acao === 'corrigiu') &&
+        outra.assuntos.slice().sort().join('|') === c.assuntos.slice().sort().join('|');
+    };
+    var heranca = herancaDoLivro(meta);
+    var passos = [
+      ['chave', function (k, c) {
+        if (typeof c.chave !== 'string' || !c.chave) return [];
+        return entradas.filter(function (e) { return e.chave === c.chave; });
+      }],
+      ['numero', function (k, c) {
+        return entradas.filter(function (e) {
+          var mesmoNumeroETitulo = numeroDaCorrecao(k, c) === e.n && c.titulo === e.titulo;
+          return mesmoNumeroETitulo;
+        });
+      }],
+      ['titulo', function (k, c) {
+        var t = tituloNormalizado(c.titulo);
+        return entradas.filter(function (e) { return tituloNormalizado(e.titulo) === t; });
+      }],
+      ['heranca', function (k, c) {
+        var t = tituloNormalizado(c.titulo);
+        var hs = heranca.filter(function (h) { return h.antigo === t; });
+        if (hs.length !== 1) return [];
+        var h = hs[0];
+        var naFaixa = entradas.filter(function (e) { return inteiro(e.pagina) && e.pagina >= h.ini && e.pagina <= h.fim; });
+        var escolhidos = c.assuntos.filter(function (id) { return typeof id === 'string' && id; });
+        // sem assunto escolhido ("nenhum"), não há o que comparar: fica órfã
+        if (!escolhidos.length) return [];
+        return naFaixa.filter(function (e) {
+          return idsDe(e).some(function (id) { return escolhidos.indexOf(id) >= 0; });
+        });
+      }]
+    ];
+    passos.forEach(function (passo) {
+      validas.forEach(function (k) {
+        if (feitas[k]) return;
+        var c = todas[k];
+        var achadas = passo[1](k, c);
+        // dois candidatos (dois capítulos de mesmo título, duas entradas da mesma chave): nenhum
+        if (achadas.length !== 1) return;
+        var e = achadas[0];
+        if (porN[e.n]) {
+          if (mesmoQueODaEntrada(c, e.n)) { feitas[k] = true; absorvidas[k] = true; }
+          return;
+        }
+        porN[e.n] = { chave: k, correcao: c, como: passo[0] };
+        feitas[k] = true;
       });
     });
-    return saida;
+    var orfas = validas.filter(function (k) { return !feitas[k]; }).sort().map(function (k) {
+      var c = todas[k];
+      return { chave: k, titulo: c.titulo, assuntos: c.assuntos.filter(function (id) { return typeof id === 'string' && id; }),
+        acao: c.acao === 'corrigiu' ? 'corrigiu' : 'confirmou', quando: c.quando || null, n: numeroDaCorrecao(k, c) };
+    });
+    return { entradas: entradas, porN: porN, orfas: orfas, absorvidas: Object.keys(absorvidas).sort() };
+  }
+
+  /* As correções dela que não acharam capítulo no mapa de agora: a tela do
+   * livro mostra uma linha discreta com o número, e cada uma com "Ligar a um
+   * capítulo" e "Descartar" (com Desfazer). Nunca saem sozinhas. */
+  function correcoesOrfas(meta, correcoes) {
+    return resolverCorrecoes(meta, correcoes).orfas;
+  }
+
+  /* Onde gravar a próxima palavra dela sobre uma entrada do mapaDoLivro: na
+   * chave da correção que já vale ali (a palavra nova substitui a dela
+   * mesma); senão no número do capítulo, se ele estiver livre; senão (o
+   * número guarda OUTRA correção dela, que casou com outro capítulo ou é
+   * órfã) numa chave nova "<n>~<chave ou titulo>", sem tocar na que está. */
+  function chaveParaGravarCorrecao(correcoes, entrada) {
+    var todas = correcoes && typeof correcoes === 'object' ? correcoes : {};
+    var tem = function (k) { return Object.prototype.hasOwnProperty.call(todas, k); };
+    if (entrada.correcaoChave) return entrada.correcaoChave;
+    var k = String(entrada.n);
+    if (!tem(k)) return k;
+    var base = k + '~' + (entrada.chave || tituloNormalizado(entrada.titulo).replace(/[^a-z0-9]+/g, '-').slice(0, 24) || 'c');
+    if (!tem(base)) return base;
+    for (var i = 2; ; i++) if (!tem(base + '~' + i)) return base + '~' + i;
   }
 
   /* A entrada do mapa onde a leitura está: no PDF, a que tem a página entre o
@@ -1334,7 +1504,8 @@
     sha256: sha256, tipoDoAsset: tipoDoAsset,
     paginaImpressa: paginaImpressa, paginaDoArquivo: paginaDoArquivo, paginaDaPosicao: paginaDaPosicao,
     resolverPaginaDoLeitor: resolverPaginaDoLeitor, conferirNumeracao: conferirNumeracao, paraRomano: paraRomano, deRomano: deRomano,
-    mapaDoLivro: mapaDoLivro, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
+    mapaDoLivro: mapaDoLivro, resolverCorrecoes: resolverCorrecoes, correcoesOrfas: correcoesOrfas,
+    chaveParaGravarCorrecao: chaveParaGravarCorrecao, tituloNormalizado: tituloNormalizado, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
     marcadorSemSentido: marcadorSemSentido, sumarioDosMarcadoresInutil: sumarioDosMarcadoresInutil, sumarioDoLivro: sumarioDoLivro,
     coberturaDoMapa: coberturaDoMapa, COBERTURA_MINIMA_DO_MAPA: COBERTURA_MINIMA_DO_MAPA,
     TETO_DE_PAGINAS_EXPORTADAS: TETO_DE_PAGINAS_EXPORTADAS, livroTemGabarito: livroTemGabarito,

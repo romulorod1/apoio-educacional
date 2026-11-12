@@ -2677,14 +2677,18 @@
    * e gera de novo esquece de subir a versão, e o hash não esquece.
    *   livro que não está no tablet                 entra (novos)
    *   mesmo id, hash diferente, versão igual ou maior: é substituído
-   *     (atualizados). A posição de leitura fica se o sumário for o mesmo
-   *     (a página 40 continua a página 40 do mesmo capítulo); com sumário
-   *     diferente, ela sai, para o livro não abrir num lugar que mudou
+   *     (atualizados). A posição de leitura segue a regra da fase 1a da
+   *     nuvem (posicaoNoArquivoNovo): fica se a página existe no arquivo
+   *     novo, mesmo com o sumário diferente (a página do arquivo é a mesma
+   *     página); se não existe, vai para a última, com `ajustadaDe` para o
+   *     leitor dizer onde ela estava. Até 12/11/2026 a posição SAÍA quando o
+   *     sumário mudava (posicoesSoltas), e a revisão dos mapas muda o sumário
+   *     de vários livros
    *   mesmo id, hash diferente, de versão MENOR que a do tablet: fica o do
    *     tablet, que é mais novo (maisNovos)
    *   mesmo id e mesmo hash                         fica como está (iguais);
    *     de versão maior, só a versão e o manifest do livro são renovados,
-   *     sem regravar o arquivo
+   *     sem regravar o arquivo e sem tocar na posição de leitura
    *   livro deste pacote, de versão menor, que saiu do pacote novo: sai do
    *     tablet, com a posição dele (removidos)
    *   o mesmo id vindo de OUTRO pacote: fica o que está (deOutroPacote), para
@@ -2698,8 +2702,8 @@
       return new Promise(function (resolve, reject) {
         var t = transacao(b, ['livros', 'livros_posicoes'], 'readwrite');
         var dep = t.objectStore('livros');
-        var contas = { novos: 0, atualizados: 0, iguais: 0, maisNovos: 0, removidos: 0, posicoesSoltas: 0,
-          deOutroPacote: [], bytes: 0 };
+        var contas = { novos: 0, atualizados: 0, iguais: 0, maisNovos: 0, removidos: 0, sumariosMudados: 0,
+          posicoesAjustadas: 0, deOutroPacote: [], bytes: 0 };
         var noPacote = {};
         (preservarIds || []).forEach(function (id) { noPacote[id] = true; });
         aberto.livros.forEach(function (l) {
@@ -2720,10 +2724,19 @@
             if (atual && atual.versao > versao) { contas.maisNovos++; return; }
             if (atual) {
               contas.atualizados++;
+              // o sumário mudar não mexe mais na posição (fase 1a da nuvem): só entra na conta
               if (JSON.stringify(atual.meta && atual.meta.sumario || []) !== JSON.stringify(l.meta.sumario || [])) {
-                contas.posicoesSoltas++;
-                t.objectStore('livros_posicoes').delete(l.meta.id);
+                contas.sumariosMudados++;
               }
+              // o ARQUIVO mudou (mesmo id, hash novo): a posição fica se a página existe no novo
+              var ps = t.objectStore('livros_posicoes');
+              var rp = ps.get(l.meta.id);
+              rp.onsuccess = function () {
+                var nova = posicaoNoArquivoNovo(rp.result, atual.meta, l.meta);
+                if (!nova) return;
+                if (nova.ajustadaDe && !(rp.result && rp.result.ajustadaDe)) contas.posicoesAjustadas++;
+                ps.put(nova);
+              };
             } else {
               contas.novos++;
             }
@@ -2781,13 +2794,94 @@
     });
   }
 
-  /* { id, pagina } no PDF; { id, capitulo, fracao } no EPUB. */
+  /* { id, pagina } no PDF; { id, capitulo, fracao } no EPUB. Desde a fase 1a
+   * da nuvem, também:
+   *   sha          o hash do arquivo em que a posição foi gravada (meta.hash);
+   *   ancoraVista  no EPUB, a última âncora "page_N" acima do alto da tela
+   *                (os EPUBs feitos de imagens de página, como as resoluções
+   *                do FME): é por ela que a posição passa para a página N
+   *                quando o mesmo livro chega remontado em PDF;
+   *   ajustadaDe   só a posição que ANDOU numa troca de arquivo
+   *                (posicaoNoArquivoNovo): onde ela estava ({ pagina } ou
+   *                { capitulo }). O leitor e a tela do livro mostram "você
+   *                estava na p. X"; a próxima posição gravada já não o traz. */
   function lerPosicaoLivro(id) { return ler('livros_posicoes', id); }
   function gravarPosicaoLivro(reg) {
     var r = { id: reg.id, quando: Date.now() };
     if (reg.pagina != null) r.pagina = reg.pagina;
     if (reg.capitulo != null) { r.capitulo = reg.capitulo; r.fracao = reg.fracao || 0; }
+    if (typeof reg.sha === 'string' && reg.sha) r.sha = reg.sha;
+    if (typeof reg.ancoraVista === 'string' && /^page_\d+$/.test(reg.ancoraVista)) r.ancoraVista = reg.ancoraVista;
     return escrever('livros_posicoes', function (s) { return s.put(r); });
+  }
+
+  function inteiroPositivo(x) { return typeof x === 'number' && isFinite(x) && Math.floor(x) === x && x >= 1; }
+  // "page_7" é a página 7 do PDF remontado (conferido de 1 a N, em ordem, pela ferramenta de remontagem)
+  function paginaDaAncora(a) {
+    var m = typeof a === 'string' ? /^page_(\d+)$/.exec(a) : null;
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  /* A POSIÇÃO DE LEITURA QUANDO O ARQUIVO DO LIVRO MUDA (mesmo id, hash
+   * novo; fase 1a da biblioteca na nuvem, DESENHO 4.1). Regra pura: recebe a
+   * posição guardada, o meta antigo e o novo, e devolve o registro novo, ou
+   * null quando não há posição. Nunca devolve "apagar": a posição só sai
+   * quando ELA tira o livro do aparelho.
+   *   PDF para PDF:   fica se a página existe no novo (pagina <= paginas);
+   *                   senão vai para a última, com ajustadaDe: { pagina }.
+   *   EPUB para EPUB: fica se a parte existe na espinha nova; senão vai
+   *                   para a última, do começo, com ajustadaDe: { capitulo }.
+   *   EPUB para PDF:  a âncora "page_N" da posição vira a página N (as
+   *                   resoluções do FME remontadas em PDF, com o mesmo id);
+   *                   sem âncora, ou com a página fora do livro novo, abre
+   *                   na p. 1 com ajustadaDe: { capitulo }.
+   *   PDF para EPUB:  a parte 1, com ajustadaDe: { pagina }.
+   * O registro novo leva o sha do arquivo novo. Um ajustadaDe que já estava
+   * (ela ainda não abriu o livro desde a troca anterior) é mantido: é onde
+   * ela estava de verdade. */
+  function posicaoNoArquivoNovo(pos, metaAntigo, metaNovo) {
+    if (!pos || typeof pos !== 'object' || !metaNovo) return null;
+    var r = {};
+    Object.keys(pos).forEach(function (k) { r[k] = pos[k]; });
+    if (typeof metaNovo.hash === 'string' && metaNovo.hash) r.sha = metaNovo.hash;
+    var antes = pos.ajustadaDe || null;
+    var ajustar = function (de) { r.ajustadaDe = antes || de; };
+    if (metaNovo.formato === 'epub') {
+      var partes = ((metaNovo.epub && metaNovo.epub.espinha) || []).length;
+      if (inteiroPositivo(pos.capitulo)) {
+        if (partes && pos.capitulo > partes) {
+          r.capitulo = partes; r.fracao = 0;
+          delete r.ancoraVista;
+          ajustar({ capitulo: pos.capitulo });
+        }
+      } else if (inteiroPositivo(pos.pagina)) {
+        delete r.pagina;
+        r.capitulo = 1; r.fracao = 0;
+        ajustar({ pagina: pos.pagina });
+      }
+      return r;
+    }
+    var total = metaNovo.paginas;
+    if (inteiroPositivo(pos.pagina)) {
+      if (inteiroPositivo(total) && pos.pagina > total) {
+        r.pagina = total;
+        ajustar({ pagina: pos.pagina });
+      }
+      return r;
+    }
+    if (inteiroPositivo(pos.capitulo)) {
+      // a posição era de EPUB, e o livro agora é PDF
+      var n = paginaDaAncora(pos.ancoraVista || pos.ancora);
+      delete r.capitulo; delete r.fracao; delete r.ancoraVista; delete r.ancora;
+      if (n && (!inteiroPositivo(total) || n <= total)) {
+        r.pagina = n;
+      } else {
+        r.pagina = 1;
+        ajustar({ capitulo: pos.capitulo });
+      }
+      return r;
+    }
+    return r;
   }
 
   /* O PDF EXPORTADO DE UM LIVRO (C15.4), anexado a uma aula. É material de
@@ -3405,7 +3499,7 @@
     gravarListaBiblioteca: gravarListaBiblioteca, apagarListaBiblioteca: apagarListaBiblioteca,
     listasDaBiblioteca: listasDaBiblioteca,
     gravarLivros: gravarLivros, listarLivros: listarLivros, lerLivro: lerLivro, removerLivro: removerLivro,
-    lerPosicaoLivro: lerPosicaoLivro, gravarPosicaoLivro: gravarPosicaoLivro,
+    lerPosicaoLivro: lerPosicaoLivro, gravarPosicaoLivro: gravarPosicaoLivro, posicaoNoArquivoNovo: posicaoNoArquivoNovo,
     aoMudar: aoMudar, somenteLeitura: somenteLeitura, celularQueEdita: celularQueEdita,
     estaSoLendo: function () { return soLeitura; },
     celularEdita: function () { return soLeitura && celularEdita; },

@@ -153,8 +153,10 @@
  * O v139 traz a busca no texto dos livros. O v140 traz os 22 assuntos novos de
  * matemática da revisão dos mapas dos livros no banco/topicos/matematica.json.
  * O v141 traz os 11 assuntos novos de física da revisão dos mapas dos livros no banco/topicos/fisica.json.
+ * O v144 traz a fase 1a da biblioteca na nuvem: a posição de leitura e a correção do
+ * mapa sobrevivem à troca de meta e de arquivo do livro.
  */
-var CACHE = 'apoio-educacional-v141';
+var CACHE = 'apoio-educacional-v144';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
