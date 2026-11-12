@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.63';
+  var VERSAO = '1.42.64';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -84,6 +84,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.64',
+      itens: [
+        'Planejamento de estudos: na ficha de cada aluno, em Planejamentos, cole ou dite o aviso de provas da escola e anexe os prints. O aplicativo monta a folha da semana com as provas e as aulas, você confere, ajusta se precisar e compartilha o PDF com a família.'
+      ]
+    },
     {
       versao: '1.42.61',
       itens: [
