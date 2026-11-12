@@ -519,6 +519,11 @@ roda "navegacao biblioteca --envenenado-rotulo-corta" node "_teste/testa_navegac
 # capitulo na pagina 1, e a prova tem de ver.
 roda "biblioteca livros tela"                   node "_teste/testa_biblioteca_livros_tela.js"
 roda "biblioteca livros tela --envenenado-capitulo-abre-pagina-errada" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-capitulo-abre-pagina-errada
+roda "biblioteca livros tela --envenenado-zoom-sem-ancora" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-zoom-sem-ancora
+roda "biblioteca livros tela --envenenado-giro-sem-ancora-guardada" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-giro-sem-ancora-guardada
+roda "biblioteca livros tela --envenenado-largura-vai-ao-alto" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-largura-vai-ao-alto
+roda "biblioteca livros tela --envenenado-vizinhas-sem-desenho" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-vizinhas-sem-desenho
+roda "biblioteca livros tela --envenenado-canvas-sem-soltar" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-canvas-sem-soltar
 roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-sumario-dos-marcadores
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
