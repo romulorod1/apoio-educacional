@@ -303,12 +303,13 @@ roda "virada anual"          node _teste/testa_virada_anual.js
 # A regra do merge na main (_teste/merge_seguro.sh), que segura o processo
 # quando a protecao de branch do GitHub sumir com o repositorio privado.
 roda "merge seguro"          node _teste/testa_merge_seguro.js
-# O guarda de merge no CI (item 13c): o guarda_merge.sh julga pelo merge_seguro
+# O guarda de merge no CI (item 13c): o guarda_merge.js julga pelo merge_seguro
 # e publica o status portao-merge na cabeca que julgou. Com gh e git falsos:
-# aprovado publica success, recusado publica failure com o motivo, cabeca que
-# andou nao publica, e o merge nunca e chamado; o guarda nao julga a si mesmo
-# (com controle sem a regra); e o workflow tem os tres gatilhos, so a escrita de
-# status, um grupo de concorrencia por PR e nada de strict.
+# pending no comeco, success ou failure com o motivo, cabeca que andou nao
+# publica, fork e pulado, e o merge nunca e chamado; quando a main anda, todos os
+# PRs abertos sao rejulgados (o caso dos dois PRs com a mesma versao); o guarda
+# nao julga a si mesmo (com controle sem a regra); e o workflow so roda codigo da
+# main, sem checkout da cabeca do PR, com so a escrita de status e sem strict.
 roda "guarda de merge"       node _teste/testa_guarda_merge.js
 # CACHE do sw.js e VERSAO do app.js do PR MAIORES que os da main atual, e nao so
 # diferentes da base do merge (12/11/2026: um ramo em v130 integrado com a main
