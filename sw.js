@@ -156,6 +156,7 @@
  * O v143 traz o planejamento de estudos com IA: './planejamento.js' entra na
  * lista. O endpoint de IA (/api/ia) só recebe POST, que o fetch abaixo já deixa
  * passar sem cache. O v148 traz o aviso de novidades do planejamento.
+ * O v152 reorganiza a janela da aula em duas colunas no tablet.
  * O v158 traz a busca da Biblioteca nos capítulos e assuntos do mapa, com todas as palavras e os melhores resultados.
  */
 var CACHE = 'apoio-educacional-v158';
