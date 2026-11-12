@@ -1427,35 +1427,35 @@ if [ -n "$base" ]; then
   sw_antes=$(git show "$base:sw.js" 2>/dev/null | tr -d '\r' || true)
 fi
 # 13f: o nome do cache que o tablet ve e o GERADO na publicacao, a partir do
-# contador de publicacoes (_teste/versao_publicada.js --contador). O CACHE do
-# sw.js do repositorio fica fixo. Entao a pergunta das duas travas abaixo deixa
-# de ser "o PR subiu o nome?" e passa a ser "o contador do HEAD e maior que o da
-# base?", que e o que faz o nome publicado mudar. E a mesma funcao do deploy,
-# rodada de verdade sobre o git: se alguem quebrar a regra do que conta (tirar o
-# banco, por exemplo), a trava reprova o PR que muda o banco.
-n_agora=""; n_base=""
+# contador de publicacoes (_teste/versao_publicada.js). O CACHE do sw.js do
+# repositorio fica fixo. Entao a pergunta das duas travas abaixo deixa de ser
+# "o PR subiu o nome?" e passa a ser "o merge deste PR na main sobe o
+# contador?" (--sobe): sobe se o diff base..HEAD muda algum arquivo que conta,
+# que e exatamente o que o commit de merge na main conta. E a mesma regra do
+# deploy (contaParaPublicacao): se alguem quebrar a regra do que conta (tirar
+# o banco, por exemplo), a trava reprova o PR que muda o banco.
+# (Na primeira rodada a trava comparava o contador do HEAD com o da base, e
+# dava FALSO VERMELHO local quando a main tinha andado mais que o ramo: a
+# historia de primeiro pai do ramo passa pelos commits dele, e nao pelos da
+# main. No CI nao acontecia, porque la o HEAD e o merge sobre a ponta da main.)
+sobe=""
 if [ -n "$base" ]; then
-  n_agora=$(node _teste/versao_publicada.js --contador HEAD 2>/dev/null || true)
-  n_base=$(node _teste/versao_publicada.js --contador "$base" 2>/dev/null || true)
+  sobe=$(node _teste/versao_publicada.js --sobe "$base" HEAD 2>/dev/null || true)
 fi
-case "$n_agora$n_base" in ''|*[!0-9]*) n_ok=0 ;; *) n_ok=1 ;; esac
-[ -n "$n_agora" ] && [ -n "$n_base" ] || n_ok=0
 if [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
   printf '  INSTAVEL %-23s sem base de merge com sw.js para comparar\n' "nome do cache"
   pulada=1
 elif [ "$lista_agora" = "$(entradas_sw "$(lista_sw "$sw_antes")")" ]; then
   printf '  ok      %-24s a lista nao mudou desde a base do merge\n' "nome do cache"
-elif [ "$n_ok" != "1" ]; then
-  printf '  FALHOU  %-24s a lista mudou e nao consegui calcular o contador da publicacao (HEAD:[%s] base:[%s])\n' \
-    "nome do cache" "$n_agora" "$n_base"
+elif [ "$sobe" != "sim" ] && [ "$sobe" != "nao" ]; then
+  printf '  FALHOU  %-24s a lista mudou e nao consegui perguntar se a publicacao sobe (--sobe:[%s])\n' \
+    "nome do cache" "$sobe"
   falhou=1
-elif [ "$n_agora" -gt "$n_base" ]; then
-  printf '  ok      %-24s lista nova desde a base; a publicacao sobe de %s para %s\n' "nome do cache" \
-    "$(node -e "console.log(require('./_teste/versao_publicada.js').cacheDe($n_base))")" \
-    "$(node -e "console.log(require('./_teste/versao_publicada.js').cacheDe($n_agora))")"
+elif [ "$sobe" = "sim" ]; then
+  printf '  ok      %-24s lista nova desde a base; o merge sobe o contador e a publicacao troca o nome do cache\n' "nome do cache"
 else
-  printf '  FALHOU  %-24s a lista de ARQUIVOS mudou desde a base e o contador da publicacao nao subiu (%s)\n' \
-    "nome do cache" "$n_agora"
+  printf '  FALHOU  %-24s a lista de ARQUIVOS mudou desde a base e o merge nao sobe o contador da publicacao\n' \
+    "nome do cache"
   falhou=1
 fi
 
@@ -1507,11 +1507,11 @@ veredito_cache() {
 # fechando sobre si mesma. Agora o mapeamento esta aqui dentro, e as quatro
 # asercoes abaixo o exercitam com argumento de verdade.
 #
-# $1 = lista de mudados (vazia = nada mudou); $2 = contador da publicacao do HEAD;
-# $3 = o da base (13f: o nome publicado sai do contador; maior e nome novo)
+# $1 = lista de mudados (vazia = nada mudou); $2 = o merge sobe o contador da
+# publicacao (sim/nao, do --sobe; 13f: o nome publicado sai do contador)
 decide_cache() {
   if [ -n "$1" ]; then dc_mudou=sim; else dc_mudou=nao; fi
-  if [ "$2" -gt "$3" ]; then dc_novo=sim; else dc_novo=nao; fi
+  if [ "$2" = "sim" ]; then dc_novo=sim; else dc_novo=nao; fi
   veredito_cache "$dc_mudou" "$dc_novo"
 }
 p_cache=0; f_cache=0
@@ -1525,12 +1525,12 @@ afere_cache() {
       "$1" "$2" "$3" "$obtido" "$4"
   fi
 }
-afere_cache "app.js" 22 22 reprova
-afere_cache "app.js" 23 22 passa
-afere_cache ""       23 22 passa
-afere_cache ""       22 22 passa
-# o contador e numero: 100 contra 99 e maior (como texto, "100" sairia menor)
-afere_cache "app.js" 100 99 passa
+afere_cache "app.js" nao reprova
+afere_cache "app.js" sim passa
+afere_cache ""       sim passa
+afere_cache ""       nao passa
+# so "sim" e sim: resposta vazia ou estranha nao vira subida
+afere_cache "app.js" "" reprova
 if [ "$f_cache" != "0" ]; then
   printf '  FALHOU  %-24s a prova da trava nao passou: %s de 5\n' "conteudo no cache" "$p_cache"
   falhou=1
@@ -1611,12 +1611,12 @@ else
   done
   set +f
   IFS=$ifs_antes
-  if [ "$n_ok" != "1" ]; then
+  if [ "$sobe" != "sim" ] && [ "$sobe" != "nao" ]; then
     # Nome vazio passava como "promovido", porque vazio e diferente de v22. Uma
     # reformatacao do sw.js (aspas duplas, const, espaco a mais) faria nome_sw
     # devolver vazio, e a trava imprimiria ok com o nome em branco.
-    printf '  FALHOU  %-24s nao consegui calcular o contador da publicacao (HEAD:[%s] base:[%s])\n' \
-      "conteudo no cache" "$n_agora" "$n_base"
+    printf '  FALHOU  %-24s nao consegui perguntar se a publicacao sobe (--sobe:[%s])\n' \
+      "conteudo no cache" "$sobe"
     falhou=1
   elif [ -n "$caixa_trocada" ] || [ -n "$sumidos" ] || [ -n "$fora_do_git" ]; then
     # UMA falha so, com os TRES motivos: separados em falhas diferentes, quem
@@ -1642,15 +1642,15 @@ else
     fi
     falhou=1
   else
-    if [ "$(decide_cache "$mudados" "$n_agora" "$n_base")" = "reprova" ]; then
-      printf '  FALHOU  %-24s mudou de conteudo e o contador da publicacao nao subiu (%s):%s\n' \
-        "conteudo no cache" "$n_agora" "$mudados"
+    if [ "$(decide_cache "$mudados" "$sobe")" = "reprova" ]; then
+      printf '  FALHOU  %-24s mudou de conteudo e o merge nao sobe o contador da publicacao:%s\n' \
+        "conteudo no cache" "$mudados"
       falhou=1
     elif [ -z "$mudados" ]; then
       printf '  ok      %-24s nenhum arquivo do pacote mudou de conteudo desde a base\n' "conteudo no cache"
     else
-      printf '  ok      %-24s%s arquivo(s) do pacote mudaram e a publicacao sobe o contador de %s para %s\n' \
-        "conteudo no cache" "$(printf '%s' "$mudados" | wc -w | tr -d ' ')" "$n_base" "$n_agora"
+      printf '  ok      %-24s%s arquivo(s) do pacote mudaram e o merge sobe o contador da publicacao\n' \
+        "conteudo no cache" "$(printf '%s' "$mudados" | wc -w | tr -d ' ')"
     fi
   fi
 fi

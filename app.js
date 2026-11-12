@@ -1317,13 +1317,17 @@
       return;
     }
 
-    /* Só mostra novidades da versão ATUAL (se houver anúncio formal para ela)
-     * e se a professora ainda não tiver visto essa versão. Notícias de versões
-     * intermediárias anteriores (como 1.18.0 de Português) nunca são requentadas
-     * como novidade da versão atual. Se a versão atual não tiver novidades
-     * cadastradas (lançamento silencioso), apenas atualiza versaoVista. */
+    /* Mostra as novidades de TODAS as versões depois da última que ela viu, até
+     * a atual, da mais nova para a mais antiga (13f). Até o 13f só entrava a da
+     * versão atual, e quem pulava uma publicação (o tablet ficou dias sem abrir,
+     * ou duas publicações saíram seguidas) perdia a novidade da pulada. Notícia
+     * de versão que ela já viu (como a 1.18.0 de Português para quem está na
+     * 1.27.0) continua de fora: só entra versão MAIOR que a versaoVista. Sem
+     * nenhuma novidade nesse intervalo (lançamento silencioso), apenas atualiza
+     * versaoVista. */
     var novas = NOVIDADES.filter(function (n) {
-      return n.versao === VERSAO && compararVersao(n.versao, vista) > 0;
+      return Core.versaoAntes(vista, n.versao) === true && Core.versaoAntes(VERSAO, n.versao) !== true &&
+        n.itens && n.itens.length > 0;
     });
     if (!novas.length) {
       db.ajustes.versaoVista = VERSAO;

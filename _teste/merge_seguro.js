@@ -226,11 +226,14 @@ function decidir(pr) {
  *   1. VERSAO (app.js) e CACHE (sw.js) da arvore do merge sao IGUAIS aos da
  *      main: mudar no PR nao publica nada e reabre o conflito;
  *   2. o PR que leva para a main um arquivo que sobe ao site (ehDoSite) traz
- *      pelo menos um novidades/<nome>.txt, novo ou mudado: uma linha por item
+ *      pelo menos um novidades/<nome>.txt NOVO (adicionado pelo PR): uma linha por item
  *      do que ela ganha, ou so linhas com "#" para dizer que nao ha novidade
  *      para ela (refatoracao, conserto invisivel);
  *   3. todo arquivo em novidades/ e um .txt direto na pasta, e nenhum vem vazio.
- * O PR que nao leva arquivo do site passa sem novidade. */
+ * O PR que nao leva arquivo do site passa sem novidade.
+ * TRANSICAO: se a main ainda nao tem o _teste/versao_publicada.js (o merge do
+ * proprio 13f), o item 1 vira a regra antiga: VERSAO e CACHE MAIORES que os da
+ * main, porque e o merge_seguro da main, com essa regra, que julga o merge. */
 /* Le UMA declaracao real da constante. Duas declaracoes (var, let ou const no
  * comeco da linha) devolvem null: ler a primeira e confiar seria conferir um
  * valor que talvez nao seja o que o navegador usa. Comentario nao conta. */
@@ -249,9 +252,21 @@ function lerVersao(app) { return lerConstante(app, 'VERSAO', /^ *var VERSAO = '(
  * Devolve { ok, motivos, recusas }. */
 function decidirPublicacao(v) {
   const motivos = [], recusas = [];
+  // A TRANSICAO: enquanto a main nao tem o gerador (o merge do proprio 13f), o
+  // que esta no ar ainda sai dos valores escritos a mao, e quem julga o merge e
+  // o merge_seguro da main, com a regra antiga (#173): MAIORES que os da main.
+  const maior = {
+    VERSAO: (a, b) => { const p = /^(\d+)\.(\d+)\.(\d+)$/.exec(a), q = /^(\d+)\.(\d+)\.(\d+)$/.exec(b); if (!p || !q) return null;
+      for (let i = 1; i <= 3; i++) if (Number(p[i]) !== Number(q[i])) return Number(p[i]) > Number(q[i]); return false; },
+    CACHE: (a, b) => { const p = /^apoio-educacional-v(\d+)$/.exec(a), q = /^apoio-educacional-v(\d+)$/.exec(b); return p && q ? Number(p[1]) > Number(q[1]) : null; }
+  };
   [['VERSAO', v.versao], ['CACHE', v.cache]].forEach(([nome, c]) => {
     if (c.agora == null || c.main == null) {
       recusas.push('nao consegui ler ' + nome + ' (merge:[' + c.agora + '] main:[' + c.main + ']): falta a declaracao, ou ha mais de uma');
+    } else if (v.transicao) {
+      const m = maior[nome](c.agora, c.main);
+      if (m === true) motivos.push(nome + ' ' + c.agora + ' maior que a da main, ' + c.main + ' (transicao: a main ainda nao tem o gerador)');
+      else recusas.push(nome + ' ' + c.agora + ' nao e MAIOR que a da main, ' + c.main + ': na transicao (a main ainda nao tem o gerador) vale a regra antiga; suba para a proxima livre');
     } else if (c.agora !== c.main) {
       recusas.push(nome + ' mudou no PR (' + c.main + ' na main, ' + c.agora + ' no merge): desde o 13f ela e gerada na publicacao ' +
         '(_teste/versao_publicada.js); volte ao valor da main');
@@ -263,14 +278,16 @@ function decidirPublicacao(v) {
   const doSite = v.mudancas.map(m => m.caminho).filter(VP.ehDoSite);
   const naPasta = levados.filter(c => /^novidades\//.test(c));
   naPasta.filter(c => !VP.NOVIDADE.test(c)).forEach(c => recusas.push('em novidades/ so vale <nome>.txt direto na pasta: ' + c));
-  const novas = naPasta.filter(c => VP.NOVIDADE.test(c));
-  novas.forEach(c => {
+  naPasta.filter(c => VP.NOVIDADE.test(c)).forEach(c => {
     const l = VP.lerNovidade(v.novidades[c]);
     if (!l.itens.length && !l.comentarios) recusas.push(c + ' esta vazio: escreva o que ela ganha, ou uma linha com # dizendo que nao ha novidade para ela');
   });
+  // Vale so a novidade NOVA (adicionada pelo PR). Editar a de um PR antigo nao
+  // diz nada sobre este, e a versao dela continua a do commit que a trouxe.
+  const novas = v.mudancas.filter(m => m.estado === 'A' && VP.NOVIDADE.test(m.caminho)).map(m => m.caminho);
   const quais = doSite.slice(0, 3).join(', ') + (doSite.length > 3 ? ' e mais ' + (doSite.length - 3) : '');
   if (doSite.length && !novas.length) {
-    recusas.push('o PR muda o app (leva ' + quais + ') e nao traz novidades/<nome>.txt: uma linha por item do que ela ganha, ' +
+    recusas.push('o PR muda o app (leva ' + quais + ') e nao traz novidades/<nome>.txt NOVO: uma linha por item do que ela ganha, ' +
       'ou so uma linha com # para dizer que nao ha novidade para ela');
   } else if (doSite.length) {
     motivos.push('o PR muda o app (leva ' + quais + ') e traz ' + novas.join(', '));
@@ -302,9 +319,13 @@ function lerPublicacaoGit(g, alvo, main) {
   }
   const novidades = {};
   mudancas.filter(m => m.estado !== 'D' && VP.NOVIDADE.test(m.caminho)).forEach(m => { novidades[m.caminho] = g(['show', arvore + ':' + m.caminho]); });
+  // Transicao: a main ainda nao tem o gerador (o merge do proprio 13f).
+  let transicao = false;
+  try { g(['cat-file', '-e', main + ':_teste/versao_publicada.js']); } catch (e) { transicao = true; }
   return {
     mudancas,
     novidades,
+    transicao,
     versao: { agora: lerVersao(g(['show', arvore + ':app.js'])), main: lerVersao(g(['show', main + ':app.js'])) },
     cache: { agora: lerCache(g(['show', arvore + ':sw.js'])), main: lerCache(g(['show', main + ':sw.js'])) }
   };

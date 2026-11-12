@@ -146,3 +146,46 @@ jobs:
     with:
       site: https://apoio-educacional.pages.dev
       ref: ${{ github.event.workflow_run.head_sha }}
+
+  # O ENDERECO ANTIGO (romulorod1.github.io), pela MESMA montagem (13f). Ate o
+  # 13f o GitHub Pages publicava o repositorio cru (build legacy, a cada push na
+  # main, sem esperar o portao). Com VERSAO e CACHE fixos no repositorio, o
+  # sw.js de la nunca mudaria, e o tablet que abrisse o endereco antigo nao
+  # atualizaria mais. Agora ele sai daqui, so depois do endereco novo publicar
+  # (portao verde e commit na ponta da main), com o icone de sempre
+  # (--endereco-antigo). O Pages do repositorio esta em build_type "workflow".
+  publica-github-pages:
+    needs: publica
+    if: needs.publica.outputs.publicou == 'sim'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.envio-pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.1'
+      - name: Monta o site do endereco antigo
+        run: sh .github/monta_site.sh _site_antigo --endereco-antigo
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site_antigo
+      - name: Envia ao GitHub Pages
+        id: envio-pages
+        uses: actions/deploy-pages@v4
+
+  conferencia-antigo:
+    needs: publica-github-pages
+    uses: ./.github/workflows/conferencia-no-ar.yml
+    with:
+      site: https://romulorod1.github.io/apoio-educacional
+      ref: ${{ github.event.workflow_run.head_sha }}

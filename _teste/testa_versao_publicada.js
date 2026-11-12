@@ -9,11 +9,13 @@
  *   - cada novidade leva a versão do commit que a trouxe, e o arquivo só de
  *     comentário não vira entrada;
  *   - a injeção troca a ÚNICA declaração, e recusa gerar VERSAO ou CACHE que não
- *     seja MAIOR que o do repositório, que é o que está no ar na migração
- *     (1.42.61 e apoio-educacional-v141): o tablet dela só atualiza com nome novo;
+ *     seja MAIOR que o do repositório (o valor fixo, que no merge do 13f é maior
+ *     que o da main e portanto que o do ar): o tablet só atualiza com nome novo;
+ *   - o texto da novidade entra literal, mesmo com $&, $' e R$1;
  *   - clone raso é erro, e não um número menor;
- *   - no repositório de verdade, a próxima publicação sai maior que o que está
- *     no ar, e o app.js e o sw.js gerados são JavaScript válido.
+ *   - no repositório de verdade, a próxima publicação sai maior que o valor
+ *     fixo lido do próprio repositório, e o app.js e o sw.js gerados são
+ *     JavaScript válido.
  * Os venenos trocam a regra de contagem: uma que conta todo commit (o tablet
  * veria "Versão nova pronta" por um PR só de prova) e uma que esquece o banco
  * (o banco novo ficaria preso no cache velho). Cada um TEM de reprovar.
@@ -96,6 +98,24 @@ try {
   conf('o contador nunca desce ao longo da main', cresce, true);
   conf('ele sobe exatamente nos commits que mudam o que e publicado', sobeQuandoDeve, true);
 
+  // --sobe (o que o portao pergunta): o merge de REV sobre BASE sobe o contador?
+  const sobe = (base, rev) => execFileSync(process.execPath, [path.join(__dirname, 'versao_publicada.js'), '--sobe', base, rev],
+    { cwd: tmp, encoding: 'utf8', env: ENV }).trim();
+  // o CLI le o git da RAIZ do script; aqui a prova usa a mesma regra sobre o repo de mentira
+  const sobeAqui = (base, rev) => (g(['diff', '--name-only', base, rev]).split('\n').filter(Boolean).some(VP.contaParaPublicacao) ? 'sim' : 'nao');
+  conf('--sobe: so prova (c1..c2) nao sobe', sobeAqui(ns.c1, ns.c2), 'nao');
+  conf('--sobe: a tela (c2..c3) sobe', sobeAqui(ns.c2, ns.c3), 'sim');
+  conf('--sobe: documentacao e CI (c4..c5) nao sobe', sobeAqui(ns.c4, ns.c5), 'nao');
+  // O caso do falso vermelho: um ramo que saiu de c3 e mudou a tela, com a main
+  // andando mais (c4..c8). Pelo contador do ramo contra o da base daria menor;
+  // pela pergunta certa, o merge sobe.
+  g(['checkout', '-q', '-b', 'ramo-atras', ns.c3]); arq('tela.js', 'tela do ramo\n'); const ramoAtras = commit('ramo atras muda a tela');
+  const baseRamo = g(['merge-base', ramoAtras, ns.c8]).trim();
+  conf('controle: o contador do ramo atras (' + N(ramoAtras) + ') sai MENOR que o da main (' + N(ns.c8) + '), o falso vermelho de antes', N(ramoAtras) < N(ns.c8), true);
+  conf('--sobe: o ramo atras que muda a tela sobe (sem falso vermelho)', sobeAqui(baseRamo, ramoAtras), 'sim');
+  g(['checkout', '-q', 'main']);
+  conf('--sobe pelo CLI: le o git da raiz e responde sim ou nao', ['sim', 'nao'].indexOf(sobe('HEAD~1', 'HEAD')) >= 0, true);
+
   const c7 = VP.calcular(g, ns.c7);
   conf('c7: VERSAO 1.43.5 e CACHE v1005', c7.versao + ' ' + c7.cache, '1.43.5 apoio-educacional-v1005');
   conf('c7: novidades geradas, da mais nova para a mais antiga', JSON.stringify(c7.novidades),
@@ -133,6 +153,19 @@ try {
     lanca(() => VP.injetar(APP, SW, { versao: '1.43.0', cache: 'apoio-educacional-v1000', novidades: [] })), '');
   conf('duas declaracoes de VERSAO recusam',
     /esperava uma declaracao/.test(lanca(() => VP.injetar(APP.replace("var VERSAO = '1.42.61';", "var VERSAO = '1.42.61';\n  var VERSAO = '1.42.61';"), SW, c7))), true);
+  // "$" no texto da novidade: com String.replace de string, $& e $' injetariam
+  // pedaços do arquivo e R$1 viraria R + o primeiro grupo. Sai literal.
+  const ITEM_DOLAR = "Custa R$1 por mes, $& e $' e $$ no texto.";
+  const comDolar = VP.injetar(APP, SW, { versao: '1.43.7', cache: 'apoio-educacional-v1007', novidades: [{ versao: '1.43.7', itens: [ITEM_DOLAR] }] });
+  const ctxD = {};
+  let erroD = '';
+  try { vm.runInNewContext(comDolar.app, { globalThis: ctxD }); } catch (e) { erroD = e.message; }
+  conf('novidade com $&, $\' e R$1: o app.js gerado roda', erroD, '');
+  conf('e o texto sai literal na NOVIDADES', ctxD.__r && ctxD.__r.NOVIDADES[0].itens[0], ITEM_DOLAR);
+  conf('e o resto do app.js nao mudou (so a VERSAO e a linha nova)',
+    comDolar.app.split('\n').length, APP.split('\n').length + 1);
+  conf("controle: com troca por string, o mesmo texto sairia outro (o defeito que a funcao evita)",
+    'var NOVIDADES = ['.replace(/(var NOVIDADES = \[)/, '$1' + ITEM_DOLAR) !== 'var NOVIDADES = [' + ITEM_DOLAR, true);
   conf('sem a linha do NOVIDADES, com novidade a gerar, recusa',
     /NOVIDADES/.test(lanca(() => VP.injetar(APP.replace('var NOVIDADES = [', 'var NOVAS = ['), SW, c7))), true);
 
@@ -156,17 +189,20 @@ fs.rmSync(tmp, { recursive: true, force: true });
 console.log('\n=== 3. No repositorio de verdade: a migracao ===');
 const gR = args => execFileSync('git', args, { cwd: RAIZ, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024 });
 const appRepo = gR(['show', 'HEAD:app.js']), swRepo = gR(['show', 'HEAD:sw.js']);
-// O que esta no ar quando o 13f entra: 1.42.61 e v141 (conferido no app.js e no
-// sw.js publicados em 12/11/2026). O valor fixo do repositorio TEM de ser esse,
-// porque e ele o piso da injecao.
-conf('a VERSAO fixa do repositorio e a do ar na migracao (1.42.61)', VP.lerValor(appRepo, VP.RE_VERSAO), '1.42.61');
-conf('o CACHE fixo do repositorio e o do ar na migracao (v141)', VP.lerValor(swRepo, VP.RE_CACHE), 'apoio-educacional-v141');
+// O valor fixo do repositorio e o piso da injecao. Ele NAO e cravado aqui: a
+// main anda (1.42.61, 1.42.63, ...) ate o 13f entrar, e o merge do proprio 13f
+// ainda e julgado pela regra antiga, que o obriga a ser MAIOR que o da main, ou
+// seja, maior que o que esta no ar. A prova le o valor do repositorio e exige
+// que a publicacao saia acima dele.
+const versaoRepo = VP.lerValor(appRepo, VP.RE_VERSAO), cacheRepo = VP.lerValor(swRepo, VP.RE_CACHE);
+conf('li a VERSAO fixa do repositorio (' + versaoRepo + ')', /^\d+\.\d+\.\d+$/.test(versaoRepo || ''), true);
+conf('li o CACHE fixo do repositorio (' + cacheRepo + ')', /^apoio-educacional-v\d+$/.test(cacheRepo || ''), true);
 let real = null;
 try { real = VP.calcular(gR, 'HEAD'); } catch (e) { conf('o calculo no repositorio de verdade: ' + e.message, false, true); }
 if (real) {
-  const [a, b, cc] = real.versao.split('.').map(Number);
-  conf('a proxima publicacao sai com VERSAO maior que 1.42.61 (' + real.versao + ')', a > 1 || (a === 1 && (b > 42 || (b === 42 && cc > 61))), true);
-  conf('e com CACHE maior que v141 (' + real.cache + ')', Number(real.cache.split('-v')[1]) > 141, true);
+  const maior = (x, y) => { const p = x.split('.').map(Number), q = y.split('.').map(Number); for (let k = 0; k < 3; k++) if (p[k] !== q[k]) return p[k] > q[k]; return false; };
+  conf('a proxima publicacao sai com VERSAO maior que a fixa (' + real.versao + ' > ' + versaoRepo + ')', maior(real.versao, versaoRepo), true);
+  conf('e com CACHE maior que o fixo (' + real.cache + ' > ' + cacheRepo + ')', Number(real.cache.split('-v')[1]) > Number(cacheRepo.split('-v')[1]), true);
   const r = VP.injetar(appRepo, swRepo, real);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'versao_publicada_real_'));
   fs.writeFileSync(path.join(dir, 'app.js'), r.app); fs.writeFileSync(path.join(dir, 'sw.js'), r.sw);

@@ -111,15 +111,33 @@ function defeitosDoPublica(texto) {
   if (!/needs: publica/.test(c) || !/uses: \.\/\.github\/workflows\/conferencia-no-ar\.yml/.test(c) ||
       !/site: https:\/\/apoio-educacional\.pages\.dev/.test(c))
     d.push('a conferencia do endereco novo nao segue o envio');
+  // 13f: o endereco antigo (GitHub Pages) sai da MESMA montagem, depois do novo.
+  const gp = blocoJob(texto, 'publica-github-pages') || '';
+  if (!gp) d.push('sem o job publica-github-pages (o endereco antigo ficaria com o sw.js fixo)');
+  else {
+    if (!/needs: publica\n/.test(gp)) d.push('o GitHub Pages nao espera o publica');
+    if (!/if: needs\.publica\.outputs\.publicou == 'sim'/.test(gp)) d.push('o GitHub Pages publica sem o endereco novo ter publicado');
+    if (!/pages: write/.test(gp) || !/id-token: write/.test(gp)) d.push('o GitHub Pages sem as permissoes pages e id-token');
+    if (!/ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}\n\s+fetch-depth: 0/.test(gp)) d.push('o GitHub Pages sem o checkout do commit com a historia inteira');
+    if (!/sh \.github\/monta_site\.sh _site_antigo --endereco-antigo/.test(gp)) d.push('o GitHub Pages nao usa o montador com --endereco-antigo');
+    if (!/uses: actions\/upload-pages-artifact@v\d+\n\s+with:\n\s+path: _site_antigo/.test(gp)) d.push('o GitHub Pages nao sobe o _site_antigo');
+    if (!/uses: actions\/deploy-pages@v\d+/.test(gp)) d.push('sem o deploy-pages');
+  }
+  const ca = blocoJob(texto, 'conferencia-antigo') || '';
+  if (!/needs: publica-github-pages/.test(ca) || !/uses: \.\/\.github\/workflows\/conferencia-no-ar\.yml/.test(ca) ||
+      !/site: https:\/\/romulorod1\.github\.io\/apoio-educacional/.test(ca))
+    d.push('a conferencia do endereco antigo nao segue o envio ao GitHub Pages');
   return d;
 }
 
 function defeitosDaConferencia(texto) {
   const d = [];
   const gatilhos = filhos(blocoTopo(texto, 'on'));
-  ['push', 'workflow_dispatch', 'workflow_call'].forEach(g => {
+  ['workflow_dispatch', 'workflow_call'].forEach(g => {
     if (gatilhos.indexOf(g) < 0) d.push('conferencia-no-ar sem o gatilho ' + g);
   });
+  // 13f: no push nenhum dos enderecos tem o commit ainda (os dois publicam depois do portao).
+  if (gatilhos.indexOf('push') >= 0) d.push('conferencia-no-ar com gatilho de push: compararia o ar antes da publicacao');
   if (!/SITE_ANTIGO: https:\/\/romulorod1\.github\.io\/apoio-educacional/.test(texto)) d.push('sem o endereco antigo');
   if (!/- https:\/\/apoio-educacional\.pages\.dev/.test(texto)) d.push('a escolha manual nao tem o endereco novo');
   if (!/ref: \$\{\{ inputs\.ref \|\| github\.sha \}\}/.test(texto)) d.push('checkout nao segue o commit pedido');
@@ -128,8 +146,8 @@ function defeitosDaConferencia(texto) {
   // contador le a historia inteira. Sem isto a conferencia compararia o ar com o
   // valor fixo do repositorio e reprovaria todo deploy certo.
   if (!/fetch-depth: 0/.test(texto)) d.push('o checkout da conferencia nao traz a historia inteira (fetch-depth: 0)');
-  if (!/confere_no_ar\.sh --montado "\$SITE"/.test(texto)) d.push('o endereco novo nao e conferido contra o site montado (--montado)');
-  if (!/if \[ "\$SITE" = "\$SITE_ANTIGO" \]; then\n\s+sh _teste\/confere_no_ar\.sh "\$SITE" 900/.test(texto)) d.push('o endereco antigo deixou de ser conferido contra o disco');
+  if (!/confere_no_ar\.sh --montado "\$SITE" 900/.test(texto)) d.push('a conferencia nao compara com o site montado (--montado)');
+  if (/confere_no_ar\.sh "\$SITE"/.test(texto)) d.push('a conferencia ainda compara algum endereco com o disco cru');
   return d;
 }
 
@@ -144,7 +162,7 @@ conf('o workflow que ele espera se chama "portao"', /^name: portao$/m.test(PORTA
 conf('no push na main o portao roda o navegador (nenhum job pulado)',
   (PORTAO.match(/github\.event_name != 'pull_request' \|\|/g) || []).length >= 2);
 const dc = defeitosDaConferencia(CONFERENCIA);
-conf('conferencia-no-ar confere o antigo no push e o novo pela chamada', dc.length === 0, dc.join('; '));
+conf('conferencia-no-ar confere os dois enderecos pela chamada, contra o site montado', dc.length === 0, dc.join('; '));
 
 console.log('\n=== venenos: cada um TEM de reprovar ===');
 const venenos = [
@@ -168,7 +186,12 @@ const venenos = [
     return sem.replace(/(        run: \|\n          npx --yes wrangler@[\s\S]*?publicou=sim" >> "\$GITHUB_OUTPUT"\n)/, '$1' + m[0]);
   })()],
   ['envio com working-directory', PUBLICA.replace(/(id: envio\n)/, '$1        working-directory: _site\n')],
-  ['checkout raso', PUBLICA.replace(/(ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}\n\s+)fetch-depth: 0/, '$1fetch-depth: 1')]
+  ['checkout raso', PUBLICA.replace(/(ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}\n\s+)fetch-depth: 0/, '$1fetch-depth: 1')],
+  ['sem o job do GitHub Pages', PUBLICA.replace('  publica-github-pages:\n', '  outro-job:\n')],
+  ['GitHub Pages sem a guarda do publicou', PUBLICA.replace(/(  publica-github-pages:\n    needs: publica\n)    if: needs\.publica\.outputs\.publicou == 'sim'\n/, '$1')],
+  ['GitHub Pages com o icone novo (sem --endereco-antigo)', PUBLICA.replace('monta_site.sh _site_antigo --endereco-antigo', 'monta_site.sh _site_antigo')],
+  ['GitHub Pages com checkout raso', PUBLICA.replace(/(  publica-github-pages:[\s\S]*?)fetch-depth: 0/, '$1fetch-depth: 1')],
+  ['sem a conferencia do antigo', PUBLICA.replace('  conferencia-antigo:\n', '  outra-conferencia:\n')]
 ];
 venenos.forEach(([nome, texto]) => {
   conf('veneno "' + nome + '" foi aplicado', texto !== PUBLICA);
@@ -177,6 +200,7 @@ venenos.forEach(([nome, texto]) => {
 const vconf = CONFERENCIA.replace(/  workflow_call:\n(    .*\n)+/, '');
 conf('veneno "conferencia sem workflow_call" foi aplicado e reprova', vconf !== CONFERENCIA && defeitosDaConferencia(vconf).length > 0);
 [['conferencia sem --montado', CONFERENCIA.replace('confere_no_ar.sh --montado "$SITE"', 'confere_no_ar.sh "$SITE"')],
+ ['conferencia com o gatilho de push de volta', CONFERENCIA.replace('on:\n', 'on:\n  push:\n    branches: [main]\n')],
  ['conferencia com checkout raso', CONFERENCIA.replace('fetch-depth: 0', 'fetch-depth: 1')]].forEach(([nome, texto]) => {
   conf('veneno "' + nome + '" foi aplicado e reprova', texto !== CONFERENCIA && defeitosDaConferencia(texto).length > 0);
 });
@@ -237,6 +261,20 @@ try {
     const c = execFileSync('sh', ['-c', "sed -n \"s/^var CACHE = '\\([^']*\\)'.*/\\1/p\" \"$1\" | head -1", 'x', path.join(destino, 'sw.js')], { encoding: 'utf8' }).trim();
     return v === gerado.versao && c === gerado.cache;
   })());
+  const antigo = fs.mkdtempSync(path.join(os.tmpdir(), 'site_antigo_'));
+  try {
+    execFileSync('sh', [path.join(RAIZ, '.github', 'monta_site.sh'), antigo, '--endereco-antigo'], { cwd: RAIZ, stdio: 'pipe' });
+    const lerA = rel => fs.readFileSync(path.join(antigo, rel), 'utf8').replace(/\r\n/g, '\n');
+    conf('endereco antigo: o mesmo app.js, sw.js e index.html do novo (a conferencia compara estes)',
+      ['app.js', 'sw.js', 'index.html'].every(f => lerA(f) === fs.readFileSync(path.join(destino, f), 'utf8').replace(/\r\n/g, '\n')));
+    ['icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'favicon.png'].forEach(f => {
+      conf('endereco antigo: o icone ' + f + ' e o de sempre', hashDe(path.join(antigo, 'icons', f)) === hashDe(path.join(RAIZ, 'icons', f)));
+    });
+    conf('endereco antigo: a pasta icons/pages-dev nao sobe', !fs.existsSync(path.join(antigo, 'icons', 'pages-dev')));
+    let codigo = 0;
+    try { execFileSync('sh', [path.join(RAIZ, '.github', 'monta_site.sh'), antigo, '--outra'], { cwd: RAIZ, stdio: 'pipe' }); } catch (e) { codigo = e.status; }
+    conf('opcao desconhecida no montador sai com 2', codigo, 2);
+  } finally { fs.rmSync(antigo, { recursive: true, force: true }); }
   conf('o index.html do site e o do commit, igual (a conferencia-no-ar compara)',
     fs.readFileSync(path.join(destino, 'index.html'), 'utf8').replace(/\r\n/g, '\n') === ler('index.html'));
   conf('o apple-touch-icon do index.html aponta para icons/icon-192.png, que no Cloudflare e o novo',

@@ -31,6 +31,7 @@
  *
  *   node _teste/versao_publicada.js --arquivos-do-site   os arquivos que sobem (o monta_site.sh copia estes)
  *   node _teste/versao_publicada.js --contador [REV]     o N do commit (padrão HEAD)
+ *   node _teste/versao_publicada.js --sobe BASE [REV]    "sim" se o merge de REV sobre BASE sobe o contador
  *   node _teste/versao_publicada.js --mostrar [REV]      N, VERSAO, CACHE e as novidades geradas
  *   node _teste/versao_publicada.js --montar PASTA [REV] escreve VERSAO, CACHE e NOVIDADES em PASTA/app.js e PASTA/sw.js
  *
@@ -149,10 +150,14 @@ function calcular(g, rev) {
 
 /* Troca a ÚNICA declaração da constante. Zero ou duas declarações é erro: o
  * navegador usaria uma que talvez não seja a trocada. */
+/* novo(m1, m2, m3) devolve o texto que entra no lugar. É FUNÇÃO, e nunca string:
+ * com string o String.replace interpreta $&, $' e $1 (um item "R$1" de uma
+ * novidade injetaria outro pedaço do arquivo e quebraria o app.js). */
 function trocarUnica(texto, rotulo, padrao, novo) {
   const achadas = texto.match(new RegExp(padrao.source, 'gm')) || [];
   if (achadas.length !== 1) throw new Error(rotulo + ': esperava uma declaracao, achei ' + achadas.length);
-  return texto.replace(padrao, novo);
+  if (typeof novo !== 'function') throw new Error(rotulo + ': a troca tem de ser uma funcao');
+  return texto.replace(padrao, (tudo, a, b, c) => novo(a, b, c));
 }
 const RE_VERSAO = /^([ \t]*var VERSAO = ')([^']*)(';)/m;
 const RE_CACHE = /^(var CACHE = ')([^']*)(';)/m;
@@ -175,13 +180,13 @@ function injetar(app, sw, calc) {
   if (!versaoRepo || !cacheRepo) throw new Error('nao achei VERSAO no app.js ou CACHE no sw.js');
   if (compararVersao(calc.versao, versaoRepo) <= 0) throw new Error('VERSAO gerada ' + calc.versao + ' nao e maior que a do repositorio ' + versaoRepo);
   if (!(numeroDoCache(calc.cache) > numeroDoCache(cacheRepo))) throw new Error('CACHE gerado ' + calc.cache + ' nao e maior que o do repositorio ' + cacheRepo);
-  let a = trocarUnica(app, 'VERSAO do app.js', RE_VERSAO, '$1' + calc.versao + '$3');
+  let a = trocarUnica(app, 'VERSAO do app.js', RE_VERSAO, (ini, velho, fim) => ini + calc.versao + fim);
   if (calc.novidades.length) {
     const recuo = (RE_NOVIDADES.exec(a) || [, ''])[1].match(/^[ \t]*/)[0];
     const texto = calc.novidades.map(e => recuo + '  { versao: ' + JSON.stringify(e.versao) + ', itens: ' + JSON.stringify(e.itens) + ' },').join(nl);
-    a = trocarUnica(a, 'NOVIDADES do app.js', RE_NOVIDADES, '$1' + nl + texto);
+    a = trocarUnica(a, 'NOVIDADES do app.js', RE_NOVIDADES, ini => ini + nl + texto);
   }
-  const s = trocarUnica(sw, 'CACHE do sw.js', RE_CACHE, '$1' + calc.cache + '$3');
+  const s = trocarUnica(sw, 'CACHE do sw.js', RE_CACHE, (ini, velho, fim) => ini + calc.cache + fim);
   return { app: a, sw: s };
 }
 
@@ -197,6 +202,16 @@ if (require.main === module) {
       g(['-c', 'core.quotePath=false', 'ls-files']).split('\n').filter(ehDoSite).forEach(f => process.stdout.write(f + '\n'));
     } else if (a[0] === '--contador') {
       process.stdout.write(calcular(g, a[1]).n + '\n');
+    } else if (a[0] === '--sobe') {
+      // O merge de REV na main sobe o contador? Sobe se o diff BASE..REV muda
+      // algum arquivo que conta, porque o commit de merge na main conta pelo que
+      // trouxe (o diff contra o primeiro pai). E a pergunta certa para um ramo:
+      // comparar o contador do HEAD do ramo com o da base dava falso vermelho
+      // quando a main tinha andado mais que o ramo (a historia de primeiro pai
+      // do ramo passa pelos commits dele, e nao pelos da main).
+      if (!a[1]) falha('uso: --sobe BASE [REV]');
+      const mudados = g(['-c', 'core.quotePath=false', 'diff', '--no-renames', '--name-only', a[1], a[2] || 'HEAD']).split('\n').filter(Boolean);
+      process.stdout.write((mudados.some(contaParaPublicacao) ? 'sim' : 'nao') + '\n');
     } else if (a[0] === '--mostrar') {
       const c = calcular(g, a[1]);
       console.log('N ' + c.n + ': VERSAO ' + c.versao + ', CACHE ' + c.cache + ', ' + c.novidades.length + ' versao(oes) com novidade gerada');

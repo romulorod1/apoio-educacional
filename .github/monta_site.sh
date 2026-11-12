@@ -1,7 +1,14 @@
 #!/bin/sh
 # Monta em _site/ o que o Cloudflare Pages publica (B4).
 #
-#   sh .github/monta_site.sh [pasta]     padrao: _site
+#   sh .github/monta_site.sh [pasta]                     padrao: _site (o endereco novo, Cloudflare)
+#   sh .github/monta_site.sh pasta --endereco-antigo     o GitHub Pages (romulorod1.github.io), com o
+#                                                        icone de sempre
+#
+# Os DOIS enderecos recebem a mesma montagem (13f): desde que VERSAO e CACHE
+# sao gerados na publicacao, o GitHub Pages deixou de servir o repositorio cru
+# (com o sw.js fixo, o tablet que abrisse o endereco antigo nunca atualizaria).
+# Ele e publicado pelo publica-cloudflare.yml, depois do portao verde, como o novo.
 #
 # Sai do `git ls-files`, e nao da pasta: nada que nao esta no commit (perfil de
 # Chrome esquecido, node_modules, rascunho) sobe. E fica de fora o que so serve a
@@ -33,6 +40,8 @@
 set -e
 cd "$(dirname "$0")/.."
 destino="${1:-_site}"
+antigo=0
+if [ "${2:-}" = "--endereco-antigo" ]; then antigo=1; elif [ -n "${2:-}" ]; then printf 'monta_site: opcao desconhecida: %s\n' "$2" >&2; exit 2; fi
 rm -rf "$destino"
 mkdir -p "$destino"
 lista=$(node _teste/versao_publicada.js --arquivos-do-site)
@@ -50,7 +59,10 @@ done
 # conferencia-no-ar compara o index.html com o commit). O apple-touch-icon do
 # index.html aponta para icons/icon-192.png, que aqui ja e o novo. A pasta
 # icons/pages-dev/ nao sobe.
-if [ -d "$destino/icons/pages-dev" ]; then
+# No endereco antigo o icone fica o de sempre, e a pasta pages-dev so sai.
+if [ "$antigo" = "1" ]; then
+  rm -rf "$destino/icons/pages-dev"
+elif [ -d "$destino/icons/pages-dev" ]; then
   for f in icon-192.png icon-512.png icon-maskable-512.png favicon.png; do
     cp "$destino/icons/pages-dev/$f" "$destino/icons/$f"
   done

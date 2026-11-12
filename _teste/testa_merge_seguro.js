@@ -214,6 +214,9 @@ fs.writeFileSync(gitFalso,
   // a prova pede outro (FALSO_MAIN_VP), para o caso da copia velha ao lado.
   "} else if (a[0] === 'show' && a[1] === 'origin/main:_teste/versao_publicada.js') {\n" +
   "  process.stdout.write(fs.readFileSync(process.env.FALSO_MAIN_VP, 'utf8'));\n" +
+  // A main ja tem o gerador (o 13f entrou), salvo FALSO_TRANSICAO.
+  "} else if (a[0] === 'cat-file' && a[1] === '-e' && a[2] === 'origin/main:_teste/versao_publicada.js') {\n" +
+  "  if (process.env.FALSO_TRANSICAO) { process.stderr.write('fatal: path not in tree'); process.exit(128); }\n" +
   "} else if (a[0] === 'merge-tree') {\n" +
   "  if (process.env.FALSO_ORDEM_ERRO === 'merge-tree') { process.stderr.write('CONFLICT (content): Merge conflict in sw.js'); process.exit(1); }\n" +
   "  if (a[2] !== 'origin/main' || a[3] !== process.env.FALSO_CABECA) { process.stderr.write('merge-tree inesperado ' + a.join(' ')); process.exit(3); }\n" +
@@ -250,7 +253,7 @@ function rodar(pr, extra, behind, scriptAlvo, git) {
         GIT: gitFalso, FALSO_GIT_LOG: logGit, FALSO_MAIN: git.main || scriptAlvo || script,
         FALSO_MAIN_VP: git.mainVp || path.join(__dirname, 'versao_publicada.js'),
         FALSO_FETCH: git.fetch || '', FALSO_SHOW: git.show || '',
-        FALSO_CABECA: CABECA, FALSO_ORDEM: git.ordem ? JSON.stringify(git.ordem) : '', FALSO_ORDEM_ERRO: git.ordemErro || '' })
+        FALSO_CABECA: CABECA, FALSO_ORDEM: git.ordem ? JSON.stringify(git.ordem) : '', FALSO_ORDEM_ERRO: git.ordemErro || '', FALSO_TRANSICAO: git.transicao ? '1' : '' })
     });
   } catch (e) { codigo = e.status; saida = String(e.stdout || ''); }
   return { codigo, saida, chamadas: fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean),
@@ -438,6 +441,12 @@ r = rodar(semRisco(), [], 3, undefined, { ordem: pub([['M', '_teste/testa_x.js']
 conf('PR so de teste, atras da main, passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge 9 /.test(c)).length === 1, true);
 r = rodar(semRisco(), [], 0, undefined, { ordem: COM_NOV, ordemErro: 'merge-tree' });
 conf('conflito com a main recusa e nao mergeia', r.codigo === 1 && !r.chamadas.some(c => /^pr merge/.test(c)) && /conflito com a main/.test(r.saida), true);
+// A transicao: a main ainda sem o gerador (o merge do proprio 13f) julga pela regra antiga.
+r = rodar(semRisco(), [], 0, undefined, { transicao: true, ordem: pub([['M', 'app.js'], ['A', NOV]], { [NOV]: '# nada\n' }, V(149, '1.42.69'), V(143, '1.42.63')) });
+conf('transicao: VERSAO e CACHE maiores que os da main, com novidade, passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge 9 /.test(c)).length === 1, true);
+conf('transicao: perguntou se a main tem o gerador', r.chamadasGit.indexOf('cat-file -e origin/main:_teste/versao_publicada.js') >= 0, true);
+r = rodar(semRisco(), [], 0, undefined, { transicao: true, ordem: COM_NOV });
+conf('transicao: VERSAO e CACHE iguais aos da main recusa e nao mergeia', r.codigo === 1 && !r.chamadas.some(c => /^pr merge/.test(c)) && /transicao/.test(r.saida), true);
 // Controle: sem o bloco, o mesmo PR sem novidade passaria e mergearia.
 const semOrdem = fonte.replace(/ *\/\/ ORDEM-INICIO[\s\S]*?\/\/ ORDEM-FIM\r?\n/, '');
 conf('controle: achei o bloco da publicacao para tirar', semOrdem !== fonte, true);

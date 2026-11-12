@@ -109,7 +109,8 @@ const TABELA = [
   ['muda o sw.js (lista) sem novidade: recusa', caso(mud('sw.js')), 'reprova', 'sem'],
   ['apaga arquivo do site sem novidade: recusa', caso([del('figuras/velha.js')]), 'reprova', 'sem'],
   ['muda o app com novidade so de comentario (nada para ela): passa', caso(mud('app.js', add('novidades/x.txt')), { 'novidades/x.txt': '# refatoracao, nada muda para ela\n' }), 'passa'],
-  ['novidade MUDADA (nao nova) tambem vale: passa', caso(mud('styles.css', 'novidades/x.txt'), { 'novidades/x.txt': 'item\n' }), 'passa'],
+  ['so EDITAR uma novidade antiga nao vale: recusa', caso(mud('styles.css', 'novidades/x.txt'), { 'novidades/x.txt': 'item\n' }), 'reprova', 'sem'],
+  ['editar uma antiga e trazer uma nova: passa', caso(mud('styles.css', 'novidades/x.txt', add(NOV)), { 'novidades/x.txt': 'item\n', [NOV]: 'novo\n' }), 'passa'],
   ['novidade vazia: recusa', caso(mud('app.js', add(NOV)), { [NOV]: '\n  \n' }), 'reprova'],
   ['novidade fora de .txt: recusa', caso(mud('app.js', add(NOV), add('novidades/x.md')), { [NOV]: 'item\n' }), 'reprova'],
   ['novidade em subpasta: recusa', caso(mud('app.js', add(NOV), add('novidades/a/b.txt')), { [NOV]: 'item\n' }), 'reprova'],
@@ -119,7 +120,18 @@ const TABELA = [
   ['PR que muda a VERSAO: recusa', caso(mud('app.js', add(NOV)), { [NOV]: 'item\n' }, { versao: { agora: '1.42.62', main: '1.42.61' } }), 'reprova', 'livre'],
   ['PR que muda o CACHE: recusa', caso(mud('sw.js', add(NOV)), { [NOV]: 'item\n' }, { cache: { agora: 'apoio-educacional-v142', main: 'apoio-educacional-v141' } }), 'reprova', 'livre'],
   ['PR que BAIXA a VERSAO, so de prova: recusa', caso(mud('_teste/x.js'), {}, { versao: { agora: '1.42.60', main: '1.42.61' } }), 'reprova', 'livre'],
-  ['VERSAO ilegivel (null): recusa', caso(mud('_teste/x.js'), {}, { versao: { agora: null, main: '1.42.61' } }), 'reprova']
+  ['VERSAO ilegivel (null): recusa', caso(mud('_teste/x.js'), {}, { versao: { agora: null, main: '1.42.61' } }), 'reprova'],
+  // A TRANSICAO (a main sem o gerador: o merge do proprio 13f): vale a regra antiga, MAIORES.
+  ['transicao: VERSAO e CACHE maiores, com novidade: passa', caso(mud('app.js', add(NOV)), { [NOV]: '# nada\n' }, { transicao: true,
+    versao: { agora: '1.42.69', main: '1.42.63' }, cache: { agora: 'apoio-educacional-v149', main: 'apoio-educacional-v143' } }), 'passa'],
+  ['transicao: VERSAO igual a da main: recusa', caso(mud('app.js', add(NOV)), { [NOV]: '# nada\n' }, { transicao: true,
+    versao: { agora: '1.42.63', main: '1.42.63' }, cache: { agora: 'apoio-educacional-v149', main: 'apoio-educacional-v143' } }), 'reprova'],
+  ['transicao: VERSAO 1.42.9 contra 1.42.10 (numero): recusa', caso(mud('app.js', add(NOV)), { [NOV]: '# nada\n' }, { transicao: true,
+    versao: { agora: '1.42.9', main: '1.42.10' }, cache: { agora: 'apoio-educacional-v149', main: 'apoio-educacional-v143' } }), 'reprova'],
+  ['transicao: CACHE v99 contra v143 (numero): recusa', caso(mud('app.js', add(NOV)), { [NOV]: '# nada\n' }, { transicao: true,
+    versao: { agora: '1.42.69', main: '1.42.63' }, cache: { agora: 'apoio-educacional-v99', main: 'apoio-educacional-v143' } }), 'reprova'],
+  ['transicao: maiores mas sem novidade: recusa', caso(mud('app.js'), {}, { transicao: true,
+    versao: { agora: '1.42.69', main: '1.42.63' }, cache: { agora: 'apoio-educacional-v149', main: 'apoio-educacional-v143' } }), 'reprova', 'sem']
 ];
 const errados = [];
 TABELA.forEach(([rot, v, esp]) => {
@@ -159,7 +171,9 @@ const roda = () => conferir(tmp, ENV);
 if (!VENENO) {
   try {
     g(['init', '-q', '-b', 'main']);
-    escreve('1.42.61', 'apoio-educacional-v141'); arq('tela.js', 'tela\n'); arq('_teste/p.js', 'prova\n'); commit('base');
+    escreve('1.42.61', 'apoio-educacional-v141'); arq('tela.js', 'tela\n'); arq('_teste/p.js', 'prova\n'); commit('antes do 13f');
+    g(['tag', 'antes-do-13f']);
+    arq('_teste/versao_publicada.js', '// o gerador\n'); commit('base: a main ja tem o gerador');
     g(['update-ref', 'refs/remotes/origin/main', 'main']);
 
     ramo('tela-sem'); arq('tela.js', 'tela nova\n'); commit('tela sem novidade');
@@ -197,6 +211,18 @@ if (!VENENO) {
     conf('--conferir: duas declaracoes de CACHE saem 1', r.codigo, 1);
     conf('--conferir: e o motivo cita a declaracao', r.linhas.some(l => /mais de uma/.test(l)), true);
 
+    ramo('edita-antiga'); arq('tela.js', 'tela 4\n'); arq('novidades/outra.txt', 'A outra, revista.\n'); commit('so edita a novidade antiga (a outra.txt esta na main)');
+    r = roda();
+    conf('--conferir: tela mudada editando so uma novidade que ja esta na main sai 1', r.codigo, 1);
+    // A TRANSICAO: a main sem o gerador (o merge do proprio 13f) julga pela regra antiga.
+    g(['update-ref', 'refs/remotes/origin/main', 'antes-do-13f']);
+    ramo('transicao-igual', 'antes-do-13f'); arq('tela.js', 'tela 13f\n'); arq('_teste/versao_publicada.js', '// o gerador\n'); arq('novidades/13f.txt', '# nada\n'); commit('13f sem subir');
+    r = roda();
+    conf('--conferir: transicao (main sem o gerador), VERSAO igual a da main, sai 1', r.codigo, 1);
+    conf('--conferir: e o motivo e a regra antiga da transicao', r.linhas.some(l => /FALHOU .*transicao/.test(l)), true);
+    escreve('1.42.69', 'apoio-educacional-v149'); commit('13f sobe para a proxima livre');
+    r = roda();
+    conf('--conferir: transicao com VERSAO e CACHE maiores e novidade sai 0', r.codigo, 0);
     g(['update-ref', '-d', 'refs/remotes/origin/main']); g(['branch', '-q', '-m', 'main', 'outra']);
     r = roda();
     conf('--conferir: sem main para comparar sai 2 (INSTAVEL)', r.codigo, 2);
