@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.59';
+  var VERSAO = '1.42.63';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -84,6 +84,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.63',
+      itens: [
+        'O botão Voltar do tablet e do celular volta para a tela anterior dentro do aplicativo, e não fecha mais o app. Na tela inicial, toque em Voltar duas vezes para sair.'
+      ]
+    },
     {
       versao: '1.42.59',
       itens: [
@@ -1490,10 +1496,15 @@
       var depois = retornoProgramado;
       retornoProgramado = null;
       if (depois !== true) depois();
+      // o passo de tela que veio enquanto a janela fechava entra agora, na ordem
+      var passos = passosDepoisDoRetorno;
+      passosDepoisDoRetorno = [];
+      passos.forEach(function (antes) { registrarPassoDeTela(antes); });
       return;
     }
     var topo = pilhaModalHistorico[pilhaModalHistorico.length - 1];
-    if (!topo) return;
+    // sem janela aberta, o Voltar é das telas (FILA 2b)
+    if (!topo) { voltarDeTela(); return; }
     /* B6: a tabela lado a lado por cima de uma janela (a aula) não entra no
      * histórico: o Voltar fecha a TABELA, e a entrada da janela de baixo volta
      * para a pilha continuar casando com o que está aberto. */
@@ -1536,6 +1547,136 @@
     fechandoPorVoltar = false;
   });
 
+  /* O VOLTAR DO APARELHO NAS TELAS (FILA 2b).
+   *
+   * Relato do dono em 12/11: na Biblioteca, o Voltar do tablet FECHAVA o
+   * aplicativo. O histórico só conhecia as janelas (MODAIS_HISTORICO); trocar
+   * de aba, entrar numa série, num módulo, numa lista ou na tela de um livro
+   * não deixava entrada nenhuma, e o Voltar saía do app.
+   *
+   * Agora cada passo de navegação deixa uma entrada { apoioTela } no histórico,
+   * com o retrato da tela de ANTES (aba, lugar na Biblioteca, livro aberto e
+   * rolagem). O Voltar do aparelho devolve esse retrato, como a seta de voltar
+   * da tela. Quem descobre o passo é o toque: o retrato é tirado na captura do
+   * clique e comparado logo depois dos ouvintes; se a tela mudou, é um passo.
+   * Quando a mudança só devolve a tela ao retrato de cima da pilha (a seta de
+   * voltar da própria tela), a entrada sai do histórico em vez de entrar outra.
+   *
+   * Na tela inicial (nenhum passo na pilha), o primeiro Voltar avisa "Toque em
+   * Voltar de novo para sair." e só o segundo sai: uma entrada de guarda fica
+   * sobre a raiz, e volta 3 s depois do aviso.
+   *
+   * As janelas continuam como eram: o passo não é registrado com janela do
+   * histórico aberta, e o Voltar com janela aberta é dela (a proteção do relato,
+   * da folha, da exclusão e da trilha segue igual, no ouvinte acima). */
+  var pilhaTelas = [];
+  var proximoPassoTela = 0;
+  var passosDepoisDoRetorno = [];
+  var restaurandoTela = false;
+  var guardaDaSaida = null;
+
+  function retratoDaTela() {
+    var aba = modoCelular ? 'cel:' + telaCelular : (($('#abas .aba.ativa') || { dataset: {} }).dataset.tela || '');
+    var conteudo = $(modoCelular ? '#cel-conteudo' : '.conteudo');
+    return {
+      aba: aba,
+      alunoCelular: modoCelular && alunoCelular ? String(alunoCelular) : null,
+      bib: aba === 'biblioteca' ? JSON.stringify({ s: bibNav.serie, m: bibNav.modulo, a: bibNav.aula, l: bibNav.minhas }) : null,
+      bibNav: aba === 'biblioteca' ? JSON.parse(JSON.stringify(bibNav)) : null,
+      livro: aba === 'biblioteca' ? (bibLivroAberto || null) : null,
+      rolagem: conteudo ? conteudo.scrollTop : 0
+    };
+  }
+
+  // o que conta como "outra tela": a aba, o lugar na Biblioteca e o livro (a rolagem não)
+  function mesmaTela(a, b) {
+    return !!a && !!b && a.aba === b.aba && a.alunoCelular === b.alunoCelular && a.bib === b.bib && a.livro === b.livro;
+  }
+
+  function registrarPassoDeTela(antes) {
+    if (retornoProgramado) { passosDepoisDoRetorno.push(antes); return; }
+    var topo = pilhaTelas[pilhaTelas.length - 1];
+    var agora = retratoDaTela();
+    if (topo && mesmaTela(topo.antes, agora)) {
+      // a seta de voltar da tela levou de volta ao lugar de antes: a entrada sai
+      pilhaTelas.pop();
+      if (history.state && history.state.apoioTela === topo.token) { retornoProgramado = true; history.back(); }
+      return;
+    }
+    var token = ++proximoPassoTela;
+    pilhaTelas.push({ token: token, antes: antes });
+    history.pushState({ apoioTela: token }, '');
+  }
+
+  function restaurarTela(r) {
+    restaurandoTela = true;
+    try {
+      if (modoCelular) {
+        var tela = r.aba.indexOf('cel:') === 0 ? r.aba.slice(4) : 'hoje';
+        if (tela !== telaCelular || String(alunoCelular || '') !== String(r.alunoCelular || '')) irParaTelaCelular(tela);
+        // a ficha de um aluno na aba Alunos: o mesmo caminho do toque na lista
+        if (r.alunoCelular && db && db.alunos.some(function (a) { return String(a.id) === r.alunoCelular; })) {
+          alunoCelular = r.alunoCelular;
+          editandoFichaAlunoCelular = false;
+          desenharAlunosCelular();
+        }
+      } else {
+        var atual = ($('#abas .aba.ativa') || { dataset: {} }).dataset.tela;
+        if (r.aba && r.aba !== atual) {
+          var b = $('#abas .aba[data-tela="' + r.aba + '"]');
+          if (b) b.click();
+        }
+        if (r.aba === 'biblioteca' && r.bibNav) {
+          var mudouBib = JSON.stringify({ s: bibNav.serie, m: bibNav.modulo, a: bibNav.aula, l: bibNav.minhas }) !== r.bib;
+          if (mudouBib) irNaBiblioteca({ serie: r.bibNav.serie, modulo: r.bibNav.modulo, aula: r.bibNav.aula, minhas: r.bibNav.minhas });
+          if (r.livro && r.livro !== bibLivroAberto) abrirTelaDoLivro(r.livro);
+          else if (!r.livro && bibLivroAberto) fecharTelaDoLivro();
+        }
+      }
+    } finally {
+      restaurandoTela = false;
+    }
+    // a rolagem volta depois do desenho (a tela do livro desenha depois de ler a posição)
+    var conteudo = $(modoCelular ? '#cel-conteudo' : '.conteudo');
+    var rolar = function () { if (conteudo) conteudo.scrollTop = r.rolagem; };
+    rolar();
+    setTimeout(rolar, 0);
+    setTimeout(rolar, 250);
+  }
+
+  // o Voltar chegou sem janela aberta: devolve a tela de antes, ou, na tela inicial, avisa antes de sair
+  function voltarDeTela() {
+    var passo = pilhaTelas.pop();
+    if (passo) { restaurarTela(passo.antes); return; }
+    if (history.state && history.state.apoioRaiz) {
+      avisar('Toque em Voltar de novo para sair.');
+      clearTimeout(guardaDaSaida);
+      guardaDaSaida = setTimeout(function () {
+        guardaDaSaida = null;
+        if (history.state && history.state.apoioRaiz) history.pushState({ apoioGuarda: true }, '');
+      }, 3000);
+    }
+  }
+
+  function ligarVoltarDasTelas() {
+    if (ligarVoltarDasTelas.feito) return;
+    ligarVoltarDasTelas.feito = true;
+    // a raiz e a guarda: o primeiro Voltar na tela inicial cai na raiz e avisa
+    if (!(history.state && (history.state.apoioRaiz || history.state.apoioGuarda || history.state.apoioTela || history.state.apoioModal))) {
+      history.replaceState({ apoioRaiz: true }, '');
+      history.pushState({ apoioGuarda: true }, '');
+    }
+    document.addEventListener('click', function () {
+      if (restaurandoTela) return;
+      var antes = retratoDaTela();
+      setTimeout(function () {
+        // com janela do histórico aberta, o toque é dela, e não um passo de tela
+        if (pilhaModalHistorico.length && !retornoProgramado) return;
+        if (!mesmaTela(antes, retratoDaTela())) registrarPassoDeTela(antes);
+      }, 0);
+    }, true);
+  }
+
   var MODAIS_HISTORICO = {
     'modal-aula': true,
     'modal-sair-relato': true,
@@ -1546,7 +1687,10 @@
     'modal-trilha': true,
     'modal-virada-anual': true,
     'modal-nuvem-restaurar': true,
-    'modal-nuvem-senha': true
+    'modal-nuvem-senha': true,
+    // FILA 2b: o leitor de livro é uma tela para ela; o Voltar fecha o leitor e volta ao livro
+    'modal-leitor-pdf': true,
+    'modal-leitor-epub': true
   };
 
   function abrirModal(id) {
@@ -2581,6 +2725,7 @@
 
   function ligarEventos() {
     ligarBuscaAoIndice();
+    ligarVoltarDasTelas();
     $$('#abas .aba').forEach(function (b) {
       b.addEventListener('click', function () {
         $$('#abas .aba').forEach(function (x) { x.classList.remove('ativa'); x.removeAttribute('aria-current'); });

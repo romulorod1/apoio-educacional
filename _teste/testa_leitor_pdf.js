@@ -247,7 +247,10 @@ async function cortarRede(pag, cortar) {
   const urlAntes = pag.url();
   const abasAntes = (await navegador.pages()).length;
   let navegacoes = 0;
-  const contaNavegacao = f => { if (f === pag.mainFrame()) navegacoes++; };
+  /* a entrada do leitor no histórico (FILA 2b: o Voltar do aparelho fecha o
+   * leitor) é um pushState na mesma página: não é sair do aplicativo. Conta
+   * só a navegação que troca de documento ou de endereço. */
+  const contaNavegacao = f => { if (f === pag.mainFrame() && f.url() !== urlAntes) navegacoes++; };
   pag.on('framenavigated', contaNavegacao);
   let alvosNovos = 0;
   const contaAlvo = t => { if (t.type() === 'page') alvosNovos++; };

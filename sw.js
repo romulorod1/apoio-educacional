@@ -152,8 +152,9 @@
  * aula no celular.
  * O v138 traz a leitura contínua dos livros e a exportação por página.
  * O v139 traz a busca no texto dos livros.
+ * O v143 traz o Voltar do aparelho dentro do aplicativo.
  */
-var CACHE = 'apoio-educacional-v139';
+var CACHE = 'apoio-educacional-v143';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
