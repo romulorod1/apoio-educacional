@@ -229,9 +229,13 @@ def trava_credito(p):
     for it in p.itens:
         doc = p.doc(it['origem']['arquivo'])
         for pz in pg.pedacos(it, 'enunciado'):
-            for bb, t, corpo, girada, _ in linhas_no(doc[pz['pagina'] - 1], pz['bbox']):
+            pgn = doc[pz['pagina'] - 1]
+            ims = [pymupdf.Rect(b['bbox']) for b in pgn.get_text('dict')['blocks'] if b['type'] == 1]
+            for bb, t, corpo, girada, _ in linhas_no(pgn, pz['bbox']):
                 tem_letra = sum(c.isalpha() for c in t) >= 2
-                if tem_letra and ((girada and corpo <= 7) or (corpo <= 8 and CREDITO.search(t))):
+                junto_de_imagem = any((pymupdf.Rect(bb) + (-6, -6, 6, 6)).intersects(i) for i in ims)
+                if tem_letra and ((girada and corpo <= 7) or (girada and corpo <= 8.5 and junto_de_imagem)
+                                  or (corpo <= 8.5 and CREDITO.search(t))):
                     erros.append('%s: credito de imagem de terceiro no recorte: %r (p%d)' % (it['id'], t[:50], pz['pagina']))
     return erros
 
@@ -246,12 +250,94 @@ def trava_corrido(p):
             for bb, t, *_ in linhas_no(pgn, pz['bbox']):
                 if bb[1] >= H * 0.88 and (re.match(r'^\d{1,3}$', t) or 'cadernos de apoio' in sem_acento(t)):
                     erros.append('%s: rodape corrido no recorte: %r (p%d)' % (it['id'], t[:40], pz['pagina']))
+            # e nenhum pedaco do selo do numero da pagina (o desenho em volta do numero)
+            numeros = [pymupdf.Rect(bb) for bb, t, *_ in linhas_no(pgn, (0, H * 0.88, pgn.rect.width, H))
+                       if re.match(r'^\d{1,3}$', t)]
+            r = pymupdf.Rect(pz['bbox'])
+            for d in pgn.get_drawings():
+                # o selo: desenho pequeno no pe, que se sobrepoe de fato ao numero
+                selo = d['rect'].height < H * 0.2 and d['rect'].y0 >= H * 0.8 and \
+                    any(not (d['rect'] & n).is_empty and (d['rect'] & n).get_area() > 1 for n in numeros)
+                dentro = (d['rect'] & r)
+                if selo and not dentro.is_empty and dentro.height > 0.5 and dentro.width > 0.5:
+                    erros.append('%s: selo do numero da pagina no recorte (p%d)' % (it['id'], pz['pagina']))
+    return erros
+
+
+def trava_cobertura(p):
+    """Toda a tinta das paginas do caderno, da primeira a ultima unidade, tem dono.
+
+    Pagina com pedaco de unidade: toda linha de texto e toda imagem cai num
+    pedaco (fora o rodape e o cabecalho, o titulo "Agora, e com voce" das
+    revisoes separadas e o credito de foto). Pagina sem pedaco: so a abertura
+    de unidade ("Unidade N") e as anotacoes; qualquer outra com texto ou
+    imagem e pagina sem dono (o tabuleiro de 5o ano, p. 91, achado da revisao)."""
+    erros = []
+    arquivos = {c['serie']: c['arquivo'] for c in p.relatorio['cadernos']}
+    por_cad = {}
+    for u in p.relatorio['unidades']:
+        cad = u['id'].split(':')[1]
+        for pz in u['pedacos']:
+            por_cad.setdefault(cad, {}).setdefault(pz['pagina'], []).append(pymupdf.Rect(pz['bbox']) + (-1, -1, 1, 1))
+    for cad, pags in sorted(por_cad.items()):
+        doc = p.doc(arquivos[cad])
+        for pno in range(min(pags), max(pags) + 1):
+            pgn = doc[pno - 1]
+            W, H = pgn.rect.width, pgn.rect.height
+            ls = [l for l in linhas_no(pgn, (0, H * 0.12, W, H * 0.88)) if not l[3] and l[2] > 6
+                  and not (l[2] <= 8.5 and CREDITO.search(l[1]))]
+            ims = [pymupdf.Rect(b['bbox']) for b in pgn.get_text('dict')['blocks'] if b['type'] == 1
+                   and b['bbox'][2] - b['bbox'][0] >= 10 and b['bbox'][3] - b['bbox'][1] >= 10
+                   and pymupdf.Rect(b['bbox']).get_area() > 400 and b['bbox'][1] < H * 0.88]
+            rs = pags.get(pno)
+            if not rs:
+                txt = ' '.join(letras(l[1]) for l in ls)
+                if re.search(r'unidade\d', txt) or txt.startswith('anotacoes') or (not ls and not ims):
+                    continue
+                erros.append('%s p%d: pagina com conteudo e sem unidade nenhuma' % (cad, pno))
+                continue
+            for bb, t, *_ in ls:
+                c = pymupdf.Point((bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2)
+                if not any(r.contains(c) for r in rs) and not letras(t).startswith('agoraecomvoce'):
+                    erros.append('%s p%d: %r fora de toda unidade' % (cad, pno, t[:40]))
+            for im in ims:
+                if not any(r.intersects(im) for r in rs):
+                    erros.append('%s p%d: imagem em %s fora de toda unidade' % (cad, pno, [round(v) for v in im]))
+    return erros
+
+
+REF = re.compile(r'(atividade|questao|pagina|exercicio)s?\s+anterior|anteriormente|pagina\s+\d', re.I)
+
+
+def trava_referencia(p):
+    """Nenhum item do pacote remete a outra atividade, questao ou pagina (nao se resolveria sozinho)."""
+    return ['%s: remete a %r' % (it['id'], m.group(0)) for it in p.itens for m in [REF.search(sem_acento(it['texto']))] if m]
+
+
+def trava_enunciado_comum(p):
+    """Revisao separada por questao nao deixa de fora texto entre o titulo dela e a questao 1."""
+    erros = []
+    arquivos = {c['serie']: c['arquivo'] for c in p.relatorio['cadernos']}
+    for u in p.relatorio['unidades']:
+        if not u['id'].endswith(':q1') or not u['pedacos']:
+            continue
+        doc = p.doc(arquivos[u['id'].split(':')[1]])
+        pz = u['pedacos'][0]
+        pgn = doc[pz['pagina'] - 1]
+        ls = linhas_no(pgn, (0, 0, pgn.rect.width, pz['bbox'][1]))
+        tit = [l for l in ls if letras(l[1]).startswith('agora')]
+        if not tit:
+            continue
+        y = max(l[0][3] for l in tit)
+        for bb, t, corpo, girada, _ in ls:
+            if not girada and bb[1] >= y - 1 and not letras(t).startswith('agora') and corpo > 8.5:
+                erros.append('%s: %r fica entre o titulo da revisao e a questao 1, fora das questoes' % (u['id'], t[:40]))
     return erros
 
 
 def trava_revisao(p):
     erros = []
-    inteiras = set(re.findall(r'revisao (sme:\S+): a numeracao', ' '.join(n for c in p.relatorio['cadernos'] for n in c['notas'])))
+    inteiras = set(re.findall(r'revisao (sme:\S+): (?:a numeracao|enunciado comum)', ' '.join(n for c in p.relatorio['cadernos'] for n in c['notas'])))
     for it in p.itens:
         doc = p.doc(it['origem']['arquivo'])
         q = it['origem_detalhe'].get('questao')
@@ -331,6 +417,9 @@ def travas(p, vinc, placar, zip_caminho=None, rot=''):
     placar.conferir('cadernos%s: uma questao da revisao por item' % rot, trava_revisao(p))
     placar.conferir('cadernos%s: nada entre duas unidades' % rot, trava_entre(p))
     placar.conferir('cadernos%s: desenho da questao seguinte fica com ela' % rot, trava_continuacao(p))
+    placar.conferir('cadernos%s: nada que remete a outra atividade' % rot, trava_referencia(p))
+    placar.conferir('cadernos%s: toda a tinta do caderno tem dono' % rot, trava_cobertura(p))
+    placar.conferir('cadernos%s: enunciado comum da revisao nao se perde' % rot, trava_enunciado_comum(p))
     placar.conferir('cadernos%s: svg autocontido' % rot, pg.trava_svg(p))
     placar.conferir('cadernos%s: svg bem formado' % rot, pg.trava_xml(p))
     placar.conferir('cadernos%s: manifesto' % rot, pg.trava_manifesto(p, zip_caminho))
@@ -362,16 +451,18 @@ def esperado_da_amostra(p):
     erros = []
     ids = sorted(i['id'] for i in p.itens)
     certos = ['sme:3ano:p004', 'sme:3ano:p006b', 'sme:3ano:p007', 'sme:3ano:p008:q1', 'sme:3ano:p008:q2', 'sme:3ano:p008:q3',
-              'sme:3ano:p008:q8']
+              'sme:3ano:p008:q8', 'sme:3ano:p010']
     if ids != certos:
         erros.append('entraram %s, e o certo e %s' % (ids, certos))
     exc = {e['id']: e['motivo'] for e in p.relatorio['excluidos']}
     if 'Fulano de Tal/Agencia Imagens' not in exc.get('sme:3ano:p006', ''):
         erros.append('o album de fotos nao saiu pelo credito: %r' % exc.get('sme:3ano:p006'))
-    if 'Beltrano/folhapress' not in exc.get('sme:3ano:p008:q5', ''):
+    if 'Beltrano Sicrano' not in exc.get('sme:3ano:p008:q5', ''):
         erros.append('a questao 5 nao saiu pelo credito: %r' % exc.get('sme:3ano:p008:q5'))
     if not exc.get('sme:3ano:p008:q6', '').startswith('curadoria: cedula'):
         erros.append('a questao 6 nao saiu pela curadoria: %r' % exc.get('sme:3ano:p008:q6'))
+    if 'questao anterior' not in exc.get('sme:3ano:p008:q9', ''):
+        erros.append('a questao 9 nao saiu por remeter a outra: %r' % exc.get('sme:3ano:p008:q9'))
     if [e['id'] for e in p.relatorio['fora_do_alvo']] != ['sme:3ano:p008:q7']:
         erros.append('fora do alvo: %s' % [e['id'] for e in p.relatorio['fora_do_alvo']])
     por = {i['id']: i for i in p.itens}
@@ -446,6 +537,18 @@ def venenos(temp, pdfs, vinc_c, vinc, cur, placar, boa):
     # sem dar o desenho do alto da pagina a questao seguinte, a 7 o leva
     q = com('IMAGEM_ACIMA_E_DA_SEGUINTE', False, lambda: gera('imagem_acima'))
     placar.conferir('desenho da questao 8 na questao 7', trava_continuacao(q), True, 'so tem desenho')
+    # sem o selo como rodape, o topo do circulo do numero da pagina entra no recorte
+    q = com('SELO_DO_RODAPE', False, lambda: gera('selo'))
+    placar.conferir('selo do numero da pagina no recorte', trava_corrido(q), True, 'selo')
+    # o credito de 8 pt encostado na foto so e pego pela regra da imagem
+    q = com('CREDITO_GIRADO_IMAGEM', 7.0, lambda: gera('credito8'))
+    placar.conferir('credito de 8 pt junto da foto', trava_credito(q), True, 'Beltrano')
+    # sem tirar o que remete a outra questao, a 9 entra e nao se resolve sozinha
+    q = com('TIRA_REFERENCIA', False, lambda: gera('referencia'))
+    placar.conferir('questao que remete a anterior', trava_referencia(q), True, 'questao anterior')
+    # separando a revisao com enunciado comum, o texto antes da 1 fica de fora
+    q = com('REVISAO_COM_ENUNCIADO_INTEIRA', False, lambda: gera('enunciado'))
+    placar.conferir('enunciado comum da revisao perdido', trava_enunciado_comum(q), True, 'Use a tabela')
     # sem a excecao da revisao, a questao solta do 3o ano sai ludica
     q = com('TOM_REVISAO_ESCOLAR', False, lambda: gera('tom_revisao'))
     placar.conferir('questao da revisao do 3o ano ludica', trava_campos(q, vinc), True, "tom 'lúdico'")
@@ -454,8 +557,14 @@ def venenos(temp, pdfs, vinc_c, vinc, cur, placar, boa):
     for u in q.relatorio['unidades']:
         if u['id'] == 'sme:3ano:p008:q1':
             b = u['pedacos'][0]['bbox']
-            u['pedacos'][0]['bbox'] = [b[0], b[1], b[2], b[3] - 14]
-    placar.conferir('recorte encolhido', trava_entre(q), True, 'entre os dois recortes')
+            u['pedacos'][0]['bbox'] = [b[0], b[1], b[2], b[3] - 30]
+    placar.conferir('recorte encolhido', trava_entre(q), True, 'Mostre como pensou')
+    # pagina que nenhuma unidade cobre (a continuacao de "Pastores e ovelhas" some)
+    q = pg.copia(boa, temp, 'v_cobertura')
+    for u in q.relatorio['unidades']:
+        if u['id'] == 'sme:3ano:p004':
+            u['pedacos'] = u['pedacos'][:1]
+    placar.conferir('pagina sem dono', trava_cobertura(q), True, 'sem unidade nenhuma')
     # recorte que sobe para a unidade de cima: o fim do album de fotos fica no
     # alto do recorte do quadro de numeros
     q = pg.copia(boa, temp, 'v_sobe')

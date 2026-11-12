@@ -6,7 +6,7 @@ para a prova do tipo de fonte cadernos-sme-sp (biblioteca/_prova_cadernos_sme.py
 Conteudo proprio, escrito aqui, para a prova rodar no portao sem o Drive. Imita
 o que o C5 mediu nos cadernos reais (ver o cabecalho de biblioteca/cadernos_sme.py):
 
-CadernosApoioAprendizagemMatematicaAluno3Ano.pdf, 10 paginas:
+CadernosApoioAprendizagemMatematicaAluno3Ano.pdf, 11 paginas:
 - p1 capa; p2 o Indice em DUAS colunas, com guia de pontos, a linha da
   unidade com pontos depois do numero, um titulo que quebra em duas linhas e
   uma guia de um ponto so;
@@ -26,7 +26,13 @@ CadernosApoioAprendizagemMatematicaAluno3Ano.pdf, 10 paginas:
   que a curadoria tira; a 7, de massa, assunto fora dos 33;
 - p9 (9) a revisao continua: um desenho no alto, que e da questao 8, e a 8;
   a questao 7 acaba na p8 (o desenho nao e dela);
-- p10 ANOTACOES (fim: nada dali entra).
+  e a 9, que remete a "questao anterior" (sai: nao se resolve sozinha);
+- p10 (10) outra revisao, com "Use a tabela abaixo..." e a tabela antes da
+  questao 1: sai inteira, num item so;
+- p11 ANOTACOES (fim: nada dali entra).
+O numero de cada pagina fica num selo (circulo claro) que sobe acima do
+texto do numero; a questao 5 tem o credito da foto em 8 pt, girado, sem
+palavra de credito, encostado na foto.
 Toda pagina de conteudo tem o rodape corrido: o numero da pagina, a linha
 "cadernos de apoio e aprendizagem SMESP" e o numero por extenso.
 """
@@ -38,7 +44,7 @@ import pymupdf
 FIXO = {'creationDate': 'D:20261113000000', 'modDate': 'D:20261113000000', 'producer': 'amostra', 'creator': 'amostra'}
 W, H = 555.0, 774.0
 NOME = 'CadernosApoioAprendizagemMatematicaAluno3Ano.pdf'
-EXTENSO = {3: 'tres', 4: 'quatro', 5: 'cinco', 6: 'seis', 7: 'sete', 8: 'oito', 9: 'nove', 10: 'dez'}
+EXTENSO = {3: 'tres', 4: 'quatro', 5: 'cinco', 6: 'seis', 7: 'sete', 8: 'oito', 9: 'nove', 10: 'dez', 11: 'onze'}
 
 
 def texto(pg, x, y, t, corpo=12, fonte='helv', rot=0):
@@ -46,7 +52,10 @@ def texto(pg, x, y, t, corpo=12, fonte='helv', rot=0):
 
 
 def rodape(pg, n):
-    texto(pg, 30 if n % 2 == 0 else W - 50, 740, str(n), corpo=10)
+    x = 30 if n % 2 == 0 else W - 50
+    # o selo do numero da pagina: circulo verde que sobe acima do texto
+    pg.draw_circle((x + 6, 736), 14, color=None, fill=(0.45, 0.7, 0.5))
+    texto(pg, x, 740, str(n), corpo=10)
     texto(pg, 300 if n % 2 == 0 else 110, 745, 'cadernos de apoio e aprendizagem SMESP', corpo=9)
     texto(pg, 60 if n % 2 == 0 else W - 120, 752, EXTENSO.get(n, ''), corpo=7)
 
@@ -89,7 +98,8 @@ def fazer(pasta):
            ('QUADRO DE NUMEROS . . . . . . . . 6', 'helv')]
     dir_ = [('DUAS COLUNAS LADO', 'helv'),
             ('A LADO . . . . . . . . . . . . . . . . 7', 'helv'),
-            ('AGORA, E COM VOCE. 8', 'helv')]
+            ('AGORA, E COM VOCE. 8', 'helv'),
+            ('AGORA, E COM VOCE . . . . . . . 10', 'helv')]
     for k, (t, f) in enumerate(esq):
         texto(pg, 60, 100 + 18 * k, t, corpo=10, fonte=f)
     for k, (t, f) in enumerate(dir_):
@@ -146,7 +156,7 @@ def fazer(pasta):
     texto(pg, 326, 286, 'Quanto falta para 10?')
     item(pg, 100, 340, 5, 'Que horas o relogio da foto marca?')
     foto(pg, (130, 355, 260, 440))
-    texto(pg, 122, 438, 'Beltrano/folhapress', corpo=5, rot=90)
+    texto(pg, 124, 438, 'Beltrano Sicrano', corpo=8, rot=90)  # credito de 8 pt, sem palavra de credito, encostado na foto
     item(pg, 100, 480, 6, 'Circule a cedula de 20 reais.')
     desenho(pg, (120, 495, 300, 560), cor=(0.1, 0.6, 0.2))
     item(pg, 100, 600, 7, 'Quantos quilos tem a mochila da balanca?')
@@ -157,11 +167,21 @@ def fazer(pasta):
     desenho(pg, (150, 90, 400, 200), cor=(0.3, 0.3, 0.7))
     item(pg, 100, 230, 8, 'Quantos lados tem a figura desenhada acima?')
     texto(pg, 116, 246, 'Escreva o numero de lados.')
+    item(pg, 100, 320, 9, 'Some 5 ao numero de lados da figura da questao anterior.')
+    texto(pg, 116, 336, 'Escreva a conta.')
     rodape(pg, 9)
-    # p10: anotacoes
+    # p10: outra revisao, com enunciado comum antes da questao 1 (sai inteira)
+    pg = doc.new_page(width=W, height=H)
+    texto(pg, 100, 90, 'AGORA, E COM VOCE', corpo=26, fonte='hebo')
+    texto(pg, 100, 125, 'Use a tabela abaixo nas questoes 1 e 2.')
+    desenho(pg, (110, 140, 400, 220), cor=(0.4, 0.2, 0.6))
+    item(pg, 100, 250, 1, 'Qual coluna tem o maior valor?')
+    item(pg, 100, 300, 2, 'Quanto a primeira coluna tem a mais que a segunda?')
+    rodape(pg, 10)
+    # p11: anotacoes
     pg = doc.new_page(width=W, height=H)
     texto(pg, 100, 100, 'ANOTACOES', corpo=15, fonte='hebo')
-    rodape(pg, 10)
+    rodape(pg, 11)
     doc.set_metadata(FIXO)
     caminho = os.path.join(pasta, NOME)
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
@@ -180,6 +200,8 @@ sme:3ano:p008:q5;MAT03-11;;amostra;horas
 sme:3ano:p008:q6;MAT03-10;cedula de dinheiro sem credito, imagem de terceiro;amostra;dinheiro
 sme:3ano:p008:q7;MAT03-09;;amostra;massa, fora dos 33
 sme:3ano:p008:q8;MAT03-07;;amostra;lados de figura plana
+sme:3ano:p008:q9;MAT03-02;;amostra;adicao com a figura de outra questao
+sme:3ano:p010;MAT03-12;;amostra;leitura de tabela
 """
 
 

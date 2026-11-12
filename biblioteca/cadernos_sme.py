@@ -35,7 +35,10 @@ Unidade do pacote (o "exercicio" do app):
   item, porque as questoes sao independentes e cada uma tem o seu assunto;
   questoes lado a lado na mesma faixa saem juntas, num item so.
 A abertura de cada unidade (conversa de sala) e o que vem depois da ultima
-atividade (paginas de anotacoes) nao sao atividades.
+atividade (paginas de anotacoes) nao sao atividades. A revisao com texto comum
+antes da questao 1 sai inteira, e o item que remete a outra atividade, questao
+ou pagina ("a tabela da atividade anterior") sai com motivo: separado, nao se
+resolveria sozinho.
 
 Campos (CONTRATO_pacote_biblioteca.md, esquema 1; os novos sao aditivos e o
 aplicativo ignora o que nao conhece):
@@ -44,7 +47,9 @@ aplicativo ignora o que nao conhece):
   assunto: reclassificar nao muda id.
 - serie: a do caderno (2ano a 9ano). tema_app: o assunto do aplicativo, pelo
   csv de vinculos (feito por leitura). modulo: o assunto. aula: o caderno.
-- tom: 'lúdico' no 2o e no 3o ano, 'escolar' do 4o ao 9o (TOM, abaixo).
+- tom: 'lúdico' no 2o e no 3o ano, 'escolar' do 4o ao 9o (TOM, abaixo), com
+  uma excecao medida: a questao solta da revisao do 2o e do 3o ano e
+  'escolar' (tom_do_item).
 - dificuldade: o caderno nao da referencia de dificuldade; sai null, com
   dificuldade_origem null (o app ja trata dificuldade ausente).
 - sem solucao: o caderno do aluno nao traz respostas; assets.solucao null,
@@ -124,8 +129,9 @@ ALTURA_MIN = 20.0        # recorte de enunciado mais baixo que isto nao e ativid
 PEDACO_MIN = 9.0         # pedaco de continuacao mais baixo que isto nao e conteudo
 BANDA = 0.12             # fracao da altura onde moram cabecalho e rodape corridos
 REPETE_MIN = 0.3         # corrido: na mesma altura em ao menos 30% das paginas
-CREDITO_GIRADO_MAX = 6.5  # texto girado ate este corpo, com letras, e credito de imagem
-CREDITO_MIUDO_MAX = 8.0   # texto miudo ate este corpo, com palavra de credito, tambem
+CREDITO_GIRADO_MAX = 7.0  # texto girado ate este corpo, com letras, e credito de imagem
+CREDITO_GIRADO_IMAGEM = 8.5  # ate este, quando encosta numa imagem (a capa de jornal do 6o ano, p. 22, credita em 8 pt)
+CREDITO_MIUDO_MAX = 8.5   # texto miudo ate este corpo, com palavra de credito, tambem
 MARGEM_QUESTAO = 14.0    # o numero da questao da revisao fica ate 14 pt da margem
 MAX_PAGINAS = 5          # uma atividade nunca passa disto (salvaguarda contra fim nao achado)
 
@@ -134,13 +140,24 @@ TIRA_CREDITO = True      # atividade com credito de imagem de terceiro sai com m
 SEPARA_REVISAO = True    # a revisao sai uma questao por item; False so no veneno
 TIRA_CORRIDO = True      # cabecalho e rodape corridos ficam fora do recorte; False so no veneno
 CONFERE_BORDA = True     # recorte que corta tinta na borda sai com motivo; False so no veneno
-FIO_FINO = True          # o traco fino desenhado (linha de resposta) entra no recorte; False so no veneno
+FIO_FINO = True          # o desenho vetorial claro ou fino (linha de resposta, quadro) entra no recorte; False so no veneno
 IMAGEM_ACIMA_E_DA_SEGUINTE = True  # desenho no alto da pagina, acima do numero, e da questao seguinte; False so no veneno
+SELO_DO_RODAPE = True    # o desenho que encosta no numero da pagina e do rodape; False so no veneno
+TIRA_REFERENCIA = True   # o item que remete a outra atividade, questao ou pagina sai com motivo; False so no veneno
+REVISAO_COM_ENUNCIADO_INTEIRA = True  # revisao com texto comum antes do "1." nao se separa; False so no veneno
+
+# o item que remete a outra atividade ou pagina nao se resolve sozinho (achado
+# da revisao do C5: "ordene os numeros da atividade anterior", "a tabela que
+# voce montou na atividade anterior", "os prismas da pagina anterior")
+REFERENCIA = re.compile(r'\b(?:atividades?|quest[oõ](?:es)?|quest[aã]o|p[aá]ginas?|exerc[ií]cios?|itens?|problemas?)\s+'
+                        r'anterior(?:es)?\b|\banteriormente\b|\bp[aá]gina\s+\d+', re.I)
+# a questao solta da revisao que cita "o quadro 1" ou "a tabela 2" sem traze-los
+ROTULO = re.compile(r'\b(quadro|tabela|figura|gr[aá]fico)\s+(\d+)\b', re.I)
 
 PALAVRA_DE_CREDITO = re.compile(
     r'\bfotos?\b|wiki(?:pedia|media)|getty|pulsar|folha\s*(?:press|imagem)|folhapress|\bafp\b|\bnasa\b|reprodu[cç][aã]o'
     r'|©|\bacervo\b|shutterstock|latin\s*stock|stockfood|thinkstock|\bimages?\b|\bimagens\b|projeto\s+portinari'
-    r'|arquivo\s+\w+|\bae\b|agência', re.I)
+    r'|arquivo\s+\w+|\bae\b|agência|\bfolha\b|estad[aã]o|estado\s+de\s+s|\bveja\b|\brevista\b|\bjornal\b|stock', re.I)
 ANEXO = re.compile(r'\banexos?\b', re.I)
 
 
@@ -179,12 +196,25 @@ def linhas(pg):
     return out
 
 
-def eh_credito(l):
-    """A linha e credito de foto ou reproducao de terceiro?"""
+def eh_credito(l, imagens=()):
+    """A linha e credito de foto ou reproducao de terceiro?
+
+    imagens: as caixas das imagens raster da pagina; o texto girado de ate
+    CREDITO_GIRADO_IMAGEM pt a ate 6 pt de uma delas tambem e credito."""
     letras = sum(1 for c in l['texto'] if c.isalpha())
-    if l['girada'] and l['tam'] <= CREDITO_GIRADO_MAX and letras >= 2:
+    if letras < 2:
+        return False
+    if l['girada'] and l['tam'] <= CREDITO_GIRADO_MAX:
         return True
-    return l['tam'] <= CREDITO_MIUDO_MAX and letras >= 2 and bool(PALAVRA_DE_CREDITO.search(l['texto']))
+    if l['girada'] and l['tam'] <= CREDITO_GIRADO_IMAGEM:
+        r = pymupdf.Rect(l['bb']) + (-6, -6, 6, 6)
+        if any(r.intersects(pymupdf.Rect(i)) for i in imagens):
+            return True
+    return l['tam'] <= CREDITO_MIUDO_MAX and bool(PALAVRA_DE_CREDITO.search(l['texto']))
+
+
+def imagens_da_pagina(pg):
+    return [tuple(b['bbox']) for b in pg.get_text('dict')['blocks'] if b['type'] == 1]
 
 
 # ------------------------------------------------------------------ indice
@@ -303,6 +333,22 @@ def faixas(doc):
         junto = lambda bb: any(min(bb[3], q[3]) - max(bb[1], q[1]) > 0 for _, q in corr)
         alto = [bb[3] for k, bb in por_pag[pno] if k[0] == 'a' and (junto(bb))]
         pe = [bb[1] for k, bb in por_pag[pno] if k[0] == 'p' and (junto(bb))]
+        if SELO_DO_RODAPE and corr:
+            # o desenho ou a imagem que encosta num corrido e dele: o circulo em
+            # volta do numero da pagina sobe ate y 721, acima do texto "16"
+            # (y 727), e o pe pelo texto deixava o topo do circulo no recorte
+            # (achado da revisao do C5: 231 de 364 pedacos)
+            caixas = [tuple(d['rect']) for d in pg.get_drawings()] + imagens_da_pagina(pg)
+            for r in caixas:
+                if r[3] - r[1] > H * BANDA * 1.5 or r[2] - r[0] > pg.rect.width * 0.9:
+                    continue  # fundo ou moldura grande nao e selo de rodape
+                if H * BANDA + 10 < r[1] < H * (1 - BANDA) - 10:
+                    continue  # o selo comeca dentro da banda: o quadro do conteudo que so encosta no rodape fica
+                for k, q in corr:
+                    if k[0] == 'p' and pymupdf.Rect(r).intersects(pymupdf.Rect(q)):
+                        pe.append(r[1])
+                    if k[0] == 'a' and pymupdf.Rect(r).intersects(pymupdf.Rect(q)):
+                        alto.append(r[3])
         out.append((max(alto) + 1.5 if alto else 0.0, min(pe) - 1.5 if pe else H - 1.0))
     return out
 
@@ -320,7 +366,10 @@ def achar_titulo(pg, titulo, topo, pe):
             cands.append(l)
     if not cands:
         return None
-    return min(cands, key=lambda l: (l['bb'][1], l['bb'][0]))['bb']
+    # o de maior corpo (a fonte do titulo), e entre esses o mais alto: "pirâmide:"
+    # no corpo do texto nao passa pelo titulo "Pirâmides"
+    maior = max(round(l['tam']) for l in cands)
+    return min([l for l in cands if round(l['tam']) == maior], key=lambda l: (l['bb'][1], l['bb'][0]))['bb']
 
 
 def texto_acima(pg, bb, topo):
@@ -329,11 +378,29 @@ def texto_acima(pg, bb, topo):
                for l in linhas(pg))
 
 
+def continua_acima(pg, bb, topo):
+    """O texto acima do titulo e a continuacao da unidade anterior?
+
+    Sim quando ha questao numerada ("3. ...") ou mais de duas linhas de texto
+    acima do titulo. A legenda curta de uma foto ou de um desenho no alto da
+    pagina ("Parque Estadual Carlos Botelho...", 4o ano, p. 130) e desta
+    atividade, como o desenho: ela comeca no topo da pagina."""
+    ims = imagens_da_pagina(pg)
+    acima = [l for l in linhas(pg) if l['bb'][3] <= bb[1] + 1 and l['bb'][1] >= topo - 1 and not l['girada']
+             and not eh_credito(l, ims)]
+    return len(acima) > 2 or any(re.match(r'^\d{1,2}\s*[.)](?!\d)', l['texto']) for l in acima)
+
+
 def pagina_vazia(pg, topo, pe):
-    """Sem texto util entre o topo e o pe, ou so "ANOTACOES": fim do caderno."""
+    """Fim do caderno: a pagina de "ANOTACOES", ou sem texto E sem imagem nem
+    desenho entre o topo e o pe. Pagina so de desenho (o tabuleiro de "A trilha
+    do resto", 5o ano, p. 91) NAO e vazia: e da atividade (achado da revisao)."""
     ts = [so_letras(l['texto']) for l in linhas(pg) if topo <= l['bb'][1] and l['bb'][3] <= pe + 1]
     ts = [t for t in ts if t]
-    return not ts or all(t in ('anotacoes',) for t in ts)
+    if ts:
+        return all(t in ('anotacoes',) for t in ts)
+    caixas = [tuple(d['rect']) for d in pg.get_drawings()] + imagens_da_pagina(pg)
+    return not any(r[1] >= topo - 1 and r[3] <= pe + 1 and (r[2] - r[0]) * (r[3] - r[1]) > 100 for r in caixas)
 
 
 def unidades_do_caderno(doc, serie, cache):
@@ -356,7 +423,7 @@ def unidades_do_caderno(doc, serie, cache):
         if bb is None:
             notas.append('titulo do indice nao achado na pagina: %r p%d' % (e['titulo'], e['pagina']))
             y = fx[pno][0]
-        elif not texto_acima(doc[pno], bb, fx[pno][0]):
+        elif not continua_acima(doc[pno], bb, fx[pno][0]):
             # o titulo e o primeiro texto da pagina: o que estiver acima dele (o
             # desenho que abre a atividade) e desta atividade, e a anterior
             # acaba na pagina de antes
@@ -389,11 +456,20 @@ def unidades_do_caderno(doc, serie, cache):
         ult = p0
         while ult < fim[0] and ult + 1 - p0 < MAX_PAGINAS and not pagina_vazia(doc[ult + 1], *fx[ult + 1]):
             ult += 1
+        truncada = None
         if ult < fim[0]:
             if ult + 1 - p0 >= MAX_PAGINAS and not pagina_vazia(doc[ult + 1], *fx[ult + 1]):
+                truncada = 'a atividade passa de %d paginas sem achar o fim; sai, para nao entrar pela metade' % MAX_PAGINAS
                 notas.append('%r passa de %d paginas; cortada na p%d' % (e['titulo'], MAX_PAGINAS, ult + 1))
             fim = (ult, fx[ult][1] + 1)
-        out.append(dict(e, fim=fim))
+        out.append(dict(e, fim=fim, truncada=truncada))
+    # titulo do Indice nao achado na pagina: o comeco desta e o fim da anterior
+    # ficam incertos, e as duas saem com motivo
+    for k, u in enumerate(out):
+        if u['tipo'] != 'unidade' and u.get('titulo_bb') is None:
+            u['truncada'] = u.get('truncada') or 'o titulo do Indice nao foi achado na pagina'
+            if k and out[k - 1]['ini'][0] <= u['ini'][0]:
+                out[k - 1]['truncada'] = out[k - 1].get('truncada') or 'a atividade seguinte nao tem titulo achado: o fim desta e incerto'
     return out, fx, desl, notas
 
 
@@ -412,7 +488,15 @@ def fronteira_livre(doc, pno, y, topo, cache):
     if not FRONTEIRA_LIVRE:
         return y
     tinta = provas._tinta_da_pagina(doc, pno, cache, [])[0]
-    linha = tinta.any(axis=1)
+    linha = tinta.any(axis=1).copy()
+    if FIO_FINO:
+        # o desenho claro conta como tinta aqui tambem (o quadro azul claro da
+        # questao de cima nao pode ficar do lado de baixo da fronteira); o de
+        # mais de 200 pt de altura (fio lateral da pagina) nao barra fronteira
+        for fy0, fy1, _x0, _x1 in desenhos_visiveis(doc, pno, cache):
+            if fy1 - fy0 <= 200:
+                a = max(0, int(math.floor(fy0)))
+                linha[a:max(a + 1, int(math.ceil(fy1)))] = True
     r = int(math.floor(y))
     lim = max(int(math.ceil(topo)), int(math.floor(y - SOBE_MAX)))
     while r - 1 >= lim:
@@ -479,6 +563,26 @@ def questoes_da_revisao(doc, fx, e, cache):
     ms = marcadores_de_questao(doc, fs)
     if not ms or not cadeia(ms):
         return None
+    if REVISAO_COM_ENUNCIADO_INTEIRA:
+        # texto entre o titulo da revisao e o "1." e enunciado comum ("Resolva
+        # as seguintes situacoes:", o "Quadro 1" do 7o ano, p. 229): separada,
+        # cada questao perderia esse texto. A revisao sai inteira.
+        tb = e.get('titulo_bb')
+        p1, y1 = ms[0]['pno'], ms[0]['bb'][1]
+        for p, a, b in fs:
+            if p > p1:
+                break
+            ims = imagens_da_pagina(doc[p])
+            for l in linhas(doc[p]):
+                if l['girada'] or eh_credito(l, ims) or not (a - 1 <= l['bb'][1] < b):
+                    continue
+                if p == p1 and l['bb'][1] >= y1 - 1:
+                    continue
+                if tb and p == e['ini'][0] and l['bb'][1] < tb[3] and l['bb'][3] > tb[1] - 1:
+                    continue  # a linha do proprio titulo
+                if tb and p == e['ini'][0] and l['bb'][3] <= tb[1] + 1:
+                    continue  # acima do titulo (fora da revisao)
+                return 'enunciado'
     grupos = []
     for m in ms:
         if m['direita'] and grupos and grupos[-1][0]['pno'] == m['pno'] and \
@@ -506,20 +610,32 @@ def questoes_da_revisao(doc, fx, e, cache):
 
 # ------------------------------------------------------------------ recorte
 
-def fios_finos(doc, pno, cache):
-    """(y0, y1, x0, x1) dos tracos finos (ate 2 pt de espessura) com cor visivel."""
-    chave = ('fios_finos', pno)
+def desenhos_visiveis(doc, pno, cache):
+    """(y0, y1, x0, x1) dos desenhos vetoriais com cor visivel (nao branca, nao transparente)."""
+    chave = ('desenhos_visiveis', pno)
     if chave not in cache:
         out = []
         for d in doc[pno].get_drawings():
             r = d['rect']
             cor = d.get('color') or d.get('fill')
-            if not cor or min(r.width, r.height) >= 2 or max(r.width, r.height) < 20:
+            if not cor or max(r.width, r.height) < 3:
                 continue
             if sum(cor[:3]) / 3.0 > 0.9:  # branco ou quase: nao aparece
                 continue
+            opac = [v for v in (d.get('stroke_opacity'), d.get('fill_opacity')) if v is not None]
+            if opac and max(opac) < 0.05:
+                continue
             out.append((r.y0, r.y1, r.x0, r.x1))
         cache[chave] = out
+    return cache[chave]
+
+
+def imagens_inteiras(doc, pno, cache):
+    """(y0, y1, x0, x1) das imagens raster da pagina: a imagem clara (o quadro de
+    resposta em imagem, 3o ano, p. 111) fica acima do limiar da tinta."""
+    chave = ('imagens', pno)
+    if chave not in cache:
+        cache[chave] = [(b[1], b[3], b[0], b[2]) for b in imagens_da_pagina(doc[pno]) if (b[2] - b[0]) >= 3 and (b[3] - b[1]) >= 3]
     return cache[chave]
 
 
@@ -537,10 +653,13 @@ def caixa_pela_tinta(doc, pno, y0, y1, cache):
         if cy0 >= ya and cy1 <= yb:
             ys.extend((int(cy0), int(math.ceil(cy1))))
             cols.append(int(cx))
-    # o fio fino desenhado (a linha de resposta de 0,5 pt, 8o ano, p. 71) some
-    # na tinta de 72 dpi pelo antialias: entra pelo proprio desenho
-    for fy0, fy1, fx0, fx1 in (fios_finos(doc, pno, cache) if FIO_FINO else []):
-        if ya <= (fy0 + fy1) / 2.0 < yb:
+    # o desenho vetorial que a tinta de 72 dpi nao ve entra pelo proprio
+    # retangulo: a linha de resposta de 0,5 pt (8o ano, p. 71) some no
+    # antialias, e o quadro e as bolhas em azul claro translucido (2o ano,
+    # p. 90) ficam acima do limiar da tinta. So o desenho INTEIRO dentro da
+    # faixa: o fundo de pagina inteira e o desenho da unidade vizinha ficam fora
+    for fy0, fy1, fx0, fx1 in ((desenhos_visiveis(doc, pno, cache) + imagens_inteiras(doc, pno, cache)) if FIO_FINO else []):
+        if ya - 1 <= fy0 and fy1 <= yb + 1:
             ys.extend((int(math.floor(fy0)), int(math.ceil(fy1))))
             cols.extend((int(math.floor(fx0)), int(math.ceil(fx1))))
     if not ys or not cols:
@@ -577,9 +696,10 @@ def creditos(doc, ps):
     out = []
     for p in ps:
         r = pymupdf.Rect(p['rect'])
+        ims = imagens_da_pagina(doc[p['pno']])
         for l in linhas(doc[p['pno']]):
             c = pymupdf.Point((l['bb'][0] + l['bb'][2]) / 2, (l['bb'][1] + l['bb'][3]) / 2)
-            if r.contains(c) and eh_credito(l):
+            if r.contains(c) and eh_credito(l, ims):
                 out.append(l['texto'])
     return out
 
@@ -657,13 +777,17 @@ def detectar(pasta, cad):
         qs = questoes_da_revisao(doc, fx, e, cache) if (e['tipo'] == 'revisao' and SEPARA_REVISAO) else None
         if e['tipo'] == 'revisao' and SEPARA_REVISAO and qs is None:
             notas.append('revisao %s: a numeracao das questoes nao fecha; saiu inteira' % base)
+        if qs == 'enunciado':
+            notas.append('revisao %s: enunciado comum antes da questao 1; saiu inteira' % base)
+            qs = None
         if qs:
             for nums, ini, fim in qs:
                 numero += 1
                 unidades.append({'id': '%s:q%d' % (base, nums[0]), 'numero': numero, 'tipo': 'questao',
                                  'titulo': '%s, questão %s' % (titulo_bonito(e['titulo']), ' e '.join(map(str, nums))),
                                  'atividade': titulo_bonito(e['titulo']), 'questoes': nums, 'unidade': e['unidade'],
-                                 'pagina': pag, 'fatias': fatias(fx, ini, fim), 'alvo': '%d' % nums[0]})
+                                 'pagina': pag, 'fatias': fatias(fx, ini, fim), 'alvo': '%d' % nums[0],
+                                 'truncada': e.get('truncada')})
         else:
             numero += 1
             fs = fatias(fx, e['ini'], e['fim'])
@@ -671,7 +795,7 @@ def detectar(pasta, cad):
             unidades.append({'id': base, 'numero': numero, 'tipo': 'atividade', 'titulo': titulo_bonito(e['titulo']),
                              'atividade': titulo_bonito(e['titulo']), 'questoes': sorted(set(m['numero'] for m in ms)),
                              'unidade': e['unidade'], 'pagina': pag, 'fatias': fs,
-                             'alvo': e['titulo'] if e.get('titulo_bb') else None})
+                             'alvo': e['titulo'] if e.get('titulo_bb') else None, 'truncada': e.get('truncada')})
     return doc, unidades, fx, desl, notas, cache
 
 
@@ -683,7 +807,17 @@ def titulo_bonito(t):
     t = re.sub(r'\s+', ' ', t.replace('’', ',').replace(',,', ',')).strip()
     t = re.sub(r'\s*,\s*', ', ', t)
     palavras = t.split(' ')
-    mista = any(len(p) > 1 and p.isupper() for p in palavras) or not any(c.islower() for c in t)
+    # caixa misturada: palavra com maiusculas e minusculas e duas maiusculas ou
+    # mais ("AGora", "RODíZIO"), metade das palavras toda em maiuscula
+    # ("OUTROS PASTORES E suas OVELHAS"), ou nenhuma minuscula (menos a sigla
+    # sozinha, "GPS"); a sigla no meio de frase fica ("Índice de massa corporal (IMC)")
+    ps = [re.sub(r'[^\w]', '', p) for p in palavras]
+    ps = [p for p in ps if len(p) > 1 and not p.isdigit()]
+    misturada = any(sum(1 for c in p if c.isupper()) >= 2 and any(c.islower() for c in p) for p in ps)
+    maiusculas = [p for p in ps if p.isupper()]
+    sem_minuscula = not any(c.islower() for c in t)
+    mista = misturada or (sem_minuscula and len(re.sub(r'\W', '', t)) > 4) or \
+        (not sem_minuscula and ps and len(maiusculas) * 2 >= len(ps))
     if mista:
         t = t.lower()
     return portal.sem_tracos(t[:1].upper() + t[1:])
@@ -697,16 +831,40 @@ def atribuicao(serie, paginas, atividade, questao=None):
     return '%s, %s (SME-SP, 2014), %s, atividade "%s"%s.' % (NOME_CADERNO, NOME_SERIE[serie], pg, atividade, q)
 
 
-def origem_curta(serie, paginas):
+def origem_curta(serie, paginas, atividade):
+    """O que o aplicativo desenha no cartao, na tela cheia e na folha: a atribuicao
+    curta com a licenca (nao comercial e pela mesma licenca)."""
     pg = 'p. %d' % paginas[0] if len(paginas) == 1 else 'p. %d a %d' % (paginas[0], paginas[-1])
-    return 'Cadernos de Apoio e Aprendizagem, SME-SP, %s, %s. Licença não comercial (Decreto 52.681/2011)' % (
-        NOME_SERIE[serie], pg)
+    return ('Cadernos de Apoio e Aprendizagem, SME-SP, %s, %s, "%s". Licença não comercial e pela mesma licença '
+            '(Decreto 52.681/2011)' % (NOME_SERIE[serie], pg, atividade))
+
+
+def referencia_de_fora(texto, tipo):
+    """O trecho que remete a algo fora do recorte, ou None.
+
+    "atividade anterior", "pagina anterior", "pagina 12": sempre. Na questao
+    solta da revisao, tambem "quadro 1", "tabela 2" quando o rotulo so aparece
+    uma vez no recorte (a mencao, e nao o quadro)."""
+    t = ' '.join(texto.split())
+    m = REFERENCIA.search(t)
+    if m:
+        return m.group(0)
+    if tipo == 'questao':
+        vistos = {}
+        for r in ROTULO.finditer(sem_acento(t)):
+            vistos.setdefault((r.group(1), r.group(2)), []).append(r.group(0))
+        for chave, ms in sorted(vistos.items()):
+            if len(ms) == 1:
+                return ms[0]
+    return None
 
 
 def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=None, commit=None, gravar_zip=True,
           series=None):
     t_ini = time.time()
-    nome = PACOTE
+    # com --serie, o pacote parcial leva as series no nome: com o nome do completo,
+    # importado no app ele substituiria o completo (achado da revisao do C5)
+    nome = PACOTE if not series else '%s-%s' % (PACOTE, '-'.join(sorted(series, key=lambda s: int(s[0]))))
     trabalho = trabalho or os.path.join(os.path.dirname(os.path.abspath(saida)), 'trabalho', '%s-v%d' % (nome, versao))
     dif_cur, apelidos, excl_cur, _meta = gerar_pacote.ler_curadoria(curadoria)
     vinc = ler_vinculos(vinculos)
@@ -745,8 +903,14 @@ def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=Non
                 cr = creditos(doc, ps)
                 if cr:
                     motivo = 'foto ou ilustração de terceiro (crédito na página: %s)' % '; '.join(sorted(set(cr)))[:160]
+            if not motivo and u.get('truncada'):
+                motivo = u['truncada']
             if not motivo and ANEXO.search(txt):
                 motivo = 'depende do anexo do caderno (material para recortar)'
+            if not motivo and TIRA_REFERENCIA:
+                ref = referencia_de_fora(txt, u['tipo'])
+                if ref:
+                    motivo = 'remete a %r, que nao vem no recorte (nao se resolve sozinho)' % ref
             if not motivo and iid in excl_cur:
                 motivo = 'curadoria: ' + excl_cur[iid]
             if not motivo and v and v['exclusao']:
@@ -807,7 +971,7 @@ def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=Non
                 'formato': 'aberta', 'alternativas': None, 'resposta': None,
                 'subitens': [str(n) for n in u['questoes']] if u['tipo'] == 'atividade' else [],
                 'texto': portal.para_busca(txt),
-                'origem_citada': origem_curta(serie, paginas),
+                'origem_citada': origem_curta(serie, paginas, u['atividade']),
                 'dificuldade': None, 'dificuldade_origem': None, 'proxy': None,
                 'tema_app': tid, 'tema_origem': 'leitura',
                 'tom': tom_do_item(serie, u['tipo']),
@@ -840,6 +1004,16 @@ def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=Non
             docs_busca.append({'id': '%s:%s' % (s, slug), 'serie': s, 'tipo': 'modulo', 'titulo': modulos_vistos[slug],
                                'resumo': ' '.join(sorted(set(i['aula']['titulo'] for i in ids if i['serie'] == s))),
                                'texto': ''})
+    # o numero do exercicio e o da lista (o app escreve "Exercicio N" no cartao):
+    # 1, 2, 3... em cada assunto de cada caderno, na ordem do caderno. A ordem no
+    # caderno inteiro fica em ordem_no_caderno (aditivo); o id nao depende disto
+    por_lista = collections.defaultdict(list)
+    for i in itens:
+        i['ordem_no_caderno'] = i['numero']
+        por_lista[(i['serie'], i['modulo']['slug'])].append(i)
+    for lista in por_lista.values():
+        for k, i in enumerate(sorted(lista, key=lambda i: i['ordem_no_caderno']), 1):
+            i['numero'] = k
     itens.sort(key=lambda i: (i['serie'], i['modulo']['slug'], i['aula']['n'], i['numero']))
     docs_busca.sort(key=lambda d: d['id'])
     conteudo['itens.json'] = gerar_pacote.json_bytes(itens)

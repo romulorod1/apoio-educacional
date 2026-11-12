@@ -982,10 +982,7 @@ sme:7ano:p225;MAT07-08;;leitura C5 (Sonnet);Próximos termos de sequências de n
 sme:7ano:p226;MAT07-08;;leitura C5 (Sonnet);Padrão de quadrados e termo geral;média
 sme:7ano:p227;;;leitura C5 (Sonnet) + lente C5 (Opus);volume com cubinhos, nenhum assunto da lista (era MAT07-08);baixa
 sme:7ano:p228;MAT07-08;;leitura C5 (Sonnet);Padrão de cubos e termo geral;média
-sme:7ano:p229:q1;MAT07-15;;leitura C5 (Sonnet);Reconhecer reflexão ou giro entre figuras;alta
-sme:7ano:p229:q2;MAT07-15;;leitura C5 (Sonnet);Reflexão em reta de hexágono;alta
-sme:7ano:p229:q3;;;leitura C5 (Sonnet);Cálculo com potências, fora da lista;média
-sme:7ano:p229:q4;;;leitura C5 (Sonnet);Propriedades de potências, fora da lista;média
+sme:7ano:p229;MAT07-15;;leitura C5 (Sonnet) + revisão C5;revisão inteira (enunciado comum): reflexão e potências, o principal é reflexão;média
 sme:7ano:p232;MAT07-14;;leitura C5 (Sonnet);Leitura de texto e gráficos sobre a Terra;baixa
 sme:7ano:p233;;;leitura C5 (Sonnet);Texto sobre água com percentuais, sem tarefa clara;média
 sme:7ano:p235;MAT07-14;;leitura C5 (Sonnet);Escolher gráfico de barras para setores;média
@@ -1112,13 +1109,7 @@ sme:8ano:p130;;;leitura C5 (Sonnet);Juros compostos em empréstimo;alta
 sme:8ano:p131;MAT08-17;;leitura C5 (Sonnet);Mediana do triângulo e ponto médio;alta
 sme:8ano:p132;MAT08-17;;leitura C5 (Sonnet);Construir medianas e baricentro;alta
 sme:8ano:p133;MAT08-17;;leitura C5 (Sonnet);Propriedade do baricentro na razão dois para um;alta
-sme:8ano:p135:q1;;;leitura C5 (Sonnet);Desconto percentual;alta
-sme:8ano:p135:q2;;;leitura C5 (Sonnet);Acréscimo percentual;alta
-sme:8ano:p135:q3;;;leitura C5 (Sonnet);Regra de três direta;alta
-sme:8ano:p135:q4;;;leitura C5 (Sonnet);Regra de três inversa com operários;alta
-sme:8ano:p135:q5;;;leitura C5 (Sonnet);Problema de mesadas resolvido por equação;média
-sme:8ano:p135:q6;;;leitura C5 (Sonnet);Resolver equações do 1º grau;alta
-sme:8ano:p135:q7;;;leitura C5 (Sonnet);Criar problema para equação do 1º grau;alta
+sme:8ano:p135;;;leitura C5 (Sonnet) + revisão C5;revisão inteira (enunciado comum): porcentagem, regra de três e equações, nenhum assunto da lista;alta
 sme:8ano:p140;;;leitura C5 (Sonnet);Diagonais de polígonos;alta
 sme:8ano:p141;;;leitura C5 (Sonnet);Número de diagonais de polígonos e fórmula;média
 sme:8ano:p142;;;leitura C5 (Sonnet);Classificação de quadriláteros;alta
