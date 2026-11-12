@@ -26,12 +26,26 @@
  *   3. a caneta (ponteiro pen, dois toques rápidos) não muda o zoom;
  *   4. um dedo só: a área deixa rolar (touch-action pan-x pan-y), nenhum
  *      touchmove de um dedo é cancelado pelo leitor, e o zoom não muda;
- *   5. deitado (1280x800), o duplo toque dobra a largura, e uma pinça de 120
+ *   5. dois dedos que só arrastam levam a página junto (100 px, ±3), sem
+ *      zoom; a pinça de reduzir (zoom 3 a 1,5, com o ponto médio andando)
+ *      segura o ponto a menos de 24 px;
+ *   6. os limites: a pinça que pede menos de 0,5 para em 0,5 e a que pede
+ *      mais de 4 para em 4 (largura conferida em px);
+ *   7. a posição gravada nas bordas do livro: na p. 1, com a rolagem presa
+ *      no alto, uma pinça com os dedos na p. 2 deixa gravada a página do meio
+ *      (a 1), e não a dos dedos; no fim do livro, com os dedos na página de
+ *      cima da área, a gravada também é a do meio (ali a altura do livro muda
+ *      e a rolagem dispara de qualquer jeito, então só a p. 1 pega o veneno);
+ *   8. deitado (1280x800), o duplo toque dobra a largura, e uma pinça de 120
  *      a 180 px a partir dali (zoom 2 a 3, com o ponto médio andando 20 px)
  *      também segura o ponto sob os dedos a menos de 24 px;
- *   6. nenhum erro de página.
+ *   9. nenhum erro de página.
  *
- * Veneno:
+ * Venenos:
+ *   node _teste/testa_leitor_pinca.js --envenenado-gesto-grava-pela-ancora
+ *     o app.js servido volta ao de antes: o gesto grava a página sob os
+ *     dedos. Na p. 1, a rolagem fica presa no alto, nenhum evento de
+ *     rolagem corrige, e a seção 7 TEM de ver a p. 2 gravada.
  *   node _teste/testa_leitor_pinca.js --envenenado-gesto-sem-ponto
  *     o app.js servido faz o zoom do gesto com a âncora do MEIO da tela, e
  *     não a do ponto dos dedos: a pinça fora do meio e o duplo toque têm de
@@ -52,7 +66,9 @@ const PORTA = 8971;
 const TOLERANCIA_PX = 24;
 const VENENOS_GESTO = {
   // o zoom do gesto ancorado no meio da tela, como os botões, e não no ponto dos dedos
-  'gesto-sem-ponto': ['var ancora = ancoraNoPontoDoLeitor(estado, x, y, alvoX, alvoY);', 'var ancora = null;']
+  'gesto-sem-ponto': ['var ancora = ancoraNoPontoDoLeitor(estado, x, y, alvoX, alvoY);', 'var ancora = null;'],
+  // o comportamento de antes: o gesto grava a página sob os dedos, e não a do meio
+  'gesto-grava-pela-ancora': ['var vista = ancoraDada ? paginaMaisProximaDoCentro(estado) : ancora.n;', 'var vista = ancora.n;']
 };
 const VENENO = Object.keys(VENENOS_GESTO).find(k => process.argv.indexOf('--envenenado-' + k) !== -1) || null;
 const iPrints = process.argv.indexOf('--prints');
@@ -97,6 +113,11 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   await pag.setViewport({ width: 800, height: 1280, hasTouch: true, deviceScaleFactor: 1 });
   await H.abrirApp(pag, amb.ORIGEM);
   const cdp = await pag.target().createCDPSession();
+  // o id do livro, para ler a posição gravada depois (sai da gravação que o leitor faz)
+  await pag.evaluate(() => {
+    const original = Store.gravarPosicaoLivro;
+    Store.gravarPosicaoLivro = function (pos) { if (pos && pos.id) window.__idLivro = pos.id; return original.apply(Store, arguments); };
+  });
 
   // ---- importar e abrir o livro
   await H.irParaAba(pag, 'ajustes');
@@ -203,7 +224,9 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   // checa: no modo normal é um conf; no veneno, a falha da verificação marcada é o que se quer ver
   const visto = [];
   const checa = (rotulo, obtido, esperado, doVeneno) => {
-    if (VENENO) { if (doVeneno && String(obtido) !== String(esperado)) visto.push(rotulo + ' [obtido: ' + obtido + ']'); return; }
+    // doVeneno: true é o gesto-sem-ponto; um nome é o veneno daquela verificação
+    const deQuem = doVeneno === true ? 'gesto-sem-ponto' : doVeneno;
+    if (VENENO) { if (deQuem === VENENO && String(obtido) !== String(esperado)) visto.push(rotulo + ' [obtido: ' + obtido + ']'); return; }
     conf(rotulo, obtido, esperado);
   };
 
@@ -314,7 +337,106 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   conf('e não muda o zoom', Math.abs(depoisDedo.largura - antesDedo.largura) <= 1, true);
 
   // ================================================================
-  secao('5. Deitado: duplo toque e pinça a partir do zoom 2');
+  secao('5. Pinça de reduzir, em pé, do zoom 3 a 1,5');
+  const wBase = a206.valor.largura;
+  await irParaPagina(150);
+  let s5 = await estadoDoLeitor();
+  // dois dedos que só arrastam (a distância não muda): a página anda junto, sem zoom
+  await pinca(s5.area.x + s5.area.w * 0.5, s5.area.y + s5.area.h * 0.6, 150, 150, 0, -100, 8);
+  await pausa(700);
+  const pan = await estadoDoLeitor();
+  console.log('   dois dedos arrastando 100 px para cima: a rolagem andou ' + Math.round(pan.scrollTop - s5.scrollTop) + ' px');
+  conf('arrastar dois dedos sem abrir nem fechar leva a página junto (100 px, ±3)', Math.abs(pan.scrollTop - s5.scrollTop - 100) <= 3, true);
+  conf('e não muda o zoom', Math.abs(pan.largura - s5.largura) <= 1, true);
+  s5 = pan;
+  await duploToque(s5.area.x + s5.area.w * 0.5, s5.area.y + s5.area.h * 0.45);
+  await redesenhado('o duplo toque na p. 150');
+  s5 = await estadoDoLeitor();
+  await pinca(s5.area.x + s5.area.w * 0.5, s5.area.y + s5.area.h * 0.5, 120, 180, 0, 0, 8);
+  await redesenhado('a pinça até o zoom 3');
+  const z3 = await estadoDoLeitor();
+  conf('antes de reduzir, a página está no zoom 3 (±5%)', z3.largura / wBase > 2.85 && z3.largura / wBase < 3.15, true);
+  const c6 = { x: z3.area.x + z3.area.w * 0.45, y: z3.area.y + z3.area.h * 0.55 };
+  const sob6 = await pontoDoConteudo(c6.x, c6.y);
+  const g6 = await pinca(c6.x, c6.y, 180, 90, 10, -15, 10);
+  await redesenhado('a pinça de reduzir');
+  const z15 = await estadoDoLeitor();
+  const dv6 = distancia(await ondeEsta(sob6), g6.fim);
+  console.log('   reduzir: largura ' + Math.round(z3.largura) + ' -> ' + Math.round(z15.largura) + ' px; o ponto a ' + dv6.toFixed(1) + ' px do centro dos dedos');
+  conf('a pinça de 180 a 90 px reduziu a largura à metade (±5%)', z15.largura / z3.largura > 0.475 && z15.largura / z3.largura < 0.525, true);
+  checa('reduzindo, o ponto sob os dedos fica sob o centro a menos de ' + TOLERANCIA_PX + ' px', dv6 < TOLERANCIA_PX, true, true);
+
+  // ================================================================
+  secao('6. Os limites do zoom: 0,5 e 4');
+  let s6 = await estadoDoLeitor();
+  await pinca(s6.area.x + s6.area.w * 0.5, s6.area.y + s6.area.h * 0.5, 240, 30, 0, 0, 10);
+  await redesenhado('a pinça abaixo do mínimo');
+  const zMin = await estadoDoLeitor();
+  console.log('   pedindo 1,5 x 0,125: largura ' + Math.round(zMin.largura) + ' px (a largura é ' + Math.round(wBase) + ')');
+  conf('a pinça que pede menos de 0,5 para em 0,5 (largura à metade, ±2 px)', Math.abs(zMin.largura - wBase * 0.5) <= 2, true);
+  await clicar(pag, '#leitor-largura');
+  await redesenhado('a volta à largura');
+  s6 = await estadoDoLeitor();
+  await pinca(s6.area.x + s6.area.w * 0.5, s6.area.y + s6.area.h * 0.5, 40, 240, 0, 0, 10);
+  await redesenhado('a pinça acima do máximo');
+  const zMax = await estadoDoLeitor();
+  console.log('   pedindo 1 x 6: largura ' + Math.round(zMax.largura) + ' px');
+  conf('a pinça que pede mais de 4 para em 4 (largura 4 vezes, ±4 px)', Math.abs(zMax.largura - wBase * 4) <= 4, true);
+  await clicar(pag, '#leitor-largura');
+  await redesenhado('a volta à largura depois do máximo');
+
+  // ================================================================
+  secao('7. A posição gravada nas bordas do livro');
+  const posicaoGravada = () => pag.evaluate(() => window.__idLivro ? Store.lerPosicaoLivro(window.__idLivro).then(r => r ? r.pagina : null) : null);
+  // zoom 0,5 e depois 0,6: a p. 1 e o alto da p. 2 cabem juntos na área
+  await irParaPagina(1);
+  s6 = await estadoDoLeitor();
+  await pinca(s6.area.x + s6.area.w * 0.5, s6.area.y + s6.area.h * 0.5, 240, 30, 0, 0, 8);
+  await redesenhado('o zoom 0,5 na p. 1');
+  s6 = await estadoDoLeitor();
+  await pinca(s6.area.x + s6.area.w * 0.5, s6.area.y + s6.area.h * 0.5, 150, 180, 0, 0, 6);
+  await redesenhado('o zoom 0,6 na p. 1');
+  await pag.evaluate(() => { document.querySelector('#corpo-modal-leitor-pdf').scrollTop = 0; });
+  await pausa(900);
+  const alto = await pag.evaluate(() => {
+    const c = document.querySelector('#corpo-modal-leitor-pdf'), r = c.getBoundingClientRect();
+    const p2 = document.querySelector('[data-pagina-arquivo="2"]').getBoundingClientRect();
+    return { scrollTop: c.scrollTop, p2: p2.top, fundo: r.top + c.clientHeight };
+  });
+  const s7 = await estadoDoLeitor();
+  const yDedos = alto.p2 + 40;
+  conf('no alto do livro (rolagem em 0), com a p. 1 no meio', alto.scrollTop + '|' + s7.meio, '0|1');
+  conf('e o alto da p. 2 à vista, onde os dedos vão', yDedos < alto.fundo - 10, true);
+  conf('antes da pinça, a posição gravada é a p. 1', await posicaoGravada(), 1);
+  await pinca(s7.area.x + s7.area.w * 0.5, yDedos, 180, 150, 0, 0, 6);
+  await redesenhado('a pinça com os dedos na p. 2');
+  await pausa(900);
+  const d7 = await estadoDoLeitor();
+  const pos7 = await posicaoGravada();
+  console.log('   no alto: a rolagem ficou em ' + Math.round(d7.scrollTop) + ' px, a p. ' + d7.meio + ' no meio, a posição gravada é a p. ' + pos7);
+  conf('a pinça reduziu a página (a troca aconteceu)', d7.largura < s7.largura - 10, true);
+  checa('perto da p. 1, a posição gravada é a página do meio, e não a dos dedos', pos7 + '|' + d7.meio, d7.meio + '|1', 'gesto-grava-pela-ancora');
+  checa('e o contador diz a página do meio', contaDiz(d7, d7.meio), true, 'gesto-grava-pela-ancora');
+  // o fim do livro: a rolagem no máximo, os dedos na página de cima da área
+  await irParaPagina(400);
+  await pag.evaluate(() => { const c = document.querySelector('#corpo-modal-leitor-pdf'); c.scrollTop = c.scrollHeight; });
+  await pausa(900);
+  const s8 = await estadoDoLeitor();
+  const cima = await pontoDoConteudo(s8.area.x + s8.area.w * 0.5, s8.area.y + 30);
+  console.log('   no fim: a p. ' + s8.meio + ' no meio, a p. ' + (cima && cima.n) + ' no alto da área');
+  await pinca(s8.area.x + s8.area.w * 0.5, s8.area.y + 30, 150, 180, 0, 0, 6);
+  await redesenhado('a pinça no fim do livro');
+  await pausa(900);
+  const d8 = await estadoDoLeitor();
+  const pos8 = await posicaoGravada();
+  console.log('   no fim: a p. ' + d8.meio + ' no meio, a posição gravada é a p. ' + pos8);
+  checa('no fim do livro, a posição gravada é a página do meio', pos8, d8.meio, 'gesto-grava-pela-ancora');
+  checa('e o contador diz a página do meio', contaDiz(d8, d8.meio), true, 'gesto-grava-pela-ancora');
+  await clicar(pag, '#leitor-largura');
+  await redesenhado('a volta à largura no fim');
+
+  // ================================================================
+  secao('8. Deitado: duplo toque e pinça a partir do zoom 2');
   await pag.setViewport({ width: 1280, height: 800, hasTouch: true, deviceScaleFactor: 1 });
   await pausa(900);
   await irParaPagina(300);

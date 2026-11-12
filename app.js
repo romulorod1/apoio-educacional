@@ -23731,7 +23731,12 @@
     if (!p) return;
     var rc = corpo.getBoundingClientRect(), r = p.caixa.getBoundingClientRect();
     var topo = r.top - rc.top + corpo.scrollTop, esquerda = r.left - rc.left + corpo.scrollLeft;
-    // sem alvo, o ponto volta ao meio da área (o zoom pelos botões e o giro)
+    /* Sem alvo, o ponto volta ao meio da área (o zoom pelos botões e o giro).
+     * DERIVA NA BORDA: a rolagem não passa de 0 nem do máximo. Perto do
+     * começo ou do fim do livro, e de lado quando a página cabe na largura
+     * (zoom 1 ou menor, sem rolagem de lado), o ponto não alcança o alvo e
+     * fica deslocado exatamente o que faltou de rolagem. É o esperado: a
+     * página não sai do lugar para além da borda. */
     var alvoY = typeof ancora.alvoY === 'number' ? ancora.alvoY : corpo.clientHeight / 2;
     var alvoX = typeof ancora.alvoX === 'number' ? ancora.alvoX : corpo.clientWidth / 2;
     corpo.scrollTop = Math.max(0, topo + ancora.fy * r.height - alvoY);
@@ -23761,11 +23766,16 @@
     });
     if (paraOAlto || !ancora) { irAProximaPaginaDoLeitor(estado.pagina, false); return Promise.resolve(true); }
     voltarParaAncoraDoLeitor(estado, ancora);
-    // o contador e a posição guardada seguem a página que está à vista
-    if (ancora.n !== estado.pagina) {
-      estado.pagina = ancora.n;
+    /* O contador e a posição guardada seguem a página que está à vista. No
+     * gesto, a âncora é a página sob os DEDOS, que pode não ser a do meio; e
+     * no começo ou no fim do livro a rolagem fica presa no limite, nenhum
+     * evento de rolagem corrige depois, e a página sob os dedos ficava gravada.
+     * Por isso, no gesto, vale a página do meio medida depois da rolagem. */
+    var vista = ancoraDada ? paginaMaisProximaDoCentro(estado) : ancora.n;
+    if (vista !== estado.pagina) {
+      estado.pagina = vista;
       if (typeof estado.opcoes.aoMudarPagina === 'function') {
-        try { estado.opcoes.aoMudarPagina(ancora.n); } catch (e) { /* posição é auxiliar */ }
+        try { estado.opcoes.aoMudarPagina(vista); } catch (e) { /* posição é auxiliar */ }
       }
     }
     corpo.dataset.paginaDesenhada = String(estado.pagina);
@@ -23851,8 +23861,15 @@
     if (!leitorAceitaGesto()) return;
     var z = Math.round(g.zoom * g.escala * 100) / 100;
     z = Math.min(LEITOR_ZOOM_MAX, Math.max(LEITOR_ZOOM_MIN, z));
-    if (Math.abs(z - leitor.zoom) < 0.01) return;
-    var rc = $('#corpo-modal-leitor-pdf').getBoundingClientRect();
+    var corpo = $('#corpo-modal-leitor-pdf'), rc = corpo.getBoundingClientRect();
+    if (Math.abs(z - leitor.zoom) < 0.01) {
+      /* Dois dedos que só arrastaram (o zoom quase não mudou): o conteúdo
+       * acompanhou o ponto médio pelo transform, e a rolagem leva junto o
+       * deslocamento, em vez de a página voltar ao lugar ao soltar. */
+      corpo.scrollTop = Math.max(0, corpo.scrollTop - (g.y - g.my));
+      corpo.scrollLeft = Math.max(0, corpo.scrollLeft - (g.x - g.mx));
+      return;
+    }
     // o ponto do conteúdo que estava sob os dedos fica sob o ponto médio de agora
     aplicarZoomDoGesto(z, g.mx, g.my, g.x - rc.left, g.y - rc.top);
   }

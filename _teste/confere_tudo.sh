@@ -537,6 +537,7 @@ roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/t
 # rola. O veneno ancora o gesto no meio da tela, e a prova tem de ver.
 roda "leitor pinca"                              node "_teste/testa_leitor_pinca.js"
 roda "leitor pinca --envenenado-gesto-sem-ponto" node "_teste/testa_leitor_pinca.js" --envenenado-gesto-sem-ponto
+roda "leitor pinca --envenenado-gesto-grava-pela-ancora" node "_teste/testa_leitor_pinca.js" --envenenado-gesto-grava-pela-ancora
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
