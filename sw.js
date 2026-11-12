@@ -153,8 +153,9 @@
  * O v139 traz a busca no texto dos livros. O v140 traz os 22 assuntos novos de
  * matemática da revisão dos mapas dos livros no banco/topicos/matematica.json.
  * O v141 traz os 11 assuntos novos de física da revisão dos mapas dos livros no banco/topicos/fisica.json.
+ * O v147 traz a pinça e o duplo toque no livro aberto.
  */
-var CACHE = 'apoio-educacional-v141';
+var CACHE = 'apoio-educacional-v147';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
