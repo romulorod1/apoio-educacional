@@ -1515,14 +1515,15 @@ decide_cache() {
   veredito_cache "$dc_mudou" "$dc_novo"
 }
 p_cache=0; f_cache=0
+# $1 = mudados; $2 = o merge sobe (sim/nao); $3 = o veredito esperado
 afere_cache() {
-  obtido=$(decide_cache "$1" "$2" "$3")
-  if [ "$obtido" = "$4" ]; then
+  obtido=$(decide_cache "$1" "$2")
+  if [ "$obtido" = "$3" ]; then
     p_cache=$((p_cache + 1))
   else
     f_cache=$((f_cache + 1))
-    printf '    prova do cache: mudados=[%s] agora=%s antes=%s deu %s, esperado %s\n' \
-      "$1" "$2" "$3" "$obtido" "$4"
+    printf '    prova do cache: mudados=[%s] sobe=[%s] deu %s, esperado %s\n' \
+      "$1" "$2" "$obtido" "$3"
   fi
 }
 afere_cache "app.js" nao reprova
