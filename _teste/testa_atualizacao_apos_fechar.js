@@ -196,14 +196,14 @@ const servidor = http.createServer((req, res) => {
       await p.evaluateOnNewDocument(() => { window.__nasceuControlada = !!(navigator.serviceWorker && navigator.serviceWorker.controller); });
       return p;
     };
-    /* O worker da versao N ativo e nada em espera, visto de DENTRO do worker
-     * (pelo nome do cache que o servidor pos no sw.js dele), sem abrir pagina:
-     * uma pagina aberta viraria cliente do worker de antes e seguraria a troca. */
-    /* Cada sondagem tem prazo proprio de 1 s, numa sessao CDP propria que se
-     * desliga depois: o evaluate num worker que esta sendo encerrado (o 1, ao
-     * virar redundante) nao responde, e pelo worker() do puppeteer a chamada
+    /* O worker da versão N ativado e nada em espera, visto de DENTRO do worker
+     * (pelo nome do cache que o servidor pôs no sw.js dele), sem abrir página:
+     * uma página aberta viraria cliente do worker de antes e seguraria a troca. */
+    /* Cada sondagem tem prazo próprio de 1 s, numa sessão CDP própria que se
+     * desliga depois: o evaluate num worker que está sendo encerrado (o 1, ao
+     * virar redundante) não responde, e pelo worker() do puppeteer a chamada
      * pendurada segurava o processo vivo por mais 30 s (o protocolTimeout).
-     * Desligar a sessao cancela a chamada e o relogio dela. */
+     * Desligar a sessão cancela a chamada e o relógio dela. */
     const comPrazo = (promessa, ms) => Promise.race([promessa.catch(() => null),
       new Promise(resolve => setTimeout(() => resolve(null), ms))]);
     const sondarWorker = async (alvo, expressao) => {
@@ -216,7 +216,8 @@ const servidor = http.createServer((req, res) => {
     const esperarWorkerAtivo = async (sufixo, prazoMs) => {
       const fim = Date.now() + prazoMs;
       const expressao = "typeof CACHE !== 'undefined' && CACHE.endsWith(" + JSON.stringify(sufixo) + ') && ' +
-        '!self.registration.waiting && !self.registration.installing && !!self.registration.active';
+        '!self.registration.waiting && !self.registration.installing && !!self.registration.active && ' +
+        "self.registration.active.state === 'activated'";
       while (Date.now() < fim) {
         for (const alvo of navegador.targets().filter(t => t.type() === 'service_worker')) {
           if (await sondarWorker(alvo, expressao)) return true;
@@ -225,7 +226,7 @@ const servidor = http.createServer((req, res) => {
       }
       return false;
     };
-    /* A pagina aberta, com o #versao-app preenchido, num documento que NASCEU
+    /* A página aberta, com o #versao-app preenchido, num documento que NASCEU
      * controlado e com o carregamento terminado. */
     const esperarAberta = (p, ms) => p.waitForFunction(() => window.__nasceuControlada === true &&
       document.readyState === 'complete' && !!(document.querySelector('#versao-app')?.textContent || '').trim(), { timeout: ms || 15000 });
@@ -294,21 +295,21 @@ const servidor = http.createServer((req, res) => {
       await pagina.close();
       semRede = true;
       /* Ela fechou sem tocar: sem cliente nenhum, o navegador ativa o worker 2.
-       * A prova espera ISSO, e nao um tempo fixo. Antes, a pagina nova abria
-       * antes da ativacao em 2 de 10 rodadas, virava cliente do worker 1 e o 2
+       * A prova espera ISSO, e não um tempo fixo. Antes, a página nova abria
+       * antes da ativação em 2 de 10 rodadas, virava cliente do worker 1 e o 2
        * ficava em espera para sempre. Sem ativar em 20 s, segue e reprova
        * abaixo, com o estado. */
       const t0 = Date.now();
       const PRAZO_ATIVAR = 20000;
       const ativou = await esperarWorkerAtivo('-2', PRAZO_ATIVAR);
-      console.log('   ' + (ativou ? 'worker 2 ativo ' + (Date.now() - t0) + ' ms depois de fechar'
-        : 'worker 2 NAO ativou em ' + (PRAZO_ATIVAR / 1000) + ' s depois de fechar'));
+      console.log('   ' + (ativou ? 'worker 2 ativado ' + (Date.now() - t0) + ' ms depois de fechar'
+        : 'worker 2 NÃO ativou em ' + (PRAZO_ATIVAR / 1000) + ' s depois de fechar'));
       pagina = await paginaComRelogio();
       const t1 = Date.now();
       await pagina.goto(url, { waitUntil: 'load' }).catch(() => {});
-      const abriu = await esperarAberta(pagina).then(() => 'aberta', () => 'NAO abriu em 15 s');
+      const abriu = await esperarAberta(pagina).then(() => 'aberta', () => 'NÃO abriu em 15 s');
       await pagina.reload({ waitUntil: 'load' }).catch(() => {});
-      const reabriu = await esperarAberta(pagina).then(() => 'aberta', () => 'NAO abriu em 15 s');
+      const reabriu = await esperarAberta(pagina).then(() => 'aberta', () => 'NÃO abriu em 15 s');
       console.log('   sem rede: primeira abertura ' + abriu + ', recarga ' + reabriu + ' (' + (Date.now() - t1) + ' ms)');
       const estado = await pagina.evaluate(async () => ({
         extra: window.__EXTRA === 1,
