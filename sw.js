@@ -148,10 +148,11 @@
  * sincroniza PDFs e fotos anexados a aulas; v128 traz os filtros de tipo na Biblioteca.
  * O v129 atualiza os assets de Vagos em cache exclusivo. O v134 traz o sumário do mapa
  * quando os marcadores do PDF são lixo. O v135 traz o assunto de volume do 8º ano no
- * banco/topicos/matematica.json.
- * O v137 traz a leitura contínua dos livros e a exportação por página.
+ * banco/topicos/matematica.json. O v137 inclui o ajuste pontual da duração de uma
+ * aula no celular.
+ * O v138 traz a leitura contínua dos livros e a exportação por página.
  */
-var CACHE = 'apoio-educacional-v137';
+var CACHE = 'apoio-educacional-v138';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
