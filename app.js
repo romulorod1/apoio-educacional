@@ -16404,8 +16404,11 @@
         pagina: (destino && destino.pagina) || Biblioteca.paginaDaPosicao(reg.meta, pos) || 1,
         sumario: sumario, livro: reg,
         dica: sumario.length ? '' : 'Este livro não tem sumário: role as páginas ou use a barra de página.',
-        aoMudarPagina: function (n) {
-          Store.gravarPosicaoLivro({ id: id, pagina: n }).catch(function () { /* a leitura segue; só a posição não fica */ });
+        aoMudarPagina: function (n, como) {
+          // arrastando a barra, a faixa acompanha, e a posição só grava ao soltar
+          if (!como || como.gravar !== false) {
+            Store.gravarPosicaoLivro({ id: id, pagina: n }).catch(function () { /* a leitura segue; só a posição não fica */ });
+          }
           mostrarCobre('pdf', reg, n);
         }
       });
@@ -22717,8 +22720,10 @@
    *   opcoes.sumario       os livros (C15.1): [{ n, nivel, titulo, pagina }];
    *                        com ele aparece o botão Sumário, e cada entrada
    *                        leva à página dela
-   *   opcoes.aoMudarPagina function (n) chamada a cada página desenhada (o
-   *                        livro guarda onde ela parou)
+   *   opcoes.aoMudarPagina function (n, como) chamada a cada página desenhada
+   *                        (o livro guarda onde ela parou e atualiza a faixa
+   *                        do capítulo); como.gravar === false enquanto ela
+   *                        arrasta a barra: a faixa muda, a posição só ao soltar
    *   opcoes.livro         o registro do livro (C15.4): com ele aparece o
    *                        "Exportar em PDF"
    *
@@ -23136,8 +23141,8 @@
     if (!leitor || !leitor.doc) return Promise.resolve(false);
     leitor.pagina = Math.max(1, Math.min(leitor.total, n));
     atualizarBarraDoLeitor();
-    if (!semGravar && typeof leitor.opcoes.aoMudarPagina === 'function') {
-      try { leitor.opcoes.aoMudarPagina(leitor.pagina); } catch (e) { /* posição é auxiliar */ }
+    if (typeof leitor.opcoes.aoMudarPagina === 'function') {
+      try { leitor.opcoes.aoMudarPagina(leitor.pagina, { gravar: !semGravar }); } catch (e) { /* posição é auxiliar */ }
     }
     if (leitor.continuo && leitor.paginas) {
       $('#corpo-modal-leitor-pdf').dataset.paginaDesenhada = String(leitor.pagina);
