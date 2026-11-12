@@ -59,6 +59,13 @@ SEGUNDA_E_SOLUCAO = True
 
 
 FIM_REMISSIVO = True  # indice remissivo e errata fecham o conteudo (marcos); False so no veneno
+# o bloco "Comentario para professores" dentro de um enunciado sai dele e vai, como
+# ultimo pedaco, para a solucao do mesmo problema (decisao D2, a mesma regra do
+# Portal, gerar_pacote.TITULO_COMENTARIO). Nos volumes de 2016 a 2020 nao ha
+# nenhum (medido em 12/11/2026: os negritos "Observacao:" e "Dica:" desses volumes
+# falam com o aluno e nao casam com o titulo); a regra fica para o volume que vier
+# com um. False so no veneno
+COMENTARIO_AO_PROFESSOR = True
 
 
 def pe_util(pg):
@@ -119,8 +126,26 @@ def _linhas(pg):
             t = ''.join(s['text'] for s in l['spans']).strip()
             if t:
                 sp = l['spans'][0]
-                out.append({'bb': tuple(l['bbox']), 'texto': t, 'tam': sp['size'], 'neg': negrito(sp)})
+                # o titulo em negrito que abre a linha (os spans negritos do comeco)
+                titulo = []
+                for s in l['spans']:
+                    if not s['text'].strip():
+                        continue
+                    if not negrito(s):
+                        break
+                    titulo.append(s['text'])
+                out.append({'bb': tuple(l['bbox']), 'texto': t, 'tam': sp['size'], 'neg': negrito(sp),
+                            'titulo_negrito': ' '.join(titulo)})
     return out
+
+
+def eh_comentario(l):
+    """Linha que abre o bloco do comentario ao professor: titulo em negrito do
+    corpo do texto (nao o de 13,2 pt do cabecalho), lido como no Portal."""
+    if not (COMENTARIO_AO_PROFESSOR and l['neg'] and l['tam'] < CORPO_CAB[0]):
+        return False
+    t = re.sub(r'\s+', '', portal.para_busca(l['titulo_negrito']))
+    return gerar_pacote.TITULO_COMENTARIO.match(t) is not None
 
 
 def _eh_cab(l):
@@ -170,6 +195,12 @@ def marcos(doc):
                     out.append((i, corte, 'fim', {}))
                     k += 1
                     continue
+            if eh_comentario(l):
+                # o topo da caixa do titulo: a caixa de fonte sobe acima da tinta dele,
+                # e a linha de cima termina antes (as linhas do Banco nao se sobrepoem)
+                out.append((i, y0 - 0.5, 'com', {}))
+                k += 1
+                continue
             if _eh_cab(l) and re.match(r'^\d+\s', l['texto']):
                 partes, j = [l['texto']], k + 1
                 # cabecalho quebrado em ate duas linhas, as vezes em outro bloco e com
@@ -216,22 +247,38 @@ def trechos(doc, nivel):
     secao = None
     enun, sol, vistas = {}, {}, {}
     reprovados, anomalias = [], []
+    ultimo = None  # o enunciado aberto, para o comentario ao professor que vem dentro dele
     for k, (p, y, tipo, d) in enumerate(ms):
         if tipo == 'secao':
             secao = d
+            ultimo = None
             continue
-        if tipo != 'cab' or secao is None or secao['nivel'] != nivel:
+        if secao is None or secao['nivel'] != nivel:
             continue
-        prox = next(((q, yq) for q, yq, t, _ in ms[k + 1:] if t in ('cab', 'secao', 'fim')), fim_doc)
+        # o comentario so corta na secao de enunciados; na de solucoes ele ja e do gabarito
+        fins = ('cab', 'secao', 'fim', 'com') if secao['tipo'] == 'enun' else ('cab', 'secao', 'fim')
+        prox = next(((q, yq) for q, yq, t, _ in ms[k + 1:] if t in fins), fim_doc)
+        if tipo == 'com':
+            # do titulo ate o proximo marco: o comentario do enunciado aberto
+            if secao['tipo'] == 'enun' and ultimo is not None:
+                ultimo.setdefault('comentarios', []).append({'ini': (p, y), 'fim': prox})
+            elif secao['tipo'] == 'enun':
+                anomalias.append({'pagina': p + 1, 'nota': 'comentario ao professor sem enunciado aberto antes dele: '
+                                                           'fica fora do pacote'})
+            continue
+        if tipo != 'cab':
+            continue
         reg = {'titulo': d['titulo'], 'ini': (p, y), 'fim': prox}
         n = d['numero']
         if secao['tipo'] == 'enun':
+            ultimo = None
             if d['solucao']:
                 reprovados.append((n, 'cabecalho de solucao na secao de enunciados'))
             elif n in enun:
                 reprovados.append((n, 'numero %d repetido nos enunciados' % n))
             else:
                 enun[n] = reg
+                ultimo = reg
             continue
         # na secao de solucoes cada numero vem duas vezes: o enunciado repetido e a
         # solucao. A fonte as vezes esquece o " - Solucao" (2018 N1 #13): a SEGUNDA
@@ -353,6 +400,9 @@ def gerar(base, nivel, versao, saida, curadoria, anos=ANOS_MODELO_A, trabalho=No
             p_s = pedacos(doc, s, cache) if not motivo else []
             if not motivo and (not p_e or not p_s):
                 motivo = 'recorte vazio'
+            # o comentario ao professor do enunciado vai no fim da solucao (decisao D2)
+            p_c = [dict(pz, comentario=True) for t in e.get('comentarios', []) for pz in pedacos(doc, t, cache)] \
+                if not motivo else []
             if not motivo:
                 for tipo, ps in (('enunciado', p_e), ('solucao', p_s)):
                     lin = primeira_linha(doc, ps[0])
@@ -365,7 +415,7 @@ def gerar(base, nivel, versao, saida, curadoria, anos=ANOS_MODELO_A, trabalho=No
                 continue
             base_a = 'assets/%s/%s/%s/ex-%02d' % (serie, modulo['slug'], aula['slug'], n)
             assets, medidas, origem, falhou = {}, {}, {}, None
-            for tipo, ps, suf in (('enunciado', p_e, '.svg'), ('solucao', p_s, '-sol.svg')):
+            for tipo, ps, suf in (('enunciado', p_e, '.svg'), ('solucao', p_s + p_c, '-sol.svg')):
                 svgs, meds = [], []
                 for p in ps:
                     svg, dif, obs = gerar_pacote.svg_redigido(doc, p['pno'], p['rect'])
@@ -384,7 +434,8 @@ def gerar(base, nivel, versao, saida, curadoria, anos=ANOS_MODELO_A, trabalho=No
                 medidas[tipo] = {'largura_pt': round(w, 1), 'altura_pt': round(h, 1), 'rotulo': None}
                 o = {'pagina': ps[0]['pno'] + 1, 'coluna': 1, 'bbox': list(ps[0]['rect'])}
                 if len(ps) > 1:
-                    o['pedacos'] = [{'pagina': p['pno'] + 1, 'coluna': 1, 'bbox': list(p['rect'])} for p in ps]
+                    o['pedacos'] = [dict({'pagina': p['pno'] + 1, 'coluna': 1, 'bbox': list(p['rect'])},
+                                         **({'comentario': True} if p.get('comentario') else {})) for p in ps]
                 origem[tipo] = o
             if falhou:
                 for c in assets.values():
@@ -392,7 +443,10 @@ def gerar(base, nivel, versao, saida, curadoria, anos=ANOS_MODELO_A, trabalho=No
                 rel['excluidos'].append({'id': iid, 'numero': n, 'motivo': falhou})
                 continue
             txt_e = '\n'.join(gerar_pacote.texto_do_retangulo(doc, p['pno'], p['rect']) for p in p_e)
-            txt_s = '\n'.join(gerar_pacote.texto_do_retangulo(doc, p['pno'], p['rect']) for p in p_s)
+            # o texto do comentario vai para a busca com a solucao, e nao com o enunciado
+            txt_s = '\n'.join(gerar_pacote.texto_do_retangulo(doc, p['pno'], p['rect']) for p in p_s + p_c)
+            if p_c:
+                rel['notas'].append({'id': iid, 'nota': 'comentario ao professor do enunciado levado ao fim da solucao'})
             titulo = portal.sem_tracos(e['titulo'])
             titulos.append(titulo)
             item = {
