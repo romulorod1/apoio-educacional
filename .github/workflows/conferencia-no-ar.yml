@@ -60,13 +60,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # fetch-depth 0: no endereco novo o esperado e o site MONTADO, e a VERSAO e
+      # o CACHE saem do contador da publicacao, que le a historia inteira (13f).
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.1'
       - name: O site publicado bate com o commit
         env:
           SITE_PEDIDO: ${{ inputs.site }}
         run: |
           SITE="${SITE_PEDIDO:-$SITE_ANTIGO}"
           echo "conferindo $SITE"
-          sh _teste/confere_no_ar.sh "$SITE" 900
+          # O endereco antigo (GitHub Pages) serve o repositorio cru; o novo, o
+          # site montado pelo publica-cloudflare, com VERSAO e CACHE gerados.
+          if [ "$SITE" = "$SITE_ANTIGO" ]; then
+            sh _teste/confere_no_ar.sh "$SITE" 900
+          else
+            sh _teste/confere_no_ar.sh --montado "$SITE" 900
+          fi

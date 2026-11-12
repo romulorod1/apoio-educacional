@@ -48,21 +48,17 @@
  * comments nao traz as "reviews" do GitHub: revisao postada como review nunca
  * e vista por este script.
  *
- * Por ultimo, logo antes do merge, a ORDEM do CACHE (sw.js) e da VERSAO
- * (app.js): git fetch da origin/main e da cabeca do PR NA HORA, e a pergunta e
- * "o PR leva para a main algum arquivo que muda o que o tablet baixa?" (app.js,
- * sw.js ou um arquivo da lista ARQUIVOS do sw.js). Quem responde e o diff da
- * origin/main contra a arvore do MERGE (git merge-tree), e nao a base do merge:
- * depois que o ramo traz a main, a base vira a ponta da main e um ramo que subiu
- * para o MESMO valor que a main alcancou parecia "nao mudou". Se leva, CACHE e
- * VERSAO da arvore do merge tem de ser ESTRITAMENTE MAIORES que os da main
- * atual, como numero (o vNNN do cache; x.y.z da versao, campo a campo, entao
- * 1.42.10 e maior que 1.42.9). Igual reaproveita um nome ja publicado e menor o
- * rebaixa: nos dois o tablet ja instalado pode nao receber o codigo novo. Se nao
- * leva, passa. Leitura que falha, conflito com a main, CACHE fora de
- * apoio-educacional-vNNN ou constante declarada duas vezes recusam.
- * A regra pura e decidirOrdens(), e a leitura e lerOrdensGit(), as duas
- * provadas em _teste/testa_ordem_versao.js, que tambem confere o portao.
+ * Por ultimo, logo antes do merge, a PUBLICACAO (13f): git fetch da origin/main
+ * e da cabeca do PR NA HORA, e o que o PR leva para a main sai do diff da
+ * origin/main contra a arvore do MERGE (git merge-tree), e nao da base do merge.
+ * VERSAO (app.js) e CACHE (sw.js) sao gerados na publicacao
+ * (_teste/versao_publicada.js) e ficam fixos no repositorio: o PR que os muda
+ * e recusado. O PR que leva arquivo que sobe ao site traz um novidades/<nome>.txt
+ * (uma linha por item, ou so "#" para dizer que nao ha novidade para ela). O PR
+ * que nao leva arquivo do site passa sem novidade. Leitura que falha, conflito
+ * com a main ou constante declarada duas vezes recusam. A regra pura e
+ * decidirPublicacao(), e a leitura e lerPublicacaoGit(), as duas provadas em
+ * _teste/testa_ordem_versao.js, que tambem confere o portao.
  *
  * O merge vai com --match-head-commit: se alguem empurrar um commit entre a
  * conferencia e o merge, o GitHub recusa, em vez de mergear o que ninguem
@@ -71,6 +67,7 @@
 'use strict';
 const fs = require('fs');
 const { execFileSync } = require('child_process');
+const VP = require('./versao_publicada.js');
 
 const REPO = process.env.REPO_MERGE_SEGURO || 'romulorod1/apoio-educacional';
 const GH = process.env.GH || 'gh';
@@ -219,12 +216,21 @@ function decidir(pr) {
   return { ok: motivos.length === 0, motivos, cabeca };
 }
 
-/* A ORDEM DO CACHE E DA VERSAO. Puras: sem git e sem gh.
+/* A VERSAO, O CACHE E A NOVIDADE (13f, 12/11/2026). Puras: sem git e sem gh.
  *
- * Ate 12/11/2026 a unica trava era a do confere_tudo.sh, e ela so exigia que o
- * CACHE fosse DIFERENTE do da base do merge. Com PRs em paralelo, um ramo com
- * v130 integrado depois de a main estar em v134 passava verde, e a VERSAO nao
- * tinha trava nenhuma. Aqui a exigencia e ser MAIOR que a da main ATUAL. */
+ * Ate o 13f, todo PR que mudava o app subia VERSAO e CACHE, e o merge exigia
+ * que fossem MAIORES que os da main (#173). Como todos editavam as mesmas
+ * linhas, cada merge deixava os outros PRs em conflito. Agora os dois sao
+ * gerados na publicacao (_teste/versao_publicada.js), a partir de um contador
+ * que so cresce, e no repositorio ficam fixos. A regra do merge passa a ser:
+ *   1. VERSAO (app.js) e CACHE (sw.js) da arvore do merge sao IGUAIS aos da
+ *      main: mudar no PR nao publica nada e reabre o conflito;
+ *   2. o PR que leva para a main um arquivo que sobe ao site (ehDoSite) traz
+ *      pelo menos um novidades/<nome>.txt, novo ou mudado: uma linha por item
+ *      do que ela ganha, ou so linhas com "#" para dizer que nao ha novidade
+ *      para ela (refatoracao, conserto invisivel);
+ *   3. todo arquivo em novidades/ e um .txt direto na pasta, e nenhum vem vazio.
+ * O PR que nao leva arquivo do site passa sem novidade. */
 /* Le UMA declaracao real da constante. Duas declaracoes (var, let ou const no
  * comeco da linha) devolvem null: ler a primeira e confiar seria conferir um
  * valor que talvez nao seja o que o navegador usa. Comentario nao conta. */
@@ -237,72 +243,49 @@ function lerConstante(texto, nome, padrao) {
 }
 function lerCache(sw) { return lerConstante(sw, 'CACHE', /^var CACHE = '([^']*)';/m); }
 function lerVersao(app) { return lerConstante(app, 'VERSAO', /^ *var VERSAO = '([^']*)';/m); }
-/* A lista ARQUIVOS do sw.js, como caminhos do repositorio ('./' e a raiz e sai). */
-function listaArquivos(sw) {
-  const linhas = String(sw == null ? '' : sw).replace(/\r/g, '').split('\n');
-  const ini = linhas.findIndex(l => /^var ARQUIVOS = \[/.test(l));
-  if (ini < 0) return [];
-  const fora = [];
-  for (let i = ini + 1; i < linhas.length && !/^\];/.test(linhas[i]); i++) {
-    const m = /^ *'(?:\.\/)?([^']*)' *,? *$/.exec(linhas[i]);
-    if (m && m[1]) fora.push(m[1]);
+
+/* v = { mudancas: [{ estado, caminho }], versao: { agora, main }, cache: { agora, main },
+ *       novidades: { caminho: texto } (os arquivos de novidade da arvore do merge que o PR leva) }
+ * Devolve { ok, motivos, recusas }. */
+function decidirPublicacao(v) {
+  const motivos = [], recusas = [];
+  [['VERSAO', v.versao], ['CACHE', v.cache]].forEach(([nome, c]) => {
+    if (c.agora == null || c.main == null) {
+      recusas.push('nao consegui ler ' + nome + ' (merge:[' + c.agora + '] main:[' + c.main + ']): falta a declaracao, ou ha mais de uma');
+    } else if (c.agora !== c.main) {
+      recusas.push(nome + ' mudou no PR (' + c.main + ' na main, ' + c.agora + ' no merge): desde o 13f ela e gerada na publicacao ' +
+        '(_teste/versao_publicada.js); volte ao valor da main');
+    } else {
+      motivos.push(nome + ' ' + c.agora + ' igual a da main (a publicacao gera a de verdade)');
+    }
+  });
+  const levados = v.mudancas.filter(m => m.estado !== 'D').map(m => m.caminho);
+  const doSite = v.mudancas.map(m => m.caminho).filter(VP.ehDoSite);
+  const naPasta = levados.filter(c => /^novidades\//.test(c));
+  naPasta.filter(c => !VP.NOVIDADE.test(c)).forEach(c => recusas.push('em novidades/ so vale <nome>.txt direto na pasta: ' + c));
+  const novas = naPasta.filter(c => VP.NOVIDADE.test(c));
+  novas.forEach(c => {
+    const l = VP.lerNovidade(v.novidades[c]);
+    if (!l.itens.length && !l.comentarios) recusas.push(c + ' esta vazio: escreva o que ela ganha, ou uma linha com # dizendo que nao ha novidade para ela');
+  });
+  const quais = doSite.slice(0, 3).join(', ') + (doSite.length > 3 ? ' e mais ' + (doSite.length - 3) : '');
+  if (doSite.length && !novas.length) {
+    recusas.push('o PR muda o app (leva ' + quais + ') e nao traz novidades/<nome>.txt: uma linha por item do que ela ganha, ' +
+      'ou so uma linha com # para dizer que nao ha novidade para ela');
+  } else if (doSite.length) {
+    motivos.push('o PR muda o app (leva ' + quais + ') e traz ' + novas.join(', '));
+  } else {
+    motivos.push('o PR nao leva arquivo do site para a main' + (novas.length ? ' (traz ' + novas.join(', ') + ')' : ''));
   }
-  return fora;
-}
-/* O numero do nome do cache. Os DOIS lados tem de casar o padrao que o sw.js
- * reconhece (VERSAO_DO_APP = /^apoio-educacional-v\d+$/): fora dele o activate
- * nao ve o cache novo como versao do app. */
-const NOME_DO_CACHE = /^apoio-educacional-v([0-9]+)$/;
-function compararCache(a, b) {
-  const x = NOME_DO_CACHE.exec(String(a || '')), y = NOME_DO_CACHE.exec(String(b || ''));
-  if (!x || !y) return null;
-  return Number(x[1]) - Number(y[1]);
-}
-/* x.y.z campo a campo, como numero: '1.42.10' > '1.42.9'. Formato fora de x.y.z da null. */
-function compararSemver(a, b) {
-  const pa = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(String(a || ''));
-  const pb = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(String(b || ''));
-  if (!pa || !pb) return null;
-  for (let i = 1; i <= 3; i++) {
-    const d = Number(pa[i]) - Number(pb[i]);
-    if (d !== 0) return d;
-  }
-  return 0;
-}
-/* Uma constante: o valor da arvore do merge (agora), o da main atual e os
- * arquivos do app que o PR leva para a main. Devolve { ok, motivo }. */
-function decidirOrdem(nome, agora, main, levados, comparar) {
-  if (agora == null || main == null) {
-    return { ok: false, motivo: 'nao consegui ler ' + nome + ' (merge:[' + agora + '] main:[' + main + ']): ' +
-      'falta a declaracao, ou ha mais de uma' };
-  }
-  const c = comparar(agora, main);
-  if (c === null) return { ok: false, motivo: nome + ' fora do formato: merge ' + agora + ', main ' + main };
-  if (!levados || !levados.length) {
-    return { ok: true, motivo: nome + ' ' + agora + ': o PR nao leva arquivo do app para a main' };
-  }
-  const quais = ' (leva ' + levados.slice(0, 3).join(', ') + (levados.length > 3 ? ' e mais ' + (levados.length - 3) : '') + ')';
-  if (c > 0) return { ok: true, motivo: nome + ' ' + agora + ' e maior que o da main atual, ' + main + quais };
-  return { ok: false, motivo: nome + ' ' + agora + ' do PR nao e MAIOR que o da main atual, ' + main +
-    (c === 0 ? ' (igual: reaproveita o que ja foi publicado)' : ' (menor: rebaixa o que ja foi publicado)') +
-    quais + '; suba para a proxima livre' };
-}
-/* v = { levados: [arquivos do app que mudam], cache: { agora, main }, versao: { agora, main } } */
-function decidirOrdens(v) {
-  const r = [
-    decidirOrdem('CACHE', v.cache.agora, v.cache.main, v.levados, compararCache),
-    decidirOrdem('VERSAO', v.versao.agora, v.versao.main, v.levados, compararSemver)
-  ];
-  return { ok: r.every(x => x.ok), motivos: r.map(x => x.motivo), recusas: r.filter(x => !x.ok).map(x => x.motivo) };
+  return { ok: !recusas.length, motivos, recusas };
 }
 
 /* O que o PR LEVA para a main, lido do git. g(args) devolve a saida ou lanca.
  * A arvore do merge sai do `git merge-tree --write-tree main alvo`, que e o que
  * a main fica depois do merge; o diff dela contra a main e o que o PR leva, sem
  * contar o que a main andou enquanto o ramo ficou atras. Conflito (merge-tree
- * sai 1) lanca. Arquivo do app: app.js, sw.js e a lista ARQUIVOS do sw.js da
- * main e da arvore do merge. */
-function lerOrdensGit(g, alvo, main) {
+ * sai 1) lanca. */
+function lerPublicacaoGit(g, alvo, main) {
   let arvore;
   try {
     arvore = g(['merge-tree', '--write-tree', main, alvo]).split('\n')[0].trim();
@@ -312,20 +295,25 @@ function lerOrdensGit(g, alvo, main) {
     throw err;
   }
   if (!/^[0-9a-f]{40,64}$/.test(arvore)) throw new Error('o merge-tree nao devolveu uma arvore: [' + arvore + ']');
-  const mudados = g(['diff', '--name-only', '-z', main, arvore]).split('\0').filter(Boolean);
-  const swMerge = g(['show', arvore + ':sw.js']), swMain = g(['show', main + ':sw.js']);
-  const app = new Set(['app.js', 'sw.js'].concat(listaArquivos(swMerge), listaArquivos(swMain)));
+  const partes = g(['-c', 'core.quotePath=false', 'diff', '--no-renames', '--name-status', '-z', main, arvore]).split('\0');
+  const mudancas = [];
+  for (let i = 0; i + 1 < partes.length; i += 2) {
+    if (partes[i]) mudancas.push({ estado: partes[i][0], caminho: partes[i + 1] });
+  }
+  const novidades = {};
+  mudancas.filter(m => m.estado !== 'D' && VP.NOVIDADE.test(m.caminho)).forEach(m => { novidades[m.caminho] = g(['show', arvore + ':' + m.caminho]); });
   return {
-    levados: mudados.filter(f => app.has(f)),
-    cache: { agora: lerCache(swMerge), main: lerCache(swMain) },
-    versao: { agora: lerVersao(g(['show', arvore + ':app.js'])), main: lerVersao(g(['show', main + ':app.js'])) }
+    mudancas,
+    novidades,
+    versao: { agora: lerVersao(g(['show', arvore + ':app.js'])), main: lerVersao(g(['show', main + ':app.js'])) },
+    cache: { agora: lerCache(g(['show', arvore + ':sw.js'])), main: lerCache(g(['show', main + ':sw.js'])) }
   };
 }
 
 /* No merge: busca a origin/main e a cabeca do PR AGORA, e le o que ele leva. */
-function lerOrdens(numero, cabeca) {
+function lerPublicacao(numero, cabeca) {
   git(['fetch', 'origin', 'main', 'refs/pull/' + numero + '/head']);
-  return lerOrdensGit(git, cabeca, 'origin/main');
+  return lerPublicacaoGit(git, cabeca, 'origin/main');
 }
 
 /* Quantos commits a cabeca esta atras da main. Lanca se nao conseguir medir. */
@@ -357,6 +345,13 @@ function conferirVersao() {
     const eu = fs.readFileSync(__filename, 'utf8');
     if (main.replace(/\r\n/g, '\n') !== eu.replace(/\r\n/g, '\n')) {
       return 'este merge_seguro não é o da main atualizada: rode-o de uma pasta com a main em dia (git pull) e tente de novo';
+    }
+    // 13f: a regra da publicação mora no versao_publicada.js, ao lado. Uma cópia
+    // velha dele decidiria pela regra velha com este arquivo em dia.
+    const vpMain = git(['show', 'origin/main:_teste/versao_publicada.js']);
+    const vpEu = fs.readFileSync(require.resolve('./versao_publicada.js'), 'utf8');
+    if (vpMain.replace(/\r\n/g, '\n') !== vpEu.replace(/\r\n/g, '\n')) {
+      return 'o versao_publicada.js ao lado deste merge_seguro não é o da main atualizada: rode-o de uma pasta com a main em dia (git pull) e tente de novo';
     }
     return null;
   } catch (e) {
@@ -407,9 +402,9 @@ function principal(argv) {
   // ORDEM-INICIO
   let ordem;
   try {
-    ordem = decidirOrdens(lerOrdens(numero, r.cabeca));
+    ordem = decidirPublicacao(lerPublicacao(numero, r.cabeca));
   } catch (e) {
-    console.log('RECUSADO  nao consegui conferir CACHE e VERSAO contra a origin/main: ' + String(e.stderr || e.message).split('\n')[0]);
+    console.log('RECUSADO  nao consegui conferir VERSAO, CACHE e novidade contra a origin/main: ' + String(e.stderr || e.message).split('\n')[0]);
     return 1;
   }
   if (!ordem.ok) {
@@ -432,4 +427,4 @@ function principal(argv) {
 }
 
 if (require.main === module) process.exit(principal(process.argv.slice(2)));
-module.exports = { decidir, principal, decidirOrdem, decidirOrdens, lerOrdensGit, listaArquivos, compararCache, compararSemver, lerCache, lerVersao };
+module.exports = { decidir, principal, decidirPublicacao, lerPublicacaoGit, lerCache, lerVersao };

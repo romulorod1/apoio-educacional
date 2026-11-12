@@ -75,6 +75,8 @@ function defeitosDoPublica(texto) {
   if (/\|\|/.test(se)) d.push('if do publica tem um "ou": qualquer ramo dele publicaria sem as outras condicoes');
 
   if (!/ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/.test(pub)) d.push('checkout nao e do commit do portao');
+  // 13f: o monta_site gera VERSAO e CACHE pelo contador, que exige a historia inteira.
+  if (!/ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}\n\s+fetch-depth: 0/.test(pub)) d.push('checkout do publica sem fetch-depth: 0 (o contador da publicacao sairia menor)');
   const ps = passos(pub);
   const iPonta = ps.findIndex(p => /id: ponta/.test(p));
   if (iPonta < 0) d.push('sem o passo da ponta da main');
@@ -122,6 +124,12 @@ function defeitosDaConferencia(texto) {
   if (!/- https:\/\/apoio-educacional\.pages\.dev/.test(texto)) d.push('a escolha manual nao tem o endereco novo');
   if (!/ref: \$\{\{ inputs\.ref \|\| github\.sha \}\}/.test(texto)) d.push('checkout nao segue o commit pedido');
   if (!/SITE="\$\{SITE_PEDIDO:-\$SITE_ANTIGO\}"/.test(texto)) d.push('o site conferido nao vem do pedido');
+  // 13f: o endereco novo serve o site MONTADO (VERSAO e CACHE gerados), e o
+  // contador le a historia inteira. Sem isto a conferencia compararia o ar com o
+  // valor fixo do repositorio e reprovaria todo deploy certo.
+  if (!/fetch-depth: 0/.test(texto)) d.push('o checkout da conferencia nao traz a historia inteira (fetch-depth: 0)');
+  if (!/confere_no_ar\.sh --montado "\$SITE"/.test(texto)) d.push('o endereco novo nao e conferido contra o site montado (--montado)');
+  if (!/if \[ "\$SITE" = "\$SITE_ANTIGO" \]; then\n\s+sh _teste\/confere_no_ar\.sh "\$SITE" 900/.test(texto)) d.push('o endereco antigo deixou de ser conferido contra o disco');
   return d;
 }
 
@@ -159,7 +167,8 @@ const venenos = [
     const sem = PUBLICA.replace(m[0], '');
     return sem.replace(/(        run: \|\n          npx --yes wrangler@[\s\S]*?publicou=sim" >> "\$GITHUB_OUTPUT"\n)/, '$1' + m[0]);
   })()],
-  ['envio com working-directory', PUBLICA.replace(/(id: envio\n)/, '$1        working-directory: _site\n')]
+  ['envio com working-directory', PUBLICA.replace(/(id: envio\n)/, '$1        working-directory: _site\n')],
+  ['checkout raso', PUBLICA.replace(/(ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}\n\s+)fetch-depth: 0/, '$1fetch-depth: 1')]
 ];
 venenos.forEach(([nome, texto]) => {
   conf('veneno "' + nome + '" foi aplicado', texto !== PUBLICA);
@@ -167,6 +176,10 @@ venenos.forEach(([nome, texto]) => {
 });
 const vconf = CONFERENCIA.replace(/  workflow_call:\n(    .*\n)+/, '');
 conf('veneno "conferencia sem workflow_call" foi aplicado e reprova', vconf !== CONFERENCIA && defeitosDaConferencia(vconf).length > 0);
+[['conferencia sem --montado', CONFERENCIA.replace('confere_no_ar.sh --montado "$SITE"', 'confere_no_ar.sh "$SITE"')],
+ ['conferencia com checkout raso', CONFERENCIA.replace('fetch-depth: 0', 'fetch-depth: 1')]].forEach(([nome, texto]) => {
+  conf('veneno "' + nome + '" foi aplicado e reprova', texto !== CONFERENCIA && defeitosDaConferencia(texto).length > 0);
+});
 
 console.log('\n=== o site montado tem o que o aplicativo pede ===');
 const destino = fs.mkdtempSync(path.join(os.tmpdir(), 'site_b4_'));
@@ -204,6 +217,26 @@ try {
   conf('o site do Cloudflare tem o apple-touch-icon novo (180 px)',
     tem('icons/apple-touch-icon.png') && hashDe(path.join(destino, 'icons', 'apple-touch-icon.png')) === hashDe(path.join(RAIZ, 'icons', 'pages-dev', 'apple-touch-icon.png')));
   conf('a pasta icons/pages-dev nao sobe para o site', !tem('icons/pages-dev/icon-192.png'));
+  // 13f: VERSAO e CACHE do site sao os gerados pelo contador, maiores que os
+  // fixos do repositorio; o resto do app.js e do sw.js e o do commit.
+  const VP = require('./versao_publicada.js');
+  const gerado = VP.calcular(args => execFileSync('git', args, { cwd: RAIZ, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024 }), 'HEAD');
+  const appSite = fs.readFileSync(path.join(destino, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
+  const swSite = fs.readFileSync(path.join(destino, 'sw.js'), 'utf8').replace(/\r\n/g, '\n');
+  conf('o app.js do site traz a VERSAO gerada (' + gerado.versao + ')', VP.lerValor(appSite, VP.RE_VERSAO) === gerado.versao);
+  conf('o sw.js do site traz o CACHE gerado (' + gerado.cache + ')', VP.lerValor(swSite, VP.RE_CACHE) === gerado.cache);
+  conf('controle: o repositorio continua com o valor fixo, diferente do gerado',
+    VP.lerValor(ler('app.js'), VP.RE_VERSAO) !== gerado.versao && VP.lerValor(ler('sw.js'), VP.RE_CACHE) !== gerado.cache);
+  conf('fora a VERSAO, o CACHE e as NOVIDADES geradas, o app.js e o sw.js do site sao os do commit',
+    appSite.replace(VP.RE_VERSAO, '$1X$3').replace(/^([ \t]*var NOVIDADES = \[)\n(?:[ \t]*\{ versao: "[^"]*", itens: .*\},\n)*/m, '$1\n') ===
+      ler('app.js').replace(VP.RE_VERSAO, '$1X$3') &&
+    swSite.replace(VP.RE_CACHE, '$1X$3') === ler('sw.js').replace(VP.RE_CACHE, '$1X$3'));
+  conf('a pasta novidades/ nao sobe ao site (vai dentro do app.js)', !fs.existsSync(path.join(destino, 'novidades')));
+  conf('o confere_no_ar.sh le a VERSAO e o CACHE gerados do site montado', (() => {
+    const v = execFileSync('sh', ['-c', "sed -n \"s/^ *var VERSAO = '\\([^']*\\)'.*/\\1/p\" \"$1\" | head -1", 'x', path.join(destino, 'app.js')], { encoding: 'utf8' }).trim();
+    const c = execFileSync('sh', ['-c', "sed -n \"s/^var CACHE = '\\([^']*\\)'.*/\\1/p\" \"$1\" | head -1", 'x', path.join(destino, 'sw.js')], { encoding: 'utf8' }).trim();
+    return v === gerado.versao && c === gerado.cache;
+  })());
   conf('o index.html do site e o do commit, igual (a conferencia-no-ar compara)',
     fs.readFileSync(path.join(destino, 'index.html'), 'utf8').replace(/\r\n/g, '\n') === ler('index.html'));
   conf('o apple-touch-icon do index.html aponta para icons/icon-192.png, que no Cloudflare e o novo',

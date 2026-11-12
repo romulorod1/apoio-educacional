@@ -4,6 +4,11 @@
 (function () {
   'use strict';
 
+  /* VERSAO é gerada na publicação (13f, _teste/versao_publicada.js): o site
+   * recebe 1.43.N, em que N é o contador de publicações da main. Aqui fica
+   * FIXA no valor de desenvolvimento, que é o último escrito à mão e o piso da
+   * publicação. Não mude no PR: o merge_seguro recusa. O que ela ganha vai num
+   * arquivo novidades/<nome>.txt, e não no NOVIDADES abaixo. */
   var VERSAO = '1.42.61';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
@@ -82,7 +87,10 @@
 
   /* O que mudou em cada versão, para ela não descobrir por acaso.
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
-   * ganha, e onde encontrar. */
+   * ganha, e onde encontrar.
+   * Desde o 13f esta lista é só o histórico: cada PR escreve as dele em
+   * novidades/<nome>.txt (uma linha por item), e a publicação as põe aqui na
+   * frente, com a versão gerada do commit que as trouxe. */
   var NOVIDADES = [
     {
       versao: '1.42.61',

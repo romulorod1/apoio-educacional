@@ -153,6 +153,14 @@
  * O v139 traz a busca no texto dos livros. O v140 traz os 22 assuntos novos de
  * matemática da revisão dos mapas dos livros no banco/topicos/matematica.json.
  * O v141 traz os 11 assuntos novos de física da revisão dos mapas dos livros no banco/topicos/fisica.json.
+ *
+ * DESDE O 13f ESTE HISTÓRICO PAROU, e o CACHE abaixo fica fixo. O nome que o
+ * tablet vê é gerado na publicação (_teste/versao_publicada.js):
+ * apoio-educacional-v(1000 + N), em que N é o contador de publicações da main,
+ * que sobe em todo commit que muda o que o tablet baixa. O v141 daqui é o valor
+ * de desenvolvimento e o piso da publicação. Não mude no PR (o merge_seguro
+ * recusa) e não acrescente linha neste comentário: era ele, junto com a VERSAO
+ * e as NOVIDADES, que fazia todo PR do app conflitar com o anterior.
  */
 var CACHE = 'apoio-educacional-v141';
 var BAIXADOS = 'apoio-educacional-baixados';

@@ -18,16 +18,26 @@
 # O que o aplicativo pede tem que estar aqui: a prova e o
 # _teste/testa_publica_cloudflare.js, que confere toda entrada do ARQUIVOS do
 # sw.js e os assuntos do banco/topicos dentro da pasta montada.
+#
+# A regra de quem sobe mora em _teste/versao_publicada.js (ehDoSite), e nao
+# aqui: a mesma regra decide quando o contador da publicacao sobe (13f). Duas
+# copias da regra deixariam um arquivo subir ao site sem subir o CACHE.
+# As novidades (novidades/*.txt) nao sobem como arquivo: vao dentro do app.js.
+#
+# Depois de copiar, a VERSAO do app.js, o CACHE do sw.js e as NOVIDADES de
+# novidades/ sao escritos no site pelo versao_publicada.js --montar, a partir
+# do git (precisa da historia inteira: fetch-depth 0). No repositorio os dois
+# ficam fixos no valor de desenvolvimento. Se a geracao falhar, o site NAO e
+# montado: publicar o sw.js com o nome de cache ja publicado deixaria o tablet
+# com o codigo velho, calado.
 set -e
 cd "$(dirname "$0")/.."
 destino="${1:-_site}"
 rm -rf "$destino"
 mkdir -p "$destino"
-git ls-files -z | tr '\0' '\n' | while IFS= read -r f; do
-  case "$f" in
-    _teste/*|biblioteca/*|.github/*|functions/*|servidor/*|README.md|*.md|*.py|*.sh) continue ;;
-    _*|*/_*|.*|*/.*) continue ;;
-  esac
+lista=$(node _teste/versao_publicada.js --arquivos-do-site)
+[ -n "$lista" ] || { printf 'monta_site: a lista de arquivos do site saiu vazia\n' >&2; exit 1; }
+printf '%s\n' "$lista" | while IFS= read -r f; do
   mkdir -p "$destino/$(dirname "$f")"
   cp "$f" "$destino/$f"
 done
@@ -53,4 +63,5 @@ fi
 # arquivo esquecido no ARQUIVOS entraria no cache do worker como index.html,
 # calado, e a conferencia-no-ar leria 200. Com ele, caminho que nao existe e 404.
 printf '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Apoio Educacional</title><p>Endereço não encontrado. <a href="./">Abrir o aplicativo</a></p></html>\n' > "$destino/404.html"
+node _teste/versao_publicada.js --montar "$destino"
 printf 'site montado em %s: %s arquivos\n' "$destino" "$(find "$destino" -type f | wc -l | tr -d ' ')"
