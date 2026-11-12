@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.58';
+  var VERSAO = '1.42.59';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,9 +85,16 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.58',
+      versao: '1.42.59',
       itens: [
         'Em Química entraram 6 assuntos novos, para escolher na aula e procurar na Biblioteca: no ensino médio, como laboratório e segurança, pilhas e baterias comerciais, nitrocompostos e oxidação de alcenos.'
+      ]
+    },
+    {
+      versao: '1.42.58',
+      itens: [
+        'No tablet, a leitura de livros PDF segue em rolagem cont\u00ednua, e a barra permite ir diretamente a uma p\u00e1gina.',
+        'Na exporta\u00e7\u00e3o, marque p\u00e1ginas com toques ou digite intervalos pela numera\u00e7\u00e3o impressa; p\u00e1ginas sem n\u00famero aparecem como "arquivo N".'
       ]
     },
     {
@@ -2758,6 +2765,20 @@
         if (ev.key === 'Enter') { ev.preventDefault(); irParaPaginaDoLeitor(this.value); }
       });
     }
+    $('#corpo-modal-leitor-pdf').addEventListener('scroll', rolarLeitorContinuo, { passive: true });
+    $('#leitor-slider-pagina').addEventListener('input', function () {
+      // rolagem DIRETA: a suave atravessava as páginas do caminho, desenhava cada uma
+      // e deixava o temporizador gravar posições intermediárias depois de soltar
+      if (leitor && leitor.continuo) {
+        leitor.arrastandoAte = Date.now() + LEITOR_ARRASTO_MS;
+        irAProximaPaginaDoLeitor(+this.value, false, true);
+      }
+    });
+    // ao soltar a barra: aí sim a posição do livro é gravada, uma vez
+    $('#leitor-slider-pagina').addEventListener('change', function () {
+      if (!leitor || !leitor.continuo || typeof leitor.opcoes.aoMudarPagina !== 'function') return;
+      try { leitor.opcoes.aoMudarPagina(leitor.pagina); } catch (e) { /* posição é auxiliar */ }
+    });
     $('#epub-anterior').addEventListener('click', function () { andarNoEpub(-1); });
     $('#epub-proximo').addEventListener('click', function () { andarNoEpub(1); });
     $('#epub-sumario').addEventListener('click', alternarSumarioEpub);
@@ -16405,9 +16426,12 @@
         titulo: tituloDoLivro(reg.meta), nome: reg.id + '.pdf',
         pagina: (destino && destino.pagina) || Biblioteca.paginaDaPosicao(reg.meta, pos) || 1,
         sumario: sumario, livro: reg,
-        dica: sumario.length ? '' : 'Este livro não tem sumário: use Anterior e Próxima.',
-        aoMudarPagina: function (n) {
-          Store.gravarPosicaoLivro({ id: id, pagina: n }).catch(function () { /* a leitura segue; só a posição não fica */ });
+        dica: sumario.length ? '' : 'Este livro não tem sumário: role as páginas ou use a barra de página.',
+        aoMudarPagina: function (n, como) {
+          // arrastando a barra, a faixa acompanha, e a posição só grava ao soltar
+          if (!como || como.gravar !== false) {
+            Store.gravarPosicaoLivro({ id: id, pagina: n }).catch(function () { /* a leitura segue; só a posição não fica */ });
+          }
           mostrarCobre('pdf', reg, n);
         }
       });
@@ -16994,10 +17018,44 @@
     // o que exportar: o capítulo à vista, ou (no PDF) as páginas que ela escrever
     var radioCap = el('input', { type: 'radio', name: 'livro-exportar-o-que', id: 'livro-exportar-capitulo', value: 'capitulo' });
     var radioPag = el('input', { type: 'radio', name: 'livro-exportar-o-que', id: 'livro-exportar-paginas', value: 'paginas' });
-    var campoPag = el('input', { type: 'text', id: 'livro-exportar-quais', autocomplete: 'off', inputmode: 'numeric',
-      value: epub ? '' : String(origem.pagina || 1), placeholder: 'por exemplo 3-5, 8' });
+    var paginaInicial = epub ? '' : (Biblioteca.paginaImpressa(meta, origem.pagina) ||
+      (meta.numeracao && meta.numeracao.length ? 'arquivo ' + (origem.pagina || 1) : (origem.pagina || 1)));
+    var campoPag = el('input', { type: 'text', id: 'livro-exportar-quais', autocomplete: 'off', inputmode: 'text',
+      value: String(paginaInicial), placeholder: 'por exemplo 45-48, 52' });
     var opcoes = el('div', { class: 'livro-exportar-opcoes' });
     var partesDoCap = entrada ? Biblioteca.partesDoCapitulo(meta, entrada, false).capitulo : [];
+    var paginasMarcadas = {};
+    var gradePaginas = el('div', { class: 'livro-exportar-grade', id: 'livro-exportar-grade-paginas', hidden: true,
+      'aria-label': 'Páginas do capítulo' });
+    if (!epub) {
+      var paginaAtualArquivo = Number(origem.pagina) || 1;
+      paginasMarcadas[paginaAtualArquivo] = true;
+      if (partesDoCap.length) {
+        // a frase diz a verdade do livro: sem numeração impressa, os números são os do arquivo
+        var temImpressa = !!(meta.numeracao && meta.numeracao.length);
+        gradePaginas.appendChild(el('p', { class: 'ajuda', texto: temImpressa
+          ? 'Toque para marcar. Os números são os da página impressa; "arq." marca a página sem número impresso.'
+          : 'Toque para marcar. Os números são os das páginas do arquivo.' }));
+        var botoesPaginas = el('div', { class: 'livro-exportar-grade-botoes' });
+        var paginasDaGrade = partesDoCap.slice();
+        if (paginasDaGrade.indexOf(paginaAtualArquivo) < 0) paginasDaGrade.push(paginaAtualArquivo);
+        paginasDaGrade.sort(function (a, b) { return a - b; }).forEach(function (paginaArquivo) {
+          var impressa = Biblioteca.paginaImpressa(meta, paginaArquivo);
+          var rotulo = impressa || paginaArquivo;
+          var b = el('button', { type: 'button', class: 'livro-exportar-pagina',
+            'aria-label': (impressa ? 'Página impressa ' + rotulo : 'Página do arquivo ' + rotulo),
+            'aria-pressed': paginasMarcadas[paginaArquivo] ? 'true' : 'false', 'data-pagina-arquivo': paginaArquivo,
+            texto: impressa || (meta.numeracao && meta.numeracao.length ? 'arq. ' + paginaArquivo : String(rotulo)) });
+          b.addEventListener('click', function () {
+            if (paginasMarcadas[paginaArquivo]) delete paginasMarcadas[paginaArquivo];
+            else paginasMarcadas[paginaArquivo] = true;
+            sincronizarCampoPaginas();
+          });
+          botoesPaginas.appendChild(b);
+        });
+        gradePaginas.appendChild(botoesPaginas);
+      }
+    }
     if (entrada && partesDoCap.length) {
       opcoes.appendChild(el('label', { class: 'bib-marcar' }, [radioCap,
         el('span', { texto: 'O capítulo: ' + entrada.titulo + ' (' + Biblioteca.descreverUnidades(partesDoCap, nomeUnidade) + ')' })]));
@@ -17005,10 +17063,72 @@
     if (!epub) {
       opcoes.appendChild(el('label', { class: 'bib-marcar' }, [radioPag, el('span', { texto: 'Páginas escolhidas' })]));
       opcoes.appendChild(el('label', { class: 'campo livro-exportar-quais' }, [
-        el('span', { texto: 'Quais páginas (o livro vai da 1 à ' + (meta.paginas || '?') + ')' }), campoPag]));
+        el('span', { texto: (meta.numeracao && meta.numeracao.length ? 'Quais páginas impressas' : 'Quais páginas') + ' (o livro vai da 1 à ' + (meta.paginas || '?') + ')' }), campoPag]));
     }
     if (entrada && partesDoCap.length) radioCap.checked = true; else radioPag.checked = true;
     corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'O que exportar' }), opcoes]));
+    if (!epub && partesDoCap.length) corpo.appendChild(gradePaginas);
+
+    function lerPaginasDoCampo() {
+      if (!meta.numeracao || !meta.numeracao.length) return Biblioteca.paginasEscolhidas(campoPag.value, meta.paginas || 0);
+      var texto = String(campoPag.value || '').trim();
+      if (!texto) return { erro: 'Escreva as páginas, por exemplo 45-48, 52.' };
+      var itens = texto.split(/[,;]+|\s+e\s+/i), paginas = [];
+      for (var i = 0; i < itens.length; i++) {
+        // a página é número ou romano, nunca os dois juntos: "45a48" (sem espaço) é o intervalo de 45 a 48
+        var m = /^(?:(arquivo)\s+)?(\d+|[ivxlcdm]+)(?:\s*(?:-|a|até)\s*(?:(arquivo)\s+)?(\d+|[ivxlcdm]+))?$/i.exec(itens[i].trim());
+        if (!m) return { erro: 'Não entendi "' + itens[i].trim() + '". Escreva páginas impressas, por exemplo 45-48, 52.' };
+        var aTexto = m[2], bTexto = m[4] || m[2];
+        var arquivoExplicito = !!m[1] || !!m[3];
+        if (arquivoExplicito && ((m[3] && !m[1]) || (m[1] && m[3] && !m[4]))) return { erro: 'Use o mesmo tipo de página no intervalo.' };
+        if (arquivoExplicito) {
+          var arqA = parseInt(aTexto, 10), arqZ = parseInt(bTexto, 10);
+          if (!/^\d+$/.test(aTexto) || !/^\d+$/.test(bTexto) || arqA < 1 || arqZ < 1) return { erro: 'A página do arquivo deve ser um número positivo.' };
+          if (arqA > arqZ) { var trocaArq = arqA; arqA = arqZ; arqZ = trocaArq; }
+          if (arqZ > (meta.paginas || 0)) return { erro: 'O livro vai da página 1 à ' + (meta.paginas || '?') + '.' };
+          for (var pArq = arqA; pArq <= arqZ; pArq++) {
+            if (paginas.indexOf(pArq) < 0) paginas.push(pArq);
+            if (paginas.length > Biblioteca.TETO_DE_PAGINAS_EXPORTADAS) return { erro: 'No máximo ' + Biblioteca.TETO_DE_PAGINAS_EXPORTADAS + ' páginas por PDF.' };
+          }
+          continue;
+        }
+        var romano = /[ivxlcdm]/i.test(aTexto + bTexto);
+        if (romano !== /[ivxlcdm]/i.test(aTexto) || romano !== /[ivxlcdm]/i.test(bTexto)) return { erro: 'Use páginas do mesmo tipo no intervalo.' };
+        var estilo = romano ? 'romano' : 'arabico';
+        var a = romano ? Biblioteca.deRomano(aTexto) : parseInt(aTexto, 10);
+        var z = romano ? Biblioteca.deRomano(bTexto) : parseInt(bTexto, 10);
+        if (!a || !z) return { erro: 'Essa página impressa não existe no livro.' };
+        if (a > z) { var troca = a; a = z; z = troca; }
+        for (var n = a; n <= z; n++) {
+          var impressa = estilo === 'romano' ? Biblioteca.paraRomano(n) : n;
+          var arquivo = Biblioteca.paginaDoArquivo(meta, impressa, estilo);
+          if (arquivo === null) return { erro: 'A página impressa ' + impressa + ' não existe no livro.' };
+          if (paginas.indexOf(arquivo) < 0) paginas.push(arquivo);
+          if (paginas.length > Biblioteca.TETO_DE_PAGINAS_EXPORTADAS) return { erro: 'No máximo ' + Biblioteca.TETO_DE_PAGINAS_EXPORTADAS + ' páginas por PDF.' };
+        }
+      }
+      return paginas.length ? { paginas: paginas.sort(function (x, y) { return x - y; }) } : { erro: 'Escreva as páginas impressas.' };
+    }
+    function sincronizarCampoPaginas() {
+      var escolhidas = Object.keys(paginasMarcadas).map(Number).sort(function (a, b) { return a - b; });
+      campoPag.value = escolhidas.map(function (n) {
+        return Biblioteca.paginaImpressa(meta, n) || (meta.numeracao && meta.numeracao.length ? 'arquivo ' + n : n);
+      }).join(', ');
+      $$('#livro-exportar-grade-paginas [data-pagina-arquivo]').forEach(function (b) {
+        b.setAttribute('aria-pressed', paginasMarcadas[b.dataset.paginaArquivo] ? 'true' : 'false');
+      });
+      atualizarTamanho();
+    }
+    campoPag.addEventListener('input', function () {
+      var r = lerPaginasDoCampo();
+      if (!r.erro) {
+        paginasMarcadas = {};
+        r.paginas.forEach(function (n) { paginasMarcadas[n] = true; });
+        $$('#livro-exportar-grade-paginas [data-pagina-arquivo]').forEach(function (b) {
+          b.setAttribute('aria-pressed', paginasMarcadas[b.dataset.paginaArquivo] ? 'true' : 'false');
+        });
+      }
+    });
 
     // o gabarito do capítulo, no mesmo PDF
     var caixaGab = el('input', { type: 'checkbox', id: 'livro-exportar-gabarito' });
@@ -17038,6 +17158,7 @@
       motivoGab.dataset.estado = !temGabarito ? 'sem_no_livro' : doCapitulo ? 'tem' : 'sem_no_capitulo';
       // o campo das páginas só vale com "Páginas escolhidas" marcada (painel cego)
       campoPag.disabled = !radioPag.checked;
+      gradePaginas.hidden = !radioPag.checked;
       atualizarTamanho();
     }
     /* O TAMANHO ESTIMADO, antes de gerar: cada página do livro vira uma imagem
@@ -17052,8 +17173,10 @@
       if (p.erro) { tamanho.textContent = ''; avisoTamanho.hidden = true; delete tamanho.dataset.bytes; return; }
       var bytes = estimarPdfDoLivro(origem.formato, p.capitulo.length + p.gabarito.length);
       tamanho.dataset.bytes = String(bytes);
-      tamanho.textContent = 'Tamanho estimado do PDF: ' + textoDeMb(bytes) + ' (' + (p.capitulo.length + p.gabarito.length) +
-        (epub ? ' partes do livro).' : ' páginas do livro).');
+      var nUnidades = p.capitulo.length + p.gabarito.length;
+      tamanho.textContent = 'Tamanho estimado do PDF: ' + textoDeMb(bytes) + ' (' + nUnidades + ' ' + (epub
+        ? (nUnidades === 1 ? 'parte do livro' : 'partes do livro')
+        : (nUnidades === 1 ? 'página do livro' : 'páginas do livro')) + ').';
       avisoTamanho.hidden = bytes <= avisoDeTamanhoExportado();
       avisoTamanho.textContent = 'Passa de 20 MB: o PDF ocupa esse espaço no tablet e pode não ir por WhatsApp ou e-mail. ' +
         'Se for mandar, prefira menos páginas.';
@@ -17116,7 +17239,7 @@
         var p = Biblioteca.partesDoCapitulo(meta, entrada, caixaGab.checked && !caixaGab.disabled);
         return { capitulo: p.capitulo, gabarito: p.gabarito, titulo: entrada.titulo, entrada: entrada };
       }
-      var r = Biblioteca.paginasEscolhidas(campoPag.value, meta.paginas || 0);
+      var r = lerPaginasDoCampo();
       if (r.erro) return { erro: r.erro };
       var e1 = Biblioteca.entradaDoMapa(mapa, 'pdf', r.paginas[0]);
       // as páginas escolhidas, todas de um capítulo só, levam o nome dele no rodapé
@@ -22632,8 +22755,10 @@
    *   opcoes.sumario       os livros (C15.1): [{ n, nivel, titulo, pagina }];
    *                        com ele aparece o botão Sumário, e cada entrada
    *                        leva à página dela
-   *   opcoes.aoMudarPagina function (n) chamada a cada página desenhada (o
-   *                        livro guarda onde ela parou)
+   *   opcoes.aoMudarPagina function (n, como) chamada a cada página desenhada
+   *                        (o livro guarda onde ela parou e atualiza a faixa
+   *                        do capítulo); como.gravar === false enquanto ela
+   *                        arrasta a barra: a faixa muda, a posição só ao soltar
    *   opcoes.livro         o registro do livro (C15.4): com ele aparece o
    *                        "Exportar em PDF"
    *
@@ -22654,6 +22779,8 @@
     $('#leitor-sumario').hidden = !(opcoes.sumario && opcoes.sumario.length);
     // "Exportar em PDF" (C15.4) e "Ir para a página" (B3) só no livro
     $('#leitor-exportar').hidden = !opcoes.livro;
+    $('#leitor-exportar').textContent = 'Exportar páginas';
+    $('#leitor-pdf-navegacao').hidden = !opcoes.livro;
     if ($('#leitor-ir-caixa')) $('#leitor-ir-caixa').hidden = !opcoes.livro;
     fecharSumarioDoLeitor();
     // "Este capítulo cobre" (C15.2) nasce escondido: só o livro o mostra, a cada página
@@ -22684,7 +22811,7 @@
       estado.doc = doc;
       estado.total = doc.numPages;
       estado.pagina = Math.min(estado.pagina, estado.total);
-      return desenharPaginaDoLeitor(true);
+      return opcoes.livro ? abrirLeitorContinuo(estado) : desenharPaginaDoLeitor(true);
     }).catch(function () {
       if (vez !== leitorVez) return false;
       mostrarFalhaDoLeitor(falha || 'pdf');
@@ -22764,6 +22891,11 @@
     var meta = tem && leitor.opcoes && leitor.opcoes.livro ? leitor.opcoes.livro.meta : null;
     var imp = meta ? Biblioteca.paginaImpressa(meta, leitor.pagina) : null;
     $('#leitor-contador').textContent = tem ? textoDoContadorDoLeitor(meta, leitor.pagina, leitor.total) : '';
+    var slider = $('#leitor-slider-pagina');
+    if (slider) {
+      slider.disabled = !tem || !leitor.continuo;
+      if (tem) { slider.min = '1'; slider.max = String(leitor.total); slider.value = String(leitor.pagina); }
+    }
     var ir = $('#leitor-ir-pagina');
     if (ir) {
       ir.disabled = !tem;
@@ -22788,8 +22920,8 @@
       return false;
     }
     fecharSumarioDoLeitor();
-    leitor.pagina = destino;
-    desenharPaginaDoLeitor(true);
+    if (leitor.continuo) irAProximaPaginaDoLeitor(destino, false);
+    else { leitor.pagina = destino; desenharPaginaDoLeitor(true); }
     return true;
   }
 
@@ -22809,8 +22941,9 @@
     desenharSumario(lista, sumario, entradaAtualDoSumario(sumario, 'pagina', leitor.pagina), function (e) {
       fecharSumarioDoLeitor();
       if (!leitor || !leitor.doc) return;
-      leitor.pagina = Math.max(1, Math.min(leitor.total, e.pagina));
-      desenharPaginaDoLeitor(true);
+      var destino = Math.max(1, Math.min(leitor.total, e.pagina));
+      if (leitor.continuo) irAProximaPaginaDoLeitor(destino, false);
+      else { leitor.pagina = destino; desenharPaginaDoLeitor(true); }
     }, meta);
     lista.hidden = false;
     $('#leitor-sumario').setAttribute('aria-expanded', 'true');
@@ -22825,6 +22958,7 @@
   function desenharPaginaDoLeitor(paraOAlto) {
     var estado = leitor;
     if (!estado || !estado.doc) return Promise.resolve(false);
+    if (estado.continuo) return redimensionarLeitorContinuo(paraOAlto);
     var vez = ++leitorDesenho;
     var n = estado.pagina;
     if (leitorTarefa) { leitorTarefa.cancel(); leitorTarefa = null; }
@@ -22866,12 +23000,308 @@
     });
   }
 
+  /* O livro inteiro é uma faixa contínua. Os espaços mantêm o tamanho das
+   * páginas; IntersectionObserver desenha só as que estão perto da tela e
+   * libera as distantes para que livros grandes não mantenham centenas de
+   * canvases na memória. Anexos de aula continuam no leitor de página única. */
+  function abrirLeitorContinuo(estado) {
+    var corpo = $('#corpo-modal-leitor-pdf');
+    estado.continuo = true;
+    estado.paginas = [];
+    corpo.innerHTML = '';
+    return estado.doc.getPage(1).then(function (primeira) {
+      if (estado !== leitor) return false;
+      var base = primeira.getViewport({ scale: 1 });
+      estado.proporcaoPagina = base.height / base.width;
+      var largura = Math.max(160, corpo.clientWidth - 36);
+      var frag = document.createDocumentFragment();
+      for (var n = 1; n <= estado.total; n++) {
+        var caixa = el('div', { class: 'leitor-pdf-pagina', 'data-pagina-arquivo': String(n),
+          'aria-label': 'Página ' + n + ' de ' + estado.total });
+        caixa.style.width = Math.floor(largura * estado.zoom) + 'px';
+        caixa.style.height = Math.ceil(largura * estado.zoom * estado.proporcaoPagina) + 'px';
+        caixa.appendChild(el('div', { class: 'leitor-pdf-pagina-vazia', 'aria-hidden': 'true' }));
+        var registro = { n: n, caixa: caixa, visivel: false, tarefa: null, desenhando: false };
+        estado.paginas.push(registro);
+        frag.appendChild(caixa);
+      }
+      corpo.appendChild(frag);
+      corpo.dataset.paginaDesenhada = String(estado.pagina);
+      atualizarBarraDoLeitor();
+      return irAProximaPaginaDoLeitor(estado.pagina, false).then(function () {
+        return !!corpo.querySelector('[data-pagina-arquivo="' + estado.pagina + '"] canvas');
+      });
+    }).catch(function () { mostrarFalhaDoLeitor('pdf'); return false; });
+  }
+
+  function desenharPaginaContinua(estado, registro) {
+    if (registro.desenhando) return registro.promessa || Promise.resolve(false);
+    if (registro.caixa.querySelector('canvas')) return Promise.resolve(true);
+    if (estado !== leitor) return Promise.resolve(false);
+    registro.desenhando = true;
+    var tarefaDaPagina = null;
+    registro.promessa = estado.doc.getPage(registro.n).then(function (pagina) {
+      // a página saiu de perto da tela enquanto o pdf.js a abria: nem cria o canvas
+      if (estado !== leitor || !registro.visivel) return null;
+      var corpo = $('#corpo-modal-leitor-pdf');
+      var base = pagina.getViewport({ scale: 1 });
+      var largura = Math.max(160, corpo.clientWidth - 36) * estado.zoom;
+      var vp = pagina.getViewport({ scale: largura / base.width });
+      registro.proporcao = base.height / base.width;
+      registro.caixa.style.width = Math.floor(vp.width) + 'px';
+      registro.caixa.style.height = Math.ceil(vp.height) + 'px';
+      var densidade = Math.min(window.devicePixelRatio || 1, Math.sqrt(LEITOR_MAX_PIXELS / (vp.width * vp.height)));
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.floor(vp.width * densidade));
+      canvas.height = Math.max(1, Math.floor(vp.height * densidade));
+      canvas.style.width = Math.floor(vp.width) + 'px';
+      canvas.style.height = Math.floor(vp.height) + 'px';
+      canvas.setAttribute('aria-label', 'Página ' + registro.n + ' de ' + estado.total);
+      var tarefa = pagina.render({ canvasContext: canvas.getContext('2d'), canvas: canvas, viewport: vp,
+        transform: densidade !== 1 ? [densidade, 0, 0, densidade, 0, 0] : null });
+      tarefaDaPagina = tarefa;
+      registro.tarefa = tarefa;
+      return tarefa.promise.then(function () {
+        if (estado !== leitor || !registro.visivel || registro.tarefa !== tarefa) { canvas.width = 0; canvas.height = 0; return false; }
+        registro.caixa.innerHTML = '';
+        registro.caixa.appendChild(canvas);
+        registro.temCanvas = true;
+        return true;
+      });
+    }).catch(function (e) {
+      if (e && e.name !== 'RenderingCancelledException' && estado === leitor) mostrarFalhaDoLeitor('pdf');
+      return false;
+    }).then(function () {
+      if (!tarefaDaPagina || registro.tarefa === tarefaDaPagina) {
+        registro.tarefa = null;
+        registro.desenhando = false;
+      }
+    });
+    return registro.promessa;
+  }
+
+  function liberarPaginaContinua(registro) {
+    if (registro.tarefa) { registro.tarefa.cancel(); registro.tarefa = null; }
+    var c = registro.caixa.querySelector('canvas');
+    if (c) { c.width = 0; c.height = 0; registro.caixa.removeChild(c); }
+    registro.caixa.innerHTML = '';
+    registro.caixa.appendChild(el('div', { class: 'leitor-pdf-pagina-vazia', 'aria-hidden': 'true' }));
+    registro.desenhando = false;
+    registro.temCanvas = false;
+  }
+
+  /* QUEM FICA DESENHADO no leitor contínuo: a página do meio e as vizinhas
+   * (centro - 1 a centro + 1) e toda página que encosta na tela, com uma
+   * folga pequena. As outras soltam o canvas. Roda a cada quadro de rolagem,
+   * na troca de página, no zoom e no giro.
+   *
+   * Antes isso era do IntersectionObserver, com margem de 700 px: deitado, a
+   * página tem cerca de 1700 px, e quando ela saía da margem ainda era vizinha
+   * da do meio; ficava, e o observador não avisava de novo (19 canvases, cerca
+   * de 150 Mpx, depois de 80 passos). E no zoom e no giro as vizinhas que já
+   * estavam na margem ficavam em branco, porque o observador não volta a
+   * avisar quem não saiu. A conciliação não depende de evento. */
+  var LEITOR_FOLGA_PX = 200;
+  var LEITOR_ARRASTO_MS = 150;
+  var leitorDepoisDoArrasto = null;
+  function conciliarPaginasContinuas(estado, centro) {
+    if (!estado || !estado.paginas || !estado.paginas.length) return;
+    /* Arrastando a barra, a página muda a cada movimento: desenhar cada uma
+     * criava um canvas por página do caminho (300 da p. 50 à 350). Enquanto
+     * ela arrasta, só se solta o que saiu; o desenho espera a barra parar. */
+    var falta = (estado.arrastandoAte || 0) - Date.now();
+    if (falta > 0) {
+      clearTimeout(leitorDepoisDoArrasto);
+      leitorDepoisDoArrasto = setTimeout(function () {
+        leitorDepoisDoArrasto = null;
+        if (estado === leitor) conciliarPaginasContinuas(estado, estado.pagina);
+      }, falta + 10);
+      estado.paginas.forEach(function (pagina) {
+        if (pagina.n !== centro && (pagina.visivel || pagina.desenhando || pagina.temCanvas)) {
+          pagina.visivel = false;
+          liberarPaginaContinua(pagina);
+        }
+      });
+      return;
+    }
+    var corpo = $('#corpo-modal-leitor-pdf');
+    var rc = corpo.getBoundingClientRect();
+    var topo = rc.top - LEITOR_FOLGA_PX, fundo = rc.top + corpo.clientHeight + LEITOR_FOLGA_PX;
+    var c = Math.max(1, Math.min(estado.total, centro || estado.pagina || 1));
+    var ficam = {};
+    ficam[c] = true;
+    /* As vizinhas ficam prontas para a rolagem, mas só se estiverem a menos
+     * de uma altura de tela da área à vista: no zoom alto a página é maior
+     * que a tela, e a vizinha lá longe só gastava memória (36 Mpx no zoom 4). */
+    var alcance = corpo.clientHeight;
+    [c - 1, c + 1].forEach(function (k) {
+      if (k < 1 || k > estado.total) return;
+      var r = estado.paginas[k - 1].caixa.getBoundingClientRect();
+      if (r.bottom >= rc.top - alcance && r.top <= rc.top + corpo.clientHeight + alcance) ficam[k] = true;
+    });
+    // as caixas estão em ordem, uma embaixo da outra: anda do centro para os dois lados
+    for (var cima = c; cima >= 1; cima--) {
+      var rCima = estado.paginas[cima - 1].caixa.getBoundingClientRect();
+      if (rCima.bottom < topo) break;
+      if (rCima.top <= fundo) ficam[cima] = true;
+    }
+    for (var baixo = c + 1; baixo <= estado.total; baixo++) {
+      var rBaixo = estado.paginas[baixo - 1].caixa.getBoundingClientRect();
+      if (rBaixo.top > fundo) break;
+      if (rBaixo.bottom >= topo) ficam[baixo] = true;
+    }
+    estado.paginas.forEach(function (pagina) {
+      if (ficam[pagina.n]) {
+        pagina.visivel = true;
+        desenharPaginaContinua(estado, pagina);
+      } else if (pagina.visivel || pagina.desenhando || pagina.temCanvas) {
+        pagina.visivel = false;
+        liberarPaginaContinua(pagina);
+      }
+    });
+  }
+
+  function paginaMaisProximaDoCentro(estado) {
+    var corpo = $('#corpo-modal-leitor-pdf'), caixas = estado.paginas || [];
+    var centro = corpo.getBoundingClientRect().top + corpo.clientHeight / 2, melhor = estado.pagina, distancia = Infinity;
+    caixas.forEach(function (p) {
+      var r = p.caixa.getBoundingClientRect(), d = centro < r.top ? r.top - centro : centro > r.bottom ? centro - r.bottom : 0;
+      if (d < distancia) { distancia = d; melhor = p.n; }
+    });
+    return melhor;
+  }
+
+  var leitorRolarAgendado = false;
+  var leitorRolarDestinoTimer = null;
+  function rolarLeitorContinuo() {
+    if (!leitor || !leitor.continuo || leitorRolarAgendado) return;
+    leitorRolarAgendado = true;
+    window.requestAnimationFrame(function () {
+      leitorRolarAgendado = false;
+      if (!leitor || !leitor.continuo) return;
+      var n = paginaMaisProximaDoCentro(leitor);
+      leitor.ancora = ancoraDoLeitorContinuo(leitor, n);
+      conciliarPaginasContinuas(leitor, n);
+      // Em uma navegação suave, o meio da tela ainda passa por páginas
+      // anteriores. Não grave esse trecho intermediário como a última página.
+      if (leitor.rolagemProgramaticaAte && n !== leitor.rolagemProgramaticaAte) return;
+      if (leitor.rolagemProgramaticaAte === n) {
+        leitor.rolagemProgramaticaAte = 0;
+        clearTimeout(leitorRolarDestinoTimer);
+        leitorRolarDestinoTimer = null;
+      }
+      if (n !== leitor.pagina) {
+        leitor.pagina = n;
+        $('#corpo-modal-leitor-pdf').dataset.paginaDesenhada = String(n);
+        atualizarBarraDoLeitor();
+        if (typeof leitor.opcoes.aoMudarPagina === 'function') {
+          // no meio de um arrasto da barra, a posição só grava ao soltar
+          try { leitor.opcoes.aoMudarPagina(n, { gravar: !((leitor.arrastandoAte || 0) > Date.now()) }); } catch (e) { /* posição é auxiliar */ }
+        }
+      }
+    });
+  }
+
+  // semGravar: a barra de página leva a página a cada movimento e só grava a posição ao soltar
+  function irAProximaPaginaDoLeitor(n, suave, semGravar) {
+    if (!leitor || !leitor.doc) return Promise.resolve(false);
+    leitor.pagina = Math.max(1, Math.min(leitor.total, n));
+    atualizarBarraDoLeitor();
+    if (typeof leitor.opcoes.aoMudarPagina === 'function') {
+      try { leitor.opcoes.aoMudarPagina(leitor.pagina, { gravar: !semGravar }); } catch (e) { /* posição é auxiliar */ }
+    }
+    if (leitor.continuo && leitor.paginas) {
+      $('#corpo-modal-leitor-pdf').dataset.paginaDesenhada = String(leitor.pagina);
+      var p = leitor.paginas[leitor.pagina - 1];
+      if (!p) return Promise.resolve(false);
+      p.visivel = true;
+      if (suave) {
+        leitor.rolagemProgramaticaAte = leitor.pagina;
+        clearTimeout(leitorRolarDestinoTimer);
+        leitorRolarDestinoTimer = setTimeout(function () {
+          leitorRolarDestinoTimer = null;
+          if (!leitor || !leitor.continuo) return;
+          leitor.rolagemProgramaticaAte = 0;
+          rolarLeitorContinuo();
+        }, 900);
+      }
+      p.caixa.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'start' });
+      conciliarPaginasContinuas(leitor, p.n);
+      // arrastando a barra, o desenho espera ela parar (a conciliação agenda)
+      if ((leitor.arrastandoAte || 0) > Date.now()) return Promise.resolve(false);
+      return desenharPaginaContinua(leitor, p).then(function () { return !!p.caixa.querySelector('canvas'); });
+    }
+    desenharPaginaDoLeitor(true);
+    return Promise.resolve(true);
+  }
+
+  /* A âncora do zoom e do giro: a página que está no meio da tela e o ponto
+   * dentro dela (fração da altura e da largura). Mudar a altura de todas as
+   * caixas sem levar a rolagem junto deixava outra página à vista (na p. 206,
+   * o "+" mostrava a p. 165) e o contador dizendo a antiga. */
+  function ancoraDoLeitorContinuo(estado, jaMedida) {
+    var corpo = $('#corpo-modal-leitor-pdf');
+    var n = jaMedida || paginaMaisProximaDoCentro(estado), p = estado.paginas[n - 1];
+    if (!p) return null;
+    var rc = corpo.getBoundingClientRect(), r = p.caixa.getBoundingClientRect();
+    var meioY = rc.top + corpo.clientHeight / 2, meioX = rc.left + corpo.clientWidth / 2;
+    return { n: n, lc: corpo.clientWidth, ac: corpo.clientHeight,
+      fy: r.height ? Math.max(0, Math.min(1, (meioY - r.top) / r.height)) : 0,
+      fx: r.width ? Math.max(0, Math.min(1, (meioX - r.left) / r.width)) : 0.5 };
+  }
+
+  /* No giro, a janela já mudou quando o redesenho roda (250 ms depois): o
+   * meio da tela nova é outro ponto. Vale a âncora da última rolagem, tirada
+   * com a janela de antes; no zoom, a janela é a mesma e a âncora é a de agora. */
+  function ancoraParaRedimensionar(estado) {
+    var corpo = $('#corpo-modal-leitor-pdf'), guardada = estado.ancora;
+    if (guardada && (guardada.lc !== corpo.clientWidth || guardada.ac !== corpo.clientHeight)) return guardada;
+    return ancoraDoLeitorContinuo(estado);
+  }
+
+  function voltarParaAncoraDoLeitor(estado, ancora) {
+    var corpo = $('#corpo-modal-leitor-pdf'), p = estado.paginas[ancora.n - 1];
+    if (!p) return;
+    var rc = corpo.getBoundingClientRect(), r = p.caixa.getBoundingClientRect();
+    var topo = r.top - rc.top + corpo.scrollTop, esquerda = r.left - rc.left + corpo.scrollLeft;
+    corpo.scrollTop = Math.max(0, topo + ancora.fy * r.height - corpo.clientHeight / 2);
+    corpo.scrollLeft = Math.max(0, esquerda + ancora.fx * r.width - corpo.clientWidth / 2);
+  }
+
+  function redimensionarLeitorContinuo(paraOAlto) {
+    if (!leitor || !leitor.continuo) return Promise.resolve(false);
+    var estado = leitor;
+    var corpo = $('#corpo-modal-leitor-pdf'), largura = Math.max(160, corpo.clientWidth - 36) * estado.zoom;
+    var ancora = paraOAlto ? null : ancoraParaRedimensionar(estado);
+    estado.paginas.forEach(function (p) {
+      liberarPaginaContinua(p);
+      p.caixa.style.width = Math.floor(largura) + 'px';
+      // a página já lida guarda a proporção dela; as outras usam a da primeira
+      p.caixa.style.height = Math.ceil(largura * (p.proporcao || estado.proporcaoPagina)) + 'px';
+    });
+    if (paraOAlto || !ancora) { irAProximaPaginaDoLeitor(estado.pagina, false); return Promise.resolve(true); }
+    voltarParaAncoraDoLeitor(estado, ancora);
+    // o contador e a posição guardada seguem a página que está à vista
+    if (ancora.n !== estado.pagina) {
+      estado.pagina = ancora.n;
+      if (typeof estado.opcoes.aoMudarPagina === 'function') {
+        try { estado.opcoes.aoMudarPagina(ancora.n); } catch (e) { /* posição é auxiliar */ }
+      }
+    }
+    corpo.dataset.paginaDesenhada = String(estado.pagina);
+    atualizarBarraDoLeitor();
+    conciliarPaginasContinuas(estado, estado.pagina);
+    var p = estado.paginas[estado.pagina - 1];
+    p.visivel = true;
+    return desenharPaginaContinua(estado, p).then(function () { return !!p.caixa.querySelector('canvas'); });
+  }
+
   function andarNoLeitorPdf(passo) {
     if (!leitor || !leitor.doc) return;
     var nova = leitor.pagina + passo;
     if (nova < 1 || nova > leitor.total) return;
-    leitor.pagina = nova;
-    desenharPaginaDoLeitor(true);
+    if (leitor.continuo) irAProximaPaginaDoLeitor(nova, true);
+    else { leitor.pagina = nova; desenharPaginaDoLeitor(true); }
   }
 
   // fator 0 é "Ajustar à largura"; os outros multiplicam, dentro dos limites
@@ -22926,6 +23356,9 @@
     leitorVez++;
     leitorDesenho++;
     if (leitorTarefa) { leitorTarefa.cancel(); leitorTarefa = null; }
+    clearTimeout(leitorRolarDestinoTimer);
+    leitorRolarDestinoTimer = null;
+    if (leitor && leitor.paginas) leitor.paginas.forEach(liberarPaginaContinua);
     leitor = null;
     fecharSumarioDoLeitor();
     esconderCobre('pdf');
