@@ -12048,9 +12048,12 @@
     rodape.innerHTML = '';
 
     var anoDoAluno = aluno && Core.anoEscolarDe(aluno);
+    // a última aula que aconteceu antes desta (a cancelada não conta como aula dada)
+    var chaveDaAula = function (a) { return a.data + ' ' + (a.hora || ''); };
     var aulaAnterior = db.aulas.filter(function (a) {
-      return a.alunoId === aula.alunoId && a.id !== aula.id && a.data <= aula.data;
-    }).sort(function (a, b) { return b.data.localeCompare(a.data); })[0];
+      return a.alunoId === aula.alunoId && a.id !== aula.id && (a.status || 'realizada') !== 'cancelada' &&
+        chaveDaAula(a) < chaveDaAula(aula);
+    }).sort(function (a, b) { return chaveDaAula(b).localeCompare(chaveDaAula(a)); })[0];
     corpo.appendChild(el('div', { class: 'tema-contexto', id: 'tema-contexto' }, [
       el('strong', { texto: 'Para ' + (aluno ? aluno.nome : 'este aluno') }),
       anoDoAluno ? el('span', { class: 'tag', texto: nomeDoAno(anoDoAluno) }) : null,
