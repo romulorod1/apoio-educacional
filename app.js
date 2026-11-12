@@ -9,7 +9,7 @@
    * FIXA no valor de desenvolvimento, que é o último escrito à mão e o piso da
    * publicação. Não mude no PR: o merge_seguro recusa. O que ela ganha vai num
    * arquivo novidades/<nome>.txt, e não no NOVIDADES abaixo. */
-  var VERSAO = '1.42.69';
+  var VERSAO = '1.42.74';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -92,6 +92,12 @@
    * novidades/<nome>.txt (uma linha por item), e a publicação as põe aqui na
    * frente, com a versão gerada do commit que as trouxe. */
   var NOVIDADES = [
+    {
+      versao: '1.42.68',
+      itens: [
+        'Na ficha de cada aluno, em Planejamentos, toque em Novo planejamento, cole ou dite o aviso de provas da escola e anexe os prints. O aplicativo monta um PDF com os dias de estudo, as provas e as suas aulas; você confere, ajusta se quiser e compartilha com a família. Precisa de internet. Também dá para começar pelo link na janela de marcar aula.'
+      ]
+    },
     {
       versao: '1.42.61',
       itens: [
