@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.63';
+  var VERSAO = '1.42.64';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -84,6 +84,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.64',
+      itens: [
+        'Em Matemática, 10 assuntos passaram a abrir a lista e o Material do módulo certo, entre eles funções trigonométricas e adição de arcos (que estavam trocados entre si), média, estatística, leitura de gráficos, radiciação e juros compostos. Círculo (comprimento e área), notação científica, determinantes e distribuições e dispersão ficam sem lista pronta e sem Material, porque nenhum módulo trata deles.'
+      ]
+    },
     {
       versao: '1.42.61',
       itens: [
