@@ -155,10 +155,10 @@
  * O v141 traz os 11 assuntos novos de física da revisão dos mapas dos livros no banco/topicos/fisica.json.
  * O v143 traz o planejamento de estudos com IA: './planejamento.js' entra na
  * lista. O endpoint de IA (/api/ia) só recebe POST, que o fetch abaixo já deixa
- * passar sem cache.
- * O v144 reorganiza a janela da aula em duas colunas no tablet.
+ * passar sem cache. O v148 traz o aviso de novidades do planejamento.
+ * O v150 reorganiza a janela da aula em duas colunas no tablet.
  */
-var CACHE = 'apoio-educacional-v144';
+var CACHE = 'apoio-educacional-v150';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
