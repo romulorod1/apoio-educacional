@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.54';
+  var VERSAO = '1.42.57';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -84,6 +84,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.57',
+      itens: [
+        'No celular, ajuste a duração de uma aula sem alterar as demais aulas da repetição.'
+      ]
+    },
     {
       versao: '1.42.54',
       itens: [
@@ -23912,7 +23918,7 @@
    * tela se refaz quando ela fecha o formulário. */
   function formularioAbertoNoCelular() {
     if (telaCelular === 'hoje') return !!(formCelular && $('#cel-hoje [data-form-celular]')) ||
-      !!(folhaCelular && folhaCelular.passo === 'remarcar' && $('#cel-folha [data-form-celular]'));
+      !!(folhaCelular && (folhaCelular.passo === 'remarcar' || folhaCelular.passo === 'duracao') && $('#cel-folha [data-form-celular]'));
     if ($('#cel-mensagem')) return true; // o editor da mensagem do mês, em qualquer tela
     if (telaCelular === 'fechamento') return !!$('#cel-fechamento .pagamento-valor');
     return false;
@@ -25095,6 +25101,7 @@
     ]));
     if (folhaCelular.passo === 'cancelar') desenharCancelarNaFolha(folha, a);
     else if (folhaCelular.passo === 'remarcar') desenharRemarcarNaFolha(folha, a);
+    else if (folhaCelular.passo === 'duracao') desenharDuracaoNaFolha(folha, a);
     else if (folhaCelular.passo === 'ficha') desenharFichaNaFolha(folha, a, aluno);
     else desenharAcoesNaFolha(folha, a, aluno, edita);
     $('#cel-hoje').appendChild(fundo);
@@ -25183,6 +25190,7 @@
         }, false));
       }
       acoes.push(botao('remarcar', 'cel-folha-remarcar', 'Remarcar', function () { irAoPassoDaFolha('remarcar'); }, false));
+      acoes.push(botao('ajustar-duracao', 'cel-folha-duracao', 'Ajustar duração', function () { irAoPassoDaFolha('duracao'); }, false));
       if (!futura) {
         acoes.push(botaoDeAcaoCelular('registrar-como-foi', { class: 'btn cel-folha-botao cel-folha-largo', id: 'cel-folha-registrar', texto: 'Escrever como foi esta aula',
           aoClick: function () { fecharFolhaCelular(); abrirFormularioCelular({ tipo: 'relato', aulaId: a.id }); } }));
@@ -25403,6 +25411,38 @@
     h.atualizar();
     corpo.appendChild(el('div', { class: 'barra cel-rodape-form' }, [
       botaoSalvar,
+      el('button', { type: 'button', class: 'btn', id: 'cel-folha-voltar', texto: 'Voltar', aoClick: function () { irAoPassoDaFolha('acoes'); } })
+    ]));
+  }
+
+  /* Ajusta a duração desta aula sem mexer no dia nem no horário. Em aula de
+   * repetição, alterarAulaComDesfazer aplica somente a ocorrência selecionada. */
+  function desenharDuracaoNaFolha(folha, a) {
+    var corpo = el('div', { 'data-form-celular': 'duracao:' + a.id });
+    folha.appendChild(corpo);
+    corpo.appendChild(el('p', { class: 'cel-folha-pergunta', texto: 'Ajustar duração desta aula' }));
+    var serie = Core.serieDe(db, a);
+    if (serie) corpo.appendChild(el('p', { class: 'ajuda', id: 'cel-duracao-serie', texto: 'Esta aula é de uma repetição: muda só esta. As outras continuam com a duração de sempre.' }));
+    /* A duração atual entra na lista e vem marcada, como no Remarcar e no
+     * formulário do tablet: a aula dividida (23/22, 75/75) não pode abrir
+     * mostrando a primeira opção, que o Salvar gravaria. */
+    var atual = Number(a.duracaoMin) || 60;
+    var opcoes = DURACOES.slice();
+    if (opcoes.indexOf(atual) < 0) { opcoes.push(atual); opcoes.sort(function (x, y) { return x - y; }); }
+    var duracao = el('select', { id: 'cel-ajustar-duracao', 'aria-label': 'Duração desta aula' }, opcoes.map(function (m) {
+      return el('option', { value: String(m), texto: Core.fmtDuracao(m), selected: m === atual ? 'selected' : null });
+    }));
+    corpo.appendChild(campoCelular('Duração desta aula', duracao));
+    folha.appendChild(el('div', { class: 'barra cel-rodape-form' }, [
+      botaoDeAcaoCelular('ajustar-duracao', { class: 'btn principal', id: 'cel-ajustar-duracao-salvar', texto: 'Salvar duração', aoClick: function () {
+        var minutos = parseInt(duracao.value, 10) || 60;
+        if (minutos === atual) { irAoPassoDaFolha('acoes'); return; } // nada mudou: só fecha o passo, sem gravar
+        var proposta = Object.assign({}, a, { duracaoMin: minutos });
+        var choques = choquesDaAulaCelular(proposta);
+        if (!confirmaSalvarComChoque(choques)) return;
+        var mensagem = 'Duração alterada para ' + Core.fmtDuracao(minutos) + '.' + (serie ? ' Só esta aula da repetição foi alterada.' : '');
+        mudarAulaNoCelular(a, { duracaoMin: minutos }, mensagem);
+      } }),
       el('button', { type: 'button', class: 'btn', id: 'cel-folha-voltar', texto: 'Voltar', aoClick: function () { irAoPassoDaFolha('acoes'); } })
     ]));
   }

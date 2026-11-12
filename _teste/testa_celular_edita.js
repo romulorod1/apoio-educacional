@@ -58,6 +58,10 @@
  *                         monta e manda a cópia (app.js);
  *   --envenenado-observador-edita     o celular "da dona" deixa de conferir a
  *                         conta: o observador de outra conta ganha as ações.
+ *   --envenenado-ajuste-todas    Ajustar duração (#168) grava com escopo
+ *                         'todas': a repetição inteira muda de duração;
+ *   --envenenado-ajuste-lista-fixa  o seletor do Ajustar duração volta a ter só
+ *                         a lista fixa: a aula de 1h15 abre marcando outra.
  *
  * Portas: 8941 (app), 8943 (auth), 8944 (firestore), 8945 (hub), 8946 (log),
  * 8947 (websocket). Precisa do firebase-tools e de um JDK 21 em JAVA_HOME.
@@ -78,8 +82,9 @@ const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 
 const MODOS = ['--envenenado-celular-envia-copia', '--envenenado-observador-edita', '--envenenado-corte-sobe',
   '--envenenado-remarca-todas', '--envenenado-remarca-solta', '--envenenado-sem-choque', '--envenenado-duracao-padrao', '--envenenado-cancela-sempre-sem',
-  '--envenenado-cobranca-volta', '--envenenado-rolagem-antiga'];
+  '--envenenado-cobranca-volta', '--envenenado-rolagem-antiga', '--envenenado-ajuste-todas', '--envenenado-ajuste-lista-fixa'];
 const V_TODAS = MODOS[3], V_SOLTA = MODOS[4], V_CHOQUE = MODOS[5], V_DURACAO = MODOS[6], V_CANCELA = MODOS[7], V_COBRANCA = MODOS[8], V_ROLAGEM = MODOS[9];
+const V_AJUSTE_TODAS = MODOS[10], V_AJUSTE_LISTA = MODOS[11];
 /* --prints <pasta>: tira os cinco prints do D6c e da ficha em 390 x 844 (dados fictícios). */
 const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
@@ -157,6 +162,13 @@ if (MODO === V_SOLTA) comNuvemIgual(APP.replace(REMARCA, 'comoAcaoDoCelular(func
 if (MODO === V_CHOQUE) comNuvemIgual(APP.replace(CHOQUE, '    return [];'));
 if (MODO === V_DURACAO) comNuvemIgual(APP.replace(DURACAO, 'duracaoMin: 60 }, a.id, a.status,'));
 if (MODO === V_COBRANCA) comNuvemIgual(APP.replace(MESMA_SITUACAO, '    if (false) {'));
+/* (#168) As âncoras do Ajustar duração: a gravação só nesta aula e a duração atual na lista. */
+const AJUSTE = '        mudarAulaNoCelular(a, { duracaoMin: minutos }, mensagem);';
+const AJUSTE_LISTA = '    if (opcoes.indexOf(atual) < 0) { opcoes.push(atual); opcoes.sort(function (x, y) { return x - y; }); }';
+conf('(#168) a gravação do Ajustar duração e a duração atual na lista estão cada uma num lugar só', APP.split(AJUSTE).length + ',' + APP.split(AJUSTE_LISTA).length, '2,2');
+if (MODO === V_AJUSTE_TODAS) comNuvemIgual(APP.replace(AJUSTE, "        comoAcaoDoCelular(function () { fecharFolhaCelular(); Core.aplicarEdicaoAula(db, a.id, { duracaoMin: minutos }, 'todas'); " +
+  'return salvar(); }).then(function () { desenharCelular(); });'));
+if (MODO === V_AJUSTE_LISTA) comNuvemIgual(APP.replace(AJUSTE_LISTA, ''));
 /* A folga entre a faixa dos dias e a linha que a rolagem inicial mostra: maior que o vão de 6 px entre as
  * linhas, ela deixava a linha de cima com 2 px à vista, cortada (o portão de 09/11, de madrugada em UTC). */
 const FOLGA = '  var FOLGA_SOB_A_FAIXA = 4;';
@@ -528,6 +540,9 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
       { id: 'ux-gap-cancelada', alunoId: 'alfa', serieId: null, data: ontem, hora: '17:30', duracaoMin: 60, status: 'cancelada', cobravel: false, notaTexto: '', anexos: [] },
       { id: 'ux-gap-depois', alunoId: 'alfa', serieId: null, data: ontem, hora: '19:00', duracaoMin: 60, status: 'agendada', cobravel: true, notaTexto: '', anexos: [] }
     );
+    /* (#168) Uma aula de 1h15, fora da lista de durações (como as metades que o
+     * dividirAula gera), num dia de dezembro que nenhuma outra conta olha. */
+    d.aulas.push({ id: 'aula-75', alunoId: 'alfa', serieId: null, data: '2026-12-10', hora: '18:00', duracaoMin: 75, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] });
     // marcada no tablet como realizada, mas sem cobrança
     d.aulas.push({ id: 'aula-gratis', alunoId: 'gama', serieId: null, data: ontem, hora: '16:00', duracaoMin: 60, status: 'realizada', cobravel: false, notaTexto: '', anexos: [] });
     junho.forEach(([data, dur], i) => d.aulas.push({ id: 'ref-' + data, alunoId: 'ref', serieId: null, data, hora: '15:30', duracaoMin: dur, status: 'realizada', cobravel: true, notaTexto: '', anexos: [] }));
@@ -725,7 +740,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
     return Array.from(document.querySelectorAll('#cel-folha .cel-folha-botao')).filter(b => b.id !== 'cel-folha-cancelar').every(b => {
       const o = b.getBoundingClientRect(); return Math.max(c.top - o.bottom, o.top - c.bottom, c.left - o.right, o.left - c.right) >= 16; }); }), true);
   conf('a aula de HOJE oferece o nome (a ficha, D6c lote 2), Realizada, Faltou, Cancelar, Remarcar e Registrar como foi', (await botoesDaFolha(pagC)).join(','),
-    'cel-folha-ficha,cel-folha-realizada,cel-folha-faltou,cel-folha-remarcar,cel-folha-registrar,cel-folha-cancelar,cel-folha-fechar');
+    'cel-folha-ficha,cel-folha-realizada,cel-folha-faltou,cel-folha-remarcar,cel-folha-duracao,cel-folha-registrar,cel-folha-cancelar,cel-folha-fechar');
   m = await medirTela(pagC);
   conf('a folha: alvos de 48 px e sem rolagem de lado', m.pequenos.join('; ') + (m.rolaDeLado ? ' rola' : ''), '');
   conf('a folha: os botões de edição são todos das ações do celular', m.soltos.join(', '), '');
@@ -736,7 +751,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('"Fechar" tira a folha', await existe(pagC, '#cel-folha'), false);
   await irParaDia(pagC, OUTRO);
   await abrirFolha(pagC, 'aula-outro');
-  conf('a aula de amanhã oferece Cancelar e Remarcar, e não Realizada nem Faltou', (await botoesDaFolha(pagC)).join(','), 'cel-folha-ficha,cel-folha-remarcar,cel-folha-cancelar,cel-folha-fechar');
+  conf('a aula de amanhã oferece Cancelar, Remarcar e Ajustar duração, e não Realizada nem Faltou', (await botoesDaFolha(pagC)).join(','), 'cel-folha-ficha,cel-folha-remarcar,cel-folha-duracao,cel-folha-cancelar,cel-folha-fechar');
   await clicar(pagC, '#cel-folha-fechar');
 
   secao('3c. Faltou e Realizada, pela folha');
@@ -899,6 +914,28 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('"Voltar" não grava nada: a aula continua às 11:00 do mesmo dia', await pagC.evaluate(() => Store.carregar().then(b => {
     const a = b.aulas.find(x => x.id === 'aula-terceiro'); return a.data + ' ' + a.hora; })), TERCEIRO + ' 11:00');
 
+  /* (#168) Ajustar duração usa a mesma conta de choque do celular: a aula das
+   * 14:00 esticada para 2h30 invade a do Gama às 16:00, e o "não" não grava. */
+  secao('6b2. Ajustar duração que estende e invade a aula seguinte acusa o choque');
+  const id14 = await pagC.evaluate(d => Store.carregar().then(b => {
+    const a = b.aulas.find(x => x.data === d && x.hora === '14:00' && x.alunoId === 'alfa'); return a ? a.id : null; }), TERCEIRO);
+  conf('(arranjo) há a aula das 14:00 de 1h e a do Gama às 16:00 em ' + TERCEIRO, !!id14 && (await pagC.evaluate(d => Store.carregar().then(b =>
+    b.aulas.some(x => x.data === d && x.hora === '16:00' && x.alunoId === 'gama')), TERCEIRO)), true);
+  await irParaDia(pagC, TERCEIRO);
+  await abrirFolha(pagC, id14);
+  await clicar(pagC, '#cel-folha-duracao');
+  await digitar(pagC, '#cel-ajustar-duracao', '150');
+  pagC.recusarProximo = true;
+  const dialogosDuracao = pagC.dialogos.length;
+  await clicar(pagC, '#cel-ajustar-duracao-salvar');
+  await pausa(300);
+  const avisoDuracao = pagC.dialogos.slice(dialogosDuracao).join(' ');
+  conf('esticar para 2h30 pede o sim, citando a aula do Gama às 16:00 ("' + avisoDuracao.slice(0, 120) + '")',
+    /As duas aulas vão ficar no mesmo horário/.test(avisoDuracao) && /Aluno Gama Teste às 16:00/.test(avisoDuracao), true);
+  conf('e o "não" não grava: a aula das 14:00 continua com 1h', await pagC.evaluate(id => Store.carregar().then(b => b.aulas.find(x => x.id === id).duracaoMin), id14), 60);
+  await clicar(pagC, '#cel-folha-voltar');
+  await clicar(pagC, '#cel-folha-fechar');
+
   secao('6c. Remarcar UMA aula da repetição: só esta muda, e o vínculo com a série fica');
   await abrirFolha(pagC, idGama1);
   await clicar(pagC, '#cel-folha-remarcar');
@@ -920,10 +957,85 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   console.log('   no celular: ' + JSON.stringify(rg));
   prop('a aula remarcada continua na série (destacada, às 17:00, 1h) e a data de onde saiu fica como exclusão da série',
     rg.movida === 'true true 17:00 60' && rg.serie.split(' ')[1] === TERCEIRO, V_SOLTA);
-  prop('as outras três aulas da repetição não mudaram, nem a hora da série (' + rg.outras + ')', rg.outras === outrasAntes && rg.serie.split(' ')[0] === '16:00', V_TODAS);
+  prop('o remarcar de uma aula não mudou as demais aulas da repetição nem o horário da série (' + rg.outras + ')', rg.outras === outrasAntes && rg.serie.split(' ')[0] === '16:00', V_TODAS);
   if (MODO === V_SOLTA || MODO === V_TODAS) fimDoVeneno();
   conf('Hoje foi ao dia novo da aula, às 17:00', (await texto(pagC, '#cel-dia-titulo')).indexOf(QUARTO.slice(8, 10) + '/' + QUARTO.slice(5, 7)) >= 0 &&
     !!(await existe(pagC, '.cel-bloco[data-aula="' + idGama1 + '"]')), true);
+
+  secao('6c1. Ajustar duração de uma aula da repetição: só esta ocorrência e a home reflete');
+  const proximaGama = serieGama.aulas.map(t => t.split(' ')).find(p => p[1] !== TERCEIRO);
+  const idGama2 = proximaGama[0], dataGama2 = proximaGama[1];
+  await irParaDia(pagC, dataGama2);
+  await abrirFolha(pagC, idGama2);
+  await clicar(pagC, '#cel-folha-duracao');
+  conf('Ajustar duração informa que só esta aula da repetição muda', /muda só esta/.test((await texto(pagC, '#cel-duracao-serie')) || ''), true);
+  conf('a duração inicial é 1h', await pagC.evaluate(() => document.querySelector('#cel-ajustar-duracao').value), '60');
+  /* O dinheiro do mês antes do ajuste, pelo Core, para conferir a diferença depois. */
+  const mesDoGama = (pag, id, sid, m) => pag.evaluate((id, sid, m) => Store.carregar().then(d => {
+    const f = Core.calcularMesInteiro(d, m).find(x => x.aluno.id === 'gama');
+    const linha = f.linhas.find(l => l.id === id);
+    /* As outras da série em TODOS os meses: as do mês seguinte são as que o
+     * escopo 'todas' mudaria sem aparecer no fechamento deste mês. */
+    return { totalMin: f.totalMin, totalValor: f.totalValor, ajustada: linha && [linha.duracaoMin, linha.valor, linha.valorHora].join(' '),
+      outras: d.aulas.filter(a => a.serieId === sid && a.id !== id).map(a => a.data + ' ' + a.duracaoMin).sort().join('; ') };
+  }), id, sid, m);
+  const dinheiroAntes = await mesDoGama(pagC, idGama2, serieGama.id, dataGama2.slice(0, 7));
+  await digitar(pagC, '#cel-ajustar-duracao', '90');
+  await clicar(pagC, '#cel-ajustar-duracao-salvar');
+  const duracaoNova = await esperar('a duração individual foi salva', () => pagC.evaluate(id => Store.carregar().then(b => {
+    const a = b.aulas.find(x => x.id === id); return a && a.duracaoMin;
+  }), idGama2), v => v === 90, 10000);
+  conf('a aula selecionada ficou com 1h30', duracaoNova.ok, true);
+  conf('a home mostra o novo intervalo e 1h30', await pagC.evaluate(id => {
+    const b = document.querySelector('.cel-bloco[data-aula="' + id + '"]'); return b && b.textContent;
+  }, idGama2).then(v => /16:00 a 17:30 · 1h30/.test(v || '')), true);
+  const estadoDuracao = await pagC.evaluate(sid => Store.carregar().then(b => ({
+    duracoes: b.aulas.filter(a => a.serieId === sid).map(a => a.duracaoMin), padrao: b.series.find(s => s.id === sid).duracaoMin
+  })), serieGama.id);
+  estadoDuracao.duracoes.sort((a, b) => a - b);
+  prop('a repetição mantém 1h como padrão e só uma ocorrência fica em 1h30 (' + JSON.stringify(estadoDuracao) + ')',
+    JSON.stringify(estadoDuracao) === JSON.stringify({ duracoes: [60, 60, 60, 90], padrao: 60 }), V_AJUSTE_TODAS);
+  /* O fechamento do mês soma a duração nova: a aula ajustada vale 1h30 do valor
+   * por hora, o total sobe meia hora, e as outras da série seguem com 1h. */
+  const dinheiroDepois = await mesDoGama(pagC, idGama2, serieGama.id, dataGama2.slice(0, 7));
+  console.log('   dinheiro do Gama no mês: antes ' + JSON.stringify(dinheiroAntes) + ', depois ' + JSON.stringify(dinheiroDepois));
+  const vh = Number(String(dinheiroDepois.ajustada || '').split(' ')[2]);
+  prop('o fechamento soma a duração nova: a aula ajustada é 1h30 e vale 1,5 hora, o total sobe 30 min e meia hora de valor, e as outras da série seguem com 1h',
+    vh > 0 && dinheiroDepois.ajustada === '90 ' + (vh * 1.5) + ' ' + vh && dinheiroDepois.totalMin - dinheiroAntes.totalMin === 30 &&
+    Math.abs(dinheiroDepois.totalValor - dinheiroAntes.totalValor - vh * 0.5) < 0.005 &&
+    !!dinheiroDepois.outras && dinheiroDepois.outras === dinheiroAntes.outras && dinheiroDepois.outras.split('; ').every(t => t.split(' ')[1] === '60'), V_AJUSTE_TODAS);
+  if (MODO === V_AJUSTE_TODAS) fimDoVeneno();
+  await abrirCelular(pagC);
+  await esperar('a busca automática do celular terminou depois de atualizar', () => pagC.evaluate(() => !/Buscando a cópia mais nova/.test((document.querySelector('#cel-origem') || {}).textContent || '')), v => v === true, 30000);
+  const duracaoAposAtualizar = await pagC.evaluate(id => Store.carregar().then(b => {
+    const a = b.aulas.find(x => x.id === id); return a && a.duracaoMin;
+  }), idGama2);
+  conf('F5 e a sincronização não desfazem o ajuste de duração', duracaoAposAtualizar, 90);
+  await irParaDia(pagC, dataGama2);
+  conf('depois de F5, a home ainda mostra a aula até 17:30', await pagC.evaluate(id => {
+    const b = document.querySelector('.cel-bloco[data-aula="' + id + '"]'); return b && b.textContent;
+  }, idGama2).then(v => /16:00 a 17:30 · 1h30/.test(v || '')), true);
+  const rgDepoisDuracao = await retratoGama(pagC);
+
+  secao('6c2. Ajustar duração de uma aula fora da lista (1h15): abre marcando 1h15, e Salvar sem mudar não grava');
+  conf('(arranjo) a faixa da semana chega a 10/12/2026', await irParaDia(pagC, '2026-12-10'), true);
+  await abrirFolha(pagC, 'aula-75');
+  await clicar(pagC, '#cel-folha-duracao');
+  const sel75 = await pagC.evaluate(() => {
+    const s = document.querySelector('#cel-ajustar-duracao');
+    return s ? s.value + '|' + (s.selectedOptions[0] || {}).textContent : 'sem seletor';
+  });
+  prop('o seletor abre marcando a duração atual, 1h15 (' + sel75 + ')', sel75 === '75|1h15', V_AJUSTE_LISTA);
+  if (MODO === V_AJUSTE_LISTA) fimDoVeneno();
+  const aulasAntes75 = await pagC.evaluate(() => Store.carregar().then(b => JSON.stringify(b.aulas)));
+  const dialogos75 = pagC.dialogos.length;
+  await clicar(pagC, '#cel-ajustar-duracao-salvar');
+  await pausa(400);
+  const depois75 = await pagC.evaluate(() => Store.carregar().then(b => JSON.stringify(b.aulas)));
+  conf('Salvar sem mudar a duração não grava nada (as aulas ficam idênticas) e não pergunta nada', depois75 === aulasAntes75 && pagC.dialogos.length === dialogos75, true);
+  conf('e só fecha o passo: a folha volta às ações da aula', !!(await existe(pagC, '#cel-folha-duracao')) && !(await existe(pagC, '#cel-ajustar-duracao')), true);
+  conf('a aula de 1h15 continua com 75 min', await pagC.evaluate(() => Store.carregar().then(b => b.aulas.find(x => x.id === 'aula-75').duracaoMin)), 75);
+  await clicar(pagC, '#cel-folha-fechar');
 
   secao('6d. O fechamento de referência de junho continua igual depois de remarcar a aula de 1h30 dele');
   conf('a faixa da semana chega a 10/06/2026', await irParaDia(pagC, '2026-06-10'), true);
@@ -1058,7 +1170,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
    * e realizada, e junho. */
   const rgA = await retratoGama(pagA);
   console.log('   no tablet: ' + JSON.stringify(rgA));
-  conf('(D6c) remarcar chegou ao tablet: a aula na série, destacada, às 17:00, e as outras três como estavam', JSON.stringify(rgA), JSON.stringify(rg));
+  conf('(D6c) remarcar e ajuste de duração chegaram ao tablet sem alterar a série', JSON.stringify(rgA), JSON.stringify(rgDepoisDuracao));
   conf('(D6c) e o tablet, ao abrir, não recriou a aula na data de onde ela saiu (a repetição continua com quatro)', rgA.gama, 4);
   conf('(D6c) cancelar hoje com cobrança chegou ao tablet', await pagA.evaluate(() => Store.carregar().then(b => { const a = b.aulas.find(x => x.id === 'aula-hoje'); return a.status + '/' + a.cobravel; })), 'cancelada/true');
   conf('(D6c) faltou e realizada: a aula de ontem chegou ao tablet como realizada', await pagA.evaluate(() => Store.carregar().then(b => b.aulas.find(x => x.id === 'aula-ontem').status)), 'realizada');
@@ -1246,9 +1358,9 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   const diagnosticosDoCelular = tudoDoCelular.filter(n => /^diagnostico\//.test(n));
   conf('(D7) o celular que editou sobe o diagnóstico dele, e só o do próprio aparelho', diagnosticosDoCelular.join(','), 'diagnostico/' + idCelular);
   const enviadosDoCelular = tudoDoCelular.filter(n => !/^diagnostico\//.test(n));
-  // (D6c) e os da folha: faltou e realizada (ontem), a remarcação da repetição (a aula e a série) e a de junho
+  // (D6c) e os da folha: faltou/realizada, remarcação e duração de uma ocorrência da repetição, e a aula de junho
   const esperados = ['registros/aula:' + idMarcada, 'registros/aula:aula-outro', 'registros/aula:aula-hoje', 'registros/aluno:' + idBeta, 'registros/aluno:alfa', 'registros/aula:aula-terceiro',
-    'registros/aula:aula-ontem', 'registros/aula:' + idGama1, 'registros/serie:' + serieGama.id, 'registros/aula:ref-2026-06-10'];
+    'registros/aula:aula-ontem', 'registros/aula:' + idGama1, 'registros/serie:' + serieGama.id, 'registros/aula:' + idGama2, 'registros/aula:ref-2026-06-10'];
   const pagamento = enviadosDoCelular.filter(n => /^registros\/pagamento:/.test(n));
   conf('tudo o que subiu do celular é um registro das cinco ações: as aulas, o aluno novo e o pagamento, e nada mais',
     enviadosDoCelular.filter(n => esperados.indexOf(n) < 0 && pagamento.indexOf(n) < 0).join(', ') + '|' + esperados.filter(n => enviadosDoCelular.indexOf(n) < 0).join(', ') + '|' + pagamento.length, '||1');
