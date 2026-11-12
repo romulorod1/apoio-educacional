@@ -446,6 +446,8 @@ def gerar(base, nivel, versao, saida, curadoria, anos=ANOS_MODELO_A, trabalho=No
             # o texto do comentario vai para a busca com a solucao, e nao com o enunciado
             txt_s = '\n'.join(gerar_pacote.texto_do_retangulo(doc, p['pno'], p['rect']) for p in p_s + p_c)
             if p_c:
+                # sem a conferencia de repeticao do Portal (gerar_pacote.comentario_ja_na_solucao):
+                # nenhum volume tem o caso; se vier, a trava geral da prova acusa a repeticao
                 rel['notas'].append({'id': iid, 'nota': 'comentario ao professor do enunciado levado ao fim da solucao'})
             titulo = portal.sem_tracos(e['titulo'])
             titulos.append(titulo)

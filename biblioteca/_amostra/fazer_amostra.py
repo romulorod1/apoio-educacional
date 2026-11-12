@@ -565,12 +565,16 @@ def lista_comentario(caminho):
     xt = p.marcador(X0, T + 90, 1)
     p.pg.insert_text((xt, T + 90), 'Quanto é 7 vezes 8?', fontname='helv', fontsize=10)
     p.texto(X0, T + 102, ['Escreva a conta antes de responder.'])
+    # comentario que a solucao 1 repete palavra por palavra (5 dos 6 casos reais)
+    titulo = 'Comentário para professores:'
+    largura = pymupdf.get_text_length(titulo, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X0, T + 126), titulo, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X0 + largura + 4, T + 126), 'Peça a tabuada', fontname='helv', fontsize=10)
+    p.texto(X0, T + 138, ['do sete inteira antes de multiplicar.'])
     y = g['yrod'] - 170
     xt = p.marcador(X0, y, 2)
     p.pg.insert_text((xt, y), 'Um grupo de alunos quer comprar', fontname='helv', fontsize=10)
     p.texto(X0, y + 12, ['um presente para o professor. Se cada um', 'der 20 reais, quantos alunos há?'])
-    titulo = 'Comentário para professores:'
-    largura = pymupdf.get_text_length(titulo, fontname='hebo', fontsize=10)
     p.pg.insert_text((X0, y + 48), titulo, fontname='hebo', fontsize=10)
     p.pg.insert_text((X0 + largura + 4, y + 48), 'Peça uma', fontname='helv', fontsize=10)
     p.texto(X0, y + 60, ['estimativa antes da conta. Texto RESERVADO', 'à professora, que segue até o pé da',
@@ -591,8 +595,11 @@ def lista_comentario(caminho):
     p.secao(X0, T + 40, 1, 'Exercícios Introdutórios')
     p.numero_solucao(X0, T + 70, 1)
     p.texto(X0 + 14, T + 70, ['7 · 8 = 56.'])
-    p.numero_solucao(X0, T + 100, 2)
-    p.texto(X0 + 14, T + 100, ['Com x alunos, 20x mais 60 é o preço.'])
+    p.pg.insert_text((X0, T + 86), titulo, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X0 + largura + 4, T + 86), 'Peça a tabuada', fontname='helv', fontsize=10)
+    p.texto(X0, T + 98, ['do sete inteira antes de multiplicar.'])
+    p.numero_solucao(X0, T + 124, 2)
+    p.texto(X0 + 14, T + 124, ['Com x alunos, 20x mais 60 é o preço.'])
     # a solucao 3 na coluna da direita, com o titulo das solucoes na da esquerda: o
     # comentario dela vem depois do titulo pela ordem de leitura (coluna, altura)
     p.numero_solucao(X1, T + 40, 3)

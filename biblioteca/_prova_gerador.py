@@ -363,7 +363,14 @@ def trava_tinta_coberta(p):
             for tipo in ('enunciado', 'solucao'):
                 for pz in pedacos(it, tipo):
                     rects[pz['pagina']].append(pymupdf.Rect(pz['bbox']))
-        paginas = {pno: _linhas_da_pagina(doc, pno) for pno in range(1, doc.page_count)}
+        # o comentario ao professor que so saiu do enunciado (a solucao da fonte ja o
+        # traz) fica fora de todo recorte de proposito; que ele esta mesmo na solucao,
+        # quem confere e a trava_comentario_fora_do_enunciado
+        for c in l.get('comentarios_ao_professor', []):
+            if c.get('ja_na_solucao'):
+                for pz in c.get('regiao', []):
+                    rects[pz['pagina']].append(pymupdf.Rect(pz['bbox']))
+        paginas ={pno: _linhas_da_pagina(doc, pno) for pno in range(1, doc.page_count)}
         # margem de cada coluna, na lista inteira: o menor comeco de linha que
         # aparece pelo menos 3 vezes (a 1 pt). Nao a moda nem por pagina: uma
         # tabela recuada em x 70 enchia a p. 6 de Conjuntos Numericos, que so
@@ -1910,8 +1917,17 @@ def trava_comentario_fora_do_enunciado(p):
             erros.append('%s: a solucao comeca pelo comentario, e nao pela solucao' % it['id'])
         pg0 = doc[ps[marcados[0]]['pagina'] - 1]
         comeco = re.sub(r'\s+', ' ', portal.para_busca(pg0.get_text('text', clip=pymupdf.Rect(ps[marcados[0]]['bbox']))))
-        if not (TITULO_NO_TEXTO.match(comeco) or TITULO_CURTO.match(comeco)):
+        m = TITULO_NO_TEXTO.match(comeco) or TITULO_CURTO.match(comeco)
+        if not m:
             erros.append('%s: o pedaco do comentario nao comeca pelo titulo: %r' % (it['id'], comeco[:40]))
+        else:
+            # o comentario que a solucao da fonte ja traz nao pode aparecer duas vezes
+            so_alnum = lambda s: re.sub(r'[^a-z0-9]', '', s)
+            todo = re.sub(r'\s+', ' ', texto_dos_pedacos(p, it, 'solucao', True))
+            m2 = TITULO_NO_TEXTO.match(todo) or TITULO_CURTO.match(todo)
+            corpo = so_alnum(todo[m2.end():] if m2 else todo)
+            if len(corpo) >= 20 and corpo[:200] in so_alnum(texto_dos_pedacos(p, it, 'solucao', False)):
+                erros.append('%s: comentario repetido na solucao: a da fonte ja o traz' % it['id'])
         for k in range(marcados[0], len(ps)):
             if k not in marcados and not so_miudo(doc[ps[k]['pagina'] - 1], ps[k]['bbox']):
                 erros.append('%s: pedaco da solucao depois do comentario' % it['id'])
@@ -1919,6 +1935,25 @@ def trava_comentario_fora_do_enunciado(p):
         if abs(soma - it['medidas']['solucao']['altura_pt']) > 1:
             erros.append('%s: a pilha da solucao (%.1f pt) nao bate com medidas (%.1f pt)' % (
                 it['id'], soma, it['medidas']['solucao']['altura_pt']))
+    # o comentario que so saiu do enunciado, porque a solucao da fonte ja o traz: a
+    # regiao declarada no relatorio tem de comecar pelo titulo, e o corpo dela tem
+    # de estar, pela pagina, na solucao do item
+    por_id = {i['id']: i for i in p.itens}
+    for l in p.relatorio.get('listas', []):
+        for c in l.get('comentarios_ao_professor', []):
+            if not c.get('ja_na_solucao'):
+                continue
+            it = por_id.get(c.get('id'))
+            if not it or not c.get('regiao'):
+                erros.append('%s: comentario dado como ja na solucao sem item ou sem regiao' % c.get('id'))
+                continue
+            doc = p.doc(it['origem']['arquivo'])
+            reg = re.sub(r'\s+', ' ', portal.para_busca(' '.join(
+                doc[pz['pagina'] - 1].get_text('text', clip=pymupdf.Rect(pz['bbox'])) for pz in c['regiao'])))
+            m3 = TITULO_NO_TEXTO.match(reg) or TITULO_CURTO.match(reg)
+            corpo = re.sub(r'[^a-z0-9]', '', reg[m3.end():] if m3 else '')
+            if not m3 or len(corpo) < 20 or corpo not in re.sub(r'[^a-z0-9]', '', texto_dos_pedacos(p, it, 'solucao')):
+                erros.append('%s: o comentario dado como ja na solucao nao esta nela: %r' % (it['id'], reg[:50]))
     return erros
 
 
@@ -1940,7 +1975,14 @@ def trava_comentario_amostra(p):
         # resto do enunciado cai abaixo da altura minima
         return ['a lista com comentario tem os itens %s, e nao 1, 2 e 3%s: %r' % (
             sorted(por_n), ' (o 3 e o da "Observacao:" do aluno)' if 3 not in por_n else '', motivos)]
-    i2, i3 = por_n[2], por_n[3]
+    i1, i2, i3 = por_n[1], por_n[2], por_n[3]
+    # 1: o comentario sai do enunciado e, como a solucao da fonte ja o traz, aparece
+    # uma vez so no gabarito
+    if 'tabuada' in i1['texto'] or 'tabuada' in texto_dos_pedacos(p, i1, 'enunciado'):
+        erros.append('o enunciado 1 leva o comentario')
+    s1 = texto_dos_pedacos(p, i1, 'solucao')
+    if s1.count('tabuada do sete') != 1:
+        erros.append('a solucao 1 repete o comentario: %d vez(es)' % s1.count('tabuada do sete'))
     if 'presente para o professor' not in i2['texto']:
         erros.append('o enunciado 2 perdeu "presente para o professor", que e enunciado')
     if 'reservad' in i2['texto'] or 'reservad' in texto_dos_pedacos(p, i2, 'enunciado'):
@@ -1963,8 +2005,10 @@ def trava_comentario_amostra(p):
     if 'fica onde esta' not in s3 or 'tambem fica na solucao' not in s3:
         erros.append('um comentario que ja estava na solucao 3 saiu dela')
     regs = [c for l in p.relatorio['listas'] if l['aula'] == 'lista-comentario' for c in l.get('comentarios_ao_professor', [])]
-    if [(c.get('id'), c.get('na_solucao')) for c in regs] != [(i2['id'], True)]:
-        erros.append('o relatorio nao registra um comentario so, o do item 2, levado a solucao: %r' % regs)
+    quer = [(i1['id'], None, True), (i2['id'], True, None)]
+    if [(c.get('id'), c.get('na_solucao'), c.get('ja_na_solucao')) for c in regs] != quer:
+        erros.append('o relatorio nao registra os dois comentarios (o 1, que ja estava na solucao, e o 2, '
+                     'levado a ela): %r' % regs)
     return erros
 
 
@@ -2000,6 +2044,30 @@ def comentario_ao_professor(temp, placar, cur, navegador=True):
                     'comentario ao professor no enunciado')
     placar.conferir('gabarito sem o comentario (gerador antigo)', trava_comentario_amostra(v), True,
                     'a solucao 2 nao leva o comentario')
+    # veneno: sem conferir a solucao da fonte, o comentario 1 aparece duas vezes nela
+    antes_r = gerar_pacote.COMENTARIO_SEM_REPETIR
+    gerar_pacote.COMENTARIO_SEM_REPETIR = False
+    try:
+        gerar(pdfs, os.path.join(temp, 'v_comentario_repete'), cur)
+    finally:
+        gerar_pacote.COMENTARIO_SEM_REPETIR = antes_r
+    v = Pacote(os.path.join(temp, 'v_comentario_repete'), pdfs)
+    placar.conferir('comentario repetido no gabarito', trava_comentario_fora_do_enunciado(v), True,
+                    'comentario repetido na solucao')
+    placar.conferir('comentario repetido no gabarito (amostra)', trava_comentario_amostra(v), True,
+                    'a solucao 1 repete o comentario')
+    # veneno: o relatorio diz que o comentario do 1 ja esta na solucao, mas aponta a
+    # regiao do comentario do 2, que nao esta nela: a regiao tirada de todo recorte
+    # tem de ser conferida pela pagina, e nao aceita pela palavra do relatorio
+    r = copia(q, temp, 'v_regiao')
+    i2_com = [pz for pz in pedacos(next(i for i in r.itens if i['numero'] == 2), 'solucao') if pz.get('comentario')]
+    for l in r.relatorio['listas']:
+        for c in l.get('comentarios_ao_professor', []):
+            if c.get('ja_na_solucao'):
+                c['regiao'] = [{k: pz[k] for k in ('pagina', 'coluna', 'bbox')} for pz in i2_com]
+    r.gravar('relatorio.json', r.relatorio)
+    placar.conferir('regiao declarada que nao esta na solucao', trava_comentario_fora_do_enunciado(r), True,
+                    'nao esta nela')
     # veneno: sem o filtro das solucoes, o comentario que ja esta no gabarito corta a
     # solucao 3 (na coluna da direita e na pagina que ja abre nas solucoes)
     antes_s = gerar_pacote.COMENTARIO_SO_NO_ENUNCIADO

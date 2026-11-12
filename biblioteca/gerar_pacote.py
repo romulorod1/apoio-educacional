@@ -503,6 +503,26 @@ def titulo_de_comentario(e, txt):
     return TITULO_COMENTARIO.match(t) is not None
 
 
+COMENTARIO_SEM_REPETIR = True  # o comentario que a solucao da fonte ja traz nao se repete nela; False so no veneno
+
+
+def comentario_ja_na_solucao(txt_com, txt_sol):
+    """A solucao da fonte ja traz o mesmo comentario, palavra por palavra?
+
+    Medido em 12/11/2026: em 5 dos 6 enunciados com comentario ao professor, a
+    solucao do mesmo item repete o comentario inteiro (7o ano, Introducao a
+    Porcentagem 22; o do 3o medio, Pontos, Retas e Planos 14, nao). Ali o
+    comentario sai do enunciado e nao entra de novo no gabarito. Compara o corpo
+    do comentario, sem o titulo, so letras e algarismos, contra a solucao.
+    """
+    if not (COMENTARIO_SEM_REPETIR and txt_com and txt_sol):
+        return False
+    t = re.sub(r'\s+', '', portal.para_busca(txt_com))
+    m = TITULO_COMENTARIO.match(t)
+    corpo = re.sub(r'[^a-z0-9]', '', t[m.end():] if m else t)
+    return len(corpo) >= 20 and corpo in re.sub(r'[^a-z0-9]', '', portal.para_busca(txt_sol))
+
+
 def recuado_na_linha(e, txt, geo):
     """"Exercicio" com recuo de paragrafo: ate RECUO_MAX do fim da margem e primeiro da linha.
 
@@ -1943,10 +1963,17 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                 if com_fora:
                     rel['notas'].append({'id': iid, 'nota': 'comentario ao professor fora do pacote: o item nao '
                                                             'tem solucao para levar o comentario'})
+                txt_com = '\n'.join(texto_do_retangulo(doc, p['pno'], p['rect']) for p in p_com)
+                repetido = bool(p_com) and comentario_ja_na_solucao(txt_com, txt_s)
+                regiao_fora = []
+                if repetido:
+                    # a solucao da fonte ja o traz: sai do enunciado e nao se repete. A
+                    # regiao fica no relatorio, porque passa a ficar fora de todo recorte
+                    regiao_fora = [{'pagina': p['pno'] + 1, 'coluna': p['col'] + 1, 'bbox': list(p['rect'])} for p in p_com]
+                    p_com, txt_com = [], ''
                 # a solucao com o comentario no fim; o primeiro pedaco continua sendo o
                 # da solucao (o rotulo e a regra "comeca pelo numero" sao dele)
                 ps_sol = p_sol + [dict(p, comentario=True) for p in p_com]
-                txt_com = '\n'.join(texto_do_retangulo(doc, p['pno'], p['rect']) for p in p_com)
                 # alturas
                 col_alt = det['geo']['yrod'] or 750
                 ruim = None
@@ -2028,10 +2055,14 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                 item['medidas'] = medidas
                 item['origem'] = dict({'arquivo': 'PDF/matematica/obmep-portal/%s/%s' % (serie, a['arquivo'])}, **origem)
                 itens.append(item)
-                if p_com:
+                if p_com or repetido:
                     for reg in rel['comentarios_ao_professor']:
                         if reg.get('id') == iid:
-                            reg['na_solucao'] = True
+                            # na_solucao: levado ao fim da solucao; ja_na_solucao: a
+                            # solucao da fonte ja o trazia, e ele so saiu do enunciado
+                            reg['ja_na_solucao' if repetido else 'na_solucao'] = True
+                            if repetido:
+                                reg['regiao'] = regiao_fora
                 # o texto do comentario vai para a busca junto com a solucao, e nao com o enunciado
                 docs_busca.append({'id': iid, 'serie': SERIE_BUSCA.get(serie, serie), 'tipo': 'exercicio',
                                    'titulo': '', 'resumo': '%s %s' % (aula_tit, modulo['titulo']),
