@@ -153,9 +153,12 @@
  * O v139 traz a busca no texto dos livros. O v140 traz os 22 assuntos novos de
  * matemática da revisão dos mapas dos livros no banco/topicos/matematica.json.
  * O v141 traz os 11 assuntos novos de física da revisão dos mapas dos livros no banco/topicos/fisica.json.
- * O v142 traz os 6 assuntos novos de química da revisão dos mapas dos livros no banco/topicos/quimica.json.
+ * O v143 traz o planejamento de estudos com IA: './planejamento.js' entra na
+ * lista. O endpoint de IA (/api/ia) só recebe POST, que o fetch abaixo já deixa
+ * passar sem cache.
+ * O v146 traz os 6 assuntos novos de química da revisão dos mapas dos livros no banco/topicos/quimica.json.
  */
-var CACHE = 'apoio-educacional-v142';
+var CACHE = 'apoio-educacional-v146';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -183,6 +186,10 @@ var ARQUIVOS = [
   /* A cópia na nuvem (N0): o motor e o gerador do QR da chave. Fora da lista,
    * o app.js novo abriria Ajustes sem o Nuvem depois de uma atualização. */
   './nuvem.js',
+  /* O planejamento de estudos com IA (fase 2): o pedido, a leitura do plano
+   * e o desenho da folha. Fora da lista, o app.js novo abriria o botão sem o
+   * módulo depois de uma atualização sem sinal. */
+  './planejamento.js',
   './app.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
