@@ -271,7 +271,7 @@ const medir = pag => pag.evaluate(() => {
   const chips = await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-comparar .bibl-comparar-chip')).map(b => (b.dataset.comparar || b.id) + '=' + b.innerText.replace(/\s+/g, ' ').trim()).join(' ; '));
   conf('a aba oferece assuntos com mais vínculos registrados e "Todos os N assuntos"', chips,
     'MAT06-01=Sistema de numeração decimal 2 livros com vínculo no mapa ; MAT06-06=Operações com frações 2 livros com vínculo no mapa ; MAT06-07=Números decimais e suas operações 2 livros com vínculo no mapa ; ' +
-    'MAT06-05=Frações: o que são e como comparar 1 livro com vínculo no mapa ; bib-comparar-todos=Todos os 14 assuntos');
+    'MAT06-05=Frações: o que são e como comparar 1 livro com vínculo no mapa ; bib-comparar-todos=Todos os 19 assuntos');
   conf('o título da seção diz o ano', await pag.evaluate(() => document.querySelector('#bib-comparar .bibl-rotulo').textContent), 'Comparar livros por assunto, 6º ano');
   await clicar(pag, '#bib-comparar [data-comparar="MAT06-05"]');
   let lado = (await esperar('a tabela de Frações', () => lerLado(pag), v => v.visivel && v.modo === 'tabela' && !!v.colunas, 10000)).valor;
@@ -385,7 +385,8 @@ const medir = pag => pag.evaluate(() => {
       b.querySelector('.lado-ano').textContent + '|' + b.querySelector('.lado-n').textContent)
   }));
   let esc = await lerEscolha();
-  conf('sem termo, os 14 assuntos de Matemática do 6º ano', esc.conta + ' ' + esc.itens.length, '14 assuntos de Matemática do 6º ano. Escreva para buscar em todos os anos. 14');
+  // 19 desde 12/11/2026: eram 14 (MAT06-01 a 14); a revisão dos mapas dos livros criou MAT06-15 a 19
+  conf('sem termo, os 19 assuntos de Matemática do 6º ano', esc.conta + ' ' + esc.itens.length, '19 assuntos de Matemática do 6º ano. Escreva para buscar em todos os anos. 19');
   await pag.focus('#lado-busca');
   await pag.keyboard.type('fraç');
   esc = (await esperar('o resultado de "fraç"', lerEscolha, v => /todos os anos/.test(v.conta) && v.itens.length > 2, 5000)).valor;
@@ -414,7 +415,7 @@ const medir = pag => pag.evaluate(() => {
   conf('o Voltar da tabela volta à busca com o termo', await pag.evaluate(() => document.querySelector('#lado-busca').value), 'fraç');
   await pag.evaluate(() => { const i = document.querySelector('#lado-busca'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); });
   conf('e com a matéria e o ano de onde ela veio, e não os do último assunto', (await lerEscolha()).conta,
-    '14 assuntos de Matemática do 6º ano. Escreva para buscar em todos os anos.');
+    '19 assuntos de Matemática do 6º ano. Escreva para buscar em todos os anos.');
   await clicar(pag, '#lado-voltar');
   conf('e o Voltar da busca fecha', (await lerLado(pag)).visivel, false);
 

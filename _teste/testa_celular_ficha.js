@@ -52,8 +52,8 @@ const { conf, secao, pausa, esperar } = H;
 
 const MODOS = ['--envenenado-sem-55', '--envenenado-texto-errado', '--envenenado-abre-sozinho', '--envenenado-campo-obrigatorio',
   '--envenenado-campos-nao-sobem', '--envenenado-cobranca-retrato', '--envenenado-observador-cadastra',
-  '--envenenado-extracao-antiga', '--envenenado-aceita-http', '--envenenado-nunca-desatualizado'];
-const [V_55, V_TEXTO, V_SOZINHO, V_OBRIGATORIO, V_NAO_SOBE, V_RETRATO, V_OBS, V_EXTRACAO, V_HTTP, V_HORA] = MODOS;
+  '--envenenado-extracao-antiga', '--envenenado-aceita-http', '--envenenado-nunca-desatualizado', '--envenenado-planejamento-solto'];
+const [V_55, V_TEXTO, V_SOZINHO, V_OBRIGATORIO, V_NAO_SOBE, V_RETRATO, V_OBS, V_EXTRACAO, V_HTTP, V_HORA, V_PLAN] = MODOS;
 const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 function prop(rotulo, ok, veneno) {
@@ -89,7 +89,10 @@ const ANCORAS = {
   [V_EXTRACAO]: [["    return aluno && telefoneValidado(aluno.telefone) ? String(aluno.telefone).trim() : '';", '    return telefoneDoAluno(aluno);'],
     ['  function telefoneValidado(texto) {', "  function telefoneValidado(texto) { var achados = [], m0, RE0 = /(?:^|[^\\d])((?:\\+?55[\\s.-]?)?(?:\\(?\\d{2}\\)?[\\s.-]?)?9?\\d{4}[\\s.-]?\\d{4})(?!\\d)/g; while ((m0 = RE0.exec(String(texto || ''))) !== null) achados.push(m0[1]); if (achados.length !== 1) return ''; var d0 = achados[0].replace(/\\D/g, ''); if (d0.length >= 12 && /^55/.test(d0)) d0 = d0.slice(2); return d0;"]],
   [V_HTTP]: ['if (/^https:\\/\\//i.test(t)) return t;', 'if (/^https?:\\/\\//i.test(t)) return t;'],
-  [V_HORA]: ['var desatualizado = !!r.erroRecebimento || agora.getTime() - d.getTime() > HORAS_SEM_RECEBER * 3600 * 1000;', 'var desatualizado = false;']
+  [V_HORA]: ['var desatualizado = !!r.erroRecebimento || agora.getTime() - d.getTime() > HORAS_SEM_RECEBER * 3600 * 1000;', 'var desatualizado = false;'],
+  /* (IA, fase 2) a seção Planejamentos do celular volta a botões comuns, sem
+   * data-acao-celular: o código de 1b6cfca */
+  [V_PLAN]: ['      if (acaoDeclarada) return botaoDeAcaoCelular(acao, atributos);', '      if (false) return botaoDeAcaoCelular(acao, atributos);']
 };
 const paresDe = m => Array.isArray(ANCORAS[m][0]) ? ANCORAS[m] : [ANCORAS[m]];
 conf('cada âncora de veneno está no app.js uma vez só', MODOS.map(m => paresDe(m).map(par => APP.split(par[0]).length - 1).join('+')).join(','),
@@ -489,6 +492,20 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   conf('a ficha: alvos de 48 px (os links também) e sem rolagem de lado', telaBoa(m), '');
   conf('(painel) o telefone na ficha em letra maior (16 px, peso 600 do sistema visual)', await pagC.evaluate(() => { const c = getComputedStyle(document.querySelector('#cel-ficha-telefone')); return c.fontSize + ' ' + c.fontWeight + ' ' + document.querySelector('#cel-ficha-telefone').textContent; }), '16px 600 Telefone: ' + TEL_ALFA);
   conf('a ficha: nenhum botão nem campo de edição', m.soltos.join(', ') + '|' + m.campos.join(','), '|');
+  /* (IA, fase 2, D6b) a seção Planejamentos da dona: o "Novo planejamento" é
+   * ação declarada, e nenhum botão da seção fica fora de [data-acao-celular].
+   * A regra de cima mede pelo texto de edição e não vê este botão; esta mede
+   * pela seção inteira. */
+  const plan = await pagC.evaluate(() => {
+    const secao = document.querySelector('#cel-plan-secao');
+    if (!secao) return { secao: false, novo: false, soltos: [] };
+    return { secao: true, novo: !!document.querySelector('#cel-plan-novo[data-acao-celular="planejamento"]'),
+      soltos: Array.from(secao.querySelectorAll('button')).filter(b => !b.closest('[data-acao-celular]')).map(b => b.id || b.textContent.trim()) };
+  });
+  conf('(arranjo) a ficha da dona tem a seção Planejamentos', plan.secao, true);
+  prop('o "Novo planejamento" do celular é ação declarada (data-acao-celular="planejamento")', plan.novo, V_PLAN);
+  prop('nenhum botão da seção Planejamentos fora de [data-acao-celular] (' + (plan.soltos.join(', ') || 'nenhum') + ')', plan.soltos.length === 0, V_PLAN);
+  if (MODO === V_PLAN) fimDoVeneno();
   await tirarPrint(pagC, '2_ficha_minima.png');
 
   secao('5. As mensagens prontas: wa.me com o telefone do responsável e o texto certo, e nada sai sozinho');

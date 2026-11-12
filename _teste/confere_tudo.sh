@@ -326,6 +326,12 @@ roda "endpoint de IA"         node _teste/testa_ia_endpoint.js
 # build), antes do merge: sem ele, um import quebrado so apareceria travando
 # o deploy da main. Precisa do registro do npm; sem rede, falha.
 roda "endpoint de IA (empacota)" node _teste/testa_ia_empacota.js
+# O planejamento de estudos com IA (fase 2): o modulo puro (pedido, leitura da
+# resposta, ajuste com o content intacto, a folha de uma pagina), dados sinteticos.
+roda "planejamento com IA (fase 2)" node _teste/testa_planejamento.js
+# o salvar com a gravacao pendente: a mudanca no meio grava de novo, com o mesmo id
+roda "planejamento (salvar pendente)" node _teste/testa_planejamento_salvar.js
+roda "planejamento --envenenado-zera-sem-comparar" node _teste/testa_planejamento_salvar.js --envenenado-zera-sem-comparar
 # Politica de testes por checkpoint (09/11/2026): o nivel 1 (quais provas de
 # navegador rodam pelos arquivos tocados, com o mapa em mapa_provas.tsv) e o
 # nivel 3 (a main reaproveita a bateria inteira se o tree for igual ao da cabeca
@@ -789,6 +795,14 @@ roda "banco v5 --envenenado-restauro-sem-fila"    node "_teste/testa_banco_v5.js
 # registros, e TEM de ser visto.
 roda "rollback v4 (N1)"                           node "_teste/testa_rollback_v4.js"
 roda "rollback v4 --envenenado-registros-ressuscitam" node "_teste/testa_rollback_v4.js" --envenenado-registros-ressuscitam
+# IA, fase 2: o fluxo do planejamento no app (ficha, atalho do +, previa em PDF,
+# ajuste, salvar, compartilhar, erros, observador e transbordo), com o /api/ia falso;
+# e a pergunta de producao: o plano salvo como ajuste sobrevive ao store.js de antes
+# (1f0b839), e o tipo novo seria apagado por ele (controle).
+roda "planejamento (fluxo, IA fase 2)"              node "_teste/testa_planejamento_navegador.js"
+roda "planejamento --envenenado-salva-duplo"       node "_teste/testa_planejamento_navegador.js" --envenenado-salva-duplo
+roda "planejamento (registro e versao antiga)"      node "_teste/testa_planejamento_registro_navegador.js"
+roda "planejamento --envenenado-cascata-deixa-plano" node "_teste/testa_planejamento_registro_navegador.js" --envenenado-cascata-deixa-plano
 # N1: a volta depois do rollback. O codigo da 4 republicado com o numero novo abre
 # um banco nesse numero sem os depositos novos; o codigo novo, voltando, sonda o
 # banco, cria o que falta na versao mais um e migra. O veneno sem a deteccao TEM
@@ -1083,6 +1097,7 @@ roda "celular ficha --envenenado-observador-cadastra" node "_teste/testa_celular
 # de um estranho; a tabela dos 28 casos dela), o link online com http, e o alto que nunca avisa que pode
 # estar desatualizado
 roda "celular ficha --envenenado-extracao-antiga"   node "_teste/testa_celular_ficha.js" --envenenado-extracao-antiga
+roda "celular ficha --envenenado-planejamento-solto" node "_teste/testa_celular_ficha.js" --envenenado-planejamento-solto
 roda "celular ficha --envenenado-aceita-http"       node "_teste/testa_celular_ficha.js" --envenenado-aceita-http
 roda "celular ficha --envenenado-nunca-desatualizado" node "_teste/testa_celular_ficha.js" --envenenado-nunca-desatualizado
 # D6c (lote 3): dinheiro de relance. O selo de cada familia (pago, parcial, em
@@ -1746,9 +1761,12 @@ fi
 
 printf '\n'
 if [ -n "$pn" ] && [ -n "$provas_lista" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
-  # o nivel 1 em fatias: a fatia pode nao ter prova da lista, e isso e verde
-  printf 'FATIA %s DE %s: nenhuma prova da lista cai nesta fatia; nada a rodar.\n' "$pk" "$pn"
-  exit 0
+  # o nivel 1 em fatias (#174): o plano so abre a fatia que tem prova da
+  # selecao (provas_tocadas.js e divide_portao.js com PORTAO_SELECAO). Fatia do
+  # nivel 1 sem prova e plano e fatia desencontrados, e era o unico verde sem
+  # prova nenhuma: agora falha.
+  printf 'HA FALHA. A fatia %s de %s do nivel 1 nao rodou prova nenhuma da lista: o plano e a fatia nao batem.\n' "$pk" "$pn"
+  exit 1
 fi
 if [ -n "$pn" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
   # fatia vazia nao e fatia verde: com mais fatias que provas, a conta esta errada
