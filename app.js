@@ -22286,6 +22286,8 @@
   }
 
   function desenharCarrinho() {
+    // as caixas do bloco "Teoria e exercícios" da página do assunto (T2) seguem o carrinho
+    atualizarBlocosTeoriaExercicios();
     var faixa = $('#bib-carrinho');
     if (!faixa) return;
     limparCarrinhoOrfao();
@@ -23524,6 +23526,374 @@
     if (campo) campo.value = '';
     if ($('#limpar-busca-biblioteca')) $('#limpar-busca-biblioteca').style.display = 'none';
     irNaBiblioteca(nav);
+  }
+
+  // ---------- página do assunto: o bloco "Teoria e exercícios" (T2) ----------
+
+  /* O BLOCO "TEORIA E EXERCÍCIOS" DA PÁGINA DO ASSUNTO (B1 do formato B).
+   *
+   * Duas peças, e a fronteira é de propósito:
+   *   Biblioteca.fontesDoAssunto (biblioteca.js) diz O QUE o aparelho tem para
+   *     o assunto, e só lê;
+   *   desenharBlocoTeoriaExercicios (aqui) desenha isso dentro da caixa que
+   *     recebe, e não sabe de cabeçalho, de livros nem de tela: a página do
+   *     assunto (cabeçalho, Nos livros, Exportar, Anexar à aula) é de outra
+   *     executora, que chama as duas.
+   *
+   * Abrir e Anexar NÃO TÊM CAMINHO PRÓPRIO: Abrir é a tela cheia da Biblioteca
+   * (verNaBiblioteca), na página da teoria ou no exercício dentro da lista da
+   * fonte, e Anexar é a caixa "No material" de sempre (marcarNoCarrinho), ou o
+   * "Usar esta lista" da lista pronta (pedirParaUsarLista). O bloco não grava
+   * nada novo: o carrinho é o do aparelho, como em toda a Biblioteca, e o "Para
+   * mim" dela só é lido.
+   *
+   * As decisões do dono que valem aqui (DECISOES pendentes do Romulo, 12/11):
+   *   D3  a dificuldade se distingue à vista, por pontos e tom (1 a 3 pontos,
+   *       do claro ao escuro), a partir da do pacote (a estimativa da OBMEP); a
+   *       etiqueta "Para mim" dela vale por cima; o desafio vem sinalizado;
+   *   D4  nada vem marcado: o bloco desenha o carrinho como está e não põe
+   *       nada nele sozinho;
+   *   D5  o exercício é grande, numa coluna, legível sem abrir a tela cheia;
+   *   12b no celular, o mesmo bloco, na mesma coluna. */
+
+  /* A LETRA DO ENUNCIADO. Os recortes do Portal e das provas são colunas de
+   * PDF com a letra do corpo em torno de 10 a 11 pt; com 1,9 px de tela por pt
+   * do recorte, ela chega a 19 a 21 px, dentro dos 18 a 22 que o D5 pede no
+   * tablet. A largura segue o recorte (um recorte de 262 pt fica com 498 px), e
+   * a caixa nunca passa da coluna: no celular de 412 px ela encolhe até caber. */
+  var PX_POR_PT_DO_RECORTE = 1.9;
+  // a divulgação progressiva (padrão 1): os primeiros à vista, o resto no "Ver mais"
+  var EXERCICIOS_A_VISTA = 5;
+  var OBMEP_A_VISTA = 4;
+
+  /* O que o app tem carregado, na forma que a fontesDoAssunto lê. As listas
+   * prontas vão as do app (bib.listasPorModulo), que já passaram pela
+   * conferência da montagem da árvore. */
+  function opcoesDasFontesDoAssunto(vinculos) {
+    var listas = [];
+    var porModulo = (bib && bib.listasPorModulo) || {};
+    Object.keys(porModulo).forEach(function (m) {
+      porModulo[m].forEach(function (lp) { listas.push(lp); });
+    });
+    var valores = function (o) { return Object.keys(o || {}).map(function (k) { return o[k]; }); };
+    return {
+      temas: indiceTemas || [],
+      itens: bib ? valores(bib.itemPorId) : [],
+      teoria: bib ? valores(bib.teoriaPorId) : [],
+      listas: listas,
+      vinculos: vinculos || null
+    };
+  }
+
+  /* As fontes de um assunto, com a Biblioteca e o índice já carregados. A
+   * outra executora chama a de baixo, que carrega os dois antes. */
+  function fontesDoAssuntoNoApp(assuntoId, vinculos) {
+    return Biblioteca.fontesDoAssunto(assuntoId, opcoesDasFontesDoAssunto(vinculos));
+  }
+  function carregarFontesDoAssunto(assuntoId, vinculos) {
+    return Promise.all([
+      carregarBiblioteca(),
+      // sem o índice, o vínculo pelo módulo some, e o do tema_app continua
+      carregarIndice().catch(function () { return null; })
+    ]).then(function () { return fontesDoAssuntoNoApp(assuntoId, vinculos); });
+  }
+
+  function temChave(o, k) { return !!o && typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k); }
+
+  /* ABRIR: a tela cheia de sempre, sem sair da página do assunto. A teoria abre
+   * na página dela; o exercício, dentro da lista da fonte (o Anterior e o
+   * Próxima andam por ela, como na lista); a lista de base, nos exercícios
+   * dela, como na prévia da lista. Devolve se abriu. */
+  function abrirFonteDoAssunto(f) {
+    var a = f && f.abrir;
+    if (!a || !bib) return false;
+    if (a.como === 'visor' && a.tipo === 'teoria') {
+      var t = temChave(bib.teoriaPorId, a.id) ? bib.teoriaPorId[a.id] : null;
+      if (!t || !t.paginas || !t.paginas.length) return false;
+      verNaBiblioteca({ tipo: 'teoria', aula: t, indice: Math.max(0, Math.min(a.indice || 0, t.paginas.length - 1)) });
+      return true;
+    }
+    if (a.como === 'lista-pronta') {
+      var lp = listaProntaPorId(a.id);
+      if (!lp || !lp.itens || !lp.itens.length) return false;
+      verNaBiblioteca({ tipo: 'exercicio', lista: { titulo: nomeDaListaPronta(lp), itens: lp.itens }, indice: 0 });
+      return true;
+    }
+    if (a.como === 'visor' && a.tipo === 'exercicio') {
+      var mod = temChave(bib.modulos, a.modulo) ? bib.modulos[a.modulo] : null;
+      var lista = mod && temChave(mod.listas, a.lista) ? mod.listas[a.lista] : null;
+      var i = lista ? lista.itens.map(function (it) { return it.id; }).indexOf(a.id) : -1;
+      if (i < 0) return false;
+      verNaBiblioteca({ tipo: 'exercicio', lista: lista, indice: i });
+      return true;
+    }
+    return false;
+  }
+
+  /* ANEXAR: pôr no material ou tirar, pela porta de sempre. A teoria leva
+   * todas as páginas da aula; a lista de base troca o material pela lista,
+   * com a pergunta e o Desfazer que a lista pronta já tem. */
+  function anexarFonteDoAssunto(f, marcado) {
+    var x = f && f.anexar;
+    if (!x || !bib) return false;
+    if (x.tipo === 'lista-pronta') {
+      var lp = listaProntaPorId(x.id);
+      return lp ? pedirParaUsarLista(lp) : false;
+    }
+    if (x.tipo !== 'itens' && x.tipo !== 'paginas') return false;
+    (x.ids || []).forEach(function (id) {
+      if (noCarrinho(x.tipo, id) !== !!marcado) marcarNoCarrinho(x.tipo, id, !!marcado);
+    });
+    return true;
+  }
+
+  /* No material: true (tudo), 'parte' (a aula de teoria com só algumas
+   * páginas marcadas) ou false. */
+  function fonteNoMaterial(f) {
+    var x = f && f.anexar;
+    if (!x || (x.tipo !== 'itens' && x.tipo !== 'paginas') || !x.ids || !x.ids.length) return false;
+    var n = x.ids.filter(function (id) { return noCarrinho(x.tipo, id); }).length;
+    return n === x.ids.length ? true : n ? 'parte' : false;
+  }
+
+  /* As caixas de todo bloco na tela seguem o carrinho, mude ele por onde mudar
+   * (a caixa, a tela cheia, o "Desmarcar tudo"): quem chama é o desenharCarrinho,
+   * por onde toda mudança de material passa. */
+  function atualizarBlocosTeoriaExercicios() {
+    $$('.bte input.bte-marca').forEach(function (c) {
+      var v = (c._noMaterial || fonteNoMaterial)(c._fonte);
+      c.checked = v === true;
+      c.indeterminate = v === 'parte';
+    });
+  }
+
+  function juntarComE(partes) {
+    if (partes.length < 2) return partes.join('');
+    return partes.slice(0, -1).join(', ') + ' e ' + partes[partes.length - 1];
+  }
+
+  /* desenharBlocoTeoriaExercicios(elemento, fontes, contexto)
+   *   elemento  a caixa onde o bloco é desenhado (o conteúdo dela é trocado);
+   *   fontes    o que a Biblioteca.fontesDoAssunto devolveu;
+   *   contexto  opcional: { abrir(fonte), anexar(fonte, marcado),
+   *             noMaterial(fonte), etiqueta(itemId) }. Sem ele, valem os
+   *             caminhos do app (a tela cheia, o carrinho e o "Para mim").
+   * Devolve o bloco desenhado. */
+  function desenharBlocoTeoriaExercicios(elemento, fontes, contexto) {
+    if (!elemento) return null;
+    var cx = contexto || {};
+    var abrir = typeof cx.abrir === 'function' ? cx.abrir : abrirFonteDoAssunto;
+    var anexar = typeof cx.anexar === 'function' ? cx.anexar : anexarFonteDoAssunto;
+    var noMaterial = typeof cx.noMaterial === 'function' ? cx.noMaterial : fonteNoMaterial;
+    var etiquetaDe = typeof cx.etiqueta === 'function' ? cx.etiqueta
+      : function (id) { return (bibEtiquetas && bibEtiquetas[id]) || null; };
+    var f = fontes || {};
+    var teoria = f.teoria || [], base = f.listaBase || null, exercicios = f.exercicios || [], obmep = f.obmep || [];
+    var temEnem = obmep.some(function (x) { return x.fonte === 'enem'; });
+    var nomeDaOlimpiada = temEnem ? 'OBMEP e ENEM' : 'OBMEP';
+
+    elemento.innerHTML = '';
+    var bloco = el('section', { class: 'bte', 'aria-label': 'Teoria e exercícios' });
+    elemento.appendChild(bloco);
+    bloco.appendChild(el('h3', { class: 'subtitulo bte-titulo', texto: 'Teoria e exercícios' }));
+
+    var resumo = [
+      teoria.length ? plural(teoria.length, 'aula de teoria', 'aulas de teoria') : '',
+      base ? 'lista de base' : '',
+      exercicios.length ? plural(exercicios.length, 'exercício', 'exercícios') : '',
+      obmep.length ? obmep.length + ' da ' + nomeDaOlimpiada : ''
+    ].filter(Boolean);
+    if (!resumo.length) {
+      // o vazio numa linha, e com o porquê
+      bloco.appendChild(el('p', { class: 'ajuda bte-vazio', texto: (f.vazio && f.vazio.texto) ||
+        'Ainda não há teoria nem exercícios ligados a este assunto.' }));
+      return bloco;
+    }
+    bloco.appendChild(el('p', { class: 'ajuda bte-resumo', texto: resumo.join(' · ') }));
+
+    function caixaNoMaterial(fonte, nome) {
+      var chk = el('input', { type: 'checkbox', class: 'bte-marca', 'aria-label': 'No material: ' + nome });
+      chk._fonte = fonte;
+      chk._noMaterial = noMaterial;
+      var v = noMaterial(fonte);
+      chk.checked = v === true;
+      chk.indeterminate = v === 'parte';
+      chk.addEventListener('change', function () {
+        anexar(fonte, chk.checked);
+        atualizarBlocosTeoriaExercicios();
+      });
+      return el('label', { class: 'bib-marcar bte-marcar' }, [chk, el('span', { texto: 'No material' })]);
+    }
+
+    function miniatura(imagem, larguraPx) {
+      if (!imagem || !imagem.caminho || !imagem.pacote || !bib) return null;
+      return miniaturaBib(imagem.pacote, imagem.caminho, imagem.medidas, larguraPx);
+    }
+
+    /* O SELO DA DIFICULDADE (D3): um a três pontos, do tom claro ao escuro, e
+     * o nome ao lado. A etiqueta dela vale por cima da do pacote e vira o selo
+     * cheio, com "para mim"; o desafio segue a dificuldade que vale. */
+    function seloDeDificuldade(e) {
+      var caixa = el('span', { class: 'bte-dificuldade' });
+      caixa._desenha = function () {
+        var dela = etiquetaDe(e.id);
+        dela = dela === 1 || dela === 2 || dela === 3 ? dela : null;
+        var d = dela || e.dificuldade;
+        caixa.innerHTML = '';
+        if (!d) return;
+        var nome = NOME_DIFICULDADE[d];
+        var origem = dela ? 'pela sua etiqueta' : e.dificuldadeOrigem === 'curadoria' ? 'revisada' : 'estimada pela posição na lista da OBMEP';
+        var pontos = el('span', { class: 'bte-pontos', 'aria-hidden': 'true' });
+        for (var k = 1; k <= 3; k++) pontos.appendChild(el('span', { class: 'bte-ponto' + (k <= d ? ' cheio' : '') }));
+        caixa.appendChild(el('span', {
+          class: 'bte-selo bte-dif-' + d + (dela ? ' bte-selo-dela' : ''), role: 'img', 'data-dificuldade': d,
+          'data-de': dela ? 'dela' : 'pacote', 'aria-label': 'Dificuldade ' + nome.toLowerCase() + ', ' + origem,
+          title: nome + ', ' + origem
+        }, [
+          pontos,
+          el('span', { class: 'bte-selo-nome', 'aria-hidden': 'true', texto: nome }),
+          dela ? el('span', { class: 'bte-selo-para-mim', 'aria-hidden': 'true', texto: 'para mim' }) : null
+        ]));
+        if (d === 3) caixa.appendChild(el('span', { class: 'tag bib-lp-desafio bte-desafio', texto: 'desafio' }));
+      };
+      caixa._desenha();
+      return caixa;
+    }
+
+    function cartaoDeExercicio(e) {
+      var medidas = e.imagem && e.imagem.medidas;
+      var largura = Math.round(((medidas && medidas.largura_pt) || 262) * PX_POR_PT_DO_RECORTE);
+      var img = miniatura(e.imagem, Math.min(1200, largura * 2));
+      if (img) img.style.maxWidth = largura + 'px';
+      var de = e.fonte === 'obmep-banco' ? [e.modulo.titulo, e.lista.titulo].filter(Boolean).join(', ') : e.lista.titulo;
+      return el('article', { class: 'bte-ex', 'data-id': e.id, 'data-tipo': e.tipo }, [
+        el('div', { class: 'bte-ex-cabeca' }, [
+          el('span', { class: 'bte-ex-nome', texto: e.titulo }),
+          seloDeDificuldade(e),
+          e.objetiva ? el('span', { class: 'tag', texto: 'Objetiva' }) : null
+        ]),
+        de ? el('div', { class: 'bte-ex-de', texto: de }) : null,
+        el('button', {
+          type: 'button', class: 'bte-ex-abrir', 'aria-label': 'Abrir ' + e.titulo + ' em tela cheia',
+          aoClick: function () { abrir(e); }
+        }, [img]),
+        el('div', { class: 'bte-ex-acoes' }, [caixaNoMaterial(e, e.titulo)])
+      ]);
+    }
+
+    function secao(chave, titulo) {
+      var s = el('div', { class: 'bte-secao', 'data-secao': chave }, [el('h4', { class: 'bloco-exercicios', texto: titulo })]);
+      bloco.appendChild(s);
+      return s;
+    }
+
+    function listaDeCartoes(s, lista, aVista, um, varios) {
+      var coluna = el('div', { class: 'bte-exercicios' });
+      s.appendChild(coluna);
+      var postos = 0;
+      function mostrarAte(n) {
+        var novos = [];
+        while (postos < Math.min(n, lista.length)) {
+          var c = cartaoDeExercicio(lista[postos]);
+          coluna.appendChild(c);
+          novos.push(c);
+          postos++;
+        }
+        observarMiniaturasDoBloco(coluna);
+        return novos;
+      }
+      mostrarAte(aVista);
+      var faltam = lista.length - postos;
+      if (faltam > 0) {
+        var mais = el('button', {
+          type: 'button', class: 'btn bte-mais', iconeDepois: 'chd',
+          texto: 'Ver mais ' + plural(faltam, um, varios),
+          aoClick: function () {
+            mais.remove();
+            var novos = mostrarAte(lista.length);
+            // o foco vai para o primeiro que apareceu, e não se perde com o botão que saiu
+            var alvo = novos[0] && novos[0].querySelector('.bte-ex-abrir');
+            if (alvo) alvo.focus();
+          }
+        });
+        s.appendChild(mais);
+      }
+    }
+
+    if (teoria.length) {
+      var sTeoria = secao('teoria', 'Teoria');
+      teoria.forEach(function (t) {
+        var capa = miniatura(t.imagem, 160);
+        if (capa) capa.classList.add('bte-teoria-capa');
+        sTeoria.appendChild(el('div', { class: 'bte-teoria', 'data-id': t.id }, [
+          el('button', {
+            type: 'button', class: 'bte-teoria-abrir', 'aria-label': 'Abrir a teoria ' + t.titulo,
+            aoClick: function () { abrir(t); }
+          }, [
+            capa,
+            el('span', { class: 'bte-teoria-texto' }, [
+              el('span', { class: 'nome', texto: t.titulo }),
+              el('span', { class: 'detalhe', texto: plural(t.quantidade, 'página', 'páginas') +
+                (t.modulo && t.modulo.titulo ? ' · ' + t.modulo.titulo : '') })
+            ]),
+            icone('olho')
+          ]),
+          caixaNoMaterial(t, 'a teoria ' + t.titulo)
+        ]));
+      });
+    }
+
+    if (base) {
+      var sBase = secao('lista-base', 'Lista de base');
+      sBase.appendChild(el('div', { class: 'bte-lista', 'data-id': base.id }, [
+        el('div', { class: 'bte-lista-texto' }, [
+          el('div', { class: 'nome', texto: base.titulo }),
+          el('div', { class: 'detalhe', texto: plural(base.quantidade, 'exercício', 'exercícios') +
+            (base.minutos !== null && base.minutos !== undefined ? ' · ' + minutosEstimados(base.minutos, true) : '') })
+        ]),
+        el('span', { class: 'bib-minha-nivel bib-lp-nivel', texto: 'Nível Base' }),
+        el('div', { class: 'bte-lista-acoes' }, [
+          el('button', { type: 'button', class: 'btn bte-lista-ver', icone: 'olho', texto: 'Ver',
+            'aria-label': 'Ver a lista de base em tela cheia', aoClick: function () { abrir(base); } }),
+          el('button', { type: 'button', class: 'btn principal bte-lista-usar', texto: 'Usar esta lista',
+            aoClick: function () { anexar(base, true); } })
+        ])
+      ]));
+    }
+
+    if (exercicios.length) listaDeCartoes(secao('exercicios', 'Exercícios'), exercicios, EXERCICIOS_A_VISTA, 'exercício', 'exercícios');
+    if (obmep.length) listaDeCartoes(secao('obmep', nomeDaOlimpiada), obmep, OBMEP_A_VISTA, 'questão', 'questões');
+
+    // o que falta, numa linha só no fim, e nunca uma seção vazia
+    var faltam = [
+      teoria.length ? '' : 'teoria',
+      base ? '' : 'lista de base',
+      exercicios.length ? '' : 'exercícios avulsos',
+      obmep.length ? '' : 'questões da OBMEP'
+    ].filter(Boolean);
+    if (faltam.length) {
+      var frase = 'Ainda sem ' + juntarComE(faltam) + ' para este assunto.';
+      bloco.appendChild(el('p', { class: 'ajuda bte-vazio bte-faltam', texto: frase }));
+    }
+
+    // a etiqueta dela chega depois do primeiro desenho: os selos se refazem
+    if (typeof cx.etiqueta !== 'function') {
+      carregarEtiquetas().then(function () {
+        $$('.bte .bte-dificuldade').forEach(function (c) { if (c._desenha) c._desenha(); });
+      });
+    }
+    return bloco;
+  }
+
+  /* As miniaturas do bloco entram como as da Biblioteca, quando aparecem na
+   * tela. O observador de lá mede pela área de rolagem da Biblioteca; fora
+   * dela (no celular, ou numa caixa ainda fora do documento), elas são pedidas
+   * direto, na mesma fila de três por vez. */
+  function observarMiniaturasDoBloco(caixa) {
+    if (!caixa.isConnected) { setTimeout(function () { if (caixa.isConnected) observarMiniaturasDoBloco(caixa); }, 0); return; }
+    var area = $('.conteudo');
+    if (area && area.contains(caixa) && !document.body.classList.contains('modo-celular')) observarMiniaturas(caixa);
+    else Array.prototype.slice.call(caixa.querySelectorAll('img.bib-mini')).forEach(pedirMiniatura);
   }
 
   // ---------- miniaturas ----------
