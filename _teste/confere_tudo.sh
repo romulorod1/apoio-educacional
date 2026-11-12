@@ -782,6 +782,7 @@ roda "rollback v4 --envenenado-registros-ressuscitam" node "_teste/testa_rollbac
 # e a pergunta de producao: o plano salvo como ajuste sobrevive ao store.js de antes
 # (1f0b839), e o tipo novo seria apagado por ele (controle).
 roda "planejamento (fluxo, IA fase 2)"              node "_teste/testa_planejamento_navegador.js"
+roda "planejamento --envenenado-salva-duplo"       node "_teste/testa_planejamento_navegador.js" --envenenado-salva-duplo
 roda "planejamento (registro e versao antiga)"      node "_teste/testa_planejamento_registro_navegador.js"
 roda "planejamento --envenenado-cascata-deixa-plano" node "_teste/testa_planejamento_registro_navegador.js" --envenenado-cascata-deixa-plano
 # N1: a volta depois do rollback. O codigo da 4 republicado com o numero novo abre

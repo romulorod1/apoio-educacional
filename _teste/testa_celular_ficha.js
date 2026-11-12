@@ -92,7 +92,7 @@ const ANCORAS = {
   [V_HORA]: ['var desatualizado = !!r.erroRecebimento || agora.getTime() - d.getTime() > HORAS_SEM_RECEBER * 3600 * 1000;', 'var desatualizado = false;'],
   /* (IA, fase 2) a seção Planejamentos do celular volta a botões comuns, sem
    * data-acao-celular: o código de 1b6cfca */
-  [V_PLAN]: ['      if (celular) return botaoDeAcaoCelular(acao, atributos);', '      if (false) return botaoDeAcaoCelular(acao, atributos);']
+  [V_PLAN]: ['      if (acaoDeclarada) return botaoDeAcaoCelular(acao, atributos);', '      if (false) return botaoDeAcaoCelular(acao, atributos);']
 };
 const paresDe = m => Array.isArray(ANCORAS[m][0]) ? ANCORAS[m] : [ANCORAS[m]];
 conf('cada âncora de veneno está no app.js uma vez só', MODOS.map(m => paresDe(m).map(par => APP.split(par[0]).length - 1).join('+')).join(','),

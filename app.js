@@ -1537,7 +1537,9 @@
     'modal-virada-anual': true,
     'modal-nuvem-restaurar': true,
     'modal-nuvem-senha': true,
-    'modal-planejamento': true
+    'modal-planejamento': true,
+    'modal-sair-planejamento': true,
+    'modal-plan-print': true
   };
 
   function abrirModal(id) {
@@ -3189,8 +3191,7 @@
   }
 
   function solicitarFecharModal(id) {
-    if (id === 'modal-planejamento' && planejamentoTemTrabalho() &&
-        !confirmar('Sair do planejamento? O texto, os prints e o plano que não foi salvo se perdem.')) return;
+    if (id === 'modal-planejamento' && planejamentoTemTrabalho()) { perguntarSairDoPlanejamento(); return; }
     if (id === 'modal-aula' && relatoEmEdicaoAlterado()) {
       guardarRascunhoRelato(aulaEmEdicao, $('#campo-nota-texto'), $('#campo-nota-privada'));
       abrirModal('modal-sair-relato');
@@ -3220,18 +3221,12 @@
 
     var corpo = $('#corpo-modal-aula');
     corpo.innerHTML = '';
-    /* O atalho do "+" para o planejamento de estudos (IA, fase 2): o mesmo
-     * fluxo da ficha, sem aluno escolhido. Só na aula nova; o toque no "+"
-     * continua abrindo a aula, que é o mais comum. */
-    if (novo && podePlanejar()) {
-      corpo.appendChild(el('div', { class: 'plan-atalho' }, [
-        el('button', { type: 'button', class: 'btn pequeno', id: 'aula-planejamento', icone: 'folha', texto: 'Planejamento de estudos',
-          aoClick: function () {
-            // relato em edição: o mesmo caminho do fechar (guarda o rascunho e pergunta)
-            if (relatoEmEdicaoAlterado()) { solicitarFecharModal('modal-aula'); return; }
-            fecharModal('modal-aula', function () { abrirPlanejamento({}); });
-          } })
-      ]));
+    /* Ela mexeu na aula nova (aluno, data, hora...): o link do planejamento,
+     * no pé, pergunta antes de fechar (IA, fase 2). */
+    var aulaNovaMexida = false;
+    if (novo) {
+      corpo.addEventListener('input', function () { aulaNovaMexida = true; });
+      corpo.addEventListener('change', function () { aulaNovaMexida = true; });
     }
 
     var selAluno = el('select', { id: 'campo-aluno' });
@@ -3429,6 +3424,13 @@
         class: 'ajuda', id: 'ajuda-aula-nova',
         texto: 'Para salvar rapidamente na agenda, use "Salvar na agenda". Para já definir assunto e abrir a folha, use "Salvar e preparar".'
       }));
+      /* O planejamento de estudos com IA (fase 2): um link discreto no pé da
+       * aula nova, que abre o mesmo fluxo da ficha, sem aluno escolhido. O
+       * toque no "+" continua abrindo a aula, que é o mais comum. */
+      if (podeChamarIA()) {
+        corpo.appendChild(linkDoPlanejamento('aula-planejamento', false, function () { return aulaNovaMexida || relatoEmEdicaoAlterado(); },
+          function (depois) { fecharModal('modal-aula', depois); }));
+      }
 
       atualizarPrevisao();
       abrirModal('modal-aula');
@@ -5444,7 +5446,7 @@
     });
     /* Os planejamentos de estudo do aluno (IA, fase 2), logo abaixo das
      * etapas: a lista dos salvos e o "Novo planejamento". */
-    if (!novo && podePlanejar()) painel.dados.appendChild(secaoPlanejamentos(alunoEmEdicao.id, false));
+    if (!novo && podeVerPlanejamentos()) painel.dados.appendChild(secaoPlanejamentos(alunoEmEdicao.id, false));
 
     painel.dados.appendChild(el('label', { class: 'campo' }, [
       el('span', { texto: 'Nome do aluno' }),
@@ -25488,13 +25490,6 @@
   function desenharMarcarAulaCelular(caixa) {
     var titulo = el('h2', { class: 'cel-titulo', id: 'cel-aula-titulo', texto: 'Marcar aula' });
     caixa.appendChild(titulo);
-    // o atalho do "+" para o planejamento de estudos (IA, fase 2), sem aluno escolhido
-    if (podePlanejar()) {
-      caixa.appendChild(el('div', { class: 'plan-atalho' }, [
-        botaoDeAcaoCelular('planejamento', { class: 'btn pequeno', id: 'cel-aula-planejamento', icone: 'folha', texto: 'Planejamento de estudos',
-          aoClick: function () { abrirPlanejamento({}); } })
-      ]));
-    }
     var ativos = db.alunos.filter(function (al) { return al.ativo !== false; })
       .sort(function (x, y) { return x.nome.localeCompare(y.nome); });
     if (!ativos.length) {
@@ -25509,6 +25504,15 @@
       function (v, choques) { titulo.textContent = 'Marcar aula às ' + v.hora; ajustarSalvarAoChoque($('#cel-aula-salvar'), 'Salvar na agenda', choques); });
     h.campos.forEach(function (c) { caixa.appendChild(c); });
     caixa.appendChild(el('p', { class: 'ajuda', texto: 'Aula de repetição se marca no tablet.' }));
+    /* O planejamento de estudos com IA (fase 2): o link discreto no pé do
+     * formulário; se ela já mexeu nele, pergunta antes. */
+    if (podeChamarIA()) {
+      var marcarMexido = false;
+      caixa.addEventListener('input', function () { marcarMexido = true; });
+      caixa.addEventListener('change', function () { marcarMexido = true; });
+      caixa.appendChild(linkDoPlanejamento('cel-aula-planejamento', true, function () { return marcarMexido; },
+        function (depois) { depois(); }));
+    }
     caixa.appendChild(rodapeDoFormularioCelular('cel-aula-salvar', 'Salvar na agenda', function () {
       var v = h.ler();
       if (!v.data) { avisar('Escreva a data como dd/mm/aaaa, por exemplo ' + Core.ddmmaaaa(Core.hojeIso()) + '.'); return; }
@@ -25859,7 +25863,7 @@
       }
       editandoFichaAlunoCelular = false;
       caixa.appendChild(fichaMinimaCelular(aberto, aulaDeContextoDoAluno(aberto.id)));
-      if (podePlanejar()) caixa.appendChild(secaoPlanejamentos(aberto.id, true));
+      if (podeVerPlanejamentos()) caixa.appendChild(secaoPlanejamentos(aberto.id, true));
       caixa.appendChild(el('div', { class: 'barra' }, [
         celularEdita() ? botaoDeAcaoCelular('editar-ficha-aluno', { class: 'btn', id: 'cel-alunos-editar-ficha', texto: 'Editar ficha',
           aoClick: function () { editandoFichaAlunoCelular = true; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } }) : null,
@@ -26549,31 +26553,44 @@
 
   // ================= o planejamento de estudos com IA (fase 2) =================
   /* Na ficha do aluno (tablet e celular), a seção "Planejamentos" com o
-   * "Novo planejamento"; e o atalho pela janela do "+" (Nova aula / Marcar
-   * aula), que abre o mesmo fluxo sem aluno escolhido. Uma janela só:
-   * o pedido (texto, ditado e prints), o "montando" que dá para cancelar, a
-   * prévia que é o próprio PDF, o ajuste por texto, o compartilhar e o salvar.
+   * "Novo planejamento" e os salvos; e um link discreto no pé da aula nova
+   * (tablet) e do "Marcar aula" (celular), que abre o mesmo fluxo sem aluno.
+   * Uma janela só: o pedido (texto, ditado e prints), o "montando" que dá
+   * para cancelar, a prévia que é o próprio PDF (tocar amplia no leitor do
+   * app), a conferência, o ajuste com "Desfazer ajuste", o compartilhar e o
+   * salvar.
    *
    * Quem fala com a IA é o endpoint do próprio site (/api/ia), com o login da
    * nuvem; o app só monta o corpo (planejamento.js). Os prints NÃO são
    * guardados: só o plano, em ajustes['planejamento:<id>'] (o porquê está no
-   * store.js, no PREFIXO_PLANEJAMENTO). O observador não vê nada disto. */
+   * store.js, no PREFIXO_PLANEJAMENTO).
+   *
+   * Quem vê o quê:
+   *   - podeVerPlanejamentos: a lista, a prévia e o compartilhar. Só o
+   *     observador (a cópia de outra conta) não vê.
+   *   - podeGravarPlanejamentos: salvar, excluir e trocar o aluno; o
+   *     aparelho que grava (o tablet, o celular da dona).
+   *   - podeChamarIA: o Novo e o Ajustar, que além de gravar exigem a conta
+   *     da nuvem entrada (o endpoint confere o login). */
   var PREFIXO_PLANEJAMENTO = 'planejamento:';
   var PRAZO_DA_IA_MS = 150000;
-  var fluxoPlano = null; // o fluxo aberto: { vez, alunoFixoId, estado, texto, imagens, conversa, plano, bytes, erro, salvoId, mudouDesdeSalvar, parar }
+  var TRAVA_DO_RODAPE_MS = 400;
+  var LISTA_CURTA = 3;
+  var fluxoPlano = null; // o fluxo aberto (abrirPlanejamento)
   var vezDoPlanejamento = 0;
+  var listaInteiraDe = {}; // ficha com "ver todos" aberto, por aluno
 
-  function podePlanejar() {
+  function podeVerPlanejamentos() {
     if (typeof Planejamento === 'undefined') return false;
-    /* Sem a conta da nuvem não há como chamar a IA (o endpoint confere o
-     * login): o botão nem aparece. Quem decide se a conta pode usar é o
-     * endpoint (IA_UIDS); para outra conta, a frase de sem_permissao. */
-    if (!temNuvem()) return false;
+    return !leOutraConta();
+  }
+  function podeGravarPlanejamentos() {
+    return podeVerPlanejamentos() && (!aparelhoSoLe() || celularEdita());
+  }
+  function podeChamarIA() {
+    if (!podeGravarPlanejamentos() || !temNuvem()) return false;
     var est = Nuvem.estado();
-    if (!est || !est.entrada || !est.entrada.uid) return false;
-    if (leOutraConta()) return false;
-    if (aparelhoSoLe() && !celularEdita()) return false;
-    return true;
+    return !!(est && est.entrada && est.entrada.uid);
   }
 
   function planejamentosDoAluno(alunoId) {
@@ -26609,6 +26626,19 @@
     return db.alunos.filter(function (a) { return a.ativo !== false; }).map(function (a) {
       return { id: a.id, nome: Planejamento.primeiroNome(a.nome), horarios: horariosFixosDoAluno(a.id, hoje) };
     });
+  }
+
+  /* O nome na tela: o primeiro nome, e a inicial do sobrenome quando outro
+   * aluno ativo tem o mesmo primeiro nome. Só na tela: o pedido à IA continua
+   * só com o primeiro nome. */
+  function nomeNaTela(aluno) {
+    var primeiro = Planejamento.primeiroNome(aluno.nome);
+    var repetido = db.alunos.some(function (o) {
+      return o.id !== aluno.id && o.ativo !== false && Planejamento.primeiroNome(o.nome) === primeiro;
+    });
+    if (!repetido) return primeiro;
+    var resto = String(aluno.nome || '').trim().split(/\s+/).slice(1);
+    return resto.length ? primeiro + ' ' + resto[resto.length - 1].charAt(0).toUpperCase() + '.' : primeiro;
   }
 
   /* As aulas do aluno no período, da AGENDA (as gravadas e as previstas das
@@ -26648,34 +26678,55 @@
     }, PDFGen);
   }
 
-  /* A seção "Planejamentos" da ficha. `aoMudar` redesenha quem a contém. */
+  function anunciar(texto) {
+    var r = $('#plan-anuncio');
+    if (!r) return;
+    r.textContent = '';
+    setTimeout(function () { r.textContent = texto; }, 30);
+  }
+
+  /* A seção "Planejamentos" da ficha: os 3 mais recentes, com "ver todos", e
+   * o "Novo planejamento" como ação do cartão. */
   function secaoPlanejamentos(alunoId, celular) {
     var caixa = el('div', { class: 'cartao plan-secao', id: celular ? 'cel-plan-secao' : 'plan-secao', 'data-aluno': alunoId });
     /* No celular da dona, todo botão que leva a uma gravação é uma ação
-     * declarada (D6b): data-acao-celular, como o "Cadastrar aluno". */
+     * declarada (D6b): data-acao-celular, como o "Cadastrar aluno". O celular
+     * que só lê abre os salvos com botão comum: abrir não grava. */
+    var acaoDeclarada = celular && celularEdita();
     var botao = function (acao, atributos) {
-      if (celular) return botaoDeAcaoCelular(acao, atributos);
+      if (acaoDeclarada) return botaoDeAcaoCelular(acao, atributos);
       atributos.type = 'button';
       return el('button', atributos);
     };
-    caixa.appendChild(el('div', { class: 'plan-secao-cabeca' }, [
-      el('strong', { class: 'cresce', texto: 'Planejamentos' }),
-      botao('planejamento', { class: 'btn pequeno', id: celular ? 'cel-plan-novo' : 'plan-novo', icone: 'plus', texto: 'Novo planejamento',
-        aoClick: function () { abrirPlanejamento({ alunoFixoId: alunoId }); } })
-    ]));
+    caixa.appendChild(el('div', { class: 'plan-secao-cabeca' }, [el('strong', { class: 'cresce', texto: 'Planejamentos de estudo' })]));
     var lista = planejamentosDoAluno(alunoId);
     if (!lista.length) {
       caixa.appendChild(el('p', { class: 'ajuda u-margem-0', texto: 'Mande o aviso da escola, e o plano de estudos sai pronto em PDF.' }));
     } else {
-      caixa.appendChild(el('div', { class: 'plan-lista' }, lista.map(function (r) {
+      var inteira = !!listaInteiraDe[alunoId];
+      var mostrados = inteira ? lista : lista.slice(0, LISTA_CURTA);
+      caixa.appendChild(el('div', { class: 'plan-lista' }, mostrados.map(function (r) {
         var rotulo;
         try { rotulo = Planejamento.rotuloCurto(r.plano); } catch (e) { rotulo = 'Planejamento de estudos'; }
-        var item = botao('planejamento-salvo', { class: 'plan-item', 'data-plano': r.id,
-          aoClick: function () { abrirPlanejamento({ salvo: r }); } });
-        item.appendChild(el('span', { class: 'plan-item-nome', texto: rotulo }));
-        item.appendChild(el('span', { class: 'plan-item-quando', texto: 'feito em ' + Core.ddmm(String(r.criadoEm || '').slice(0, 10) || Core.hojeIso()) }));
+        var item = botao('planejamento-salvo', { class: 'plan-item', 'data-plano': r.id, 'aria-label': rotulo + '. Abrir',
+          aoClick: function () { abrirPlanejamento({ salvo: r }, item); } });
+        item.appendChild(el('span', { class: 'plan-item-texto' }, [
+          el('span', { class: 'plan-item-nome', texto: rotulo }),
+          el('span', { class: 'plan-item-quando', texto: 'feito em ' + Core.ddmm(String(r.criadoEm || '').slice(0, 10) || Core.hojeIso()) })
+        ]));
+        item.appendChild(icone('chr', '', 'plan-item-abre'));
         return item;
       })));
+      if (lista.length > LISTA_CURTA) {
+        caixa.appendChild(el('button', { type: 'button', class: 'btn pequeno plan-ver-todos', id: celular ? 'cel-plan-ver-todos' : 'plan-ver-todos',
+          'aria-expanded': inteira ? 'true' : 'false', texto: inteira ? 'Ver só os recentes' : 'Ver todos (' + lista.length + ')',
+          aoClick: function () { listaInteiraDe[alunoId] = !inteira; redesenharSecoesDePlanejamento(); } }));
+      }
+    }
+    if (podeChamarIA()) {
+      var novo = botao('planejamento', { class: 'btn plan-novo', id: celular ? 'cel-plan-novo' : 'plan-novo', icone: 'plus', texto: 'Novo planejamento' });
+      novo.addEventListener('click', function () { abrirPlanejamento({ alunoFixoId: alunoId }, novo); });
+      caixa.appendChild(el('div', { class: 'plan-secao-acao' }, [novo]));
     }
     return caixa;
   }
@@ -26685,13 +26736,30 @@
     if (velha && velha.parentNode) velha.parentNode.replaceChild(secaoPlanejamentos(velha.dataset.aluno, false), velha);
   }
 
-  /* abrirPlanejamento({ alunoFixoId }) ou ({ salvo: registro }) ou ({}) (atalho do +). */
-  function abrirPlanejamento(o) {
+  /* O link discreto no pé da aula nova (tablet) e do "Marcar aula" (celular).
+   * `preenchida()` diz se ela já mexeu no formulário: aí passa pela mesma
+   * pergunta do sair sem salvar. */
+  function linkDoPlanejamento(id, celular, preenchida, fechar) {
+    var atributos = { class: 'plan-link', id: id, texto: 'Fazer planejamento de estudos' };
+    var b = celular ? botaoDeAcaoCelular('planejamento', atributos) : el('button', Object.assign({ type: 'button' }, atributos));
+    b.addEventListener('click', function () {
+      var seguir = function () { fechar(function () { abrirPlanejamento({}); }); };
+      if (preenchida()) perguntarAntesDeDescartar('Sair da aula nova?', 'O que você preencheu nesta aula ainda não foi salvo e se perde.', seguir);
+      else seguir();
+    });
+    return el('div', { class: 'plan-atalho' }, [b]);
+  }
+
+  /* abrirPlanejamento({ alunoFixoId }) ou ({ salvo: registro }) ou ({}) (atalho).
+   * `origem` é o botão que abriu: o foco volta para ele ao fechar. */
+  function abrirPlanejamento(o, origem) {
     o = o || {};
-    if (!podePlanejar()) return;
+    if (o.salvo ? !podeVerPlanejamentos() : !podeChamarIA()) return;
     vezDoPlanejamento++;
-    fluxoPlano = { vez: vezDoPlanejamento, alunoFixoId: o.alunoFixoId || null, estado: 'pedido', texto: '', imagens: [],
-      conversa: null, plano: null, bytes: null, erro: null, salvoId: null, mudouDesdeSalvar: false, parar: null, uso: [] };
+    fluxoPlano = { vez: vezDoPlanejamento, alunoFixoId: o.alunoFixoId || null, estado: 'pedido', texto: '', imagens: [], preparando: null,
+      conversa: null, plano: null, planoAnterior: null, mudou: '', bytes: null, erro: null, erroAjuste: null, textoAjuste: '',
+      salvoId: null, idParaSalvar: null, salvando: false, compartilhando: false, mudouDesdeSalvar: false, parar: null, uso: [],
+      conferirAberto: false, rodapeLivreEm: 0, origem: origem || document.activeElement, focarTitulo: false };
     if (o.salvo) {
       fluxoPlano.estado = 'previa';
       fluxoPlano.alunoFixoId = o.salvo.alunoId;
@@ -26700,54 +26768,117 @@
     }
     abrirModal('modal-planejamento');
     desenharPlanejamento();
+    if (fluxoPlano.estado === 'pedido') { var c = $('#plan-texto'); if (c) c.focus(); }
+    else focarTituloDoPlanejamento();
   }
-  /* Fechar a janela no meio do "montando" cancela o pedido. */
+  function focarTituloDoPlanejamento() {
+    var t = $('#titulo-modal-planejamento');
+    if (!t) return;
+    t.setAttribute('tabindex', '-1');
+    try { t.focus({ preventScroll: true }); } catch (e) { t.focus(); }
+  }
+  /* Fechar a janela: o pedido em curso é cancelado, o ditado para, e os
+   * prints (base64 e miniaturas), a conversa e o PDF saem da memória. O foco
+   * volta ao botão que abriu. */
   function pararPlanejamento() {
-    if (fluxoPlano && fluxoPlano.parar) { try { fluxoPlano.parar(); } catch (e) { /* já parou */ } }
-    if (fluxoPlano) fluxoPlano.vez = -1;
+    var p = fluxoPlano;
+    if (p && p.parar) { try { p.parar(); } catch (e) { /* já parou */ } }
+    if (p) p.vez = -1;
     pararDitado();
-    /* Os prints (base64 e miniaturas), a conversa e o PDF saem da memória
-     * junto com a janela. */
     fluxoPlano = null;
+    var origem = p && p.origem;
+    /* o botão de origem pode ter sido redesenhado (a lista da ficha muda ao
+     * salvar): procura pelo mesmo id */
+    if (origem && !document.body.contains(origem) && origem.id) origem = document.getElementById(origem.id);
+    if (origem && document.body.contains(origem) && typeof origem.focus === 'function') setTimeout(function () { try { origem.focus(); } catch (e) { /* saiu */ } }, 0);
   }
-  /* Há o que perder ao fechar: o pedido sendo montado, texto ou prints no
-   * pedido, ou um plano montado ou ajustado e ainda não salvo. */
+  /* Há o que perder ao fechar: o pedido sendo montado ou ajustado, texto ou
+   * prints no pedido, ou um plano montado ou ajustado e ainda não salvo. */
   function planejamentoTemTrabalho() {
     var p = fluxoPlano;
     if (!p) return false;
-    if (p.estado === 'montando') return true;
-    if (p.estado === 'pedido') return !!(String(p.texto || '').trim() || p.imagens.length);
+    if (p.estado === 'montando' || p.ajustando) return true;
+    if (p.estado === 'pedido') return !!(String(p.texto || '').trim() || p.imagens.length || p.preparando);
     return !!(p.plano && p.mudouDesdeSalvar);
+  }
+
+  /* A pergunta de sair sem salvar, no padrão do modal-sair-relato: o
+   * principal é "Continuar editando"; "Descartar", em vermelho, segue. */
+  var aoDescartarPlanejamento = null;
+  function perguntarAntesDeDescartar(titulo, texto, aoDescartar) {
+    $('#titulo-sair-planejamento').textContent = titulo;
+    $('#texto-sair-planejamento').textContent = texto;
+    aoDescartarPlanejamento = aoDescartar;
+    var continuar = $('#continuar-planejamento'), descartar = $('#descartar-planejamento');
+    continuar.onclick = function () { aoDescartarPlanejamento = null; fecharModal('modal-sair-planejamento'); };
+    descartar.onclick = function () {
+      var depois = aoDescartarPlanejamento;
+      aoDescartarPlanejamento = null;
+      fecharModal('modal-sair-planejamento', function () { if (depois) depois(); });
+    };
+    abrirModal('modal-sair-planejamento');
+    setTimeout(function () { continuar.focus(); }, 0);
+  }
+  function perguntarSairDoPlanejamento() {
+    var p = fluxoPlano;
+    var texto = p && (p.estado === 'montando' || p.ajustando) ? 'O planejamento ainda está sendo montado. Se sair, ele se perde.'
+      : p && p.estado === 'pedido' ? 'O texto e os prints que você pôs se perdem.'
+      : 'O plano montado ainda não foi salvo na ficha e se perde.';
+    perguntarAntesDeDescartar('Sair sem salvar?', texto, function () { fecharModal('modal-planejamento'); });
+  }
+
+  /* Botão do rodapé: ignora o toque logo depois de o rodapé mudar (o Cancelar
+   * do "montando" nasce onde estava o Montar). */
+  function botaoDoRodape(atributos, aoTocar) {
+    var b = el('button', Object.assign({ type: 'button' }, atributos));
+    b.addEventListener('click', function () {
+      var p = fluxoPlano;
+      if (p && Date.now() < p.rodapeLivreEm) return;
+      aoTocar();
+    });
+    return b;
   }
 
   function desenharPlanejamento() {
     var p = fluxoPlano;
     var corpo = $('#corpo-modal-planejamento'), rodape = $('#rodape-modal-planejamento');
     if (!p || !corpo) return;
+    pararDitado();
     corpo.innerHTML = '';
     rodape.innerHTML = '';
+    p.rodapeLivreEm = Date.now() + TRAVA_DO_RODAPE_MS;
+    var modal = corpo.closest('.modal');
+    if (modal) modal.classList.toggle('plan-largo', p.estado === 'previa');
     if (p.estado === 'montando') return desenharMontando(p, corpo, rodape);
     if (p.estado === 'previa') return desenharPreviaDoPlano(p, corpo, rodape);
     desenharPedidoDoPlano(p, corpo, rodape);
   }
 
-  function linhaDoAluno(id) {
-    var a = id ? alunoPorId(id) : null;
-    return a ? a.nome : '';
-  }
-
   /* ---- o ditado, pela Web Speech API do navegador (pt-BR); sem ela, nada aparece ---- */
   var ditado = null;
+  var ditadoBloqueado = false; // o microfone negado: o botão fica desligado na sessão
+  var ERROS_DO_DITADO = {
+    'not-allowed': 'O microfone está bloqueado para o app. Libere nas permissões do navegador ou use o microfone do teclado.',
+    'service-not-allowed': 'O microfone está bloqueado para o app. Libere nas permissões do navegador ou use o microfone do teclado.',
+    network: 'O ditado precisa de internet.',
+    'no-speech': 'Não ouvi nada. Toque em Ditar e fale perto do aparelho.'
+  };
   function temDitado() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
   function pararDitado() {
-    if (ditado) { try { ditado.stop(); } catch (e) { /* já parou */ } }
+    var r = ditado;
     ditado = null;
+    if (r) { try { r.stop(); } catch (e) { /* já parou */ } }
   }
+  /* O ditado do Chrome usa o reconhecimento de voz do Google. Sem aviso na
+   * tela, por decisão do dono (12/11/2026): ele já conversou com ela sobre
+   * isso. */
   function botaoDeDitar(campo, id) {
     if (!temDitado()) return null;
-    var b = el('button', { type: 'button', class: 'btn pequeno plan-ditar', id: id, icone: 'mic', texto: 'Ditar', 'aria-pressed': 'false' });
+    /* O estado vai na troca do rótulo (Ditar / Parar), e não também em aria-pressed. */
+    var b = el('button', { type: 'button', class: 'btn pequeno plan-ditar', id: id, icone: 'mic', texto: 'Ditar', disabled: ditadoBloqueado ? 'disabled' : null });
     b.addEventListener('click', function () {
-      if (ditado) { pararDitado(); b.setAttribute('aria-pressed', 'false'); trocarComIcone(b, 'mic', 'Ditar'); return; }
+      if (ditado) { pararDitado(); trocarComIcone(b, 'mic', 'Ditar'); return; }
+      if (ditadoBloqueado) return;
       var R = window.SpeechRecognition || window.webkitSpeechRecognition;
       var r;
       try { r = new R(); } catch (e) { avisar('O ditado não abriu neste aparelho. Use o microfone do teclado.'); return; }
@@ -26761,78 +26892,127 @@
         campo.value = (campo.value ? campo.value.replace(/\s*$/, ' ') : '') + falado.trim();
         campo.dispatchEvent(new Event('input', { bubbles: true }));
       };
-      r.onend = function () { if (ditado === r) { ditado = null; b.setAttribute('aria-pressed', 'false'); trocarComIcone(b, 'mic', 'Ditar'); } };
-      r.onerror = function () { avisar('O ditado parou. Toque em Ditar de novo ou use o microfone do teclado.'); };
+      r.onend = function () { if (ditado === r) { ditado = null; trocarComIcone(b, 'mic', 'Ditar'); } };
+      r.onerror = function (ev) {
+        var codigo = ev && ev.error;
+        if (codigo === 'not-allowed' || codigo === 'service-not-allowed') { ditadoBloqueado = true; b.disabled = true; }
+        if (codigo === 'aborted') return;
+        avisar(ERROS_DO_DITADO[codigo] || 'O ditado parou. Toque em Ditar de novo ou use o microfone do teclado.');
+      };
       try { r.start(); } catch (e) { avisar('O ditado não abriu neste aparelho. Use o microfone do teclado.'); return; }
       ditado = r;
-      b.setAttribute('aria-pressed', 'true');
       trocarComIcone(b, 'mic', 'Parar');
     });
     return b;
   }
 
+  /* A redução de imagem, numa função só: o lado maior até `maxLado`, JPEG
+   * com fundo branco, e o canvas zerado logo depois (não fica memória presa). */
+  function imagemReduzida(img, maxLado, qualidade) {
+    var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    var k = Math.min(1, maxLado / Math.max(w, h, 1));
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * k));
+    c.height = Math.max(1, Math.round(h * k));
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    var dataUrl = c.toDataURL('image/jpeg', qualidade);
+    c.width = 0; c.height = 0;
+    return dataUrl;
+  }
   /* Cada print é reduzido NO APARELHO: até 1568 px no lado maior, JPEG 0,85,
-   * em base64. Economiza tokens e banda, e o original nunca sai daqui. */
+   * em base64, para a IA; e uma miniatura à parte, de 200 px, para a tela. */
   function reduzirPrint(arquivo) {
     return new Promise(function (resolve, reject) {
       var url = URL.createObjectURL(arquivo);
       var img = new Image();
       img.onload = function () {
         try {
-          var w = img.naturalWidth, h = img.naturalHeight;
-          var k = Math.min(1, 1568 / Math.max(w, h, 1));
-          var c = document.createElement('canvas');
-          c.width = Math.max(1, Math.round(w * k));
-          c.height = Math.max(1, Math.round(h * k));
-          var ctx = c.getContext('2d');
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, c.width, c.height);
-          ctx.drawImage(img, 0, 0, c.width, c.height);
-          var dataUrl = c.toDataURL('image/jpeg', 0.85);
-          resolve({ media_type: 'image/jpeg', data: dataUrl.slice(dataUrl.indexOf(',') + 1), miniatura: dataUrl, nome: arquivo.name || 'print' });
+          var grande = imagemReduzida(img, 1568, 0.85);
+          var miniatura = imagemReduzida(img, 200, 0.8);
+          resolve({ media_type: 'image/jpeg', data: grande.slice(grande.indexOf(',') + 1), miniatura: miniatura, nome: arquivo.name || 'print' });
         } catch (e) { reject(e); } finally { URL.revokeObjectURL(url); }
       };
       img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('imagem que não abre')); };
       img.src = url;
     });
   }
+  function ampliarPrint(im, n) {
+    var corpo = $('#corpo-modal-plan-print');
+    corpo.innerHTML = '';
+    corpo.appendChild(el('img', { class: 'plan-print-grande', src: 'data:' + im.media_type + ';base64,' + im.data, alt: 'Print ' + n + ', ampliado' }));
+    abrirModal('modal-plan-print');
+  }
 
   function desenharPedidoDoPlano(p, corpo, rodape) {
     $('#titulo-modal-planejamento').textContent = 'Novo planejamento';
     if (p.alunoFixoId && alunoPorId(p.alunoFixoId)) {
-      corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', id: 'plan-para', texto: 'Para ' + linhaDoAluno(p.alunoFixoId) + '.' }));
+      corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', id: 'plan-para', texto: 'Para ' + alunoPorId(p.alunoFixoId).nome + '.' }));
     }
-    if (p.erro) corpo.appendChild(el('div', { class: 'faixa-aviso', id: 'plan-erro', role: 'alert', texto: p.erro }));
+    var offline = navigator.onLine === false;
+    if (p.erro || offline) {
+      var faixa = el('div', { class: 'faixa-aviso plan-erro', id: 'plan-erro', role: 'alert' }, [
+        el('span', { class: 'cresce', texto: p.erro || Planejamento.fraseDoErro('sem_internet') })
+      ]);
+      faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'plan-tentar', texto: 'Tentar de novo',
+        aoClick: function () { p.erro = null; desenharPlanejamento(); if (navigator.onLine !== false) montar(); } }));
+      corpo.appendChild(faixa);
+    }
     var campo = el('textarea', { id: 'plan-texto', rows: '6', 'aria-label': 'O pedido do planejamento',
       placeholder: 'Cole o aviso da escola ou dite o que precisa. Por exemplo: provas de novembro, uma matéria por dia, revisão na manhã da prova.' });
     campo.value = p.texto || '';
-    campo.addEventListener('input', function () { p.texto = campo.value; });
     corpo.appendChild(campo);
 
     var entrada = el('input', { type: 'file', accept: 'image/*', multiple: 'multiple', id: 'plan-arquivos', hidden: 'hidden' });
+    var estadoPrints = el('p', { class: 'ajuda plan-preparando', id: 'plan-preparando', role: 'status', hidden: 'hidden' });
     var prints = el('div', { class: 'plan-prints', id: 'plan-prints' });
+    var montarBotao = null;
+    function atualizarMontar() {
+      if (!montarBotao) return;
+      var falta = !String(p.texto || '').trim() && !p.imagens.length;
+      montarBotao.disabled = !!(p.preparando || falta || navigator.onLine === false);
+    }
+    campo.addEventListener('input', function () { p.texto = campo.value; atualizarMontar(); });
     function desenharPrints() {
       prints.innerHTML = '';
       p.imagens.forEach(function (im, i) {
         prints.appendChild(el('div', { class: 'plan-print' }, [
-          el('img', { src: im.miniatura, alt: 'Print ' + (i + 1) }),
-          el('button', { type: 'button', class: 'btn pequeno plan-print-tirar', icone: 'x', 'aria-label': 'Tirar o print ' + (i + 1),
-            aoClick: function () { p.imagens.splice(i, 1); desenharPrints(); } })
+          el('button', { type: 'button', class: 'plan-print-ver', 'aria-label': 'Ampliar o print ' + (i + 1),
+            aoClick: function () { ampliarPrint(im, i + 1); } }, [el('img', { src: im.miniatura, alt: '' })]),
+          el('button', { type: 'button', class: 'plan-print-tirar', icone: 'x', 'aria-label': 'Tirar o print ' + (i + 1),
+            aoClick: function () { p.imagens.splice(i, 1); desenharPrints(); atualizarMontar(); } })
         ]));
       });
+      if (p.preparando) {
+        estadoPrints.hidden = false;
+        estadoPrints.textContent = 'Preparando ' + p.preparando.feitos + ' de ' + p.preparando.total + '...';
+      } else estadoPrints.hidden = true;
+      atualizarMontar();
     }
     entrada.addEventListener('change', function () {
       var arquivos = Array.prototype.slice.call(entrada.files || []);
       entrada.value = '';
-      var cabem = Planejamento.MAX_IMAGENS - p.imagens.length;
+      var cabem = Planejamento.MAX_IMAGENS - p.imagens.length - (p.preparando ? p.preparando.total - p.preparando.feitos : 0);
       if (arquivos.length > cabem) avisar('Cabem até ' + Planejamento.MAX_IMAGENS + ' prints. ' + (cabem > 0 ? 'Entraram os ' + cabem + ' primeiros.' : 'Tire algum para pôr outro.'));
-      arquivos.slice(0, Math.max(0, cabem)).reduce(function (fila, arq) {
-        return fila.then(function () {
+      var fila = arquivos.slice(0, Math.max(0, cabem));
+      if (!fila.length) return;
+      p.preparando = p.preparando || { feitos: 0, total: 0 };
+      p.preparando.total += fila.length;
+      desenharPrints();
+      fila.reduce(function (corrente, arq) {
+        return corrente.then(function () {
           return reduzirPrint(arq).then(function (im) { if (fluxoPlano === p) p.imagens.push(im); }, function () {
             avisar('Um dos arquivos não abriu como imagem.');
+          }).then(function () {
+            if (fluxoPlano !== p || !p.preparando) return;
+            p.preparando.feitos++;
+            if (p.preparando.feitos >= p.preparando.total) p.preparando = null;
+            if (p.estado === 'pedido') desenharPrints();
           });
         });
-      }, Promise.resolve()).then(function () { if (fluxoPlano === p) desenharPrints(); });
+      }, Promise.resolve());
     });
     corpo.appendChild(entrada);
     corpo.appendChild(el('div', { class: 'barra plan-ferramentas' }, [
@@ -26840,33 +27020,41 @@
       el('button', { type: 'button', class: 'btn pequeno', id: 'plan-anexar', icone: 'imagem', texto: 'Anexar prints',
         aoClick: function () { entrada.click(); } })
     ]));
+    corpo.appendChild(estadoPrints);
     corpo.appendChild(prints);
-    desenharPrints();
 
-    rodape.appendChild(el('button', { type: 'button', class: 'btn', 'data-fechar': '', texto: 'Cancelar',
-      aoClick: function () { solicitarFecharModal('modal-planejamento'); } }));
-    rodape.appendChild(el('button', { type: 'button', class: 'btn principal', id: 'plan-montar', texto: 'Montar planejamento',
-      aoClick: function () {
-        if (!String(p.texto || '').trim() && !p.imagens.length) { avisar('Escreva o pedido ou anexe os prints do aviso.'); campo.focus(); return; }
-        var hoje = Planejamento.hojeEmSaoPaulo();
-        var corpoDoPedido = Planejamento.montarPedido({ texto: p.texto, imagens: p.imagens, alunos: alunosParaIA(hoje),
-          alunoFixoId: p.alunoFixoId, hoje: hoje });
-        pedirPlano(p, corpoDoPedido, 'pedido');
-      } }));
+    function montar() {
+      if (p.preparando) return;
+      if (!String(p.texto || '').trim() && !p.imagens.length) { avisar('Escreva o pedido ou anexe os prints do aviso.'); campo.focus(); return; }
+      if (navigator.onLine === false) { p.erro = Planejamento.fraseDoErro('sem_internet'); desenharPlanejamento(); return; }
+      var hoje = Planejamento.hojeEmSaoPaulo();
+      var corpoDoPedido = Planejamento.montarPedido({ texto: p.texto, imagens: p.imagens, alunos: alunosParaIA(hoje),
+        alunoFixoId: p.alunoFixoId, hoje: hoje });
+      pedirPlano(p, corpoDoPedido, 'pedido');
+    }
+    rodape.appendChild(botaoDoRodape({ class: 'btn esquerda', id: 'plan-fechar-pedido', texto: 'Cancelar' }, function () { solicitarFecharModal('modal-planejamento'); }));
+    montarBotao = botaoDoRodape({ class: 'btn principal', id: 'plan-montar', texto: 'Montar planejamento' }, montar);
+    rodape.appendChild(montarBotao);
+    desenharPrints();
   }
 
+  /* O "montando" do primeiro pedido: as etapas, e o Cancelar do OUTRO lado
+   * do rodapé (onde estava o Montar não nasce botão nenhum). */
   function desenharMontando(p, corpo, rodape) {
-    corpo.appendChild(el('div', { class: 'plan-montando', id: 'plan-montando', role: 'status', 'aria-live': 'polite' }, [
+    var etapa = el('strong', { id: 'plan-etapa', texto: p.imagens.length ? 'Lendo os prints...' : 'Lendo o pedido...' });
+    corpo.appendChild(el('div', { class: 'plan-montando', id: 'plan-montando' }, [
       el('div', { class: 'plan-girando', 'aria-hidden': 'true' }),
-      el('strong', { texto: p.ajustando ? 'Ajustando o planejamento...' : 'Montando o planejamento...' }),
-      el('p', { class: 'ajuda u-margem-0', texto: 'Pode levar até 1 minuto.' })
+      etapa,
+      el('p', { class: 'ajuda u-margem-0', texto: 'Pode levar 1 ou 2 minutos.' })
     ]));
-    rodape.appendChild(el('button', { type: 'button', class: 'btn', id: 'plan-cancelar', texto: 'Cancelar',
-      aoClick: function () { if (p.parar) p.parar(); } }));
+    var vez = p.vez;
+    setTimeout(function () { if (fluxoPlano === p && p.vez === vez && p.estado === 'montando') etapa.textContent = 'Montando a grade...'; }, 15000);
+    rodape.appendChild(botaoDoRodape({ class: 'btn esquerda', id: 'plan-cancelar', texto: 'Cancelar' }, function () { if (p.parar) p.parar(); }));
+    anunciar('Montando o planejamento. Pode levar 1 ou 2 minutos.');
   }
 
   /* A chamada ao endpoint. Devolve o JSON dele, ou { ok: false, codigo }
-   * para o que nem chegou lá (sem internet, sem login, cancelado). */
+   * para o que nem chegou lá (sem internet, sem login, cancelado, prazo). */
   function chamarIA(corpoDoPedido, sinal) {
     if (navigator.onLine === false) return Promise.resolve({ ok: false, codigo: 'sem_internet' });
     if (!temNuvem() || typeof Nuvem.tokenParaIA !== 'function') return Promise.resolve({ ok: false, codigo: 'sem_login' });
@@ -26878,7 +27066,7 @@
       }).then(function (r) {
         return r.json().catch(function () { return { ok: false, codigo: 'indisponivel' }; });
       }, function (e) {
-        if (e && e.name === 'AbortError') return { ok: false, codigo: sinal && sinal.motivo === 'prazo' ? 'rede' : 'cancelado' };
+        if (e && e.name === 'AbortError') return { ok: false, codigo: sinal && sinal.motivo === 'prazo' ? 'prazo' : 'cancelado' };
         return { ok: false, codigo: navigator.onLine === false ? 'sem_internet' : 'rede' };
       });
     }, function (e) {
@@ -26886,17 +27074,23 @@
     });
   }
 
-  /* tipo: 'pedido' (o primeiro plano) ou 'ajuste'. */
+  /* tipo: 'pedido' (o primeiro plano) ou 'ajuste'. No ajuste a prévia fica à
+   * vista, esmaecida, e o "ajustando" fica por cima dela. */
   function pedirPlano(p, corpoDoPedido, tipo, textoDoAjuste, jaRecomecou) {
     var controle = typeof AbortController === 'function' ? new AbortController() : null;
     var sinal = controle ? controle.signal : undefined;
     var relogio = setTimeout(function () { if (controle) { sinal.motivo = 'prazo'; controle.abort(); } }, PRAZO_DA_IA_MS);
     var vez = p.vez;
-    var estadoAntes = p.estado;
+    pararDitado();
     p.erro = null;
-    p.ajustando = tipo === 'ajuste';
-    p.estado = 'montando';
+    p.erroAjuste = null;
     p.parar = function () { if (controle) controle.abort(); };
+    if (tipo === 'ajuste') {
+      p.ajustando = true;
+      p.textoAjuste = textoDoAjuste || '';
+    } else {
+      p.estado = 'montando';
+    }
     desenharPlanejamento();
     chamarIA(corpoDoPedido, sinal).then(function (resposta) {
       clearTimeout(relogio);
@@ -26908,171 +27102,284 @@
        * vez de mandar ela encurtar. Uma vez só. */
       if ((lido.erro === 'texto_demais' || lido.erro === 'conversa_longa') && tipo === 'ajuste' && !jaRecomecou && p.plano && textoDoAjuste) {
         p.conversa = null;
-        p.estado = estadoAntes;
         var hoje = Planejamento.hojeEmSaoPaulo();
         pedirPlano(p, Planejamento.pedidoDeAjusteDoSalvo(p.plano, textoDoAjuste, { alunos: alunosParaIA(hoje), hoje: hoje }), 'ajuste', textoDoAjuste, true);
         return;
       }
       if (lido.erro) {
-        p.estado = estadoAntes;
-        p.erro = lido.erro === 'cancelado' ? null : Planejamento.fraseDoErro(lido.erro);
+        var frase = lido.erro === 'cancelado' ? null : Planejamento.fraseDoErro(lido.erro);
+        if (tipo === 'ajuste') {
+          // o texto dela volta ao campo, e o erro fica acima dele
+          p.ajustando = false;
+          p.erroAjuste = frase;
+        } else {
+          p.estado = 'pedido';
+          p.erro = frase;
+        }
         desenharPlanejamento();
-        if (p.erro && estadoAntes === 'previa') avisar(p.erro);
+        if (frase) anunciar(frase);
+        if (tipo === 'ajuste') { var c = $('#plan-ajuste'); if (c) c.focus(); }
         return;
       }
       if (lido.uso) p.uso.push(lido.uso);
       p.conversa = { pedido: corpoDoPedido, conteudo: lido.conteudo };
-      /* O aluno da ficha vale mais que o palpite do modelo. */
-      /* O que ela escolheu na prévia (o aluno, Aluna ou Aluno) vale nos ajustes seguintes. */
+      /* O que ela escolheu na prévia (o aluno, Aluna ou Aluno) vale nos
+       * ajustes seguintes; senão, o aluno da ficha vale mais que o palpite. */
       if (p.alunoEscolhido) { lido.plano.alunoId = p.alunoEscolhido; lido.plano.confiancaAluno = 'alta'; }
       else if (p.alunoFixoId) { lido.plano.alunoId = p.alunoFixoId; lido.plano.confiancaAluno = 'alta'; }
       if (p.tratamentoEscolhido) lido.plano.tratamento = p.tratamentoEscolhido;
+      if (tipo === 'ajuste') {
+        p.planoAnterior = p.plano;
+        p.mudou = Planejamento.resumoDaMudanca(p.plano, lido.plano);
+        p.ajustando = false;
+        p.textoAjuste = '';
+      } else {
+        p.planoAnterior = null;
+        p.mudou = '';
+      }
       p.plano = lido.plano;
       p.mudouDesdeSalvar = true;
       p.estado = 'previa';
       desenharPlanejamento();
+      focarTituloDoPlanejamento();
+      anunciar(tipo === 'ajuste' ? 'Plano ajustado. Mudou ' + p.mudou + '.' : 'O planejamento está pronto. A prévia da folha está na tela.');
       /* Plano já salvo e ajustado: a ficha guarda a versão nova sozinha. */
       if (p.salvoId) salvarPlanoNaFicha(p, true);
     });
   }
 
+  /* O seletor de um valor só (role=radiogroup): o marcado tem o ✓. */
+  function seletorUnico(id, rotulo, opcoes, marcado, aoEscolher, desligado) {
+    return el('div', { class: 'plan-seletor', id: id, role: 'radiogroup', 'aria-label': rotulo }, opcoes.map(function (o) {
+      var sim = o.valor === marcado;
+      return el('button', { type: 'button', role: 'radio', class: 'chip-filtro plan-opcao' + (sim ? ' ativo' : ''), 'aria-checked': sim ? 'true' : 'false',
+        'data-valor': o.valor, 'data-aluno': o.aluno || null, 'data-tratamento': o.tratamento || null, disabled: desligado ? 'disabled' : null,
+        icone: sim ? 'check' : null, texto: o.rotulo,
+        aoClick: function () { if (!sim) aoEscolher(o.valor); } });
+    }));
+  }
+
   function desenharPreviaDoPlano(p, corpo, rodape) {
     var pl = p.plano;
+    var grava = podeGravarPlanejamentos(), chamaIA = podeChamarIA();
     $('#titulo-modal-planejamento').textContent = 'Planejamento de estudos';
     var aluno = pl.alunoId ? alunoPorId(pl.alunoId) : null;
     if (!aluno) pl.alunoId = null;
-    /* O aluno: do modelo (atalho do +), com troca em um toque; e no plano
-     * SALVO também, para o plano guardado no aluno errado poder mudar de ficha. */
+    /* Com confiança baixa, nenhum aluno vem marcado até ela escolher. */
+    var escolhido = aluno && (pl.confiancaAluno !== 'baixa' || p.alunoEscolhido) ? aluno : null;
+
+    var lado = el('div', { class: 'plan-lado' });
+    /* Para qual aluno: do modelo (atalho do +) e no plano SALVO, para o plano
+     * guardado no aluno errado poder mudar de ficha. Seleção única. */
     if (!p.alunoFixoId || !aluno || p.salvoId) {
       var ativos = db.alunos.filter(function (a) { return a.ativo !== false; })
         .sort(function (x, y) { return String(x.nome).localeCompare(String(y.nome)); });
-      var artigo = pl.tratamento === 'Aluna' ? 'a' : 'o';
-      var pergunta = aluno ? 'É ' + artigo + ' ' + Planejamento.primeiroNome(aluno.nome) + '?' : 'De qual aluno é este plano?';
-      var chips = el('div', { class: 'chips-filtro plan-alunos', id: 'plan-alunos', role: 'group', 'aria-label': 'Trocar o aluno' },
-        ativos.map(function (a) {
-          return el('button', { type: 'button', class: 'chip-filtro' + (a.id === pl.alunoId ? ' ativo' : ''), 'data-aluno': a.id,
-            'aria-pressed': a.id === pl.alunoId ? 'true' : 'false', texto: Planejamento.primeiroNome(a.nome),
-            aoClick: function () {
-              if (pl.alunoId === a.id) return;
-              pl.alunoId = a.id;
-              pl.confiancaAluno = 'alta';
-              p.alunoEscolhido = a.id;
-              /* A conversa de antes era sobre outro aluno (outra lista, outras
-               * aulas): o próximo ajuste recomeça com o plano como texto e o
-               * aluno novo (pedidoDeAjusteDoSalvo). */
-              p.conversa = null;
-              p.mudouDesdeSalvar = true;
-              desenharPlanejamento();
-            } });
-        }));
-      /* "Aluna" ou "Aluno" no alto da folha: o modelo diz pelo pedido; depois
-       * de trocar o aluno, quem sabe é ela, num toque. */
-      var tratamento = el('div', { class: 'chips-filtro plan-alunos', id: 'plan-tratamento', role: 'group', 'aria-label': 'Aluna ou aluno, no alto da folha' },
-        ['Aluna', 'Aluno'].map(function (t) {
-          return el('button', { type: 'button', class: 'chip-filtro' + (pl.tratamento === t ? ' ativo' : ''), 'data-tratamento': t,
-            'aria-pressed': pl.tratamento === t ? 'true' : 'false', texto: t,
-            aoClick: function () {
-              if (pl.tratamento === t) return;
-              pl.tratamento = t;
-              p.tratamentoEscolhido = t;
-              p.mudouDesdeSalvar = true;
-              desenharPlanejamento();
-            } });
-        }));
-      corpo.appendChild(el('div', { class: 'plan-quem' + (pl.confiancaAluno === 'baixa' || !aluno ? ' plan-quem-duvida' : ''), id: 'plan-quem' }, [
-        el('strong', { id: 'plan-pergunta', texto: pergunta }),
-        el('p', { class: 'ajuda u-margem-0', texto: aluno ? 'Se não for, toque no nome certo.' : 'Toque no nome.' }),
-        chips,
-        aluno ? tratamento : null
+      lado.appendChild(el('div', { class: 'plan-linha' + (!escolhido ? ' plan-quem-duvida' : ''), id: 'plan-quem' }, [
+        el('span', { class: 'plan-rotulo', id: 'plan-pergunta', texto: 'Para qual aluno?' }),
+        seletorUnico('plan-alunos', 'Para qual aluno?', ativos.map(function (a) { return { valor: a.id, aluno: a.id, rotulo: nomeNaTela(a) }; }),
+          escolhido ? escolhido.id : null, function (id) {
+            pl.alunoId = id;
+            pl.confiancaAluno = 'alta';
+            p.alunoEscolhido = id;
+            /* A conversa de antes era sobre outro aluno (outra lista, outras
+             * aulas): o próximo ajuste recomeça com o plano como texto e o
+             * aluno novo (pedidoDeAjusteDoSalvo). */
+            p.conversa = null;
+            p.mudouDesdeSalvar = true;
+            desenharPlanejamento();
+          }, !grava)
       ]));
     }
-    var incertos = Planejamento.itensIncertos(pl);
-    if (incertos.length) {
-      corpo.appendChild(el('div', { class: 'faixa-info plan-incertos', id: 'plan-incertos' }, [
-        el('strong', { texto: 'Confira antes de mandar:' }),
-        el('ul', { class: 'plan-incertos-lista' }, incertos.map(function (t) { return el('li', { texto: t }); }))
+    /* "Aluna" ou "Aluno" no alto da folha: sempre à vista, numa linha rotulada. */
+    lado.appendChild(el('div', { class: 'plan-linha', id: 'plan-na-folha' }, [
+      el('span', { class: 'plan-rotulo', texto: 'Na folha:' }),
+      seletorUnico('plan-tratamento', 'Na folha, Aluna ou Aluno', [{ valor: 'Aluna', tratamento: 'Aluna', rotulo: 'Aluna' }, { valor: 'Aluno', tratamento: 'Aluno', rotulo: 'Aluno' }],
+        pl.tratamento, function (t) {
+          pl.tratamento = t;
+          p.tratamentoEscolhido = t;
+          p.mudouDesdeSalvar = true;
+          desenharPlanejamento();
+        }, !grava)
+    ]));
+
+    /* A conferência: o que a IA marcou e o que o app conferiu, num selo
+     * recolhível. Tocar num item com data leva ao Ajustar já com o dia. */
+    var campoAjuste = null;
+    var conferir = Planejamento.itensIncertos(pl);
+    if (conferir.length) {
+      var selo = el('button', { type: 'button', class: 'plan-selo', id: 'plan-conferir', 'aria-expanded': p.conferirAberto ? 'true' : 'false',
+        'aria-controls': 'plan-incertos', icone: 'alerta', texto: conferir.length === 1 ? '1 item para conferir' : conferir.length + ' itens para conferir',
+        aoClick: function () { p.conferirAberto = !p.conferirAberto; desenharPlanejamento(); } });
+      lado.appendChild(selo);
+      if (p.conferirAberto) {
+        lado.appendChild(el('ul', { class: 'faixa-info plan-incertos-lista', id: 'plan-incertos' }, conferir.map(function (item) {
+          if (!item.data || !chamaIA) return el('li', { texto: item.texto });
+          return el('li', {}, [el('button', { type: 'button', class: 'plan-item-conferir', 'data-data': item.data, texto: item.texto,
+            aoClick: function () {
+              if (!campoAjuste) return;
+              campoAjuste.value = 'No dia ' + Planejamento.ddmm(item.data) + ': ';
+              campoAjuste.focus();
+              try { campoAjuste.setSelectionRange(campoAjuste.value.length, campoAjuste.value.length); } catch (e) { /* campo sem seleção */ }
+            } })]);
+        })));
+      }
+    }
+    /* O que o último ajuste mudou, com o Desfazer. */
+    if (p.planoAnterior && !p.ajustando) {
+      lado.appendChild(el('div', { class: 'plan-linha plan-mudou', id: 'plan-mudou' }, [
+        el('span', { class: 'cresce', texto: 'Mudou: ' + p.mudou + '.' }),
+        el('button', { type: 'button', class: 'btn pequeno', id: 'plan-desfazer-ajuste', icone: 'undo', texto: 'Desfazer ajuste',
+          aoClick: function () {
+            p.plano = p.planoAnterior;
+            p.planoAnterior = null;
+            p.mudou = '';
+            p.conversa = null; // a conversa era do plano que saiu
+            p.mudouDesdeSalvar = true;
+            desenharPlanejamento();
+            anunciar('Ajuste desfeito.');
+            if (p.salvoId) salvarPlanoNaFicha(p, true);
+          } })
       ]));
     }
-    var caixaPrevia = el('div', { class: 'plan-previa', id: 'plan-previa' });
-    corpo.appendChild(caixaPrevia);
+    if (chamaIA) {
+      lado.appendChild(el('button', { type: 'button', class: 'btn pequeno plan-mudar-algo', id: 'plan-mudar-algo', icone: 'pencil', texto: 'Mudar algo?',
+        aoClick: function () { if (campoAjuste) { campoAjuste.scrollIntoView({ block: 'center' }); campoAjuste.focus(); } } }));
+    }
+
+    /* A prévia: o PRÓPRIO PDF; tocar amplia no leitor do app. */
+    var caixaPrevia = el('div', { class: 'plan-previa' + (p.ajustando ? ' plan-previa-esmaecida' : ''), id: 'plan-previa' });
     p.bytes = null;
-    if (aluno) {
+    if (!escolhido) {
+      caixaPrevia.appendChild(el('p', { class: 'ajuda plan-previa-recado', id: 'plan-sem-aluno', texto: 'Escolha o aluno para ver a folha.' }));
+    } else {
       var folha = folhaDoPlano(pl);
       if (folha.erro) caixaPrevia.appendChild(el('div', { class: 'faixa-aviso', id: 'plan-erro-folha', role: 'alert', texto: folha.erro }));
       else { p.bytes = folha.bytes; desenharPreviaPdf(p, folha.bytes, caixaPrevia); }
     }
+    if (p.ajustando) {
+      caixaPrevia.appendChild(el('div', { class: 'plan-ajustando', id: 'plan-ajustando' }, [
+        el('div', { class: 'plan-girando', 'aria-hidden': 'true' }),
+        el('strong', { texto: 'Ajustando...' }),
+        el('button', { type: 'button', class: 'btn pequeno', id: 'plan-cancelar-ajuste', texto: 'Cancelar', aoClick: function () { if (p.parar) p.parar(); } })
+      ]));
+    }
 
     /* O ajuste: curto, por texto ou ditado. A conversa continua (ou, no plano
      * salvo, recomeça com o plano como está). */
-    var campoAjuste = el('input', { type: 'text', id: 'plan-ajuste', autocomplete: 'off', 'aria-label': 'O que mudar',
-      placeholder: 'O que mudar? Ex.: põe Geografia no dia 21' });
-    campoAjuste.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); ajustar(); } });
-    function ajustar() {
-      var t = campoAjuste.value.trim();
-      if (!t) { avisar('Escreva ou dite o que mudar.'); campoAjuste.focus(); return; }
-      var corpoDoAjuste;
-      if (p.conversa) corpoDoAjuste = Planejamento.pedidoDeAjuste(p.conversa, t);
-      else {
-        var hoje = Planejamento.hojeEmSaoPaulo();
-        corpoDoAjuste = Planejamento.pedidoDeAjusteDoSalvo(pl, t, { alunos: alunosParaIA(hoje), hoje: hoje });
-      }
-      pedirPlano(p, corpoDoAjuste, 'ajuste', t);
+    var blocoAjuste = null;
+    if (chamaIA) {
+      campoAjuste = el('input', { type: 'text', id: 'plan-ajuste', autocomplete: 'off', placeholder: 'Ex.: Geografia no dia 21', disabled: p.ajustando ? 'disabled' : null });
+      campoAjuste.value = p.textoAjuste || '';
+      var ajustar = function () {
+        var t = campoAjuste.value.trim();
+        if (!t) { avisar('Escreva ou dite o que mudar.'); campoAjuste.focus(); return; }
+        var corpoDoAjuste;
+        if (p.conversa) corpoDoAjuste = Planejamento.pedidoDeAjuste(p.conversa, t);
+        else {
+          var hoje = Planejamento.hojeEmSaoPaulo();
+          corpoDoAjuste = Planejamento.pedidoDeAjusteDoSalvo(pl, t, { alunos: alunosParaIA(hoje), hoje: hoje });
+        }
+        pedirPlano(p, corpoDoAjuste, 'ajuste', t);
+      };
+      campoAjuste.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); ajustar(); } });
+      blocoAjuste = el('div', { class: 'plan-ajuste', id: 'plan-bloco-ajuste' }, [
+        p.erroAjuste ? el('div', { class: 'faixa-aviso', id: 'plan-erro-ajuste', role: 'alert', texto: p.erroAjuste }) : null,
+        el('label', { class: 'campo u-margem-0', for: 'plan-ajuste' }, [el('span', { texto: 'O que mudar?' })]),
+        campoAjuste,
+        el('div', { class: 'barra u-margem-baixo-0' }, [
+          p.ajustando ? null : botaoDeDitar(campoAjuste, 'plan-ajuste-ditar'),
+          el('button', { type: 'button', class: 'btn', id: 'plan-ajustar', texto: 'Ajustar', disabled: p.ajustando ? 'disabled' : null, aoClick: ajustar })
+        ])
+      ]);
     }
-    corpo.appendChild(el('div', { class: 'plan-ajuste' }, [
-      el('label', { class: 'campo u-margem-0', for: 'plan-ajuste' }, [el('span', { texto: 'Ajustar' })]),
-      campoAjuste,
-      el('div', { class: 'barra u-margem-baixo-0' }, [
-        botaoDeDitar(campoAjuste, 'plan-ajuste-ditar'),
-        el('button', { type: 'button', class: 'btn', id: 'plan-ajustar', texto: 'Ajustar', aoClick: ajustar })
-      ])
-    ]));
+    var grade = el('div', { class: 'plan-grade-previa' }, [lado, caixaPrevia, blocoAjuste]);
+    if (p.salvoId && grava) {
+      grade.appendChild(el('div', { class: 'plan-excluir-linha' }, [
+        el('button', { type: 'button', class: 'btn pequeno perigo', id: 'plan-excluir', texto: 'Excluir este plano',
+          disabled: p.ajustando ? 'disabled' : null, aoClick: function () { excluirPlanoSalvo(p.salvoId); } })
+      ]));
+    }
+    corpo.appendChild(grade);
 
     var podeCompartilhar = false;
     try {
       podeCompartilhar = !!(navigator.canShare && navigator.canShare({ files: [new File([new Uint8Array(1)], 'a.pdf', { type: 'application/pdf' })] }));
     } catch (e) { podeCompartilhar = false; }
-    if (p.salvoId) {
-      rodape.appendChild(el('button', { type: 'button', class: 'btn perigo esquerda', id: 'plan-excluir', texto: 'Excluir',
-        aoClick: function () { excluirPlanoSalvo(p.salvoId); } }));
+    p.rotuloEntregar = podeCompartilhar ? 'Compartilhar PDF' : 'Baixar PDF';
+    if (grava) {
+      var salvar = botaoDoRodape({ class: 'btn', id: 'plan-salvar',
+        texto: p.salvoId && !p.mudouDesdeSalvar ? 'Salvo na ficha' : 'Salvar na ficha',
+        disabled: !escolhido || p.ajustando || p.salvando || (p.salvoId && !p.mudouDesdeSalvar) ? 'disabled' : null }, function () { salvarPlanoNaFicha(p, false); });
+      rodape.appendChild(salvar);
     }
-    rodape.appendChild(el('button', { type: 'button', class: 'btn', id: 'plan-salvar',
-      texto: p.salvoId && !p.mudouDesdeSalvar ? 'Salvo na ficha' : 'Salvar na ficha',
-      disabled: !aluno || (p.salvoId && !p.mudouDesdeSalvar) ? 'disabled' : null,
-      aoClick: function () { salvarPlanoNaFicha(p, false); } }));
-    rodape.appendChild(el('button', { type: 'button', class: 'btn principal', id: 'plan-compartilhar',
-      icone: podeCompartilhar ? null : 'download', texto: podeCompartilhar ? 'Compartilhar PDF' : 'Baixar PDF',
-      disabled: p.bytes ? null : 'disabled',
-      aoClick: function () {
-        if (!p.bytes) return;
-        var nome = Planejamento.nomeDoArquivo(pl, aluno ? aluno.nome : '');
-        entregarArquivo(nome, new Blob([p.bytes], { type: 'application/pdf' }), nome.replace(/\.pdf$/, ''));
-      } }));
+    rodape.appendChild(botaoDoRodape({ class: 'btn principal', id: 'plan-compartilhar',
+      icone: podeCompartilhar ? null : 'download', texto: p.rotuloEntregar,
+      disabled: p.bytes && !p.ajustando ? null : 'disabled' }, function () { entregarPlano(p, podeCompartilhar); }));
   }
 
-  /* A prévia é o PRÓPRIO PDF, desenhado pelo leitor do app (PDF.js). */
+  /* Compartilhar a folha: o cancelar da folha de compartilhamento (AbortError)
+   * não vira download, e o botão fica travado enquanto ela está aberta. */
+  function entregarPlano(p, podeCompartilhar) {
+    if (!p.bytes || p.compartilhando) return;
+    var pl = p.plano, aluno = pl && pl.alunoId ? alunoPorId(pl.alunoId) : null;
+    var nome = Planejamento.nomeDoArquivo(pl, aluno ? aluno.nome : '');
+    var blob = new Blob([p.bytes], { type: 'application/pdf' });
+    if (!podeCompartilhar) { baixar(nome, blob); return; }
+    var arquivo;
+    try { arquivo = new File([blob], nome, { type: 'application/pdf' }); } catch (e) { baixar(nome, blob); return; }
+    p.compartilhando = true;
+    var b = $('#plan-compartilhar');
+    if (b) b.disabled = true;
+    var fim = function () {
+      p.compartilhando = false;
+      var bb = $('#plan-compartilhar');
+      if (bb && p.bytes && !p.ajustando) bb.disabled = false;
+    };
+    Promise.resolve().then(function () { return navigator.share({ files: [arquivo], title: nome.replace(/\.pdf$/, '') }); }).then(fim, function (e) {
+      fim();
+      if (!(e && e.name === 'AbortError')) baixar(nome, blob);
+    });
+  }
+
+  /* A prévia é o PRÓPRIO PDF, desenhado pelo leitor do app (PDF.js). Tocar
+   * nela abre o mesmo PDF no leitor, em tela cheia, com zoom. */
   function desenharPreviaPdf(p, bytes, caixa) {
-    caixa.innerHTML = '';
-    caixa.appendChild(el('p', { class: 'ajuda', texto: 'Desenhando a folha...' }));
+    var espera = el('p', { class: 'ajuda plan-previa-recado', texto: 'Desenhando a folha...' });
+    caixa.insertBefore(espera, caixa.firstChild);
     var vez = p.vez;
+    var docPdf = null, canvas = null, usado = false;
     carregarPdfJs().then(function (lib) {
       return lib.getDocument({ data: bytes.slice(), isEvalSupported: false, enableXfa: false }).promise;
     }).then(function (doc) {
+      docPdf = doc;
       var largura = Math.max(260, caixa.clientWidth || 320);
       var escala = Math.min(window.devicePixelRatio || 1, 2.5);
       var w = Math.round(largura * escala), h = Math.round(w * PDFGen.PAGINA_A / PDFGen.PAGINA_L);
-      return desenharPaginaPdfEmCanvas(doc, 1, w, h).then(function (c) {
-        soltarDocPdf(doc);
-        if (fluxoPlano !== p || p.vez !== vez || p.bytes !== bytes) return;
-        c.className = 'plan-previa-folha';
-        c.setAttribute('role', 'img');
-        c.setAttribute('aria-label', 'A folha do planejamento, como sai no PDF');
-        caixa.innerHTML = '';
-        caixa.appendChild(c);
-      });
+      return desenharPaginaPdfEmCanvas(doc, 1, w, h);
+    }).then(function (c) {
+      canvas = c;
+      if (fluxoPlano !== p || p.vez !== vez || p.bytes !== bytes) return;
+      usado = true;
+      c.className = 'plan-previa-folha';
+      c.setAttribute('aria-hidden', 'true');
+      var ver = el('button', { type: 'button', class: 'plan-previa-ver', id: 'plan-ampliar', 'aria-label': 'Ampliar a folha',
+        aoClick: function () {
+          var aluno = alunoPorId(p.plano.alunoId);
+          var nome = Planejamento.nomeDoArquivo(p.plano, aluno ? aluno.nome : '');
+          abrirLeitorPdf(new Blob([bytes], { type: 'application/pdf' }), { titulo: 'Planejamento de estudos', nome: nome, comoFolha: false });
+        } }, [c]);
+      espera.remove();
+      caixa.insertBefore(ver, caixa.firstChild);
+      caixa.insertBefore(el('p', { class: 'ajuda plan-legenda', id: 'plan-legenda', texto: 'Toque para ampliar' }), ver.nextSibling);
     }).catch(function () {
       if (fluxoPlano !== p || p.vez !== vez) return;
-      caixa.innerHTML = '';
-      caixa.appendChild(el('p', { class: 'ajuda', id: 'plan-previa-falhou', texto: 'A prévia não abriu aqui. O PDF sai igual pelo botão de compartilhar.' }));
+      espera.remove();
+      caixa.insertBefore(el('p', { class: 'ajuda plan-previa-recado', id: 'plan-previa-falhou',
+        texto: 'A prévia não abriu aqui. O PDF sai igual pelo botão ' + (p.rotuloEntregar || 'Baixar PDF') + '.' }), caixa.firstChild);
+    }).then(function () {
+      // finally: o canvas que não foi para a tela é zerado, e o documento é solto
+      if (canvas && !usado) { canvas.width = 0; canvas.height = 0; }
+      if (docPdf) soltarDocPdf(docPdf);
     });
   }
 
@@ -27104,10 +27411,18 @@
     });
   }
 
+  /* Salvar na ficha. O id nasce UMA vez por fluxo (idParaSalvar), e a trava
+   * `salvando`, ligada antes de qualquer espera, faz o segundo toque não
+   * gravar um segundo plano. Falhou: a trava sai e o botão volta. */
   function salvarPlanoNaFicha(p, calado) {
     var pl = p.plano;
+    if (p.salvando) return;
     if (!pl || !pl.alunoId || !alunoPorId(pl.alunoId)) { avisar('Escolha o aluno antes de salvar.'); return; }
-    var id = p.salvoId || Core.uid();
+    p.salvando = true;
+    p.idParaSalvar = p.idParaSalvar || p.salvoId || Core.uid();
+    var botaoSalvar = $('#plan-salvar');
+    if (botaoSalvar) botaoSalvar.disabled = true;
+    var id = p.idParaSalvar;
     var chave = PREFIXO_PLANEJAMENTO + id;
     var agora = new Date().toISOString();
     db.ajustes = db.ajustes || {};
@@ -27117,22 +27432,37 @@
     function gravar() {
       db.ajustes[chave] = registro;
       return salvarEDepois(function (gravou) {
-        if (!gravou) return;
+        p.salvando = false;
+        if (!gravou) {
+          var b = $('#plan-salvar');
+          if (fluxoPlano === p && b) b.disabled = false;
+          return;
+        }
         if (fluxoPlano === p) {
           p.salvoId = id;
           p.alunoFixoId = pl.alunoId;
           p.mudouDesdeSalvar = false;
           if (p.estado === 'previa') {
-            var b = $('#plan-salvar');
-            if (b) { b.textContent = 'Salvo na ficha'; b.disabled = true; }
+            var b2 = $('#plan-salvar');
+            if (b2) { b2.textContent = 'Salvo na ficha'; b2.disabled = true; }
           }
         }
         redesenharSecoesDePlanejamento();
         if (!calado) avisar('Planejamento salvo na ficha ' + (alunoPorId(pl.alunoId) ? 'de ' + Planejamento.primeiroNome(alunoPorId(pl.alunoId).nome) : '') + '.');
       });
     }
-    if (modoCelular) comoAcaoDoCelular(gravar); else gravar();
+    try {
+      if (modoCelular) comoAcaoDoCelular(gravar); else gravar();
+    } catch (e) {
+      p.salvando = false;
+      if (botaoSalvar) botaoSalvar.disabled = false;
+      throw e;
+    }
   }
+
+  /* Sem internet ou com ela de volta: o Montar acompanha. */
+  window.addEventListener('online', function () { if (fluxoPlano && fluxoPlano.estado === 'pedido') desenharPlanejamento(); });
+  window.addEventListener('offline', function () { if (fluxoPlano && fluxoPlano.estado === 'pedido') desenharPlanejamento(); });
 
   // ================= partida =================
 

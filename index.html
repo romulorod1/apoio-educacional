@@ -626,6 +626,36 @@
     </div>
   </div>
 
+  <!-- Sair do planejamento (ou da aula nova, pelo atalho) com trabalho que
+       ainda não foi salvo: o padrão do modal-sair-relato, sem confirm(). -->
+  <div class="fundo-modal" id="modal-sair-planejamento">
+    <div class="modal">
+      <div class="modal-cabecalho"><h3 id="titulo-sair-planejamento">Sair sem salvar?</h3></div>
+      <div class="modal-corpo">
+        <p id="texto-sair-planejamento">O texto, os prints e o plano que não foi salvo se perdem.</p>
+      </div>
+      <div class="modal-rodape">
+        <button class="btn perigo esquerda" id="descartar-planejamento" type="button">Descartar</button>
+        <button class="btn principal" id="continuar-planejamento" type="button">Continuar editando</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Um print do planejamento, ampliado. -->
+  <div class="fundo-modal" id="modal-plan-print">
+    <div class="modal">
+      <div class="modal-cabecalho">
+        <h3>Print do aviso</h3>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-plan-print"></div>
+    </div>
+  </div>
+
+  <!-- A região viva do planejamento: o leitor de tela ouve "montando", "a
+       prévia chegou" e os erros, sem o foco sair do lugar. -->
+  <div id="plan-anuncio" class="so-leitor-de-tela" aria-live="polite" role="status"></div>
+
   <div class="fundo-modal" id="modal-bib-compartilhar">
     <div class="modal">
       <div class="modal-cabecalho">

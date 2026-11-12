@@ -163,9 +163,40 @@ secao('3. A leitura da resposta (dos dois lados)');
   conf('plano com provas null: a conferência recusa com motivo, sem quebrar', [lancou, motivo], [false, 'provas ausentes']);
   conf('JSON quebrado vira "sem_plano"', P.lerResposta({ ok: true, resposta: { stop_reason: 'end_turn', content: [{ type: 'text', text: '{"alunoId":' }] } }, IDS).erro, 'sem_plano');
   conf('as frases de tela dos códigos do brief', [P.fraseDoErro('limite_mensal'), P.fraseDoErro('sem_permissao'), P.fraseDoErro('sem_internet')],
-    ['A IA está pausada até o dia 1.', 'Esta conta ainda não tem a IA liberada.', 'Precisa de internet para montar o planejamento.']);
+    ['A IA está pausada até o dia 1.', 'Esta conta ainda não tem a IA liberada. Peça ao Rômulo.', 'Precisa de internet para montar o planejamento.']);
+  conf('o tempo esgotado tem frase própria, que não é "a conexão caiu"', [P.fraseDoErro('prazo'), P.fraseDoErro('prazo') === P.fraseDoErro('rede')],
+    ['A IA demorou demais para responder. Tente de novo.', false]);
   const inc = P.itensIncertos(planoBase({ extra: { observacoes: ['Confira o dia ' + String.fromCharCode(0x2013) + ' 14.'] } }));
-  conf('o resumo de incertos traz a prova incerta e a observação, sem travessão', inc, ['14/11, História: confira no aviso.', 'Confira o dia: 14.']);
+  conf('o resumo de incertos traz a prova incerta e a observação (com verbo e alvo, sem travessão), e a data para o toque',
+    inc.slice(0, 2), [{ texto: 'Confira no aviso a prova de 14/11 (História).', data: '2026-11-14' }, { texto: 'Confira o dia: 14.', data: null }]);
+})();
+
+// ================================================================
+secao('3b. A conferência do app: estudo antes da prova e conteúdo que faltou (dos dois lados)');
+(function () {
+  const g = (data, estudo) => ({ data, prova: null, estudo, deManha: false });
+  const plano = (grade, provas) => ({ grade, provas });
+  const prova = (data, disciplina, conteudo) => ({ data, disciplina, conteudo: conteudo === undefined ? 'Cap. 1.' : conteudo, material: null, incerto: false });
+  const so = (lista, tipo) => lista.filter(i => i.tipo === tipo).map(i => i.texto);
+  conf('com um dia de estudo da matéria antes da prova: nenhum aviso',
+    so(P.conferenciasDoPlano(plano([g('2026-11-10', ['História (2h)']), g('2026-11-12', [])], [prova('2026-11-12', 'História')])), 'estudo'), []);
+  conf('sem nenhum dia de estudo dela antes: o aviso, com a matéria e a data',
+    so(P.conferenciasDoPlano(plano([g('2026-11-10', ['Geografia']), g('2026-11-12', [])], [prova('2026-11-12', 'História')])), 'estudo'),
+    ['Nenhum dia de estudo de História antes da prova de 12/11.']);
+  conf('estudar a matéria só no DIA da prova não conta como antes (mas é aviso, não erro: o plano é lido)',
+    so(P.conferenciasDoPlano(plano([g('2026-11-12', ['História'])], [prova('2026-11-12', 'História')])), 'estudo').length, 1);
+  conf('os nomes que a escola usa nas duas línguas contam como a mesma matéria (Math e Matemática; Língua portuguesa e Português)',
+    so(P.conferenciasDoPlano(plano([g('2026-11-10', ['Math (30min)', 'Português'])], [prova('2026-11-12', 'Matemática'), prova('2026-11-13', 'Língua portuguesa')])), 'estudo'), []);
+  conf('"Prova de Writing" no rótulo e "Writing (+ ELA)" no estudo: a mesma matéria',
+    so(P.conferenciasDoPlano(plano([g('2026-11-10', ['Writing (+ ELA)'])], [prova('2026-11-12', 'Writing')])), 'estudo'), []);
+  conf('prova sem conteúdo: o aviso para dizer no Ajustar; com conteúdo, nenhum',
+    [so(P.conferenciasDoPlano(plano([], [prova('2026-11-27', 'ELA', null)])), 'conteudo'), so(P.conferenciasDoPlano(plano([], [prova('2026-11-27', 'ELA')])), 'conteudo')],
+    [['O conteúdo da prova de 27/11 (ELA) não veio no aviso. Se tiver, diga no Ajustar.'], []]);
+  const comAviso = planoBase();
+  conf('a conferência entra no resumo de conferir, e a folha não muda (o texto do aviso não está no PDF)',
+    [P.itensIncertos(comAviso).some(i => i.tipo === 'estudo'), textoDoPdf(P.desenharFolha(comAviso, { nome: 'Ana' }, G).bytes).join(' ').indexOf('Nenhum dia de estudo') < 0], [true, true]);
+  conf('o resumo de um ajuste: os dias que mudaram', [P.resumoDaMudanca(planoBase(), (() => { const x = planoBase(); x.grade[2].estudo = ['Geografia']; return x; })()),
+    P.resumoDaMudanca(planoBase(), planoBase())], ['o dia 11/11', 'nada na folha']);
 })();
 
 // ================================================================

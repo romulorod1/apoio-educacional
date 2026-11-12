@@ -317,13 +317,14 @@
   /* As frases curtas da tela para cada código do endpoint e daqui. */
   var FRASES = {
     limite_mensal: 'A IA está pausada até o dia 1.',
-    sem_permissao: 'Esta conta ainda não tem a IA liberada.',
+    sem_permissao: 'Esta conta ainda não tem a IA liberada. Peça ao Rômulo.',
     sem_login: 'Entre na sua conta da nuvem, em Ajustes, para usar a IA.',
     login_invalido: 'Entre de novo na sua conta da nuvem, em Ajustes, para usar a IA.',
     recusa: 'A IA não conseguiu montar este plano. Tente escrever o pedido de outro jeito.',
     ocupado: 'A IA está ocupada agora. Tente de novo daqui a pouco.',
     muitos_pedidos: 'Muitos pedidos seguidos. Espere alguns minutos e tente de novo.',
     rede: 'A conexão caiu no meio. Tente de novo.',
+    prazo: 'A IA demorou demais para responder. Tente de novo.',
     sem_internet: 'Precisa de internet para montar o planejamento.',
     pedido_grande: 'Os prints ficaram grandes demais. Tente com menos prints.',
     imagens_demais: 'São prints demais. Mande até 8.',
@@ -339,14 +340,75 @@
     return FRASES[codigo] || 'Não consegui montar o planejamento agora. Tente de novo.';
   }
 
-  /* O que ela precisa conferir, acima da prévia (nunca na folha). */
+  /* O que ela precisa conferir, acima da prévia (nunca na folha):
+   * [{ texto, data }]. A data, quando há, leva o toque ao Ajustar já com o dia.
+   * Junta o que a IA marcou (incerto, observações) e a conferência do app
+   * (conferenciasDoPlano). Frases com verbo e alvo. */
   function itensIncertos(plano) {
     var itens = [];
     (plano.provas || []).forEach(function (p) {
-      if (p.incerto) itens.push(ddmm(p.data) + ', ' + p.disciplina + ': confira no aviso.');
+      if (p.incerto) itens.push({ texto: 'Confira no aviso a prova de ' + ddmm(p.data) + ' (' + limpar(p.disciplina) + ').', data: p.data });
     });
-    (plano.observacoes || []).forEach(function (o) { if (String(o).trim()) itens.push(limpar(o)); });
+    (plano.observacoes || []).forEach(function (o) { if (String(o).trim()) itens.push({ texto: limpar(o), data: null }); });
+    return itens.concat(conferenciasDoPlano(plano));
+  }
+
+  /* A matéria do jeito que a conta compara: sem acento, minúscula, e com os
+   * nomes que a escola usa nas duas línguas juntos. */
+  var SINONIMOS = [['portugues', 'lingua portuguesa'], ['matematica', 'math'], ['ciencias', 'science'],
+    ['historia', 'history'], ['geografia', 'geography'], ['ingles', 'english']];
+  function chaveDaMateria(s) {
+    var n = String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      .replace(/\(.*?\)/g, ' ').replace(/^prova\s+(de\s+|do\s+|da\s+)?/, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    for (var i = 0; i < SINONIMOS.length; i++) {
+      for (var j = 0; j < SINONIMOS[i].length; j++) if (n === SINONIMOS[i][j] || n.indexOf(SINONIMOS[i][j]) === 0) return SINONIMOS[i][0];
+    }
+    return n;
+  }
+  /* "História (2h)" estuda História; "Writing (+ ELA)" estuda Writing. */
+  function estudaMateria(item, chave) {
+    var k = chaveDaMateria(item);
+    return !!chave && (k === chave || k.indexOf(chave + ' ') === 0 || chave.indexOf(k + ' ') === 0);
+  }
+
+  /* A CONFERÊNCIA DO APP, determinística (não é a IA): para cada prova,
+   *   - nenhum dia ANTES dela com estudo daquela matéria vira aviso (o
+   *     rascunho de verdade estuda outra matéria no dia da prova, e isso vale;
+   *     é aviso, não erro);
+   *   - prova sem conteúdo vira aviso para ela dizer no Ajustar, se tiver.
+   * Nada disto vai para a folha. */
+  function conferenciasDoPlano(plano) {
+    var itens = [];
+    var grade = Array.isArray(plano.grade) ? plano.grade : [];
+    (plano.provas || []).forEach(function (p) {
+      var chave = chaveDaMateria(p.disciplina);
+      var estudou = grade.some(function (g) {
+        return g && g.data < p.data && Array.isArray(g.estudo) && g.estudo.some(function (e) { return estudaMateria(e, chave); });
+      });
+      if (!estudou) itens.push({ texto: 'Nenhum dia de estudo de ' + limpar(p.disciplina) + ' antes da prova de ' + ddmm(p.data) + '.', data: p.data, tipo: 'estudo' });
+      if (p.conteudo === null || !String(p.conteudo).trim()) {
+        itens.push({ texto: 'O conteúdo da prova de ' + ddmm(p.data) + ' (' + limpar(p.disciplina) + ') não veio no aviso. Se tiver, diga no Ajustar.', data: p.data, tipo: 'conteudo' });
+      }
+    });
     return itens;
+  }
+
+  /* O que um ajuste mudou, em poucas palavras: os dias da grade e as provas
+   * que ficaram diferentes. */
+  function resumoDaMudanca(antes, depois) {
+    if (!antes || !depois) return '';
+    var porData = function (lista) { var m = {}; (lista || []).forEach(function (g) { if (g && g.data) m[g.data] = JSON.stringify(g); }); return m; };
+    var a = porData(antes.grade), d = porData(depois.grade), dias = [];
+    Object.keys(a).concat(Object.keys(d)).forEach(function (k) { if (a[k] !== d[k] && dias.indexOf(k) < 0) dias.push(k); });
+    dias.sort();
+    var provas = JSON.stringify(antes.provas) !== JSON.stringify(depois.provas);
+    var periodo = JSON.stringify(antes.periodo) !== JSON.stringify(depois.periodo);
+    var partes = [];
+    if (dias.length) partes.push((dias.length === 1 ? 'o dia ' : 'os dias ') + juntarComE(dias.slice(0, 6).map(ddmm)) + (dias.length > 6 ? ' e outros' : ''));
+    if (provas) partes.push('o quadro das provas');
+    if (periodo && !dias.length) partes.push('o período');
+    if (!partes.length && JSON.stringify(antes) !== JSON.stringify(depois)) partes.push('o aluno ou as observações');
+    return partes.length ? juntarComE(partes) : 'nada na folha';
   }
 
   // ================= a folha =================
@@ -593,6 +655,8 @@
     nomeDoArquivo: nomeDoArquivo,
     fraseDoErro: fraseDoErro,
     itensIncertos: itensIncertos,
+    conferenciasDoPlano: conferenciasDoPlano,
+    resumoDaMudanca: resumoDaMudanca,
     rotuloDaProva: rotuloDaProva,
     horaCurta: horaCurta,
     hojeEmSaoPaulo: hojeEmSaoPaulo,
