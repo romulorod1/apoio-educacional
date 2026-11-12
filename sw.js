@@ -151,8 +151,9 @@
  * banco/topicos/matematica.json. O v137 inclui o ajuste pontual da duração de uma
  * aula no celular.
  * O v138 traz a leitura contínua dos livros e a exportação por página.
+ * O v139 traz a busca no texto dos livros.
  */
-var CACHE = 'apoio-educacional-v138';
+var CACHE = 'apoio-educacional-v139';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
