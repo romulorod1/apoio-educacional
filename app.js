@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.54';
+  var VERSAO = '1.42.56';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -84,6 +84,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.56',
+      itens: [
+        'Em Física entraram 12 assuntos novos, para escolher na aula e procurar na Biblioteca: no ensino médio, como movimento harmônico simples, instrumentos ópticos, hidrodinâmica, cosmologia, ondas eletromagnéticas e relatividade geral.'
+      ]
+    },
     {
       versao: '1.42.54',
       itens: [
