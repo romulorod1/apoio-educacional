@@ -91,6 +91,31 @@
       ]
     },
     {
+      versao: '1.42.60',
+      itens: [
+        'Em Matemática entraram 22 assuntos novos, para escolher na aula e procurar na Biblioteca: 14 do 6º ao 9º ano (como construções geométricas, simetria, contagem e juros compostos) e 8 do ensino médio (como lógica, geometria de posição, equações trigonométricas e derivada).'
+      ]
+    },
+    {
+      versao: '1.42.59',
+      itens: [
+        'Na Biblioteca, busque palavras no texto dos livros e abra o resultado no capítulo e página encontrados. A busca não altera o livro nem a aula.'
+      ]
+    },
+    {
+      versao: '1.42.58',
+      itens: [
+        'No tablet, a leitura de livros PDF segue em rolagem cont\u00ednua, e a barra permite ir diretamente a uma p\u00e1gina.',
+        'Na exporta\u00e7\u00e3o, marque p\u00e1ginas com toques ou digite intervalos pela numera\u00e7\u00e3o impressa; p\u00e1ginas sem n\u00famero aparecem como "arquivo N".'
+      ]
+    },
+    {
+      versao: '1.42.57',
+      itens: [
+        'No celular, ajuste a duração de uma aula sem alterar as demais aulas da repetição.'
+      ]
+    },
+    {
       versao: '1.42.54',
       itens: [
         'No 8º ano de Matemática entrou o assunto "Volume e capacidade: bloco retangular e cilindro", para escolher na aula e procurar na Biblioteca.'
@@ -2567,6 +2592,7 @@
   // ================= navegação =================
 
   function ligarEventos() {
+    ligarBuscaAoIndice();
     $$('#abas .aba').forEach(function (b) {
       b.addEventListener('click', function () {
         $$('#abas .aba').forEach(function (x) { x.classList.remove('ativa'); x.removeAttribute('aria-current'); });
@@ -2752,6 +2778,20 @@
         if (ev.key === 'Enter') { ev.preventDefault(); irParaPaginaDoLeitor(this.value); }
       });
     }
+    $('#corpo-modal-leitor-pdf').addEventListener('scroll', rolarLeitorContinuo, { passive: true });
+    $('#leitor-slider-pagina').addEventListener('input', function () {
+      // rolagem DIRETA: a suave atravessava as páginas do caminho, desenhava cada uma
+      // e deixava o temporizador gravar posições intermediárias depois de soltar
+      if (leitor && leitor.continuo) {
+        leitor.arrastandoAte = Date.now() + LEITOR_ARRASTO_MS;
+        irAProximaPaginaDoLeitor(+this.value, false, true);
+      }
+    });
+    // ao soltar a barra: aí sim a posição do livro é gravada, uma vez
+    $('#leitor-slider-pagina').addEventListener('change', function () {
+      if (!leitor || !leitor.continuo || typeof leitor.opcoes.aoMudarPagina !== 'function') return;
+      try { leitor.opcoes.aoMudarPagina(leitor.pagina); } catch (e) { /* posição é auxiliar */ }
+    });
     $('#epub-anterior').addEventListener('click', function () { andarNoEpub(-1); });
     $('#epub-proximo').addEventListener('click', function () { andarNoEpub(1); });
     $('#epub-sumario').addEventListener('click', alternarSumarioEpub);
@@ -16399,9 +16439,12 @@
         titulo: tituloDoLivro(reg.meta), nome: reg.id + '.pdf',
         pagina: (destino && destino.pagina) || Biblioteca.paginaDaPosicao(reg.meta, pos) || 1,
         sumario: sumario, livro: reg,
-        dica: sumario.length ? '' : 'Este livro não tem sumário: use Anterior e Próxima.',
-        aoMudarPagina: function (n) {
-          Store.gravarPosicaoLivro({ id: id, pagina: n }).catch(function () { /* a leitura segue; só a posição não fica */ });
+        dica: sumario.length ? '' : 'Este livro não tem sumário: role as páginas ou use a barra de página.',
+        aoMudarPagina: function (n, como) {
+          // arrastando a barra, a faixa acompanha, e a posição só grava ao soltar
+          if (!como || como.gravar !== false) {
+            Store.gravarPosicaoLivro({ id: id, pagina: n }).catch(function () { /* a leitura segue; só a posição não fica */ });
+          }
           mostrarCobre('pdf', reg, n);
         }
       });
@@ -16988,10 +17031,44 @@
     // o que exportar: o capítulo à vista, ou (no PDF) as páginas que ela escrever
     var radioCap = el('input', { type: 'radio', name: 'livro-exportar-o-que', id: 'livro-exportar-capitulo', value: 'capitulo' });
     var radioPag = el('input', { type: 'radio', name: 'livro-exportar-o-que', id: 'livro-exportar-paginas', value: 'paginas' });
-    var campoPag = el('input', { type: 'text', id: 'livro-exportar-quais', autocomplete: 'off', inputmode: 'numeric',
-      value: epub ? '' : String(origem.pagina || 1), placeholder: 'por exemplo 3-5, 8' });
+    var paginaInicial = epub ? '' : (Biblioteca.paginaImpressa(meta, origem.pagina) ||
+      (meta.numeracao && meta.numeracao.length ? 'arquivo ' + (origem.pagina || 1) : (origem.pagina || 1)));
+    var campoPag = el('input', { type: 'text', id: 'livro-exportar-quais', autocomplete: 'off', inputmode: 'text',
+      value: String(paginaInicial), placeholder: 'por exemplo 45-48, 52' });
     var opcoes = el('div', { class: 'livro-exportar-opcoes' });
     var partesDoCap = entrada ? Biblioteca.partesDoCapitulo(meta, entrada, false).capitulo : [];
+    var paginasMarcadas = {};
+    var gradePaginas = el('div', { class: 'livro-exportar-grade', id: 'livro-exportar-grade-paginas', hidden: true,
+      'aria-label': 'Páginas do capítulo' });
+    if (!epub) {
+      var paginaAtualArquivo = Number(origem.pagina) || 1;
+      paginasMarcadas[paginaAtualArquivo] = true;
+      if (partesDoCap.length) {
+        // a frase diz a verdade do livro: sem numeração impressa, os números são os do arquivo
+        var temImpressa = !!(meta.numeracao && meta.numeracao.length);
+        gradePaginas.appendChild(el('p', { class: 'ajuda', texto: temImpressa
+          ? 'Toque para marcar. Os números são os da página impressa; "arq." marca a página sem número impresso.'
+          : 'Toque para marcar. Os números são os das páginas do arquivo.' }));
+        var botoesPaginas = el('div', { class: 'livro-exportar-grade-botoes' });
+        var paginasDaGrade = partesDoCap.slice();
+        if (paginasDaGrade.indexOf(paginaAtualArquivo) < 0) paginasDaGrade.push(paginaAtualArquivo);
+        paginasDaGrade.sort(function (a, b) { return a - b; }).forEach(function (paginaArquivo) {
+          var impressa = Biblioteca.paginaImpressa(meta, paginaArquivo);
+          var rotulo = impressa || paginaArquivo;
+          var b = el('button', { type: 'button', class: 'livro-exportar-pagina',
+            'aria-label': (impressa ? 'Página impressa ' + rotulo : 'Página do arquivo ' + rotulo),
+            'aria-pressed': paginasMarcadas[paginaArquivo] ? 'true' : 'false', 'data-pagina-arquivo': paginaArquivo,
+            texto: impressa || (meta.numeracao && meta.numeracao.length ? 'arq. ' + paginaArquivo : String(rotulo)) });
+          b.addEventListener('click', function () {
+            if (paginasMarcadas[paginaArquivo]) delete paginasMarcadas[paginaArquivo];
+            else paginasMarcadas[paginaArquivo] = true;
+            sincronizarCampoPaginas();
+          });
+          botoesPaginas.appendChild(b);
+        });
+        gradePaginas.appendChild(botoesPaginas);
+      }
+    }
     if (entrada && partesDoCap.length) {
       opcoes.appendChild(el('label', { class: 'bib-marcar' }, [radioCap,
         el('span', { texto: 'O capítulo: ' + entrada.titulo + ' (' + Biblioteca.descreverUnidades(partesDoCap, nomeUnidade) + ')' })]));
@@ -16999,10 +17076,72 @@
     if (!epub) {
       opcoes.appendChild(el('label', { class: 'bib-marcar' }, [radioPag, el('span', { texto: 'Páginas escolhidas' })]));
       opcoes.appendChild(el('label', { class: 'campo livro-exportar-quais' }, [
-        el('span', { texto: 'Quais páginas (o livro vai da 1 à ' + (meta.paginas || '?') + ')' }), campoPag]));
+        el('span', { texto: (meta.numeracao && meta.numeracao.length ? 'Quais páginas impressas' : 'Quais páginas') + ' (o livro vai da 1 à ' + (meta.paginas || '?') + ')' }), campoPag]));
     }
     if (entrada && partesDoCap.length) radioCap.checked = true; else radioPag.checked = true;
     corpo.appendChild(el('div', { class: 'campo' }, [el('span', { class: 'bib-gerar-rotulo', texto: 'O que exportar' }), opcoes]));
+    if (!epub && partesDoCap.length) corpo.appendChild(gradePaginas);
+
+    function lerPaginasDoCampo() {
+      if (!meta.numeracao || !meta.numeracao.length) return Biblioteca.paginasEscolhidas(campoPag.value, meta.paginas || 0);
+      var texto = String(campoPag.value || '').trim();
+      if (!texto) return { erro: 'Escreva as páginas, por exemplo 45-48, 52.' };
+      var itens = texto.split(/[,;]+|\s+e\s+/i), paginas = [];
+      for (var i = 0; i < itens.length; i++) {
+        // a página é número ou romano, nunca os dois juntos: "45a48" (sem espaço) é o intervalo de 45 a 48
+        var m = /^(?:(arquivo)\s+)?(\d+|[ivxlcdm]+)(?:\s*(?:-|a|até)\s*(?:(arquivo)\s+)?(\d+|[ivxlcdm]+))?$/i.exec(itens[i].trim());
+        if (!m) return { erro: 'Não entendi "' + itens[i].trim() + '". Escreva páginas impressas, por exemplo 45-48, 52.' };
+        var aTexto = m[2], bTexto = m[4] || m[2];
+        var arquivoExplicito = !!m[1] || !!m[3];
+        if (arquivoExplicito && ((m[3] && !m[1]) || (m[1] && m[3] && !m[4]))) return { erro: 'Use o mesmo tipo de página no intervalo.' };
+        if (arquivoExplicito) {
+          var arqA = parseInt(aTexto, 10), arqZ = parseInt(bTexto, 10);
+          if (!/^\d+$/.test(aTexto) || !/^\d+$/.test(bTexto) || arqA < 1 || arqZ < 1) return { erro: 'A página do arquivo deve ser um número positivo.' };
+          if (arqA > arqZ) { var trocaArq = arqA; arqA = arqZ; arqZ = trocaArq; }
+          if (arqZ > (meta.paginas || 0)) return { erro: 'O livro vai da página 1 à ' + (meta.paginas || '?') + '.' };
+          for (var pArq = arqA; pArq <= arqZ; pArq++) {
+            if (paginas.indexOf(pArq) < 0) paginas.push(pArq);
+            if (paginas.length > Biblioteca.TETO_DE_PAGINAS_EXPORTADAS) return { erro: 'No máximo ' + Biblioteca.TETO_DE_PAGINAS_EXPORTADAS + ' páginas por PDF.' };
+          }
+          continue;
+        }
+        var romano = /[ivxlcdm]/i.test(aTexto + bTexto);
+        if (romano !== /[ivxlcdm]/i.test(aTexto) || romano !== /[ivxlcdm]/i.test(bTexto)) return { erro: 'Use páginas do mesmo tipo no intervalo.' };
+        var estilo = romano ? 'romano' : 'arabico';
+        var a = romano ? Biblioteca.deRomano(aTexto) : parseInt(aTexto, 10);
+        var z = romano ? Biblioteca.deRomano(bTexto) : parseInt(bTexto, 10);
+        if (!a || !z) return { erro: 'Essa página impressa não existe no livro.' };
+        if (a > z) { var troca = a; a = z; z = troca; }
+        for (var n = a; n <= z; n++) {
+          var impressa = estilo === 'romano' ? Biblioteca.paraRomano(n) : n;
+          var arquivo = Biblioteca.paginaDoArquivo(meta, impressa, estilo);
+          if (arquivo === null) return { erro: 'A página impressa ' + impressa + ' não existe no livro.' };
+          if (paginas.indexOf(arquivo) < 0) paginas.push(arquivo);
+          if (paginas.length > Biblioteca.TETO_DE_PAGINAS_EXPORTADAS) return { erro: 'No máximo ' + Biblioteca.TETO_DE_PAGINAS_EXPORTADAS + ' páginas por PDF.' };
+        }
+      }
+      return paginas.length ? { paginas: paginas.sort(function (x, y) { return x - y; }) } : { erro: 'Escreva as páginas impressas.' };
+    }
+    function sincronizarCampoPaginas() {
+      var escolhidas = Object.keys(paginasMarcadas).map(Number).sort(function (a, b) { return a - b; });
+      campoPag.value = escolhidas.map(function (n) {
+        return Biblioteca.paginaImpressa(meta, n) || (meta.numeracao && meta.numeracao.length ? 'arquivo ' + n : n);
+      }).join(', ');
+      $$('#livro-exportar-grade-paginas [data-pagina-arquivo]').forEach(function (b) {
+        b.setAttribute('aria-pressed', paginasMarcadas[b.dataset.paginaArquivo] ? 'true' : 'false');
+      });
+      atualizarTamanho();
+    }
+    campoPag.addEventListener('input', function () {
+      var r = lerPaginasDoCampo();
+      if (!r.erro) {
+        paginasMarcadas = {};
+        r.paginas.forEach(function (n) { paginasMarcadas[n] = true; });
+        $$('#livro-exportar-grade-paginas [data-pagina-arquivo]').forEach(function (b) {
+          b.setAttribute('aria-pressed', paginasMarcadas[b.dataset.paginaArquivo] ? 'true' : 'false');
+        });
+      }
+    });
 
     // o gabarito do capítulo, no mesmo PDF
     var caixaGab = el('input', { type: 'checkbox', id: 'livro-exportar-gabarito' });
@@ -17032,6 +17171,7 @@
       motivoGab.dataset.estado = !temGabarito ? 'sem_no_livro' : doCapitulo ? 'tem' : 'sem_no_capitulo';
       // o campo das páginas só vale com "Páginas escolhidas" marcada (painel cego)
       campoPag.disabled = !radioPag.checked;
+      gradePaginas.hidden = !radioPag.checked;
       atualizarTamanho();
     }
     /* O TAMANHO ESTIMADO, antes de gerar: cada página do livro vira uma imagem
@@ -17046,8 +17186,10 @@
       if (p.erro) { tamanho.textContent = ''; avisoTamanho.hidden = true; delete tamanho.dataset.bytes; return; }
       var bytes = estimarPdfDoLivro(origem.formato, p.capitulo.length + p.gabarito.length);
       tamanho.dataset.bytes = String(bytes);
-      tamanho.textContent = 'Tamanho estimado do PDF: ' + textoDeMb(bytes) + ' (' + (p.capitulo.length + p.gabarito.length) +
-        (epub ? ' partes do livro).' : ' páginas do livro).');
+      var nUnidades = p.capitulo.length + p.gabarito.length;
+      tamanho.textContent = 'Tamanho estimado do PDF: ' + textoDeMb(bytes) + ' (' + nUnidades + ' ' + (epub
+        ? (nUnidades === 1 ? 'parte do livro' : 'partes do livro')
+        : (nUnidades === 1 ? 'página do livro' : 'páginas do livro')) + ').';
       avisoTamanho.hidden = bytes <= avisoDeTamanhoExportado();
       avisoTamanho.textContent = 'Passa de 20 MB: o PDF ocupa esse espaço no tablet e pode não ir por WhatsApp ou e-mail. ' +
         'Se for mandar, prefira menos páginas.';
@@ -17110,7 +17252,7 @@
         var p = Biblioteca.partesDoCapitulo(meta, entrada, caixaGab.checked && !caixaGab.disabled);
         return { capitulo: p.capitulo, gabarito: p.gabarito, titulo: entrada.titulo, entrada: entrada };
       }
-      var r = Biblioteca.paginasEscolhidas(campoPag.value, meta.paginas || 0);
+      var r = lerPaginasDoCampo();
       if (r.erro) return { erro: r.erro };
       var e1 = Biblioteca.entradaDoMapa(mapa, 'pdf', r.paginas[0]);
       // as páginas escolhidas, todas de um capítulo só, levam o nome dele no rodapé
@@ -17690,6 +17832,9 @@
   var bibLivrosNav = { disciplina: null, ano: null, tipo: 'todos' };
   var bibLivrosVez = 0;
   var bibLivrosCache = Object.create(null);   // id -> { id, meta, pos, cor }, do último desenho
+  var buscaTextoLivrosVez = 0;
+  var buscaLivrosAtual = null;                 // { termo, caixa } do grupo "Nos livros" à vista
+  var temLivrosNoTablet = false;               // do último desenho dos livros: a busca procura neles também
   var bibLivroAberto = null;                   // o id do livro na tela do livro
   // as cores das capas são as do protótipo (styles.css, --capa-*), todas com letra branca a 4,5:1 ou mais
   var CORES_DAS_CAPAS = ['var(--capa-alfa)', 'var(--capa-beta)', 'var(--capa-gama)', 'var(--capa-delta)', 'var(--capa-zeta)'];
@@ -17890,6 +18035,255 @@
     if (x) x.classList.toggle('bibl-na-busca', !!buscando);
   }
 
+  /* B12: UM campo só. O campo do alto da Biblioteca busca nos exercícios e,
+   * com livro no tablet, também no texto dos livros. O resultado sai em dois
+   * grupos rotulados e recolhíveis, "Exercícios" e depois "Nos livros", cada
+   * um com a contagem no rótulo (divulgação progressiva, padrão 1), e no alto
+   * uma linha-resumo que leva a cada grupo: os dois ficam na primeira tela. */
+  var BUSCA_LINHAS_VISIVEIS = 3;        // o grupo dos exercícios mostra 3 linhas e "Ver todos os N"
+  var BUSCA_LIVROS_POR_VEZ = 30;        // o grupo dos livros mostra 30 livros e "Mostrar mais"
+  var BUSCA_BLOCOS_POR_VEZ = 200;       // ...ou 200 capítulos, o que vier antes
+  var BUSCA_PAGINAS_POR_BLOCO = 16;     // as páginas de um capítulo, e "+N" abre o resto
+  var avisoSemTextoDispensado = '';     // os ids do aviso dispensado; volta quando entra livro novo
+
+  function grupoDaBusca(chave, titulo) {
+    var contagem = el('span', { class: 'bib-grupo-contagem' });
+    var corpoGrupo = el('div', { class: 'bib-grupo-corpo' });
+    var grupo = el('details', { class: 'bib-grupo-busca', 'data-grupo': chave, id: 'bib-grupo-' + chave }, [
+      el('summary', { class: 'bib-grupo-cabeca' }, [
+        el('span', { class: 'bib-grupo-seta', 'aria-hidden': 'true' }, [icone('chr')]),
+        el('span', { class: 'bib-grupo-titulo', texto: titulo }), contagem]),
+      corpoGrupo
+    ]);
+    grupo.open = true;
+    return { grupo: grupo, contagem: contagem, corpo: corpoGrupo };
+  }
+
+  /* A linha-resumo no alto: "Exercícios 9 listas · Nos livros 3 páginas em
+   * 1 livro". Cada parte é um botão que abre o grupo e rola até ele. */
+  function resumoDaBusca() {
+    var caixa = el('p', { class: 'bib-busca-resumo', id: 'bib-busca-resumo' });
+    var partes = {};
+    function parte(chave, titulo) {
+      var valor = el('span', { class: 'bib-busca-resumo-valor' });
+      var b = el('button', { type: 'button', class: 'bib-busca-resumo-parte', 'data-alvo': chave, aoClick: function () {
+        var g = document.getElementById('bib-grupo-' + chave);
+        if (!g) return;
+        g.open = true;
+        g.scrollIntoView({ block: 'start' });
+      } }, [el('span', { class: 'bib-busca-resumo-titulo', texto: titulo }), valor]);
+      partes[chave] = { botao: b, valor: valor };
+      return b;
+    }
+    return {
+      caixa: caixa,
+      montar: function (comExercicios, comLivros) {
+        if (comExercicios) caixa.appendChild(parte('exercicios', 'Exercícios'));
+        if (comExercicios && comLivros) caixa.appendChild(el('span', { class: 'bib-busca-resumo-ponto', 'aria-hidden': 'true', texto: '·' }));
+        if (comLivros) caixa.appendChild(parte('livros', 'Nos livros'));
+      },
+      diz: function (chave, texto) { if (partes[chave]) partes[chave].valor.textContent = texto; }
+    };
+  }
+
+  function rotuloDePaginaDoLivro(meta, pagina) {
+    var impressa = Biblioteca.paginaImpressa(meta || {}, pagina);
+    return impressa || (meta && meta.numeracao && meta.numeracao.length ? 'arquivo ' + pagina : String(pagina));
+  }
+
+  /* O grupo "Nos livros" da busca: monta a caixa e consulta o índice local
+   * (só lê; nada é gravado). `resumo` e `aoVazio` vêm da busca dos dois
+   * grupos: o resumo do alto, e o estado vazio único quando nada aparece. */
+  function grupoNosLivros(termo, resumo, aoVazio) {
+    var g = grupoDaBusca('livros', 'Nos livros');
+    g.status = el('p', { class: 'ajuda bib-busca-livros-status', role: 'status', 'aria-live': 'polite' });
+    g.resultados = el('div', { class: 'bib-busca-livros-resultados', 'aria-busy': 'false' });
+    g.resumo = resumo || null;
+    g.aoVazio = aoVazio || null;
+    g.corpo.appendChild(g.status);
+    g.corpo.appendChild(g.resultados);
+    buscaLivrosAtual = { termo: termo, caixa: g, pronto: null };
+    buscarTextoNosLivros(termo, g);
+    return g.grupo;
+  }
+
+  /* Os livros que a busca não alcança, com o nome de cada um, recolhidos num
+   * aviso discreto, que ela pode dispensar até entrar um livro novo: o livro
+   * sem texto pesquisável (escaneado) inteiro, e o que tem só algumas páginas
+   * sem texto. */
+  function avisoDosLivrosSemTexto(naoLidos) {
+    if (!naoLidos || !naoLidos.length) return null;
+    var chave = naoLidos.map(function (x) { return x.id; }).sort().join('|');
+    if (avisoSemTextoDispensado && avisoSemTextoDispensado === chave) return null;
+    var inteiros = naoLidos.filter(function (x) { return x.livroInteiro || (x.total && x.naoLidas >= x.total); });
+    var parciais = naoLidos.filter(function (x) { return inteiros.indexOf(x) < 0; });
+    var resumo = [];
+    if (inteiros.length) resumo.push(plural(inteiros.length, 'livro', 'livros') + ' sem texto pesquisável ' +
+      (inteiros.length === 1 ? 'não entra' : 'não entram') + ' na busca');
+    if (parciais.length) resumo.push(plural(parciais.length, 'livro tem', 'livros têm') + ' páginas sem texto');
+    var nome = function (x) {
+      var meta = bibLivrosCache[x.id] ? bibLivrosCache[x.id].meta : null;
+      return meta ? tituloDoLivro(meta) : (x.titulo || x.id) + (x.volume ? ', ' + x.volume : '');
+    };
+    var lista = el('ul', { class: 'bib-busca-livros-sem-texto-lista' });
+    inteiros.forEach(function (x) { lista.appendChild(el('li', { 'data-livro': x.id, texto: nome(x) + ': o livro inteiro' })); });
+    parciais.forEach(function (x) {
+      lista.appendChild(el('li', { 'data-livro': x.id, texto: nome(x) + ': ' + plural(x.naoLidas, 'página', 'páginas') + (x.total ? ' de ' + x.total : '') }));
+    });
+    var aviso = el('details', { class: 'ajuda bib-busca-livros-aviso bib-busca-livros-sem-texto' });
+    aviso.appendChild(el('summary', {}, [el('span', { class: 'bib-grupo-seta', 'aria-hidden': 'true' }, [icone('chr')]),
+      el('span', { class: 'bib-busca-livros-sem-texto-resumo', texto: resumo.join('; ') + '.' })]));
+    aviso.appendChild(lista);
+    aviso.appendChild(el('button', { type: 'button', class: 'btn pequeno bib-busca-livros-dispensar', texto: 'Dispensar', aoClick: function () {
+      avisoSemTextoDispensado = chave;
+      if (aviso.parentNode) aviso.parentNode.removeChild(aviso);
+    } }));
+    return aviso;
+  }
+
+  // um capítulo do resultado: o nome e cada página encontrada como botão que abre o leitor nela
+  function blocoDoCapitulo(livro, meta, grupo) {
+    var paginas = grupo.paginas || [];
+    var unidade = livro.formato === 'epub' ? 'parte' : 'página';
+    var abrir = function (n) {
+      return function () { abrirLivro(livro.id, livro.formato === 'epub' ? { capitulo: n } : { pagina: n }); };
+    };
+    var botao = function (n) {
+      var rotulo = livro.formato === 'epub' ? String(n) : rotuloDePaginaDoLivro(meta, n);
+      return el('button', { type: 'button', class: 'bib-busca-pagina', 'data-pagina': n,
+        'aria-label': livro.formato === 'epub' ? 'Abrir na parte ' + n : 'Abrir na p. ' + rotulo, texto: rotulo, aoClick: abrir(n) });
+    };
+    var botoes = el('div', { class: 'bib-busca-paginas' });
+    paginas.slice(0, BUSCA_PAGINAS_POR_BLOCO).forEach(function (n) { botoes.appendChild(botao(n)); });
+    if (paginas.length > BUSCA_PAGINAS_POR_BLOCO) {
+      var resto = paginas.slice(BUSCA_PAGINAS_POR_BLOCO);
+      var mais = el('button', { type: 'button', class: 'bib-busca-pagina bib-busca-pagina-mais', texto: '+' + resto.length,
+        'aria-label': 'Mostrar mais ' + plural(resto.length, unidade, unidade + 's'), aoClick: function () {
+          resto.forEach(function (n) { botoes.insertBefore(botao(n), mais); });
+          botoes.removeChild(mais);
+        } });
+      botoes.appendChild(mais);
+    }
+    return el('div', { class: 'bib-busca-livro-grupo' }, [
+      el('div', { class: 'bib-busca-livro-paginas' }, [
+        el('strong', { texto: grupo.titulo || 'Fora dos capítulos do sumário' }),
+        el('span', { class: 'bib-busca-livro-quantas', texto: plural(paginas.length, unidade, unidade + 's') })
+      ]),
+      botoes
+    ]);
+  }
+
+  function buscarTextoNosLivros(termo, g) {
+    if (!g || !g.status || !g.resultados) return;
+    var status = g.status, resultados = g.resultados;
+    var consulta = String(termo || '').trim();
+    var vez = ++buscaTextoLivrosVez;
+    var diz = function (t) { g.contagem.textContent = t; if (g.resumo) g.resumo.diz('livros', t); };
+    resultados.setAttribute('aria-busy', 'false');
+    if (consulta.length < 2) {
+      resultados.innerHTML = '';
+      diz('');
+      status.textContent = 'Digite ao menos duas letras para buscar nos livros.';
+      return;
+    }
+    if (!window.IndiceLivros || !window.IndiceLivros.buscarNosLivros) {
+      resultados.innerHTML = '';
+      diz('');
+      status.textContent = 'A busca no texto dos livros não está disponível neste aparelho.';
+      return;
+    }
+    // a consulta anterior para no meio: a varredura confere a vez entre um lote e outro
+    var cancelada = function () { return vez !== buscaTextoLivrosVez; };
+    if (!resultados.childNodes.length) status.textContent = 'Buscando nos livros deste tablet...';
+    resultados.setAttribute('aria-busy', 'true');
+    window.IndiceLivros.buscarNosLivros(consulta, {}, { cancelada: cancelada }).then(function (res) {
+      if (cancelada() || (res && res.cancelada)) return;
+      resultados.setAttribute('aria-busy', 'false');
+      resultados.innerHTML = '';
+      var livros = res.livros || [];
+      var total = 0;
+      livros.forEach(function (l) { (l.capitulos && l.capitulos.length ? l.capitulos : [{ paginas: l.paginas || [] }]).forEach(function (c) { total += (c.paginas || []).length; }); });
+      // o teto: 30 livros ou 200 capítulos por vez, e "Mostrar mais" desenha o resto
+      var proximo = 0;
+      function desenharMais() {
+        var livrosAgora = 0, blocosAgora = 0;
+        while (proximo < livros.length && livrosAgora < BUSCA_LIVROS_POR_VEZ && blocosAgora < BUSCA_BLOCOS_POR_VEZ) {
+          var livro = livros[proximo++];
+          var meta = bibLivrosCache[livro.id] ? bibLivrosCache[livro.id].meta : {};
+          var grupos = livro.capitulos && livro.capitulos.length ? livro.capitulos : [{ titulo: null, paginas: livro.paginas || [] }];
+          var cartao = el('article', { class: 'bib-busca-livro', 'data-livro': livro.id });
+          cartao.appendChild(el('h3', { class: 'bib-busca-livro-titulo', texto: livro.titulo || tituloDoLivro(meta) || livro.id }));
+          if (livro.volume || meta.volume) cartao.appendChild(el('p', { class: 'bib-busca-livro-volume', texto: livro.volume || meta.volume }));
+          grupos.forEach(function (grupo) {
+            if (!(grupo.paginas || []).length) return;
+            blocosAgora++;
+            cartao.appendChild(blocoDoCapitulo(livro, meta, grupo));
+          });
+          resultados.insertBefore(cartao, botaoMais.parentNode ? botaoMais : null);
+          livrosAgora++;
+        }
+        if (proximo < livros.length) {
+          botaoMais.textContent = 'Mostrar mais ' + plural(livros.length - proximo, 'livro', 'livros');
+          if (!botaoMais.parentNode) resultados.appendChild(botaoMais);
+        } else if (botaoMais.parentNode) botaoMais.parentNode.removeChild(botaoMais);
+      }
+      var botaoMais = el('button', { type: 'button', class: 'btn bib-busca-livros-mais', aoClick: function () { desenharMais(); } });
+      desenharMais();
+      var pendentes = (res.pendentes || []).length;
+      if (livros.length) {
+        diz(plural(total, 'página', 'páginas') + ' em ' + plural(livros.length, 'livro', 'livros'));
+        status.textContent = plural(total, 'página encontrada', 'páginas encontradas') + ' em ' + plural(livros.length, 'livro', 'livros') + '.';
+      } else if (pendentes) {
+        // a leitura dos livros ainda corre: zero aqui não quer dizer que não existe
+        diz('preparando');
+        status.textContent = 'A busca nos livros ainda está sendo preparada em ' + plural(pendentes, 'livro', 'livros') +
+          '. O resultado aparece aqui quando a leitura terminar.';
+      } else {
+        diz('0');
+        status.textContent = 'Nenhum livro deste tablet tem esse termo.';
+        // nada nos dois grupos: um estado vazio só, no lugar dos dois
+        if (typeof g.aoVazio === 'function' && g.aoVazio()) return;
+      }
+      if (livros.length && pendentes) {
+        resultados.appendChild(el('p', { class: 'ajuda bib-busca-livros-aviso bib-busca-livros-preparando',
+          texto: 'Ainda preparando ' + plural(pendentes, 'livro', 'livros') + ': podem aparecer mais resultados.' }));
+      }
+      var semTexto = avisoDosLivrosSemTexto(res.naoLidos);
+      if (semTexto) resultados.appendChild(semTexto);
+    }).catch(function () {
+      if (cancelada()) return;
+      resultados.setAttribute('aria-busy', 'false');
+      diz('');
+      status.textContent = 'Não consegui consultar o índice agora. Tente de novo.';
+    });
+  }
+
+  /* A leitura dos livros andou: com uma busca à vista, o grupo "Nos livros"
+   * se refaz quando um LIVRO termina (ou a leitura para), e não a cada
+   * página: com páginas a cada 500 ms, refazer a cada uma dava 120 buscas
+   * inteiras em 60 s. */
+  function precisaRefazerABusca(antes, agora) {
+    if (!agora) return false;
+    if (!antes) return true;
+    return antes.prontos !== agora.prontos || antes.total !== agora.total || antes.rodando !== agora.rodando;
+  }
+  function ligarBuscaAoIndice() {
+    if (ligarBuscaAoIndice.feito || !window.IndiceLivros || typeof window.IndiceLivros.aoMudar !== 'function') return;
+    ligarBuscaAoIndice.feito = true;
+    var visto = null, espera = null;
+    window.IndiceLivros.aoMudar(function (agora) {
+      var mudouOLivro = precisaRefazerABusca(visto, agora);
+      visto = agora ? { prontos: agora.prontos, total: agora.total, rodando: agora.rodando } : visto;
+      if (!mudouOLivro) return;
+      clearTimeout(espera);
+      espera = setTimeout(function () {
+        var b = buscaLivrosAtual;
+        if (!b || !b.caixa.grupo.isConnected || String(bibTermo).trim() !== b.termo) return;
+        buscarTextoNosLivros(b.termo, b.caixa);
+      }, 400);
+    });
+  }
+
   function desenharLivrosDaBiblioteca() {
     var caixa = $('#bib-livros');
     if (!caixa) return Promise.resolve();
@@ -17906,10 +18300,22 @@
           return reg;
         });
         if (bibLivroAberto && !bibLivrosCache[bibLivroAberto]) fecharTelaDoLivro();
-        if (!livros.length) { caixa.innerHTML = ''; mostrarSecaoDeLivros(false); return; }
-        montarSecaoDeLivros(caixa, livros);
-        mostrarSecaoDeLivros(true);
-        livrosNaBusca(!!bibTermo.trim());
+        var tinhaLivros = temLivrosNoTablet;
+        temLivrosNoTablet = !!livros.length;
+        campoDaBuscaDaBiblioteca();
+        if (!livros.length) {
+          caixa.innerHTML = '';
+          mostrarSecaoDeLivros(false);
+        } else {
+          montarSecaoDeLivros(caixa, livros);
+          mostrarSecaoDeLivros(true);
+          livrosNaBusca(!!bibTermo.trim());
+        }
+        // com uma busca à vista: o grupo "Nos livros" entra, sai ou se refaz
+        if (bibTermo.trim()) {
+          if (tinhaLivros !== temLivrosNoTablet) redesenharDaBusca();
+          else if (buscaLivrosAtual && buscaLivrosAtual.caixa.grupo.isConnected) buscarTextoNosLivros(buscaLivrosAtual.termo, buscaLivrosAtual.caixa);
+        }
       });
     }).catch(function () {
       if (vez !== bibLivrosVez) return;
@@ -21896,15 +22302,46 @@
       limpar.style.display = campo.value ? '' : 'none';
       espera = setTimeout(function () {
         bibTermo = campo.value;
-        desenharCorpoBiblioteca();
+        redesenharDaBusca();
       }, 180);
     });
     limpar.addEventListener('click', function () {
       campo.value = '';
       limpar.style.display = 'none';
       bibTermo = '';
-      desenharCorpoBiblioteca();
+      redesenharDaBusca();
     });
+  }
+
+  function temPacotesDeExercicios() { return !!(bib && bib.pacotes && bib.pacotes.length); }
+
+  /* O campo do alto diz onde procura: com livro no tablet, nos exercícios e
+   * nos livros; e aparece mesmo sem pacote de exercícios, se há livro. */
+  function campoDaBuscaDaBiblioteca() {
+    var campo = $('#busca-biblioteca'), cartao = $('#bib-busca-cartao');
+    if (!campo || !cartao) return;
+    var onde = temLivrosNoTablet
+      ? (temPacotesDeExercicios() ? 'Buscar nos exercícios e nos livros' : 'Buscar nos livros')
+      : 'Buscar nos exercícios';
+    campo.setAttribute('aria-label', onde);
+    // com livro, o texto já é longo: sem o exemplo entre parênteses, cabe a 800 px
+    campo.setAttribute('placeholder', temLivrosNoTablet ? onde : onde + ' (bhaskara, pitágoras...)');
+    if (temLivrosNoTablet) { cartao.style.display = ''; ligarBuscaBiblioteca(); }
+    else if (!temPacotesDeExercicios()) cartao.style.display = 'none';
+  }
+
+  /* A busca mudou: com pacote de exercícios, o miolo da aba se refaz como
+   * antes (com os dois grupos, se há livro); só com livros, o miolo mostra
+   * o grupo "Nos livros", e o campo vazio devolve a aba como era. */
+  function redesenharDaBusca() {
+    if (temPacotesDeExercicios()) { desenharCorpoBiblioteca(); return; }
+    var corpo = $('#bib-corpo');
+    if (!corpo) return;
+    if (!bibTermo.trim() || !temLivrosNoTablet) { buscaLivrosAtual = null; desenharBiblioteca(); return; }
+    pararMiniaturas();
+    corpo.innerHTML = '';
+    livrosNaBusca(true);
+    corpo.appendChild(grupoNosLivros(bibTermo.trim()));
   }
 
   function normalizarBusca(t) {
@@ -22026,35 +22463,77 @@
     return null;
   }
 
-  function desenharBuscaBiblioteca(corpo, termo) {
+  function desenharBuscaBiblioteca(corpoDaAba, termo) {
     var g = procurarNaBiblioteca(termo);
     var total = g.modulo.length + g.teoria.length + g.exercicio.length + g.banco.length;
-    if (!total) {
-      corpo.appendChild(el('div', { class: 'vazio', texto: 'A biblioteca não tem nada com "' + termo + '". Procure por outra palavra, ou navegue pela série.' }));
+    var corpo = corpoDaAba;
+    var vazioDaMain = function () {
+      return el('div', { class: 'vazio', texto: 'A biblioteca não tem nada com "' + termo + '". Procure por outra palavra, ou navegue pela série.' });
+    };
+    buscaLivrosAtual = null;
+    var ex = null, resumo = null;
+    if (temLivrosNoTablet) {
+      // dois grupos e a linha-resumo no alto: primeiro os exercícios, depois o texto dos livros
+      resumo = resumoDaBusca();
+      resumo.montar(true, true);
+      ex = grupoDaBusca('exercicios', 'Exercícios');
+      corpoDaAba.appendChild(resumo.caixa);
+      corpoDaAba.appendChild(ex.grupo);
+      corpoDaAba.appendChild(grupoNosLivros(termo, resumo, function () {
+        // os livros voltaram vazios: se os exercícios também, um estado vazio só
+        if (total) return false;
+        corpoDaAba.innerHTML = '';
+        corpoDaAba.appendChild(vazioDaMain());
+        return true;
+      }));
+      corpo = ex.corpo;
+      if (!total) {
+        ex.contagem.textContent = '0';
+        resumo.diz('exercicios', '0');
+        corpo.appendChild(el('p', { class: 'ajuda bib-grupo-vazio', texto: 'Nenhum exercício com "' + termo + '".' }));
+        return;
+      }
+    } else if (!total) {
+      corpo.appendChild(vazioDaMain());
       return;
     }
+    var linhas = [];   // as linhas que aparecem, para a contagem e o "Ver todos"
+    var porTipo = { modulo: 0, teoria: 0, lista: 0, problema: 0 };
+    function bloco(texto) {
+      var b = el('div', { class: 'bloco-exercicios', texto: texto });
+      corpo.appendChild(b);
+      return b;
+    }
+    function linha(tipo, cabeca, e) {
+      e.dataset.cabeca = cabeca;
+      linhas.push(e);
+      porTipo[tipo]++;
+      corpo.appendChild(e);
+    }
     if (g.modulo.length) {
-      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Módulos' }));
+      bloco('Módulos');
       g.modulo.forEach(function (x) {
         var m = bib.modulos[x.id];
-        corpo.appendChild(linhaBib(m.titulo, Biblioteca.nomeDaSerie(m.serie), function () {
+        linha('modulo', 'Módulos', linhaBib(m.titulo, Biblioteca.nomeDaSerie(m.serie), function () {
           abrirDaBusca({ serie: primeiraSerie(m), modulo: m.chave, aula: null });
         }));
       });
     }
     if (g.teoria.length) {
-      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Teoria' }));
+      bloco('Teoria');
       g.teoria.forEach(function (x) {
         var t = bib.teoriaPorId[x.id];
         var m = bib.modulos[t.serie + ':' + t.modulo.slug];
-        corpo.appendChild(linhaBib(t.aula.titulo, t.modulo.titulo + ', ' + Biblioteca.nomeDaSerie(t.serie) + ', ' +
+        linha('teoria', 'Teoria', linhaBib(t.aula.titulo, t.modulo.titulo + ', ' + Biblioteca.nomeDaSerie(t.serie) + ', ' +
           plural(t.paginas.length, 'página', 'páginas'), function () {
           abrirDaBusca({ serie: primeiraSerie(m), modulo: m.chave, aula: { tipo: 'teoria', id: t.id } });
         }));
       });
     }
     if (g.exercicio.length) {
-      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Exercícios' }));
+      // dentro do grupo "Exercícios", o bloco das listas não repete "Exercícios"
+      var nomeDasListas = ex ? 'Listas' : 'Exercícios';
+      bloco(nomeDasListas);
       // um por lista, na ordem em que a primeira de cada uma aparece (módulo achado, depois nota)
       var listas = [], vistas = {};
       g.exercicio.forEach(function (x) {
@@ -22066,23 +22545,44 @@
       listas.forEach(function (l) {
         var m = bib.modulos[l.it.serie + ':' + l.it.modulo.slug];
         var lista = m.listas[l.it.aula.slug];
-        corpo.appendChild(linhaBib(lista.titulo, l.it.modulo.titulo + ', ' + Biblioteca.nomeDaSerie(l.it.serie) + ', ' +
+        linha('lista', nomeDasListas, linhaBib(lista.titulo, l.it.modulo.titulo + ', ' + Biblioteca.nomeDaSerie(l.it.serie) + ', ' +
           plural(lista.itens.length, 'exercício', 'exercícios'), function () {
           abrirDaBusca({ serie: primeiraSerie(m), modulo: m.chave, aula: { tipo: 'exercicios', slug: lista.slug } });
         }));
       });
     }
     if (g.banco.length) {
-      corpo.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Banco de Questões' }));
+      bloco('Banco de Questões');
       g.banco.forEach(function (x) {
         var it = bib.itemPorId[x.id];
         var m = bib.modulos[it.serie + ':' + it.modulo.slug];
         var lista = m.listas[it.aula.slug];
-        corpo.appendChild(linhaBib(it.titulo || ('Problema ' + it.numero), it.modulo.titulo + ', ' + it.aula.titulo +
+        linha('problema', 'Banco de Questões', linhaBib(it.titulo || ('Problema ' + it.numero), it.modulo.titulo + ', ' + it.aula.titulo +
           ', problema ' + it.numero, function () {
           verNaBiblioteca({ tipo: 'exercicio', lista: lista, indice: lista.itens.indexOf(it) });
         }));
       });
+    }
+    if (!ex) return;
+    // a contagem conta o que aparece, com a unidade: "9 listas", ou "12 resultados" quando há de mais de um tipo
+    var unidades = { modulo: ['módulo', 'módulos'], teoria: ['aula de teoria', 'aulas de teoria'], lista: ['lista', 'listas'], problema: ['problema', 'problemas'] };
+    var tipos = Object.keys(porTipo).filter(function (k) { return porTipo[k]; });
+    var conta = tipos.length === 1 ? plural(linhas.length, unidades[tipos[0]][0], unidades[tipos[0]][1]) : plural(linhas.length, 'resultado', 'resultados');
+    ex.contagem.textContent = conta;
+    resumo.diz('exercicios', conta);
+    // passou de 5 linhas: o grupo mostra as primeiras e "Ver todos os N", para os livros ficarem na primeira tela
+    if (linhas.length > BUSCA_LINHAS_VISIVEIS) {
+      var escondidas = linhas.slice(BUSCA_LINHAS_VISIVEIS);
+      var cabecasVisiveis = {};
+      linhas.slice(0, BUSCA_LINHAS_VISIVEIS).forEach(function (e) { cabecasVisiveis[e.dataset.cabeca] = true; });
+      escondidas.forEach(function (e) { e.style.display = 'none'; });
+      var blocosEscondidos = Array.prototype.filter.call(corpo.querySelectorAll('.bloco-exercicios'), function (b) { return !cabecasVisiveis[b.textContent]; });
+      blocosEscondidos.forEach(function (b) { b.style.display = 'none'; });
+      corpo.appendChild(el('button', { type: 'button', class: 'btn bib-grupo-ver-todos', texto: 'Ver todos os ' + linhas.length, aoClick: function () {
+        escondidas.forEach(function (e) { e.style.display = ''; });
+        blocosEscondidos.forEach(function (b) { b.style.display = ''; });
+        this.parentNode.removeChild(this);
+      } }));
     }
   }
 
@@ -22626,8 +23126,10 @@
    *   opcoes.sumario       os livros (C15.1): [{ n, nivel, titulo, pagina }];
    *                        com ele aparece o botão Sumário, e cada entrada
    *                        leva à página dela
-   *   opcoes.aoMudarPagina function (n) chamada a cada página desenhada (o
-   *                        livro guarda onde ela parou)
+   *   opcoes.aoMudarPagina function (n, como) chamada a cada página desenhada
+   *                        (o livro guarda onde ela parou e atualiza a faixa
+   *                        do capítulo); como.gravar === false enquanto ela
+   *                        arrasta a barra: a faixa muda, a posição só ao soltar
    *   opcoes.livro         o registro do livro (C15.4): com ele aparece o
    *                        "Exportar em PDF"
    *
@@ -22648,6 +23150,8 @@
     $('#leitor-sumario').hidden = !(opcoes.sumario && opcoes.sumario.length);
     // "Exportar em PDF" (C15.4) e "Ir para a página" (B3) só no livro
     $('#leitor-exportar').hidden = !opcoes.livro;
+    $('#leitor-exportar').textContent = 'Exportar páginas';
+    $('#leitor-pdf-navegacao').hidden = !opcoes.livro;
     if ($('#leitor-ir-caixa')) $('#leitor-ir-caixa').hidden = !opcoes.livro;
     fecharSumarioDoLeitor();
     // "Este capítulo cobre" (C15.2) nasce escondido: só o livro o mostra, a cada página
@@ -22678,7 +23182,7 @@
       estado.doc = doc;
       estado.total = doc.numPages;
       estado.pagina = Math.min(estado.pagina, estado.total);
-      return desenharPaginaDoLeitor(true);
+      return opcoes.livro ? abrirLeitorContinuo(estado) : desenharPaginaDoLeitor(true);
     }).catch(function () {
       if (vez !== leitorVez) return false;
       mostrarFalhaDoLeitor(falha || 'pdf');
@@ -22758,6 +23262,11 @@
     var meta = tem && leitor.opcoes && leitor.opcoes.livro ? leitor.opcoes.livro.meta : null;
     var imp = meta ? Biblioteca.paginaImpressa(meta, leitor.pagina) : null;
     $('#leitor-contador').textContent = tem ? textoDoContadorDoLeitor(meta, leitor.pagina, leitor.total) : '';
+    var slider = $('#leitor-slider-pagina');
+    if (slider) {
+      slider.disabled = !tem || !leitor.continuo;
+      if (tem) { slider.min = '1'; slider.max = String(leitor.total); slider.value = String(leitor.pagina); }
+    }
     var ir = $('#leitor-ir-pagina');
     if (ir) {
       ir.disabled = !tem;
@@ -22782,8 +23291,8 @@
       return false;
     }
     fecharSumarioDoLeitor();
-    leitor.pagina = destino;
-    desenharPaginaDoLeitor(true);
+    if (leitor.continuo) irAProximaPaginaDoLeitor(destino, false);
+    else { leitor.pagina = destino; desenharPaginaDoLeitor(true); }
     return true;
   }
 
@@ -22803,8 +23312,9 @@
     desenharSumario(lista, sumario, entradaAtualDoSumario(sumario, 'pagina', leitor.pagina), function (e) {
       fecharSumarioDoLeitor();
       if (!leitor || !leitor.doc) return;
-      leitor.pagina = Math.max(1, Math.min(leitor.total, e.pagina));
-      desenharPaginaDoLeitor(true);
+      var destino = Math.max(1, Math.min(leitor.total, e.pagina));
+      if (leitor.continuo) irAProximaPaginaDoLeitor(destino, false);
+      else { leitor.pagina = destino; desenharPaginaDoLeitor(true); }
     }, meta);
     lista.hidden = false;
     $('#leitor-sumario').setAttribute('aria-expanded', 'true');
@@ -22819,6 +23329,7 @@
   function desenharPaginaDoLeitor(paraOAlto) {
     var estado = leitor;
     if (!estado || !estado.doc) return Promise.resolve(false);
+    if (estado.continuo) return redimensionarLeitorContinuo(paraOAlto);
     var vez = ++leitorDesenho;
     var n = estado.pagina;
     if (leitorTarefa) { leitorTarefa.cancel(); leitorTarefa = null; }
@@ -22860,12 +23371,308 @@
     });
   }
 
+  /* O livro inteiro é uma faixa contínua. Os espaços mantêm o tamanho das
+   * páginas; IntersectionObserver desenha só as que estão perto da tela e
+   * libera as distantes para que livros grandes não mantenham centenas de
+   * canvases na memória. Anexos de aula continuam no leitor de página única. */
+  function abrirLeitorContinuo(estado) {
+    var corpo = $('#corpo-modal-leitor-pdf');
+    estado.continuo = true;
+    estado.paginas = [];
+    corpo.innerHTML = '';
+    return estado.doc.getPage(1).then(function (primeira) {
+      if (estado !== leitor) return false;
+      var base = primeira.getViewport({ scale: 1 });
+      estado.proporcaoPagina = base.height / base.width;
+      var largura = Math.max(160, corpo.clientWidth - 36);
+      var frag = document.createDocumentFragment();
+      for (var n = 1; n <= estado.total; n++) {
+        var caixa = el('div', { class: 'leitor-pdf-pagina', 'data-pagina-arquivo': String(n),
+          'aria-label': 'Página ' + n + ' de ' + estado.total });
+        caixa.style.width = Math.floor(largura * estado.zoom) + 'px';
+        caixa.style.height = Math.ceil(largura * estado.zoom * estado.proporcaoPagina) + 'px';
+        caixa.appendChild(el('div', { class: 'leitor-pdf-pagina-vazia', 'aria-hidden': 'true' }));
+        var registro = { n: n, caixa: caixa, visivel: false, tarefa: null, desenhando: false };
+        estado.paginas.push(registro);
+        frag.appendChild(caixa);
+      }
+      corpo.appendChild(frag);
+      corpo.dataset.paginaDesenhada = String(estado.pagina);
+      atualizarBarraDoLeitor();
+      return irAProximaPaginaDoLeitor(estado.pagina, false).then(function () {
+        return !!corpo.querySelector('[data-pagina-arquivo="' + estado.pagina + '"] canvas');
+      });
+    }).catch(function () { mostrarFalhaDoLeitor('pdf'); return false; });
+  }
+
+  function desenharPaginaContinua(estado, registro) {
+    if (registro.desenhando) return registro.promessa || Promise.resolve(false);
+    if (registro.caixa.querySelector('canvas')) return Promise.resolve(true);
+    if (estado !== leitor) return Promise.resolve(false);
+    registro.desenhando = true;
+    var tarefaDaPagina = null;
+    registro.promessa = estado.doc.getPage(registro.n).then(function (pagina) {
+      // a página saiu de perto da tela enquanto o pdf.js a abria: nem cria o canvas
+      if (estado !== leitor || !registro.visivel) return null;
+      var corpo = $('#corpo-modal-leitor-pdf');
+      var base = pagina.getViewport({ scale: 1 });
+      var largura = Math.max(160, corpo.clientWidth - 36) * estado.zoom;
+      var vp = pagina.getViewport({ scale: largura / base.width });
+      registro.proporcao = base.height / base.width;
+      registro.caixa.style.width = Math.floor(vp.width) + 'px';
+      registro.caixa.style.height = Math.ceil(vp.height) + 'px';
+      var densidade = Math.min(window.devicePixelRatio || 1, Math.sqrt(LEITOR_MAX_PIXELS / (vp.width * vp.height)));
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.floor(vp.width * densidade));
+      canvas.height = Math.max(1, Math.floor(vp.height * densidade));
+      canvas.style.width = Math.floor(vp.width) + 'px';
+      canvas.style.height = Math.floor(vp.height) + 'px';
+      canvas.setAttribute('aria-label', 'Página ' + registro.n + ' de ' + estado.total);
+      var tarefa = pagina.render({ canvasContext: canvas.getContext('2d'), canvas: canvas, viewport: vp,
+        transform: densidade !== 1 ? [densidade, 0, 0, densidade, 0, 0] : null });
+      tarefaDaPagina = tarefa;
+      registro.tarefa = tarefa;
+      return tarefa.promise.then(function () {
+        if (estado !== leitor || !registro.visivel || registro.tarefa !== tarefa) { canvas.width = 0; canvas.height = 0; return false; }
+        registro.caixa.innerHTML = '';
+        registro.caixa.appendChild(canvas);
+        registro.temCanvas = true;
+        return true;
+      });
+    }).catch(function (e) {
+      if (e && e.name !== 'RenderingCancelledException' && estado === leitor) mostrarFalhaDoLeitor('pdf');
+      return false;
+    }).then(function () {
+      if (!tarefaDaPagina || registro.tarefa === tarefaDaPagina) {
+        registro.tarefa = null;
+        registro.desenhando = false;
+      }
+    });
+    return registro.promessa;
+  }
+
+  function liberarPaginaContinua(registro) {
+    if (registro.tarefa) { registro.tarefa.cancel(); registro.tarefa = null; }
+    var c = registro.caixa.querySelector('canvas');
+    if (c) { c.width = 0; c.height = 0; registro.caixa.removeChild(c); }
+    registro.caixa.innerHTML = '';
+    registro.caixa.appendChild(el('div', { class: 'leitor-pdf-pagina-vazia', 'aria-hidden': 'true' }));
+    registro.desenhando = false;
+    registro.temCanvas = false;
+  }
+
+  /* QUEM FICA DESENHADO no leitor contínuo: a página do meio e as vizinhas
+   * (centro - 1 a centro + 1) e toda página que encosta na tela, com uma
+   * folga pequena. As outras soltam o canvas. Roda a cada quadro de rolagem,
+   * na troca de página, no zoom e no giro.
+   *
+   * Antes isso era do IntersectionObserver, com margem de 700 px: deitado, a
+   * página tem cerca de 1700 px, e quando ela saía da margem ainda era vizinha
+   * da do meio; ficava, e o observador não avisava de novo (19 canvases, cerca
+   * de 150 Mpx, depois de 80 passos). E no zoom e no giro as vizinhas que já
+   * estavam na margem ficavam em branco, porque o observador não volta a
+   * avisar quem não saiu. A conciliação não depende de evento. */
+  var LEITOR_FOLGA_PX = 200;
+  var LEITOR_ARRASTO_MS = 150;
+  var leitorDepoisDoArrasto = null;
+  function conciliarPaginasContinuas(estado, centro) {
+    if (!estado || !estado.paginas || !estado.paginas.length) return;
+    /* Arrastando a barra, a página muda a cada movimento: desenhar cada uma
+     * criava um canvas por página do caminho (300 da p. 50 à 350). Enquanto
+     * ela arrasta, só se solta o que saiu; o desenho espera a barra parar. */
+    var falta = (estado.arrastandoAte || 0) - Date.now();
+    if (falta > 0) {
+      clearTimeout(leitorDepoisDoArrasto);
+      leitorDepoisDoArrasto = setTimeout(function () {
+        leitorDepoisDoArrasto = null;
+        if (estado === leitor) conciliarPaginasContinuas(estado, estado.pagina);
+      }, falta + 10);
+      estado.paginas.forEach(function (pagina) {
+        if (pagina.n !== centro && (pagina.visivel || pagina.desenhando || pagina.temCanvas)) {
+          pagina.visivel = false;
+          liberarPaginaContinua(pagina);
+        }
+      });
+      return;
+    }
+    var corpo = $('#corpo-modal-leitor-pdf');
+    var rc = corpo.getBoundingClientRect();
+    var topo = rc.top - LEITOR_FOLGA_PX, fundo = rc.top + corpo.clientHeight + LEITOR_FOLGA_PX;
+    var c = Math.max(1, Math.min(estado.total, centro || estado.pagina || 1));
+    var ficam = {};
+    ficam[c] = true;
+    /* As vizinhas ficam prontas para a rolagem, mas só se estiverem a menos
+     * de uma altura de tela da área à vista: no zoom alto a página é maior
+     * que a tela, e a vizinha lá longe só gastava memória (36 Mpx no zoom 4). */
+    var alcance = corpo.clientHeight;
+    [c - 1, c + 1].forEach(function (k) {
+      if (k < 1 || k > estado.total) return;
+      var r = estado.paginas[k - 1].caixa.getBoundingClientRect();
+      if (r.bottom >= rc.top - alcance && r.top <= rc.top + corpo.clientHeight + alcance) ficam[k] = true;
+    });
+    // as caixas estão em ordem, uma embaixo da outra: anda do centro para os dois lados
+    for (var cima = c; cima >= 1; cima--) {
+      var rCima = estado.paginas[cima - 1].caixa.getBoundingClientRect();
+      if (rCima.bottom < topo) break;
+      if (rCima.top <= fundo) ficam[cima] = true;
+    }
+    for (var baixo = c + 1; baixo <= estado.total; baixo++) {
+      var rBaixo = estado.paginas[baixo - 1].caixa.getBoundingClientRect();
+      if (rBaixo.top > fundo) break;
+      if (rBaixo.bottom >= topo) ficam[baixo] = true;
+    }
+    estado.paginas.forEach(function (pagina) {
+      if (ficam[pagina.n]) {
+        pagina.visivel = true;
+        desenharPaginaContinua(estado, pagina);
+      } else if (pagina.visivel || pagina.desenhando || pagina.temCanvas) {
+        pagina.visivel = false;
+        liberarPaginaContinua(pagina);
+      }
+    });
+  }
+
+  function paginaMaisProximaDoCentro(estado) {
+    var corpo = $('#corpo-modal-leitor-pdf'), caixas = estado.paginas || [];
+    var centro = corpo.getBoundingClientRect().top + corpo.clientHeight / 2, melhor = estado.pagina, distancia = Infinity;
+    caixas.forEach(function (p) {
+      var r = p.caixa.getBoundingClientRect(), d = centro < r.top ? r.top - centro : centro > r.bottom ? centro - r.bottom : 0;
+      if (d < distancia) { distancia = d; melhor = p.n; }
+    });
+    return melhor;
+  }
+
+  var leitorRolarAgendado = false;
+  var leitorRolarDestinoTimer = null;
+  function rolarLeitorContinuo() {
+    if (!leitor || !leitor.continuo || leitorRolarAgendado) return;
+    leitorRolarAgendado = true;
+    window.requestAnimationFrame(function () {
+      leitorRolarAgendado = false;
+      if (!leitor || !leitor.continuo) return;
+      var n = paginaMaisProximaDoCentro(leitor);
+      leitor.ancora = ancoraDoLeitorContinuo(leitor, n);
+      conciliarPaginasContinuas(leitor, n);
+      // Em uma navegação suave, o meio da tela ainda passa por páginas
+      // anteriores. Não grave esse trecho intermediário como a última página.
+      if (leitor.rolagemProgramaticaAte && n !== leitor.rolagemProgramaticaAte) return;
+      if (leitor.rolagemProgramaticaAte === n) {
+        leitor.rolagemProgramaticaAte = 0;
+        clearTimeout(leitorRolarDestinoTimer);
+        leitorRolarDestinoTimer = null;
+      }
+      if (n !== leitor.pagina) {
+        leitor.pagina = n;
+        $('#corpo-modal-leitor-pdf').dataset.paginaDesenhada = String(n);
+        atualizarBarraDoLeitor();
+        if (typeof leitor.opcoes.aoMudarPagina === 'function') {
+          // no meio de um arrasto da barra, a posição só grava ao soltar
+          try { leitor.opcoes.aoMudarPagina(n, { gravar: !((leitor.arrastandoAte || 0) > Date.now()) }); } catch (e) { /* posição é auxiliar */ }
+        }
+      }
+    });
+  }
+
+  // semGravar: a barra de página leva a página a cada movimento e só grava a posição ao soltar
+  function irAProximaPaginaDoLeitor(n, suave, semGravar) {
+    if (!leitor || !leitor.doc) return Promise.resolve(false);
+    leitor.pagina = Math.max(1, Math.min(leitor.total, n));
+    atualizarBarraDoLeitor();
+    if (typeof leitor.opcoes.aoMudarPagina === 'function') {
+      try { leitor.opcoes.aoMudarPagina(leitor.pagina, { gravar: !semGravar }); } catch (e) { /* posição é auxiliar */ }
+    }
+    if (leitor.continuo && leitor.paginas) {
+      $('#corpo-modal-leitor-pdf').dataset.paginaDesenhada = String(leitor.pagina);
+      var p = leitor.paginas[leitor.pagina - 1];
+      if (!p) return Promise.resolve(false);
+      p.visivel = true;
+      if (suave) {
+        leitor.rolagemProgramaticaAte = leitor.pagina;
+        clearTimeout(leitorRolarDestinoTimer);
+        leitorRolarDestinoTimer = setTimeout(function () {
+          leitorRolarDestinoTimer = null;
+          if (!leitor || !leitor.continuo) return;
+          leitor.rolagemProgramaticaAte = 0;
+          rolarLeitorContinuo();
+        }, 900);
+      }
+      p.caixa.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'start' });
+      conciliarPaginasContinuas(leitor, p.n);
+      // arrastando a barra, o desenho espera ela parar (a conciliação agenda)
+      if ((leitor.arrastandoAte || 0) > Date.now()) return Promise.resolve(false);
+      return desenharPaginaContinua(leitor, p).then(function () { return !!p.caixa.querySelector('canvas'); });
+    }
+    desenharPaginaDoLeitor(true);
+    return Promise.resolve(true);
+  }
+
+  /* A âncora do zoom e do giro: a página que está no meio da tela e o ponto
+   * dentro dela (fração da altura e da largura). Mudar a altura de todas as
+   * caixas sem levar a rolagem junto deixava outra página à vista (na p. 206,
+   * o "+" mostrava a p. 165) e o contador dizendo a antiga. */
+  function ancoraDoLeitorContinuo(estado, jaMedida) {
+    var corpo = $('#corpo-modal-leitor-pdf');
+    var n = jaMedida || paginaMaisProximaDoCentro(estado), p = estado.paginas[n - 1];
+    if (!p) return null;
+    var rc = corpo.getBoundingClientRect(), r = p.caixa.getBoundingClientRect();
+    var meioY = rc.top + corpo.clientHeight / 2, meioX = rc.left + corpo.clientWidth / 2;
+    return { n: n, lc: corpo.clientWidth, ac: corpo.clientHeight,
+      fy: r.height ? Math.max(0, Math.min(1, (meioY - r.top) / r.height)) : 0,
+      fx: r.width ? Math.max(0, Math.min(1, (meioX - r.left) / r.width)) : 0.5 };
+  }
+
+  /* No giro, a janela já mudou quando o redesenho roda (250 ms depois): o
+   * meio da tela nova é outro ponto. Vale a âncora da última rolagem, tirada
+   * com a janela de antes; no zoom, a janela é a mesma e a âncora é a de agora. */
+  function ancoraParaRedimensionar(estado) {
+    var corpo = $('#corpo-modal-leitor-pdf'), guardada = estado.ancora;
+    if (guardada && (guardada.lc !== corpo.clientWidth || guardada.ac !== corpo.clientHeight)) return guardada;
+    return ancoraDoLeitorContinuo(estado);
+  }
+
+  function voltarParaAncoraDoLeitor(estado, ancora) {
+    var corpo = $('#corpo-modal-leitor-pdf'), p = estado.paginas[ancora.n - 1];
+    if (!p) return;
+    var rc = corpo.getBoundingClientRect(), r = p.caixa.getBoundingClientRect();
+    var topo = r.top - rc.top + corpo.scrollTop, esquerda = r.left - rc.left + corpo.scrollLeft;
+    corpo.scrollTop = Math.max(0, topo + ancora.fy * r.height - corpo.clientHeight / 2);
+    corpo.scrollLeft = Math.max(0, esquerda + ancora.fx * r.width - corpo.clientWidth / 2);
+  }
+
+  function redimensionarLeitorContinuo(paraOAlto) {
+    if (!leitor || !leitor.continuo) return Promise.resolve(false);
+    var estado = leitor;
+    var corpo = $('#corpo-modal-leitor-pdf'), largura = Math.max(160, corpo.clientWidth - 36) * estado.zoom;
+    var ancora = paraOAlto ? null : ancoraParaRedimensionar(estado);
+    estado.paginas.forEach(function (p) {
+      liberarPaginaContinua(p);
+      p.caixa.style.width = Math.floor(largura) + 'px';
+      // a página já lida guarda a proporção dela; as outras usam a da primeira
+      p.caixa.style.height = Math.ceil(largura * (p.proporcao || estado.proporcaoPagina)) + 'px';
+    });
+    if (paraOAlto || !ancora) { irAProximaPaginaDoLeitor(estado.pagina, false); return Promise.resolve(true); }
+    voltarParaAncoraDoLeitor(estado, ancora);
+    // o contador e a posição guardada seguem a página que está à vista
+    if (ancora.n !== estado.pagina) {
+      estado.pagina = ancora.n;
+      if (typeof estado.opcoes.aoMudarPagina === 'function') {
+        try { estado.opcoes.aoMudarPagina(ancora.n); } catch (e) { /* posição é auxiliar */ }
+      }
+    }
+    corpo.dataset.paginaDesenhada = String(estado.pagina);
+    atualizarBarraDoLeitor();
+    conciliarPaginasContinuas(estado, estado.pagina);
+    var p = estado.paginas[estado.pagina - 1];
+    p.visivel = true;
+    return desenharPaginaContinua(estado, p).then(function () { return !!p.caixa.querySelector('canvas'); });
+  }
+
   function andarNoLeitorPdf(passo) {
     if (!leitor || !leitor.doc) return;
     var nova = leitor.pagina + passo;
     if (nova < 1 || nova > leitor.total) return;
-    leitor.pagina = nova;
-    desenharPaginaDoLeitor(true);
+    if (leitor.continuo) irAProximaPaginaDoLeitor(nova, true);
+    else { leitor.pagina = nova; desenharPaginaDoLeitor(true); }
   }
 
   // fator 0 é "Ajustar à largura"; os outros multiplicam, dentro dos limites
@@ -22920,6 +23727,9 @@
     leitorVez++;
     leitorDesenho++;
     if (leitorTarefa) { leitorTarefa.cancel(); leitorTarefa = null; }
+    clearTimeout(leitorRolarDestinoTimer);
+    leitorRolarDestinoTimer = null;
+    if (leitor && leitor.paginas) leitor.paginas.forEach(liberarPaginaContinua);
     leitor = null;
     fecharSumarioDoLeitor();
     esconderCobre('pdf');
@@ -23918,7 +24728,7 @@
    * tela se refaz quando ela fecha o formulário. */
   function formularioAbertoNoCelular() {
     if (telaCelular === 'hoje') return !!(formCelular && $('#cel-hoje [data-form-celular]')) ||
-      !!(folhaCelular && folhaCelular.passo === 'remarcar' && $('#cel-folha [data-form-celular]'));
+      !!(folhaCelular && (folhaCelular.passo === 'remarcar' || folhaCelular.passo === 'duracao') && $('#cel-folha [data-form-celular]'));
     if ($('#cel-mensagem')) return true; // o editor da mensagem do mês, em qualquer tela
     if (telaCelular === 'fechamento') return !!$('#cel-fechamento .pagamento-valor');
     return false;
@@ -25101,6 +25911,7 @@
     ]));
     if (folhaCelular.passo === 'cancelar') desenharCancelarNaFolha(folha, a);
     else if (folhaCelular.passo === 'remarcar') desenharRemarcarNaFolha(folha, a);
+    else if (folhaCelular.passo === 'duracao') desenharDuracaoNaFolha(folha, a);
     else if (folhaCelular.passo === 'ficha') desenharFichaNaFolha(folha, a, aluno);
     else desenharAcoesNaFolha(folha, a, aluno, edita);
     $('#cel-hoje').appendChild(fundo);
@@ -25189,6 +26000,7 @@
         }, false));
       }
       acoes.push(botao('remarcar', 'cel-folha-remarcar', 'Remarcar', function () { irAoPassoDaFolha('remarcar'); }, false));
+      acoes.push(botao('ajustar-duracao', 'cel-folha-duracao', 'Ajustar duração', function () { irAoPassoDaFolha('duracao'); }, false));
       if (!futura) {
         acoes.push(botaoDeAcaoCelular('registrar-como-foi', { class: 'btn cel-folha-botao cel-folha-largo', id: 'cel-folha-registrar', texto: 'Escrever como foi esta aula',
           aoClick: function () { fecharFolhaCelular(); abrirFormularioCelular({ tipo: 'relato', aulaId: a.id }); } }));
@@ -25409,6 +26221,38 @@
     h.atualizar();
     corpo.appendChild(el('div', { class: 'barra cel-rodape-form' }, [
       botaoSalvar,
+      el('button', { type: 'button', class: 'btn', id: 'cel-folha-voltar', texto: 'Voltar', aoClick: function () { irAoPassoDaFolha('acoes'); } })
+    ]));
+  }
+
+  /* Ajusta a duração desta aula sem mexer no dia nem no horário. Em aula de
+   * repetição, alterarAulaComDesfazer aplica somente a ocorrência selecionada. */
+  function desenharDuracaoNaFolha(folha, a) {
+    var corpo = el('div', { 'data-form-celular': 'duracao:' + a.id });
+    folha.appendChild(corpo);
+    corpo.appendChild(el('p', { class: 'cel-folha-pergunta', texto: 'Ajustar duração desta aula' }));
+    var serie = Core.serieDe(db, a);
+    if (serie) corpo.appendChild(el('p', { class: 'ajuda', id: 'cel-duracao-serie', texto: 'Esta aula é de uma repetição: muda só esta. As outras continuam com a duração de sempre.' }));
+    /* A duração atual entra na lista e vem marcada, como no Remarcar e no
+     * formulário do tablet: a aula dividida (23/22, 75/75) não pode abrir
+     * mostrando a primeira opção, que o Salvar gravaria. */
+    var atual = Number(a.duracaoMin) || 60;
+    var opcoes = DURACOES.slice();
+    if (opcoes.indexOf(atual) < 0) { opcoes.push(atual); opcoes.sort(function (x, y) { return x - y; }); }
+    var duracao = el('select', { id: 'cel-ajustar-duracao', 'aria-label': 'Duração desta aula' }, opcoes.map(function (m) {
+      return el('option', { value: String(m), texto: Core.fmtDuracao(m), selected: m === atual ? 'selected' : null });
+    }));
+    corpo.appendChild(campoCelular('Duração desta aula', duracao));
+    folha.appendChild(el('div', { class: 'barra cel-rodape-form' }, [
+      botaoDeAcaoCelular('ajustar-duracao', { class: 'btn principal', id: 'cel-ajustar-duracao-salvar', texto: 'Salvar duração', aoClick: function () {
+        var minutos = parseInt(duracao.value, 10) || 60;
+        if (minutos === atual) { irAoPassoDaFolha('acoes'); return; } // nada mudou: só fecha o passo, sem gravar
+        var proposta = Object.assign({}, a, { duracaoMin: minutos });
+        var choques = choquesDaAulaCelular(proposta);
+        if (!confirmaSalvarComChoque(choques)) return;
+        var mensagem = 'Duração alterada para ' + Core.fmtDuracao(minutos) + '.' + (serie ? ' Só esta aula da repetição foi alterada.' : '');
+        mudarAulaNoCelular(a, { duracaoMin: minutos }, mensagem);
+      } }),
       el('button', { type: 'button', class: 'btn', id: 'cel-folha-voltar', texto: 'Voltar', aoClick: function () { irAoPassoDaFolha('acoes'); } })
     ]));
   }

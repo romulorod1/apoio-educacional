@@ -116,7 +116,8 @@
          Sem pacote importado, oferece a importação pelo controle de Ajustes. -->
     <section class="tela" id="tela-biblioteca">
       <!-- B2: o topo do desenho, numa linha: o título, quantos livros e a busca.
-           A busca é a dos EXERCÍCIOS (a de livros é outra fatia), e diz isso. -->
+           B12: um campo só. Com livro no tablet ele busca nos exercícios E no
+           texto dos livros (dois grupos no resultado), e o texto dele diz isso. -->
       <div class="bibl-topo">
         <h2 class="titulo">Biblioteca</h2>
         <span class="bibl-contagem" id="bib-livros-contagem" hidden></span>
@@ -126,11 +127,11 @@
           <button class="btn pequeno" id="limpar-busca-biblioteca" type="button" style="display:none">Limpar</button>
         </div>
       </div>
-      <!-- B12: o índice de texto dos livros sendo preparado; some quando termina -->
-      <p id="indice-livros-progresso" class="ajuda indice-livros-progresso" role="status" aria-live="polite" hidden></p>
       <!-- B2: os livros do tablet por disciplina e ano, com o Continuar lendo.
            Só aparece com livro no tablet; sem livro, a aba fica como era. -->
       <div class="bibl" id="bib-livros" hidden></div>
+      <!-- B12: o andamento não empurra o atalho Continuar lendo para baixo. -->
+      <p id="indice-livros-progresso" class="ajuda indice-livros-progresso" role="status" aria-live="polite" hidden></p>
       <!-- a cabeça dos exercícios: o título (com livros no tablet), a contagem e o guia das listas -->
       <div class="bibl-exercicios-cabeca" id="bib-exercicios-cabeca">
         <h3 class="bibl-exercicios-titulo" id="bib-exercicios-titulo" hidden>Exercícios e listas</h3>
@@ -539,6 +540,9 @@
       <div class="leitor-cobre" id="leitor-cobre" hidden></div>
       <div class="leitor-sumario" id="leitor-sumario-lista" hidden></div>
       <div class="modal-corpo leitor-pdf-corpo" id="corpo-modal-leitor-pdf"></div>
+      <div class="leitor-pdf-navegacao" id="leitor-pdf-navegacao" hidden>
+        <input id="leitor-slider-pagina" type="range" min="1" max="1" value="1" aria-label="Posição no livro">
+      </div>
       <div class="modal-rodape">
         <button class="btn" data-fechar type="button">Fechar</button>
         <!-- C15.4: só no livro; o anexo da aula não exporta -->

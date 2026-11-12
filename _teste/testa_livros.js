@@ -202,7 +202,7 @@ const contagens = pag => pag.evaluate(() => new Promise(r => {
 
 // pixels perto de uma cor no canvas do leitor de PDF, um a cada sete
 const pixelsDaCor = (pag, rgb) => pag.evaluate(cor => {
-  const c = document.querySelector('#corpo-modal-leitor-pdf canvas');
+  const c = document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="3"] canvas');
   if (!c) return -1;
   const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
   let n = 0;
@@ -404,6 +404,7 @@ async function printar(pag, nome) {
     .find(b => /Capítulo 2/.test(b.textContent)).click());
   const p3 = await esperar('a página 3 desenhada', () => paginaDesenhada(p), v => v === '3', 15000);
   conf('o toque no capítulo 2 leva à página 3', p3.ok, true);
+  await esperar('o canvas da página 3', () => p.evaluate(() => !!document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="3"] canvas')), Boolean, 15000);
   conf('a página 3 é a do capítulo 2 (o retângulo azul)', (await pixelsDaCor(p, AZUL)) > 500, true);
   conf('e o sumário fecha', await p.evaluate(() => document.querySelector('#leitor-sumario-lista').hidden), true);
   await p.evaluate(() => document.querySelector('#leitor-proxima').click());
