@@ -89,7 +89,9 @@ disciplinas.forEach(function (d) {
   conf(d.chave + ': o índice diz ' + d.topicos + ' assuntos (é o número que a tela mostra, app.js:7985)', titulos, d.topicos);
   conf(d.chave + ': grupos do arquivo na ordem do índice', arq.grupos.map(function (g) { return g.chave; }), d.grupos.map(function (g) { return g.chave; }));
 });
-conf('total de tópicos', todosIds.length, 2513);
+/* 2519 desde 12/11/2026: a revisão dos mapas dos livros de química criou 6
+ * assuntos (QUIEM1-T45 e T46, QUIEM2-T52, QUIEM3-T54 a T56); eram 2513. */
+conf('total de tópicos', todosIds.length, 2519);
 
 secao('2. Unicidade');
 conf('nenhum id se repete nos 12 arquivos', new Set(todosIds.map(function (x) { return x.id; })).size, todosIds.length);
