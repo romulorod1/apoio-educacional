@@ -78,6 +78,52 @@ service cloud.firestore {
         && (!('apagadoEm' in d) || !('bytes' in d))
         && (!('servidorEm' in d) || d.servidorEm is timestamp);
     }
+    // o documento de um anexo ou de uma imagem da folha (N2, fatia 2): id igual
+    // ao nome do documento ("anexo:<id>" ou "midia:<id>"), o sha256 dos bytes em
+    // 64 hexadecimais (obrigatório no vivo), o tamanho até 25 MiB, metadados com
+    // nomes e tamanhos fechados; a lápide vai sem nome nem tamanho
+    function anexoValido(id) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['id', 'aulaId', 'origem', 'sha256', 'nome', 'tipo', 'tamanho', 'largura', 'altura',
+          'atualizadoEm', 'apagadoEm', 'aparelho', 'esquema', 'app', 'servidorEm'])
+        && d.id == id && d.id.size() <= 200 && d.id.matches('^(anexo|midia):[^/]+$')
+        && d.origem is string && (d.origem == 'anexo' || d.origem == 'midia')
+        && d.id.split(':')[0] == d.origem
+        && d.aulaId is string && d.aulaId.size() <= 120
+        && d.atualizadoEm is string && d.atualizadoEm.size() <= 40
+        && d.aparelho is string && d.aparelho.size() <= 64
+        && d.esquema is int
+        && (!('app' in d) || (d.app is string && d.app.size() <= 32))
+        && (!('apagadoEm' in d) || (d.apagadoEm is string && d.apagadoEm.size() <= 40))
+        && (!('sha256' in d) || (d.sha256 is string && d.sha256.matches('^[0-9a-f]{64}$')))
+        && (!('nome' in d) || (d.nome is string && d.nome.size() <= 300))
+        && (!('tipo' in d) || (d.tipo is string && d.tipo.size() <= 120))
+        && (!('tamanho' in d) || (d.tamanho is int && d.tamanho >= 0 && d.tamanho <= 25 * 1024 * 1024))
+        && (!('largura' in d) || (d.largura is int && d.largura >= 0 && d.largura <= 100000))
+        && (!('altura' in d) || (d.altura is int && d.altura >= 0 && d.altura <= 100000))
+        && (('apagadoEm' in d) || ('sha256' in d && 'tamanho' in d))
+        && (!('apagadoEm' in d) || (!('nome' in d) && !('tamanho' in d)))
+        && (!('servidorEm' in d) || d.servidorEm is timestamp);
+    }
+    // o cabeçalho de um arquivo (N2, fatia 2): o nome do documento é o sha256 dos
+    // bytes, em 64 hexadecimais; partes de 1 a 40, tamanho até 25 MiB
+    function arquivoValido(sha) {
+      let d = request.resource.data;
+      return sha.matches('^[0-9a-f]{64}$')
+        && d.keys().hasOnly(['sha256', 'tamanho', 'tipo', 'partes'])
+        && d.sha256 == sha
+        && d.tamanho is int && d.tamanho >= 0 && d.tamanho <= 25 * 1024 * 1024
+        && d.partes is int && d.partes >= 1 && d.partes <= 40
+        && (!('tipo' in d) || (d.tipo is string && d.tipo.size() <= 120));
+    }
+    // uma parte de um arquivo: o número é o nome do documento, os bytes até 900 KiB
+    function parteDeArquivoValida(sha, parte) {
+      let d = request.resource.data;
+      return sha.matches('^[0-9a-f]{64}$') && parte.matches('^[0-9]{1,2}$')
+        && d.keys().hasOnly(['dados', 'n'])
+        && d.dados is bytes && d.dados.size() <= 900 * 1024
+        && d.n is int && d.n == int(parte);
+    }
     // o cabeçalho da cópia completa e as partes dela, em bytes: só os campos
     // que o aplicativo escreve, cada um com o tipo esperado quando presente
     function copiaValida() {
@@ -169,6 +215,24 @@ service cloud.firestore {
         allow read: if podeLer(uid);
         allow create, update: if dona(uid) && folhaValida(folha);
         allow delete: if dona(uid);
+      }
+      // os anexos e as imagens das folhas (N2, fatia 2): o documento pequeno que
+      // liga o arquivo à aula, e o arquivo pelo sha256, em partes; só a dona
+      // escreve, com a forma conferida; quem lê a cópia lê os dois
+      match /anexos/{anexo} {
+        allow read: if podeLer(uid);
+        allow create, update: if dona(uid) && anexoValido(anexo);
+        allow delete: if dona(uid);
+      }
+      match /arquivos/{sha} {
+        allow read: if podeLer(uid);
+        allow create, update: if dona(uid) && arquivoValido(sha);
+        allow delete: if dona(uid);
+        match /partes/{parte} {
+          allow read: if podeLer(uid);
+          allow create, update: if dona(uid) && parteDeArquivoValida(sha, parte);
+          allow delete: if dona(uid);
+        }
       }
       // o diagnóstico por aparelho (D7): a dona escreve só o do próprio
       // aparelho (o id do documento), e quem lê a cópia lê os resumos

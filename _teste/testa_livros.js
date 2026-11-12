@@ -551,8 +551,8 @@ async function printar(pag, nome) {
   conf('e o total caiu exatamente o tamanho do livro removido', caiu.valor && totalAntes - caiu.valor.bytes, bytesDe['livro-sem-sumario']);
   conf('o livro saiu do depósito', await H.contarDeposito(p, 'livros'), 3);
   await H.irParaAba(p, 'biblioteca');
-  conf('a aba Biblioteca diz 3 livros', (await esperar('a contagem da Biblioteca', () => p.evaluate(() =>
-    (document.querySelector('#bib-livros-contagem') || {}).textContent || ''), v => /^3 livros/.test(v || ''), 10000)).ok, true);
+  conf('a aba Biblioteca diz 3 materiais', (await esperar('a contagem da Biblioteca', () => p.evaluate(() =>
+    (document.querySelector('#bib-livros-contagem') || {}).textContent || ''), v => /^3 materiais/.test(v || ''), 10000)).ok, true);
   const de_novo = await importar(p, ZIP, 'a segunda importação');
   console.log('   estado: ' + JSON.stringify(de_novo));
   conf('importar de novo devolve só o que faltava', /1 livro novo/.test(de_novo) && /3 já estavam no tablet/.test(de_novo), true);
@@ -693,6 +693,19 @@ async function printar(pag, nome) {
   conf('os livros ficaram', await H.contarDeposito(p, 'livros'), livrosAntes);
   conf('e a pergunta disse que os livros ficam', /Os livros importados ficam no tablet/.test(mensagens[0] || ''), true);
 
-  secao('9. Nenhum erro de página');
+  secao('9. Livro recusado numa versao nova permanece instalado');
+  const hashLivroPreservado = await p.evaluate(() => Store.lerLivro('livro-sem-marcadores').then(l => l.meta.hash));
+  const preservacao = await p.evaluate(async (pacote, versao, idRecusado) => {
+    const atuais = await Store.listarLivros();
+    const doPacote = atuais.filter(l => l.pacote === pacote);
+    await Store.gravarLivros({ manifest: { pacote, versao },
+      livros: doPacote.filter(l => l.id !== idRecusado).map(l => ({ meta: l.meta, blob: l.blob }))
+    }, [idRecusado]);
+    return Store.lerLivro(idRecusado).then(l => ({ id: l && l.id, hash: l && l.meta.hash }));
+  }, manifest.pacote, manifest.versao + 1, 'livro-sem-marcadores');
+  conf('o registro antigo do livro recusado continua no tablet', preservacao.id, 'livro-sem-marcadores');
+  conf('e o arquivo antigo nao e apagado nem substituido', preservacao.hash, hashLivroPreservado);
+
+  secao('10. Nenhum erro de pagina');
   conf('nenhum erro', p.errosDePagina.join(' | '), '');
 })().then(() => H.fim(amb)(), e => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e)));

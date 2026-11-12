@@ -119,6 +119,14 @@ jobs:
       - name: Monta o site
         if: steps.ponta.outputs.publicar == 'sim'
         run: sh .github/monta_site.sh _site
+      # O endpoint de IA (functions/api/ia.js) e uma Pages Function: o wrangler,
+      # rodando da raiz do repositorio, acha functions/ e empacota o codigo com
+      # o SDK da Anthropic. A versao do SDK e exata (functions/package-lock.json).
+      # Se o empacotamento falhar, o deploy inteiro falha e o site no ar fica
+      # como estava.
+      - name: Dependencias do endpoint de IA (functions/)
+        if: steps.ponta.outputs.publicar == 'sim'
+        run: npm ci --prefix functions --no-audit --no-fund
       - name: Envia ao Cloudflare Pages (producao, ramo main)
         id: envio
         if: steps.ponta.outputs.publicar == 'sim'

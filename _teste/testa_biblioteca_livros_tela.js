@@ -12,7 +12,7 @@
  * O que prova:
  *   1. sem livro, a seção de livros não aparece e os exercícios ficam como
  *      eram;
- *   2. com os livros, a aba diz quantos livros e disciplinas há, lista as
+ *   2. com os livros, a aba diz quantos materiais e disciplinas há, lista as
  *      disciplinas na ordem do app com a quantidade e o sinal do mapa (com a
  *      legenda uma vez), e cada ano mostra os livros certos; o livro sem
  *      sumário diz isso, e o do 9º de Matemática traz o cartão dos exercícios;
@@ -37,11 +37,24 @@
  *      pé) com a letra a 100% e a 130%, nada transborda;
  *   8. nada novo gravado: os depósitos têm, no fim, as mesmas chaves de antes
  *      dos toques, fora a posição de leitura que os leitores já guardavam.
+ *   9. marcadores lixo e sumário vazio (livros SINTÉTICOS gravados direto no
+ *      depósito, com o PDF de 6 páginas do livro-com-marcadores): o livro de
+ *      marcadores "page1..page40" com mapa de 3 capítulos mostra os 3 do
+ *      mapa no cartão, no resumo, no sumário (página, título, assuntos,
+ *      aria-label), no painel, no Abrir, no sumário do leitor, na posição
+ *      atual e no Continuar lendo; o livro sem marcadores com mapa de 1
+ *      entrada ("Volume") mostra a entrada; o controle, marcadores lixo sem
+ *      mapa, fica como está. O sumário do mapa é só da tela: o JSON do
+ *      depósito livros fica idêntico depois da tela e do leitor, e
+ *      livros_posicoes só ganha a posição dos livros lidos.
  *
  * Veneno:
  *   node _teste/testa_biblioteca_livros_tela.js --envenenado-capitulo-abre-pagina-errada
  *     o app.js servido abre todo capítulo do sumário na página 1: o toque no
  *     capítulo 2 tem de abrir na 1, e a prova TEM de ver ("VENENO visto").
+ *   node _teste/testa_biblioteca_livros_tela.js --envenenado-sumario-dos-marcadores
+ *     o app.js servido usa sempre o sumário do pacote (a main antes deste
+ *     conserto): o livro de marcadores lixo tem de mostrar os 40 "pageN".
  *
  *   --prints <pasta>   grava os prints do painel cego (tablet 1280x800 e
  *                      celular 412x915 e 360 a 130%, com escala 2).
@@ -56,8 +69,9 @@ const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8940;
-const VENENOS = ['--envenenado-capitulo-abre-pagina-errada'];
+const VENENOS = ['--envenenado-capitulo-abre-pagina-errada', '--envenenado-sumario-dos-marcadores'];
 const VENENO_PAGINA = process.argv.indexOf('--envenenado-capitulo-abre-pagina-errada') !== -1;
+const VENENO_SUMARIO = process.argv.indexOf('--envenenado-sumario-dos-marcadores') !== -1;
 const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
 const PYTHON = process.env.PYTHON || 'python';
@@ -66,6 +80,9 @@ const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const ANCORA_PAGINA = 'return abrirLivro(l.id, { pagina: paginaDoArquivo(l.meta, e) });';
 const trocas = {};
 if (VENENO_PAGINA) trocas['/app.js'] = APP.split(ANCORA_PAGINA).join('return abrirLivro(l.id, { pagina: 1 });');
+// o sumário que a tela usa (sumarioDaTela): no veneno, sempre o do pacote, como na main antes do conserto
+const ANCORA_SUMARIO = 'return Biblioteca.sumarioDoLivro(meta);';
+if (VENENO_SUMARIO) trocas['/app.js'] = APP.split(ANCORA_SUMARIO).join('return Array.isArray(meta.sumario) ? meta.sumario : [];');
 
 const amb = H.criarAmbiente(PORTA, 'perfil_biblioteca_livros_tela', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'b2_livros_'));
@@ -213,6 +230,10 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('a lista de venenos não está vazia', VENENOS.length > 0, true);
   conf('a âncora do veneno (o capítulo abre na página do arquivo) aparece uma vez só no app.js', APP.split(ANCORA_PAGINA).length - 1, 1);
   if (VENENO_PAGINA) conf('o app.js servido está envenenado', trocas['/app.js'].indexOf(ANCORA_PAGINA) === -1, true);
+  if (VENENO_SUMARIO) {
+    conf('a âncora do veneno do sumário aparece uma vez só no app.js', APP.split(ANCORA_SUMARIO).length - 1, 1);
+    conf('o app.js servido está envenenado no sumário', trocas['/app.js'].indexOf(ANCORA_SUMARIO) === -1, true);
+  }
   const zipEx = path.join(TMP, 'pacote_9ano.zip');
   Sintetico.gerar(zipEx);
   const zipLivros = gerarLivros();
@@ -263,7 +284,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await abrirBiblioteca(pag);
   await esperar('a seção de livros', () => lerSecao(pag), v => v.visivel && !!v.livros, 10000);
   s = await lerSecao(pag);
-  conf('a contagem diz livros e disciplinas', s.contagem, '4 livros, 2 disciplinas');
+  conf('a contagem diz materiais e disciplinas', s.contagem, '4 materiais, 2 disciplinas');
   conf('as disciplinas, na ordem do app, com a quantidade e o sinal do mapa', s.disciplinas, 'matematica:3:mapa,literatura:1:mapa');
   conf('a legenda do mapa aparece uma vez só', s.legendas, 1);
   conf('abre em Matemática', s.ativa, 'matematica');
@@ -504,6 +525,155 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('livros_posicoes só tem a posição de cada livro lido (o que os leitores já guardavam)', chaves, 'livro-com-marcadores,livro-de-prova');
   const ajustes = await pag.evaluate(() => Store.carregar().then(d => JSON.stringify((d.ajustes || {}).mapaDosLivros || null)));
   conf('o mapa dos livros dela continua sem correção nenhuma', ajustes, 'null');
+
+  // ================================================================
+  secao('9. Marcadores lixo e sumário vazio: a tela usa o sumário do mapa');
+  /* Três livros SINTÉTICOS gravados direto no depósito, com o PDF de 6
+   * páginas do livro-com-marcadores e um pacote próprio (não mexe nos de
+   * cima): marcadores "page1..page40" com mapa de 3 capítulos; sem marcadores
+   * com mapa de 1 entrada ("Volume", como o Araribá 8); e o controle,
+   * marcadores lixo SEM mapa, que fica como está. */
+  const gravados = await pag.evaluate(async () => {
+    const base = await Store.lerLivro('livro-com-marcadores');
+    const cap = (n, titulo, ini, fim, ids) => ({ n, titulo, pagina: ini, pagina_fim: fim,
+      assuntos: ids.map(id => ({ id, confianca: 'alta' })), origem: 'mapa' });
+    const lixo = Array.from({ length: 40 }, (_, i) => ({ n: i + 1, nivel: 1, titulo: 'page' + (i + 1), pagina: (i % 6) + 1 }));
+    const livro = (id, titulo, extra) => ({ blob: base.blob, meta: Object.assign({}, base.meta, { id, titulo, volume: '',
+      hash: 'prova-' + id, numeracao: undefined, gabarito_origem: undefined, gabarito_secoes: undefined }, extra) });
+    const c = await Store.gravarLivros({ manifest: { pacote: 'prova-sumario-do-mapa', versao: 1 }, livros: [
+      livro('prova-marcadores-lixo', 'Prova marcadores lixo', { sumario: lixo, sumario_origem: 'marcadores',
+        mapa: [cap(1, 'Números naturais', 1, 2, ['MAT06-02']), cap(2, 'Frações', 3, 4, ['MAT06-05']), cap(3, 'Geometria plana', 5, 6, [])] }),
+      livro('prova-sem-marcadores', 'Prova sem marcadores', { sumario: [], sumario_origem: 'nenhum',
+        mapa: [cap(1, 'Volume', 4, 6, ['MAT06-05'])] }),
+      livro('prova-lixo-sem-mapa', 'Prova lixo sem mapa', { sumario: lixo, sumario_origem: 'marcadores', mapa: [] })
+    ] });
+    return c.novos;
+  });
+  conf('os três livros de prova entraram no depósito', gravados, 3);
+  /* O sumário do mapa é calculado NA TELA e nunca gravado: gravar mudaria o
+   * JSON do sumário, e o gravarLivros solta a posição de leitura quando o
+   * sumário muda (posicoesSoltas). O retrato é o JSON cru dos depósitos
+   * 'livros' (o registro inteiro, menos o Blob) e 'livros_posicoes'. */
+  const retrato = () => pag.evaluate(() => new Promise((ok, falha) => {
+    const q = indexedDB.open('apoio-educacional');
+    q.onerror = () => falha(q.error);
+    q.onsuccess = () => {
+      const b = q.result; const tr = b.transaction(['livros', 'livros_posicoes'], 'readonly');
+      const r = {};
+      tr.objectStore('livros').getAll().onsuccess = e => {
+        r.livros = JSON.stringify(e.target.result.map(x => Object.assign({}, x, { blob: x.blob ? x.blob.size : null })));
+      };
+      tr.objectStore('livros_posicoes').getAll().onsuccess = e => {
+        r.posicoes = {}; e.target.result.forEach(p => { r.posicoes[p.id] = JSON.stringify(p); });
+      };
+      tr.oncomplete = () => { b.close(); ok(r); };
+      tr.onerror = () => { b.close(); falha(tr.error); };
+    };
+  }));
+  const antes = await retrato();
+  conf('o retrato enxerga os livros de prova e o sumário gravado deles', /"id":"prova-marcadores-lixo"/.test(antes.livros) &&
+    /"titulo":"page40"/.test(antes.livros) && /"sumario":\[\],"sumario_origem":"nenhum"/.test(antes.livros), true);
+  await H.irParaAba(pag, 'biblioteca');
+  await pausa(300);
+  await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  await clicar(pag, '#bib-livros .bibl-ano[data-ano="06"]');
+  await esperar('os livros de prova na aba', () => lerSecao(pag), v => /prova-marcadores-lixo/.test(v.livros), 10000);
+  const cartao = id => pag.evaluate(i => {
+    const b = document.querySelector('#bib-livros [data-livro="' + i + '"]');
+    if (!b) return '';
+    const f = b.querySelector('[data-falta]');
+    return b.querySelectorAll('.bibl-apoio')[0].textContent + '|' + (f ? 'falta:' + f.dataset.falta : (b.querySelector('[data-mapa]') ? 'mapa' : '?'));
+  }, id);
+  const cLixo = await cartao('prova-marcadores-lixo');
+
+  if (VENENO_SUMARIO) {
+    secao('VENENO: a tela usa o sumário do pacote (o da main)');
+    await clicar(pag, '#bib-livros [data-livro="prova-marcadores-lixo"]');
+    await esperar('a tela do livro de prova', () => lerLivro(pag), v => v.visivel && v.livro === 'prova-marcadores-lixo', 5000);
+    const lvv = await lerLivro(pag);
+    const visto = /40 capítulos/.test(lvv.resumo) && /^cap1@1\[1\]\*,cap2@2\[2\]/.test(lvv.linhas);
+    conf('envenenado-sumario-dos-marcadores: a tela lista os 40 "pageN" como capítulos (defeito detectado)', visto, true);
+    if (visto) console.log('VENENO visto: o sumário dos marcadores lixo voltou à tela.');
+    await H.fim(amb)();
+    return;
+  }
+
+  conf('o cartão do livro de marcadores lixo conta os capítulos do mapa', cLixo, '6 p. · 3 capítulos|mapa');
+  conf('o cartão do livro sem marcadores com mapa não diz "sem sumário"', await cartao('prova-sem-marcadores'), '6 p. · 1 capítulo|mapa');
+  conf('controle: o cartão do lixo sem mapa fica como está', await cartao('prova-lixo-sem-mapa'), '6 p. · 40 capítulos|falta:mapa');
+
+  await clicar(pag, '#bib-livros [data-livro="prova-marcadores-lixo"]');
+  await esperar('a tela do livro de marcadores lixo', () => lerLivro(pag), v => v.visivel && v.livro === 'prova-marcadores-lixo', 5000);
+  await esperar('os nomes dos assuntos', () => lerLivro(pag), v => !/MAT06-/.test(v.assuntosDosCapitulos), 10000);
+  lv = await lerLivro(pag);
+  let depois = await retrato();
+  conf('só a tela aberta, com o sumário do mapa: o depósito livros fica idêntico (o JSON)', depois.livros === antes.livros, true);
+  conf('e livros_posicoes também', JSON.stringify(depois.posicoes) === JSON.stringify(antes.posicoes), true);
+  conf('o resumo: 3 capítulos do mapa, e não 40', lv.resumo, '6 páginas · 3 capítulos · 2 assuntos ligados');
+  conf('o sumário são os capítulos do mapa, cada um na página dele (o primeiro marcado)', lv.linhas, 'cap1@1[1]*,cap2@3[2],cap3@5[3]');
+  conf('os títulos do mapa', await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-livro .bibl-cap .bibl-cap-titulo'))
+    .map(b => b.textContent).join(' | ')), 'Números naturais | Frações | Geometria plana');
+  const ass = lv.assuntosDosCapitulos.split(' | ');
+  conf('os assuntos ligados de cada capítulo (os dois primeiros com nome, o terceiro sem)', ass.length + '|' +
+    (ass[0] !== 'nenhum assunto ligado ainda' && !!ass[0]) + '|' + (ass[1] !== 'nenhum assunto ligado ainda' && !!ass[1]) + '|' + ass[2], '3|true|true|nenhum assunto ligado ainda');
+  conf('o aria-label do capítulo 2', await pag.evaluate(() => document.querySelector('#bib-livro .bibl-cap[data-n="2"]').getAttribute('aria-label')),
+    'Capítulo 2, Frações, página 3');
+  conf('o painel: Capítulo 1, as páginas, os assuntos e o Abrir na p. 1',
+    /^Capítulo 1\s+Números naturais\s+Páginas do arquivo 1 a 2 · 2 páginas[\s\S]*Assuntos ligados[\s\S]*Abrir na p\. 1$/.test(lv.painel.trim()) &&
+    !/Nenhum assunto ligado/.test(lv.painel), true);
+  await clicar(pag, '#bib-livro .bibl-cap[data-n="2"]');
+  const rl = await esperar('o leitor no capítulo 2 do mapa', () => paginaDesenhada(pag), v => v !== 'fechado' && v !== '', 20000);
+  conf('tocar no capítulo 2 abre o leitor na página 3', rl.valor, '3');
+  await clicar(pag, '#leitor-sumario');
+  await pausa(200);
+  conf('o sumário do leitor também é o do mapa, com o capítulo atual marcado', await pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#leitor-sumario-lista button')).map(b => b.dataset.entrada + (b.classList.contains('atual') ? '*' : '')).join(',')),
+  '1,2*,3');
+  await clicar(pag, '#leitor-sumario');
+  await fecharModal(pag, 'modal-leitor-pdf');
+  await esperar('a tela com a posição nova', () => lerLivro(pag), v => v.visivel && /p\. 3/.test(v.continuar), 5000);
+  lv = await lerLivro(pag);
+  conf('a posição atual: o capítulo 2 marcado e o painel nele', lv.linhas + '|' + /^Capítulo 2\s+Frações[\s\S]*Abrir na p\. 3$/.test(lv.painel.trim()),
+    'cap1@1[1],cap2@3[2]*,cap3@5[3]|true');
+  ruins = await medir(pag, '#bib-livro');
+  conf('a tela do livro de marcadores lixo não transborda', ruins.join('; '), '');
+  await clicar(pag, '#bib-livro-voltar');
+  await esperar('a aba de volta', () => lerSecao(pag), v => v.visivel && /prova-marcadores-lixo/.test(v.continuar), 5000);
+  s = await lerSecao(pag);
+  conf('o Continuar lendo diz o capítulo do mapa', /(^|,)prova-marcadores-lixo\|Cap\. 2, Frações · p\. 3(,|$)/.test(s.continuar), true);
+
+  await clicar(pag, '#bib-livros [data-livro="prova-sem-marcadores"]');
+  await esperar('a tela do livro sem marcadores', () => lerLivro(pag), v => v.visivel && v.livro === 'prova-sem-marcadores', 5000);
+  await esperar('o nome do assunto', () => lerLivro(pag), v => !/MAT06-/.test(v.assuntosDosCapitulos), 10000);
+  lv = await lerLivro(pag);
+  conf('sem marcadores e com mapa de 1 entrada: não diz que falta sumário', lv.semSumario, '');
+  conf('o resumo: 1 capítulo e 1 assunto ligado', lv.resumo, '6 páginas · 1 capítulo · 1 assunto ligado');
+  conf('o sumário é a entrada do mapa', lv.linhas + '|' + await pag.evaluate(() => document.querySelector('#bib-livro .bibl-cap .bibl-cap-titulo').textContent),
+    'cap1@4[1]*|Volume');
+  conf('com o assunto ligado', !!lv.assuntosDosCapitulos && lv.assuntosDosCapitulos !== 'nenhum assunto ligado ainda', true);
+  conf('o painel: páginas 4 a 6 e Abrir na p. 4', /^Capítulo 1\s+Volume\s+Páginas do arquivo 4 a 6 · 3 páginas[\s\S]*Abrir na p\. 4$/.test(lv.painel.trim()), true);
+  await clicar(pag, '#bib-livro-abrir-capitulo');
+  const rv = await esperar('o leitor no Volume', () => paginaDesenhada(pag), v => v !== 'fechado' && v !== '', 20000);
+  conf('o Abrir na p. 4 abre o leitor na página 4', rv.valor, '4');
+  await fecharModal(pag, 'modal-leitor-pdf');
+  await clicar(pag, '#bib-livro-voltar');
+  await pausa(300);
+
+  await clicar(pag, '#bib-livros [data-livro="prova-lixo-sem-mapa"]');
+  await esperar('a tela do lixo sem mapa', () => lerLivro(pag), v => v.visivel && v.livro === 'prova-lixo-sem-mapa', 5000);
+  lv = await lerLivro(pag);
+  conf('controle: sem mapa, os 40 marcadores ficam como estão', lv.resumo, '6 páginas · 40 capítulos · sem mapa de assuntos');
+  await clicar(pag, '#bib-livro-voltar');
+  await pausa(300);
+
+  depois = await retrato();
+  conf('depois da tela e do leitor com o sumário do mapa: o depósito livros fica idêntico (o JSON, sumário incluído)',
+    depois.livros === antes.livros, true);
+  const novas = Object.keys(depois.posicoes).filter(k => !(k in antes.posicoes)).sort().join(',');
+  // controle positivo: o retrato vê a posição que o leitor grava, como sempre gravou
+  conf('livros_posicoes ganhou só a posição dos dois livros lidos (o que o leitor sempre gravou)', novas, 'prova-marcadores-lixo,prova-sem-marcadores');
+  conf('e as posições que já estavam ficam idênticas (nenhuma solta)', Object.keys(antes.posicoes).length > 0 &&
+    Object.keys(antes.posicoes).every(k => depois.posicoes[k] === antes.posicoes[k]), true);
 
   if (PRINTS) {
     secao('Prints');
