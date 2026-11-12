@@ -17,7 +17,8 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { leMapa, listaDoPortao, provasTocadas, nomesDaSelecao, fatiasDoPlano, daFatia, MAPA, ALVO_POR_FATIA } = require('./provas_tocadas.js');
+const PORTAO_REL_T = '_teste/confere_tudo.sh';
+const { leMapa, listaDoPortao, provasTocadas, rodaDoDiff, nomesDaSelecao, fatiasDoPlano, daFatia, MAPA, ALVO_POR_FATIA } = require('./provas_tocadas.js');
 
 let passes = 0, falhas = 0;
 function conf(rotulo, obtido, esperado) {
@@ -150,6 +151,51 @@ conf('nada tocado: nenhum nome', nomesDaSelecao(provasTocadas([], mapa, nav), []
 // os nomes saem na ordem do portao (e o que o divide_portao.js tambem usa)
 nn = nomesDaSelecao(provasTocadas(['app.js'], mapa, nav), ['app.js'], nav);
 conf('os nomes saem na ordem do portao', nn.join('\n'), nav.ordem.filter(n => nn.indexOf(n) >= 0).join('\n'));
+
+console.log('\n=== 7b2. confere_tudo.sh que so ganha linhas roda: as provas delas, e nao a bateria ===');
+const linhaRoda = '+roda "biblioteca listas --envenenado-novo"   node "_teste/testa_biblioteca_listas.js" --envenenado-novo';
+const cab = 'diff --git a/_teste/confere_tudo.sh b/_teste/confere_tudo.sh\n--- a/_teste/confere_tudo.sh\n+++ b/_teste/confere_tudo.sh\n@@ -1,3 +1,5 @@\n';
+const dSo = cab + ' contexto\n+# veneno novo da regra do PR\n' + linhaRoda + '\n';
+let dd = rodaDoDiff(dSo);
+conf('diff so com roda e comentario: ok, com o arquivo da linha nova', dd.ok + '/' + dd.arquivos.join(','), 'true/_teste/testa_biblioteca_listas.js');
+rr = provasTocadas([PORTAO_REL_T, 'app.js'], mapa, nav, { [PORTAO_REL_T]: dSo });
+conf('com o diff so de roda, o confere_tudo.sh nao pede a bateria inteira', rr.modo, 'lista');
+nn = nomesDaSelecao(rr, [PORTAO_REL_T, 'app.js'], nav);
+conf('a prova da linha nova roda com todos os nomes, venenos inclusive', todosOsNomes(pBusca).every(n => nn.indexOf(n) >= 0), true);
+conf('e as outras do app.js seguem so com os nomes base', nn.filter(n => ehVeneno(n) && todosOsNomes(pBusca).indexOf(n) < 0).length, 0);
+// o outro lado: qualquer linha que nao e roda nem comentario e a maquinaria
+const venenosDiff = [
+  ['linha de maquinaria (if)', cab + '+if [ "$x" = 1 ]; then\n' + linhaRoda + '\n'],
+  ['roda com sobra depois (&& outra coisa)', cab + linhaRoda + ' && rm -rf _site\n'],
+  ['roda sem aspas no nome', cab + '+roda nome node "_teste/testa_busca.js"\n'],
+  ['variavel trocada', cab + '-falhou=0\n+falhou=1\n'],
+  ['linha tirada da maquinaria', cab + '-  shift\n'],
+  ['diff vazio', cab],
+];
+venenosDiff.forEach(([rot, d]) => {
+  conf('veneno ' + rot + ': nao e ok', rodaDoDiff(d).ok, false);
+  conf('veneno ' + rot + ': bateria inteira', provasTocadas([PORTAO_REL_T], mapa, nav, { [PORTAO_REL_T]: d }).modo, 'inteira');
+});
+conf('sem diff lido, o confere_tudo.sh pede a bateria inteira', provasTocadas([PORTAO_REL_T], mapa, nav, {}).modo, 'inteira');
+conf('sem o argumento de diffs, como antes: bateria inteira', provasTocadas([PORTAO_REL_T], mapa, nav).modo, 'inteira');
+dd = rodaDoDiff(cab + '+roda "merge seguro"          node _teste/testa_merge_seguro.js\n');
+conf('roda nova de prova sem navegador: ok, e o nivel 1 nao roda nada (o rapido cobre)',
+  dd.ok + '/' + provasTocadas([PORTAO_REL_T], mapa, nav, { [PORTAO_REL_T]: cab + '+roda "merge seguro"          node _teste/testa_merge_seguro.js\n' }).modo, 'true/nenhuma');
+dd = rodaDoDiff(cab + '-roda "biblioteca listas --envenenado-lixeira"   node "_teste/testa_biblioteca_listas.js" --envenenado-lixeira\n');
+conf('roda tirada: ok, sem prova a rodar', dd.ok + '/' + dd.arquivos.length, 'true/0');
+// as linhas roda de hoje, sem variavel: todas na forma que o rodaDoDiff aceita (o instrumento ve a forma real)
+const rodasHoje = fs.readFileSync(path.join(__dirname, 'confere_tudo.sh'), 'utf8').split(/\r?\n/).filter(l => /^\s*roda /.test(l));
+const literais = rodasHoje.filter(l => l.indexOf('$') < 0);
+dd = rodaDoDiff(cab + literais.map(l => '+' + l).join('\n') + '\n');
+conf('todas as ' + literais.length + ' linhas roda literais do portao de hoje passam pela forma estrita', dd.ok, true);
+conf('e todo arquivo delas existe', dd.arquivos.filter(p => !fs.existsSync(path.join(RAIZ, p))).join(' '), '');
+conf('e cobrem mais de 50 das provas de navegador', nav.arquivos.filter(p => dd.arquivos.indexOf(p) >= 0).length > 50, true);
+const doLaco = rodasHoje.filter(l => l.indexOf('$') >= 0);
+conf('o instrumento ve a linha do laco das provas com navegador', doLaco.length >= 1, true);
+doLaco.forEach(l => conf('linha roda com variavel (' + l.trim().slice(0, 40) + '): maquinaria, bateria inteira',
+  provasTocadas([PORTAO_REL_T], mapa, nav, { [PORTAO_REL_T]: cab + '+' + l + ' --x\n' }).modo, 'inteira'));
+conf('acrescentar prova na lista do laco: maquinaria, bateria inteira',
+  provasTocadas([PORTAO_REL_T], mapa, nav, { [PORTAO_REL_T]: cab + '+         testa_nova_navegador \\\n' }).modo, 'inteira');
 
 console.log('\n=== 7c. Quantas fatias o plano abre ===');
 const { leTempos, mediana, divide } = require('./divide_portao.js');
