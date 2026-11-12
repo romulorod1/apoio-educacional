@@ -829,6 +829,12 @@ roda "livros mapa --envenenado-sem-ano-na-tela"   node "_teste/testa_livros_mapa
 # faixa e apagava a lista do Corrigir aberta; a prova esperava pela pagina que
 # ja estava a vista e falhava uma vez em dez. O veneno volta a refazer a faixa.
 roda "livros mapa --envenenado-faixa-refeita"     node "_teste/testa_livros_mapa.js" --envenenado-faixa-refeita
+# 12/11/2026: a versao nova de um pacote de livros que so muda o mapa (o MAT08-15
+# de volume): mesmo arquivo, versao maior, so o meta trocado; a posicao de
+# leitura e a correcao dela intactas, inclusive no livro cujo sumario era vazio;
+# o v1 depois do v2 nao rebaixa. O veneno deixa de trocar o meta. Porta 8887.
+roda "livros reimportar mapa"                     node "_teste/testa_livros_reimportar_mapa.js"
+roda "livros reimportar mapa --envenenado-meta-nao-troca" node "_teste/testa_livros_reimportar_mapa.js" --envenenado-meta-nao-troca
 # C15.4 e C15.5: "Exportar em PDF" do capitulo 2 com o gabarito dele no mesmo
 # arquivo, anexado na aula: o texto do capitulo e DEPOIS o do gabarito do 2 (e
 # nao o do 1), o rodape de fonte, nenhum travessao; sem o gabarito; paginas

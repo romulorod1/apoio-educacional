@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.56';
+  var VERSAO = '1.42.57';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,10 +85,16 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.56',
+      versao: '1.42.57',
       itens: [
         'No tablet, a leitura de livros PDF segue em rolagem cont\u00ednua, e a barra permite ir diretamente a uma p\u00e1gina.',
         'Na exporta\u00e7\u00e3o, marque p\u00e1ginas com toques ou digite intervalos pela numera\u00e7\u00e3o impressa; p\u00e1ginas sem n\u00famero aparecem como "arquivo N".'
+      ]
+    },
+    {
+      versao: '1.42.54',
+      itens: [
+        'No 8º ano de Matemática entrou o assunto "Volume e capacidade: bloco retangular e cilindro", para escolher na aula e procurar na Biblioteca.'
       ]
     },
     {

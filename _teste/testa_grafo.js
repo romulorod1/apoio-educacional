@@ -105,7 +105,7 @@ function analisa(lista) {
 /* ------------------------------------------------------------------ 1 a 5: o grafo de verdade */
 secao('1. O grafo gravado');
 
-conf('o índice tem os 148 assuntos', temas.length, 148);
+conf('o índice tem os 149 assuntos (148 de 09/2026 e o MAT08-15)', temas.length, 149);
 conf('o cabeçalho diz que o grafo foi revisado no C7', /revisado no C7 em 30\/10\/2026/.test(indice.prerequisitos_origem || ''), true);
 conf('todo registro traz a lista de pré-requisitos', temas.every(t => Array.isArray(t.prerequisitos)), true);
 conf('nenhum assunto repete um pré-requisito na própria lista',
@@ -115,7 +115,7 @@ const g = analisa(temas);
 const arestas = temas.reduce((n, t) => n + t.prerequisitos.length, 0);
 console.log('       ' + arestas + ' arestas, ' + temas.filter(t => t.prerequisitos.length).length + ' assuntos com pré-requisito');
 conf('todo id de pré-requisito existe', g.inexistentes.join(' ') || 'todos existem', 'todos existem');
-conf('nenhum ciclo: a ordem topológica tem os 148', g.ciclo || ('completa com ' + g.ordem.length), 'completa com 148');
+conf('nenhum ciclo: a ordem topológica tem os 149', g.ciclo || ('completa com ' + g.ordem.length), 'completa com 149');
 conf('nenhum pré-requisito de ano posterior', g.posteriores.join(' ') || 'nenhum', 'nenhum');
 conf('nenhuma aresta redundante pela transitividade (fora as declaradas)', g.redundantes.slice(0, 5).join(' ; ') || 'nenhuma', 'nenhuma');
 conf('toda redundância declarada de propósito existe no grafo',
@@ -231,6 +231,8 @@ const CONGELADO = [
   'MAT08-12|08|Congruência de triângulos',
   'MAT08-13|08|Círculo: comprimento e área',
   'MAT08-14|08|Média ponderada e probabilidade',
+  // acrescentado em 12/11/2026, depois do 82bf848: o 8º ano não tinha volume
+  'MAT08-15|08|Volume e capacidade: bloco retangular e cilindro',
   'MAT09-01|09|Números reais e irracionais',
   'MAT09-02|09|Potências com expoente negativo e fracionário',
   'MAT09-03|09|Radicais: operações e racionalização',
@@ -290,7 +292,7 @@ const CONGELADO = [
   'MATEM3-13|em3|Matemática financeira aplicada',
   'MATEM3-14|em3|Interpretação de dados e gráficos',
 ];
-conf('a lista congelada tem 148 linhas', CONGELADO.length, 148);
+conf('a lista congelada tem 149 linhas', CONGELADO.length, 149);
 const deHoje = temas.map(t => t.id + '|' + t.serie + '|' + t.pt.titulo);
 const diferentes = [];
 for (let i = 0; i < Math.max(deHoje.length, CONGELADO.length); i++) {
