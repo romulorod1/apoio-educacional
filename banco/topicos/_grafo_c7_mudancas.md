@@ -323,3 +323,72 @@ do 8º ano dela já o trazem no mesmo capítulo. Nenhum id existente mudou.
 
 O MAT09-12 continua pedindo MAT08-13 e MAT06-12, e não o MAT08-15: trocar as
 duas arestas por esta mudaria a trilha do 9º ano, e isso não foi pedido.
+
+## Assuntos novos da revisão dos mapas dos livros (12/11/2026)
+
+A revisão dos mapas dos livros de matemática (lotes L1 e L2) levantou 26
+itens que os livros dela trazem e o banco não tinha. Para cada um, primeiro se
+procurou no banco um assunto que cobrisse o conteúdo; só se não houvesse, se
+criou um. Entraram 22 assuntos: 14 do 6º ao 9º ano e 8 do ensino médio. A
+série é a do livro que põe o conteúdo; a habilidade é a da BNCC oficial
+(versão final, 600 páginas, página impressa). Nenhum id existente mudou e
+nenhuma aresta de assunto antigo foi mexida; os assuntos antigos que vêm
+depois de um novo (por exemplo MATEM2-07, contagem do médio, depois do
+MAT08-18) continuam com os pré-requisitos que tinham, porque mudar a trilha
+deles não foi pedido.
+
+### A regra da repetição entre anos
+
+O aplicativo só oferece ao livro os assuntos das séries dele: na lista do
+Corrigir, `app.js` filtra os assuntos de eixo "ano" por `reg.meta.series` do
+livro (a função que monta as `opcoes` do leitor). Um assunto do 7º ano não
+aparece num livro do 8º, a não ser que o mapa marque a ligação com
+`serie_vizinha`. Isso empurra a criar o mesmo conteúdo em todo ano, e a regra
+é esta:
+
+- repetir um conteúdo num ano só é legítimo quando AQUELE ano tem habilidade
+  própria na BNCC para ele (a espiral). O MAT06-16 tem a EF06MA17, e fica, ao
+  lado do MAT05-08;
+- sem habilidade própria no ano, não se cria: o capítulo liga ao assunto do
+  outro ano, com a marca `serie_vizinha` no mapa.
+
+Aplicada nesta revisão, ela tirou três assuntos que tinham sido propostos:
+inequações do 1º grau no 7º ano (não há habilidade de inequação no
+fundamental; os capítulos ligam ao MATEM1-05 como série vizinha), conjuntos e
+Venn no médio (mesmo ano do MATEM1-01 "Conjuntos numéricos", que já cobre o
+capítulo "Conjuntos" do Moderna Plus 1) e poliedros com relação de Euler no
+médio (não há habilidade do médio; vértices, faces e arestas são a EF06MA17
+do MAT06-16, ligado como série vizinha). Os outros repetidos ficaram porque o
+ano tem habilidade própria: MAT06-16 (EF06MA17) com MAT05-08; MAT06-17
+(EF06MA24) com MAT05-10 e MAT04-10; MAT08-18 (EF08MA03) com MATEM2-07;
+MAT09-16 (EF09MA16) com MATEM3-01; MAT09-17 (EF09MA05) com MATEM2-13; MAT07-15
+(EF07MA21) com MAT04-08; MAT06-19 (EF06MA21) com MAT09-08.
+
+| Assunto | BNCC | Pré-requisitos (aresta acrescentada) | Motivo |
+| --- | --- | --- | --- |
+| MAT06-15 Construções com régua e esquadro | EF06MA22, p. 303 | MAT06-10 | Constrói paralelas, perpendiculares e quadriláteros; ângulos e retas vêm por MAT06-10. |
+| MAT06-16 Figuras não planas | EF06MA17, p. 303 | MAT05-08, MAT06-10 | Continua os sólidos do 5º ano; as faces são os polígonos do 6º. |
+| MAT06-17 Grandezas e medidas | EF06MA24, p. 303 (e EF07MA29, p. 309) | MAT05-10, MAT06-07 | Conversões do 5º ano, agora com decimais. |
+| MAT06-18 Plantas baixas, vistas e escala | EF06MA28, p. 303 | MAT06-11, MAT06-16 | Planta baixa mede área; vista é de figura não plana. |
+| MAT06-19 Ampliação e redução de figuras na malha | EF06MA21, p. 303 | MAT06-10, MAT06-13 | Polígonos ampliados na malha quadriculada e no plano cartesiano. |
+| MAT07-15 Simetria e transformações | EF07MA20 e EF07MA21, p. 309 (e EF08MA18, p. 315) | MAT06-10, MAT06-13 | Transforma polígonos, também no plano cartesiano. |
+| MAT07-16 Circunferência e círculo: elementos e construção | EF07MA22, p. 309 | MAT06-15, MAT07-11 | Construção com instrumentos e ângulo central. |
+| MAT08-16 Construções com régua e compasso | EF08MA15, EF08MA16 e EF08MA17, p. 315 | MAT07-12, MAT07-16 | Polígonos regulares e triângulos; o compasso vem da circunferência. |
+| MAT08-17 Cevianas e pontos notáveis | não há habilidade própria; a mais próxima é EF08MA17, p. 315 | MAT08-12, MAT08-16 | Mediatriz e bissetriz construídas; congruência nas propriedades. |
+| MAT08-18 Contagem: árvore e princípio multiplicativo | EF08MA03, p. 313 | MAT06-02 | Só multiplicação de naturais. |
+| MAT08-19 Pesquisa estatística: população e amostra | EF08MA23, EF08MA26 e EF08MA27, p. 315 | MAT07-07, MAT07-14 | Frequência relativa em porcentagem; medidas de tendência no relatório. |
+| MAT09-15 Vistas ortogonais e perspectiva | EF09MA17, p. 319 | MAT06-18 | Continua as vistas do 6º ano. |
+| MAT09-16 Distância entre dois pontos e ponto médio | EF09MA16, p. 319 | MAT06-13, MAT09-07 | Coordenadas e Pitágoras. |
+| MAT09-17 Porcentagens sucessivas e juros compostos | EF09MA05, p. 317 | MAT07-07, MAT08-01 | Juros simples e potência. |
+| MATEM1-16 Noções de lógica | não há habilidade EM13MAT de lógica | MAT07-09 | Sentença matemática e linguagem algébrica. |
+| MATEM1-17 Equações e inequações irracionais | não há habilidade EM13MAT própria | MATEM1-05 | Elevar ao quadrado leva à inequação do 2º grau. |
+| MATEM2-16 Geometria de posição | não há habilidade EM13MAT própria | MAT08-11, MAT09-07 | Paralelas e perpendiculares do plano, e distância. |
+| MATEM2-17 Equações e inequações trigonométricas | não há habilidade própria; a mais próxima é EM13MAT306, p. 536 | MATEM2-02, MATEM2-15 | Funções trigonométricas e identidades. |
+| MATEM2-18 Funções trigonométricas inversas | não há habilidade EM13MAT própria | MATEM1-15, MATEM2-02 | Função inversa e funções trigonométricas. |
+| MATEM3-15 Introdução à derivada | não há habilidade de derivada; a mais próxima é EM13MAT101 (taxa de variação), p. 533 | MATEM3-09 | Limite. |
+| MATEM3-16 Introdução à integral | não há habilidade de integral; a mais próxima é EM13MAT307 (área por aproximação), p. 536 | MATEM3-15 | Antiderivada. |
+| MATEM3-17 Lugares geométricos no plano cartesiano | não há habilidade EM13MAT; lugar geométrico é EF07MA22 (p. 309) e EF08MA17 (p. 315) | MAT08-16, MATEM3-03 | Mediatriz e bissetriz como lugar geométrico, e a circunferência analítica. |
+
+A lista de cada item, com livro, capítulo, decisão e a marca de série vizinha,
+está no PR que criou estes assuntos e no arquivo de decisões da coordenação
+(BANCO_matematica_decisoes.json).

@@ -154,7 +154,14 @@ conf('letra a menos conta como uma', B.umaLetraDeDiferenca('teorma', 'teorema'),
 secao('8. Começo de palavra, para quem digita enquanto o aluno senta');
 
 conf('"pitag" acha Pitágoras', contem('pitag', 'Teorema de Pitágoras', 2), true);
-conf('"inequa" acha inequações', primeiro('inequa'), 'Inequações do 1º e do 2º grau');
+/* Desde a revisão dos mapas dos livros (12/11/2026) há três assuntos com
+ * inequação no título: o MATEM1-05 "Inequações do 1º e do 2º grau", que esta
+ * linha esperava em primeiro, e os novos MATEM1-17 (irracionais) e MATEM2-17
+ * (trigonométricas). Medido: os dois novos vêm antes do MATEM1-05, que fica em
+ * 3º. O que a seção prova é que o começo de palavra acha inequação: os três no
+ * topo, e o de sempre entre eles. */
+conf('"inequa" traz o MATEM1-05 entre os três primeiros', contem('inequa', 'Inequações do 1º e do 2º grau', 3), true);
+conf('e os três primeiros são todos de inequação', noTopo('inequa', 3).every(x => /nequações/.test(x)), true);
 conf('"porcent" acha porcentagem', /[Pp]orcentagem/.test(primeiro('porcent')), true);
 conf('"equa" acha equações do 1º grau no topo', primeiro('equa'), 'Equações do 1º grau');
 conf('letra sozinha não vira busca por prefixo', achar('x').length < 20, true);
