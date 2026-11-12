@@ -306,3 +306,20 @@ de cada mudança pelo `testa_grafo.js` (ciclo, ano, redundância, raízes).
 Grandes linhas: a álgebra salta do 2º para o 7º ano e a contagem só aparece na
 2ª série do médio. As duas são falta de assunto, não de aresta; estão nas
 sugestões 1 e 8, nada foi criado.
+
+## Assunto novo: MAT08-15 (12/11/2026)
+
+O 8º ano não tinha assunto de volume, e a professora procurou volume de 8º ano
+na Biblioteca sem achar. Entrou o MAT08-15 "Volume e capacidade: bloco
+retangular e cilindro" (grandezas, 60 min, dificuldade 3), habilidades
+EF08MA20 (litro, decímetro cúbico e metro cúbico) e EF08MA21 (volume do bloco
+retangular) da BNCC. O cilindro, na BNCC, é do 9º ano (EF09MA19), mas os livros
+do 8º ano dela já o trazem no mesmo capítulo. Nenhum id existente mudou.
+
+| Assunto | Mudança | Aresta | Motivo |
+| --- | --- | --- | --- |
+| MAT08-15 Volume e capacidade | Acrescentada | MAT08-15 <- MAT06-12 | Continua volume e unidades de medida do 6º ano (litro, centímetro cúbico). |
+| MAT08-15 Volume e capacidade | Acrescentada | MAT08-15 <- MAT08-13 | O volume do cilindro é a área do círculo da base vezes a altura. |
+
+O MAT09-12 continua pedindo MAT08-13 e MAT06-12, e não o MAT08-15: trocar as
+duas arestas por esta mudaria a trilha do 9º ano, e isso não foi pedido.
