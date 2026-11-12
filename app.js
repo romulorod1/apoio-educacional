@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.52';
+  var VERSAO = '1.42.54';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,7 +85,7 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.52',
+      versao: '1.42.54',
       itens: [
         'No 8º ano de Matemática entrou o assunto "Volume e capacidade: bloco retangular e cilindro", para escolher na aula e procurar na Biblioteca.'
       ]
@@ -16388,7 +16388,7 @@
       if (reg.meta.formato === 'epub') {
         return abrirLeitorEpub(reg, destino && destino.capitulo ? { capitulo: destino.capitulo, fracao: 0, ancora: destino.ancora || null } : pos);
       }
-      var sumario = reg.meta.sumario || [];
+      var sumario = sumarioDaTela(reg.meta);
       return abrirLeitorPdf(reg.blob, {
         titulo: tituloDoLivro(reg.meta), nome: reg.id + '.pdf',
         pagina: (destino && destino.pagina) || Biblioteca.paginaDaPosicao(reg.meta, pos) || 1,
@@ -17798,6 +17798,15 @@
     var nivel = nivelDosCapitulos(sumario);
     return (sumario || []).filter(function (e) { return (e.nivel || nivel) === nivel; });
   }
+  /* O sumário que a tela e o leitor usam: o dos marcadores do PDF, ou o do
+   * mapa quando os marcadores são lixo ("page1", "Blank Page", nome de
+   * arquivo). O critério mora em biblioteca.js (sumarioDoLivro). Todo lugar
+   * que conta, lista ou acha capítulo pelo sumário passa por aqui, para a
+   * tela do livro, o Continuar lendo, o leitor e o lado a lado dizerem o
+   * mesmo capítulo. */
+  function sumarioDaTela(meta) {
+    return Biblioteca.sumarioDoLivro(meta);
+  }
 
   function capaDoLivro(l, mini) {
     var capa = el('span', { class: 'bibl-capa' + (mini ? ' mini' : ''), 'aria-hidden': 'true' });
@@ -17813,7 +17822,7 @@
 
   // o tamanho do livro numa linha: "6 p. · 3 capítulos"
   function tamanhoDoLivro(meta) {
-    var caps = capitulosDoSumario(meta.sumario).length;
+    var caps = capitulosDoSumario(sumarioDaTela(meta)).length;
     return [meta.formato === 'epub' ? 'EPUB' : (meta.paginas ? meta.paginas + ' p.' : ''),
       caps ? plural(caps, 'capítulo', 'capítulos') : ''].filter(Boolean).join(' · ');
   }
@@ -17825,7 +17834,7 @@
     if (!pos) return '';
     var epub = meta.formato === 'epub';
     // os dois formatos contam pelos capítulos do sumário (o nível de cima), e não pelas seções
-    var caps = capitulosDoSumario(meta.sumario);
+    var caps = capitulosDoSumario(sumarioDaTela(meta));
     var ent = entradaAtualDoSumario(caps, epub ? 'capitulo' : 'pagina', epub ? (pos.capitulo || 1) : (pos.pagina || 1));
     var cap = '';
     if (ent) {
@@ -18053,7 +18062,7 @@
     } else bibLivrosNav.tipo = 'todos';
     var grade = el('div', { class: 'bibl-grade' });
     livrosDoRecorte.filter(function (l) { return bibLivrosNav.tipo === 'todos' || tipoDoMaterial(l.meta) === bibLivrosNav.tipo; }).forEach(function (l) {
-      var semSumario = !(l.meta.sumario && l.meta.sumario.length);
+      var semSumario = !sumarioDaTela(l.meta).length;
       var tipo = tipoDoMaterial(l.meta);
       grade.appendChild(el('button', { type: 'button', class: 'bibl-livro-cartao', 'data-livro': l.id,
         'aria-label': 'Abrir o sumário de ' + tituloDoLivro(l.meta),
@@ -18136,10 +18145,13 @@
     }, 0);
   }
 
-  // a entrada do mapa de um capítulo do sumário: pelo título, e na falta dele pelo começo
+  /* a entrada do mapa de um capítulo do sumário: o capítulo do mapa de onde
+   * ele veio (mapa_n, quando o sumário é o do mapa), depois pelo título, e
+   * na falta dele pelo começo */
   function entradaDoMapaDoCapitulo(mapa, meta, e) {
     var epub = meta.formato === 'epub';
-    return mapa.filter(function (m) { return m.titulo === e.titulo; })[0] ||
+    var doMapa = e.mapa_n != null ? mapa.filter(function (m) { return m.n === e.mapa_n; })[0] : null;
+    return doMapa || mapa.filter(function (m) { return m.titulo === e.titulo; })[0] ||
       mapa.filter(function (m) { return epub ? m.capitulo === e.capitulo && !e.ancora : m.pagina === e.pagina; })[0] || null;
   }
 
@@ -18152,7 +18164,7 @@
     var tela = $('#bib-livro');
     if (!tela) return;
     var meta = l.meta, epub = meta.formato === 'epub';
-    var sumario = Array.isArray(meta.sumario) ? meta.sumario : [];
+    var sumario = sumarioDaTela(meta);
     var mapa = Biblioteca.mapaDoLivro(meta, correcoesDosLivros()[l.id]);
     var nivel = nivelDosCapitulos(sumario);
     var capitulos = capitulosDoSumario(sumario);
@@ -18640,9 +18652,9 @@
   // "Cap. 3, Frações": o numeral do título, ou a posição do capítulo no sumário
   function rotuloDoCapituloDoMapa(meta, e) {
     if (e.obraInteira) return 'Livro inteiro';
-    var caps = capitulosDoSumario(meta.sumario);
+    var caps = capitulosDoSumario(sumarioDaTela(meta));
     var k = -1;
-    caps.forEach(function (c, i) { if (k < 0 && c.titulo === e.titulo) k = i; });
+    caps.forEach(function (c, i) { if (k < 0 && (c.mapa_n != null ? c.mapa_n === e.n : c.titulo === e.titulo)) k = i; });
     var p = partesDoCapitulo(e.titulo, k >= 0 ? k + 1 : e.n);
     return (p.palavra === 'Capítulo' ? 'Cap. ' : p.palavra + ' ') + p.numero + ', ' + p.titulo;
   }

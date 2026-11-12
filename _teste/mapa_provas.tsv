@@ -27,6 +27,8 @@ README.md	-
 .gitignore	-
 .github/workflows/*	-
 .github/monta_site.sh	-
+functions/*	-
+servidor/*	-
 _teste/mapa_provas.tsv	-
 _teste/tempos_do_portao.tsv	-
 _teste/merge_seguro.*	-

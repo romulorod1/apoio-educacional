@@ -309,6 +309,13 @@ roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
 # B4: o deploy no Cloudflare Pages so depois do portao inteiro verde na main,
 # com venenos, e o site montado com tudo o que o aplicativo pede.
 roda "publica cloudflare (B4)" node _teste/testa_publica_cloudflare.js
+# O endpoint de IA (fase 1 do projeto IA no app): login, lista de uids, limites,
+# modelo decidido no servidor, erro traduzido e registro sem conteudo. Sem rede.
+roda "endpoint de IA"         node _teste/testa_ia_endpoint.js
+# O mesmo empacotamento que o deploy faz (npm ci e wrangler pages functions
+# build), antes do merge: sem ele, um import quebrado so apareceria travando
+# o deploy da main. Precisa do registro do npm; sem rede, falha.
+roda "endpoint de IA (empacota)" node _teste/testa_ia_empacota.js
 # Politica de testes por checkpoint (09/11/2026): o nivel 1 (quais provas de
 # navegador rodam pelos arquivos tocados, com o mapa em mapa_provas.tsv) e o
 # nivel 3 (a main reaproveita a bateria inteira se o tree for igual ao da cabeca
@@ -502,6 +509,7 @@ roda "navegacao biblioteca --envenenado-rotulo-corta" node "_teste/testa_navegac
 # capitulo na pagina 1, e a prova tem de ver.
 roda "biblioteca livros tela"                   node "_teste/testa_biblioteca_livros_tela.js"
 roda "biblioteca livros tela --envenenado-capitulo-abre-pagina-errada" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-capitulo-abre-pagina-errada
+roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-sumario-dos-marcadores
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
@@ -1274,6 +1282,9 @@ roda "livros (regras) --envenenado-respostas-no-capitulo" node "_teste/testa_liv
 # Revisao do C15.5: o gabarito do fim do capitulo (achado so pelo lugar) nunca
 # tira pagina do capitulo exportado. O veneno volta a regra antiga.
 roda "livros (regras) --envenenado-fim-do-capitulo-tira" node "_teste/testa_livros_regras.js" --envenenado-fim-do-capitulo-tira
+# O sumario que a tela usa: marcadores lixo e sumario vazio dao lugar ao mapa.
+roda "livros (regras) --envenenado-sumario-dos-marcadores" node "_teste/testa_livros_regras.js" --envenenado-sumario-dos-marcadores
+roda "livros (regras) --envenenado-mapa-parcial-troca" node "_teste/testa_livros_regras.js" --envenenado-mapa-parcial-troca
 # B3: a pagina impressa do livro (trechos romanos e arabicos, mudanca no meio,
 # ida e volta em todas as paginas, tela e leitor mostrando a impressa e abrindo
 # e gravando em pagina do arquivo, e recusa so do livro com numeracao invalida).
