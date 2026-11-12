@@ -141,7 +141,10 @@ console.log('\n=== 3. O caminho real do --conferir, num repositorio de mentira =
 // O --conferir le o disco e o git de verdade. Aqui ele roda sobre um repo
 // montado na hora, com a main em v134 / 1.42.10 e ramos de cada caso.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ordem_versao_'));
-const g = args => execFileSync('git', args, { cwd: tmp, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+// Identidade pelo ambiente, para TODO comando (commit e merge): a maquina do CI
+// nao tem user.name, e o merge do caso "trazer a main errado" morria ali.
+const ID = { GIT_AUTHOR_NAME: 'prova', GIT_AUTHOR_EMAIL: 'prova@invalid', GIT_COMMITTER_NAME: 'prova', GIT_COMMITTER_EMAIL: 'prova@invalid' };
+const g = args => execFileSync('git', args, { cwd: tmp, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: Object.assign({}, process.env, ID) });
 const escreve = (cache, versao) => {
   fs.writeFileSync(path.join(tmp, 'sw.js'), "var ARQUIVOS = [];\nvar CACHE = 'apoio-educacional-v" + cache + "';\n");
   // Com mais de 1 MB, como o app.js de verdade: a primeira versao do --conferir
@@ -149,7 +152,7 @@ const escreve = (cache, versao) => {
   fs.writeFileSync(path.join(tmp, 'app.js'), "(function () {\n  var VERSAO = '" + versao + "';\n  // " +
     'x'.repeat(1300000) + "\n})();\n");
 };
-const commit = msg => { g(['add', '-A']); g(['-c', 'user.name=prova', '-c', 'user.email=prova@invalid', 'commit', '-q', '-m', msg]); };
+const commit = msg => { g(['add', '-A']); g(['commit', '-q', '-m', msg]); };
 let real = !VENENO;
 if (real) {
   try {
