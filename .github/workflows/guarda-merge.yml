@@ -25,6 +25,7 @@ name: guarda-merge
 
 on:
   pull_request_target:
+    branches: [main]
     types: [opened, synchronize, reopened, labeled, unlabeled]
   issue_comment:
     types: [created, edited, deleted]
@@ -38,7 +39,7 @@ on:
 # mais novo cancela o que estava julgando, e um failure julgado antes da
 # bateria terminar não sai depois do success. O push na main tem grupo próprio.
 concurrency:
-  group: guarda-merge-${{ github.event_name == 'push' && 'main' || github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha || github.run_id }}
+  group: guarda-merge-${{ github.event_name == 'push' && 'main' || github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
   cancel-in-progress: true
 
 permissions:

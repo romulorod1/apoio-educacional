@@ -12,9 +12,12 @@
  *    PRs sobem para a MESMA versão, o primeiro entra, e o segundo, que tinha
  *    success, passa a failure; o PR só de teste continua success.
  * 3. O guarda não julga a si mesmo (com controle sem a regra).
- * 4. O workflow: só código da main (pull_request_target, nunca pull_request),
- *    nenhum checkout da cabeça do PR, os quatro gatilhos, o modo "todos" no push,
- *    um grupo por PR, só a escrita de status, fork fora, e nada de strict.
+ * 4. O workflow: trava da PROPRIEDADE (três passos fixos, um run literal, sem
+ *    ref, repository nem cache, sem ${{ }} no run, nada que puxe o PR fora do env
+ *    e do if), rodada contra doze venenos que TÊM de ser vistos.
+ * E a main que anda no meio do julgamento não deixa sair veredito velho; no
+ * modo todos, o pending vai para todas as cabeças antes, e a leitura que falha
+ * sai 1.
  */
 'use strict';
 const fs = require('fs');
@@ -82,6 +85,7 @@ fs.writeFileSync(ghFalso, [
   "if (a[0] === 'pr' && a[1] === 'view') {",
   "  const n = a[2]; const p = m.prs[n];",
   "  if (!p) { process.stderr.write('no pull requests found'); process.exit(1); }",
+  "  if (m.viewErro && m.viewErro[n] && !/statusCheckRollup/.test(campos)) { process.stderr.write('HTTP 502: Bad Gateway'); process.exit(1); }",
   "  if (/statusCheckRollup/.test(campos)) { process.stdout.write(JSON.stringify(p)); process.exit(0); }",
   // a segunda leitura curta do guarda pode ver a cabeça nova (cabecaDepois)
   "  const v = fs.existsSync(process.env.FALSO_VISTAS) ? JSON.parse(fs.readFileSync(process.env.FALSO_VISTAS, 'utf8')) : {};",
@@ -93,7 +97,7 @@ fs.writeFileSync(ghFalso, [
   "  process.stdout.write(JSON.stringify(Object.values(m.prs).filter(p => p.headRefOid === sha).map(p => ({ number: p.number, headRefOid: p.headRefOid }))));",
   "} else if (a[0] === 'pr' && a[1] === 'list') {",
   "  if (m.listaErro) { process.stderr.write('HTTP 502'); process.exit(1); }",
-  "  process.stdout.write(JSON.stringify(Object.values(m.prs).filter(p => p.state === 'OPEN').map(p => ({ number: p.number }))));",
+  "  process.stdout.write(JSON.stringify(Object.values(m.prs).filter(p => p.state === 'OPEN').map(p => ({ number: p.number, headRefOid: p.headRefOid, isCrossRepository: !!p.isCrossRepository }))));",
   "} else if (a[0] === 'api' && a[1] === '-X' && /\\/statuses\\//.test(a[3])) {",
   "  if (m.statusErro) { process.stderr.write('HTTP 403'); process.exit(1); }",
   "  process.stdout.write('{}');",
@@ -108,7 +112,15 @@ fs.writeFileSync(gitFalso, [
   "const daArvore = t => Object.keys(m.merge).find(s => arvore(s) === t);",
   "const sw = c => \"var ARQUIVOS = [\\n  './',\\n  './tela.js'\\n];\\nvar CACHE = 'apoio-educacional-v\" + c + \"';\\n\";",
   "const app = v => \"  var VERSAO = '\" + v + \"';\\n\";",
-  "if (a[0] === 'fetch') {}",
+  // ls-remote da main: mainSha, e mainShaDepois a partir da segunda leitura (a
+  // main que anda no meio do julgamento); mainErro faz a leitura falhar.
+  "if (a[0] === 'ls-remote') {",
+  "  if (m.mainErro) { process.stderr.write('fatal: unable to access origin'); process.exit(128); }",
+  "  const arq = process.env.FALSO_VISTAS + '.main';",
+  "  const n = (fs.existsSync(arq) ? Number(fs.readFileSync(arq, 'utf8')) : 0) + 1; fs.writeFileSync(arq, String(n));",
+  "  const sha = n >= 2 && m.mainShaDepois ? m.mainShaDepois : (m.mainSha || 'e'.repeat(40));",
+  "  process.stdout.write(sha + '\\trefs/heads/main\\n');",
+  "} else if (a[0] === 'fetch') {}",
   "else if (a[0] === 'merge-tree') process.stdout.write(arvore(a[3]) + '\\n');",
   "else if (a[0] === 'diff') { const s = daArvore(a[4]); process.stdout.write((m.merge[s].levados || []).map(f => f + '\\0').join('')); }",
   "else if (a[0] === 'show') {",
@@ -124,6 +136,7 @@ function rodar(mundo, env) {
   fs.writeFileSync(mundoArq, JSON.stringify(mundo));
   fs.writeFileSync(log, '');
   if (fs.existsSync(vistas)) fs.unlinkSync(vistas);
+  if (fs.existsSync(vistas + '.main')) fs.unlinkSync(vistas + '.main');
   let codigo = 0, saida = '';
   try {
     saida = execFileSync(process.execPath, [script], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: Object.assign({}, process.env,
@@ -174,6 +187,23 @@ r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55') }, V(134, '1.42.54')
 conf('publicar que falha sai 1', r.codigo, 1);
 conf('e diz que não publicou', /não consegui publicar/.test(r.saida), true);
 
+// A main que anda no meio do julgamento: o veredito foi contra a main velha e
+// não sai; fica o pending, e o job do push decide.
+const M0 = '0'.repeat(39) + '1', M1 = '0'.repeat(39) + '2';
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55', ['app.js']) }, V(134, '1.42.54'), { mainSha: M0, mainShaDepois: M1 }));
+conf('main que anda no meio: só o pending, nenhum success', so(r, A), 'pending');
+conf('main que anda no meio: diz que o job do push decide', /a main andou de 0000000 para 0000000/.test(r.saida) && /job do push na main decide/.test(r.saida), true);
+conf('main que anda no meio: sai 0 (não é erro)', r.codigo, 0);
+p = pr(9, A); p.comments = [];
+r = rodar(mundoUm({ 9: p }, { [A]: V(135, '1.42.55', ['app.js']) }, V(134, '1.42.54'), { mainSha: M0, mainShaDepois: M1 }));
+conf('main que anda no meio: também não publica failure velho', so(r, A), 'pending');
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55', ['app.js']) }, V(134, '1.42.54'), { mainSha: M0 }));
+conf('controle: main parada, o mesmo PR recebe success', so(r, A), 'pending,success');
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55', ['app.js']) }, V(134, '1.42.54'), { mainErro: true }));
+conf('main que não se lê: sai 1, só o pending', r.codigo === 1 && so(r, A) === 'pending', true);
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55') }, V(134, '1.42.54'), { viewErro: { 9: true } }));
+conf('modo um, PR que não se lê: sai 1 e diz', r.codigo === 1 && /não consegui ler o PR #9/.test(r.saida), true);
+
 console.log('\n=== 2. A main andou: todos os PRs abertos são rejulgados ===');
 // Antes: main em v133 / 1.42.53. O #10 e o #11 sobem os dois para v134 / 1.42.54;
 // o #12 é só de teste. Os três recebem success.
@@ -196,34 +226,87 @@ r = rodar(mundoUm(prs, antes, V(133, '1.42.53'), { listaErro: true }), { MODO: '
 conf('lista que falha no modo todos sai 1, sem publicar', r.codigo === 1 && r.status.length === 0, true);
 r = rodar(mundoUm({ 11: pr(11, B, { isCrossRepository: true }), 12: prs[12] }, mergeDepois, V(134, '1.42.54')), { MODO: 'todos' });
 conf('no modo todos, o fork é pulado e o resto julgado', !r.status.some(s => s.sha === B) && so(r, C) === 'pending,success', true);
+// Pending em TODAS as cabeças antes de julgar qualquer uma, e o PR que não se
+// lê fica pending (não com o success velho), com saída 1.
+r = rodar(mundoUm({ 11: prs[11], 12: prs[12] }, mergeDepois, V(134, '1.42.54'), { viewErro: { 11: true } }), { MODO: 'todos' });
+const ordemEstados = r.status.map(s => s.sha.slice(0, 1) + ':' + s.estado).join(' ');
+conf('modo todos: os dois pendings vêm antes de qualquer veredito (' + ordemEstados + ')',
+  r.status.slice(0, 2).every(s => s.estado === 'pending') && new Set(r.status.slice(0, 2).map(s => s.sha)).size === 2, true);
+conf('modo todos: o #11, que não se lê, fica só com o pending', so(r, B), 'pending');
+conf('modo todos: o #12 é julgado mesmo assim (sem pending repetido)', so(r, C), 'pending,success');
+conf('modo todos: a leitura que falhou sai 1 e diz', r.codigo === 1 && /não consegui ler o PR #11/.test(r.saida), true);
 
-console.log('\n=== 4. O workflow ===');
+console.log('\n=== 4. O workflow: a trava é da PROPRIEDADE, e roda contra venenos ===');
 const yml = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'guarda-merge.yml'), 'utf8').replace(/\r/g, '');
-const codigoYml = yml.split('\n').filter(l => !/^\s*#/.test(l)).join('\n');
-conf('dispara em pull_request_target', /^  pull_request_target:/m.test(codigoYml), true);
-conf('NÃO dispara em pull_request (código do PR)', /^  pull_request:/m.test(codigoYml), false);
-conf('dispara em issue_comment', /^  issue_comment:/m.test(codigoYml), true);
-conf('dispara na conclusão da bateria (workflow_run do portao)', /^  workflow_run:\n    workflows: \[portao\]\n    types: \[completed\]/m.test(codigoYml), true);
-conf('dispara no push da main', /^  push:\n    branches: \[main\]/m.test(codigoYml), true);
-conf('o push roda o modo todos', /MODO: \$\{\{ github\.event_name == 'push' && 'todos' \|\| 'um' \}\}/.test(codigoYml), true);
-// Nenhum checkout da cabeça do PR: um checkout só, sem ref nem repository, e
-// nenhuma menção à cabeça ou ao ramo do PR fora do "if" do fork.
-const checkouts = codigoYml.match(/uses: actions\/checkout@/g) || [];
-conf('um checkout só', checkouts.length, 1);
-const blocoCheckout = (codigoYml.match(/uses: actions\/checkout@v4\n(?:        .*\n)*/) || [''])[0];
-conf('o checkout não escolhe ref nem repositório (fica a main)', /\bref:|repository:/.test(blocoCheckout), false);
-const semIfDoFork = codigoYml.replace("github.event.pull_request.head.repo.full_name == github.repository", '');
-conf('nada de head.sha, head.ref ou refs/pull no workflow', /head\.sha|head\.ref|head_ref|refs\/pull|pull_request\.head/.test(semIfDoFork), false);
-conf('o fork fica de fora no próprio if', /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/.test(codigoYml), true);
-conf('pode publicar status', /^  statuses: write$/m.test(codigoYml), true);
-conf('não pede escrita além do status', (codigoYml.match(/: write$/gm) || []).length, 1);
-conf('roda o guarda_merge.js', /run: node _teste\/guarda_merge\.js/.test(codigoYml), true);
-const grupo = (codigoYml.match(/group: (.*)/) || [])[1] || '';
-conf('um grupo por PR para os três eventos de PR, e um para o push',
-  ['pull_request.number', 'issue.number', 'workflow_run.pull_requests[0].number', "github.event_name == 'push' && 'main'"].every(s => grupo.indexOf(s) >= 0), true);
-conf('nada de strict', /strict/i.test(codigoYml), false);
-conf('não exige nem cita o portao-navegador fora dos comentários', /portao-navegador/.test(codigoYml), false);
-conf('o job se chama guarda-merge, o nome que o merge_seguro ignora', /^  guarda-merge:/m.test(codigoYml), true);
+/* A trava devolve a lista do que viola a propriedade "só código da main, num
+ * único caminho". Os extremos (um checkout sem ref, nada de head.sha) deixavam
+ * passar cinco jeitos de rodar código do PR; por isso a forma é fixa: três
+ * passos, nessa ordem, um run só e literal, e nenhuma palavra que puxe o PR fora
+ * do env e do if. */
+function travaYml(texto) {
+  const v = [];
+  const linhas = texto.replace(/\r/g, '').split('\n').filter(l => !/^\s*#/.test(l));
+  const codigo = linhas.join('\n');
+  if (!/^  pull_request_target:\n    branches: \[main\]\n/m.test(codigo)) v.push('pull_request_target sem branches: [main] logo abaixo');
+  if (/^  pull_request:/m.test(codigo)) v.push('dispara em pull_request (código do PR)');
+  if (!/^  issue_comment:/m.test(codigo)) v.push('sem issue_comment');
+  if (!/^  workflow_run:\n    workflows: \[portao\]\n    types: \[completed\]/m.test(codigo)) v.push('sem workflow_run do portao');
+  if (!/^  push:\n    branches: \[main\]/m.test(codigo)) v.push('sem push na main');
+  if (!/MODO: \$\{\{ github\.event_name == 'push' && 'todos' \|\| 'um' \}\}/.test(codigo)) v.push('o push não roda o modo todos');
+  if (!/^  statuses: write$/m.test(codigo)) v.push('sem statuses: write');
+  if ((codigo.match(/: write\s*$/gm) || []).length !== 1) v.push('escrita além do status');
+  if (/strict/i.test(codigo)) v.push('strict');
+  if (/portao-navegador/.test(codigo)) v.push('cita o portao-navegador');
+  if (!/^  guarda-merge:/m.test(codigo)) v.push('o job não se chama guarda-merge');
+  // Passos: exatamente três, nesta ordem.
+  const iSteps = linhas.findIndex(l => /^    steps:\s*$/.test(l));
+  const itens = iSteps < 0 ? [] : linhas.slice(iSteps + 1).filter(l => /^      - /.test(l));
+  if (itens.length !== 3) v.push('são ' + itens.length + ' passos, e não 3');
+  if (itens[0] !== '      - uses: actions/checkout@v4') v.push('o 1º passo não é o checkout');
+  if (itens[1] !== '      - uses: actions/setup-node@v4') v.push('o 2º passo não é o setup-node');
+  if (!/^      - name: /.test(itens[2] || '')) v.push('o 3º passo não é o do guarda');
+  const runs = linhas.filter(l => /^\s*(- )?run:/.test(l));
+  if (runs.length !== 1 || runs[0] !== '        run: node _teste/guarda_merge.js') v.push('o run não é só "node _teste/guarda_merge.js"');
+  if (runs.some(l => /\$\{\{/.test(l))) v.push('${{ }} dentro de run');
+  if (/^\s*(- )?(ref|repository|cache[\w-]*)\s*:/m.test(codigo)) v.push('chave ref, repository ou cache');
+  // Fora do env e do if: nenhuma palavra que puxe o PR ou instale algo.
+  const fora = [];
+  let pular = -1;
+  linhas.forEach(l => {
+    const ind = l.length - l.trimStart().length;
+    if (pular >= 0 && (ind > pular || !l.trim())) return;
+    pular = -1;
+    if (/^\s*(env|if):/.test(l)) { pular = ind; return; }
+    fora.push(l);
+  });
+  const foraTexto = fora.filter(l => l !== '      - uses: actions/checkout@v4').join('\n');
+  ['checkout', 'npm', 'pull/', 'title', 'body', 'head_ref', 'head_sha', 'head.sha', 'head.ref', 'refs/pull', 'pull_request.head']
+    .forEach(p => { if (foraTexto.indexOf(p) >= 0) v.push('"' + p + '" fora do env e do if'); });
+  return v;
+}
+conf('o yml de verdade passa a trava (' + (travaYml(yml).join('; ') || 'nada') + ')', travaYml(yml).length, 0);
+const troca = (de, para) => { if (yml.indexOf(de) < 0) throw new Error('veneno não achou: ' + de); return yml.replace(de, para); };
+const CK = '      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n';
+const GUARDA = '      - name: Julga e publica o status portao-merge\n';
+const RUN = '        run: node _teste/guarda_merge.js';
+const VENENOS = [
+  ['with: ref: head_sha antes do uses', troca(CK, '      - with:\n          ref: ${{ github.event.workflow_run.head_sha }}\n          fetch-depth: 0\n        uses: actions/checkout@v4\n')],
+  ['gh pr checkout num passo separado', troca(GUARDA, '      - run: gh pr checkout ${{ github.event.pull_request.number }}\n' + GUARDA)],
+  ['git fetch pull/N/head e checkout do FETCH_HEAD', troca(GUARDA, '      - run: git fetch origin pull/1/head && git checkout FETCH_HEAD\n' + GUARDA)],
+  ['título do PR dentro do run', troca(RUN, '        run: node _teste/guarda_merge.js "${{ github.event.pull_request.title }}"')],
+  ['npm install', troca(RUN, '        run: npm install && node _teste/guarda_merge.js')],
+  ['gatilho pull_request', troca('  pull_request_target:\n', '  pull_request:\n')],
+  ['ref da cabeça no checkout', troca(CK, CK + '          ref: ${{ github.event.pull_request.head.sha }}\n')],
+  ['repository do fork no checkout', troca(CK, CK + '          repository: ${{ github.event.pull_request.head.repo.full_name }}\n')],
+  ['um segundo checkout', troca(GUARDA, '      - uses: actions/checkout@v4\n' + GUARDA)],
+  ['refs/pull no run', troca(RUN, '        run: git fetch origin refs/pull/1/head && node _teste/guarda_merge.js')],
+  ['strict', troca(CK, CK + '          strict: true\n')],
+  ['escrita além do status', troca('  statuses: write\n', '  statuses: write\n  contents: write\n')]
+];
+VENENOS.forEach(([nome, texto]) => {
+  const v = travaYml(texto);
+  conf('VENENO visto: ' + nome + ' (' + (v[0] || 'nada acusado') + ')', v.length > 0, true);
+});
 
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log('\n' + passes + ' passaram, ' + falhas + ' falharam.');

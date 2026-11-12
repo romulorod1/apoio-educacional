@@ -17,14 +17,19 @@
  *          regras dependem da main atual (CACHE e VERSAO maiores, ramo em dia
  *          quando é risco, merge sem conflito); sem isto, dois PRs com o mesmo
  *          número de versão ficavam os dois com success, o primeiro entrava e o
- *          segundo seguia aprovado.
+ *          segundo seguia aprovado. Antes de julgar qualquer um, publica
+ *          pending em TODAS as cabeças: um PR que depois não se consegue ler
+ *          não fica com o success velho.
  *
- * Em cada PR: publica pending ("julgando") na cabeça, julga, relê a cabeça e só
- * publica o veredito se ela não andou. PR que vem de fork é pulado com o motivo
- * dito: o token do repositório não deve julgar código de fora.
+ * Em cada PR: publica pending ("julgando"), lê a main, julga, relê a cabeça e a
+ * main, e só publica o veredito se nenhuma das duas andou. Se a main andou, o
+ * veredito foi dado contra uma main que já não existe: fica o pending, e o job
+ * do push na main, que rejulga todos, decide. PR que vem de fork é pulado com
+ * o motivo dito: o token deste repositório não julga código de fora.
  *
  * Costura das provas: GH e GIT terminados em .js rodam pelo node (falsos de
- * caminho absoluto, sem rede). Saída 1 só quando não conseguiu publicar.
+ * caminho absoluto, sem rede). Saída 1 quando não conseguiu ler um PR, ler a
+ * main, listar os PRs ou publicar; recusa do merge_seguro não é erro do job.
  */
 'use strict';
 const path = require('path');
@@ -32,12 +37,16 @@ const { execFileSync } = require('child_process');
 
 const REPO = process.env.REPO_MERGE_SEGURO || 'romulorod1/apoio-educacional';
 const GH = process.env.GH || 'gh';
+const GIT = process.env.GIT || 'git';
 const MERGE_SEGURO = path.join(__dirname, 'merge_seguro.js');
+const RAIZ = path.join(__dirname, '..');
 
-function gh(args) {
-  const [bin, pre] = /\.js$/.test(GH) ? [process.execPath, [GH]] : [GH, []];
-  return execFileSync(bin, pre.concat(args), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 });
+function roda(bin0, args, cwd) {
+  const [bin, pre] = /\.js$/.test(bin0) ? [process.execPath, [bin0]] : [bin0, []];
+  return execFileSync(bin, pre.concat(args), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024, cwd });
 }
+const gh = args => roda(GH, args);
+const git = args => roda(GIT, args, RAIZ);
 const primeiraLinha = e => String((e && (e.stderr || e.message)) || e).split('\n')[0];
 /* O GitHub corta a descrição em 140; cortada aqui, sem partir acento. */
 function corta(s) {
@@ -47,7 +56,13 @@ function corta(s) {
 function verPR(numero) {
   return JSON.parse(gh(['pr', 'view', String(numero), '-R', REPO, '--json', 'number,headRefOid,isCrossRepository,state,baseRefName']));
 }
-let falhouPublicar = false;
+/* O sha da main AGORA, no servidor (não o da cópia local). Lança se não conseguir. */
+function mainAgora() {
+  const sha = (git(['ls-remote', 'origin', 'refs/heads/main']).split(/\s/)[0] || '').trim();
+  if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('o ls-remote não devolveu o sha da main: [' + sha + ']');
+  return sha;
+}
+let erro = false;
 function publicar(sha, estado, descricao) {
   try {
     gh(['api', '-X', 'POST', 'repos/' + REPO + '/statuses/' + sha, '-f', 'state=' + estado, '-f', 'context=portao-merge',
@@ -56,7 +71,7 @@ function publicar(sha, estado, descricao) {
     return true;
   } catch (e) {
     console.log('FALHOU    não consegui publicar portao-merge=' + estado + ' em ' + sha.slice(0, 7) + ': ' + primeiraLinha(e));
-    falhouPublicar = true;
+    erro = true;
     return false;
   }
 }
@@ -69,11 +84,13 @@ function primeiroMotivo(saida) {
   return recusa ? recusa.replace(/^RECUSADO  /, '') : 'o merge_seguro recusou (veja a rodada)';
 }
 
-/* Julga um PR. Devolve o estado publicado, ou null quando não publicou. */
-function julgar(numero) {
+/* Julga um PR. Devolve o estado publicado, ou null quando não publicou
+ * veredito. jaPendente: o modo todos já publicou o pending nesta cabeça. */
+function julgar(numero, jaPendente) {
   let pr;
   try { pr = verPR(numero); } catch (e) {
-    console.log('não julgo o PR #' + numero + ': não consegui lê-lo: ' + primeiraLinha(e));
+    console.log('FALHOU    não consegui ler o PR #' + numero + ': ' + primeiraLinha(e));
+    erro = true;
     return null;
   }
   if (pr.isCrossRepository) {
@@ -85,9 +102,19 @@ function julgar(numero) {
     return null;
   }
   const cabeca = String(pr.headRefOid || '');
-  if (!/^[0-9a-f]{40}$/.test(cabeca)) { console.log('não julgo o PR #' + numero + ': cabeça ilegível'); return null; }
+  if (!/^[0-9a-f]{40}$/.test(cabeca)) {
+    console.log('FALHOU    o PR #' + numero + ' veio com a cabeça ilegível');
+    erro = true;
+    return null;
+  }
   // Pending logo no começo: o veredito anterior não vale enquanto este julga.
-  publicar(cabeca, 'pending', 'julgando o commit ' + cabeca.slice(0, 7));
+  if (jaPendente !== cabeca) publicar(cabeca, 'pending', 'julgando o commit ' + cabeca.slice(0, 7));
+  let main0;
+  try { main0 = mainAgora(); } catch (e) {
+    console.log('FALHOU    não consegui ler a main antes de julgar o PR #' + numero + ': ' + primeiraLinha(e));
+    erro = true;
+    return null;
+  }
   let codigo = 0, saida = '';
   try {
     saida = execFileSync(process.execPath, [MERGE_SEGURO, String(numero), '--guarda'],
@@ -105,6 +132,16 @@ function julgar(numero) {
     console.log('não publico o veredito do PR #' + numero + ': a cabeça mudou de ' + cabeca.slice(0, 7) + ' para ' + (agora || '?').slice(0, 7) + ' durante a conferência');
     return null;
   }
+  let main1 = '';
+  try { main1 = mainAgora(); } catch (e) { main1 = ''; }
+  if (main1 !== main0) {
+    // O veredito foi contra a main0. Publicá-lo agora poderia cobrir, por último,
+    // o que o job do push na main1 acabou de decidir.
+    console.log('não publico o veredito do PR #' + numero + ': a main andou de ' + main0.slice(0, 7) + ' para ' + (main1 || '?').slice(0, 7) +
+      ' durante o julgamento; fica o pending, e o job do push na main decide');
+    if (!main1) erro = true;
+    return null;
+  }
   if (codigo === 0) return publicar(cabeca, 'success', 'cumpre o processo no commit ' + cabeca.slice(0, 7)) ? 'success' : null;
   return publicar(cabeca, 'failure', primeiroMotivo(saida)) ? 'failure' : null;
 }
@@ -114,14 +151,20 @@ function principal() {
   if (modo === 'todos') {
     let abertos;
     try {
-      abertos = JSON.parse(gh(['pr', 'list', '-R', REPO, '--state', 'open', '--base', 'main', '--limit', '200', '--json', 'number']));
+      abertos = JSON.parse(gh(['pr', 'list', '-R', REPO, '--state', 'open', '--base', 'main', '--limit', '200', '--json', 'number,headRefOid,isCrossRepository']));
     } catch (e) {
       console.log('FALHOU    não consegui listar os PRs abertos: ' + primeiraLinha(e));
       return 1;
     }
     console.log('a main andou: rejulgo ' + abertos.length + ' PR(s) aberto(s)');
-    abertos.forEach(p => julgar(p.number));
-    return falhouPublicar ? 1 : 0;
+    // Primeiro o pending em TODAS as cabeças, e só depois o julgamento: o PR
+    // que não se consegue ler fica pending, e não com o success de antes.
+    const pendentes = {};
+    abertos.filter(p => !p.isCrossRepository && /^[0-9a-f]{40}$/.test(String(p.headRefOid || ''))).forEach(p => {
+      if (publicar(p.headRefOid, 'pending', 'a main andou: rejulgando o commit ' + p.headRefOid.slice(0, 7))) pendentes[p.number] = p.headRefOid;
+    });
+    abertos.forEach(p => julgar(p.number, pendentes[p.number]));
+    return erro ? 1 : 0;
   }
   let numero = String(process.env.PR_NUM || '').trim();
   const sha = String(process.env.SHA_DO_EVENTO || '').trim();
@@ -130,14 +173,17 @@ function principal() {
       const achados = JSON.parse(gh(['pr', 'list', '-R', REPO, '--state', 'open', '--search', sha, '--json', 'number,headRefOid']));
       const p = achados.find(x => x.headRefOid === sha);
       if (p) numero = String(p.number);
-    } catch (e) { console.log('não consegui procurar o PR do sha ' + sha + ': ' + primeiraLinha(e)); }
+    } catch (e) {
+      console.log('FALHOU    não consegui procurar o PR do sha ' + sha + ': ' + primeiraLinha(e));
+      return 1;
+    }
   }
   if (!/^[0-9]+$/.test(numero)) {
     console.log('nada a julgar: o evento não traz PR aberto (sha ' + (sha || 'nenhum') + ')');
     return 0;
   }
   julgar(numero);
-  return falhouPublicar ? 1 : 0;
+  return erro ? 1 : 0;
 }
 
 if (require.main === module) process.exit(principal());

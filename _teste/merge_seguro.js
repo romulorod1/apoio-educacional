@@ -375,9 +375,11 @@ function conferirVersao() {
 /* --guarda: o modo do job portao-merge (.github/workflows/guarda-merge.yml).
  * Confere como o --conferir, nunca faz merge, e imprime "cabeca <sha>" assim
  * que le o PR, para o job publicar o veredito no commit que ele julgou. Nao faz
- * a conferencia de "sou a copia da main": no CI o arquivo sai fresco do checkout
- * do evento (a main, no comentario e na conclusao da bateria; o merge do PR, no
- * pull_request), e num PR que muda este proprio arquivo ela recusaria sempre. */
+ * a conferencia de "sou a copia da main": no CI o arquivo sai do checkout do
+ * evento, que nos quatro gatilhos e a main (pull_request_target, comentario,
+ * bateria e push), e a main pode ter andado desde o evento; quem cuida disso e o
+ * guarda, que nao publica veredito se a main andou durante o julgamento, e o job
+ * do push na main, que rejulga todos os PRs abertos. */
 function principal(argv) {
   const numero = argv[0];
   const guarda = argv.indexOf('--guarda') >= 0;
