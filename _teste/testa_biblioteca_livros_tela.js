@@ -848,7 +848,9 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   const visto = {};
   const checa = (rotulo, obtido, esperado, veneno) => {
     if (VENENO_LEITOR) {
-      if (veneno === VENENO_LEITOR && String(obtido) !== String(esperado)) visto[veneno] = rotulo + ' [obtido: ' + obtido + ']';
+      if (veneno === VENENO_LEITOR && String(obtido) !== String(esperado)) {
+        visto[veneno] = (visto[veneno] ? visto[veneno] + ' ; ' : '') + rotulo + ' [obtido: ' + obtido + ']';
+      }
       return;
     }
     conf(rotulo, obtido, esperado);
@@ -896,6 +898,39 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   const vizinhasDesenhadas = async rotulo => (await esperar(rotulo + ': as páginas à vista desenhadas', meioDoLeitor, v => v.vazias === '', 1000)).ok;
   const desvio = (antes, depois) => depois.fy === null || antes.fy === null ? null : Math.abs(depois.fy - antes.fy) * depois.altura;
   const contaDiz = (m, n) => new RegExp('(Página|p\\.) ' + n + ' de 400').test(m.contador);
+
+  // ---- arrastar a barra da p. 50 à 350: rolagem direta, quase nenhum canvas de passagem e uma gravação só, ao soltar
+  await irParaPagina(50);
+  await pausa(600);
+  await pag.evaluate(() => {
+    window.__canvasCriados = 0;
+    window.__createElementOriginal = document.createElement;
+    document.createElement = function (nome) {
+      if (String(nome).toLowerCase() === 'canvas') window.__canvasCriados++;
+      return window.__createElementOriginal.apply(document, arguments);
+    };
+    window.__posicoesGravadas = [];
+    window.__gravarPosicaoOriginal = Store.gravarPosicaoLivro;
+    Store.gravarPosicaoLivro = function (pos) { window.__posicoesGravadas.push(pos && pos.pagina); return window.__gravarPosicaoOriginal.apply(Store, arguments); };
+  });
+  await pag.evaluate(async () => {
+    const s = document.querySelector('#leitor-slider-pagina');
+    for (let v = 51; v <= 350; v++) { s.value = String(v); s.dispatchEvent(new Event('input', { bubbles: true })); await new Promise(r => setTimeout(r, 16)); }
+    s.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await pausa(1500);
+  const arrasto = await pag.evaluate(() => {
+    const r = { criados: window.__canvasCriados, gravadas: window.__posicoesGravadas.join(','),
+      contador: document.querySelector('#leitor-contador').textContent };
+    document.createElement = window.__createElementOriginal;
+    Store.gravarPosicaoLivro = window.__gravarPosicaoOriginal;
+    return r;
+  });
+  const m350 = await meioDoLeitor();
+  console.log('   barra de 50 a 350: ' + arrasto.criados + ' canvases criados; posições gravadas: ' + arrasto.gravadas);
+  conf('arrastar a barra de 50 a 350 cria no máximo 12 canvases (sem desenhar o caminho)', arrasto.criados <= 12, true);
+  conf('e grava a posição uma vez só, a 350, ao soltar', arrasto.gravadas, '350');
+  conf('e a página 350 fica no meio, com o contador nela', m350.meio + '|' + contaDiz(m350, 350), '350|true');
 
   // ---- o "+" na p. 206
   const a206 = await irParaPagina(206);
@@ -945,6 +980,19 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   const dm = await meioDoLeitor();
   checa('depois do "−", a página 300 continua no meio', dm.meio, 300, 'zoom-sem-ancora');
   checa('depois do "−", toda página à vista tem canvas em até 1 s', await vizinhasDesenhadas('o "−"'), true, 'vizinhas-sem-desenho');
+  /* o redimensionamento sozinho desenha as páginas à vista, sem a ajuda do
+   * evento de rolagem: com o evento segurado antes do leitor, o "−" de novo (agora
+   * duas páginas à vista) ainda deixa as duas desenhadas */
+  await pag.evaluate(() => {
+    // o evento de rolagem do leitor para antes de chegar nele (fase de captura no documento)
+    window.__seguraRolagem = e => { if (e.target && e.target.id === 'corpo-modal-leitor-pdf') e.stopImmediatePropagation(); };
+    document.addEventListener('scroll', window.__seguraRolagem, true);
+  });
+  await clicar(pag, '#leitor-menos');
+  await pausa(150);
+  const semQuadro = await vizinhasDesenhadas('o "−" sem o evento de rolagem');
+  await pag.evaluate(() => { document.removeEventListener('scroll', window.__seguraRolagem, true); delete window.__seguraRolagem; });
+  checa('sem o evento de rolagem, o "−" também redesenha as páginas à vista em até 1 s', semQuadro, true, 'vizinhas-sem-desenho');
   await clicar(pag, '#leitor-largura');
   await pausa(600);
 
@@ -989,6 +1037,18 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   checa('em pé com zoom perto de 2, depois de 80 passos, no máximo 4 canvases vivos', desceZ.vivos <= 4, true, 'canvas-sem-soltar');
   const sobeZ = await rolar(-400, 80);
   checa('e depois de voltar, no máximo 4', sobeZ.vivos <= 4, true, 'canvas-sem-soltar');
+  // no zoom 4 a página é muito maior que a tela: a vizinha longe não fica viva
+  for (let i = 0; i < 5; i++) { await clicar(pag, '#leitor-mais'); await pausa(400); }
+  await pausa(800);
+  let picoZ4 = 0;
+  for (let i = 0; i < 12; i++) {
+    await pag.evaluate(() => { document.querySelector('#corpo-modal-leitor-pdf').scrollTop += 300; });
+    await pausa(250);
+    picoZ4 = Math.max(picoZ4, (await meioDoLeitor()).vivos);
+  }
+  console.log('   zoom 4: pico de ' + picoZ4 + ' canvases vivos rolando de 300 em 300 px');
+  conf('no zoom 4, o pico fica em no máximo 2 canvases vivos', picoZ4 <= 2, true);
+  conf('e a página à vista segue desenhada', (await esperar('o zoom 4: a página à vista desenhada', meioDoLeitor, v => v.vazias === '', 8000)).ok, true);
   await clicar(pag, '#leitor-largura');
   await pausa(400);
 

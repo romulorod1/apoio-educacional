@@ -32,7 +32,7 @@ const jsonMatematica = JSON.parse(
 );
 const temas = jsonMatematica.temas || [];
 
-conf('total de assuntos no índice de matemática', temas.length, 148);
+conf('total de assuntos no índice de matemática (148 de 09/2026 e o MAT08-15)', temas.length, 149);
 
 const semCampo = temas.filter(t => t.modulo === undefined);
 

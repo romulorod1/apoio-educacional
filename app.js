@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.57';
+  var VERSAO = '1.42.58';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,16 +85,22 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.57',
+      versao: '1.42.58',
       itens: [
         'Na Biblioteca, busque palavras no texto dos livros e abra o resultado no capítulo e página encontrados. A busca não altera o livro nem a aula.'
       ]
     },
     {
-      versao: '1.42.56',
+      versao: '1.42.57',
       itens: [
         'No tablet, a leitura de livros PDF segue em rolagem cont\u00ednua, e a barra permite ir diretamente a uma p\u00e1gina.',
         'Na exporta\u00e7\u00e3o, marque p\u00e1ginas com toques ou digite intervalos pela numera\u00e7\u00e3o impressa; p\u00e1ginas sem n\u00famero aparecem como "arquivo N".'
+      ]
+    },
+    {
+      versao: '1.42.54',
+      itens: [
+        'No 8º ano de Matemática entrou o assunto "Volume e capacidade: bloco retangular e cilindro", para escolher na aula e procurar na Biblioteca.'
       ]
     },
     {
@@ -2756,7 +2762,12 @@
     }
     $('#corpo-modal-leitor-pdf').addEventListener('scroll', rolarLeitorContinuo, { passive: true });
     $('#leitor-slider-pagina').addEventListener('input', function () {
-      if (leitor && leitor.continuo) irAProximaPaginaDoLeitor(+this.value, true, true);
+      // rolagem DIRETA: a suave atravessava as páginas do caminho, desenhava cada uma
+      // e deixava o temporizador gravar posições intermediárias depois de soltar
+      if (leitor && leitor.continuo) {
+        leitor.arrastandoAte = Date.now() + LEITOR_ARRASTO_MS;
+        irAProximaPaginaDoLeitor(+this.value, false, true);
+      }
     });
     // ao soltar a barra: aí sim a posição do livro é gravada, uma vez
     $('#leitor-slider-pagina').addEventListener('change', function () {
@@ -23383,7 +23394,8 @@
     registro.desenhando = true;
     var tarefaDaPagina = null;
     registro.promessa = estado.doc.getPage(registro.n).then(function (pagina) {
-      if (estado !== leitor) return null;
+      // a página saiu de perto da tela enquanto o pdf.js a abria: nem cria o canvas
+      if (estado !== leitor || !registro.visivel) return null;
       var corpo = $('#corpo-modal-leitor-pdf');
       var base = pagina.getViewport({ scale: 1 });
       var largura = Math.max(160, corpo.clientWidth - 36) * estado.zoom;
@@ -23443,14 +23455,43 @@
    * estavam na margem ficavam em branco, porque o observador não volta a
    * avisar quem não saiu. A conciliação não depende de evento. */
   var LEITOR_FOLGA_PX = 200;
+  var LEITOR_ARRASTO_MS = 150;
+  var leitorDepoisDoArrasto = null;
   function conciliarPaginasContinuas(estado, centro) {
     if (!estado || !estado.paginas || !estado.paginas.length) return;
+    /* Arrastando a barra, a página muda a cada movimento: desenhar cada uma
+     * criava um canvas por página do caminho (300 da p. 50 à 350). Enquanto
+     * ela arrasta, só se solta o que saiu; o desenho espera a barra parar. */
+    var falta = (estado.arrastandoAte || 0) - Date.now();
+    if (falta > 0) {
+      clearTimeout(leitorDepoisDoArrasto);
+      leitorDepoisDoArrasto = setTimeout(function () {
+        leitorDepoisDoArrasto = null;
+        if (estado === leitor) conciliarPaginasContinuas(estado, estado.pagina);
+      }, falta + 10);
+      estado.paginas.forEach(function (pagina) {
+        if (pagina.n !== centro && (pagina.visivel || pagina.desenhando || pagina.temCanvas)) {
+          pagina.visivel = false;
+          liberarPaginaContinua(pagina);
+        }
+      });
+      return;
+    }
     var corpo = $('#corpo-modal-leitor-pdf');
     var rc = corpo.getBoundingClientRect();
     var topo = rc.top - LEITOR_FOLGA_PX, fundo = rc.top + corpo.clientHeight + LEITOR_FOLGA_PX;
     var c = Math.max(1, Math.min(estado.total, centro || estado.pagina || 1));
     var ficam = {};
-    for (var k = c - 1; k <= c + 1; k++) if (k >= 1 && k <= estado.total) ficam[k] = true;
+    ficam[c] = true;
+    /* As vizinhas ficam prontas para a rolagem, mas só se estiverem a menos
+     * de uma altura de tela da área à vista: no zoom alto a página é maior
+     * que a tela, e a vizinha lá longe só gastava memória (36 Mpx no zoom 4). */
+    var alcance = corpo.clientHeight;
+    [c - 1, c + 1].forEach(function (k) {
+      if (k < 1 || k > estado.total) return;
+      var r = estado.paginas[k - 1].caixa.getBoundingClientRect();
+      if (r.bottom >= rc.top - alcance && r.top <= rc.top + corpo.clientHeight + alcance) ficam[k] = true;
+    });
     // as caixas estão em ordem, uma embaixo da outra: anda do centro para os dois lados
     for (var cima = c; cima >= 1; cima--) {
       var rCima = estado.paginas[cima - 1].caixa.getBoundingClientRect();
@@ -23507,7 +23548,8 @@
         $('#corpo-modal-leitor-pdf').dataset.paginaDesenhada = String(n);
         atualizarBarraDoLeitor();
         if (typeof leitor.opcoes.aoMudarPagina === 'function') {
-          try { leitor.opcoes.aoMudarPagina(n); } catch (e) { /* posição é auxiliar */ }
+          // no meio de um arrasto da barra, a posição só grava ao soltar
+          try { leitor.opcoes.aoMudarPagina(n, { gravar: !((leitor.arrastandoAte || 0) > Date.now()) }); } catch (e) { /* posição é auxiliar */ }
         }
       }
     });
@@ -23538,6 +23580,8 @@
       }
       p.caixa.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'start' });
       conciliarPaginasContinuas(leitor, p.n);
+      // arrastando a barra, o desenho espera ela parar (a conciliação agenda)
+      if ((leitor.arrastandoAte || 0) > Date.now()) return Promise.resolve(false);
       return desenharPaginaContinua(leitor, p).then(function () { return !!p.caixa.querySelector('canvas'); });
     }
     desenharPaginaDoLeitor(true);

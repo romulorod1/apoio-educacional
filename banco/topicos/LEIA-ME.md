@@ -20,7 +20,9 @@ autorais quando o material saiu do repositório (B14, 26/10/2026): uma lista
 as aulas gravadas citam e que nunca mudam), `serie` (o ano), `unidade`,
 `duracaoMin`, `dificuldade`, `pt.titulo`, `prerequisitos` (lista de ids, vazia
 ou não) e `chaves` (as palavras-chave da busca, radicais soltos e sem frase).
-Nada de resumo, explicação ou exercício.
+Nada de resumo, explicação ou exercício. Desde 12/11/2026 são 149: entrou o
+MAT08-15 (volume e capacidade do 8º ano), o único assunto criado depois dos
+148; o motivo e as arestas estão no fim de `_grafo_c7_mudancas.md`.
 
 O cabeçalho diz de onde vêm os pré-requisitos (`prerequisitos_origem`: revisado
 no C7 em 30/10/2026, assunto por assunto, sobre o grafo autoral de 09/2026) e as
