@@ -125,6 +125,7 @@ let ORIGEM = '';
 async function abaNova(navegador) {
   const p = await amb.pagina();
   p.on('pageerror', e => erros.push(e.message));
+  p.removeAllListeners('dialog');  // o arnês aceita todo diálogo; aqui a prova escolhe a resposta
   p.on('dialog', d => { dialogos.push(d.message()); (p.__respostaDoDialogo === 'aceita' ? d.accept() : d.dismiss()).catch(() => {}); });
   await p.setViewport({ width: 1280, height: 800, hasTouch: true });
   await H.abrirApp(p, ORIGEM);
@@ -176,11 +177,12 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
   });
   void umExercicio;
   await prep.evaluate(async () => {
-    await Store.gravarListaBiblioteca({ id: 'ml_prova', titulo: 'Lista de prova', nivel: null, itens: [], paginas: [], criadaEm: Date.now(), editadaEm: Date.now() });
+    await Store.gravarListaBiblioteca({ id: 'ml_prova', titulo: 'Lista de prova', nivel: null, itens: ['prova:exercicio:1'], paginas: [], criadaEm: Date.now(), editadaEm: Date.now() });
   });
   await H.irParaAba(prep, 'agenda');
   await prep.close();
 
+  try {
   secao('1. Aba, módulo e lista: um Voltar por passo, e o quarto avisa');
   let pag = await abaNova();
   conf('a aba nova abre na Agenda', (await lugar(pag)).aba, 'agenda');
@@ -279,13 +281,14 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
   await clicar(pag, '#abas .aba[data-tela="biblioteca"]');
   await esperarBib(pag);
   await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = 'bhaskara'; i.dispatchEvent(new Event('input', { bubbles: true })); });
-  await esperar('os resultados da busca', () => lugar(pag), v => !!v && v.resultados > 0 && v.titulo === '', 5000);
-  const abriuResultado = await pag.evaluate(() => { const l = document.querySelector('#bib-corpo .item-lista'); if (!l) return false; l.click(); return true; });
+  await esperar('os resultados da busca', () => pag.evaluate(() => document.querySelectorAll('#bib-corpo details[data-grupo="exercicios"] .item-lista').length), v => v > 0, 5000);
+  const abriuResultado = await pag.evaluate(() => { const l = document.querySelector('#bib-corpo details[data-grupo="exercicios"] .item-lista'); if (!l) return false; l.click(); return true; });
   await pausa(300);
   const noResultado = await lugar(pag);
   conf('o resultado abriu (e o campo ficou vazio, como antes)', abriuResultado && noResultado.titulo !== '' && noResultado.termo === '', true);
   await voltar(pag);
-  const b1 = await esperar('o Voltar do resultado', () => lugar(pag), v => !!v && v.termo === 'bhaskara' && v.titulo === '' && v.resultados > 0, 4000);
+  const b1 = await esperar('o Voltar do resultado', () => pag.evaluate(() => ({ termo: document.querySelector('#busca-biblioteca').value,
+    grupos: document.querySelectorAll('#bib-corpo details[data-grupo="exercicios"] .item-lista').length })), v => !!v && v.termo === 'bhaskara' && v.grupos > 0, 4000);
   checa('o Voltar volta aos resultados, com "bhaskara" no campo', b1.ok, true, TODOS);
   await pag.close();
 
@@ -293,7 +296,7 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
   pag = await abaNova();
   await clicar(pag, '#abas .aba[data-tela="biblioteca"]');
   await esperarBib(pag);
-  await clicar(pag, '#bib-carrinho-minhas');
+  await clicar(pag, '#bib-abas [data-aba="minhas"]');
   await pausa(300);
   const abriuEditor = await pag.evaluate(() => {
     const b = Array.from(document.querySelectorAll('#bib-corpo [data-acao="editar"]'))[0];
@@ -343,6 +346,7 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
   secao('9. No celular: a folha, a ficha e o formulário');
   const cel = await amb.pagina();
   cel.on('pageerror', e => erros.push('celular: ' + e.message));
+  cel.removeAllListeners('dialog');
   cel.on('dialog', d => { dialogos.push(d.message()); (cel.__respostaDoDialogo === 'aceita' ? d.accept() : d.dismiss()).catch(() => {}); });
   await cel.setViewport({ width: 412, height: 915, hasTouch: true, isMobile: true });
   await cel.goto(ORIGEM + '/index.html', { waitUntil: 'networkidle0' });
@@ -364,6 +368,7 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
   // a ficha de um aluno
   await cel.evaluate(() => document.querySelector('#cel-abas .cel-aba[data-cel="alunos"]').click());
   await esperar('a lista de alunos', telaCel, v => !!v && v.ativa === 'alunos' && v.lista, 5000);
+  await pausa(200);
   await cel.evaluate(() => { const b = document.querySelector('#cel-alunos-lista [data-aluno="al_alfa"]'); if (b) b.click(); });
   await pausa(300);
   conf('a ficha do aluno abriu', (await telaCel()).lista, false);
@@ -406,6 +411,11 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
     console.log('   NÃO CONFERIDO: o formulário do celular não abriu com a nuvem dublada (' + dublou + ')');
   }
 
+  } catch (e) {
+    // sem veneno, o erro é falha; com veneno, o Voltar que sai do app no meio do caminho é o defeito
+    if (!VENENO) throw e;
+    visto.push('o caminho quebrou: ' + e.message);
+  }
   if (VENENO) {
     secao('VENENO: ' + VENENO);
     conf('envenenado-' + VENENO + ': a prova viu o defeito', visto.length > 0, true);

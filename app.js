@@ -1717,7 +1717,10 @@
             var campo = $('#busca-biblioteca'), limpar = $('#limpar-busca-biblioteca');
             if (campo) campo.value = termo;
             if (limpar) limpar.style.display = termo ? '' : 'none';
-            if (mudouBib) irNaBiblioteca({ serie: r.bibNav.serie, modulo: r.bibNav.modulo, aula: r.bibNav.aula, minhas: r.bibNav.minhas });
+            if (!bib) {
+              // a Biblioteca ainda está carregando (logo depois de recarregar): o lugar fica, e o desenho dela o usa
+              bibNav.serie = r.bibNav.serie; bibNav.modulo = r.bibNav.modulo; bibNav.aula = r.bibNav.aula; bibNav.minhas = r.bibNav.minhas;
+            } else if (mudouBib) irNaBiblioteca({ serie: r.bibNav.serie, modulo: r.bibNav.modulo, aula: r.bibNav.aula, minhas: r.bibNav.minhas });
             else desenharCorpoBiblioteca();
           }
           if (r.livro && r.livro !== bibLivroAberto) abrirTelaDoLivro(r.livro);
