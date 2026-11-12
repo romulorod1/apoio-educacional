@@ -140,7 +140,7 @@ conf('o salvar() tira o corte que o celular pôs só na memória, num lugar só'
 if (MODO === MODOS[2]) { trocas['/app.js'] = APP.replace(SEM_CORTE, 'var p = Store.salvar(dbParaGravar());'); trocas['/nuvem.js'] = NUVEM + '\n'; }
 /* D6c: as âncoras dos venenos da agenda, cada uma num lugar só. */
 const REMARCA = 'mudarAulaNoCelular(a, { data: v.data, hora: v.hora, duracaoMin: v.duracaoMin }, mensagem, function () { diaCelular = v.data; });';
-const CHOQUE = '    return Core.conflitosDe(db, provisoria);';
+const CHOQUE = '    return Core.conflitosComRepeticoes(db, provisoria);';
 const DURACAO = 'duracaoMin: Number(a.duracaoMin) || 60 }, a.id, a.status,';
 const MESMA_SITUACAO = "    if (atual && (atual.status || 'realizada') === status) {";
 const CANCELA_COM = "{ status: 'cancelada', cobravel: true }, 'Aula cancelada e cobrada.'";
