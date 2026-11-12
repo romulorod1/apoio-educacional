@@ -390,23 +390,30 @@ async function importar(pag, arquivo) {
   conf('termo que não existe não acha nada, sem erro', (r.livros || []).length + '/' + (r.pendentes || []).length, '0/0');
 
   secao('3.1. A busca na tela da Biblioteca');
+  await H.irParaAba(pag, 'biblioteca');
+  const campoUnico = await esperar('o campo de busca da Biblioteca', () => pag.evaluate(() => {
+    const c = document.querySelector('#busca-biblioteca'), cartao = document.querySelector('#bib-busca-cartao');
+    return { visivel: !!cartao && getComputedStyle(cartao).display !== 'none', rotulo: c.getAttribute('aria-label'), campos: document.querySelectorAll('.bibl-busca input').length };
+  }), v => !!v && v.visivel, 10000);
+  conf('só com livros (sem pacote de exercícios), o campo único aparece e diz que busca nos livros', JSON.stringify(campoUnico.valor),
+    JSON.stringify({ visivel: true, rotulo: 'Buscar nos livros', campos: 1 }));
   await pag.evaluate(() => {
-    const campo = document.querySelector('#bib-busca-livros-campo');
+    const campo = document.querySelector('#busca-biblioteca');
     campo.value = 'FRAÇÕES';
     campo.dispatchEvent(new Event('input', { bubbles: true }));
   });
   const telaBusca = await esperar('a tela acha as páginas do livro', () => pag.evaluate(() => ({
-    status: document.querySelector('#bib-busca-livros-status').textContent,
-    livro: document.querySelector('#bib-busca-livros-resultados [data-livro="indice-curto"]') &&
-      document.querySelector('#bib-busca-livros-resultados [data-livro="indice-curto"]').textContent,
-    botao: document.querySelector('#bib-busca-livros-resultados [data-livro="indice-curto"] button') &&
-      document.querySelector('#bib-busca-livros-resultados [data-livro="indice-curto"] button').textContent
+    status: document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status').textContent,
+    livro: document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"]') &&
+      document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"]').textContent,
+    botao: document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"] button') &&
+      document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"] button').textContent
   })), v => !!v && /2 páginas encontradas/.test(v.status) && /3, 4/.test(v.livro) && /Abrir na p\. 3/.test(v.botao), 10000);
   conf('a busca mostra o livro, o capítulo, as páginas e o atalho para a página encontrada', telaBusca.ok, true);
   await pag.setViewport({ width: 360, height: 800, hasTouch: true });
   const larguraBusca = await pag.evaluate(() => {
     document.documentElement.style.fontSize = '130%';
-    const caixa = document.querySelector('#bib-busca-livros-resultados [data-livro="indice-curto"]');
+    const caixa = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"]');
     const botao = caixa && caixa.querySelector('button');
     const r = botao && botao.getBoundingClientRect();
     const medida = { rolaDeLado: document.documentElement.scrollWidth > innerWidth + 1,
@@ -416,7 +423,7 @@ async function importar(pag, arquivo) {
   });
   conf('a busca e o atalho cabem a 360 px com a letra a 130%', JSON.stringify(larguraBusca), JSON.stringify({ rolaDeLado: false, botaoFora: false, botaoPequeno: false }));
   await pag.setViewport({ width: 1280, height: 1000, hasTouch: true });
-  await pag.evaluate(() => document.querySelector('#bib-busca-livros-resultados [data-livro="indice-curto"] button').click());
+  await pag.evaluate(() => document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"] button').click());
   const leitorBusca = await esperar('o resultado abre na página 3', () => pag.evaluate(() =>
     document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada || ''), v => v === '3', 10000);
   conf('abrir o resultado leva à página encontrada no livro', leitorBusca.ok, true);
@@ -426,24 +433,28 @@ async function importar(pag, arquivo) {
    * de 600): a tela acha, diz a parte e a página, e o toque abre nela; o
    * livro escaneado (C) não aparece, e o aviso diz que há texto que não foi lido */
   await pag.evaluate(() => {
-    const campo = document.querySelector('#bib-busca-livros-campo');
+    const campo = document.querySelector('#busca-biblioteca');
     campo.value = 'Paralelepípedo';
     campo.dispatchEvent(new Event('input', { bubbles: true }));
   });
   const telaLongo = await esperar('a tela acha a página 200 do Livro B', () => pag.evaluate(() => {
-    const caixa = document.querySelector('#bib-busca-livros-resultados [data-livro="indice-longo"]');
-    const aviso = document.querySelector('#bib-busca-livros-resultados .bib-busca-livros-aviso');
-    return { status: document.querySelector('#bib-busca-livros-status').textContent,
-      livros: [...document.querySelectorAll('#bib-busca-livros-resultados [data-livro]')].map(x => x.dataset.livro).join(','),
+    const caixa = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-longo"]');
+    const aviso = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-sem-texto');
+    return { status: document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status').textContent,
+      livros: [...document.querySelectorAll('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro]')].map(x => x.dataset.livro).join(','),
       grupo: caixa ? caixa.querySelector('.bib-busca-livro-paginas').textContent : '',
       botao: caixa && caixa.querySelector('button') ? caixa.querySelector('button').textContent : '',
-      aviso: aviso ? aviso.textContent : '' };
+      aviso: aviso ? aviso.querySelector('summary').textContent : '', avisoAberto: aviso ? aviso.open : null,
+      quais: aviso ? [...aviso.querySelectorAll('li')].map(li => li.dataset.livro + '=' + li.textContent).join('|') : '' };
   }), v => !!v && /1 página encontrada em 1 livro/.test(v.status) && /Abrir na p\. 200/.test(v.botao), 10000);
   conf('só o texto do Livro B tem "paralelepípedo": um livro, a parte e a página 200',
     telaLongo.valor && telaLongo.valor.livros + ' | ' + /Parte 2/.test(telaLongo.valor.grupo) + ' | ' + /200 · 1 página/.test(telaLongo.valor.grupo), 'indice-longo | true | true');
   conf('o livro escaneado não aparece no resultado, e o aviso diz que há texto que não foi lido',
-    telaLongo.valor && /Não foi possível ler todo o texto de 2 livros/.test(telaLongo.valor.aviso) && !/indice-sem-texto/.test(telaLongo.valor.livros), true);
-  await pag.evaluate(() => document.querySelector('#bib-busca-livros-resultados [data-livro="indice-longo"] button').click());
+    telaLongo.valor && telaLongo.valor.aviso + ' | ' + telaLongo.valor.avisoAberto + ' | ' + /indice-sem-texto/.test(telaLongo.valor.livros),
+    '1 livro sem texto pesquisável não entra na busca; 1 livro tem páginas sem texto. | false | false');
+  conf('o aviso diz QUAIS livros: o escaneado inteiro e o de uma página sem texto', telaLongo.valor && telaLongo.valor.quais,
+    'indice-sem-texto=Livro C sem texto: o livro inteiro|indice-curto=Livro A curto: 1 página de 6');
+  await pag.evaluate(() => document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-longo"] button').click());
   const leitorLongo = await esperar('o resultado abre na página 200', () => pag.evaluate(() =>
     document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada || ''), v => v === '200', 20000);
   conf('abrir o resultado do Livro B leva à página 200 do arquivo', leitorLongo.ok, true);
@@ -466,7 +477,7 @@ async function importar(pag, arquivo) {
   const semSumarioEfetivo = await buscar(pag, 'paralelepipedo');
   const bCru = (semSumarioEfetivo.livros || []).find(l => l.id === 'indice-longo');
   conf('e sem ele, volta ao sumário do PDF', bCru ? JSON.stringify(bCru.capitulos.map(c => [c.titulo, c.paginas])) : '', JSON.stringify([['Parte 2: Espaço', [200]]]));
-  await pag.evaluate(() => { const campo = document.querySelector('#bib-busca-livros-campo'); campo.value = ''; campo.dispatchEvent(new Event('input', { bubbles: true })); });
+  await pag.evaluate(() => { const campo = document.querySelector('#busca-biblioteca'); campo.value = ''; campo.dispatchEvent(new Event('input', { bubbles: true })); });
 
   const norm = await pag.evaluate(() => [IndiceLivros.normalizar('multipli-' + String.fromCharCode(10) + 'cação'),
     IndiceLivros.normalizar('multi' + String.fromCharCode(0xAD) + 'plicação'), IndiceLivros.normalizar('Frações  EQUIVALENTES'),

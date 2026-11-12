@@ -3817,8 +3817,16 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bibl-busca input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; padding: 10px 0; font: inherit; font-size: var(--letra-16); color: var(--texto); }
 .bibl-busca input::placeholder { color: var(--muted); }
 .bibl-exercicios-cabeca { display: flex; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; margin: 0 0 12px; }
-.bib-busca-livros { margin: 0 0 16px; min-width: 0; }
-.bib-busca-livros > .bibl-busca { max-width: 52rem; }
+/* B12: o resultado da busca única, em dois grupos recolhíveis com a contagem no rótulo */
+.bib-grupo-busca { margin: 0 0 12px; min-width: 0; }
+.bib-grupo-cabeca { display: flex; align-items: center; gap: 8px; min-height: var(--alvo); padding: 0 4px; cursor: pointer; border-bottom: 1px solid var(--fio); }
+.bib-grupo-titulo { font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
+.bib-grupo-contagem { font-size: var(--letra-14); color: var(--muted); }
+.bib-grupo-corpo { padding-top: 4px; min-width: 0; }
+.bib-grupo-vazio { margin: 8px 0; }
+.bib-busca-livros-status { margin: 8px 0 0; }
+.bib-busca-livros-sem-texto > summary { cursor: pointer; min-height: var(--alvo); display: flex; align-items: center; }
+.bib-busca-livros-sem-texto-lista { margin: 4px 0 0; padding-left: 20px; overflow-wrap: anywhere; }
 .bib-busca-livro { margin-top: 8px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
 .bib-busca-livro-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); overflow-wrap: anywhere; }
 .bib-busca-livro-volume { margin: 0 0 8px; font-size: var(--letra-14); color: var(--muted); }

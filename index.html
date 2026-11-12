@@ -116,7 +116,8 @@
          Sem pacote importado, oferece a importação pelo controle de Ajustes. -->
     <section class="tela" id="tela-biblioteca">
       <!-- B2: o topo do desenho, numa linha: o título, quantos livros e a busca.
-           A busca é a dos EXERCÍCIOS (a de livros é outra fatia), e diz isso. -->
+           B12: um campo só. Com livro no tablet ele busca nos exercícios E no
+           texto dos livros (dois grupos no resultado), e o texto dele diz isso. -->
       <div class="bibl-topo">
         <h2 class="titulo">Biblioteca</h2>
         <span class="bibl-contagem" id="bib-livros-contagem" hidden></span>
@@ -126,16 +127,6 @@
           <button class="btn pequeno" id="limpar-busca-biblioteca" type="button" style="display:none">Limpar</button>
         </div>
       </div>
-      <!-- B12: a busca consulta o índice local sem expor o texto do livro -->
-      <section id="bib-busca-livros" class="bib-busca-livros" aria-label="Buscar no texto dos livros" hidden>
-        <label class="bibl-busca" role="search">
-          <span class="bibl-lupa" data-icone="search" aria-hidden="true"></span>
-          <input type="search" id="bib-busca-livros-campo" aria-label="Buscar no texto dos livros" placeholder="Buscar nos livros (frações, energia...)" autocomplete="off">
-          <button class="btn pequeno" id="bib-busca-livros-limpar" type="button" hidden>Limpar</button>
-        </label>
-        <p id="bib-busca-livros-status" class="ajuda" role="status" aria-live="polite">Busque palavras nos livros deste tablet.</p>
-        <div id="bib-busca-livros-resultados" aria-busy="false"></div>
-      </section>
       <!-- B2: os livros do tablet por disciplina e ano, com o Continuar lendo.
            Só aparece com livro no tablet; sem livro, a aba fica como era. -->
       <div class="bibl" id="bib-livros" hidden></div>

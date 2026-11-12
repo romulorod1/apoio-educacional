@@ -338,6 +338,18 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   const busca = await esperar('o resultado da busca', () => pag.evaluate(() => [document.querySelector('#bib-corpo').innerText,
     !!document.querySelector('#bib-corpo .bib-titulo')]), v => !v[1] && /Equações do Segundo Grau/.test(v[0]), 5000);
   conf('a busca "bhaskara" mostra o resultado', busca.ok, true);
+  // B12: um campo só; com livro no tablet, o resultado tem dois grupos, primeiro Exercícios e depois Nos livros
+  const grupos = await esperar('os dois grupos da busca', () => pag.evaluate(() => ({
+    campo: document.querySelector('#busca-biblioteca').getAttribute('aria-label'),
+    campos: document.querySelectorAll('.bibl-busca input').length,
+    grupos: Array.from(document.querySelectorAll('#bib-corpo > .bib-grupo-busca')).map(d => d.dataset.grupo + ':' +
+      d.querySelector('.bib-grupo-titulo').textContent + ':' + d.open).join(','),
+    livros: (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''
+  })), v => !!v && /Buscando|Nenhum livro|preparada|encontrada/.test(v.livros) && !/Buscando/.test(v.livros), 10000);
+  conf('um campo de busca só, e ele diz que busca nos exercícios e nos livros',
+    grupos.valor.campos + ' | ' + grupos.valor.campo, '1 | Buscar nos exercícios e nos livros');
+  conf('o resultado tem dois grupos abertos: Exercícios e depois Nos livros', grupos.valor.grupos,
+    'exercicios:Exercícios:true,livros:Nos livros:true');
   s = await lerSecao(pag);
   conf('com termo na busca, os livros saem do caminho', s.visivel, false);
   await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); });
@@ -494,18 +506,15 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     const t = document.querySelector('.bibl-topo .titulo').getBoundingClientRect();
     const c = document.querySelector('#bib-livros-contagem').getBoundingClientRect();
     const b = document.querySelector('#bib-busca-cartao').getBoundingClientRect();
-    const buscaLivros = document.querySelector('#bib-busca-livros');
     const cont = document.querySelector('.bibl-continuar').getBoundingClientRect();
     const area = document.querySelector('.conteudo').getBoundingClientRect();
     const meio = r => r.top + r.height / 2;
     return { umaLinha: Math.abs(meio(t) - meio(c)) < 12 && Math.abs(meio(t) - meio(b)) < 12,
       lupa: !!document.querySelector('#bib-busca-cartao svg[data-icone-nome="search"]'),
-      buscaLivros: !!buscaLivros && !buscaLivros.hidden && buscaLivros.getBoundingClientRect().bottom <= cont.top,
       continuar: Math.round(cont.top - area.top) };
   });
   conf('título, contagem e busca (com a lupa) numa linha só', topo.umaLinha && topo.lupa, true);
-  conf('a busca dos livros aparece antes do Continuar lendo', topo.buscaLivros, true);
-  conf('o Continuar lendo segue visível depois da busca (a menos de 180 px do alto)', topo.continuar < 180, true);
+  conf('o Continuar lendo logo abaixo do topo (a menos de 120 px do alto)', topo.continuar < 120, true);
   console.log('   Continuar lendo a ' + topo.continuar + ' px do alto');
   ruins = await medir(pag, '.bibl-topo');
   conf('o topo não transborda', ruins.join('; '), '');
