@@ -1868,6 +1868,10 @@
     podeEnviarCopia: podeEnviarCopia, podeEnviarRegistros: podeEnviarRegistros, celularDaDona: celularDaDona,
     leitores: leitores, permitirLeitor: permitirLeitor, tirarLeitor: tirarLeitor,
     marcarMudanca: marcarMudanca, desligarAutomatica: desligarAutomatica,
+    /* O token de entrada (renovado se faltar pouco para vencer) para o
+     * endpoint de IA do mesmo site, /api/ia. É o mesmo login da nuvem; não há
+     * outro. Sem sessão, rejeita com TOKEN_EXPIRED. */
+    tokenParaIA: function () { return tokenValido(); },
     geracao: function () { return geracao; },
     enviarRegistros: enviarRegistros, enviarRegistrosSeDevido: enviarRegistrosSeDevido, contarFila: contarFila,
     receberRegistros: receberRegistros, sincronizar: sincronizar, sincronizarSeDevido: sincronizarSeDevido,
