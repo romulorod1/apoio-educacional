@@ -370,7 +370,7 @@ def trava_tinta_coberta(p):
             if c.get('ja_na_solucao'):
                 for pz in c.get('regiao', []):
                     rects[pz['pagina']].append(pymupdf.Rect(pz['bbox']))
-        paginas ={pno: _linhas_da_pagina(doc, pno) for pno in range(1, doc.page_count)}
+        paginas = {pno: _linhas_da_pagina(doc, pno) for pno in range(1, doc.page_count)}
         # margem de cada coluna, na lista inteira: o menor comeco de linha que
         # aparece pelo menos 3 vezes (a 1 pt). Nao a moda nem por pagina: uma
         # tabela recuada em x 70 enchia a p. 6 de Conjuntos Numericos, que so
@@ -2044,6 +2044,15 @@ def comentario_ao_professor(temp, placar, cur, navegador=True):
                     'comentario ao professor no enunciado')
     placar.conferir('gabarito sem o comentario (gerador antigo)', trava_comentario_amostra(v), True,
                     'a solucao 2 nao leva o comentario')
+    # a conferencia de repeticao casa o corpo mesmo quando a solucao escreve o titulo
+    # de outro jeito, e nao casa comentario so em parte na solucao
+    corpo = 'O valor arbitrário de referência não tira a generalidade da solução.'
+    casos = [('Comentário para professores:. ' + corpo, '22. Seja V o valor. Comentário para o professor: ' + corpo, True),
+             ('Comentário para professores: ' + corpo, '22. Seja V o valor. Observação: ' + corpo, True),
+             ('Comentário para professores: ' + corpo, '22. Seja V o valor. O valor arbitrário de referência.', False)]
+    placar.conferir('comentario: repeticao pelo corpo, com outro titulo na solucao',
+                    ['%r em %r deu %s' % (c[:30], s[-40:], not r) for c, s, r in casos
+                     if gerar_pacote.comentario_ja_na_solucao(c, s) != r])
     # veneno: sem conferir a solucao da fonte, o comentario 1 aparece duas vezes nela
     antes_r = gerar_pacote.COMENTARIO_SEM_REPETIR
     gerar_pacote.COMENTARIO_SEM_REPETIR = False

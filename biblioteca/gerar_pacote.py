@@ -519,7 +519,10 @@ def comentario_ja_na_solucao(txt_com, txt_sol):
         return False
     t = re.sub(r'\s+', '', portal.para_busca(txt_com))
     m = TITULO_COMENTARIO.match(t)
-    corpo = re.sub(r'[^a-z0-9]', '', t[m.end():] if m else t)
+    # o titulo inteiro sai, ate os dois pontos ("es(as):."), para o corpo casar mesmo
+    # quando a solucao escreve o titulo de outro jeito ("Comentario para o professor:")
+    resto = re.sub(r'^[a-z()]*:\.?', '', t[m.end():]) if m else t
+    corpo = re.sub(r'[^a-z0-9]', '', resto)
     return len(corpo) >= 20 and corpo in re.sub(r'[^a-z0-9]', '', portal.para_busca(txt_sol))
 
 
