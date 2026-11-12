@@ -140,6 +140,30 @@ const SIMPLES = { rota: 'teste', messages: [{ role: 'user', content: 'diga oi ' 
     const justo = novoAmbiente();
     const rj = await N.atender(pedido({ rota: 'planejamento', system: 's'.repeat(N.LIMITES.texto - 1000), messages: SIMPLES.messages }), justo.dep);
     conf('texto logo abaixo do teto passa (controle)', rj.status === 200, rj.status);
+
+    /* O bloco do assistente conta INTEIRO no teto (fase 2, o BAIXO da
+     * orquestradora): thinking com assinatura e input de tool_use, e não só o
+     * campo text. Dos dois lados: o mesmo turno, com o volume no bloco de
+     * thinking ou no input, passa logo abaixo do teto e é barrado logo acima. */
+    const turno = (bloco) => ({ rota: 'assistente', messages: [{ role: 'user', content: 'x' }, { role: 'assistant', content: [bloco] }, { role: 'user', content: 'y' }] });
+    const folga = N.LIMITES.texto - 2;           // os dois "x" e "y" já contam 2
+    const pensa = n => ({ type: 'thinking', thinking: '', signature: 's'.repeat(n) });
+    const usa = n => ({ type: 'tool_use', id: 't', name: 'f', input: { a: 'i'.repeat(n) } });
+    const tam = b => JSON.stringify(b).length;
+    for (const [nome, fazer] of [['thinking (assinatura)', pensa], ['tool_use.input', usa]]) {
+      const base = tam(fazer(0));
+      const abaixo = novoAmbiente();
+      const ra = await N.atender(pedido(turno(fazer(folga - base))), abaixo.dep);
+      conf('bloco do assistente com ' + nome + ' do tamanho exato do teto passa', ra.status === 200, JSON.stringify(ra.corpo));
+      const acima = novoAmbiente();
+      const rb = await N.atender(pedido(turno(fazer(folga - base + 1))), acima.dep);
+      conf('bloco do assistente com ' + nome + ' um caractere acima do teto: 400 texto_demais sem chamar o modelo',
+        rb.status === 400 && rb.corpo.codigo === 'texto_demais' && acima.chamadas.length === 0, JSON.stringify(rb.corpo));
+    }
+    // o text do assistente continua contando (agora pelo bloco inteiro)
+    const txt = n => ({ type: 'text', text: 't'.repeat(n) });
+    const rt = await N.atender(pedido(turno(txt(folga + 1))), novoAmbiente().dep);
+    conf('bloco de text do assistente acima do teto: 400 texto_demais', rt.status === 400 && rt.corpo.codigo === 'texto_demais');
   }
 
   console.log('\n=== método, chave e login ===');
