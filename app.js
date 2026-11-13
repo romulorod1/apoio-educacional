@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.90';
+  var VERSAO = '1.42.92';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,7 +85,7 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.90',
+      versao: '1.42.92',
       itens: [
         'Ao escolher o assunto da aula, o alto da lista mostra o ano do aluno e a data da última aula dada. Nos assuntos de Matemática de "Continuar de onde parou", das sugestões do ano e da busca, dois sinais mostram se a biblioteca tem teoria e exercícios do assunto, com a legenda uma vez no alto. No tablet deitado, a lista abre ao lado da aula, e o Voltar do aparelho fecha só a lista.'
       ]
