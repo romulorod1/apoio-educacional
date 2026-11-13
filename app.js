@@ -23649,17 +23649,29 @@
       if (!lp) return false;
       /* A tela da lista pronta mora dentro do módulo dela: sem o módulo na
        * navegação, o usarListaPronta cairia na lista de séries. É o que a
-       * trilha faz antes de usar a lista. Se ela desistir na pergunta, a
-       * navegação volta a ser a de antes. */
-      var antes = { modulo: bibNav.modulo, serie: bibNav.serie };
+       * trilha faz antes de usar a lista. A busca e Minhas listas, que são
+       * desenhadas antes do módulo, saem como no abrirDaBusca. Se ela desistir
+       * na pergunta, a navegação volta a ser a de antes. */
+      var campo = $('#busca-biblioteca');
+      var antes = { modulo: bibNav.modulo, serie: bibNav.serie, minhas: bibNav.minhas, termo: bibTermo,
+        campo: campo ? campo.value : null };
       if (temChave(bib.modulos, lp.modulo)) {
         var mod = bib.modulos[lp.modulo];
         bibNav.modulo = lp.modulo;
         bibNav.serie = (bib.listaSeries || []).filter(function (s) { return mod.series[s]; })[0] || mod.serie;
       }
-      if (pedirParaUsarLista(lp)) return true;
+      bibNav.minhas = null;
+      bibTermo = '';
+      if (campo) campo.value = '';
+      if (pedirParaUsarLista(lp)) {
+        if ($('#limpar-busca-biblioteca')) $('#limpar-busca-biblioteca').style.display = 'none';
+        return true;
+      }
       bibNav.modulo = antes.modulo;
       bibNav.serie = antes.serie;
+      bibNav.minhas = antes.minhas;
+      bibTermo = antes.termo;
+      if (campo) campo.value = antes.campo;
       return false;
     }
     if (x.tipo !== 'itens' && x.tipo !== 'paginas') return false;
@@ -23692,8 +23704,9 @@
   /* As caixas de todo bloco na tela seguem o carrinho, mude ele por onde mudar
    * (a caixa, a tela cheia, o "Desmarcar tudo"): quem chama é o desenharCarrinho,
    * por onde toda mudança de material passa. */
-  function atualizarBlocosTeoriaExercicios() {
-    $$('.bte input.bte-marca').forEach(function (c) {
+  function atualizarBlocosTeoriaExercicios(raiz) {
+    // com a raiz, só aquele bloco (que pode ainda estar fora do documento); sem ela, todos na tela
+    Array.prototype.slice.call((raiz || document).querySelectorAll('input.bte-marca')).forEach(function (c) {
       var v = (c._noMaterial || fonteNoMaterial)(c._fonte);
       c.checked = v === true;
       c.indeterminate = v === 'parte';
@@ -23730,6 +23743,10 @@
     var temObmep = obmep.some(function (x) { return x.fonte !== 'enem'; });
     var nomeDaOlimpiada = temEnem && temObmep ? 'OBMEP e ENEM' : temEnem ? 'ENEM' : 'OBMEP';
 
+    // as miniaturas do bloco de antes saem dos observadores, que senão as guardariam para sempre
+    Array.prototype.slice.call(elemento.querySelectorAll('img.bib-mini')).forEach(function (i) {
+      if (i._bteObs) i._bteObs.unobserve(i);
+    });
     elemento.innerHTML = '';
     var bloco = el('section', { class: 'bte', 'aria-label': 'Teoria e exercícios' });
     elemento.appendChild(bloco);
@@ -23853,7 +23870,7 @@
           postos++;
         }
         observarMiniaturasDoBloco(coluna);
-        if (novos.length && coluna.isConnected) atualizarBlocosTeoriaExercicios();
+        if (novos.length) atualizarBlocosTeoriaExercicios(coluna);
         return novos;
       }
       mostrarAte(aVista);
@@ -23939,7 +23956,7 @@
     }
 
     // os cartões que já estão no material nascem com a marca deles
-    atualizarBlocosTeoriaExercicios();
+    atualizarBlocosTeoriaExercicios(bloco);
     observarMiniaturasDoBloco(bloco);
 
     // a etiqueta dela chega depois do primeiro desenho: os selos se refazem
@@ -23959,11 +23976,20 @@
    * bibFila) são desligados e esvaziados a cada desenho da tela da Biblioteca
    * (pararMiniaturas), e isso acontece por baixo do bloco, por exemplo ao
    * fechar a tela cheia: as miniaturas do bloco ficariam em branco para
-   * sempre. O observador é da janela (root nulo), e por isso serve dentro da
-   * Biblioteca, no celular e numa caixa que só entra no documento depois. */
+   * sempre. O observador é o da área que rola em volta (ou da janela), e
+   * serve dentro da Biblioteca, no celular e numa caixa que só entra no
+   * documento depois de desenhada. */
   var bteFila = [];
   var bteDesenhando = 0;
-  function observarMiniaturasDoBloco(caixa) {
+  function observarMiniaturasDoBloco(caixa, tentativas) {
+    /* Fora do documento ainda não há área que rola para medir: espera a caixa
+     * entrar (a página do assunto pode montar tudo antes de inserir), por até
+     * uns 10 s, e só então observa. */
+    if (!caixa.isConnected) {
+      var n = tentativas || 0;
+      if (n < 100) setTimeout(function () { observarMiniaturasDoBloco(caixa, n + 1); }, 100);
+      return;
+    }
     var imgs = Array.prototype.slice.call(caixa.querySelectorAll('img.bib-mini'))
       .filter(function (i) { return !i._bteObservada; });
     if (typeof IntersectionObserver !== 'function') { imgs.forEach(pedirMiniaturaDoBloco); return; }
@@ -23982,6 +24008,7 @@
           pedirMiniaturaDoBloco(e.target);
         });
       }, { root: area, rootMargin: '300px 0px' }));
+      i._bteObs = obs;
       obs.observe(i);
     });
   }
@@ -24004,8 +24031,8 @@
   function andarFilaDoBloco() {
     while (bteDesenhando < MAX_MINIATURAS_JUNTAS && bteFila.length) {
       var img = bteFila.shift();
-      // saiu do documento antes da vez dela: volta a poder ser pedida
-      if (!img.isConnected) { img._btePedida = false; continue; }
+      // saiu do documento antes da vez dela: volta a poder ser observada e pedida
+      if (!img.isConnected) { img._btePedida = false; img._bteObservada = false; continue; }
       bteDesenhando++;
       desenharMiniaturaDoBloco(img);
     }

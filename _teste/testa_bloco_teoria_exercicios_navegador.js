@@ -426,6 +426,14 @@ const fecharModal = async pag => {
   conf('as caixas seguem o material de agora: os três da lista de base, e só eles', await pag.evaluate(() =>
     Array.from(document.querySelectorAll('#prova-t2 .bte-ex')).filter(c => c.querySelector('input.bte-marca').checked)
       .map(c => c.dataset.id).join(',')), BASE_IDS.join(','));
+  // a página do assunto pode montar o bloco fora do documento e inserir depois: as marcas nascem certas
+  conf('desenhado fora do documento, o bloco já nasce com as marcas do material', await pag.evaluate(() => {
+    const d = document.createElement('div');
+    window.__provaT2.desenhar(d, window.__provaFontes);
+    d.querySelector('[data-secao="exercicios"] .bte-mais').click();
+    return d.querySelectorAll('.bte-ex.bte-marcado').length + ' ' +
+      Array.from(d.querySelectorAll('input.bte-marca')).filter(c => c.checked).length;
+  }), '3 3');
   await desenhar(pag, 'MAT09-04', VINCULOS);
   await esperarMiniatura(pag);
   m = await medirExercicio(pag);

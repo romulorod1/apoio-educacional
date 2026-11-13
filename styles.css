@@ -4323,6 +4323,8 @@ h3.subtitulo.bte-titulo { margin: 6px 0 0; padding-bottom: 0; border-bottom: 0; 
 .bte-ex-de { margin-top: 4px; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--muted); overflow-wrap: anywhere; }
 .bte-ex-cabeca { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; }
 .bte-ex-cabeca .cresce { flex: 1 1 0; min-width: 0; }
+/* a caixa fica sempre na ponta direita, mesmo quando a linha quebra no celular */
+.bte-ex-cabeca .bte-marcar { margin-left: auto; }
 .bte-ex-nome { font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); overflow-wrap: anywhere; }
 .bte-ex-abrir { display: block; width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--fio);
   border-radius: 10px; background: var(--branco); cursor: pointer; text-align: left; }
@@ -4346,6 +4348,11 @@ h3.subtitulo.bte-titulo { margin: 6px 0 0; padding-bottom: 0; border-bottom: 0; 
 .bte-dif-2 .bte-pontos { color: var(--bte-dif-2); }
 .bte-dif-3 { background: var(--soft-2); border: 2px solid var(--navy-escuro); }
 .bte-dif-3 .bte-pontos { color: var(--navy-escuro); }
-.bte-selo.bte-selo-dela { background: var(--branco); border: 2px solid var(--acao); box-shadow: 0 0 0 2px var(--acao-clara); }
-.bte-selo-para-mim { padding: 1px 6px; border-radius: 999px; background: var(--acao-clara); font-size: var(--letra-12); }
+/* o "para mim" é o chip de dentro: a moldura do selo continua a do degrau,
+   para um Fácil dela não parecer Difícil */
+.bte-selo-para-mim { padding: 1px 8px; border: 1px solid var(--acao); border-radius: 999px;
+  background: var(--acao-clara); font-size: var(--letra-14); font-weight: var(--peso-forte); }
+/* o desafio é um sinal forte e próprio (D3), e não uma terceira etiqueta apagada */
+.tag.bte-desafio { padding: 3px 10px; border: 1px solid var(--aviso-borda); background: var(--aviso-fundo);
+  color: var(--aviso-texto); font-size: var(--letra-14); font-weight: var(--peso-forte); text-transform: none; letter-spacing: 0; }
 /* ==================== T2 (fim) ==================== */
