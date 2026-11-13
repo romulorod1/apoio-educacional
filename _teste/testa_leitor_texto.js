@@ -253,11 +253,16 @@ const checa = (rotulo, obtido, esperado, doVeneno) => {
     if (!PRINTS) return;
     const dir = path.join(PRINTS, pasta);
     fs.mkdirSync(dir, { recursive: true });
-    await pag.screenshot({ path: path.join(dir, nome + '.png') });
+    /* captureBeyondViewport false: o print padrão estica a janela por um
+     * instante, o leitor trata isso como giro e redesenha as páginas, e a
+     * camada nova no meio do arrasto ancorava a seleção no título (visto nas
+     * rodadas com --prints) */
+    await pag.screenshot({ path: path.join(dir, nome + '.png'), captureBeyondViewport: false });
     // o recorte: o alto da p. 206, com o título e a linha do exercício
     const a = await pontoDaPagina(206, 40, 50);
-    await pag.screenshot({ path: path.join(dir, nome + '_recorte.png'),
+    await pag.screenshot({ path: path.join(dir, nome + '_recorte.png'), captureBeyondViewport: false,
       clip: { x: Math.max(0, Math.round(a.x)), y: Math.max(0, Math.round(a.y)), width: 640, height: 200 } });
+    await pronto('depois do print ' + nome);
   };
   const pararNoVeneno = async n => {
     if (!VENENO || SECAO_DO_VENENO[VENENO] !== n) return false;
@@ -294,10 +299,9 @@ const checa = (rotulo, obtido, esperado, doVeneno) => {
   await pag.mouse.move(de.x, de.y);
   await pag.mouse.down();
   /* o arrasto só anda depois que o navegador pôs o cursor da seleção onde o
-   * mouse desceu: com os movimentos colados no down, o Chrome do teste às
-   * ancorou a seleção no título, na linha de cima, numa rodada sem a espera
-   * (com o mesmo ponto de partida em cima do "E"); a espera é pela condição,
-   * sem tempo fixo */
+   * mouse desceu (espera por condição, sem tempo fixo). A seleção que pegava
+   * o título junto só apareceu nas rodadas com --prints: era o print, que
+   * redesenhava as páginas (ver print acima), e não a falta desta espera */
   const ancoraSel = () => pag.evaluate(() => { const s = window.getSelection(); return s.anchorNode ? JSON.stringify((s.anchorNode.textContent || '').slice(0, 12)) + ' +' + s.anchorOffset : ''; });
   const anc = await esperar('o cursor da seleção onde o mouse desceu', ancoraSel, v => !!v, 3000);
   console.log('   cursor da seleção: ' + (anc.valor || 'nenhum'));
