@@ -30,7 +30,8 @@
  *      importar o mesmo pacote de novo devolve só o que faltava; e (revisão
  *      do C15.1) o mesmo pacote com dois PDFs trocados, mesmo id e mesma
  *      versão, atualiza os dois pelo hash, guarda a posição do que tem o
- *      mesmo sumário e solta a do que mudou de sumário;
+ *      mesmo sumário e, desde a fase 1a da nuvem, também a do que mudou de
+ *      sumário (a página existe no arquivo novo);
  *   7. memória (revisão do C15.1): um pacote de dez livros de 4 MB é lido
  *      livro a livro, em trechos; nenhuma leitura passa de um livro, e a
  *      memória dos processos do navegador não sobe o pacote inteiro;
@@ -88,7 +89,7 @@ const COPIA_COM_LIVROS = "pacote.biblioteca = { uso: bib[0] || [], etiquetas: bi
   "      return todosOsValores('livros').then(function (ls) { return Promise.all(ls.map(function (l) { return blobParaTexto(l.blob); })); })" +
   ".then(function (t) { pacote.livros = t; return pacote; });";
 const SANDBOX = "quadro.setAttribute('sandbox', 'allow-same-origin');";
-const GUARDA_PAGINA = "Store.gravarPosicaoLivro({ id: id, pagina: n })";
+const GUARDA_PAGINA = "Store.gravarPosicaoLivro({ id: id, pagina: n, sha: reg.meta.hash, ajustadaDe: ajuste && !ajuste.mexeu ? ajuste.de : null })";
 
 // a revisão do C15.1: o mesmo livro é o mesmo id E o mesmo hash; o veneno volta à conta só pelo id e pela versão
 const MESMO_ARQUIVO = 'var mesmoArquivo = !!atual && !!atual.meta && atual.meta.hash === l.meta.hash;';
@@ -589,11 +590,12 @@ async function printar(pag, nome) {
     throw Object.assign(new Error('fim'), { fimDoVeneno: true });
   }
   conf('a tela diz que dois foram atualizados e dois já estavam', /2 atualizados/.test(trocado) && /2 já estavam no tablet/.test(trocado), true);
-  conf('e que um mudou de sumário e abre no começo', /1 livro atualizado mudou de sumário/.test(trocado), true);
+  // fase 1a da nuvem (12/11/2026): sumário novo não solta mais a posição, e a tela não diz que abre no começo
+  conf('e não diz que algum abre no começo nem que não abre onde ela parou', /abre no começo|não abre mais onde/.test(trocado), false);
   conf('o tablet ficou com os arquivos novos (o hash de cada livro é o do pacote trocado)',
     guardados.every(l => l.hash === hashT[l.id]), true);
   conf('o livro com o mesmo sumário guarda a página onde ela parou', ((await p.evaluate(() => Store.lerPosicaoLivro('livro-sem-sumario'))) || {}).pagina, 2);
-  conf('o de sumário diferente perde a posição', await p.evaluate(() => Store.lerPosicaoLivro('livro-com-marcadores')), undefined);
+  conf('o de sumário diferente também guarda a página (ela existe no arquivo novo)', ((await p.evaluate(() => Store.lerPosicaoLivro('livro-com-marcadores'))) || {}).pagina, 4);
   const deNovoT = await importar(p, ZIP_TROCADO, 'o pacote trocado de novo');
   conf('importar o trocado outra vez não muda nada', /4 já estavam no tablet/.test(deNovoT) && !/atualizad/.test(deNovoT), true);
 
