@@ -26,6 +26,10 @@
  *      páginas lidas, e a frase "Este livro é imagem: o texto não pode ser
  *      selecionado nem buscado." aparece UMA vez; no livro de texto, nenhuma;
  *   6. nenhum erro de página.
+ *   1b. (a B12 honesta, logo depois do 1) todo pedaço da camada do leitor tem
+ *      a cor computada transparente (alfa 0), e o tamanho de letra inline
+ *      (style.fontSize) só existe nesses pedaços, em nenhum outro elemento do
+ *      documento; a contagem do que foi olhado é impressa e zero é falha.
  *
  * NENHUMA ESPERA POR TEMPO FIXO: cada leitura espera a condição dela (o leitor
  * diz que não tem desenho por fazer em corpo.dataset.ocupado, a rolagem
@@ -43,6 +47,10 @@
  *                                      texto nas páginas soltas (4)
  *   --envenenado-escaneado-com-camada  a página sem texto ganha camada (5)
  *   --envenenado-aviso-repetido        a frase do escaneado a cada página (5)
+ *   --envenenado-camada-visivel        os pedaços da camada em preto, e não
+ *                                      transparentes (1b, critério a)
+ *   --envenenado-letra-fora-da-camada  a caixa da página, fora da camada,
+ *                                      ganha font-size inline (1b, critério b)
  *
  *   --app-de <pasta>   serve o app.js e o styles.css dessa pasta (o controle
  *                      no commit pai): as verificações rodam e TÊM de falhar.
@@ -65,11 +73,13 @@ const VENENOS = {
   'caneta-seleciona': ['app.js', 'if (canetaNoLeitor) ev.preventDefault();', '/* veneno: a caneta passa */'],
   'texto-sem-soltar': ['app.js', "    soltarCamadaDeTexto(registro);\n    registro.caixa.innerHTML = '';\n", ''],
   'escaneado-com-camada': ['app.js', "      if (!temTexto) { registro.caixa.dataset.texto = '0'; return null; }\n", ''],
-  'aviso-repetido': ['app.js', 'if (estado.escaneado && !estado.avisouImagem)', 'if (estado.escaneado)']
+  'aviso-repetido': ['app.js', 'if (estado.escaneado && !estado.avisouImagem)', 'if (estado.escaneado)'],
+  'camada-visivel': ['styles.css', '.textLayer br { color: transparent;', '.textLayer br { color: #000;'],
+  'letra-fora-da-camada': ['app.js', "registro.caixa.dataset.texto = '1';", "registro.caixa.style.fontSize = '20px'; registro.caixa.dataset.texto = \"1\";"]
 };
 // a seção depois da qual o veneno já foi medido (a prova para ali)
-const SECAO_DO_VENENO = { 'sem-camada': 1, 'sem-selecao': 2, 'caneta-seleciona': 3, 'texto-sem-soltar': 4,
-  'escaneado-com-camada': 5, 'aviso-repetido': 5 };
+const SECAO_DO_VENENO = { 'sem-camada': 1, 'camada-visivel': '1b', 'letra-fora-da-camada': '1b', 'sem-selecao': 2,
+  'caneta-seleciona': 3, 'texto-sem-soltar': 4, 'escaneado-com-camada': 5, 'aviso-repetido': 5 };
 const VENENO = Object.keys(VENENOS).find(k => process.argv.indexOf('--envenenado-' + k) !== -1) || null;
 const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
@@ -284,6 +294,42 @@ const checa = (rotulo, obtido, esperado, doVeneno) => {
     ' elementos vivos em ' + s1.canvases + ' páginas desenhadas (' + s1.desenhadas + ')');
   checa('na p. 206 a área tem mais de 0 elementos de texto', s1.spans206 > 0, true, 'sem-camada');
   if (await pararNoVeneno(1)) return;
+
+  // ================================================================
+  /* A B12 (sistema visual) guarda a tipografia de leitura no styles.css. O
+   * tamanho da letra da camada é a exceção: o app.js o põe no estilo inline
+   * de cada pedaço, depois do render, porque é geometria da página do PDF e
+   * não letra que alguém lê. Esta seção mantém a exceção estreita: (a) todo
+   * pedaço da camada é transparente, então o tamanho dele não muda nada
+   * visível; (b) o tamanho inline só existe nesses pedaços, em nenhum outro
+   * elemento do documento. Zero olhado é FALHA (teste vazio passa). */
+  secao('1b. A letra da camada é invisível e só dela (a B12 honesta)');
+  const b12 = await pag.evaluate(() => {
+    const alfa = cor => {
+      const m = /rgba?\(([^)]*)\)/.exec(cor);
+      if (!m) return cor === 'transparent' ? 0 : NaN;
+      const p = m[1].split(/[\s,/]+/).filter(Boolean);
+      return p.length >= 4 ? parseFloat(p[3]) : 1;
+    };
+    const naCamada = Array.from(document.querySelectorAll('#corpo-modal-leitor-pdf .leitor-pdf-pagina .textLayer *'));
+    const visiveis = naCamada.filter(e => !(alfa(getComputedStyle(e).color) === 0))
+      .map(e => e.tagName + ' ' + getComputedStyle(e).color + ' "' + (e.textContent || '').slice(0, 15) + '"');
+    const todos = Array.from(document.querySelectorAll('*'));
+    const comLetraInline = todos.filter(e => e.style && e.style.fontSize !== '');
+    const fora = comLetraInline.filter(e => !(e.tagName === 'SPAN' && e.closest('#corpo-modal-leitor-pdf .leitor-pdf-pagina .textLayer')))
+      .map(e => e.tagName + (e.id ? '#' + e.id : '') + (e.className && typeof e.className === 'string' ? '.' + e.className.split(/\s+/).join('.') : '') +
+        ' font-size: ' + e.style.fontSize);
+    return { naCamada: naCamada.length, visiveis, todos: todos.length, comLetraInline: comLetraInline.length, fora };
+  });
+  console.log('   olhados: ' + b12.naCamada + ' pedaços na camada, ' + b12.todos + ' elementos no documento, ' +
+    b12.comLetraInline + ' com tamanho de letra inline' +
+    (b12.visiveis.length ? '; visíveis: ' + b12.visiveis.slice(0, 3).join(' | ') : '') +
+    (b12.fora.length ? '; fora da camada: ' + b12.fora.slice(0, 3).join(' | ') : ''));
+  conf('a prova olhou pedaços da camada e elementos com letra inline (zero olhado é falha)',
+    b12.naCamada > 0 && b12.comLetraInline > 0 && b12.todos > b12.naCamada, true);
+  checa('(a) todo pedaço da camada tem a cor computada transparente (alfa 0)', b12.visiveis.length, 0, 'camada-visivel');
+  checa('(b) tamanho de letra inline só em pedaço da camada, em nenhum outro elemento', b12.fora.length, 0, 'letra-fora-da-camada');
+  if (await pararNoVeneno('1b')) return;
 
   // ================================================================
   secao('2. Arrastar pela linha do exercício e copiar traz "Exercício 206"');
