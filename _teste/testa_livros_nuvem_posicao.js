@@ -27,6 +27,8 @@
  *         ida e volta PDF, EPUB, PDF que termina na página dela, o ajuste que
  *         volta ao lugar de verdade quando ele existe, a página impressa;
  *      i. o livro que sai do pacote sai do tablet, e a posição dele FICA;
+ *      j. o livro que volta com outro arquivo passa a posição velha pela regra
+ *         da troca; com o mesmo arquivo, ela fica byte a byte;
  *   2. o aviso: a tela do livro d diz "Você estava na p. 8" e "Continuar na
  *      p. 6"; o leitor abre na p. 6 com a mesma frase no alto; só abrir não
  *      tira o ajuste; ela muda de página, e o aviso não volta;
@@ -47,6 +49,8 @@
  *   --envenenado-nao-ajusta        a página que não existe fica (1d);
  *   --envenenado-sem-traducao      a âncora page_N é ignorada (1e);
  *   --envenenado-solta-no-removido o livro que sai do pacote leva a posição (1i);
+ *   --envenenado-volta-sem-regra   o livro que volta com outro arquivo fica com a
+ *                                  posição velha, sem a regra da troca (1j);
  *   --envenenado-sem-aviso         o leitor não diz onde ela estava (2);
  *   --envenenado-ajuste-sai-na-abertura  o ajuste sai só de abrir (2);
  *   --envenenado-grava-por-cima-na-tela  o Confirmar grava no número do
@@ -82,6 +86,7 @@ const VENENOS = {
   '--envenenado-solta-no-removido': ['store', '            contas.removidos++;\n', "            contas.removidos++; t.objectStore('livros_posicoes').delete(c.value.id);\n"],
   '--envenenado-ajuste-sai-na-abertura': ['app', 'ajustadaDe: ajuste && !ajuste.mexeu ? ajuste.de : null })', 'ajustadaDe: null })'],
   '--envenenado-troca-sem-perguntar': ['app', 'if (entrada && entrada.correcaoChave && entrada.correcaoChave !== chaveOrfa && !confirmado) {', 'if (false) {'],
+  '--envenenado-volta-sem-regra': ['store', 'var voltou = posicaoNoArquivoNovo(velha, null, l.meta);', 'var voltou = null;'],
   '--envenenado-desfazer-tudo': ['app', 'var agora = db.ajustes.mapaDosLivros[l.id] = db.ajustes.mapaDosLivros[l.id] || {};', 'var agora = db.ajustes.mapaDosLivros[l.id] = {};']
 };
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
@@ -151,7 +156,8 @@ const V1 = [
   livro('pos-fme-sem-ancora', 'epub', epubMeta('pos-fme-sem-ancora')),
   livro('pos-sem-posicao', 'dez'),
   livro('orfa-livro', 'dez', { sumario: SUM_ORFA, mapa: MAPA_ORFA }),
-  livro('pos-sai', 'dez')
+  livro('pos-sai', 'dez'),
+  livro('pos-volta-igual', 'dez')
 ];
 const V2 = [
   livro('pos-meta', 'dez', { sumario: SUM2 }),
@@ -295,22 +301,23 @@ const medirOrfas = (pag, largura) => pag.evaluate(w => {
   secao('1. A posição de leitura numa troca de meta ou de arquivo');
   const c1 = await gravar(pag, 1, V1);
   conf('o v1 entrou inteiro', c1.novos, V1.length);
-  await pag.evaluate(async c => {
+  await pag.evaluate(async (c, hashDez) => {
     await Store.gravarPosicaoLivro({ id: 'pos-meta', pagina: 7 });
     await Store.gravarPosicaoLivro({ id: 'pos-arquivo-sumario', pagina: 7 });
     await Store.gravarPosicaoLivro({ id: 'pos-arquivo', pagina: 7, sha: 'sha256:antigo' });
     await Store.gravarPosicaoLivro({ id: 'pos-encolhe', pagina: 8 });
     await Store.gravarPosicaoLivro({ id: 'pos-fme', capitulo: 2, fracao: 0.4, ancoraVista: 'page_7' });
     await Store.gravarPosicaoLivro({ id: 'pos-fme-sem-ancora', capitulo: 2, fracao: 0.4 });
-    await Store.gravarPosicaoLivro({ id: 'pos-sai', pagina: 3 });
+    await Store.gravarPosicaoLivro({ id: 'pos-sai', pagina: 8, sha: hashDez });
+    await Store.gravarPosicaoLivro({ id: 'pos-volta-igual', pagina: 8, sha: hashDez });
     const d = await Store.carregar();
     d.ajustes = d.ajustes || {};
     d.ajustes.mapaDosLivros = c;
     await Store.salvar(d);
-  }, CORRECOES);
+  }, CORRECOES, hashDe(ARQ.dez));
   const antes = await retrato(pag);
   conf('controle: o retrato enxerga as sete posições gravadas', Object.keys(antes.posicoes).sort().join(','),
-    'pos-arquivo,pos-arquivo-sumario,pos-encolhe,pos-fme,pos-fme-sem-ancora,pos-meta,pos-sai');
+    'pos-arquivo,pos-arquivo-sumario,pos-encolhe,pos-fme,pos-fme-sem-ancora,pos-meta,pos-sai,pos-volta-igual');
   conf('controle: a âncora do EPUB ficou gravada na posição', JSON.parse(antes.posicoes['pos-fme']).ancoraVista, 'page_7');
   const c2 = await gravar(pag, 2, V2);
   console.log('   contas do v2: ' + JSON.stringify(c2));
@@ -323,8 +330,8 @@ const medirOrfas = (pag, largura) => pag.evaluate(w => {
   if (MODO === '--envenenado-nao-ajusta') { veneno('a posição ficou na p. 8 de um livro de 6', P('pos-encolhe') === 'p8'); return H.fim(amb)(); }
   if (MODO === '--envenenado-sem-traducao') { veneno('a âncora page_7 foi ignorada e o livro abre na p. 1', P('pos-fme') === 'p1 de:{"capitulo":2}'); return H.fim(amb)(); }
   if (MODO === '--envenenado-solta-no-removido') { veneno('a posição do livro que saiu do pacote sumiu sem ação dela', P('pos-sai') === 'nenhuma'); return H.fim(amb)(); }
-  conf('as contas: 6 de arquivo novo, 2 de mesmo arquivo (meta novo), 1 que saiu do pacote, 4 sumários mudados, 2 posições ajustadas',
-    [c2.atualizados, c2.iguais, c2.removidos, c2.sumariosMudados, c2.posicoesAjustadas].join('/'), '6/2/1/4/2');
+  conf('as contas: 6 de arquivo novo, 2 de mesmo arquivo (meta novo), 2 que saíram do pacote, 4 sumários mudados, 2 posições ajustadas',
+    [c2.atualizados, c2.iguais, c2.removidos, c2.sumariosMudados, c2.posicoesAjustadas].join('/'), '6/2/2/4/2');
   conf('a. só o meta mudou: a posição ficou byte a byte', depois.posicoes['pos-meta'] === antes.posicoes['pos-meta'], true);
   conf('a. e o meta trocou (o sumário novo entrou)', JSON.parse(depois.livros['pos-meta']).meta.sumario[0].titulo, 'Números');
   conf('b. o arquivo e o sumário mudaram, a página existe: a posição ficou na 7', P('pos-arquivo-sumario'), 'p7');
@@ -341,6 +348,15 @@ const medirOrfas = (pag, largura) => pag.evaluate(w => {
   conf('g. gravar o mesmo v2 de novo: tudo igual, nada regravado', c3.iguais + '/' + c3.atualizados + '/' + c3.posicoesAjustadas, V2.length + '/0/0');
   conf('g. as posições byte a byte', JSON.stringify(outraVez.posicoes) === JSON.stringify(depois.posicoes), true);
   conf('g. e os livros byte a byte', JSON.stringify(outraVez.livros) === JSON.stringify(depois.livros), true);
+  // j. os dois que saíram VOLTAM no v3: um com outro arquivo (6 páginas), outro com o mesmo de antes
+  const c4 = await gravar(pag, 3, V2.concat([livro('pos-sai', 'seis'), livro('pos-volta-igual', 'dez')]));
+  const voltou = await retrato(pag);
+  const PV = id => resumoPos(voltou.posicoes[id] || null);
+  if (MODO === '--envenenado-volta-sem-regra') { veneno('o livro que voltou com 6 páginas ficou com a posição na p. 8', PV('pos-sai') === 'p8'); return H.fim(amb)(); }
+  conf('j. os dois voltaram como novos', c4.novos, 2);
+  conf('j. o que voltou com outro arquivo passa pela regra da troca: a p. 8 não existe, vai para a 6 com o aviso', PV('pos-sai'), 'p6 de:{"pagina":8}');
+  conf('j. e leva o sha do arquivo novo', JSON.parse(voltou.posicoes['pos-sai']).sha, hashDe(ARQ.seis));
+  conf('j. o que voltou com o MESMO arquivo: a posição fica byte a byte', voltou.posicoes['pos-volta-igual'] === depois.posicoes['pos-volta-igual'], true);
   const pura = await pag.evaluate(() => {
     const ep = n => ({ formato: 'epub', hash: 'sha256:novo', epub: { espinha: Array.from({ length: n }, (_, i) => 'p' + i + '.xhtml') } });
     const pdf = (n, extra) => Object.assign({ formato: 'pdf', paginas: n, hash: 'sha256:h' + n }, extra || {});
@@ -369,7 +385,7 @@ const medirOrfas = (pag, largura) => pag.evaluate(w => {
     '{"id":"x","sha":"sha256:novo","capitulo":5,"fracao":0} ; ' +
     '{"id":"x","pagina":6,"sha":"sha256:h6","ajustadaDe":{"pagina":8,"impressa":"6"}} ; null');
   conf('a tela da importação diz que o livro não abre mais onde ela parou', await pag.evaluate(c => Biblioteca.resumoDeLivros(c).join(' '), c2),
-    '6 atualizados, 2 já estavam no tablet, 1 saiu do pacote e do tablet 2 livros atualizados não abrem mais onde você parou; ao abrir, cada um diz onde você estava.');
+    '6 atualizados, 2 já estavam no tablet, 2 saíram do pacote e do tablet 2 livros atualizados não abrem mais onde você parou; ao abrir, cada um diz onde você estava.');
 
   // ================================================================
   secao('2. O aviso de onde ela estava');

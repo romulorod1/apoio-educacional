@@ -503,9 +503,10 @@
    *   1. a mesma `chave` de capítulo (a chave estável que o gerador dá a cada
    *      entrada e reaproveita a cada geração), e com o mesmo título
    *      normalizado, ou com o par título antigo e título novo na tabela de
-   *      herança. Chave igual com título diferente fora da tabela não aplica:
-   *      vira sugestão (o gerador que reaproveitar uma chave não move a
-   *      correção calado);
+   *      herança, e aí também com um assunto em comum entre a correção e o
+   *      capítulo novo. Chave igual com título diferente fora disso não
+   *      aplica: vira sugestão (o gerador que reaproveitar uma chave não move
+   *      a correção calado) e segue para os passos seguintes;
    *   2. o mesmo número E o mesmo título (a regra de antes, para as correções
    *      gravadas sem chave);
    *   3. a herança de títulos (herancaDoLivro): o título dela era um título
@@ -560,7 +561,12 @@
         var porChave = unica(entradas.filter(function (e) { return e.chave === c.chave; }));
         if (porChave) {
           var mesmoTitulo = tituloNormalizado(porChave.titulo) === tc;
-          if (mesmoTitulo || herdaPara(c, porChave)) { propostas[k] = { e: porChave, como: 'chave' }; return; }
+          /* a chave que vale SÓ pela herança pede também um assunto em comum com
+           * o capítulo novo: "page12" herdado para "Medições", com o volume no
+           * capítulo seguinte, não leva a correção de volume para "Medições" */
+          var herdaComAssunto = !mesmoTitulo && herdaPara(c, porChave) &&
+            c.assuntos.some(function (id) { return idsDe(porChave).indexOf(id) >= 0; });
+          if (mesmoTitulo || herdaComAssunto) { propostas[k] = { e: porChave, como: 'chave' }; return; }
           sugestoes[k] = porChave;
         }
       }

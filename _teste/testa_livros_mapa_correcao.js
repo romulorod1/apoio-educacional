@@ -46,6 +46,9 @@
  *                                    chave deixa de seguir sozinho;
  *   --envenenado-chave-sem-titulo    a chave aplica mesmo com o título
  *                                    diferente: o caso 3 move calado;
+ *   --envenenado-chave-herda-sem-assunto  a chave vale pela herança sem
+ *                                    assunto em comum: o "page12" do caso 3
+ *                                    vai para "Medições";
  *   --envenenado-titulo-aplica-calado  o título único volta a aplicar: o
  *                                    "Exercícios" do caso 6 cai calado;
  *   --envenenado-heranca-pelo-inicio  a herança cai no primeiro capítulo da
@@ -68,7 +71,8 @@ const Module = require('module');
 const RAIZ = path.join(__dirname, '..');
 const TROCAS = {
   '--envenenado-so-numero-e-titulo': ['var porChave = unica(entradas.filter(function (e) { return e.chave === c.chave; }));', 'var porChave = null;'],
-  '--envenenado-chave-sem-titulo': ['if (mesmoTitulo || herdaPara(c, porChave)) {', 'if (true) {'],
+  '--envenenado-chave-sem-titulo': ['if (mesmoTitulo || herdaComAssunto) {', 'if (true) {'],
+  '--envenenado-chave-herda-sem-assunto': ['c.assuntos.some(function (id) { return idsDe(porChave).indexOf(id) >= 0; });', 'true;'],
   '--envenenado-titulo-aplica-calado': ['if (porTitulo) sugestoes[k] = porTitulo;', "if (porTitulo) { propostas[k] = { e: porTitulo, como: 'numero' }; return; }"],
   '--envenenado-heranca-pelo-inicio': ['if (!escolhidos.length) return [];', 'return naFaixa.slice(0, 1);'],
   '--envenenado-mais-forte-vence': ['return maisNova(a, b) || forca(a) - forca(b) ||', 'return forca(a) - forca(b) || maisNova(a, b) ||'],
@@ -228,8 +232,22 @@ conf('renumerado, com o título igual normalizado (caixa e acento), a chave apli
 // o par antigo para novo da tabela de herança, com a mesma chave: aplica
 const herdouComChave = pdf([cap(1, 'Conjuntos', 1, 30, ['MAT09-01'], { chave: 'c1a2b' })], {
   heranca_titulos: [{ titulo_antigo: 'GA_X_U1_001A030', titulo_novo: 'Conjuntos', pag_arquivo_inicio_antiga: 1 }] });
-conf('chave com o par da tabela de herança (título antigo para o novo): aplica', resumo(B.mapaDoLivro(herdouComChave,
-  { 1: corr('GA_X_U1_001A030', ['MAT09-02'], 'corrigiu', { chave: 'c1a2b' }) })), '1:MAT09-02:corrigido');
+conf('chave com o par da tabela de herança e um assunto em comum: aplica', resumo(B.mapaDoLivro(herdouComChave,
+  { 1: corr('GA_X_U1_001A030', ['MAT09-01', 'MAT09-02'], 'corrigiu', { chave: 'c1a2b' }) })), '1:MAT09-01+MAT09-02:corrigido');
+// o caso da lente de dados (12/11): "page12" com a chave a e o volume, herdado para "Medições", e o volume na entrada seguinte
+const page12 = pdf([cap(12, 'Medições', 392, 405, ['MAT07-12'], { chave: 'a' }), cap(13, 'Volume', 406, 421, ['MAT06-12'], { chave: 'b' })], {
+  heranca_titulos: [{ titulo_antigo: 'page12', titulo_novo: 'Medições', pag_arquivo_inicio_antiga: 392 },
+    { titulo_antigo: 'page13', titulo_novo: 'Interação', pag_arquivo_inicio_antiga: 422 }] });
+const corrPage12 = { 12: corr('page12', ['MAT06-12'], 'confirmou', { chave: 'a' }) };
+const r3h = resumo(B.mapaDoLivro(page12, corrPage12));
+if (MODO === '--envenenado-chave-herda-sem-assunto') veneno('a correção de volume foi para "Medições" pela chave herdada, sem assunto em comum', r3h.indexOf('12:MAT06-12:confirmado') >= 0);
+// (nos venenos da herança pelo começo e da órfã que some, quem diz que o defeito foi visto são as seções 7 e 5)
+const foraDosVenenosDaHeranca = MODO !== '--envenenado-heranca-pelo-inicio' && MODO !== '--envenenado-orfa-some';
+if (foraDosVenenosDaHeranca) conf('chave herdada SEM assunto em comum: não cai em "Medições"; a herança pelo assunto a leva ao "Volume"', r3h,
+  '12:MAT07-12:do_mapa 13:MAT06-12:confirmado');
+const page12SemVolume = Object.assign({}, page12, { mapa: [page12.mapa[0], cap(13, 'Volume', 406, 421, [], { chave: 'b' })] });
+if (foraDosVenenosDaHeranca) conf('e sem capítulo de volume na faixa: órfã, com "Medições" só como sugestão', resumo(B.mapaDoLivro(page12SemVolume, corrPage12)) + '|' +
+  orfas(page12SemVolume, corrPage12), '12:MAT07-12:do_mapa 13::do_mapa|12=page12->12');
 const chaveDupla = pdf([cap(1, 'A', 1, 10, [], { chave: 'c7f3a' }), cap(2, 'B', 11, 20, [], { chave: 'c7f3a' })]);
 if (MODO !== '--envenenado-orfa-some') {
   conf('a mesma chave em duas entradas (mapa defeituoso): nenhuma, órfã sem sugestão', orfas(chaveDupla, correcoesChave), '2=Frações');

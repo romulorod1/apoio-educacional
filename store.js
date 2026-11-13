@@ -2761,6 +2761,19 @@
               };
             } else {
               contas.novos++;
+              /* o livro que VOLTA ao pacote (a posição dele ficou quando ele saiu)
+               * com outro arquivo: a posição velha passa pela mesma regra da
+               * troca, se o sha gravado nela é de outro arquivo */
+              var psNovo = t.objectStore('livros_posicoes');
+              var rv = psNovo.get(l.meta.id);
+              rv.onsuccess = function () {
+                var velha = rv.result;
+                if (!velha || typeof velha.sha !== 'string' || !velha.sha || velha.sha === l.meta.hash) return;
+                var voltou = posicaoNoArquivoNovo(velha, null, l.meta);
+                if (!voltou) return;
+                if (voltou.ajustadaDe && !velha.ajustadaDe) contas.posicoesAjustadas++;
+                psNovo.put(voltou);
+              };
             }
             contas.bytes += l.blob.size;
             dep.put({ id: l.meta.id, pacote: chave, versao: versao, meta: l.meta, blob: l.blob,
