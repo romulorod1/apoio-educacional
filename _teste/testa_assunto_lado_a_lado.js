@@ -26,8 +26,11 @@
  *      capítulos com as páginas do arquivo; "sem vínculo no mapa" no livro-b
  *      e "sem mapa" nos livros-c e -d;
  *   2. tocar na célula abre o leitor na página do arquivo do capítulo;
- *   3. os livros com vínculo no painel do capítulo e o "Comparar livros por assunto"
- *      da aba chegam à MESMA tabela;
+ *   3. os livros com vínculo no painel do capítulo e o "Comparar os livros"
+ *      da página do assunto chegam à MESMA tabela (desde a P3, a comparação
+ *      não é mais uma seção da tela principal da Biblioteca: ela abre pela
+ *      página do assunto, e a busca de assunto em todos os anos abre pelo
+ *      "Outro assunto" da própria comparação);
  *   4. a busca de assunto atravessa os anos e mostra o ano e a quantidade de
  *      livros de cada um; o assunto de um ano sem livro diz que não há livro;
  *   5. a correção dela no mapa (db.ajustes.mapaDosLivros) aparece na tabela:
@@ -182,12 +185,45 @@ async function fecharModal(pag, id) {
   await esperar('a janela ' + id + ' fechou', () => pag.evaluate(i => !document.querySelector('#' + i + '.aberto'), id), v => v, 5000);
   await pausa(300);
 }
-async function abrirBibliotecaNoAno(pag, disciplina, ano) {
+/* P3: a seção "Comparar livros por assunto" saiu da tela principal, e a
+ * comparação abre pela página do assunto. Na Matemática, a página vem da lista
+ * de assuntos do ano; nas outras matérias, da busca pelo título do assunto. */
+async function abrirPaginaDoAssunto(pag, disciplina, ano, id, titulo) {
   await H.irParaAba(pag, 'biblioteca');
-  await esperar('a seção de livros', () => pag.evaluate(() => !!document.querySelector('#bib-livros .bibl-disciplina')), v => v, 10000);
-  await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="' + disciplina + '"]');
-  await clicar(pag, '#bib-livros .bibl-ano[data-ano="' + ano + '"]');
-  await esperar('o "Comparar livros por assunto"', () => pag.evaluate(() => !!document.querySelector('#bib-comparar')), v => v, 10000);
+  // uma página do assunto aberta antes sai pelo Voltar dela, e a busca que ficar é apagada
+  await clicar(pag, '#bib-corpo .bib-assunto .bib-voltar');
+  await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); if (i && i.value) { i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); } });
+  await esperar('a tela principal', () => pag.evaluate(() => { const c = document.querySelector('#bib-livros');
+    return !!c && !c.hidden && !c.classList.contains('bibl-na-busca') && !!c.querySelector('.bibl-disciplina'); }), v => v, 10000);
+  if (disciplina === 'matematica') {
+    await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+    await esperar('o ' + id + ' na lista do ano', async () => {
+      await clicar(pag, '#bib-livros .bibl-ano[data-ano="' + ano + '"]');
+      return pag.evaluate(i => !!document.querySelector('#bib-livros .bibl-assunto-linha[data-assunto="' + i + '"]'), id);
+    }, v => v, 10000);
+    await clicar(pag, '#bib-livros .bibl-assunto-linha[data-assunto="' + id + '"]');
+  } else {
+    await pag.evaluate(t => { const i = document.querySelector('#busca-biblioteca'); i.value = t; i.dispatchEvent(new Event('input', { bubbles: true })); }, titulo);
+    await esperar('o ' + id + ' na busca', () => pag.evaluate(i => !!document.querySelector('#bib-assuntos-da-busca [data-assunto="' + i + '"]'), id), v => v, 10000);
+    await clicar(pag, '#bib-assuntos-da-busca [data-assunto="' + id + '"]');
+  }
+  await esperar('o "Comparar os livros" na página do ' + id, () => pag.evaluate(i =>
+    !!document.querySelector('#bib-corpo .bib-assunto[data-assunto="' + i + '"] #bib-assunto-comparar'), id), v => v, 10000);
+}
+async function compararPeloAssunto(pag, disciplina, ano, id, titulo) {
+  await abrirPaginaDoAssunto(pag, disciplina, ano, id, titulo);
+  await clicar(pag, '#bib-assunto-comparar');
+}
+// o título de um assunto do catálogo de uma matéria, lido do arquivo (a busca acha o assunto por ele)
+function tituloNoCatalogo(materia, id) {
+  let achado = null;
+  const anda = x => {
+    if (achado || !x || typeof x !== 'object') return;
+    if (x.id === id) { achado = x.titulo || (x.pt && x.pt.titulo) || null; return; }
+    Object.keys(x).forEach(k => anda(x[k]));
+  };
+  anda(JSON.parse(fs.readFileSync(path.join(H.RAIZ, 'banco', 'topicos', materia + '.json'), 'utf8')));
+  return achado;
 }
 async function abrirAulaDeHoje(pag, hora) {
   await H.irParaAba(pag, 'agenda');
@@ -266,14 +302,14 @@ const medir = pag => pag.evaluate(() => {
   const antes = await pag.evaluate(() => Store.carregar().then(d => JSON.stringify(d)));
 
   // ================================================================
-  secao('1. A tabela pelo "Comparar livros por assunto" da aba');
-  await abrirBibliotecaNoAno(pag, 'matematica', '06');
-  const chips = await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-comparar .bibl-comparar-chip')).map(b => (b.dataset.comparar || b.id) + '=' + b.innerText.replace(/\s+/g, ' ').trim()).join(' ; '));
-  conf('a aba oferece assuntos com mais vínculos registrados e "Todos os N assuntos"', chips,
-    'MAT06-01=Sistema de numeração decimal 2 livros com vínculo no mapa ; MAT06-06=Operações com frações 2 livros com vínculo no mapa ; MAT06-07=Números decimais e suas operações 2 livros com vínculo no mapa ; ' +
-    'MAT06-05=Frações: o que são e como comparar 1 livro com vínculo no mapa ; bib-comparar-todos=Todos os 19 assuntos');
-  conf('o título da seção diz o ano', await pag.evaluate(() => document.querySelector('#bib-comparar .bibl-rotulo').textContent), 'Comparar livros por assunto, 6º ano');
-  await clicar(pag, '#bib-comparar [data-comparar="MAT06-05"]');
+  secao('1. A tabela pelo "Comparar os livros" da página do assunto');
+  await abrirPaginaDoAssunto(pag, 'matematica', '06', 'MAT06-05');
+  // P3: a tela principal não tem mais a seção; a comparação mora na página do assunto
+  conf('a tela principal não tem mais a seção "Comparar livros por assunto"', await pag.evaluate(() =>
+    document.querySelectorAll('#bib-comparar, .bibl-comparar, #bib-comparar-todos').length), 0);
+  conf('a página do assunto (Frações, 6º ano) oferece "Comparar os livros"', await pag.evaluate(() =>
+    document.querySelector('#bib-corpo .bib-assunto[data-assunto="MAT06-05"] #bib-assunto-comparar').textContent), 'Comparar os livros');
+  await clicar(pag, '#bib-assunto-comparar');
   let lado = (await esperar('a tabela de Frações', () => lerLado(pag), v => v.visivel && v.modo === 'tabela' && !!v.colunas, 10000)).valor;
   conf('a tela cobre o trilho, com Voltar escrito', lado.cobreOTrilho + '|' + lado.voltar, 'true|Voltar');
   conf('o título é o tema e o ano', lado.titulo, 'Números, 6º ano');
@@ -369,15 +405,18 @@ const medir = pag => pag.evaluate(() => {
   await clicar(pag, '#lado-voltar');
   conf('o Voltar volta à tela do livro', await pag.evaluate(() => !document.querySelector('#bib-livro').hidden && document.querySelector('#lado-a-lado').hidden), true);
   await clicar(pag, '#bib-livro-voltar');
-  await abrirBibliotecaNoAno(pag, 'matematica', '06');
-  await clicar(pag, '#bib-comparar [data-comparar="MAT06-06"]');
-  lado = (await esperar('a tabela pela aba', () => lerLado(pag), v => v.visivel && v.escolhido === 'MAT06-06', 10000)).valor;
-  conf('o painel do capítulo e a aba chegam à mesma tabela', lado.titulo + '|' + lado.marcada + '|' + lado.colunas + '|' + lado.celulas, peloPainel);
-  await clicar(pag, '#lado-voltar');
+  await compararPeloAssunto(pag, 'matematica', '06', 'MAT06-06');
+  lado = (await esperar('a tabela pela página do assunto', () => lerLado(pag), v => v.visivel && v.escolhido === 'MAT06-06', 10000)).valor;
+  conf('o painel do capítulo e a página do assunto chegam à mesma tabela', lado.titulo + '|' + lado.marcada + '|' + lado.colunas + '|' + lado.celulas, peloPainel);
+  conf('o Voltar da comparação volta à página do assunto', await pag.evaluate(() => { document.querySelector('#lado-voltar').click();
+    return document.querySelector('#lado-a-lado').hidden && !!document.querySelector('#bib-corpo .bib-assunto[data-assunto="MAT06-06"]'); }), true);
 
   // ================================================================
   secao('4. A busca de assunto atravessa os anos');
-  await clicar(pag, '#bib-comparar-todos');
+  // a busca de todos os anos (o antigo "Todos os N assuntos" da aba) abre pelo "Outro assunto" da comparação
+  await clicar(pag, '#bib-assunto-comparar');
+  await esperar('a tabela do MAT06-06', () => lerLado(pag), v => v.visivel && v.modo === 'tabela' && v.escolhido === 'MAT06-06', 10000);
+  await clicar(pag, '#lado-outro-assunto');
   await esperar('a busca de assunto', () => lerLado(pag), v => v.visivel && v.modo === 'escolha', 5000);
   const lerEscolha = () => pag.evaluate(() => ({
     conta: (document.querySelector('#lado-escolha-conta') || {}).textContent || '',
@@ -430,8 +469,7 @@ const medir = pag => pag.evaluate(() => {
       await Store.salvar(d);
     }, doLivroC);
     await H.abrirApp(pag, amb.ORIGEM);
-    await abrirBibliotecaNoAno(pag, 'matematica', '06');
-    await clicar(pag, '#bib-comparar [data-comparar="MAT06-05"]');
+    await compararPeloAssunto(pag, 'matematica', '06', 'MAT06-05');
     const v = (await esperar(rotulo, () => lerLado(pag), x => x.visivel && pronto(x), 10000)).valor;
     const cel = Object.fromEntries(v.celulas.split(' ; ').map(x => [x.slice(0, x.indexOf(':')), x.slice(x.indexOf(':') + 1)]));
     await clicar(pag, '#lado-voltar');
@@ -497,33 +535,34 @@ const medir = pag => pag.evaluate(() => {
   for (const [w, h] of [[1280, 800], [800, 1280]]) {
     await pag.setViewport({ width: w, height: h, hasTouch: true });
     for (const [rot, css] of [['100%', ''], ['130%', LETRA_130]]) {
-      await abrirBibliotecaNoAno(pag, 'matematica', '06');
+      await abrirPaginaDoAssunto(pag, 'matematica', '06', 'MAT06-05');
       await letra(pag, css);
-      await clicar(pag, '#bib-comparar [data-comparar="MAT06-05"]');
+      await pausa(200);
+      // o "Comparar os livros" da página do assunto, no lugar do da aba
+      const naPagina = await pag.evaluate(() => {
+        const s = document.querySelector('#bib-corpo .bib-assunto'); const r = s.getBoundingClientRect();
+        const b = document.querySelector('#bib-assunto-comparar'); const q = b.getBoundingClientRect();
+        const ruins = [];
+        if (q.height < 47.5 || q.right > r.right + 0.5 || b.scrollWidth > b.clientWidth + 1) ruins.push(b.id);
+        if (document.documentElement.scrollWidth > innerWidth) ruins.push('a página rola de lado');
+        return ruins.join(',');
+      });
+      conf(w + ' px a ' + rot + ': o "Comparar os livros" da página do assunto não transborda', naPagina, '');
+      await clicar(pag, '#bib-assunto-comparar');
       await esperar('a tabela', () => lerLado(pag), v => v.visivel && !!v.colunas, 5000);
       await pausa(200);
       conf(w + ' px a ' + rot + ': a tabela não transborda', (await medir(pag)).join('; '), '');
-      await clicar(pag, '#lado-voltar');
-      await clicar(pag, '#bib-comparar-todos');
+      await clicar(pag, '#lado-outro-assunto');
       await esperar('a busca', () => lerLado(pag), v => v.visivel && v.modo === 'escolha', 5000);
       await pausa(200);
       conf(w + ' px a ' + rot + ': a busca de assunto não transborda', (await medir(pag)).join('; '), '');
       await clicar(pag, '#lado-voltar');
-      const naAba = await pag.evaluate(() => {
-        const s = document.querySelector('#bib-comparar'); const r = s.getBoundingClientRect();
-        const ruins = [];
-        s.querySelectorAll('button').forEach(b => { const q = b.getBoundingClientRect(); if (q.height < 47.5 || q.right > r.right + 0.5) ruins.push(b.dataset.comparar || b.id); });
-        if (document.documentElement.scrollWidth > innerWidth) ruins.push('a página rola de lado');
-        return ruins.join(',');
-      });
-      conf(w + ' px a ' + rot + ': o "Comparar" da aba não transborda', naAba, '');
       await letra(pag, '');
     }
   }
   // estreito de celular (360 px a 130%): a coluna dos assuntos encolhe
   await pag.setViewport({ width: 800, height: 1280, hasTouch: true });
-  await abrirBibliotecaNoAno(pag, 'matematica', '06');
-  await clicar(pag, '#bib-comparar [data-comparar="MAT06-05"]');
+  await compararPeloAssunto(pag, 'matematica', '06', 'MAT06-05');
   await esperar('a tabela', () => lerLado(pag), v => v.visivel && !!v.colunas, 5000);
   await pag.setViewport({ width: 360, height: 780, hasTouch: true });
   await letra(pag, LETRA_130);
@@ -557,8 +596,11 @@ const medir = pag => pag.evaluate(() => {
     k % 4 === 0 ? 'auto' : 'mapa', 20));
   conf('os 15 livros entraram', await gravarLivros(pag, muitos, 'prova-b6-muitos'), 15);
   await H.abrirApp(pag, amb.ORIGEM);
-  await abrirBibliotecaNoAno(pag, 'portugues', 'em3');
-  const t0 = await pag.evaluate(() => { window.__t0 = performance.now(); document.querySelector('#bib-comparar [data-comparar]').click(); return true; });
+  // o Português ainda não está por assunto na tela principal (P3): a página do assunto vem da busca
+  const tituloT01 = tituloNoCatalogo('portugues', 'POREM3-T01');
+  conf('o catálogo de Português tem o POREM3-T01', !!tituloT01, true);
+  await abrirPaginaDoAssunto(pag, 'portugues', 'em3', 'POREM3-T01', tituloT01);
+  const t0 = await pag.evaluate(() => { window.__t0 = performance.now(); document.querySelector('#bib-assunto-comparar').click(); return true; });
   const grande = (await esperar('a tabela de 15 livros', () => pag.evaluate(() => {
     const t = document.querySelector('#lado-a-lado');
     if (!t || t.hidden || !t.querySelector('.lado-grade')) return null;
@@ -569,8 +611,7 @@ const medir = pag => pag.evaluate(() => {
   conf('15 colunas e 16 linhas (240 células)', t0 && grande && grande.colunas + 'x' + grande.linhas + '=' + grande.celulas, '15x16=240');
   conf('abre em menos de 1,5 s do toque ao desenho', grande && grande.ms < 1500, true);
   conf('com 15 livros, a página não rola de lado (só a tabela)', await pag.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-  await clicar(pag, '#lado-voltar');
-  await clicar(pag, '#bib-comparar-todos');
+  await clicar(pag, '#lado-outro-assunto');
   await esperar('a busca de assunto', () => lerLado(pag), v => v.visivel && v.modo === 'escolha', 5000);
   await pag.focus('#lado-busca');
   await pag.keyboard.type('Modernismo');

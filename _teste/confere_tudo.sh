@@ -592,6 +592,17 @@ roda "assunto lado a lado"                      node "_teste/testa_assunto_lado_
 roda "assunto lado a lado --envenenado-nao-trata-vira-sem-mapa" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-nao-trata-vira-sem-mapa
 roda "assunto lado a lado --envenenado-mapa-vazio-nao-trata" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-mapa-vazio-nao-trata
 roda "assunto lado a lado --envenenado-parcial-nao-trata" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-parcial-nao-trata
+# P3: a tela principal nova da Biblioteca. A Matematica abre por ano e por
+# assunto, agrupada pela unidade do catalogo; o assunto sem material aparece
+# apagado e nao some (particao conferida pela propria pagina do assunto); as
+# capas, o Continuar lendo e Minhas listas ficam na Estante; nada novo gravado.
+# Venenos dos dois lados do apagado (o vazio some; tudo apagado), a estante que
+# nao abre o livro, e o controle no commit pai (a tela antiga tem de ser vista).
+roda "biblioteca tela principal"               node "_teste/testa_biblioteca_tela_principal.js"
+roda "biblioteca tela principal --envenenado-some-sem-material" node "_teste/testa_biblioteca_tela_principal.js" --envenenado-some-sem-material
+roda "biblioteca tela principal --envenenado-tudo-apagado" node "_teste/testa_biblioteca_tela_principal.js" --envenenado-tudo-apagado
+roda "biblioteca tela principal --envenenado-estante-nao-abre" node "_teste/testa_biblioteca_tela_principal.js" --envenenado-estante-nao-abre
+roda "biblioteca tela principal --controle-pai" node "_teste/testa_biblioteca_tela_principal.js" --controle-pai
 # C12: os pacotes de provas (OBMEP Mirim por nivel e ENEM) importam, as abas vao
 # do 2o ao 5o ano e os assuntos do aplicativo aparecem como modulos. O modo
 # envenenado serve o app.js que so espalhava o Banco pelas series equivalentes.

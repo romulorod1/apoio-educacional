@@ -158,6 +158,17 @@ async function abrirBiblioteca(pag) {
   await pausa(300);
 }
 
+/* P3: a Matemática abre por assunto, e as capas, o Continuar lendo e Minhas
+ * listas ficam na Estante, a um toque. Esta prova é a das capas: ela chega a
+ * elas pelo botão da Estante, esperando pela condição (a estante à vista). A
+ * tela principal por assunto é provada no testa_biblioteca_tela_principal. */
+async function abrirEstante(pag) {
+  await esperar('a Estante', async () => {
+    await clicar(pag, '#bib-abrir-estante');
+    return pag.evaluate(() => !!document.querySelector('#bib-livros .bibl-painel-estante'));
+  }, v => v, 10000);
+}
+
 // o que a seção de livros mostra agora
 const lerSecao = pag => pag.evaluate(() => {
   const caixa = document.querySelector('#bib-livros');
@@ -325,6 +336,10 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('os livros sintéticos entraram', /Livros importados\./.test(imp2), true);
   conf('o aviso da importação diz onde ler', /abra a aba Biblioteca e toque no livro\./.test(imp2), true);
   await abrirBiblioteca(pag);
+  // P3: a aba abre na Matemática por assunto, sem as capas; elas ficam na Estante
+  await esperar('a lista de assuntos', () => pag.evaluate(() => !!document.querySelector('#bib-livros .bibl-assunto-linha')), v => v, 10000);
+  conf('a aba abre por assunto, sem capas no caminho principal', (await lerSecao(pag)).livros, '');
+  await abrirEstante(pag);
   await esperar('a seção de livros', () => lerSecao(pag), v => v.visivel && !!v.livros, 10000);
   s = await lerSecao(pag);
   conf('a contagem diz materiais e disciplinas', s.contagem, '4 materiais, 2 disciplinas');
@@ -358,6 +373,8 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
 
   // ================================================================
   secao('3. Os exercícios continuam alcançáveis');
+  // voltar à Matemática é voltar aos assuntos (P3): os exercícios por série moram na Estante
+  await abrirEstante(pag);
   await clicar(pag, '#bib-livros .bibl-ano[data-ano="09"]');
   conf('o cartão dos exercícios do 9º ano está lá', await clicar(pag, '#bib-livros [data-exercicios="9ano"]'), true);
   await pausa(300);

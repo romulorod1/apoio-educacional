@@ -1,0 +1,5 @@
+A Biblioteca abre na Matemática por assunto: escolha o ano nas pílulas e toque no assunto para ver os capítulos dos livros, a teoria e os exercícios.
+Cada assunto da lista diz quanto material tem. O assunto que aparece apagado, com "ainda sem material", é o que ainda falta no tablet.
+Os livros, o Continuar lendo e Minhas listas ficam na Estante, no botão ao lado do nome da Matemática.
+Para comparar os livros de um assunto, abra o assunto e toque em "Comparar os livros".
+As outras disciplinas, por enquanto, abrem direto nos livros delas, como antes.

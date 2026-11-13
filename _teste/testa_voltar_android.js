@@ -275,6 +275,9 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
   await clicar(pag, '#abas .aba[data-tela="biblioteca"]');
   await esperarBib(pag);
   await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  // P3: a Matemática abre por assunto; os livros dela ficam na Estante, a um toque (espera pela condição)
+  await esperar('a Estante da Matemática', async () => { await clicar(pag, '#bib-abrir-estante');
+    return pag.evaluate(() => !!document.querySelector('#bib-livros .bibl-painel-estante')); }, v => v, 10000);
   await clicar(pag, '#bib-livros .bibl-ano[data-ano="06"]');
   await pausa(200);
   await clicar(pag, '#bib-livros [data-livro="livro-com-marcadores"]');
