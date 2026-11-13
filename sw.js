@@ -166,7 +166,7 @@
  * mapa sobrevivem à troca de meta e de arquivo do livro.
  * O v182 traz o Voltar sem entrada sobrando no histórico depois de recarregar com uma janela aberta.
  */
-var CACHE = 'apoio-educacional-v182';
+var CACHE = 'apoio-educacional-v185';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

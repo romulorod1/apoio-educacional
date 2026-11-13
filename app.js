@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.102';
+  var VERSAO = '1.42.105';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -84,6 +84,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.105',
+      itens: [
+        'Remarcar uma aula da repetição para o dia de outra aula da mesma repetição, num mês que ainda não abriu, não faz mais sumir a aula fixa daquele dia: quando o mês abre, as duas aparecem e entram no fechamento.'
+      ]
+    },
     {
       versao: '1.42.89',
       itens: [
