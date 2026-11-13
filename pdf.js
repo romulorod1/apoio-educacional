@@ -4042,6 +4042,8 @@
    *   teoria: [{ img: {bytes, wPx, hPx}, larguraPt, alturaPt }],
    *   itens: [{ id, origem, credito (texto ou null), semSolucao,
    *             resposta (letra, só sem solução),
+   *             gabaritoAgente (linhas prontas da resposta de duas IAs
+   *               conferida, só sem solução, ou null),
    *             enunciado: Peca, solucao: Peca | null }]
    * }
    * Peca = { larguraPt, alturaPt, rotulo: [x0,y0,x1,y1] | null,
@@ -4200,6 +4202,34 @@
       for (var p = antes; p < doc.paginas.length; p++) if (mapa[parte].indexOf(p) < 0) mapa[parte].push(p);
     }
 
+    /* A RESPOSTA DE DUAS IAS CONFERIDA (item sem solução na fonte que traz
+     * gabarito de origem agente-conferido): as linhas da resposta onde sairia
+     * a solução, e embaixo a marca, SEMPRE. Ela não obedece a caixa nenhuma
+     * (nem a "origem"): quem lê o gabarito precisa saber que a resposta não
+     * veio do livro. No papel não há o que tocar, então a marca já leva o
+     * porquê. O texto da marca mora aqui, e não vem do app. */
+    var MARCA_DO_AGENTE = 'Resposta conferida por duas IAs. Este livro não traz gabarito. ' +
+      'Duas IAs resolveram separadas e chegaram à mesma resposta.';
+    function linhasDoAgente(linhas) {
+      var x = MARG_E + 20, larg = UTIL - 20;
+      linhas.forEach(function (l, k) {
+        doc.quebrar(l, larg, 10, true).forEach(function (q, j) {
+          if (k || j) { doc.garanteEspaco(13); doc.y -= 13; }
+          doc.texto(q, x, doc.y, { tam: 10, bold: true, cor: COR.navy });
+          anota('gabarito');
+        });
+      });
+      marcaDoAgenteNaFolha(x, larg);
+    }
+    function marcaDoAgenteNaFolha(x, larg) {
+      doc.quebrar(MARCA_DO_AGENTE, larg, 8, false).forEach(function (q, j) {
+        doc.garanteEspaco(j ? 10 : 12);
+        doc.y -= j ? 10 : 12;
+        doc.texto(q, x, doc.y, { tam: 8, italic: true, cor: COR.muted });
+        anota('gabarito');
+      });
+    }
+
     doc.novaPagina();
 
     if (op.incluirTeoria && op.teoria && op.teoria.length) {
@@ -4239,7 +4269,8 @@
         doc.texto(String(i + 1) + '.', MARG_E, doc.y, { tam: 10, bold: true, cor: COR.navy });
         /* A prova sem solução e com a letra do gabarito oficial (ENEM, C12):
          * a resposta sai onde sairia a solução, e o gabarito não fica vazio. */
-        if (it.resposta) doc.texto('Resposta: ' + it.resposta, MARG_E + 20, doc.y, { tam: 10, bold: true, cor: COR.navy });
+        if (it.gabaritoAgente && it.gabaritoAgente.length) linhasDoAgente(it.gabaritoAgente);
+        else if (it.resposta) doc.texto('Resposta: ' + it.resposta, MARG_E + 20, doc.y, { tam: 10, bold: true, cor: COR.navy });
         else doc.texto('Sem solução na fonte.', MARG_E + 20, doc.y, { tam: 9.5, italic: true, cor: COR.muted });
         doc.y -= 8;
         anota('gabarito');

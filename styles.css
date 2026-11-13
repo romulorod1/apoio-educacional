@@ -2119,6 +2119,10 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-origem { font-size: var(--letra-12); color: var(--muted); }
 /* o crédito que a licença da fonte pede (L6): sempre visível, nunca escondido */
 .bib-credito { font-size: var(--letra-12); color: var(--muted); overflow-wrap: anywhere; }
+/* a marca da resposta de duas IAs conferida: sempre à vista; tocar abre o porquê */
+.bib-marca-ia { font-size: var(--letra-12); color: var(--muted); margin-top: 6px; }
+.bib-marca-ia > summary { display: inline-flex; align-items: center; min-height: var(--alvo); cursor: pointer; color: var(--navy); font-weight: 600; }
+.bib-marca-ia-explica { margin: 0 0 6px; }
 .bib-visor { background: var(--fio-claro); }
 .bib-cheia { width: 100%; height: auto; display: block; margin: 0 auto; background: var(--branco); box-shadow: var(--sombra); }
 /* o selo "Marcado" sobre a imagem da tela cheia: ela anda pelo Anterior e

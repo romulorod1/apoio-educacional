@@ -23637,7 +23637,8 @@
       });
     return Promise.all([enun, sol]).then(function (r) {
       return { id: it.id, origem: origemCurta(it), credito: creditoDaLicenca(it), enunciado: r[0], solucao: r[1],
-        semSolucao: !!(it.sem_solucao || !it.assets.solucao), resposta: respostaSemSolucao(it) };
+        semSolucao: !!(it.sem_solucao || !it.assets.solucao), resposta: respostaSemSolucao(it),
+        gabaritoAgente: respostasDoAgente(it) };
     });
   }
 
@@ -23646,6 +23647,37 @@
    * solução mostra a solução, e a letra fica dentro dela. */
   function respostaSemSolucao(it) {
     return it && !it.assets.solucao && it.formato === 'objetiva' && /^[A-E]$/.test(it.resposta || '') ? it.resposta : null;
+  }
+
+  /* O GABARITO RESOLVIDO POR AGENTE E CONFERIDO (aditivo no pacote). Fonte
+   * sem solução (os Cadernos da SME-SP: o caderno do aluno não traz respostas)
+   * pode trazer no item `gabarito: { origem: 'agente-conferido', respostas:
+   * [{ subitem, resposta }] }`, a resposta de duas IAs que resolveram separadas
+   * e chegaram ao mesmo resultado (o gerador grava pelo --gabarito-externo).
+   * Onde a resposta aparece (a tela cheia e o gabarito do PDF), a marca vai
+   * SEMPRE junto, e nenhuma caixa a desliga: quem lê precisa saber que aquela
+   * resposta não veio do livro. Item sem o campo, ou de outra origem, devolve
+   * null e fica exatamente como era. As linhas saem prontas para mostrar:
+   * "1) 38" por subitem, ou "Resposta: 38" quando a resposta é uma só. */
+  var MARCA_GABARITO_AGENTE = 'Resposta conferida por duas IAs';
+  var EXPLICA_GABARITO_AGENTE = 'Este livro não traz gabarito. Duas IAs resolveram separadas e chegaram à mesma resposta.';
+  function respostasDoAgente(it) {
+    var g = it && it.gabarito;
+    if (!g || g.origem !== 'agente-conferido' || !Array.isArray(g.respostas)) return null;
+    var limpo = function (v) { return typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : ''; };
+    var rs = g.respostas.filter(function (r) { return r && limpo(r.resposta); });
+    if (!rs.length) return null;
+    if (rs.length === 1 && !limpo(rs[0].subitem)) return ['Resposta: ' + limpo(rs[0].resposta)];
+    return rs.map(function (r) { return (limpo(r.subitem) ? limpo(r.subitem) + ') ' : '') + limpo(r.resposta); });
+  }
+
+  /* A marca, que se toca para ler o porquê. Um <details>: sem script, e o
+   * leitor de tela anuncia que abre. */
+  function marcaDoAgente() {
+    return el('details', { id: 'bib-marca-ia', class: 'bib-marca-ia u-texto-centro' }, [
+      el('summary', { texto: MARCA_GABARITO_AGENTE }),
+      el('p', { id: 'bib-marca-ia-explica', class: 'bib-marca-ia-explica', texto: EXPLICA_GABARITO_AGENTE })
+    ]);
   }
 
   /* Módulo de prova que não é assunto do aplicativo ("Diversos", C12) não vira
@@ -25646,6 +25678,14 @@
       corpo.appendChild(el('div', { id: 'bib-resposta', class: 'bib-resposta u-texto-centro u-letra-6 u-peso-negrito u-cor-navy u-margem-topo-10',
         texto: 'Resposta: ' + resposta }));
     }
+    /* A resposta de duas IAs conferida (item sem solução na fonte): pelo mesmo
+     * "Ver resposta", e a marca embaixo SEMPRE, aberta ou não a resposta. */
+    var doAgente = bibVendo.tipo === 'exercicio' ? respostasDoAgente(peca.item) : null;
+    if (doAgente && bibVendo.solucao) {
+      corpo.appendChild(el('div', { id: 'bib-resposta-agente', class: 'bib-resposta u-texto-centro u-peso-negrito u-cor-navy u-margem-topo-10' },
+        doAgente.map(function (l) { return el('div', { texto: l }); })));
+    }
+    if (doAgente) corpo.appendChild(marcaDoAgente());
     var vez = ++bibVezDoVisor;
     Store.lerAssetBiblioteca(peca.pacote, peca.caminho).then(function (blob) {
       // ela pode ter andado para outra página enquanto esta era lida
@@ -25659,7 +25699,7 @@
     if (bibVendo.tipo === 'exercicio' && peca.item.assets.solucao) {
       sol.style.display = '';
       sol.textContent = bibVendo.solucao ? 'Ver enunciado' : 'Ver solução';
-    } else if (resposta) {
+    } else if (resposta || doAgente) {
       sol.style.display = '';
       sol.textContent = bibVendo.solucao ? 'Esconder a resposta' : 'Ver resposta';
     } else {

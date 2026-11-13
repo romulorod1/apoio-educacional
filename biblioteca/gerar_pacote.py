@@ -1818,7 +1818,7 @@ def gravar_pacote(conteudo, manifest_b, nome, versao, saida, trabalho, gravar_zi
 
 def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, commit=None,
           so_modulos=None, gravar_zip=True, anterior=None, com_kits=False, com_listas=False,
-          regra_listas=None, com_base=False):
+          regra_listas=None, com_base=False, gabarito_externo=None):
     t_ini = time.time()
     nome = 'matematica-obmep-%s' % serie
     trabalho = trabalho or os.path.join(os.path.dirname(os.path.abspath(saida)), 'trabalho', '%s-v%d' % (nome, versao))
@@ -2126,6 +2126,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     itens.sort(key=lambda i: (i['modulo']['slug'], i['aula']['slug'], i['numero']))
     teoria.sort(key=lambda t: t['id'])
     docs_busca.sort(key=lambda d: d['id'])
+    n_gabarito = aplicar_gabarito_externo(itens, gabarito_externo) if gabarito_externo is not None else None
     conteudo['itens.json'] = json_bytes(itens)
     conteudo['teoria.json'] = json_bytes(teoria)
     conteudo['busca.json'] = json_bytes(montar_busca(docs_busca))
@@ -2178,6 +2179,9 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     }
     if kits_gerados is not None:
         contagens['kits'] = len(kits_gerados)
+    if n_gabarito is not None:
+        # so com --gabarito-externo: sem ele o manifest sai como saia antes
+        contagens['itens_com_gabarito_agente'] = n_gabarito
     manifest = {
         'esquema': 1, 'pacote': nome, 'versao': versao,
         'gerado_em': gerado_em or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).replace(microsecond=0).isoformat(),
@@ -2253,6 +2257,79 @@ def comparar_com_anterior(itens, caminho):
     return {'arquivo': caminho.replace('\\', '/'), 'itens_antes': len(antes), 'itens_agora': len(agora),
             'sairam': sorted(set(antes) - set(agora)), 'entraram': sorted(set(agora) - set(antes)),
             'com_caixa_diferente': len(mudou), 'ids_com_caixa_diferente': mudou}
+
+
+# O GABARITO DE FORA (aditivo). Fonte sem solucao (os Cadernos da SME-SP, por
+# exemplo: o caderno do aluno nao traz respostas) pode ganhar a resposta de
+# duas IAs que resolveram separadas e chegaram ao mesmo resultado. A resposta
+# entra pelo --gabarito-externo, um json com uma lista de
+#   {"id_item": ..., "subitem": "1" ou null, "resposta": "...", "origem": "agente-conferido"}
+# e o item ganha o campo
+#   gabarito: {origem: 'agente-conferido', respostas: [{subitem, resposta}]}
+# O resto do item fica como estava (sem_solucao true, assets.solucao null): o
+# aplicativo mostra a resposta com a marca "Resposta conferida por duas IAs",
+# e quem ler o pacote nunca confunde essa resposta com a solucao da fonte.
+# Item sem entrada fica exatamente como antes. Recusa, em vez de seguir calado:
+# origem fora da lista, id que nao e item do pacote, item que ja tem solucao
+# de verdade (ou a resposta oficial da fonte), subitem que o item nao tem,
+# resposta vazia, repetida ou com travessao.
+ORIGENS_DE_GABARITO_EXTERNO = ('agente-conferido',)
+
+
+def ler_gabarito_externo(caminho):
+    with io.open(caminho, encoding='utf-8') as f:
+        dados = json.load(f)
+    if not isinstance(dados, list):
+        raise SystemExit('erro: --gabarito-externo %s: o arquivo e uma lista de entradas' % caminho)
+    return dados
+
+
+def aplicar_gabarito_externo(itens, entradas):
+    """Grava o campo `gabarito` nos itens que tem entrada; devolve quantos ganharam."""
+    por_id = {i['id']: i for i in itens}
+    respostas = collections.OrderedDict()
+    vistos, origens = set(), {}
+    for n, e in enumerate(entradas, 1):
+        onde = 'gabarito externo, entrada %d' % n
+        if not isinstance(e, dict):
+            raise SystemExit('erro: %s nao e um objeto' % onde)
+        sobra = set(e) - {'id_item', 'subitem', 'resposta', 'origem'}
+        if sobra:
+            raise SystemExit('erro: %s tem campos desconhecidos: %s' % (onde, ', '.join(sorted(sobra))))
+        iid, sub, resp, origem = e.get('id_item'), e.get('subitem'), e.get('resposta'), e.get('origem')
+        if origem not in ORIGENS_DE_GABARITO_EXTERNO:
+            raise SystemExit('erro: %s (%s): origem %r recusada; so vale %s'
+                             % (onde, iid, origem, ', '.join(ORIGENS_DE_GABARITO_EXTERNO)))
+        it = por_id.get(iid)
+        if it is None:
+            raise SystemExit('erro: %s: %r nao e item deste pacote' % (onde, iid))
+        if (it.get('assets') or {}).get('solucao') or not it.get('sem_solucao'):
+            raise SystemExit('erro: %s: %s ja tem solucao da fonte; o gabarito de fora e so para item sem solucao'
+                             % (onde, iid))
+        if it.get('resposta') is not None:
+            raise SystemExit('erro: %s: %s ja tem a resposta oficial da fonte (%r)' % (onde, iid, it['resposta']))
+        if sub is not None:
+            if not isinstance(sub, str) or not sub.strip():
+                raise SystemExit('erro: %s (%s): subitem %r nao e texto' % (onde, iid, sub))
+            if it.get('subitens') and sub not in it['subitens']:
+                raise SystemExit('erro: %s: %s nao tem o subitem %r (tem %s)' % (onde, iid, sub, ', '.join(it['subitens'])))
+        if not isinstance(resp, str) or not resp.strip():
+            raise SystemExit('erro: %s (%s): resposta vazia' % (onde, iid))
+        if '–' in resp or '—' in resp:
+            raise SystemExit('erro: %s (%s): resposta com travessao ou meia-risca: %r' % (onde, iid, resp))
+        if (iid, sub) in vistos:
+            raise SystemExit('erro: %s: %s, subitem %r, repetido' % (onde, iid, sub))
+        vistos.add((iid, sub))
+        if origens.setdefault(iid, origem) != origem:
+            raise SystemExit('erro: %s: %s com duas origens (%s e %s)' % (onde, iid, origens[iid], origem))
+        respostas.setdefault(iid, []).append({'subitem': sub, 'resposta': ' '.join(resp.split())})
+    for iid, rs in respostas.items():
+        if len(rs) > 1 and any(r['subitem'] is None for r in rs):
+            raise SystemExit('erro: gabarito externo: %s mistura resposta sem subitem com resposta por subitem' % iid)
+        ordem = por_id[iid].get('subitens') or []
+        rs.sort(key=lambda r: ordem.index(r['subitem']) if r['subitem'] in ordem else len(ordem))
+        por_id[iid]['gabarito'] = {'origem': origens[iid], 'respostas': rs}
+    return len(respostas)
 
 
 # A versao do PyMuPDF que gera os pacotes publicados (biblioteca/requirements-gerador.txt).
@@ -2339,6 +2416,10 @@ def principal(argv=None):
                     help='com --listas-aula: acrescenta a cada modulo a LISTA DE BASE (regra base-v1, nivel 1, '
                          'C2b): uma aula montada so com o primeiro terco de cada lista de origem. Afirma posicao '
                          'na fonte, e nao curadoria')
+    ap.add_argument('--gabarito-externo', help='json com a resposta de item sem solucao, resolvida por duas IAs que '
+                    'chegaram ao mesmo resultado: lista de {id_item, subitem ou null, resposta, origem: '
+                    '"agente-conferido"}. O item ganha o campo gabarito; item sem entrada fica como antes. Nao vale '
+                    'com --fonte livros')
     ap.add_argument('--fontes-negrito', help='pedacos de nome de fonte negrito, separados por virgula '
                     '(padrao %s)' % ','.join(FONTES_NEGRITO))
     a = ap.parse_args(argv)
@@ -2351,6 +2432,9 @@ def principal(argv=None):
         raise SystemExit('erro: %s so vale com --fonte livros' % ', '.join(so_livros))
     if a.fonte != 'cadernos-sme-sp' and a.vinculos:
         raise SystemExit('erro: --vinculos so vale com --fonte cadernos-sme-sp')
+    if a.fonte == 'livros' and a.gabarito_externo:
+        raise SystemExit('erro: --gabarito-externo nao vale com --fonte livros (livro nao tem item)')
+    gab = ler_gabarito_externo(a.gabarito_externo) if a.gabarito_externo else None
     if a.fonte == 'cadernos-sme-sp':
         extras = [o for o, v in (('--kits', a.kits), ('--listas', a.listas), ('--listas-aula', a.listas_aula),
                                  ('--lista-de-base', a.lista_de_base), ('--modulos', a.modulos),
@@ -2362,7 +2446,7 @@ def principal(argv=None):
         if series and any(s not in cadernos_sme.TOM for s in series):
             raise SystemExit('erro: com --fonte cadernos-sme-sp, --serie e uma lista de 2ano a 9ano: %r' % a.serie)
         manifest, rel, trab = cadernos_sme.gerar(a.pdfs, a.vinculos, a.versao, a.saida, a.curadoria, a.trabalho,
-                                                 a.gerado_em, a.commit, not a.sem_zip, series)
+                                                 a.gerado_em, a.commit, not a.sem_zip, series, gabarito_externo=gab)
         print(json.dumps({'contagens': manifest['contagens'], 'zip': rel['zip'], 'bytes_por_tipo': rel['bytes_por_tipo'],
                           'excluidos': len(rel['excluidos']), 'fora_do_alvo': len(rel['fora_do_alvo']),
                           'sem_vinculo': len(rel['sem_vinculo']), 'segundos': rel['segundos'], 'trabalho': trab},
@@ -2396,7 +2480,7 @@ def principal(argv=None):
             raise SystemExit('erro: %s so vale com --fonte portal' % ', '.join(extras))
         import provas
         manifest, rel, trab = provas.gerar(a.pdfs, a.serie, a.versao, a.saida, a.curadoria, a.trabalho, a.gerado_em,
-                                           a.commit, not a.sem_zip)
+                                           a.commit, not a.sem_zip, gabarito_externo=gab)
         print(json.dumps({'contagens': manifest['contagens'], 'zip': rel['zip'], 'bytes_por_tipo': rel['bytes_por_tipo'],
                           'excluidos': len(rel['excluidos']), 'segundos': rel['segundos'], 'trabalho': trab},
                          ensure_ascii=False, indent=1))
@@ -2421,7 +2505,8 @@ def principal(argv=None):
         FONTES_NEGRITO[:] = [x for x in a.fontes_negrito.split(',') if x]
     manifest, rel, trab = gerar(a.pdfs, a.serie, a.versao, a.saida, a.curadoria, a.trabalho, a.gerado_em, a.commit,
                                 a.modulos.split(',') if a.modulos else None, not a.sem_zip, a.anterior, a.kits,
-                                a.listas, kits.REGRA_AULA if a.listas_aula else None, a.lista_de_base)
+                                a.listas, kits.REGRA_AULA if a.listas_aula else None, a.lista_de_base,
+                                gabarito_externo=gab)
     print(json.dumps({'contagens': manifest['contagens'], 'zip': rel['zip'], 'bytes_por_tipo': rel['bytes_por_tipo'],
                       'excluidos': len(rel['excluidos']), 'segundos': rel['segundos'], 'trabalho': trab},
                      ensure_ascii=False, indent=1))

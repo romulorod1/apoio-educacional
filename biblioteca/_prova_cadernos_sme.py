@@ -26,6 +26,11 @@ Travas proprias (cada uma le a pagina, e nao o detector):
               da fonte nao fecha
   entre       nenhuma linha de texto entre duas unidades seguidas da mesma
               pagina fica fora dos dois recortes
+  gabarito    o gabarito de fora (--gabarito-externo): so origem
+              agente-conferido, so em item sem solucao, cada entrada no seu
+              item, a contagem itens_com_gabarito_agente do manifest bate, e
+              o item sem entrada fica byte a byte como sem a opcao; origem
+              recusada, id desconhecido e item com solucao param o gerador
 e as genericas do Portal (determinismo, svg, xml, manifesto, tracos, PyMuPDF
 no manifest, curadoria, glifos e fidelidade no Chrome).
 """
@@ -492,6 +497,68 @@ def trava_continuacao(p):
     return erros
 
 
+GABARITO_DA_AMOSTRA = [
+    {'id_item': 'sme:3ano:p007', 'subitem': '2', 'resposta': '14 ovelhas', 'origem': 'agente-conferido'},
+    {'id_item': 'sme:3ano:p007', 'subitem': '1', 'resposta': '8', 'origem': 'agente-conferido'},
+    {'id_item': 'sme:3ano:p008:q1', 'subitem': None, 'resposta': '25 figurinhas', 'origem': 'agente-conferido'},
+]
+
+
+def trava_gabarito(p, entradas=None, sem=None):
+    """O campo gabarito de cada item e a contagem do manifest. Com `entradas`,
+    cada uma esta no seu item, na ordem dos subitens, e o item sem entrada nao
+    tem o campo. Com `sem` (o pacote gerado sem a opcao), todo item e identico
+    ao dele tirado o campo gabarito, e o manifest dele nao tem a contagem."""
+    erros = []
+    com = [i for i in p.itens if 'gabarito' in i]
+    for it in com:
+        g, iid = it['gabarito'], it['id']
+        if not isinstance(g, dict) or g.get('origem') != 'agente-conferido':
+            erros.append('%s: gabarito com origem %r (so vale agente-conferido)' % (iid, (g or {}).get('origem')))
+            continue
+        rs = g.get('respostas')
+        if not rs or any(set(r) != {'subitem', 'resposta'} or not str(r['resposta']).strip() for r in rs):
+            erros.append('%s: respostas mal formadas: %r' % (iid, rs))
+        if it['assets'].get('solucao') or not it.get('sem_solucao') or it.get('resposta') is not None:
+            erros.append('%s: gabarito de fora num item que ja tem solucao ou resposta da fonte' % iid)
+    c = p.manifest['contagens']
+    if com and c.get('itens_com_gabarito_agente') != len(com):
+        erros.append('manifest diz itens_com_gabarito_agente %r e o itens.json tem %d'
+                     % (c.get('itens_com_gabarito_agente'), len(com)))
+    if entradas is not None:
+        esperado = {}
+        for e in entradas:
+            esperado.setdefault(e['id_item'], []).append({'subitem': e['subitem'], 'resposta': e['resposta']})
+        por = {i['id']: i for i in p.itens}
+        for iid, rs in esperado.items():
+            ordem = (por.get(iid) or {}).get('subitens') or []
+            rs.sort(key=lambda r: ordem.index(r['subitem']) if r['subitem'] in ordem else len(ordem))
+            got = (por.get(iid) or {}).get('gabarito')
+            if not got or got.get('respostas') != rs:
+                erros.append('%s: o gabarito de fora devia ser %r e e %r' % (iid, rs, got))
+        for it in com:
+            if it['id'] not in esperado:
+                erros.append('%s: ganhou gabarito sem entrada' % it['id'])
+    if sem is not None:
+        antes = {i['id']: i for i in sem.itens}
+        for it in p.itens:
+            sem_campo = {k: v for k, v in it.items() if k != 'gabarito'}
+            if json.dumps(sem_campo, sort_keys=True) != json.dumps(antes.get(it['id']), sort_keys=True):
+                erros.append('%s: mudou alem do campo gabarito' % it['id'])
+        if 'itens_com_gabarito_agente' in sem.manifest['contagens']:
+            erros.append('sem --gabarito-externo, o manifest ganhou itens_com_gabarito_agente')
+    return erros
+
+
+def recusa_do_gerador(fn):
+    """A frase com que o gerador parou, ou '' se ele seguiu."""
+    try:
+        fn()
+    except SystemExit as e:
+        return str(e)
+    return ''
+
+
 def travas(p, vinc, placar, zip_caminho=None, rot=''):
     placar.conferir('cadernos%s: contagens' % rot, trava_contagens(p, vinc))
     placar.conferir('cadernos%s: campos' % rot, trava_campos(p, vinc))
@@ -578,7 +645,16 @@ def amostra(temp, placar, navegador):
     placar.conferir('cadernos: determinismo', pg.trava_determinismo(p, pg.Pacote(os.path.join(temp, 'b'), pdfs)))
     travas(p, vinc, placar, zip_caminho=os.path.join(a + '_zip', 'matematica-cadernos-sme-sp-v1.zip'))
     placar.conferir('amostra: o que entra, o que sai e por que', esperado_da_amostra(p))
+    placar.conferir('cadernos: gabarito, sem a opcao nada muda', trava_gabarito(p, entradas=[]))
+    g = os.path.join(temp, 'g')
+    gerar_amostra(pdfs, vinc_c, g, cur, gabarito_externo=GABARITO_DA_AMOSTRA)
+    pgab = pg.Pacote(g, pdfs)
+    placar.conferir('cadernos: gabarito de fora no item e na contagem',
+                    trava_gabarito(pgab, GABARITO_DA_AMOSTRA, sem=p))
+    travas(pgab, vinc, placar, zip_caminho=os.path.join(g + '_zip', 'matematica-cadernos-sme-sp-v1.zip'),
+           rot=' (com gabarito)')
     venenos(temp, pdfs, vinc_c, vinc, cur, placar, p)
+    venenos_do_gabarito(temp, pdfs, vinc_c, cur, placar, pgab, p)
     if navegador:
         sorteio = pg.sortear_pedacos(p)
         erros, medidas = pg.trava_fidelidade(p, sorteio, temp)
@@ -690,6 +766,39 @@ def venenos(temp, pdfs, vinc_c, vinc, cur, placar, boa):
     q = pg.copia(boa, temp, 'v_some')
     q.itens = [i for i in q.itens if i['id'] != 'sme:3ano:p007']
     placar.conferir('item sumido', trava_contagens(q, vinc), True, 'nem no pacote')
+
+
+def venenos_do_gabarito(temp, pdfs, vinc_c, cur, placar, boa, sem):
+    def gera(nome, entradas):
+        return recusa_do_gerador(lambda: gerar_amostra(pdfs, vinc_c, os.path.join(temp, 'vg_' + nome), cur,
+                                                       gabarito_externo=entradas))
+    um = dict(GABARITO_DA_AMOSTRA[2])
+    # o gerador recusa: origem fora da lista, id que nao e item, subitem que o item nao tem
+    r = gera('origem', [dict(um, origem='agente')])
+    placar.conferir('gabarito de origem recusada', [r] if r else [], True, 'origem')
+    r = gera('id', [dict(um, id_item='sme:3ano:p999')])
+    placar.conferir('gabarito de item desconhecido', [r] if r else [], True, 'nao e item')
+    r = gera('subitem', [dict(GABARITO_DA_AMOSTRA[0], subitem='9')])
+    placar.conferir('gabarito de subitem que o item nao tem', [r] if r else [], True, 'subitem')
+    # a regra e do gerador, para toda fonte: item com solucao de verdade (o Portal) recusa
+    com_sol = [{'id': 'x:1', 'sem_solucao': False, 'resposta': None, 'subitens': [],
+                'assets': {'enunciado': 'e.svg', 'solucao': 's.svg'}}]
+    r = recusa_do_gerador(lambda: cadernos_sme.gerar_pacote.aplicar_gabarito_externo(com_sol, [dict(um, id_item='x:1')]))
+    placar.conferir('gabarito num item com solucao', [r] if r else [], True, 'ja tem solucao')
+    # pacote envenenado: a trava ve origem trocada, contagem errada, gabarito sem entrada e item mexido
+    q = pg.copia(boa, temp, 'vg_origem_trocada')
+    next(i for i in q.itens if 'gabarito' in i)['gabarito']['origem'] = 'humano'
+    placar.conferir('gabarito com origem trocada no pacote', trava_gabarito(q), True, 'origem')
+    q = pg.copia(boa, temp, 'vg_contagem')
+    q.manifest['contagens']['itens_com_gabarito_agente'] = 1
+    placar.conferir('contagem de gabarito errada', trava_gabarito(q), True, 'itens_com_gabarito_agente')
+    q = pg.copia(boa, temp, 'vg_sobra')
+    next(i for i in q.itens if 'gabarito' not in i)['gabarito'] = {
+        'origem': 'agente-conferido', 'respostas': [{'subitem': None, 'resposta': '3'}]}
+    placar.conferir('gabarito em item sem entrada', trava_gabarito(q, GABARITO_DA_AMOSTRA), True, 'sem entrada')
+    q = pg.copia(boa, temp, 'vg_mexe')
+    next(i for i in q.itens if 'gabarito' not in i)['tom'] = 'outro'
+    placar.conferir('item sem entrada mudou', trava_gabarito(q, sem=sem), True, 'alem do campo')
 
 
 def principal():

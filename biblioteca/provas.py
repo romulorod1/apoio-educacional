@@ -1176,7 +1176,7 @@ def comeca_pelo_numero(doc, ps, n, fonte):
 
 
 def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, commit=None, gravar_zip=True,
-          provas=None):
+          provas=None, gabarito_externo=None):
     if serie not in COLECOES:
         raise SystemExit('erro: a serie do tipo de fonte provas e m1, m2 ou 3em, e nao %r' % serie)
     t_ini = time.time()
@@ -1315,6 +1315,8 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                            'resumo': ' '.join(sorted(set(i['aula']['titulo'] for i in ids))), 'texto': ''})
     itens.sort(key=lambda i: (i['modulo']['slug'], i['aula']['n'], i['numero']))
     docs_busca.sort(key=lambda d: d['id'])
+    n_gabarito = (gerar_pacote.aplicar_gabarito_externo(itens, gabarito_externo)
+                  if gabarito_externo is not None else None)
     conteudo['itens.json'] = gerar_pacote.json_bytes(itens)
     conteudo['teoria.json'] = gerar_pacote.json_bytes([])
     conteudo['busca.json'] = gerar_pacote.json_bytes(gerar_pacote.montar_busca(docs_busca))
@@ -1323,6 +1325,8 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     contagens = {'modulos': len(modulos_vistos), 'aulas_teoria': 0, 'paginas_teoria': 0, 'aulas_exercicios': len(aulas),
                  'itens': len(itens), 'itens_com_solucao': sum(1 for i in itens if i['assets']['solucao']),
                  'itens_excluidos': len(relatorio['excluidos'])}
+    if n_gabarito is not None:
+        contagens['itens_com_gabarito_agente'] = n_gabarito
     manifest = {
         'esquema': 1, 'pacote': nome, 'versao': versao,
         'gerado_em': gerado_em or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).replace(microsecond=0).isoformat(),

@@ -1,0 +1,2 @@
+Exercícios do 3º ao 5º ano que não tinham gabarito agora têm resposta, conferida por duas IAs.
+# Campo gabarito (origem agente-conferido) no pacote, com --gabarito-externo no gerador; a marca "Resposta conferida por duas IAs" aparece sempre na tela cheia e no gabarito do PDF. Prova: _teste/testa_gabarito_agente.js.
