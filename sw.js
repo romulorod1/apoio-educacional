@@ -167,8 +167,9 @@
  * O v182 traz o Voltar sem entrada sobrando no histórico depois de recarregar com uma janela aberta.
  * O v186 traz a pinça e o duplo toque no livro aberto.
  * O v187 traz o conteúdo escrito no pedido do planejamento valendo como o do aviso.
+ * O v193 traz o domínio marcado na linha do assunto, dentro da aula.
  */
-var CACHE = 'apoio-educacional-v187';
+var CACHE = 'apoio-educacional-v193';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

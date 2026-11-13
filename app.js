@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.107';
+  var VERSAO = '1.42.113';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -84,6 +84,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.113',
+      itens: [
+        'O domínio é marcado ao lado do assunto trabalhado, na própria aula.'
+      ]
+    },
     {
       versao: '1.42.106',
       itens: [
@@ -4059,8 +4065,6 @@
       }) + '. Toque em Salvar para guardar na aula.'
     }));
 
-    desenharDominio(grupoRegistro, aulaEmEdicao, eFutura);
-
     desenharAreas(grupoRegistro, aulaEmEdicao);
 
     // ----------------------------------------------------
@@ -4131,9 +4135,10 @@
    *
    * Fica recolhido por padrão: no meio de uma aula ela não quer rolar por vinte
    * e quatro caixas para chegar ao anexo. Aberto, é só clicar. */
-  /* Domínio por assunto (C1), em Registrar como foi.
+  /* Domínio por assunto (C1; F10: na própria linha do assunto da aula, em
+   * desenharTemasDaAula, e não mais num bloco à parte em Registrar como foi).
    *
-   * Abaixo de cada assunto da aula, três botões: "Ainda não", "Em andamento" e
+   * Em cada assunto da aula, três botões: "Ainda não", "Em andamento" e
    * "Domina". Um toque marca, outro toque no marcado desmarca, e nada é
    * obrigatório. Grava na hora, como as habilidades aqui embaixo, porque é
    * registro de um toque e não pede o botão Salvar.
@@ -4146,54 +4151,9 @@
    * é uma só e mora no core (dominioFechaPasso). */
   var blocoDominioAtivo = null;
 
-  function desenharDominio(corpo, aula, eFutura) {
-    var bloco = el('div', { id: 'bloco-dominio', class: 'u-margem-12-0-4' });
-    corpo.appendChild(bloco);
-
-    function desenhar() {
-      bloco.innerHTML = '';
-      var temas = Core.temasDaAula(aula);
-      bloco.appendChild(el('div', { class: 'campo-titulo-com-destino' }, [
-        el('span', { texto: 'Domínio por assunto', class: 'u-peso-negrito' }),
-        el('span', { class: 'destino-privado', texto: 'Só você vê' })
-      ]));
-      if (!temas.length) {
-        bloco.appendChild(el('div', { class: 'ajuda u-margem-topo-2', texto: 'Registre o assunto da aula, acima, para marcar como o aluno está nele.' }));
-        return;
-      }
-      if (eFutura) {
-        bloco.appendChild(el('div', { class: 'ajuda u-margem-topo-2', texto: 'Marque depois que a aula acontecer.' }));
-        return;
-      }
-      temas.forEach(function (t) {
-        var atual = Core.estadoDeDominio(t);
-        var botoes = el('div', { class: 'segmentado opcoes-dominio', role: 'group',
-          'aria-label': 'Domínio de ' + (t.titulo || t.id) });
-        Core.DOMINIO.forEach(function (op) {
-          var b = el('button', {
-            type: 'button', class: 'opcao-seg opcao-dominio' + (atual === op.id ? ' ativa' : ''),
-            'data-estado': op.id, 'aria-pressed': atual === op.id ? 'true' : 'false',
-            texto: op.rotulo,
-            aoClick: function () { marcarDominioNaAula(aula, t, op.id); }
-          });
-          botoes.appendChild(b);
-        });
-        bloco.appendChild(el('div', { class: 'item-dominio u-margem-8-0-10', 'data-chave': Core.chaveDoDominio(t) }, [
-          el('div', { class: 'nome u-letra-3 u-peso-seminegrito u-cor-navy u-margem-baixo-6', texto: t.titulo || t.id }),
-          botoes
-        ]));
-      });
-      bloco.appendChild(el('div', { class: 'ajuda u-margem-topo-menos2', texto: 'Opcional. Toque de novo no marcado para desmarcar. Domina fecha o passo da trilha ' +
-          'daquele assunto. Não vai para a família.' }));
-    }
-
-    blocoDominioAtivo = { aulaId: aula.id, desenhar: desenhar };
-    desenhar();
-  }
-
   function atualizarBlocoDominio(aulaId) {
     if (!blocoDominioAtivo || blocoDominioAtivo.aulaId !== aulaId) return false;
-    if (!$('#bloco-dominio')) return false;
+    if (!$('#lista-temas-aula')) return false;
     blocoDominioAtivo.desenhar();
     return true;
   }
@@ -4384,9 +4344,6 @@
    * Tirar um assunto ou registrar um novo muda também o rótulo do botão, e
    * redesenhar só a lista deixaria a tela mentindo. */
   function atualizarBlocoAssunto(aulaId) {
-    /* Registrar ou tirar assunto muda também a lista de domínio, lá embaixo em
-     * Registrar como foi: cada assunto tem a sua linha. */
-    atualizarBlocoDominio(aulaId);
     if (!blocoAssuntoAtivo || blocoAssuntoAtivo.aulaId !== aulaId) return false;
     if (!$('#bloco-assunto')) return false;
     blocoAssuntoAtivo.desenhar();
@@ -4533,6 +4490,9 @@
   function desenharTemasDaAula(caixa, aula, aluno) {
     caixa.innerHTML = '';
     var lista = Core.temasDaAula(aula);
+    blocoDominioAtivo = { aulaId: aula.id, desenhar: function () {
+      if ($('#lista-temas-aula')) desenharTemasDaAula($('#lista-temas-aula'), aula, aluno);
+    } };
     if (!lista.length) return;
 
     if (!aluno) aluno = alunoPorId(aula.alunoId);
@@ -4540,6 +4500,10 @@
     caixa.appendChild(el('div', {
       class: 'bloco-exercicios',
       texto: lista.length === 1 ? 'Assunto da aula' : 'Assuntos desta aula'
+    }));
+    caixa.appendChild(el('div', {
+      class: 'ajuda u-margem-topo-menos2 dominio-assuntos-privado',
+      texto: 'Domínio por assunto · Só você vê'
     }));
 
     /* A etiqueta da matéria e o botão Material dependem de dois índices
@@ -4643,7 +4607,21 @@
       var nosLivros = t.id && livrosDoTablet && livrosDoTablet.length
         ? Biblioteca.livrosComAssunto(livrosDoTablet, correcoesDosLivros(), t.id, anoParaOsLivros(aluno, t)) : [];
 
-      caixa.appendChild(el('div', { class: 'item-lista item-assunto-aula' }, [
+      var estadoDominio = Core.estadoDeDominio(t);
+      var futura = aula.data > Core.hojeIso();
+      var botoesDominio = el('div', {
+        class: 'segmentado opcoes-dominio', role: 'group',
+        'aria-label': 'Domínio de ' + (t.titulo || t.id)
+      });
+      Core.DOMINIO.forEach(function (op) {
+        botoesDominio.appendChild(el('button', {
+          type: 'button', class: 'opcao-seg opcao-dominio' + (estadoDominio === op.id ? ' ativa' : ''),
+          'data-estado': op.id, 'aria-pressed': estadoDominio === op.id ? 'true' : 'false',
+          texto: op.rotulo, disabled: futura ? 'disabled' : null,
+          aoClick: function () { marcarDominioNaAula(aula, t, op.id); }
+        }));
+      });
+      caixa.appendChild(el('div', { class: 'item-lista item-assunto-aula', 'data-tema-id': t.id }, [
         el('div', { class: 'cresce' }, [
           el('div', { class: 'nome' }, [
             document.createTextNode(t.titulo || t.id),
@@ -4651,7 +4629,11 @@
               ? el('span', { class: 'tag u-margem-esq-8', texto: 'com material pronto' })
               : null
           ].filter(Boolean)),
-          detalhe ? el('div', { class: 'detalhe', texto: detalhe }) : null
+          detalhe ? el('div', { class: 'detalhe', texto: detalhe }) : null,
+          el('div', { class: 'dominio-assunto-controles' }, [
+            botoesDominio,
+            futura ? el('div', { class: 'ajuda dominio-futuro', texto: 'Marque depois que a aula acontecer.' }) : null
+          ].filter(Boolean))
         ].filter(Boolean)),
         podeMaterial ? el('button', {
           type: 'button', class: 'btn pequeno', texto: 'Material',
