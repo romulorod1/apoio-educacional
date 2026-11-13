@@ -3892,6 +3892,25 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bib-busca-acoes .btn { max-width: 100%; }
 .bib-busca-paginas[hidden] { display: none; }
 .bib-busca-obra { margin: 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+/* B1: os assuntos no alto da busca e a página do assunto */
+.bib-assuntos-da-busca { margin: 0 0 12px; }
+.bib-assuntos-da-busca[hidden] { display: none; }
+.bib-assuntos-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
+.bib-assunto { min-width: 0; }
+.bib-assunto-caminho { margin: 8px 0 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+.bib-assunto-passo + .bib-assunto-passo { margin-left: 6px; }
+.bib-assunto-titulo { margin: 4px 0 8px; font-size: 1.25rem; color: var(--navy); overflow-wrap: anywhere; }
+.bib-assunto-tambem { margin: 0 0 8px; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+.bib-assunto-tambem-rotulo { font-weight: var(--peso-forte); }
+.bib-assunto-secao { margin-top: 12px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
+.bib-assunto-secao-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
+.bib-assunto-livros { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 8px; min-width: 0; }
+.bib-assunto-livro { display: flex; flex-direction: column; gap: 4px; padding: 10px; border: 1px solid var(--fio); border-radius: 8px; min-width: 0; overflow-wrap: anywhere; }
+.bib-assunto-livro .btn, .bib-assunto-ver-outros { min-height: var(--alvo); }
+.bib-assunto-ver-outros { justify-self: start; }
+.bib-assunto-vizinhos { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.bib-assunto-vizinho { min-height: var(--alvo); max-width: 100%; white-space: normal; text-align: left; }
+.bib-assunto-vazio { margin: 0; }
 /* "Melhores resultados" no alto do grupo "Nos livros", e o resto recolhido em "Mais resultados (N)" */
 .bib-busca-melhores { margin-top: 8px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
 .bib-busca-melhores-titulo { margin: 0; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
