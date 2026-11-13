@@ -113,7 +113,13 @@ jobs:
       - name: Dependencias Node
         working-directory: _teste
         run: npm ci --no-audit --no-fund
+      # A trava da fonte privada (_teste/testa_sem_fonte_privada.js) le os dois
+      # segredos pelo ambiente: a lista de SHA-256 dos PDFs e a impressao do
+      # texto. No CI, segredo que nao chega REPROVA a trava (nunca passa calada).
       - name: Portao rapido
+        env:
+          FONTE_PRIVADA_SHAS_CONTEUDO: ${{ secrets.FONTE_PRIVADA_SHAS }}
+          FONTE_PRIVADA_TEXTO: ${{ secrets.FONTE_PRIVADA_TEXTO }}
         run: sh _teste/confere_tudo.sh --rapido
       - name: Saida de quem reprovou
         if: failure()

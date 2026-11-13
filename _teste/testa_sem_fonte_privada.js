@@ -8,51 +8,72 @@
  * Drive, fora do repositório, e aqui não pode entrar nem o nome.
  *
  * As marcas NÃO aparecem escritas neste arquivo. Elas são montadas na hora
- * (a sigla por códigos de caractere, o título por uma frase invertida), e é
- * por isso que a prova não precisa de lista de exceções nenhuma: ela varre a
- * si mesma junto com todo o resto e sai limpa.
+ * (a sigla por códigos de caractere, o título por uma frase invertida), e por
+ * isso a prova não precisa de exceção para si mesma: ela se varre junto com
+ * todo o resto e sai limpa.
  *
- * O QUE ELA VARRE: todo arquivo de `git ls-files` (o que está no índice, que é
- * o que vai para o commit), lido do disco.
- *   o caminho e o nome      sempre;
- *   o conteúdo de texto     todo arquivo sem byte nulo nos primeiros 8000 bytes
- *                           (a mesma regra do git para "binário");
- *   .pdf                    os bytes crus (o texto não comprimido, também em
- *                           UTF-16, com os bytes nulos tirados) e cada stream
- *                           FlateDecode que o zlib consegue abrir. Texto que o
- *                           PDF guarda por códigos de glifo ou escapes octais
- *                           não é visto: para isso existe a conferência do SHA;
- *   .zip                    o nome de cada entrada, o conteúdo de cada entrada
- *                           guardada ou comprimida por deflate (com as mesmas
- *                           regras acima, inclusive zip dentro de zip) e o SHA
- *                           de cada entrada. Zip64 e zip cifrado não são lidos:
- *                           zip que não se deixa ler REPROVA, porque um pacote
- *                           ilegível pode esconder qualquer coisa;
- *   outro binário           só o nome e o SHA.
+ * AS CAMADAS, da que não depende de nada à que depende de segredo:
  *
- * AS MARCAS, sem diferença de maiúscula nem de acento:
- *   a sigla dos cadernos como PALAVRA INTEIRA. Palavra inteira aqui quer dizer
- *     sem letra colada antes nem depois; dígito, sublinhado, ponto e barra
- *     separam, para um nome de arquivo com a sigla seguida de "_3ano" ser pego;
- *   o título dos cadernos, com qualquer separador entre as palavras;
- *   o SHA-256 de cada arquivo rastreado contra a lista de SHAs da fonte, lida
- *     de FORA do repositório: FONTE_PRIVADA_SHAS, ou o caminho padrão no Drive
- *     (CAMINHO_SHAS abaixo). Sem a lista, essa conferência é pulada, dito na
- *     saída, e a prova não reprova por isso (no CI a lista nunca existe). Lista
- *     que existe e não tem SHA nenhum reprova: o instrumento não estaria vendo.
+ *   1. TIPO PROIBIDO, pelos bytes do começo e não pela extensão: PDF, zip (e
+ *      com ele docx, xlsx, odt, epub), gzip, bzip2, xz, zstd, 7z, rar, tar e
+ *      documento OLE (doc e xls antigos). Pega o caderno renomeado e o PDF
+ *      salvo de novo sem lista nenhuma. As imagens e o wasm do app não são
+ *      desses tipos. Exceção só pela lista FECHADA EXCECOES_DE_TIPO, caminho
+ *      por caminho e com motivo; o conteúdo do exceptuado continua varrido.
+ *
+ *   2. MARCAS no nome e no conteúdo, sem diferença de maiúscula nem de acento:
+ *      a sigla como palavra inteira (sem letra colada; dígito, sublinhado e
+ *      ponto separam), a sigla em maiúsculas colada em minúsculas como no
+ *      CamelCase, a sigla com pontos entre as letras e o título dos cadernos
+ *      com qualquer separador ou sem separador nenhum. Onde se procura:
+ *        texto        UTF-8, ou UTF-16 com ou sem BOM (um byte nulo cedo não
+ *                     desliga a varredura: o que decodifica como UTF-16 é
+ *                     texto);
+ *        PDF          os bytes crus, as strings literais com escape octal, as
+ *                     strings hexadecimais (UTF-16 com BOM inclusive, que é
+ *                     como os metadados costumam vir) e cada stream que o zlib
+ *                     abre, de todos os streams;
+ *        zip          o nome, o conteúdo e o SHA de cada entrada, zip dentro
+ *                     de zip até LIMITE_ZIP níveis. Zip ilegível, zip64,
+ *                     cifrado, de método desconhecido ou aninhado além do
+ *                     limite REPROVA, porque pode esconder qualquer coisa;
+ *        gzip         o que ele descomprime;
+ *        imagem, wasm só o nome e o SHA;
+ *        outro binário os bytes como latin1, sem os nulos.
+ *
+ *   3. SHA-256 de cada arquivo e de cada entrada contra a lista da fonte. A
+ *      lista vem do segredo FONTE_PRIVADA_SHAS do Actions (variável
+ *      FONTE_PRIVADA_SHAS_CONTEUDO, com o conteúdo) e, na máquina, do arquivo
+ *      FONTE_PRIVADA_SHAS ou do caminho padrão no Drive. Só o primeiro campo de
+ *      cada linha conta (o formato do sha256sum); os nomes nunca são impressos.
+ *
+ *   4. IMPRESSÃO DO TEXTO: janelas de JANELA palavras, normalizadas e com hash
+ *      exatamente como no _teste/gera_impressao_fonte_privada.py (a paridade é
+ *      conferida em toda rodada), contra a amostra do segredo
+ *      FONTE_PRIVADA_TEXTO (ou, na máquina, do arquivo FONTE_PRIVADA_TEXTO_ARQUIVO
+ *      ou do caminho padrão). Reprova o arquivo com LIMIAR_JANELAS ou mais
+ *      janelas na amostra.
+ *
+ *   No CI (GITHUB_ACTIONS=true) a falta de qualquer um dos dois segredos
+ *   REPROVA. Na máquina, a falta é dita (PULADA) e não reprova.
+ *
+ * O QUE É VARRIDO: a árvore (todo arquivo de `git ls-files`, lido do disco) e o
+ * HISTÓRICO que o merge leva junto: cada blob novo, cada caminho e cada
+ * mensagem dos commits da faixa. A faixa é `origin/main..HEAD` no PR e na
+ * máquina, `antes..HEAD` no push na main (o "before" do evento) e a que se
+ * passar em --faixa (o hook _teste/hooks/pre-push usa esta).
  *
  * A PROVA PROVA QUE RODA: o próprio caminho dela tem de estar em `git ls-files`
- * e tem de ter sido varrido (prova que nunca roda parece verde), o .gitignore
- * não pode ignorá-la e tem de ignorar os três padrões da fonte privada.
+ * e tem de ter sido varrido, e o .gitignore não pode ignorá-la.
  *
- *   node _teste/testa_sem_fonte_privada.js
+ *   node _teste/testa_sem_fonte_privada.js [--faixa A..B]
  *   node _teste/testa_sem_fonte_privada.js --envenenado-com-fonte-privada
- *        num repositório git temporário, fora desta árvore, rastreia um arquivo
- *        com a marca no conteúdo, um com a marca no NOME, um binário cujo SHA
- *        está numa lista temporária, um PDF e um zip com a marca dentro, e
- *        arquivos limpos de controle. A varredura TEM de acusar os cinco, com o
- *        caminho no relatório, e não pode acusar os de controle ("VENENO visto").
- *        O índice desta árvore não é tocado, e a pasta temporária é apagada.
+ *        num repositório git temporário, fora desta árvore, monta cada caso que
+ *        tem de reprovar (um de cada camada e de cada formato, e o histórico
+ *        com um commit que acrescenta e outro que apaga) e os controles limpos
+ *        que não podem reprovar. Cada caso tem de sair acusado pelo motivo
+ *        certo ("VENENO visto"). O índice desta árvore não é tocado, e a pasta
+ *        temporária é apagada.
  */
 'use strict';
 const fs = require('fs');
@@ -65,18 +86,47 @@ const { execFileSync, spawnSync } = require('child_process');
 const RAIZ = path.join(__dirname, '..');
 const EU = '_teste/testa_sem_fonte_privada.js';
 const VENENO = '--envenenado-com-fonte-privada';
-const MODOS = [VENENO];
-const ENVENENADA = process.argv.indexOf(VENENO) >= 0;
-const desconhecidos = process.argv.slice(2).filter(a => MODOS.indexOf(a) < 0);
 
-const CAMINHO_SHAS = 'J:\\Meu Drive\\Vida Pessoal\\Família\\Material pra Nath\\Aplicativo\\Biblioteca\\privado\\' +
-  String.fromCharCode(101, 109, 97, 105) + '\\shas.txt';
+/* Os argumentos: o veneno e --faixa A..B. */
+const argv = process.argv.slice(2);
+const ENVENENADA = argv.indexOf(VENENO) >= 0;
+let faixaDada = null;
+const desconhecidos = [];
+for (let i = 0; i < argv.length; i++) {
+  if (argv[i] === VENENO) continue;
+  if (argv[i] === '--faixa' && argv[i + 1]) { faixaDada = argv[++i]; continue; }
+  desconhecidos.push(argv[i]);
+}
 
-/* As marcas, montadas na hora. */
+/* ------------------------------------------------------------ as marcas */
 const SIGLA = String.fromCharCode(101, 109, 97, 105);
-const TITULO = 'siaicini sona son acitametam oacacude'.split('').reverse().join('');
+const SIGLA_M = SIGLA.toUpperCase();
+const TITULO = 'siaicini sona son acitametam oacacude'.split('').reverse().join('').split(' ');
 const RE_SIGLA = new RegExp('(^|[^a-z])' + SIGLA + '(?![a-z])');
-const RE_TITULO = new RegExp(TITULO.split(' ').join('[^a-z0-9]+'));
+const RE_SIGLA_PONTOS = new RegExp('(^|[^a-z])' + SIGLA.split('').join('\\.\\s?') + '(?![a-z])');
+/* Em maiúsculas, colada em qualquer coisa (CadernoXYZ3, nomeXYZTres), menos
+ * depois de outra maiúscula e menos a palavra inglesa de correio eletrônico. */
+const RE_SIGLA_CAIXA = new RegExp('(?<![A-Z])' + SIGLA_M + '(?!L)');
+const RE_TITULO = new RegExp(TITULO.join('[^a-z0-9]*'));
+
+/* Os caminhos padrão, na pasta privada do Drive. */
+const PASTA_PRIVADA = 'J:\\Meu Drive\\Vida Pessoal\\Família\\Material pra Nath\\Aplicativo\\Biblioteca\\privado\\' + SIGLA;
+const CAMINHO_SHAS = PASTA_PRIVADA + '\\shas.txt';
+const CAMINHO_TEXTO = PASTA_PRIVADA + '\\impressao_texto.txt';
+
+/* A impressão do texto: os mesmos números do gerador em Python. */
+const JANELA = 10;
+/* Calibrado em 13/11/2026 com a amostra real (2500 de 468.272 janelas): a
+ * árvore inteira casa zero janelas, e um hash de 8 bytes não colide por acaso
+ * (chance da ordem de 1e-10 na árvore toda). Uma janela casada é texto copiado. */
+const LIMIAR_JANELAS = 1;
+const LIMITE_ZIP = 3;
+
+/* Exceções ao TIPO proibido, uma por caminho, cada uma com o motivo. Vazia:
+ * a main não tem nenhum arquivo desses tipos. O conteúdo de quem estiver aqui
+ * continua varrido por todas as outras camadas. */
+const EXCECOES_DE_TIPO = [
+];
 
 let passes = 0, falhas = 0;
 function conf(rotulo, ok, detalhe) {
@@ -84,49 +134,155 @@ function conf(rotulo, ok, detalhe) {
   else { falhas++; console.log('  FALHA ' + rotulo + (detalhe ? '  [' + detalhe + ']' : '')); }
 }
 
-/* Sem acento e em minúsculas: "Ç" vira "c", "á" vira "a". */
-function normaliza(s) {
-  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+function semAcento(s) {
+  return s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+}
+
+/* A saída do CI é pública: sigla e título saem mascarados em tudo que vem de
+ * fora (caminhos, nomes, trechos). */
+function mascara(s) {
+  return String(s)
+    .replace(new RegExp(SIGLA + '(?!l)', 'gi'), '<sigla>')
+    .replace(new RegExp(TITULO.join('[^A-Za-z0-9]*'), 'gi'), '<título>');
 }
 
 /* As marcas de um texto: [{marca, linha}]. */
 function marcasDe(texto) {
-  const t = normaliza(texto);
+  const caixa = semAcento(texto);
+  const t = caixa.toLowerCase();
   const achou = [];
-  [['sigla', RE_SIGLA], ['título', RE_TITULO]].forEach(([marca, re]) => {
-    const m = re.exec(t);
-    if (m) achou.push({ marca, linha: t.slice(0, m.index + (m[1] || '').length).split('\n').length });
-  });
+  const linha = (s, i) => s.slice(0, i).split('\n').length;
+  [['sigla', RE_SIGLA, t], ['sigla com pontos', RE_SIGLA_PONTOS, t], ['sigla em maiúsculas', RE_SIGLA_CAIXA, caixa], ['título', RE_TITULO, t]]
+    .forEach(([marca, re, s]) => {
+      const m = re.exec(s);
+      if (m) achou.push({ marca, linha: linha(s, m.index + (m[1] || '').length) });
+    });
   return achou;
 }
 
-function ehBinario(buf) {
-  return buf.subarray(0, 8000).indexOf(0) >= 0;
+/* ------------------------------------------- a impressão do texto (= .py) */
+function palavras(texto) {
+  const t = texto.replace(/-[ \t]*\r?\n[ \t]*/g, '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+  return t.replace(/[^a-z]+/g, ' ').split(' ').filter(Boolean);
+}
+function hashJanela(ps) {
+  return crypto.createHash('sha256').update(ps.join(' '), 'utf8').digest('hex').slice(0, 16);
+}
+/* Quantas janelas distintas do texto estão na amostra. */
+function janelasCasadas(texto, amostra) {
+  if (!amostra || !amostra.size) return 0;
+  const ps = palavras(texto);
+  const casadas = new Set();
+  for (let i = 0; i + JANELA <= ps.length; i++) {
+    const h = hashJanela(ps.slice(i, i + JANELA));
+    if (amostra.has(h)) casadas.add(h);
+  }
+  return casadas.size;
 }
 
-function sha256(buf) {
-  return crypto.createHash('sha256').update(buf).digest('hex');
-}
-
-/* A lista de SHAs, no formato da saída do sha256sum ("<64 hex> *<nome>" ou
- * "<64 hex>  <nome>"): só o PRIMEIRO campo de cada linha conta; o asterisco e
- * o nome são ignorados e nunca impressos. Linha com # e linha vazia saem. */
-function lerShas(arq) {
-  if (!arq || !fs.existsSync(arq)) return null;
-  const shas = new Set();
-  fs.readFileSync(arq, 'utf8').replace(/^﻿/, '').split(/\r?\n/).forEach(l => {
+/* -------------------------------------------------------- os segredos */
+/* Só o primeiro campo de cada linha, no formato do sha256sum. */
+function shasDe(texto) {
+  const s = new Set();
+  texto.replace(/^\uFEFF/, '').split(/\r?\n/).forEach(l => {
     if (/^\s*#/.test(l)) return;
     const m = l.match(/^\s*([0-9a-fA-F]{64})(?:\s|$)/);
-    if (m) shas.add(m[1].toLowerCase());
+    if (m) s.add(m[1].toLowerCase());
   });
-  return shas;
+  return s;
 }
-function caminhoShas(env) {
-  return (env || process.env).FONTE_PRIVADA_SHAS || CAMINHO_SHAS;
+function impressaoDe(texto) {
+  const linhas = texto.replace(/^\uFEFF/, '').split(/\r?\n/);
+  const cab = linhas.find(l => /^#/.test(l)) || '';
+  if (!new RegExp('^# impressao-texto v1 janela=' + JANELA + ' hash=sha256-8').test(cab)) return { erro: 'cabeçalho ausente ou de outro formato' };
+  const s = new Set();
+  linhas.forEach(l => { const m = l.match(/^\s*([0-9a-f]{16})\s*$/); if (m) s.add(m[1]); });
+  return { conjunto: s };
+}
+/* Uma fonte de segredo: a variável com o conteúdo e, fora do CI, o arquivo.
+ * Devolve {conjunto, de} ou {pulada} ou {erro}. */
+function leFonte(env, nomeConteudo, nomeArquivo, padrao, ler) {
+  const noCI = env.GITHUB_ACTIONS === 'true';
+  const partes = [];
+  const de = [];
+  if (env[nomeConteudo]) { partes.push(env[nomeConteudo]); de.push('variável ' + nomeConteudo); }
+  else if (noCI) return { erro: 'no CI a variável ' + nomeConteudo + ' é obrigatória (o segredo não chegou ao job)' };
+  const arq = env[nomeArquivo] || padrao;
+  if (!noCI && fs.existsSync(arq)) { partes.push(fs.readFileSync(arq, 'utf8')); de.push('arquivo ' + mascara(arq)); }
+  if (!partes.length) return { pulada: 'nem ' + nomeConteudo + ' nem o arquivo ' + mascara(arq) };
+  const conjunto = new Set();
+  for (const p of partes) {
+    const r = ler(p);
+    if (r.erro) return { erro: r.erro };
+    r.conjunto.forEach(x => conjunto.add(x));
+  }
+  if (!conjunto.size) return { erro: 'a fonte existe e não tem nenhum hash (' + de.join(', ') + ')' };
+  return { conjunto, de: de.join(' e ') };
+}
+function fonteShas(env) {
+  return leFonte(env, 'FONTE_PRIVADA_SHAS_CONTEUDO', 'FONTE_PRIVADA_SHAS', CAMINHO_SHAS, t => ({ conjunto: shasDe(t) }));
+}
+function fonteTexto(env) {
+  return leFonte(env, 'FONTE_PRIVADA_TEXTO', 'FONTE_PRIVADA_TEXTO_ARQUIVO', CAMINHO_TEXTO, impressaoDe);
 }
 
-/* As entradas de um zip pelo diretório central: [{nome, dados}] (dados nulo
- * quando o método não é guardado nem deflate). Lança erro se não for legível. */
+/* ------------------------------------------------------------ os tipos */
+function comeca(buf, bytes, em) {
+  em = em || 0;
+  if (buf.length < em + bytes.length) return false;
+  for (let i = 0; i < bytes.length; i++) if (buf[em + i] !== bytes[i]) return false;
+  return true;
+}
+const asc = s => Array.from(Buffer.from(s, 'latin1'));
+function ehZip(buf) {
+  return comeca(buf, asc('PK\x03\x04')) || comeca(buf, asc('PK\x05\x06')) || comeca(buf, asc('PK\x07\x08'));
+}
+function ehPdf(buf) {
+  return buf.subarray(0, 1024).indexOf('%PDF-') >= 0;
+}
+function tipoProibido(buf) {
+  if (ehPdf(buf)) return 'PDF';
+  if (ehZip(buf)) return 'zip (também docx, xlsx, odt, epub)';
+  if (comeca(buf, [0x1f, 0x8b])) return 'gzip';
+  if (comeca(buf, [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])) return '7z';
+  if (comeca(buf, asc('Rar!\x1a\x07'))) return 'rar';
+  if (comeca(buf, asc('BZh')) && buf[3] >= 0x31 && buf[3] <= 0x39) return 'bzip2';
+  if (comeca(buf, [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00])) return 'xz';
+  if (comeca(buf, [0x28, 0xb5, 0x2f, 0xfd])) return 'zstd';
+  if (comeca(buf, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])) return 'documento OLE (doc, xls antigos)';
+  if (comeca(buf, asc('ustar'), 257)) return 'tar';
+  return null;
+}
+/* As mídias do app: só nome e SHA. */
+function ehMidia(buf) {
+  return comeca(buf, [0x89, 0x50, 0x4e, 0x47]) || comeca(buf, [0xff, 0xd8, 0xff]) || comeca(buf, asc('GIF8')) ||
+    (comeca(buf, asc('RIFF')) && comeca(buf, asc('WEBP'), 8)) || comeca(buf, [0, 0, 1, 0]) ||
+    comeca(buf, [0, 0x61, 0x73, 0x6d]) || comeca(buf, asc('wOFF')) || comeca(buf, asc('wOF2'));
+}
+
+/* Texto: UTF-8 (com ou sem BOM) ou UTF-16 (com BOM, ou sem BOM quando os
+ * nulos caem num lado só). Devolve a string, ou null para binário. */
+function decodifica(buf) {
+  if (comeca(buf, [0xef, 0xbb, 0xbf])) return buf.subarray(3).toString('utf8');
+  if (comeca(buf, [0xff, 0xfe])) return buf.subarray(2).toString('utf16le');
+  if (comeca(buf, [0xfe, 0xff])) return trocaPares(buf.subarray(2)).toString('utf16le');
+  const ini = buf.subarray(0, 8000);
+  if (ini.indexOf(0) < 0) return buf.toString('utf8');
+  let par = 0, impar = 0;
+  for (let i = 0; i < ini.length; i++) if (ini[i] === 0) { if (i % 2) impar++; else par++; }
+  const metade = Math.floor(ini.length / 2);
+  if (impar > metade * 0.4 && par < metade * 0.05) return buf.toString('utf16le');
+  if (par > metade * 0.4 && impar < metade * 0.05) return trocaPares(buf).toString('utf16le');
+  return null;
+}
+function trocaPares(b) {
+  const c = Buffer.from(b.subarray(0, b.length - (b.length % 2)));
+  return c.swap16();
+}
+
+/* ---------------------------------------------------------------- zip */
+/* As entradas pelo diretório central: [{nome, metodo, dados}] (dados nulo no
+ * método desconhecido). Lança erro se não for legível. */
 function entradasDoZip(buf) {
   let fim = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {
@@ -145,212 +301,380 @@ function entradasDoZip(buf) {
     const nl = buf.readUInt16LE(p + 28), el = buf.readUInt16LE(p + 30), cl = buf.readUInt16LE(p + 32);
     const local = buf.readUInt32LE(p + 42);
     const nome = buf.subarray(p + 46, p + 46 + nl).toString((bandeiras & 0x800) ? 'utf8' : 'latin1');
-    if (bandeiras & 1) throw new Error('entrada cifrada: ' + nome);
+    if (bandeiras & 1) throw new Error('entrada cifrada');
+    if (local + 30 > buf.length || buf.readUInt32LE(local) !== 0x04034b50) throw new Error('cabeçalho local ausente');
+    const ini = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+    const bruto = buf.subarray(ini, ini + tamComp);
     let dados = null;
-    if (local + 30 <= buf.length && buf.readUInt32LE(local) === 0x04034b50) {
-      const ini = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
-      const bruto = buf.subarray(ini, ini + tamComp);
-      if (metodo === 0) dados = bruto;
-      else if (metodo === 8) dados = zlib.inflateRawSync(bruto);
-    } else {
-      throw new Error('cabeçalho local ausente: ' + nome);
-    }
-    lista.push({ nome, dados });
+    if (metodo === 0) dados = bruto;
+    else if (metodo === 8) dados = zlib.inflateRawSync(bruto);
+    lista.push({ nome, metodo, dados });
     p += 46 + nl + el + cl;
   }
   return lista;
 }
 
-/* O texto que um PDF deixa ler sem renderizar: os bytes crus (sem os nulos,
- * para o texto em UTF-16 aparecer) e cada stream que o zlib abre. */
+/* ---------------------------------------------------------------- PDF */
+/* O texto que um PDF deixa ler sem renderizar. */
 function textoDoPdf(buf) {
-  const partes = [buf.toString('latin1').replace(/\0/g, '')];
   const cru = buf.toString('latin1');
-  const re = /stream\r?\n/g;
+  const partes = [cru];
+  const re = /(?<!end)stream\r?\n/g;
   let m;
   while ((m = re.exec(cru))) {
     const ini = m.index + m[0].length;
     const fim = cru.indexOf('endstream', ini);
     if (fim < 0) break;
-    try { partes.push(zlib.inflateSync(buf.subarray(ini, fim)).toString('latin1').replace(/\0/g, '')); } catch (e) { /* stream que não é deflate */ }
-    re.lastIndex = fim;
+    try {
+      partes.push(zlib.inflateSync(buf.subarray(ini, fim), { finishFlush: zlib.constants.Z_SYNC_FLUSH }).toString('latin1'));
+    } catch (e) { /* stream que não é deflate */ }
+    re.lastIndex = fim + 'endstream'.length;
   }
-  return partes.join('\n');
+  return partes.map(stringsDoPdf).join('\n');
+}
+/* Desfaz os escapes octais das strings literais e as strings hexadecimais
+ * (UTF-16 com BOM vira texto), e tira os nulos do UTF-16 sem BOM. */
+function stringsDoPdf(s) {
+  const octal = s.replace(/\\([0-7]{1,3})/g, (x, o) => String.fromCharCode(parseInt(o, 8) & 0xff));
+  const hex = [];
+  s.replace(/<([0-9A-Fa-f\s]{8,})>/g, (x, h) => {
+    const b = Buffer.from(h.replace(/\s/g, ''), 'hex');
+    hex.push(comeca(b, [0xfe, 0xff]) ? trocaPares(b.subarray(2)).toString('utf16le') : b.toString('latin1'));
+    return x;
+  });
+  const sem = t => t.replace(/\xfe\xff/g, '').replace(/\0/g, '');
+  return [sem(octal), hex.join('\n')].join('\n');
 }
 
-/* Examina um conteúdo (um arquivo, ou uma entrada de zip). `onde` é o rótulo
- * no relatório: o caminho, ou "pacote.zip!entrada". */
-function examina(onde, nome, buf, shas, achados, profundidade) {
-  if (shas && shas.has(sha256(buf))) achados.push({ arquivo: onde, onde: 'sha256', marca: 'SHA da lista da fonte privada' });
-  const ext = path.extname(nome).toLowerCase();
-  if (ext === '.zip') {
+/* ---------------------------------------------------------- o exame */
+/* Examina um conteúdo (arquivo, blob do histórico ou entrada de zip).
+ * `onde` é o caminho no relatório; entrada de zip vai como "pacote.zip!x". */
+function examina(onde, buf, ctx, prof, de) {
+  const acha = (tipo, marca) => ctx.achados.push({ arquivo: onde, de, tipo, marca });
+  if (ctx.shas && ctx.shas.has(crypto.createHash('sha256').update(buf).digest('hex'))) acha('sha256', 'SHA da lista da fonte privada');
+  const tipo = tipoProibido(buf);
+  if (tipo && !(prof === 0 && ctx.excecoes.has(onde))) acha('tipo proibido', tipo);
+  const texto = t => {
+    marcasDe(t).forEach(a => acha('marca', a.marca + (a.linha > 1 ? ', linha ' + a.linha : '')));
+    const n = janelasCasadas(t, ctx.impressao);
+    if (n >= LIMIAR_JANELAS) acha('impressão do texto', n + ' janela(s) de ' + JANELA + ' palavras da fonte');
+  };
+  if (ehZip(buf)) {
+    if (prof >= LIMITE_ZIP) { acha('zip', 'zip aninhado além de ' + LIMITE_ZIP + ' níveis'); return; }
     let entradas;
-    try { entradas = entradasDoZip(buf); } catch (e) {
-      achados.push({ arquivo: onde, onde: 'zip', marca: 'zip que não se deixa ler (' + e.message + ')' });
-      return;
-    }
+    try { entradas = entradasDoZip(buf); } catch (e) { acha('zip', 'zip que não se deixa ler (' + e.message + ')'); return; }
     entradas.forEach(en => {
-      marcasDe(en.nome).forEach(a => achados.push({ arquivo: onde + '!' + en.nome, onde: 'nome da entrada do zip', marca: a.marca }));
-      if (en.dados && profundidade < 3) examina(onde + '!' + en.nome, en.nome, en.dados, shas, achados, profundidade + 1);
+      const sub = onde + '!' + en.nome;
+      marcasDe(en.nome).forEach(a => ctx.achados.push({ arquivo: sub, de, tipo: 'nome', marca: a.marca }));
+      if (en.dados === null) ctx.achados.push({ arquivo: sub, de, tipo: 'zip', marca: 'método de compressão desconhecido (' + en.metodo + ')' });
+      else examina(sub, en.dados, ctx, prof + 1, de);
     });
     return;
   }
-  if (ext === '.pdf') {
-    marcasDe(textoDoPdf(buf)).forEach(a => achados.push({ arquivo: onde, onde: 'texto do PDF', marca: a.marca }));
+  if (comeca(buf, [0x1f, 0x8b])) {
+    let d;
+    try { d = zlib.gunzipSync(buf); } catch (e) { acha('gzip', 'gzip que não se deixa ler'); return; }
+    if (prof >= LIMITE_ZIP) { acha('zip', 'compressão aninhada além de ' + LIMITE_ZIP + ' níveis'); return; }
+    examina(onde + '!gunzip', d, ctx, prof + 1, de);
     return;
   }
-  if (ehBinario(buf)) return;
-  marcasDe(buf.toString('utf8')).forEach(a => achados.push({ arquivo: onde, onde: 'conteúdo, linha ' + a.linha, marca: a.marca }));
+  if (ehPdf(buf)) { texto(textoDoPdf(buf)); return; }
+  const t = decodifica(buf);
+  if (t !== null) { texto(t); return; }
+  if (ehMidia(buf)) return;
+  marcasDe(buf.toString('latin1').replace(/\0/g, '')).forEach(a => acha('marca', a.marca + ' (bytes de binário)'));
 }
 
-/* A varredura de um repositório: o que está em `git ls-files`. */
-function varre(raiz, shas) {
-  const saida = execFileSync('git', ['ls-files', '-z'], { cwd: raiz, maxBuffer: 64 * 1024 * 1024 }).toString('utf8');
-  const arquivos = saida.split('\0').filter(Boolean);
-  const achados = [];
+function git(raiz, args, input) {
+  return execFileSync('git', args, { cwd: raiz, input, maxBuffer: 1024 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'] });
+}
+
+/* A faixa do histórico: --faixa, o "before" do push na main, origin/main..HEAD.
+ * Devolve {faixa} ou {pulada} ou {erro}. */
+function faixaPadrao(env, raiz) {
+  if (faixaDada) return { faixa: faixaDada, de: '--faixa' };
+  const existe = ref => { try { git(raiz, ['rev-parse', '--verify', '-q', ref + '^{commit}']); return true; } catch (e) { return false; } };
+  const noCI = env.GITHUB_ACTIONS === 'true';
+  if (env.GITHUB_EVENT_NAME === 'push' && env.GITHUB_EVENT_PATH) {
+    let antes = '';
+    try { antes = JSON.parse(fs.readFileSync(env.GITHUB_EVENT_PATH, 'utf8')).before || ''; } catch (e) { /* sem evento */ }
+    if (antes && !/^0+$/.test(antes) && existe(antes)) return { faixa: antes + '..HEAD', de: 'o push (before do evento)' };
+    return { erro: 'push sem um "before" que exista no clone: não sei que commits o push trouxe' };
+  }
+  if (existe('origin/main')) return { faixa: 'origin/main..HEAD', de: 'origin/main..HEAD' };
+  if (noCI) return { erro: 'no CI sem origin/main: não sei que commits o PR leva' };
+  return { pulada: 'sem origin/main nesta cópia' };
+}
+
+/* A varredura: a árvore de `git ls-files` e, com faixa, o histórico dela. */
+function varre(raiz, opcoes) {
+  const ctx = { shas: opcoes.shas, impressao: opcoes.impressao, excecoes: new Set(opcoes.excecoes || []), achados: [] };
+  const arquivos = git(raiz, ['ls-files', '-z']).toString('utf8').split('\0').filter(Boolean);
   const vistos = new Set();
   const ilegiveis = [];
   arquivos.forEach(rel => {
-    marcasDe(rel).forEach(a => achados.push({ arquivo: rel, onde: 'caminho ou nome', marca: a.marca }));
+    marcasDe(rel).forEach(a => ctx.achados.push({ arquivo: rel, de: 'árvore', tipo: 'nome', marca: a.marca }));
     let buf;
     try { buf = fs.readFileSync(path.join(raiz, rel)); } catch (e) { ilegiveis.push(rel); return; }
     vistos.add(rel);
-    examina(rel, rel, buf, shas, achados, 0);
+    examina(rel, buf, ctx, 0, 'árvore');
   });
-  return { arquivos, achados, vistos, ilegiveis };
-}
-
-/* A saída do CI é pública: a sigla sai mascarada no que se imprime. */
-function mascara(s) {
-  return s.replace(new RegExp(SIGLA, 'ig'), '<sigla>');
+  const historico = { commits: 0, blobs: 0, caminhos: 0 };
+  if (opcoes.faixa) {
+    const f = opcoes.faixa;
+    historico.commits = git(raiz, ['rev-list', f]).toString().split('\n').filter(Boolean).length;
+    const caminhos = new Set(git(raiz, ['log', '--no-renames', '--format=', '--name-only', '-z', f]).toString('utf8').split(/\0|\n/).filter(Boolean));
+    historico.caminhos = caminhos.size;
+    caminhos.forEach(c => marcasDe(c).forEach(a => ctx.achados.push({ arquivo: c, de: 'histórico', tipo: 'nome', marca: a.marca })));
+    git(raiz, ['log', '--format=%H%x01%B%x00', f]).toString('utf8').split('\0').forEach(bloco => {
+      const [h, corpo] = bloco.replace(/^\n/, '').split('\x01');
+      if (!h || corpo === undefined) return;
+      marcasDe(corpo).forEach(a => ctx.achados.push({ arquivo: 'commit ' + h.slice(0, 10), de: 'mensagem de commit', tipo: 'marca', marca: a.marca }));
+    });
+    const objetos = git(raiz, ['rev-list', '--objects', f]).toString('utf8').split('\n').filter(Boolean)
+      .map(l => { const i = l.indexOf(' '); return i < 0 ? { sha: l, nome: '' } : { sha: l.slice(0, i), nome: l.slice(i + 1) }; });
+    if (objetos.length) {
+      const tipos = git(raiz, ['cat-file', '--batch-check=%(objectname) %(objecttype)'], objetos.map(o => o.sha).join('\n') + '\n')
+        .toString().split('\n').filter(Boolean);
+      /* O blob que está no índice já foi varrido como arquivo da árvore. */
+      const noIndice = new Set(git(raiz, ['ls-files', '-s', '-z']).toString('utf8').split('\0').filter(Boolean).map(l => l.split(' ')[1]));
+      const blobs = objetos.filter((o, i) => / blob$/.test(tipos[i] || '') && !noIndice.has(o.sha));
+      historico.blobs = blobs.length;
+      if (blobs.length) {
+        const saida = git(raiz, ['cat-file', '--batch'], blobs.map(b => b.sha).join('\n') + '\n');
+        let p = 0;
+        blobs.forEach(b => {
+          const nl = saida.indexOf(10, p);
+          const tam = parseInt(saida.subarray(p, nl).toString().split(' ')[2], 10);
+          const dados = saida.subarray(nl + 1, nl + 1 + tam);
+          p = nl + 1 + tam + 1;
+          examina(b.nome || b.sha, dados, ctx, 0, 'histórico, blob ' + b.sha.slice(0, 10));
+        });
+      }
+    }
+  }
+  return { arquivos, achados: ctx.achados, vistos, ilegiveis, historico };
 }
 
 function relatorio(achados) {
-  return achados.map(a => '        ' + a.arquivo + '  (' + a.onde + ': ' + a.marca + ')').join('\n');
+  return achados.map(a => '        ' + mascara(a.arquivo) + '  (' + a.de + '; ' + a.tipo + ': ' + mascara(a.marca) + ')').join('\n');
 }
 
-/* ------------------------------------------------------------- a prova */
+/* ----------------------------------------------------- a prova normal */
 function provaNormal() {
-  const arqShas = caminhoShas();
-  const shas = lerShas(arqShas);
-  if (shas === null) console.log('  PULADA a conferência por SHA: a lista não existe aqui (' + mascara(arqShas) + '); defina FONTE_PRIVADA_SHAS para rodá-la');
-  else conf('a lista de SHAs da fonte privada foi lida e tem SHAs (' + shas.size + ')', shas.size > 0, mascara(arqShas));
+  const env = process.env;
+  /* A normalização e o hash são os mesmos do gerador em Python. */
+  const py = spawnSync(env.PYTHON || 'python', [path.join(__dirname, 'gera_impressao_fonte_privada.py'), '--autoteste'], { encoding: 'utf8' });
+  const linhasPy = String(py.stdout || '').replace(/\r/g, '').trim().split('\n');
+  let frase = '';
+  try { frase = JSON.parse(linhasPy[0]); } catch (e) { /* saída sem a frase */ }
+  const psJs = palavras(frase);
+  const esperado = psJs.join(' ') + '\n' + hashJanela(psJs.slice(0, JANELA));
+  conf('a normalização e o hash da trava são os mesmos do gerador em Python (--autoteste)',
+    py.status === 0 && frase.length > 20 && linhasPy.slice(1).join('\n') === esperado,
+    py.status !== 0 ? String(py.stderr || py.error).split('\n')[0] : 'js: ' + psJs.slice(0, 4).join(' '));
 
-  const r = varre(RAIZ, shas);
+  const fs1 = fonteShas(env);
+  const ft = fonteTexto(env);
+  [['lista de SHAs', fs1], ['impressão do texto', ft]].forEach(([nome, f]) => {
+    if (f.pulada) console.log('  PULADA a conferência por ' + nome + ': ' + f.pulada);
+    else conf('a ' + nome + ' da fonte privada foi lida' + (f.de ? ' (' + f.de + ', ' + f.conjunto.size + ')' : ''), !f.erro, f.erro);
+  });
+  const fx = faixaPadrao(env, RAIZ);
+  if (fx.pulada) console.log('  PULADA a varredura do histórico: ' + fx.pulada);
+  else conf('a faixa do histórico foi decidida (' + (fx.faixa ? fx.de : '') + ')', !fx.erro, fx.erro);
+
+  const exc = EXCECOES_DE_TIPO.map(e => e.caminho);
+  const r = varre(RAIZ, { shas: fs1.conjunto, impressao: ft.conjunto, faixa: fx.faixa, excecoes: exc });
   conf('a varredura viu os arquivos rastreados (controle: mais de 100)', r.arquivos.length > 100, String(r.arquivos.length));
   conf('esta prova está em git ls-files (prova fora do índice nunca roda)', r.arquivos.indexOf(EU) >= 0);
   conf('esta prova foi lida e varrida junto com o resto', r.vistos.has(EU));
-  conf('todo arquivo rastreado foi lido do disco', r.ilegiveis.length === 0, r.ilegiveis.slice(0, 5).join(', '));
-  if (r.achados.length) console.log('    achados:\n' + mascara(relatorio(r.achados)));
-  conf('nada da fonte privada nos ' + r.arquivos.length + ' arquivos rastreados (nome, conteúdo' + (shas ? ', SHA' : '') + ')',
+  conf('todo arquivo rastreado foi lido do disco', r.ilegiveis.length === 0, r.ilegiveis.slice(0, 5).map(mascara).join(', '));
+  conf('toda exceção de tipo tem motivo e está rastreada (' + EXCECOES_DE_TIPO.length + ')',
+    EXCECOES_DE_TIPO.every(e => e.motivo && String(e.motivo).trim().length > 10 && r.arquivos.indexOf(e.caminho) >= 0));
+  if (fx.faixa) console.log('    histórico (' + fx.faixa + '): ' + r.historico.commits + ' commit(s), ' + r.historico.blobs + ' blob(s) novos, ' + r.historico.caminhos + ' caminho(s)');
+  if (r.achados.length) console.log('    achados:\n' + relatorio(r.achados));
+  conf('nada da fonte privada nos ' + r.arquivos.length + ' arquivos rastreados' + (fx.faixa ? ' nem no histórico da faixa' : ''),
     r.achados.length === 0, r.achados.length + ' achado(s)');
 
-  /* O .gitignore: não ignora esta prova e ignora os três padrões da fonte. */
+  /* O .gitignore: não ignora esta prova nem um email.pdf, e ignora a fonte. */
   const ignorado = rel => spawnSync('git', ['check-ignore', '-q', '--no-index', rel], { cwd: RAIZ }).status;
   conf('o .gitignore não ignora esta prova (git check-ignore)', ignorado(EU) === 1, 'status ' + ignorado(EU));
-  const S = SIGLA.toUpperCase();
+  ['email.pdf', 'docs/email_recebido.pdf', 'biblioteca/emails-2026.pdf'].forEach(rel =>
+    conf('o .gitignore não ignora ' + rel, ignorado(rel) === 1, 'status ' + ignorado(rel)));
   [
     'privado/caderno.pdf',
     'biblioteca/privado/texto.txt',
-    'material/Caderno_' + S + '_3ano.pdf',
+    'material/Caderno_' + SIGLA_M + '_3ano.pdf',
     'material/caderno-' + SIGLA + '-volume-2.pdf',
+    SIGLA_M + '_web.pdf',
+    'x/EFAI_1ano_LER-' + SIGLA_M + '_web.pdf',
     SIGLA + '_pacotes/indice.json',
-    S + '_extraido/texto.txt',
+    SIGLA_M + '_extraido/texto.txt',
   ].forEach(rel => conf('o .gitignore ignora ' + mascara(rel), ignorado(rel) === 0, 'status ' + ignorado(rel)));
+
+  const gancho = path.join(__dirname, 'hooks', 'pre-push');
+  conf('o hook opcional _teste/hooks/pre-push existe e chama esta prova com --faixa',
+    fs.existsSync(gancho) && /testa_sem_fonte_privada\.js" --faixa/.test(fs.readFileSync(gancho, 'utf8')));
 }
 
-function provaEnvenenada() {
-  const status = () => execFileSync('git', ['status', '--porcelain'], { cwd: RAIZ }).toString();
-  const antes = status();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fonte_privada_'));
-  try {
-    execFileSync('git', ['init', '-q'], { cwd: tmp });
-    execFileSync('git', ['config', 'core.autocrlf', 'false'], { cwd: tmp });
-    const escreve = (rel, conteudo) => {
-      fs.mkdirSync(path.dirname(path.join(tmp, rel)), { recursive: true });
-      fs.writeFileSync(path.join(tmp, rel), conteudo);
-    };
-    const S = SIGLA.toUpperCase();
-    /* O título com acento e maiúsculas, montado ao contrário como o de cima. */
-    const titulo = 'siaicinI sonA son acitáme' + 'taM oãçacudE';
-    const tituloCerto = titulo.split('').reverse().join('');
-    const sujos = {
-      conteudo: 'notas/aula.md',
-      nome: 'material/Caderno_' + S + '_3ano.txt',
-      sha: 'figuras/pagina.bin',
-      pdf: 'docs/folha.pdf',
-      zip: 'docs/pacote.zip',
-    };
-    escreve(sujos.conteudo, '# Aula\n\nExercício tirado do caderno ' + S + ', volume 2.\n');
-    escreve(sujos.nome, 'texto neutro, sem marca nenhuma\n');
-    const binario = Buffer.concat([Buffer.from([0, 1, 2, 3, 0, 255]), crypto.randomBytes(256)]);
-    escreve(sujos.sha, binario);
-    escreve(sujos.pdf, Buffer.from('%PDF-1.4\n1 0 obj << /Length 44 >>\nstream\nBT (' + tituloCerto + ') Tj ET\nendstream\nendobj\n%%EOF\n', 'latin1'));
-    escreve(sujos.zip, zipGuardado([{ nome: 'pacote/' + SIGLA + '_q1.json', dados: Buffer.from('{"q":1}') }]));
-    /* Controles: não podem ser acusados. */
-    const limpos = ['notas/email.txt', 'notas/titulo_parcial.txt', 'docs/limpo.zip', 'figuras/outra.bin'];
-    escreve(limpos[0], 'Mande um email; o ' + SIGLA + 'l e o x' + SIGLA + ' não são a sigla.\n');
-    escreve(limpos[1], tituloCerto.replace(/\S+$/, 'Finais') + '\n');
-    escreve(limpos[2], zipGuardado([{ nome: 'pacote/q1.json', dados: Buffer.from('{"q":1}') }]));
-    escreve(limpos[3], Buffer.concat([Buffer.from([0, 9, 9]), crypto.randomBytes(256)]));
-    execFileSync('git', ['add', '-A'], { cwd: tmp });
-
-    const arqShas = path.join(tmp, '..', path.basename(tmp) + '_shas.txt');
-    /* Lista própria do veneno, no formato da real ("<sha> *<nome>"), com uma
-     * linha cujo SHA só aparece depois do nome, que NÃO pode contar. */
-    fs.writeFileSync(arqShas, '# lista temporária\n' + sha256(binario) + ' *pagina.pdf\n' +
-      'nome ' + sha256(Buffer.from('outro')) + '\n');
-    try {
-      const env = Object.assign({}, process.env, { FONTE_PRIVADA_SHAS: arqShas });
-      conf('FONTE_PRIVADA_SHAS troca o caminho da lista', caminhoShas(env) === arqShas);
-      const shas = lerShas(caminhoShas(env));
-      conf('a lista temporária foi lida com o SHA do binário', !!shas && shas.size === 1);
-      const r = varre(tmp, shas);
-      const texto = relatorio(r.achados);
-      console.log('    relatório da varredura no repositório temporário:\n' + mascara(texto));
-      const acusados = new Set(r.achados.map(a => a.arquivo.split('!')[0]));
-      Object.keys(sujos).forEach(k => {
-        conf('VENENO visto: ' + k + ' (' + mascara(sujos[k]) + ') acusado e no relatório',
-          acusados.has(sujos[k]) && texto.indexOf(sujos[k]) >= 0);
-      });
-      conf('VENENO visto: a marca no nome sai como "caminho ou nome"', r.achados.some(a => a.arquivo === sujos.nome && a.onde === 'caminho ou nome'));
-      conf('VENENO visto: o binário sai pelo SHA', r.achados.some(a => a.arquivo === sujos.sha && a.onde === 'sha256'));
-      conf('VENENO visto: o zip sai pelo nome da entrada', r.achados.some(a => a.arquivo.indexOf(sujos.zip + '!') === 0 && a.onde === 'nome da entrada do zip'));
-      limpos.forEach(l => conf('controle limpo não acusado: ' + l, !acusados.has(l)));
-    } finally {
-      fs.rmSync(arqShas, { force: true });
-    }
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
-  conf('a pasta temporária foi apagada', !fs.existsSync(tmp));
-  conf('o índice e a árvore desta cópia ficaram como estavam', status() === antes);
-}
-
-/* Um zip mínimo, sem compressão, para o veneno. */
-function zipGuardado(entradas) {
+/* -------------------------------------------------- a prova envenenada */
+function zipDe(entradas) {
   const locais = [], centrais = [];
   let desloc = 0;
   entradas.forEach(en => {
     const nome = Buffer.from(en.nome, 'utf8');
+    const metodo = en.metodo === undefined ? 0 : en.metodo;
+    const comp = metodo === 8 ? zlib.deflateRawSync(en.dados) : en.dados;
     const crc = zlib.crc32(en.dados);
     const l = Buffer.alloc(30);
-    l.writeUInt32LE(0x04034b50, 0); l.writeUInt16LE(20, 4); l.writeUInt16LE(0x800, 6); l.writeUInt16LE(0, 8);
-    l.writeUInt32LE(crc, 14); l.writeUInt32LE(en.dados.length, 18); l.writeUInt32LE(en.dados.length, 22);
+    l.writeUInt32LE(0x04034b50, 0); l.writeUInt16LE(20, 4); l.writeUInt16LE(0x800, 6); l.writeUInt16LE(metodo, 8);
+    l.writeUInt32LE(crc, 14); l.writeUInt32LE(comp.length, 18); l.writeUInt32LE(en.dados.length, 22);
     l.writeUInt16LE(nome.length, 26);
     const c = Buffer.alloc(46);
     c.writeUInt32LE(0x02014b50, 0); c.writeUInt16LE(20, 4); c.writeUInt16LE(20, 6); c.writeUInt16LE(0x800, 8);
-    c.writeUInt32LE(crc, 16); c.writeUInt32LE(en.dados.length, 20); c.writeUInt32LE(en.dados.length, 24);
+    c.writeUInt16LE(metodo, 10);
+    c.writeUInt32LE(crc, 16); c.writeUInt32LE(comp.length, 20); c.writeUInt32LE(en.dados.length, 24);
     c.writeUInt16LE(nome.length, 28); c.writeUInt32LE(desloc, 42);
-    locais.push(l, nome, en.dados);
+    locais.push(l, nome, comp);
     centrais.push(c, nome);
-    desloc += 30 + nome.length + en.dados.length;
+    desloc += 30 + nome.length + comp.length;
   });
   const cd = Buffer.concat(centrais);
   const e = Buffer.alloc(22);
   e.writeUInt32LE(0x06054b50, 0); e.writeUInt16LE(entradas.length, 8); e.writeUInt16LE(entradas.length, 10);
   e.writeUInt32LE(cd.length, 12); e.writeUInt32LE(desloc, 16);
   return Buffer.concat(locais.concat([cd, e]));
+}
+function pdfDe(streams, extra) {
+  const partes = ['%PDF-1.7\n'];
+  streams.forEach((s, i) => {
+    const d = zlib.deflateSync(Buffer.from(s, 'latin1'));
+    partes.push(Buffer.from((i + 1) + ' 0 obj << /Length ' + d.length + ' /Filter /FlateDecode >>\nstream\n', 'latin1'), d,
+      Buffer.from('\nendstream\nendobj\n', 'latin1'));
+  });
+  partes.push(Buffer.from((extra || '') + '%%EOF\n', 'latin1'));
+  return Buffer.concat(partes.map(p => (Buffer.isBuffer(p) ? p : Buffer.from(p, 'latin1'))));
+}
+
+function provaEnvenenada() {
+  const status = () => git(RAIZ, ['status', '--porcelain']).toString();
+  const antes = status();
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fonte_privada_'));
+  const g = args => git(tmp, ['-c', 'user.name=prova', '-c', 'user.email=prova@exemplo.invalid', '-c', 'core.autocrlf=false', '-c', 'commit.gpgsign=false'].concat(args));
+  const escreve = (rel, conteudo) => {
+    fs.mkdirSync(path.dirname(path.join(tmp, rel)), { recursive: true });
+    fs.writeFileSync(path.join(tmp, rel), conteudo);
+  };
+  try {
+    g(['init', '-q']);
+    escreve('LEIAME.md', 'repositório de mentira\n');
+    g(['add', '-A']); g(['commit', '-q', '-m', 'base']);
+    const base = g(['rev-parse', 'HEAD']).toString().trim();
+
+    /* O título com acento e maiúsculas, montado ao contrário. */
+    const tituloCerto = ('siaicinI sonA son acitáme' + 'taM oãçacudE').split('').reverse().join('');
+    const S = SIGLA_M;
+    /* O histórico: um commit acrescenta, o seguinte apaga. A mensagem do
+     * primeiro carrega o título. */
+    escreve('rascunho/apagado.md', 'Atividade copiada do caderno ' + S + '.\n');
+    escreve('rascunho/Caderno_' + S + '_velho.txt', 'neutro\n');
+    g(['add', '-A']); g(['commit', '-q', '-m', 'acrescenta ' + tituloCerto]);
+    fs.rmSync(path.join(tmp, 'rascunho'), { recursive: true });
+    g(['add', '-A']); g(['commit', '-q', '-m', 'apaga']);
+
+    /* A impressão temporária: um parágrafo inventado, todas as janelas dele. */
+    const paragrafo = 'Joana tinha doze figurinhas e ganhou mais sete do irmão; quantas figurinhas ela tem agora, ' +
+      'se depois deu três para a prima que mora na outra rua da escola?';
+    const ps = palavras(paragrafo);
+    const impressao = new Set();
+    for (let i = 0; i + JANELA <= ps.length; i++) impressao.add(hashJanela(ps.slice(i, i + JANELA)));
+
+    const binario = Buffer.concat([Buffer.from([0, 1, 2, 3, 0, 255]), crypto.randomBytes(256)]);
+    const utf16 = s => Buffer.from(s, 'utf16le');
+    const sujos = {
+      'conteúdo com a sigla': ['notas/aula.md', '# Aula\n\nExercício tirado do caderno ' + S + ', volume 2.\n', 'marca'],
+      'sigla colada (CamelCase)': ['notas/camel.js', 'const nomeCaderno' + S + 'Tres = 1;\n', 'marca'],
+      'sigla com pontos': ['notas/pontos.txt', 'Ver ' + S.split('').join('.') + '. página 4\n', 'marca'],
+      'título sem separador': ['notas/junto.txt', tituloCerto.replace(/ /g, '') + '\n', 'marca'],
+      'sigla no nome': ['material/Caderno_' + S + '_3ano.txt', 'texto neutro\n', 'nome'],
+      'binário da lista de SHAs': ['figuras/pagina.bin', binario, 'sha256'],
+      'PDF com a sigla no SEGUNDO stream Flate': ['docs/dois_streams.pdf', pdfDe(['BT (nada aqui) Tj ET', 'BT (Caderno ' + S + ') Tj ET']), 'marca'],
+      'PDF com a sigla só nos metadados (hex UTF-16)': ['docs/meta.pdf',
+        pdfDe(['BT <0041> Tj ET'], 'trailer << /Info << /Title <FEFF' + Buffer.from('Caderno ' + S, 'utf16le').swap16().toString('hex') + '> >> >>\n'), 'marca'],
+      'texto UTF-16 com BOM': ['notas/utf16_bom.txt', Buffer.concat([Buffer.from([0xff, 0xfe]), utf16('Caderno ' + S + ' do aluno\n')]), 'marca'],
+      'texto UTF-16 sem BOM': ['notas/utf16_sem.txt', utf16('Caderno ' + S + ' do aluno, terceiro ano\n'), 'marca'],
+      'zip com deflate': ['docs/deflate.zip', zipDe([{ nome: 'q1.txt', dados: Buffer.from('Caderno ' + S + '\n'), metodo: 8 }]), 'marca'],
+      'zip aninhado': ['docs/aninhado.zip', zipDe([{ nome: 'dentro.zip', dados: zipDe([{ nome: 't.txt', dados: Buffer.from(tituloCerto), metodo: 8 }]) }]), 'marca'],
+      'zip além do limite': ['docs/fundo.zip', [1, 2, 3, 4].reduce(z => zipDe([{ nome: 'z.zip', dados: z }]), zipDe([{ nome: 'a.txt', dados: Buffer.from('ok') }])), 'zip'],
+      'zip de método desconhecido': ['docs/metodo.zip', zipDe([{ nome: 'a.txt', dados: Buffer.from('ok'), metodo: 99 }]), 'zip'],
+      'impressão do texto': ['banco/problema.md', '## Problema\n\n' + paragrafo.replace('quantas', 'Quantas') + '\n', 'impressão do texto'],
+      'PDF renomeado (tipo)': ['figuras/foto.png', Buffer.from('%PDF-1.7\n%limpo\n%%EOF\n', 'latin1'), 'tipo proibido'],
+      'docx (tipo)': ['docs/relatorio.docx', zipDe([{ nome: 'word/document.xml', dados: Buffer.from('<w>ok</w>'), metodo: 8 }]), 'tipo proibido'],
+      'gzip (tipo)': ['dados/x.json', zlib.gzipSync(Buffer.from('{"a":1}')), 'tipo proibido'],
+      'gzip com a sigla dentro': ['dados/y.gz', zlib.gzipSync(Buffer.from('Caderno ' + S)), 'marca'],
+      '7z (tipo)': ['dados/a.dat', Buffer.concat([Buffer.from([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c, 0, 4]), crypto.randomBytes(64)]), 'tipo proibido'],
+      'rar (tipo)': ['dados/b.dat', Buffer.concat([Buffer.from('Rar!\x1a\x07\x01\x00', 'latin1'), crypto.randomBytes(64)]), 'tipo proibido'],
+      'exceção de tipo continua varrida': ['docs/permitido_sujo.pdf', pdfDe(['BT (Caderno ' + S + ') Tj ET']), 'marca'],
+    };
+    Object.keys(sujos).forEach(k => escreve(sujos[k][0], sujos[k][1]));
+    /* Controles: não podem ser acusados. */
+    const limpos = {
+      'notas/email.txt': 'Mande um email ou EMAIL; o x' + SIGLA + ' e o ' + SIGLA + 'lx não são a sigla.\n',
+      'notas/titulo_parcial.txt': tituloCerto.replace(/\S+$/, 'Finais') + '\n',
+      'notas/outro_problema.md': 'Joana tinha doze bolinhas e perdeu cinco no recreio da escola nova.\n',
+      'icons/icone.png': Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), crypto.randomBytes(256)]),
+      'vendor/m.wasm': Buffer.concat([Buffer.from([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0]), crypto.randomBytes(256)]),
+      'docs/permitido.pdf': pdfDe(['BT (texto limpo) Tj ET']),
+    };
+    Object.keys(limpos).forEach(k => escreve(k, limpos[k]));
+    const excecoes = ['docs/permitido.pdf', 'docs/permitido_sujo.pdf'];
+    g(['add', '-A']); g(['commit', '-q', '-m', 'o resto']);
+
+    const arqShas = tmp + '_shas.txt';
+    fs.writeFileSync(arqShas, '# lista temporária\n' + crypto.createHash('sha256').update(binario).digest('hex') + ' *pagina.pdf\n');
+    const arqTexto = tmp + '_impressao.txt';
+    fs.writeFileSync(arqTexto, '# impressao-texto v1 janela=' + JANELA + ' hash=sha256-8 amostra=' + impressao.size + '\n' + Array.from(impressao).join('\n') + '\n');
+    try {
+      /* As fontes: arquivo fora do CI, variável no CI, e a falta no CI reprova. */
+      const envLocal = { FONTE_PRIVADA_SHAS: arqShas, FONTE_PRIVADA_TEXTO_ARQUIVO: arqTexto };
+      const fs1 = fonteShas(envLocal), ft = fonteTexto(envLocal);
+      conf('as fontes temporárias foram lidas (1 SHA, ' + impressao.size + ' janelas)', fs1.conjunto && fs1.conjunto.size === 1 && ft.conjunto && ft.conjunto.size === impressao.size);
+      const envCI = { GITHUB_ACTIONS: 'true', FONTE_PRIVADA_SHAS_CONTEUDO: fs.readFileSync(arqShas, 'utf8'), FONTE_PRIVADA_TEXTO: fs.readFileSync(arqTexto, 'utf8') };
+      conf('no CI as fontes vêm das variáveis dos segredos', fonteShas(envCI).conjunto && fonteTexto(envCI).conjunto && fonteTexto(envCI).conjunto.size === impressao.size);
+      conf('VENENO visto: no CI, sem o segredo da lista de SHAs, reprova', !!fonteShas({ GITHUB_ACTIONS: 'true' }).erro);
+      conf('VENENO visto: no CI, sem o segredo da impressão, reprova', !!fonteTexto({ GITHUB_ACTIONS: 'true' }).erro);
+      conf('VENENO visto: impressão de outro formato reprova', !!fonteTexto({ FONTE_PRIVADA_TEXTO: 'abc\n0123456789abcdef\n' }).erro);
+      /* A faixa do push na main sai do "before" do evento. */
+      const evento = tmp + '_evento.json';
+      fs.writeFileSync(evento, JSON.stringify({ before: base }));
+      conf('no push na main a faixa é before..HEAD', faixaPadrao({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_PATH: evento }, tmp).faixa === base + '..HEAD');
+      fs.writeFileSync(evento, JSON.stringify({ before: '0'.repeat(40) }));
+      conf('VENENO visto: push sem before conhecido reprova', !!faixaPadrao({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_PATH: evento }, tmp).erro);
+      fs.rmSync(evento, { force: true });
+
+      const r = varre(tmp, { shas: fs1.conjunto, impressao: ft.conjunto, faixa: base + '..HEAD', excecoes });
+      console.log('    relatório da varredura no repositório temporário:\n' + relatorio(r.achados));
+      const de = (arq, tipo, ondeDe) => r.achados.some(a => (a.arquivo === arq || a.arquivo.indexOf(arq + '!') === 0) && (!tipo || a.tipo === tipo) && (!ondeDe || a.de.indexOf(ondeDe) === 0));
+      Object.keys(sujos).forEach(k => conf('VENENO visto: ' + k + ' (' + mascara(sujos[k][0]) + ', ' + sujos[k][2] + ')', de(sujos[k][0], sujos[k][2], 'árvore')));
+      conf('VENENO visto: o conteúdo do commit apagado, no histórico', de('rascunho/apagado.md', 'marca', 'histórico'));
+      conf('VENENO visto: o nome do arquivo apagado, no histórico', de('rascunho/Caderno_' + S + '_velho.txt', 'nome', 'histórico'));
+      conf('VENENO visto: o título na mensagem do commit', r.achados.some(a => a.de === 'mensagem de commit' && /título/.test(a.marca)));
+      conf('VENENO visto: o relatório traz cada caminho acusado (mascarado)', Object.keys(sujos).every(k => relatorio(r.achados).indexOf(mascara(sujos[k][0])) >= 0));
+      conf('a exceção de tipo não acusa o tipo do exceptuado', !de('docs/permitido_sujo.pdf', 'tipo proibido') && !de('docs/permitido.pdf'));
+      conf('o relatório não imprime a sigla nem o título', !RE_SIGLA.test(semAcento(relatorio(r.achados)).toLowerCase()) && !RE_TITULO.test(semAcento(relatorio(r.achados)).toLowerCase()));
+      Object.keys(limpos).forEach(l => conf('controle limpo não acusado: ' + l, !de(l)));
+      conf('o histórico da faixa foi lido (3 commits; só os blobs fora do índice são lidos de novo)',
+        r.historico.commits === 3 && r.historico.blobs >= 1 && r.historico.caminhos > 20, JSON.stringify(r.historico));
+    } finally {
+      fs.rmSync(arqShas, { force: true });
+      fs.rmSync(arqTexto, { force: true });
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+  conf('a pasta temporária foi apagada', !fs.existsSync(tmp));
+  conf('o índice e a árvore desta cópia ficaram como estavam', status() === antes);
 }
 
 if (desconhecidos.length) {

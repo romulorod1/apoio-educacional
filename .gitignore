@@ -42,7 +42,11 @@ _teste/_confere_tudo_controle_tmp.sh
 # também no Linux, e o próprio .gitignore passa limpo pela trava
 # _teste/testa_sem_fonte_privada.js, que acusa a sigla escrita por extenso.
 # Padrão largo como "*sigla*" é proibido: ignoraria arquivos que não são da
-# fonte, e a prova confere com git check-ignore que ela mesma não é ignorada.
+# fonte (um email.pdf), e a prova confere com git check-ignore que ela mesma e
+# o email.pdf não são ignorados. A sigla só conta com separador dos dois lados
+# (ou no começo do nome). PDF, zip e companhia já reprovam pelo tipo na trava;
+# estas linhas só evitam o "git add" por engano.
 privado/
-*[Ee][Mm][Aa][Ii]*.pdf
-[Ee][Mm][Aa][Ii]_*/
+[Ee][Mm][Aa][Ii][_.-]*.pdf
+*[_-][Ee][Mm][Aa][Ii][_.-]*.pdf
+[Ee][Mm][Aa][Ii][_-]*/

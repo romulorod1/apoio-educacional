@@ -37,6 +37,8 @@ _teste/divide_portao.js	-
 _teste/provas_tocadas.js	-
 _teste/testa_livros_impressa.js	-
 _teste/testa_*.js	-
+_teste/hooks/*	-
+_teste/gera_impressao_fonte_privada.py	-
 # Mexe em como o portao roda tudo: a bateria inteira.
 _teste/confere_tudo.sh	*
 _teste/package.json	*
