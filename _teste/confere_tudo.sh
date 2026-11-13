@@ -323,16 +323,22 @@ roda "merge seguro"          node _teste/testa_merge_seguro.js
 # nao julga a si mesmo (com controle sem a regra); e o workflow so roda codigo da
 # main, sem checkout da cabeca do PR, com so a escrita de status e sem strict.
 roda "guarda de merge"       node _teste/testa_guarda_merge.js
-# CACHE do sw.js e VERSAO do app.js do PR MAIORES que os da main atual, e nao so
-# diferentes da base do merge (12/11/2026: um ramo em v130 integrado com a main
-# em v134 passava verde). A regra e a do merge_seguro; a prova a exercita dos dois
-# lados, como numero (1.42.9 contra 1.42.10), e num repositorio de mentira pelo
-# caminho real do --conferir, inclusive o ramo que trouxe a main e ficou igual a
-# ela. O veneno devolve a regra antiga, "mudou desde a base, passa", e os casos
-# de menor, de igual e o da revisao TEM de sair errados. A conferencia do repositorio
-# roda mais abaixo, na secao do cache.
-roda "ordem cache e versao"  node _teste/testa_ordem_versao.js
-roda "ordem cache e versao --envenenado-so-diferente" node _teste/testa_ordem_versao.js --envenenado-so-diferente
+# 13f: VERSAO e CACHE sao gerados na publicacao (_teste/versao_publicada.js) e
+# ficam fixos no repositorio. A regra do merge: o PR nao os muda, e o PR que leva
+# arquivo do site traz novidades/<nome>.txt. A prova a exercita dos dois lados e
+# num repositorio de mentira pelo caminho real do --conferir, inclusive o ramo
+# atras de uma main que andou com outro PR do app (o conflito que o 13f tira).
+# Os venenos tiram uma exigencia de cada vez, e os casos dela TEM de sair
+# errados. A conferencia do repositorio roda mais abaixo, na secao do cache.
+roda "versao no deploy"      node _teste/testa_ordem_versao.js
+roda "versao no deploy --envenenado-sem-novidade" node _teste/testa_ordem_versao.js --envenenado-sem-novidade
+roda "versao no deploy --envenenado-versao-livre" node _teste/testa_ordem_versao.js --envenenado-versao-livre
+# O gerador da publicacao: o contador sobe exatamente quando o que o tablet
+# baixa muda, so cresce, cada novidade leva a versao do commit que a trouxe, e a
+# primeira publicacao sai MAIOR que o valor fixo do repositorio (1.42.121 e
+# v201), que e o piso. Com os venenos da regra de contagem (conta tudo, esquece
+# o banco) dentro da prova.
+roda "versao publicada"      node _teste/testa_versao_publicada.js
 # As fatias do portao inteiro no CI: toda prova de navegador em exatamente uma
 # fatia, para qualquer numero de fatias, com controle que reprova.
 roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
@@ -809,6 +815,17 @@ roda "minhas listas --envenenado-diario-antes"    node "_teste/testa_minhas_list
 roda "minhas listas --envenenado-memoria-velha"   node "_teste/testa_minhas_listas.js" --envenenado-memoria-velha
 roda "minhas listas --envenenado-uso-por-conteudo" node "_teste/testa_minhas_listas.js" --envenenado-uso-por-conteudo
 roda "minhas listas --envenenado-nomear-duplica"  node "_teste/testa_minhas_listas.js" --envenenado-nomear-duplica
+# L1 da nova montagem de listas (D1, D8 revista e D10, 12/11/2026): a janela
+# "PDF pronto" com compartilhar, baixar e ver (cancelar nao baixa nada), as
+# proximas aulas no "Gerar material" com a do aluno em contexto escolhida, e o
+# tutorial sem imprimir. Um veneno por regra.
+roda "pdf pronto"                                node "_teste/testa_biblioteca_pdf_pronto.js"
+roda "pdf pronto --envenenado-baixa-ao-cancelar" node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-baixa-ao-cancelar
+roda "pdf pronto --envenenado-so-hoje"           node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-so-hoje
+roda "pdf pronto --envenenado-sem-sugestao"      node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-sem-sugestao
+roda "pdf pronto --envenenado-sugere-depois"     node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-sugere-depois
+roda "pdf pronto --envenenado-filtro-fora"       node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-filtro-fora
+roda "pdf pronto --envenenado-voltar"            node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-voltar
 # C2a: o banco sobe de 2 para 3. A subida nao perde nada; codigo mais velho que
 # o banco diz o que fazer; a janela antiga larga o banco e avisa.
 roda "banco v3"                                   node "_teste/testa_banco_v3.js"
@@ -1554,27 +1571,46 @@ sw_antes=""
 if [ -n "$base" ]; then
   sw_antes=$(git show "$base:sw.js" 2>/dev/null | tr -d '\r' || true)
 fi
+# 13f: o nome do cache que o tablet ve e o GERADO na publicacao, a partir do
+# contador de publicacoes (_teste/versao_publicada.js). O CACHE do sw.js do
+# repositorio fica fixo. Entao a pergunta das duas travas abaixo deixa de ser
+# "o PR subiu o nome?" e passa a ser "o merge deste PR na main sobe o
+# contador?" (--sobe): sobe se o diff base..HEAD muda algum arquivo que conta,
+# que e exatamente o que o commit de merge na main conta. E a mesma regra do
+# deploy (contaParaPublicacao): se alguem quebrar a regra do que conta (tirar
+# o banco, por exemplo), a trava reprova o PR que muda o banco.
+# (Na primeira rodada a trava comparava o contador do HEAD com o da base, e
+# dava FALSO VERMELHO local quando a main tinha andado mais que o ramo: a
+# historia de primeiro pai do ramo passa pelos commits dele, e nao pelos da
+# main. No CI nao acontecia, porque la o HEAD e o merge sobre a ponta da main.)
+sobe=""
+if [ -n "$base" ]; then
+  sobe=$(node _teste/versao_publicada.js --sobe "$base" HEAD 2>/dev/null || true)
+fi
 if [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
   printf '  INSTAVEL %-23s sem base de merge com sw.js para comparar\n' "nome do cache"
   pulada=1
 elif [ "$lista_agora" = "$(entradas_sw "$(lista_sw "$sw_antes")")" ]; then
   printf '  ok      %-24s a lista nao mudou desde a base do merge\n' "nome do cache"
-elif [ "$(nome_sw "$sw_agora")" != "$(nome_sw "$sw_antes")" ]; then
-  printf '  ok      %-24s lista nova desde a base, cache %s\n' "nome do cache" "$(nome_sw "$sw_agora")"
+elif [ "$sobe" != "sim" ] && [ "$sobe" != "nao" ]; then
+  printf '  FALHOU  %-24s a lista mudou e nao consegui perguntar se a publicacao sobe (--sobe:[%s])\n' \
+    "nome do cache" "$sobe"
+  falhou=1
+elif [ "$sobe" = "sim" ]; then
+  printf '  ok      %-24s lista nova desde a base; o merge sobe o contador e a publicacao troca o nome do cache\n' "nome do cache"
 else
-  printf '  FALHOU  %-24s a lista de ARQUIVOS mudou desde a base do merge e o cache continua %s\n' \
-    "nome do cache" "$(nome_sw "$sw_agora")"
+  printf '  FALHOU  %-24s a lista de ARQUIVOS mudou desde a base e o merge nao sobe o contador da publicacao\n' \
+    "nome do cache"
   falhou=1
 fi
 
-# A ORDEM: diferente da base nao basta. Se o HEAD leva para a origin/main (a do
-# CI e buscada no job) algum arquivo que muda o que o tablet baixa (app.js, sw.js
-# ou a lista ARQUIVOS), pela arvore do merge e nao pela base, CACHE e VERSAO tem
-# de ser MAIORES que os da origin/main, como numero. Igual reaproveita um nome ja
-# publicado e menor o rebaixa; nos dois o tablet ja instalado pode ficar sem o
-# codigo novo. PR que nao leva arquivo do app passa. A regra e a do merge_seguro,
-# que confere de novo contra a origin/main buscada na hora do merge. Le o HEAD
-# commitado, nao o disco. Saida: 0 passou, 1 reprovou, 2 sem main (INSTAVEL).
+# A VERSAO NO DEPLOY (13f): pela arvore do merge com a origin/main (a do CI e
+# buscada no job), e nao pela base, VERSAO e CACHE do PR tem de ser IGUAIS aos
+# da main (sao gerados na publicacao), e o PR que leva arquivo do site traz
+# novidades/<nome>.txt. PR que nao leva arquivo do site passa sem novidade. A
+# regra e a do merge_seguro, que confere de novo contra a origin/main buscada na
+# hora do merge. Le o HEAD commitado, nao o disco. Saida: 0 passou, 1 reprovou,
+# 2 sem main (INSTAVEL).
 saida=$(node _teste/testa_ordem_versao.js --conferir 2>&1) && codigo=0 || codigo=$?
 printf '%s\n' "$saida"
 if [ "$codigo" = "1" ]; then
@@ -1616,29 +1652,33 @@ veredito_cache() {
 # fechando sobre si mesma. Agora o mapeamento esta aqui dentro, e as quatro
 # asercoes abaixo o exercitam com argumento de verdade.
 #
-# $1 = lista de mudados (vazia = nada mudou); $2 = nome de agora; $3 = nome da base
+# $1 = lista de mudados (vazia = nada mudou); $2 = o merge sobe o contador da
+# publicacao (sim/nao, do --sobe; 13f: o nome publicado sai do contador)
 decide_cache() {
   if [ -n "$1" ]; then dc_mudou=sim; else dc_mudou=nao; fi
-  if [ "$2" != "$3" ]; then dc_novo=sim; else dc_novo=nao; fi
+  if [ "$2" = "sim" ]; then dc_novo=sim; else dc_novo=nao; fi
   veredito_cache "$dc_mudou" "$dc_novo"
 }
 p_cache=0; f_cache=0
+# $1 = mudados; $2 = o merge sobe (sim/nao); $3 = o veredito esperado
 afere_cache() {
-  obtido=$(decide_cache "$1" "$2" "$3")
-  if [ "$obtido" = "$4" ]; then
+  obtido=$(decide_cache "$1" "$2")
+  if [ "$obtido" = "$3" ]; then
     p_cache=$((p_cache + 1))
   else
     f_cache=$((f_cache + 1))
-    printf '    prova do cache: mudados=[%s] agora=%s antes=%s deu %s, esperado %s\n' \
-      "$1" "$2" "$3" "$obtido" "$4"
+    printf '    prova do cache: mudados=[%s] sobe=[%s] deu %s, esperado %s\n' \
+      "$1" "$2" "$obtido" "$3"
   fi
 }
-afere_cache "app.js" apoio-v22 apoio-v22 reprova
-afere_cache "app.js" apoio-v23 apoio-v22 passa
-afere_cache ""       apoio-v23 apoio-v22 passa
-afere_cache ""       apoio-v22 apoio-v22 passa
+afere_cache "app.js" nao reprova
+afere_cache "app.js" sim passa
+afere_cache ""       sim passa
+afere_cache ""       nao passa
+# so "sim" e sim: resposta vazia ou estranha nao vira subida
+afere_cache "app.js" "" reprova
 if [ "$f_cache" != "0" ]; then
-  printf '  FALHOU  %-24s a prova da trava nao passou: %s de 4\n' "conteudo no cache" "$p_cache"
+  printf '  FALHOU  %-24s a prova da trava nao passou: %s de 5\n' "conteudo no cache" "$p_cache"
   falhou=1
 elif [ -z "$base" ] || [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
   # A MESMA guarda da trava vizinha, de proposito. Com base presente e sw.js
@@ -1717,14 +1757,12 @@ else
   done
   set +f
   IFS=$ifs_antes
-  nome_agora=$(nome_sw "$sw_agora")
-  nome_antes=$(nome_sw "$sw_antes")
-  if [ -z "$nome_agora" ] || [ -z "$nome_antes" ]; then
+  if [ "$sobe" != "sim" ] && [ "$sobe" != "nao" ]; then
     # Nome vazio passava como "promovido", porque vazio e diferente de v22. Uma
     # reformatacao do sw.js (aspas duplas, const, espaco a mais) faria nome_sw
     # devolver vazio, e a trava imprimiria ok com o nome em branco.
-    printf '  FALHOU  %-24s nao consegui ler o nome do cache no sw.js (agora:[%s] base:[%s])\n' \
-      "conteudo no cache" "$nome_agora" "$nome_antes"
+    printf '  FALHOU  %-24s nao consegui perguntar se a publicacao sobe (--sobe:[%s])\n' \
+      "conteudo no cache" "$sobe"
     falhou=1
   elif [ -n "$caixa_trocada" ] || [ -n "$sumidos" ] || [ -n "$fora_do_git" ]; then
     # UMA falha so, com os TRES motivos: separados em falhas diferentes, quem
@@ -1750,15 +1788,15 @@ else
     fi
     falhou=1
   else
-    if [ "$(decide_cache "$mudados" "$nome_agora" "$nome_antes")" = "reprova" ]; then
-      printf '  FALHOU  %-24s mudou de conteudo e o cache continua %s:%s\n' \
-        "conteudo no cache" "$nome_agora" "$mudados"
+    if [ "$(decide_cache "$mudados" "$sobe")" = "reprova" ]; then
+      printf '  FALHOU  %-24s mudou de conteudo e o merge nao sobe o contador da publicacao:%s\n' \
+        "conteudo no cache" "$mudados"
       falhou=1
     elif [ -z "$mudados" ]; then
       printf '  ok      %-24s nenhum arquivo do pacote mudou de conteudo desde a base\n' "conteudo no cache"
     else
-      printf '  ok      %-24s%s arquivo(s) do pacote mudaram e o cache subiu para %s\n' \
-        "conteudo no cache" "$(printf '%s' "$mudados" | wc -w | tr -d ' ')" "$nome_agora"
+      printf '  ok      %-24s%s arquivo(s) do pacote mudaram e o merge sobe o contador da publicacao\n' \
+        "conteudo no cache" "$(printf '%s' "$mudados" | wc -w | tr -d ' ')"
     fi
   fi
 fi
