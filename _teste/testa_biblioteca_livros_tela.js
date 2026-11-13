@@ -1206,6 +1206,17 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     (document.querySelector('#modal-leitor-pdf.aberto') && document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada) || ''), v => v === '2', 15000);
   conf('"Abrir" leva ao começo do capítulo (p. 2)', leitorB1.valor, '2');
   await fecharModal(pag, 'modal-leitor-pdf');
+  // o Voltar do aparelho (o history.back do Android, #179) volta à página do assunto depois de abrir uma fonte dela
+  await pausa(600);
+  await clicar(pag, '#bib-corpo [data-secao="teoria"] [data-fonte^="teoria:"]');
+  const naTeoria = await esperar('a teoria aberta pela página', () => pag.evaluate(() =>
+    !document.querySelector('#bib-corpo .bib-assunto') && !!document.querySelector('#bib-corpo .bib-titulo')), v => v, 10000);
+  conf('a teoria abre a partir da página do assunto', naTeoria.ok, true);
+  await pausa(700);
+  await pag.evaluate(() => history.back());
+  const deVolta = await esperar('a página do assunto de volta', lerPagina, v => !!v && v.id === 'MAT09-07', 10000);
+  conf('o Voltar do aparelho, numa teoria aberta pela página, volta à página do assunto', deVolta.ok, true);
+  await pausa(600);
   // um vizinho abre a página dele; o Voltar devolve a busca como estava
   const vizinho = (P.vizinhos || [])[0];
   if (vizinho) {
