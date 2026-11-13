@@ -57,7 +57,17 @@ aplicativo ignora o que nao conhece):
   sem_solucao true, resposta null. Com --gabarito-externo, o item que tem
   entrada ganha `gabarito` {origem: 'agente-conferido', respostas: [{subitem,
   resposta}]}, a resposta de duas IAs que resolveram separadas e concordaram
-  (gerar_pacote.aplicar_gabarito_externo); o resto do item nao muda.
+  (gerar_pacote.aplicar_gabarito_externo); o resto do item nao muda. Com
+  --so-com-resposta, o item que ficou sem gabarito sai do pacote
+  (gerar_pacote.tirar_sem_resposta), e a lista que fica volta a ser numerada
+  1, 2, 3...
+
+Dinâmica de sala (--sem-dinamica): a atividade que só se faz na sala (em
+grupo ou dupla, jogo para jogar, material de recortar, pesquisa com a turma,
+conduzida pelo professor, material concreto, medir objetos da sala) sai com o
+motivo "dinâmica de sala (<rótulo>): <trecho>", pela lista fechada
+DINAMICA_DE_SALA (abaixo, um comentário por padrão). Fica atrás da opção para
+que o pacote sem ela saia byte a byte como antes.
 - origem_detalhe (aditivo): caderno, ano, volume, edicao, pagina(s), unidade,
   atividade e, na revisao, a questao.
 """
@@ -167,6 +177,90 @@ PALAVRA_DE_CREDITO = re.compile(
     r'|©|\bacervo\b|shutterstock|latin\s*stock|stockfood|thinkstock|\bimages?\b|\bimagens\b|projeto\s+portinari'
     r'|arquivo\s+\w+|\bae\b|agência|\bfolha\b|estad[aã]o|estado\s+de\s+s|\bveja\b|\brevista\b|\bjornal\b|stock', re.I)
 ANEXO = re.compile(r'\banexos?\b', re.I)
+
+# DINÂMICA DE SALA (com --sem-dinamica). A regra de foco da biblioteca deixa
+# fora a atividade que só se faz na sala: com colegas, com o professor ou com
+# material que o aluno não tem na tela nem na folha. A lista é FECHADA e lê o
+# texto do enunciado sem acento, em minúsculas e com as linhas emendadas. Cada
+# padrão pede uma ORDEM ao aluno (o verbo no imperativo, "em dupla" abrindo a
+# frase, o possessivo "sua turma"): a palavra que só conta a história do
+# problema ("a turma da escola tem 30 alunos", "o jogo terminou 3 a 1",
+# "dividiu os alunos em grupos de 4") não basta para tirar. O motivo no
+# relatório leva o rótulo do padrão e o trecho que casou.
+IMPERATIVO_COM_OUTROS = (r'converse|conversem|discuta|discutam|compare|comparem|troque|troquem|mostre|mostrem|'
+                         r'combine|combinem|confira|confiram|faca|facam|resolva|resolvam|leia|leiam|'
+                         r'junte-se|juntem-se|reuna-se|reunam-se|trabalhe|trabalhem|monte|montem')
+DINAMICA_DE_SALA = tuple((rotulo, re.compile(padrao)) for rotulo, padrao in (
+    # 1. "Em dupla, ...", "Com o seu grupo, ...": a frase abre mandando
+    # trabalhar com outros. "Em grupos de 4" é a conta da divisão, e fica
+    ('trabalho em grupo ou dupla',
+     r'(?:^|[.:;!?] )(?:em|com (?:o |a )?(?:seu|sua)) (?:duplas?|grupos?|trios?|equipes?)\b(?! de\b)'),
+    # 2. um verbo no imperativo seguido de "com o colega", "com a sua dupla",
+    # "com a de um colega", "com a turma": a ordem de fazer junto com alguém
+    # da sala
+    ('trabalho com colegas',
+     r'\b(?:' + IMPERATIVO_COM_OUTROS + r')\b[^.!?]{0,60}?\bcom (?:(?:o|a|os|as|um|uma|seu|sua|seus|suas|de|do|da) )'
+     r'{0,3}'
+     r'(?:colegas?|dupla|grupo|trio|turma|classe|parceir[oa]s?)\b'),
+    # 3. pedir ajuda a alguém da sala: "peça a um colega", "peça ao professor"
+    ('trabalho com colegas',
+     r'\bpeca (?:a|ao|para) (?:(?:um|uma|o|a|seu|sua) ){0,2}(?:colegas?|professora?)\b'),
+    # 4. um jogo para jogar: "vamos jogar", "joguem", "regras do jogo", "lance
+    # o dado". "O jogo terminou 3 a 1" é história, e não casa
+    ('jogo para jogar',
+     r'\b(?:vamos (?:jogar|brincar)|jogue|joguem|brinque|brinquem|regras? do jogo|como (?:se )?joga|para jogar|'
+     r'(?:vence|ganha) (?:o jogo )?quem|(?:lance|lancem|role|rolem) (?:o|os|um|dois) dados?)\b'),
+    # 5. material de recortar, colar ou destacar (o anexo já sai pela regra
+    # ANEXO). "O recorte" e "em destaque" são substantivos, e não casam
+    ('material para recortar',
+     r'(?<!\bo )(?<!\bum )(?<!\bem )\b(?:recorte|recortem|destaque|destaquem|cole|colem)\b|\bpara recortar\b'),
+    # 6. pesquisa feita pela turma: "faça uma pesquisa", "pergunte aos colegas"
+    ('pesquisa com a turma',
+     r'\b(?:faca|facam|realize|realizem) (?:uma |um )?(?:pesquisa|entrevista|enquete|votacao)\b|'
+     r'\b(?:pergunte|perguntem|entreviste|entrevistem)\b[^.!?]{0,40}?\b(?:colegas|amigos|familiares|pessoas|'
+     r'alunos|turma|classe)\b'),
+    # 7. a turma do próprio aluno como dado: "quantos alunos há na sua turma".
+    # "A turma da escola tem 30 alunos" não tem o possessivo, e fica
+    ('pesquisa com a turma',
+     r'\b(?:da|na|de) sua (?:turma|sala|classe)\b|\bseus colegas de (?:turma|sala|classe)\b'),
+    # 8. atividade conduzida pelo professor: o professor dita, mostra, orienta
+    # ou lê em voz alta, ou o aluno ouve e acompanha o professor. "A
+    # professora vai ler 3 livros por mês" é história, e não casa
+    ('atividade conduzida pelo professor',
+     r'\b(?:o|a|seu|sua) professora? (?:vai |ira )?(?:ditar|dita|ditara|mostrar|mostrara|orientar|orientara|'
+     r'explicar|explicara|combinar|indicar|indicara)\b|'
+     r'\bprofessora? (?:vai |ira )?(?:ler|lera|le) (?:em voz alta|para (?:a turma|a classe|voces))\b|'
+     r'\b(?:ouca|oucam|escute|escutem|acompanhe|acompanhem|siga|sigam)\b[^.!?]{0,40}?\bprofessora?\b|'
+     r'\bcom a (?:ajuda|orientacao) d[oa] (?:seu |sua )?professora?\b|\bditado\b(?! popular)'),
+    # 9. material concreto que o aluno teria de pegar: "use o material
+    # dourado", "monte com palitos". Só depois do verbo no imperativo: "Ana fez
+    # um quadrado com 12 palitos" é história. Régua e compasso ficam: o
+    # desenho geométrico se faz na própria folha
+    ('material concreto',
+     r'\b(?:use|usem|utilize|utilizem|pegue|peguem|separe|separem|manipule|manipulem|monte|montem|construa|'
+     r'construam)\b[^.!?]{0,50}?\b(?:material dourado|tampinhas|palitos|feijoes|graos de|canudos|'
+     r'massinha|massa de modelar|tesoura|cola|barbante|cubinhos|blocos logicos|geoplano|tangram|baralho|'
+     r'cartas de baralho|cartolina|fita metrica|trena|sucata|embalagens vazias)\b'),
+    # 10. medir coisas da sala ou do corpo: "meça o lápis", "meça a carteira",
+    # "meça com palmos". "Meça o segmento AB" é da folha, e fica
+    ('medir objetos da sala',
+     r'\b(?:meca|mecam)\b[^.!?]{0,50}?\b(?:sala|carteira|mesa|lousa|porta|janela|lapis|caneta|caderno|borracha|'
+     r'estojo|colegas?|palmos?|passos?|seu pe|sua altura|seu corpo|sua mao|objetos?)\b|'
+     r'\bobjetos (?:da|de sua|da sua|na|na sua) (?:sala|classe|escola|casa)\b'),
+))
+
+
+def dinamica_de_sala(texto):
+    """(rótulo, trecho) do primeiro padrão de DINAMICA_DE_SALA que casa com o
+    enunciado, ou None. O texto vai sem acento, em minúsculas e com a palavra
+    partida no fim da linha ("con-\\nversem") emendada."""
+    t = re.sub(r'(\w)-\s*\n\s*(\w)', r'\1\2', texto or '')
+    t = ' '.join(sem_acento(t).split())
+    for rotulo, padrao in DINAMICA_DE_SALA:
+        m = padrao.search(t)
+        if m:
+            return rotulo, m.group(0).strip(' .:;!?')
+    return None
 
 
 def sem_acento(t):
@@ -937,8 +1031,18 @@ def referencia_de_fora(texto, tipo):
     return None
 
 
+def numerar_por_lista(itens):
+    """O número de cada item na sua lista (série e assunto): 1, 2, 3... na ordem do caderno."""
+    por_lista = collections.defaultdict(list)
+    for i in itens:
+        por_lista[(i['serie'], i['modulo']['slug'])].append(i)
+    for lista in por_lista.values():
+        for k, i in enumerate(sorted(lista, key=lambda i: i['ordem_no_caderno']), 1):
+            i['numero'] = k
+
+
 def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=None, commit=None, gravar_zip=True,
-          series=None, gabarito_externo=None):
+          series=None, gabarito_externo=None, so_com_resposta=False, sem_dinamica=False):
     t_ini = time.time()
     # com --serie, o pacote parcial leva as series no nome: com o nome do completo,
     # importado no app ele substituiria o completo (achado da revisao do C5)
@@ -985,6 +1089,11 @@ def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=Non
                 motivo = u['truncada']
             if not motivo and ANEXO.search(txt):
                 motivo = 'depende do anexo do caderno (material para recortar)'
+            if not motivo and sem_dinamica:
+                # --sem-dinamica: a lista fechada DINAMICA_DE_SALA, com o rótulo e o trecho no motivo
+                din = dinamica_de_sala(txt)
+                if din:
+                    motivo = 'dinâmica de sala (%s): "%s"' % din
             if not motivo and TIRA_REFERENCIA:
                 ref = referencia_de_fora(txt, u['tipo'])
                 if ref:
@@ -1087,19 +1196,33 @@ def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=Non
     # o numero do exercicio e o da lista (o app escreve "Exercicio N" no cartao):
     # 1, 2, 3... em cada assunto de cada caderno, na ordem do caderno. A ordem no
     # caderno inteiro fica em ordem_no_caderno (aditivo); o id nao depende disto
-    por_lista = collections.defaultdict(list)
     for i in itens:
         i['ordem_no_caderno'] = i['numero']
-        por_lista[(i['serie'], i['modulo']['slug'])].append(i)
-    for lista in por_lista.values():
-        for k, i in enumerate(sorted(lista, key=lambda i: i['ordem_no_caderno']), 1):
-            i['numero'] = k
+    numerar_por_lista(itens)
     itens.sort(key=lambda i: (i['serie'], i['modulo']['slug'], i['aula']['n'], i['numero']))
     docs_busca.sort(key=lambda d: d['id'])
     # o gabarito de fora (aditivo, gerar_pacote.aplicar_gabarito_externo): o
     # caderno do aluno nao traz respostas, e as de duas IAs conferidas entram aqui
     n_gabarito = (gerar_pacote.aplicar_gabarito_externo(itens, gabarito_externo)
                   if gabarito_externo is not None else None)
+    # --so-com-resposta (gerar_pacote.tirar_sem_resposta), depois do gabarito de
+    # fora: sai o item sem gabarito, a lista que ficou vazia some com ele, e a
+    # numeração da lista que fica volta a ser 1, 2, 3...
+    sem_resposta = None
+    if so_com_resposta:
+        sem_resposta = gerar_pacote.tirar_sem_resposta(itens, conteudo, docs_busca)
+        numerar_por_lista(itens)
+        fora = {e['id'] for e in sem_resposta}
+        for reg in relatorio['unidades']:
+            if reg['id'] in fora:
+                reg['destino'] = 'sem_resposta'
+        for rel in relatorio['cadernos']:
+            n = sum(1 for e in sem_resposta if e['id'].split(':')[1] == rel['serie'])
+            rel['itens'] -= n
+            rel['sem_resposta'] = n
+        relatorio['assuntos'] = gerar_pacote.assuntos_sem(relatorio['assuntos'], sem_resposta)
+        relatorio['sem_resposta'] = sem_resposta
+        series_vistas = {i['serie'] for i in itens}
     conteudo['itens.json'] = gerar_pacote.json_bytes(itens)
     conteudo['teoria.json'] = gerar_pacote.json_bytes([])
     conteudo['busca.json'] = gerar_pacote.json_bytes(gerar_pacote.montar_busca(docs_busca))
@@ -1110,6 +1233,12 @@ def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=Non
                  'itens_com_solucao': 0, 'itens_excluidos': len(relatorio['excluidos'])}
     if n_gabarito is not None:
         contagens['itens_com_gabarito_agente'], contagens['itens_com_gabarito_agente_parcial'] = n_gabarito
+    if sem_dinamica:
+        # só com --sem-dinamica: quantas das excluídas saíram pela dinâmica de sala
+        contagens['itens_dinamica_de_sala_excluidos'] = sum(
+            1 for e in relatorio['excluidos'] if e['motivo'].startswith('dinâmica de sala'))
+    if sem_resposta is not None:
+        contagens['itens_sem_resposta_excluidos'] = len(sem_resposta)
     manifest = {
         'esquema': 1, 'pacote': nome, 'versao': versao,
         'gerado_em': gerado_em or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).replace(microsecond=0).isoformat(),
@@ -1122,7 +1251,7 @@ def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=Non
     manifest_b = (json.dumps(manifest, ensure_ascii=False, indent=1) + '\n').encode('utf-8')
     zip_caminho = gerar_pacote.gravar_pacote(conteudo, manifest_b, nome, versao, saida, trabalho, gravar_zip)
     ids = {i['id'] for i in itens}
-    ids_excl = {e['id'] for e in relatorio['excluidos']}
+    ids_excl = {e['id'] for e in relatorio['excluidos'] + (sem_resposta or [])}
     relatorio['curadoria_sem_item'] = sorted(
         ['dificuldade.csv: ' + k for k in dif_cur if k.startswith('sme:') and k not in ids | ids_excl] +
         ['exclusoes.csv: ' + k for k in excl_cur if k.startswith('sme:') and k not in ids_excl])

@@ -483,7 +483,9 @@ def trava_contagens(p):
                 l['aula'], sorted(no_texto), n))
         # por arquivo, e nao por aula: ha duas listas "resolucao-de-exercicios"
         no_pacote = sorted(por_aula.get(l['arquivo'], []))
-        excl = sorted(e['numero'] for e in l['excluidos'])
+        # com --so-com-resposta, o item sem resposta sai pela lista sem_resposta do relatório
+        excl = sorted([e['numero'] for e in l['excluidos']] +
+                      [e['numero'] for e in p.relatorio.get('sem_resposta') or [] if e['arquivo'] == l['arquivo']])
         if sorted(no_pacote + excl) != list(range(1, n + 1)):
             erros.append('%s: itens no pacote %s mais excluidos %s nao dao 1..%d' % (l['aula'], no_pacote, excl, n))
         if any(not e.get('motivo') for e in l['excluidos']):
@@ -2102,6 +2104,30 @@ def comentario_ao_professor(temp, placar, cur, navegador=True):
                     'Observacao:')
 
 
+def trava_so_com_resposta_portal(p, pdfs, temp, curadoria):
+    """Na amostra do Portal todo item tem solução: com --so-com-resposta nada
+    sai, o itens.json, a teoria, a busca e os SVG ficam byte a byte, e o manifest
+    só ganha itens_sem_resposta_excluidos 0. A regra em si (o que sai, o módulo
+    vazio, a teoria) e os venenos estão em _prova_cadernos_sme.py."""
+    t = os.path.join(temp, 'so_com_resposta')
+    gerar(pdfs, t, curadoria, so_com_resposta=True)
+    q = Pacote(t, pdfs)
+    erros = []
+    if q.relatorio.get('sem_resposta') != [] or q.manifest['contagens'].get('itens_sem_resposta_excluidos') != 0:
+        erros.append('saiu item sem resposta numa amostra em que todo item tem solução: %r'
+                     % q.relatorio.get('sem_resposta'))
+    a, b = p.manifest['arquivos'], q.manifest['arquivos']
+    if a != b:
+        erros.append('com --so-com-resposta e nada sem resposta, mudaram %s' % sorted(k for k in set(a) | set(b)
+                                                                                  if a.get(k) != b.get(k))[:3])
+    c = dict(q.manifest['contagens'])
+    c.pop('itens_sem_resposta_excluidos', None)
+    if c != p.manifest['contagens']:
+        erros.append('as contagens mudaram: %r e %r' % (p.manifest['contagens'], q.manifest['contagens']))
+    erros.extend(trava_contagens(q))
+    return erros
+
+
 def trava_curadoria(p):
     """Toda linha de curadoria desta serie achou o seu item."""
     return ['%s nao achou o item no pacote' % k for k in p.relatorio.get('curadoria_sem_item', [])]
@@ -2912,6 +2938,7 @@ def principal():
                             [] if any(i['dificuldade_origem'] == 'curadoria' and i['numero'] == 4 and i['dificuldade'] == 1
                                       for i in p.itens) else ['a linha do dificuldade.csv nao chegou ao item'])
             placar.conferir('apelidos', trava_apelidos(p))
+            placar.conferir('so-com-resposta no Portal', trava_so_com_resposta_portal(p, pdfs, temp, cur))
             placar.conferir('variantes: sem titulo, recuo, duas partes', trava_variantes(p))
             placar.conferir('bordas: expoente alto, tabela no fio, nota com fracao', trava_bordas(p))
             placar.conferir('divisa fina entre itens colados', trava_divisa_fina())

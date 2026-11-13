@@ -38,6 +38,18 @@ Travas proprias (cada uma le a pagina, e nao o detector):
   desenho     as listas do Python do que o PDF desenha sao as do pdf.js
   linha de comando  o --gabarito-externo chega ao gerador pelo principal(),
               o json mal formado e recusado, e o --fonte livros o recusa
+  só com resposta  com --so-com-resposta (depois do gabarito de fora), só
+              fica item com solução, resposta oficial ou gabarito; cada lista
+              vai de 1 a N; nenhum módulo vazio, exercício tirado ou SVG sem
+              item na busca e no manifest; contagens e relatório batem; a
+              regra do gerador em itens sintéticos de toda fonte (o módulo
+              com teoria fica)
+  dinâmica    com --sem-dinamica, as frases sintéticas de cada padrão de
+              DINAMICA_DE_SALA saem e as de história ficam; na amostra
+              trocada (dinamica=True), a questão em dupla e a de medir o
+              lápis saem com o motivo no relatório, e "o jogo terminou 3 a 1"
+              e "a turma da escola" ficam; sem as duas opções, nada delas
+              aparece no pacote
 e as genericas do Portal (determinismo, svg, xml, manifesto, tracos, PyMuPDF
 no manifest, curadoria, glifos e fidelidade no Chrome).
 """
@@ -107,8 +119,10 @@ def trava_contagens(p, vinc):
     itens = {i['id'] for i in p.itens}
     excl = {e['id'] for e in r['excluidos']}
     fora = {e['id'] for e in r['fora_do_alvo']}
+    # com --so-com-resposta, o item sem resposta tem a lista própria no relatório
+    sem_resp = {e['id'] for e in r.get('sem_resposta') or []}
     for iid in sorted(vinc):
-        if iid not in itens | excl | fora:
+        if iid not in itens | excl | fora | sem_resp:
             erros.append('%s esta no csv de vinculos e nem no pacote, nem nos excluidos, nem fora do alvo' % iid)
     for i in p.itens:
         v = vinc.get(i['id'])
@@ -695,6 +709,7 @@ def amostra(temp, placar, navegador):
            rot=' (com gabarito)')
     venenos(temp, pdfs, vinc_c, vinc, cur, placar, p)
     venenos_do_gabarito(temp, pdfs, vinc_c, cur, placar, pgab, p)
+    so_com_resposta_e_dinamica(temp, pdfs, vinc_c, vinc, cur, placar, p)
     if navegador:
         sorteio = pg.sortear_pedacos(p)
         erros, medidas = pg.trava_fidelidade(p, sorteio, temp)
@@ -868,6 +883,316 @@ def venenos_do_gabarito(temp, pdfs, vinc_c, cur, placar, boa, sem):
     q = pg.copia(boa, temp, 'vg_mexe')
     next(i for i in q.itens if 'gabarito' not in i)['tom'] = 'outro'
     placar.conferir('item sem entrada mudou', trava_gabarito(q, sem=sem), True, 'alem do campo')
+
+
+# ------------------------------------------------------------------ só com resposta
+
+def tem_resposta(it):
+    """A leitura da prova, sem o gerador: solução da fonte, resposta oficial ou gabarito com resposta."""
+    return bool(it['assets'].get('solucao')) or it.get('resposta') is not None or \
+        bool((it.get('gabarito') or {}).get('respostas'))
+
+
+def trava_so_com_resposta(p):
+    """Pacote gerado com --so-com-resposta: todo item tem resposta, cada lista
+    vai de 1 a N, nenhum módulo da busca sem item, nenhum documento da busca ou
+    SVG de item que saiu, e as contagens batem com o itens.json e o relatório."""
+    erros = []
+    ids = {i['id'] for i in p.itens}
+    for it in p.itens:
+        if not tem_resposta(it):
+            erros.append('%s: no pacote sem resposta' % it['id'])
+    listas = {}
+    for i in p.itens:
+        listas.setdefault('%s:%s' % (i['serie'], i['modulo']['slug']), []).append(i['numero'])
+    for k, ns in sorted(listas.items()):
+        if sorted(ns) != list(range(1, len(ns) + 1)):
+            erros.append('lista %s numerada %s' % (k, sorted(ns)))
+    mods_busca = set()
+    for d in p.busca['temas']:
+        if d['k'] == 'exercicio' and d['i'] not in ids:
+            erros.append('busca: o exercício %s, que não está no pacote' % d['i'])
+        if d['k'] == 'modulo':
+            mods_busca.add(d['i'])
+            if d['i'] not in listas:
+                erros.append('busca: o módulo %s ficou vazio e continua' % d['i'])
+    for k in sorted(set(listas) - mods_busca):
+        erros.append('busca: o módulo %s tem item e não tem documento' % k)
+    usados = {i['assets'][t] for i in p.itens for t in ('enunciado', 'solucao') if i['assets'].get(t)}
+    for k in sorted(p.manifest['arquivos']):
+        if k.startswith('assets/') and k not in usados:
+            erros.append('%s no pacote sem item' % k)
+    c, sr = p.manifest['contagens'], p.relatorio.get('sem_resposta')
+    if sr is None or c.get('itens_sem_resposta_excluidos') != len(sr):
+        erros.append('manifest diz itens_sem_resposta_excluidos %r e o relatório lista %r'
+                     % (c.get('itens_sem_resposta_excluidos'), None if sr is None else len(sr)))
+    if c['modulos'] != len(listas):
+        erros.append('manifest diz %d módulos e o itens.json tem %d' % (c['modulos'], len(listas)))
+    if p.manifest['series'] != sorted({i['serie'] for i in p.itens}, key=lambda s: int(s[0])):
+        erros.append('manifest com as séries %s, e os itens são de %s' % (p.manifest['series'],
+                                                                        sorted({i['serie'] for i in p.itens})))
+    for e in sr or []:
+        if e['id'] in ids:
+            erros.append('%s: tirado por falta de resposta e ainda no pacote' % e['id'])
+        if not e.get('motivo'):
+            erros.append('%s: tirado sem motivo' % e['id'])
+    em_assunto = {x for v in p.relatorio['assuntos'].values() for x in v}
+    for x in sorted(em_assunto - ids):
+        erros.append('relatório: o assunto ainda lista %s, que saiu' % x)
+    return erros
+
+
+def esperado_so_com_resposta(p):
+    """Na amostra com o gabarito de fora, ficam só os dois itens com gabarito."""
+    erros = []
+    ids = sorted(i['id'] for i in p.itens)
+    if ids != ['sme:3ano:p007', 'sme:3ano:p008:q1']:
+        erros.append('com gabarito ficaram %s, e o certo é p007 e p008:q1' % ids)
+    tirados = sorted(e['id'] for e in p.relatorio.get('sem_resposta') or [])
+    certos = ['sme:3ano:p004', 'sme:3ano:p006b', 'sme:3ano:p008:q2', 'sme:3ano:p008:q3', 'sme:3ano:p008:q8',
+              'sme:3ano:p010']
+    if tirados != certos:
+        erros.append('sem resposta saíram %s, e o certo é %s' % (tirados, certos))
+    return erros
+
+
+def trava_regra_so_com_resposta():
+    """gerar_pacote.tirar_sem_resposta em itens sintéticos de toda fonte: fica o
+    item com solução, com resposta oficial ou com gabarito; sai o sem nada e o
+    de gabarito vazio, com os SVG e a busca; o módulo com teoria fica, o
+    módulo que ficou vazio some, e o pareamento da teoria esquece a lista que sumiu."""
+    gp = cadernos_sme.gerar_pacote
+
+    def item(iid, mod, aula, **kw):
+        it = {'id': iid, 'serie': 's', 'modulo': {'slug': mod}, 'aula': {'slug': aula}, 'numero': 1, 'resposta': None,
+              'assets': {'enunciado': iid + '.svg', 'solucao': None}, 'origem': {'arquivo': 'x/' + aula + '.pdf'}}
+        it.update(kw)
+        return it
+    itens = [item('a', 'm1', 'l1', assets={'enunciado': 'a.svg', 'solucao': 'a-sol.svg'}),
+             item('b', 'm1', 'l1', resposta='C'),
+             item('c', 'm2', 'l2', gabarito={'origem': 'agente-conferido', 'respostas': [{'subitem': None, 'resposta': '3'}]}),
+             item('d', 'm3', 'l3'),
+             item('e', 'm4', 'l4', gabarito={'origem': 'agente-conferido', 'respostas': []}),
+             item('f', 'm1', 'l5')]
+    conteudo = {k: b'' for k in ('a.svg', 'a-sol.svg', 'b.svg', 'c.svg', 'd.svg', 'e.svg', 'f.svg', 'teo.svg')}
+    docs = [{'id': x, 'tipo': 'exercicio'} for x in 'abcdef'] + \
+        [{'id': 's:m%d' % n, 'tipo': 'modulo'} for n in (1, 2, 3, 4)] + [{'id': 's:m4:t:teo', 'tipo': 'teoria'}]
+    teoria = [{'id': 's:m4:t:teo', 'serie': 's', 'modulo': {'slug': 'm4'}, 'exercicios_pareados': ['s:m4:l4']},
+              {'id': 's:m1:t:teo', 'serie': 's', 'modulo': {'slug': 'm1'}, 'exercicios_pareados': ['s:m1:l1', 's:m1:l5']}]
+    fora = gp.tirar_sem_resposta(itens, conteudo, docs, teoria)
+    erros = []
+    if [i['id'] for i in itens] != ['a', 'b', 'c']:
+        erros.append('ficaram %s, e o certo é a, b, c' % [i['id'] for i in itens])
+    if [(e['id'], e['arquivo']) for e in fora] != [('d', 'l3.pdf'), ('e', 'l4.pdf'), ('f', 'l5.pdf')]:
+        erros.append('a linha do relatório: %r' % fora)
+    if sorted(conteudo) != ['a-sol.svg', 'a.svg', 'b.svg', 'c.svg', 'teo.svg']:
+        erros.append('os SVG que ficaram: %s' % sorted(conteudo))
+    if [d['id'] for d in docs] != ['a', 'b', 'c', 's:m1', 's:m2', 's:m4', 's:m4:t:teo']:
+        erros.append('a busca ficou com %s (m3 vazio sai, m4 com teoria fica)' % [d['id'] for d in docs])
+    if [t['exercicios_pareados'] for t in teoria] != [[], ['s:m1:l1']]:
+        erros.append('o pareamento da teoria: %r' % [t['exercicios_pareados'] for t in teoria])
+    if gp.tirar_sem_resposta(itens, conteudo, docs, teoria) != [] or len(itens) != 3:
+        erros.append('a segunda passada tirou mais alguma coisa')
+    return erros
+
+
+# ------------------------------------------------------------------ dinâmica de sala
+
+# frases sintéticas, uma ou mais por padrão de cadernos_sme.DINAMICA_DE_SALA, e
+# as palavras de história que não podem tirar o item (None)
+CASOS_DINAMICA = (
+    ('1. Em dupla, resolvam os problemas.', 'trabalho em grupo ou dupla'),
+    ('Com o seu grupo, montem uma tabela.', 'trabalho em grupo ou dupla'),
+    ('Converse com um colega sobre a resposta.', 'trabalho com colegas'),
+    ('Compare a sua resposta com a de um colega.', 'trabalho com colegas'),
+    ('Peça ao professor uma folha.', 'trabalho com colegas'),
+    ('Con-\nversem com a turma.', 'trabalho com colegas'),
+    ('Vamos jogar? Cada um lança o dado na sua vez.', 'jogo para jogar'),
+    ('Lance o dado e ande as casas.', 'jogo para jogar'),
+    ('Recorte as peças e monte o quebra-cabeça.', 'material para recortar'),
+    ('Faça uma pesquisa sobre a fruta preferida.', 'pesquisa com a turma'),
+    ('Pergunte a dez colegas a idade deles.', 'pesquisa com a turma'),
+    ('Quantos alunos há na sua turma?', 'pesquisa com a turma'),
+    ('O professor vai ditar alguns números.', 'atividade conduzida pelo professor'),
+    ('Ouça o que o professor vai ler.', 'atividade conduzida pelo professor'),
+    ('Use o material dourado para representar 125.', 'material concreto'),
+    ('Monte um triângulo com três palitos.', 'material concreto'),
+    ('Meça a sua carteira com palmos.', 'medir objetos da sala'),
+    ('Meça o comprimento do seu lápis.', 'medir objetos da sala'),
+    ('A turma da escola tem 30 alunos. Quantas filas de 6?', None),
+    ('O jogo terminou 3 a 1. Quantos gols foram marcados?', None),
+    ('A professora dividiu os 28 alunos em grupos de 4. Quantos grupos?', None),
+    ('Em grupos de 5, quantos grupos formam 35 crianças?', None),
+    ('Ana fez um quadrado com 12 palitos. Quantos palitos em cada lado?', None),
+    ('A professora vai ler 3 livros por mês. Quantos em um ano?', None),
+    ('Pedro joga futebol com os amigos todo sábado.', None),
+    ('Meça o segmento AB com a régua e escreva a medida.', None),
+    ('Observe o recorte do mapa e responda.', None),
+    ('O número em destaque é o maior.', None),
+    ('Dobre o número 14.', None),
+    ('A sala de Ana tem 6 fileiras de 5 carteiras.', None),
+)
+# na amostra com dinamica=True: o que sai pela dinâmica de sala, com o rótulo, e o que fica
+DINAMICA_NA_AMOSTRA = {'sme:3ano:p008:q2': 'medir objetos da sala', 'sme:3ano:p008:q3': 'trabalho em grupo ou dupla'}
+HISTORIA_NA_AMOSTRA = ('sme:3ano:p008:q8', 'sme:3ano:p010')  # "o jogo terminou 3 a 1", "a turma da escola"
+
+
+def trava_casos_dinamica():
+    erros = []
+    for texto, certo in CASOS_DINAMICA:
+        r = cadernos_sme.dinamica_de_sala(texto)
+        if (r[0] if r else None) != certo:
+            erros.append('%r: %s, e o certo é %s' % (texto, 'tirou por %r' % (r,) if r else 'ficou',
+                                                    'tirar por %r' % certo if certo else 'ficar'))
+    return erros
+
+
+def trava_dinamica(p):
+    """A amostra com dinamica=True gerada com --sem-dinamica: a dinâmica de sala
+    sai com o motivo no relatório, a palavra de história fica, nada mais sai
+    por ela, e a contagem do manifest bate."""
+    erros = []
+    ids = {i['id'] for i in p.itens}
+    exc = {e['id']: e['motivo'] for e in p.relatorio['excluidos']}
+    for iid, rot in sorted(DINAMICA_NA_AMOSTRA.items()):
+        if iid in ids:
+            erros.append('%s: dinâmica de sala no pacote' % iid)
+        elif not exc.get(iid, '').startswith('dinâmica de sala (%s): ' % rot):
+            erros.append('%s: fora do pacote sem o motivo da dinâmica de sala (%r)' % (iid, exc.get(iid)))
+    for iid in HISTORIA_NA_AMOSTRA:
+        if iid not in ids:
+            erros.append('%s: a palavra de história tirou o item (%r)' % (iid, exc.get(iid)))
+    din = sorted(k for k, m in exc.items() if m.startswith('dinâmica de sala'))
+    extra = [k for k in din if k not in DINAMICA_NA_AMOSTRA]
+    if extra:
+        erros.append('a dinâmica de sala tirou também %s' % extra)
+    if p.manifest['contagens'].get('itens_dinamica_de_sala_excluidos') != len(din):
+        erros.append('manifest diz itens_dinamica_de_sala_excluidos %r e o relatório tem %d'
+                     % (p.manifest['contagens'].get('itens_dinamica_de_sala_excluidos'), len(din)))
+    return erros
+
+
+def sem_opcao_nada_muda(p):
+    """O pacote sem --so-com-resposta e sem --sem-dinamica não ganha campo nenhum delas."""
+    erros = []
+    for k in ('itens_sem_resposta_excluidos', 'itens_dinamica_de_sala_excluidos'):
+        if k in p.manifest['contagens']:
+            erros.append('sem a opção, o manifest ganhou %s' % k)
+    if 'sem_resposta' in p.relatorio:
+        erros.append('sem a opção, o relatório ganhou sem_resposta')
+    if any(e['motivo'].startswith('dinâmica de sala') for e in p.relatorio['excluidos']):
+        erros.append('sem a opção, saiu item pela dinâmica de sala')
+    return erros
+
+
+def so_com_resposta_e_dinamica(temp, pdfs, vinc_c, vinc, cur, placar, boa):
+    gp = cadernos_sme.gerar_pacote
+    placar.conferir('cadernos: sem as duas opções, nada delas no pacote', sem_opcao_nada_muda(boa))
+    placar.conferir('so-com-resposta: a regra do gerador em itens sintéticos', trava_regra_so_com_resposta())
+    s = os.path.join(temp, 's')
+    gerar_amostra(pdfs, vinc_c, s, cur, gabarito_externo=GABARITO_DA_AMOSTRA, so_com_resposta=True)
+    ps = pg.Pacote(s, pdfs)
+    placar.conferir('cadernos: so-com-resposta tira só o item sem resposta', esperado_so_com_resposta(ps))
+    placar.conferir('cadernos: so-com-resposta sem módulo vazio e com as contagens', trava_so_com_resposta(ps))
+    travas(ps, vinc, placar, zip_caminho=os.path.join(s + '_zip', 'matematica-cadernos-sme-sp-v1.zip'),
+           rot=' (so com resposta)')
+    placar.conferir('cadernos: so-com-resposta, o gabarito de fora intacto',
+                    trava_gabarito(ps, GABARITO_DA_AMOSTRA))
+    # venenos do so-com-resposta
+    sem_gab = next(i for i in boa.itens if i['id'] == 'sme:3ano:p004')
+    q = pg.copia(ps, temp, 'vs_item')
+    q.itens.append(sem_gab)
+    placar.conferir('item sem resposta no pacote', trava_so_com_resposta(q), True, 'sem resposta')
+    q = pg.copia(ps, temp, 'vs_modulo')
+    q.busca['temas'].append({'i': 'sme:3ano:sme-sequencia-vazia', 'k': 'modulo'})
+    placar.conferir('módulo vazio na busca', trava_so_com_resposta(q), True, 'ficou vazio')
+    q = pg.copia(ps, temp, 'vs_busca')
+    q.busca['temas'].append({'i': 'sme:3ano:p004', 'k': 'exercicio'})
+    placar.conferir('exercício tirado na busca', trava_so_com_resposta(q), True, 'não está no pacote')
+    q = pg.copia(ps, temp, 'vs_svg')
+    q.manifest['arquivos'][sem_gab['assets']['enunciado']] = 'sha256:0'
+    placar.conferir('SVG de item tirado no pacote', trava_so_com_resposta(q), True, 'sem item')
+    q = pg.copia(ps, temp, 'vs_numero')
+    q.itens[0]['numero'] = 2
+    placar.conferir('lista com buraco na numeração', trava_so_com_resposta(q), True, 'numerada')
+    q = pg.copia(ps, temp, 'vs_contagem')
+    q.manifest['contagens']['itens_sem_resposta_excluidos'] = 0
+    placar.conferir('contagem de sem resposta errada', trava_so_com_resposta(q), True, 'itens_sem_resposta_excluidos')
+    q = pg.copia(ps, temp, 'vs_some')
+    q.relatorio['sem_resposta'] = q.relatorio['sem_resposta'][1:]
+    placar.conferir('item tirado sumido do relatório', trava_contagens(q, vinc), True, 'nem no pacote')
+    # a regra que esquece o gabarito de fora tira o que tinha resposta
+    antes = gp.tem_resposta
+    gp.tem_resposta = lambda it: bool((it.get('assets') or {}).get('solucao'))
+    try:
+        t = os.path.join(temp, 'vs_regra')
+        gerar_amostra(pdfs, vinc_c, t, cur, gabarito_externo=GABARITO_DA_AMOSTRA, so_com_resposta=True)
+        q = pg.Pacote(t, pdfs)
+    finally:
+        gp.tem_resposta = antes
+    placar.conferir('so-com-resposta que ignora o gabarito', esperado_so_com_resposta(q), True, 'com gabarito')
+    # a dinâmica de sala: as frases sintéticas e a amostra trocada
+    placar.conferir('dinâmica de sala: as frases de cada padrão e as de história', trava_casos_dinamica())
+    pd = os.path.join(temp, 'pdfs_dinamica')
+    fazer_amostra_cadernos.fazer(pd, dinamica=True)
+    d = os.path.join(temp, 'd')
+    gerar_amostra(pd, vinc_c, d, cur, sem_dinamica=True)
+    pdin = pg.Pacote(d, pd)
+    placar.conferir('cadernos: dinâmica de sala fora, com o motivo, e a história fica', trava_dinamica(pdin))
+    travas(pdin, vinc, placar, zip_caminho=os.path.join(d + '_zip', 'matematica-cadernos-sme-sp-v1.zip'),
+           rot=' (sem dinamica)')
+    # venenos da dinâmica de sala
+    t = os.path.join(temp, 'vd_sem')
+    gerar_amostra(pd, vinc_c, t, cur)
+    q = pg.Pacote(t, pd)
+    placar.conferir('dinâmica de sala sem a opção', trava_dinamica(q), True, 'no pacote')
+    q = pg.copia(pdin, temp, 'vd_motivo')
+    for e in q.relatorio['excluidos']:
+        if e['id'] == 'sme:3ano:p008:q3':
+            e['motivo'] = 'fora'
+    placar.conferir('dinâmica fora sem o motivo', trava_dinamica(q), True, 'sem o motivo')
+    ingenuo = cadernos_sme.DINAMICA_DE_SALA + (('palavra solta', re.compile(r'\bjogo\b|\bturma\b')),)
+    t = os.path.join(temp, 'vd_ingenuo')
+    com('DINAMICA_DE_SALA', ingenuo, lambda: gerar_amostra(pd, vinc_c, t, cur, sem_dinamica=True))
+    q = pg.Pacote(t, pd)
+    placar.conferir('palavra de história tira o item', trava_dinamica(q), True, 'palavra de história')
+    placar.conferir('padrão solto nas frases', com('DINAMICA_DE_SALA', ingenuo, trava_casos_dinamica),
+                    True, 'ficar')
+    placar.conferir('lista de padrões vazia', com('DINAMICA_DE_SALA', (), trava_casos_dinamica), True, 'tirar por')
+    q = pg.copia(pdin, temp, 'vd_contagem')
+    q.manifest['contagens']['itens_dinamica_de_sala_excluidos'] = 0
+    placar.conferir('contagem da dinâmica errada', trava_dinamica(q), True, 'itens_dinamica_de_sala_excluidos')
+    # a linha de comando: as duas opções chegam ao gerador, e as fontes erradas recusam
+    arq = os.path.join(temp, 'gabarito_s.json')
+    with io.open(arq, 'w', encoding='utf-8') as f:
+        json.dump(GABARITO_DA_AMOSTRA, f, ensure_ascii=False)
+    antes = gp.confere_versao_do_pymupdf
+    gp.confere_versao_do_pymupdf = lambda versao=None: None
+    try:
+        t = os.path.join(temp, 'cli_s')
+        gp.principal(['--fonte', 'cadernos-sme-sp', '--pdfs', pd, '--vinculos', vinc_c, '--curadoria', cur,
+                      '--versao', '1', '--saida', t + '_zip', '--trabalho', t, '--gerado-em',
+                      '2026-11-13T00:00:00-03:00', '--commit', 'amostra', '--sem-zip', '--gabarito-externo', arq,
+                      '--so-com-resposta', '--sem-dinamica'])
+        q = pg.Pacote(t, pd)
+        c = q.manifest['contagens']
+        placar.conferir('linha de comando: --so-com-resposta e --sem-dinamica chegam ao pacote',
+                        trava_so_com_resposta(q) +
+                        ([] if (c.get('itens_dinamica_de_sala_excluidos'), sorted(i['id'] for i in q.itens)) ==
+                         (2, ['sme:3ano:p007', 'sme:3ano:p008:q1']) else ['contagens %r, itens %s' % (
+                             c, sorted(i['id'] for i in q.itens))]))
+        r = recusa_do_gerador(lambda: gp.principal(['--fonte', 'livros', '--planilha', 'x.csv', '--rotulo', 'x',
+                                                    '--versao', '1', '--saida', os.path.join(temp, 'livros'),
+                                                    '--so-com-resposta']))
+        placar.conferir('linha de comando: --fonte livros recusa o --so-com-resposta', [r] if r else [], True,
+                        'não vale com --fonte livros')
+        r = recusa_do_gerador(lambda: gp.principal(['--fonte', 'portal', '--pdfs', pd, '--serie', '9ano',
+                                                    '--curadoria', cur, '--versao', '1',
+                                                    '--saida', os.path.join(temp, 'portal'), '--sem-dinamica']))
+        placar.conferir('linha de comando: --sem-dinamica fora dos cadernos recusa', [r] if r else [], True,
+                        'só vale com --fonte cadernos-sme-sp')
+    finally:
+        gp.confere_versao_do_pymupdf = antes
 
 
 def linha_de_comando(temp, pdfs, vinc_c, cur, placar):

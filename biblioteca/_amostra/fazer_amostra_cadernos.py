@@ -38,6 +38,13 @@ texto do numero; a questao 5 tem o credito da foto em 8 pt, girado, sem
 palavra de credito, encostado na foto.
 Toda pagina de conteudo tem o rodape corrido: o numero da pagina, a linha
 "cadernos de apoio e aprendizagem SMESP" e o numero por extenso.
+
+Com dinamica=True (a prova do --sem-dinamica), o mesmo caderno com tres
+frases trocadas, na mesma posição: a questão 3 da revisão manda jogar em
+dupla ("Em dupla, joguem o dado."), que é dinâmica de sala; a questão 8 e a
+revisão da p10 ganham palavras de história ("O jogo terminou 3 a 1", "A turma
+da escola tem 30 alunos"), que não tiram nada. A questão 2 ("Meca o lapis em
+centimetros.") já é dinâmica de sala nos dois: medir objeto da sala.
 """
 import os
 import sys
@@ -86,7 +93,7 @@ def foto(pg, r):
     pg.insert_image(pymupdf.Rect(r), pixmap=pix)
 
 
-def fazer(pasta):
+def fazer(pasta, dinamica=False):
     os.makedirs(pasta, exist_ok=True)
     doc = pymupdf.open()
     # p1 capa
@@ -156,7 +163,7 @@ def fazer(pasta):
     pg.draw_line((116, 160), (480, 160), color=(0.5, 0.51, 0.52), width=0.5)  # linha de resposta fina
     item(pg, 100, 190, 2, 'Meca o lapis em centimetros.')
     pg.draw_rect(pymupdf.Rect(380, 165, 500, 230), color=(0.7, 0.2, 0.5), width=1.5)  # sobe 8 pt acima do "2."
-    item(pg, 100, 270, 3, 'Joao tem 5 reais.')
+    item(pg, 100, 270, 3, 'Em dupla, joguem o dado.' if dinamica else 'Joao tem 5 reais.')
     item(pg, 310, 270, 4, 'Ana tem 3 reais.')
     texto(pg, 116, 286, 'Quanto falta para 10?')
     texto(pg, 326, 286, 'Quanto falta para 10?')
@@ -172,14 +179,15 @@ def fazer(pasta):
     pg = doc.new_page(width=W, height=H)
     desenho(pg, (150, 90, 400, 200), cor=(0.3, 0.3, 0.7))
     item(pg, 100, 230, 8, 'Quantos lados tem a figura desenhada acima?')
-    texto(pg, 116, 246, 'Escreva o numero de lados.')
+    texto(pg, 116, 246, 'O jogo terminou 3 a 1; escreva o numero de lados.' if dinamica else 'Escreva o numero de lados.')
     item(pg, 100, 320, 9, 'Some 5 ao numero de lados da figura da questao anterior.')
     texto(pg, 116, 336, 'Escreva a conta.')
     rodape(pg, 9)
     # p10: outra revisao, com enunciado comum antes da questao 1 (sai inteira)
     pg = doc.new_page(width=W, height=H)
     texto(pg, 100, 90, 'AGORA, E COM VOCE', corpo=26, fonte='hebo')
-    texto(pg, 100, 125, 'Use a tabela abaixo nas questoes 1 e 2.')
+    texto(pg, 100, 125, 'A turma da escola tem 30 alunos. Use a tabela nas questoes 1 e 2.' if dinamica
+          else 'Use a tabela abaixo nas questoes 1 e 2.')
     desenho(pg, (110, 140, 400, 220), cor=(0.4, 0.2, 0.6))
     item(pg, 100, 250, 1, 'Qual coluna tem o maior valor?')
     item(pg, 100, 300, 2, 'Quanto a primeira coluna tem a mais que a segunda?')
