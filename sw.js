@@ -170,6 +170,7 @@
  * O v187 traz o conteúdo escrito no pedido do planejamento valendo como o do aviso.
  * O v192 traz a página do assunto na Biblioteca (B1).
  * O v195 traz a ligação de assunto entre matérias com a versão 1.42.115.
+ * O v199 traz a janela PDF pronto e as próximas aulas no Gerar material da Biblioteca.
  * O v201 é o último escrito à mão: o 13f passa a gerar VERSAO e CACHE na publicação,
  * com 1.42.121 e v201 como valores fixos e piso.
  *
