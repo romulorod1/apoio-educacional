@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.112';
+  var VERSAO = '1.42.117';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -84,6 +84,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.117',
+      itens: [
+        'No livro aberto com o zoom alto, a letra fica nítida assim que você para de rolar, e a página seguinte já está pronta antes de você chegar nela. O livro escaneado aparece logo, primeiro mais suave e em seguida nítido.'
+      ]
+    },
     {
       versao: '1.42.112',
       itens: [

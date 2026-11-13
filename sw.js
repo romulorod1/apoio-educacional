@@ -168,8 +168,9 @@
  * O v186 traz a pinça e o duplo toque no livro aberto.
  * O v187 traz o conteúdo escrito no pedido do planejamento valendo como o do aviso.
  * O v192 traz a página do assunto na Biblioteca (B1).
+ * O v197 traz a letra nítida no zoom alto do livro, a página seguinte pré-desenhada e o escaneado em duas passadas.
  */
-var CACHE = 'apoio-educacional-v192';
+var CACHE = 'apoio-educacional-v197';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
