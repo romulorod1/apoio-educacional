@@ -71,7 +71,7 @@ const RASCUNHO_SAIDA = "      guardarRascunhoRelato(aulaEmEdicao, $('#campo-nota
 const RETRATO = '    chaves.forEach(function (k) { s[k] = valores[k]; });';
 const ABERTURA = '      if (aberturaDaAula) {';
 const VOLTOU = '      return (sobrescritosPelaJanela[k] || []).indexOf(noBanco[k]) >= 0;';
-const DESFAZ = "(escopo === 'esta' ? comDesfazerDaAula(rotulo, aula.id, acaoDaAula) : comDesfazer(rotulo, acaoDaAula))";
+const DESFAZ = "(escopo === 'esta' ? comDesfazerDaAula(rotulo, aula.id, acaoDaAula) : comDesfazer(rotulo, acaoDaAula, true))";
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 conf('(arranjo) as âncoras dos venenos estão cada uma num lugar só',
   [CONFERE, REBASE, RASCUNHO_SAIDA, RETRATO, ABERTURA, VOLTOU, DESFAZ].map(a => APP.split(a).length).join(','), '2,2,2,2,2,2,2');
