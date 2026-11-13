@@ -4012,6 +4012,25 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bibl-sumario-cabeca { display: flex; align-items: baseline; gap: 12px; padding: 4px 12px 8px; }
 .bibl-sumario-cabeca .bibl-apoio { margin-left: auto; }
 .bibl-sem-sumario { padding: 0 12px; }
+/* fase 1a da nuvem: onde ela estava antes da atualização, e as correções órfãs (uma linha discreta, recolhida) */
+#bib-livro-onde-estava { margin: 0 0 8px; padding: 0 12px; }
+.bibl-orfas { padding: 0 12px 8px; min-width: 0; }
+.bibl-orfas-linha {
+  display: block; width: 100%; min-height: var(--alvo); padding: 8px 0; border: 0; background: transparent;
+  font: inherit; font-size: var(--letra-14); color: var(--muted); text-align: left; text-decoration: underline;
+  text-underline-offset: 3px; overflow-wrap: anywhere; cursor: pointer;
+}
+.bibl-orfa { padding: 8px 0; border-top: 1px solid var(--fio-claro); min-width: 0; }
+.bibl-orfa-texto { margin: 0 0 8px; font-size: var(--letra-14); color: var(--texto); overflow-wrap: anywhere; }
+.bibl-orfa-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.bibl-orfa-acoes .btn { max-width: 100%; white-space: normal; }
+.bibl-orfa-pergunta { margin-top: 8px; padding: 8px 12px; border-radius: var(--raio); background: var(--soft); }
+.bibl-orfa-capitulos { display: flex; flex-direction: column; margin-top: 8px; }
+.bibl-orfa-capitulo {
+  min-height: var(--alvo); padding: 8px 12px; border: 0; border-top: 1px solid var(--fio-claro); background: transparent;
+  font: inherit; font-size: var(--letra-14); color: var(--texto); text-align: left; overflow-wrap: anywhere; cursor: pointer;
+}
+.bibl-orfa-capitulo:hover { background: var(--soft); }
 .bibl-cap, .bibl-sec {
   display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline;
   width: 100%; min-height: var(--alvo); padding: 10px 12px; border: 0; border-top: 1px solid var(--fio-claro);
