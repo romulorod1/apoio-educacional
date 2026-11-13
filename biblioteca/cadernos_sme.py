@@ -688,7 +688,31 @@ def recortar(doc, fs, cache):
             lado = None
         if lado and not motivo:
             motivo = 'o recorte corta tinta na borda %s (p. %d do PDF): a atividade encosta na vizinha' % (lado, p + 1)
+        corte = desenho_cortado(doc, p, r, cache) if CONFERE_BORDA else None
+        if corte and not motivo:
+            motivo = 'o recorte corta um desenho na borda %s (p. %d do PDF): %s' % (corte[0], p + 1, corte[1])
     return out, motivo
+
+
+def desenho_cortado(doc, pno, r, cache):
+    """(lado, explicacao) do desenho visivel que a borda de cima ou de baixo do
+    recorte atravessa, ou None.
+
+    A conferencia pela tinta (borda_que_corta) so ve o escuro: as bolhas de
+    resposta em azul claro do 2o ano, p. 17, descem ate o rodape (y 729) e o
+    recorte acabava na linha escura de y 691, cortando-as sem aviso (achado da
+    prova de cobertura do C5). O desenho alto (fio lateral da pagina, mais de
+    300 pt) nao conta: ele atravessa unidades de proposito."""
+    H = doc[pno].rect.height
+    for y0, y1, x0, x1 in desenhos_visiveis(doc, pno, cache) + imagens_inteiras(doc, pno, cache):
+        if y1 - y0 > 300 or x1 <= r[0] or x0 >= r[2]:
+            continue
+        # na beira da pagina nao ha o que cortar (a imagem sangra para fora)
+        if r[1] > 1 and y0 < r[1] - 1.5 and y1 > r[1] + 2:
+            return 'de cima', 'desenho de y %.0f a %.0f' % (y0, y1)
+        if r[3] < H - 1 and y0 < r[3] - 2 and y1 > r[3] + 1.5:
+            return 'de baixo', 'desenho de y %.0f a %.0f' % (y0, y1)
+    return None
 
 
 def creditos(doc, ps):

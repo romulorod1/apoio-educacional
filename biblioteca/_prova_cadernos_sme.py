@@ -538,8 +538,14 @@ def venenos(temp, pdfs, vinc_c, vinc, cur, placar, boa):
     q = com('IMAGEM_ACIMA_E_DA_SEGUINTE', False, lambda: gera('imagem_acima'))
     placar.conferir('desenho da questao 8 na questao 7', trava_continuacao(q), True, 'so tem desenho')
     # sem o selo como rodape, o topo do circulo do numero da pagina entra no recorte
-    q = com('SELO_DO_RODAPE', False, lambda: gera('selo'))
+    # (a conferencia de borda do gerador sai junto: ela ve o selo cortado e tira a unidade)
+    q = com('CONFERE_BORDA', False, lambda: com('SELO_DO_RODAPE', False, lambda: gera('selo')))
     placar.conferir('selo do numero da pagina no recorte', trava_corrido(q), True, 'selo')
+    # e a borda do gerador e a rede: sem o selo como rodape, a unidade cortada sai com motivo
+    q = com('SELO_DO_RODAPE', False, lambda: gera('selo_rede'))
+    motivos = ' '.join(e['motivo'] for e in q.relatorio['excluidos'])
+    placar.conferir('sem o selo, a borda do gerador tira a unidade que o corta',
+                    [] if 'corta um desenho na borda de baixo' in motivos else ['nada saiu pelo desenho: %r' % motivos[:80]])
     # o credito de 8 pt encostado na foto so e pego pela regra da imagem
     q = com('CREDITO_GIRADO_IMAGEM', 7.0, lambda: gera('credito8'))
     placar.conferir('credito de 8 pt junto da foto', trava_credito(q), True, 'Beltrano')
