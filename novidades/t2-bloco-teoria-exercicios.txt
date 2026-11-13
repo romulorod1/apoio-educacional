@@ -1,0 +1,3 @@
+# T2 (frente Listas): o bloco "Teoria e exercícios" na página do assunto.
+Na página do assunto, cada exercício aparece grande, com a dificuldade em pontos e a sua etiqueta por cima, e a caixa No material para montar a aula; a teoria e a OBMEP também, e as questões do ENEM ficam numa parte só delas.
+Quando um assunto ainda não tem material próprio, como "Volume e capacidade" do 8º ano, a página mostra o dos assuntos vizinhos e diz de onde ele veio.
