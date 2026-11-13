@@ -2,9 +2,13 @@
  *
  * Exercita o fluxo REAL de mostrarNovidades() e da política de novidades
  * no navegador com Chrome e perfil isolado:
- * 1. Perfil legado (versaoVista = '1.17.0'): não exibe pop-up requentando
- *    novidades de Português (1.18.0) e atualiza versaoVista silenciosamente.
- * 2. Perfil novo (sem versaoVista): inicialização limpa, sem pop-up, grava versão atual.
+ * 1. Perfil novo (sem versaoVista): inicialização limpa, sem pop-up, grava versão atual.
+ * 2. Perfil atualizando de uma versão antiga (1.27.0): a janela abre com a
+ *    novidade mais nova e sem requentar a de Português (1.18.0).
+ * 2b. Perfil que PULOU duas versões (13f): a janela mostra as DUAS novidades,
+ *    da mais nova para a mais antiga, e não a da versão que ela já tinha visto.
+ * 2c. Lançamento silencioso: sem novidade depois da versão vista, a janela não
+ *    abre e a versão vista anda sozinha.
  * 3. Perfil já na versão atual: silencioso, sem pop-up.
  * 4. Verificação no DOM de que as frases de contagem não duplicam números (UX12).
  */
@@ -13,20 +17,22 @@ const H = require('./_bib_navegador');
 const amb = H.criarAmbiente(8829, 'nath_t03_novidades');
 const { conf, secao, esperar, pausa } = H;
 
-/* A versão e a entrada de NOVIDADES dela saem do próprio app.js, e não de
- * um número escrito aqui: cravar '1.28.0' fazia este teste reprovar a cada
- * release (aconteceu na 1.29.0, B14). */
-const APP_TEXTO = require('fs').readFileSync(require('path').join(H.RAIZ, 'app.js'), 'utf8');
+/* A versão e as NOVIDADES saem do próprio app.js, e não de um número escrito
+ * aqui: cravar '1.28.0' fazia este teste reprovar a cada release (aconteceu na
+ * 1.29.0, B14). */
+const APP_TEXTO = require('fs').readFileSync(require('path').join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 const VERSAO = (APP_TEXTO.match(/var VERSAO = '([^']+)'/) || [])[1];
-const ENTRADA = (() => {
-  const i = APP_TEXTO.indexOf("versao: '" + VERSAO + "'");
-  return i < 0 ? '' : APP_TEXTO.slice(i, APP_TEXTO.indexOf('\n    }', i));
+const NOVIDADES = (() => {
+  const i = APP_TEXTO.indexOf('var NOVIDADES = [');
+  const j = APP_TEXTO.indexOf('\n  ];', i);
+  if (i < 0 || j < 0) return [];
+  return require('vm').runInNewContext('(' + APP_TEXTO.slice(i + 'var NOVIDADES = '.length, j + 4) + ')');
 })();
-const ENTRADA_TEM_SLIDES = /slides:\s*\[/.test(ENTRADA);
-const SILENCIOSA = !ENTRADA;
-/* Um pedaço do primeiro item, para conferir que a janela mostra a entrada
- * da versão atual: as primeiras palavras do primeiro texto entre aspas. */
-const TRECHO_DA_ENTRADA = ((ENTRADA.match(/'([^'\n]{20,})'/) || [])[1] || '').slice(0, 30);
+const antes = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let k = 0; k < 3; k++) if (x[k] !== y[k]) return x[k] < y[k]; return false; };
+/* As que a janela mostra para quem viu `vista`: versão maior que a vista e não
+ * maior que a atual, com itens, na ordem do NOVIDADES (a mais nova primeiro). */
+const mostraveis = vista => NOVIDADES.filter(n => antes(vista, n.versao) && !antes(VERSAO, n.versao) && n.itens && n.itens.length);
+const trecho = n => String(n.itens[0]).slice(0, 30);
 
 async function obterBanco(pag) {
   return pag.evaluate(() => new Promise(resolve => {
@@ -93,60 +99,64 @@ async function conteudoModal(pag) {
 
     const bancoNovo = await obterBanco(pag);
     conf('perfil novo gravou versaoVista no banco', !!(bancoNovo && bancoNovo.ajustes && bancoNovo.ajustes.versaoVista), true);
-    /* Lançamento silencioso: a versão pode não ter entrada em NOVIDADES (a
-     * 1.42.12 só troca o ícone do endereço novo, e o item falaria do endereço
-     * novo no tablet dela pelo antigo, o que o dono vetou). Aí a prova confere o
-     * contrário: a janela NÃO abre e a versão vista anda sozinha. */
-    if (SILENCIOSA) conf('li a versão no app.js; ela não tem entrada em NOVIDADES (lançamento silencioso)', !!VERSAO && !ENTRADA, true);
-    else conf('li a versão e a entrada dela no app.js', !!VERSAO && !!ENTRADA && TRECHO_DA_ENTRADA.length >= 20, true);
+    conf('li a versão e as NOVIDADES no app.js (controle: mais de 10 entradas)', !!VERSAO && NOVIDADES.length > 10, true);
     conf('versaoVista do perfil novo é a versão atual', bancoNovo.ajustes.versaoVista, VERSAO);
 
-    secao('2. Perfil atualizando de versão anterior (versaoVista = 1.27.0)');
-    await gravarVersaoVista(pag, '1.27.0');
-    const bancoAntes = await obterBanco(pag);
-    conf('banco configurado com versaoVista anterior 1.27.0', bancoAntes.ajustes.versaoVista, '1.27.0');
-
-    // Recarrega o aplicativo para disparar inicialização real
-    await pag.reload({ waitUntil: 'networkidle0' });
-    await esperar('o aplicativo recarregou', () => pag.evaluate(() =>
-      !!document.querySelector('#abas .aba') && typeof Store === 'object'
-    ), v => v === true, 30000);
-
-    // Aguarda a rotina de novidades
-    await pausa(1500);
-
-    const abertoAtualizacao = await modalAberto(pag);
-    if (SILENCIOSA) {
-      conf('perfil atualizando para ' + VERSAO + ' (silenciosa) NÃO abre a janela de novidades', abertoAtualizacao, false);
-      const bancoSil = await obterBanco(pag);
-      conf('na silenciosa, a versaoVista anda sozinha para ' + VERSAO, bancoSil.ajustes.versaoVista, VERSAO);
-    } else {
-    conf('perfil atualizando para ' + VERSAO + ' abre a janela de novidades', abertoAtualizacao, true);
-
-    const textoModal = await conteudoModal(pag);
-    conf('modal não contém novidade requentada de Português (1.18.0)', textoModal.indexOf('Português') === -1, true);
-    conf('modal contém a novidade de ' + VERSAO, textoModal.indexOf(TRECHO_DA_ENTRADA) !== -1, true);
-
-    if (ENTRADA_TEM_SLIDES) {
-      // Carrossel: o Entendi avança, e o Voltar aparece a partir do slide 2
-      await pag.click('#entendi-novidades');
-      await pausa(300);
-      const textoBotaoVoltar = await pag.evaluate(() => {
-        const b = document.querySelector('#btn-carrossel-voltar');
-        return b ? window.getComputedStyle(b).display : 'none';
-      });
-      conf('botão Voltar fica visível a partir do slide 2', textoBotaoVoltar !== 'none', true);
-      await pag.click('#modal-novidades [data-fechar]');
-    } else {
-      // Lista: o Entendi fecha e grava a versão vista
-      await pag.click('#entendi-novidades');
+    /* Grava a versão vista, recarrega e devolve o que a janela mostrou. */
+    async function abrirCom(vista) {
+      await gravarVersaoVista(pag, vista);
+      await pag.reload({ waitUntil: 'networkidle0' });
+      await esperar('o aplicativo recarregou', () => pag.evaluate(() =>
+        !!document.querySelector('#abas .aba') && typeof Store === 'object'
+      ), v => v === true, 30000);
+      await pausa(1500);
+      return { aberto: await modalAberto(pag), texto: await conteudoModal(pag) };
     }
-    await pausa(400);
-    const abertoAposFechar = await modalAberto(pag);
-    conf('modal fechou com sucesso', abertoAposFechar, false);
+    async function fecharComEntendi(comSlides) {
+      if (comSlides) await pag.click('#modal-novidades [data-fechar]');
+      else await pag.click('#entendi-novidades');
+      await pausa(400);
+    }
 
-    const bancoDepois = await obterBanco(pag);
-    conf('versaoVista foi atualizada para ' + VERSAO + ' no banco', bancoDepois.ajustes.versaoVista, VERSAO);
+    secao('2. Perfil atualizando de versão anterior (versaoVista = 1.27.0)');
+    const de127 = mostraveis('1.27.0');
+    conf('controle: há novidade depois da 1.27.0 no app.js', de127.length > 0, true);
+    let r = await abrirCom('1.27.0');
+    conf('perfil atualizando de 1.27.0 para ' + VERSAO + ' abre a janela de novidades', r.aberto, true);
+    const comSlides = !!(de127[0] && de127[0].slides && de127[0].slides.length);
+    if (!comSlides) {
+      conf('modal não contém novidade requentada de Português (1.18.0)', r.texto.indexOf('Português') === -1, true);
+      conf('modal contém a novidade mais nova (' + de127[0].versao + ')', r.texto.indexOf(trecho(de127[0])) !== -1, true);
+    }
+    await fecharComEntendi(comSlides);
+    conf('modal fechou com sucesso', await modalAberto(pag), false);
+    if (!comSlides) conf('versaoVista foi atualizada para ' + VERSAO + ' no banco', (await obterBanco(pag)).ajustes.versaoVista, VERSAO);
+
+    secao('2b. Perfil que pulou duas versões: as duas novidades, na ordem (13f)');
+    // As três entradas mais novas com itens e sem carrossel: ela viu a terceira.
+    const lista = NOVIDADES.filter(n => !antes(VERSAO, n.versao) && n.itens && n.itens.length && !(n.slides && n.slides.length));
+    conf('controle: há três entradas de lista no app.js', lista.length >= 3, true);
+    const [n1, n2, n3] = lista;
+    const esperadas = mostraveis(n3.versao);
+    conf('controle: pulando de ' + n3.versao + ', as que contam são ' + n1.versao + ' e ' + n2.versao,
+      esperadas.map(n => n.versao).join(','), [n1.versao, n2.versao].join(','));
+    r = await abrirCom(n3.versao);
+    conf('quem pulou duas versões vê a janela', r.aberto, true);
+    const p1 = r.texto.indexOf(trecho(n1)), p2 = r.texto.indexOf(trecho(n2));
+    conf('a janela mostra a novidade de ' + n1.versao, p1 !== -1, true);
+    conf('e a de ' + n2.versao + ', que antes do 13f se perdia', p2 !== -1, true);
+    conf('na ordem: a mais nova primeiro', p1 !== -1 && p2 !== -1 && p1 < p2, true);
+    conf('e não a de ' + n3.versao + ', que ela já tinha visto', r.texto.indexOf(trecho(n3)) === -1, true);
+    await fecharComEntendi(false);
+    conf('versaoVista foi para ' + VERSAO, (await obterBanco(pag)).ajustes.versaoVista, VERSAO);
+
+    secao('2c. Lançamento silencioso: nada depois da versão vista');
+    if (antes(NOVIDADES[0].versao, VERSAO)) {
+      r = await abrirCom(NOVIDADES[0].versao);
+      conf('vista ' + NOVIDADES[0].versao + ' (a última com novidade) e atual ' + VERSAO + ': a janela NÃO abre', r.aberto, false);
+      conf('e a versaoVista anda sozinha para ' + VERSAO, (await obterBanco(pag)).ajustes.versaoVista, VERSAO);
+    } else {
+      conf('a versão atual ' + VERSAO + ' tem novidade; o caso silencioso não se aplica', true, true);
     }
 
     secao('3. Perfil já na versão atual (versaoVista = ' + VERSAO + ')');
