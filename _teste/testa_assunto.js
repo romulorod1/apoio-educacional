@@ -98,9 +98,16 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
       let caminho = '';
       try { caminho = new URL(r.url()).pathname; } catch (e) { /* ok */ }
       if (caminho.endsWith('/app.js')) r.respond({ status: 200, contentType: 'application/javascript; charset=utf-8', body: appEnvenenado });
-      // sem service worker no veneno: ele guardaria o app.js verdadeiro e o serviria no recarregar
-      else if (caminho.endsWith('/sw.js')) r.respond({ status: 404, contentType: 'text/plain', body: '' });
       else r.continue();
+    });
+    /* Sem service worker no veneno: ele busca os arquivos por fora desta
+     * interceptação, guarda o app.js verdadeiro e o serve no recarregar (foi o
+     * que o controle positivo pegou no nível 1). O app segue sem modo offline,
+     * como quando o registro falha. */
+    await pag.evaluateOnNewDocument(() => {
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.register = () => Promise.reject(new Error('sem service worker no veneno'));
+      }
     });
   }
   if (VENENO === '--envenenado-corpo-sem-escopo') {
