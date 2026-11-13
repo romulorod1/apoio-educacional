@@ -111,7 +111,7 @@
     'Regras que não se quebram:',
     '1. Nunca invente o conteúdo de uma prova. O conteúdo e o material vêm do que está ESCRITO: nos prints do aviso da escola OU no texto do pedido. O que a professora escreveu ou ditou no pedido ("dia 10/11 Geografia, relevo e clima, apostila p. 30 a 45") vale tanto quanto o aviso. Não complete com o que costuma cair nem com o que o livro tem.',
     '2. Avalie cada prova separadamente. "conteudo" é null só na prova cujo conteúdo não aparece em lugar nenhum (nem nos prints, nem no pedido). Uma prova sem conteúdo ("conteúdo ainda não informado") não apaga o conteúdo das outras. O mesmo vale para "material" (livro, capítulo, páginas, apostila).',
-    '3. Prova que aparece só num rascunho da professora ou numa lista de datas, sem conteúdo escrito para ela, entra em "provas" com conteudo null. As matérias que o rascunho põe para estudar em cada dia não são o conteúdo da prova.',
+    '3. Prova que aparece só num rascunho da professora ou numa lista de datas, sem conteúdo escrito para ela, entra em "provas" com conteudo null. O que o rascunho põe para estudar em cada dia (matéria, tema, exercício, duração) e as regras de tempo e de revisão do pedido não são o conteúdo da prova. Só é conteúdo o que ela diz que cai NA PROVA.',
     '4. Transcreva o conteúdo e o material como estão escritos, com as abreviações de sempre: "Cap. 7 (Egito Antigo); cap. 8 (...)". Lista longa de vídeos pode ser resumida, terminando em "(lista no aviso)".',
     '5. Marque "incerto": true na prova cuja data, disciplina ou conteúdo você não leu com certeza (print cortado, borrado, dois avisos que se contradizem). Explique a dúvida em uma frase curta em "observacoes".',
     '6. Nunca ponha aula com a professora no "estudo" da grade: as aulas com a Nath vêm da agenda do aplicativo, e são a base da folha. Quando a mensagem traz as aulas da agenda, elas estão lá só para você saber quais existem.',
@@ -567,18 +567,24 @@
     /* UM aviso por prova, o mais acionável: falta estudo antes dela; senão,
      * o conteúdo que não veio; senão, a dúvida de leitura do aviso. Depois,
      * as observações da IA, sem data. */
-    var porData = {}, ordem = [];
+    /* A chave é a PROVA (data e matéria), não só a data: duas provas no mesmo
+     * dia têm cada uma o seu aviso, e a prioridade de uma não esconde o da
+     * outra. */
+    var porProva = {}, ordem = [];
     var guardar = function (item, peso) {
-      var atual = porData[item.data];
-      if (!atual) ordem.push(item.data);
-      if (!atual || peso < atual.peso) porData[item.data] = { item: item, peso: peso };
+      var k = item.data + '|' + chaveDaMateria(item.disciplina);
+      var atual = porProva[k];
+      if (!atual) ordem.push(k);
+      if (!atual || peso < atual.peso) porProva[k] = { item: item, peso: peso };
     };
     // o conteúdo que ela escreveu e o modelo deixou vazio vem antes de tudo: é dado que se perderia
     conferenciasDoPlano(plano, opcoes).forEach(function (item) { guardar(item, item.tipo === 'conteudoNoPedido' ? -1 : item.tipo === 'estudo' ? 0 : 1); });
     (plano.provas || []).forEach(function (p) {
-      if (p.incerto) guardar({ texto: 'Confira no aviso a prova de ' + ddmm(p.data) + ' (' + limpar(p.disciplina) + ').', data: p.data, tipo: 'incerto' }, 2);
+      if (p.incerto) guardar({ texto: 'Confira no aviso a prova de ' + ddmm(p.data) + ' (' + limpar(p.disciplina) + ').', data: p.data, disciplina: p.disciplina, tipo: 'incerto' }, 2);
     });
-    var itens = ordem.sort().map(function (d) { return porData[d].item; });
+    // em ordem de data; no mesmo dia, na ordem das provas (o sort é estável)
+    var itens = ordem.sort(function (a, b) { var x = a.slice(0, 10), y = b.slice(0, 10); return x < y ? -1 : x > y ? 1 : 0; })
+      .map(function (k) { return porProva[k].item; });
     (plano.observacoes || []).forEach(function (o) { if (String(o).trim()) itens.push({ texto: limpar(o), data: null, tipo: 'observacao' }); });
     return itens;
   }
@@ -616,54 +622,99 @@
       var estudou = grade.some(function (g) {
         return g && g.data < p.data && Array.isArray(g.estudo) && g.estudo.some(function (e) { return estudaMateria(e, chave); });
       });
-      if (!estudou) itens.push({ texto: 'Nenhum dia de estudo de ' + limpar(p.disciplina) + ' antes da prova de ' + ddmm(p.data) + '.', data: p.data, tipo: 'estudo' });
+      if (!estudou) itens.push({ texto: 'Nenhum dia de estudo de ' + limpar(p.disciplina) + ' antes da prova de ' + ddmm(p.data) + '.', data: p.data, disciplina: p.disciplina, tipo: 'estudo' });
       if (p.conteudo === null || !String(p.conteudo).trim()) {
         if (opcoes.texto && escreveuConteudo(opcoes.texto, p.disciplina, plano.provas)) {
           /* ela escreveu algo depois do nome da matéria no pedido, e o modelo
            * deixou vazio: aviso para conferir, nunca preenchido sozinho */
-          itens.push({ texto: 'Confira o conteúdo de ' + limpar(p.disciplina) + ': você escreveu algo no pedido.', data: p.data, tipo: 'conteudoNoPedido' });
+          itens.push({ texto: 'Confira o conteúdo de ' + limpar(p.disciplina) + ': você escreveu algo no pedido.', data: p.data, disciplina: p.disciplina, tipo: 'conteudoNoPedido' });
           return;
         }
         // sem o Ajustar à mão (sem a conta da nuvem), a frase não manda para ele
         itens.push({ texto: 'O conteúdo da prova de ' + ddmm(p.data) + ' (' + limpar(p.disciplina) + ') não veio no aviso.' +
-          (opcoes.semAjuste ? '' : ' Se tiver, diga no Ajustar.'), data: p.data, tipo: 'conteudo' });
+          (opcoes.semAjuste ? '' : ' Se tiver, diga no Ajustar.'), data: p.data, disciplina: p.disciplina, tipo: 'conteudo' });
       }
     });
     return itens;
   }
 
-  /* A conferência DETERMINÍSTICA do conteúdo que ficou vazio: o nome da
-   * matéria aparece no texto do pedido seguido de pelo menos duas palavras
-   * (até o fim da frase, a próxima data ou a próxima matéria), e essas
-   * palavras não dizem que o conteúdo não veio ("ainda não informado",
-   * "sem conteúdo"). Só acusa; quem decide é ela. */
-  var NAO_VEIO = /\b(nao|sem)\b[^.;]*\b(conteudo|informad\w*|enviad\w*|mandad\w*|veio|sei|tem|sabemos)\b|\bainda nao\b|\ba confirmar\b|\bsem conteudo\b/;
-  function semAcento(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+  /* A conferência DETERMINÍSTICA do conteúdo que ficou vazio. ESTRITA de
+   * propósito: um aviso falso empurra a professora a inventar conteúdo, e é
+   * pior que aviso nenhum. Acusa só quando o nome da matéria vem seguido
+   * (depois de uma data, se houver) de um MARCADOR de conteúdo (dois-pontos,
+   * vírgula, "sobre", "cap", "p.", "pág", "conteúdo", "apostila", "livro",
+   * "unidade", "lista") e de pelo menos uma palavra que diz alguma coisa (fora
+   * as vazias: dia da semana, "com a Nath", revisão, manhã, horas, pontos...).
+   * Ou quando a matéria vem logo depois de uma data dd/mm e é seguida de duas
+   * palavras assim, sem duração nem verbo de estudo (a lista de provas
+   * "24/11 Geografia relevo e clima"). O trecho termina no fim da frase, na
+   * próxima data ou na próxima matéria. "Ainda não informado", "sem
+   * conteúdo" e parecidos não acusam. Vale a ÚLTIMA menção decisiva: o texto
+   * do ajuste vem depois do pedido, e "Matemática ainda não tem conteúdo" no
+   * ajuste desfaz o aviso. Sigla (ELA) só conta em maiúscula no texto. */
+  var NAO_VEIO = /\b(nao|sem)\b.{0,30}\b(conteudo|informad\w*|enviad\w*|mandad\w*|veio|chegou)\b|\bainda nao (veio|chegou|mandaram|informaram|enviaram|tem|temos|foi)\b|\ba confirmar\b|\bsem conteudo\b/;
+  var MARCADOR = /^\s*(:|,|\bsobre\b|\bcap\b|\bcapitulo\b|\bcaps?\b\.?|\bp\.|\bpags?\b|\bpagina\w*|\bconteudo\b|\bapostila\b|\blivro\b|\bunidade\b|\blista\b)/;
+  var MARCADOR_NUMERO = /^\s*(\bcap\b|\bcapitulo\b|\bcaps?\b\.?|\bp\.|\bpags?\b|\bpagina\w*|\bunidade\b|\blista\b)/;
+  var VAZIAS = ('segunda terca quarta quinta sexta sabado domingo feira com nath revisao revisar manha tarde noite hora horas minuto minutos min ' +
+    'pontos ponto vale precisa prova provas dia dias ainda nao sei sabe sabemos tem que uma por para mais materia materias estudar estuda estudo ' +
+    'semana hoje amanha depois antes cada ela ele aluna aluno meia vinte trinta').split(' ');
+  var ESTUDO = /\b(exercicio\w*|estudar|estuda|revis\w*|fazer|ler|leitura|treinar|resolver)\b|\(\s*\d|\b\d+\s*(h|min)\b|\b\d+h\d+\b/;
+  var OUTRAS_MATERIAS = ['artes', 'arte', 'educacao fisica', 'redacao', 'filosofia', 'sociologia', 'quimica', 'fisica', 'biologia', 'espanhol',
+    'literatura', 'producao textual', 'ensino religioso', 'ela', 'writing', 'cambridge'];
+  // sem acento e minúsculo, letra a letra: as posições batem com as do texto original
+  function semAcento(s) {
+    return String(s || '').split('').map(function (c) { return c.normalize('NFD').replace(/[̀-ͯ]/g, '').charAt(0) || c; }).join('').toLowerCase();
+  }
   function escreveuConteudo(texto, disciplina, provas) {
-    var t = semAcento(texto);
+    var original = String(texto || '');
+    var t = semAcento(original);
     var chave = chaveDaMateria(disciplina);
-    var nomes = [semAcento(limpar(disciplina)).replace(/^prova\s+(de\s+|do\s+|da\s+)?/, '').trim()];
+    var escrita = limpar(disciplina).replace(/^prova\s+(de\s+|do\s+|da\s+)?/i, '').trim();
+    var sigla = escrita.length <= 4 && escrita === escrita.toUpperCase() && /[A-Z]/.test(escrita);
+    var nomes = [semAcento(escrita)];
     SINONIMOS.forEach(function (g) { if (g[0] === chave) nomes = nomes.concat(g); });
     nomes = nomes.filter(function (n, i) { return n && nomes.indexOf(n) === i; });
-    // onde o trecho de uma matéria termina: outra matéria (das provas ou das conhecidas)
     var outras = [];
     (provas || []).forEach(function (q) { if (q && chaveDaMateria(q.disciplina) !== chave) outras.push(semAcento(limpar(q.disciplina))); });
     SINONIMOS.forEach(function (g) { if (g[0] !== chave) outras = outras.concat(g); });
+    OUTRAS_MATERIAS.forEach(function (n) { if (nomes.indexOf(n) < 0) outras.push(n); });
     var esc = function (s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); };
     var corteOutra = outras.length ? new RegExp('\\b(' + outras.map(esc).join('|') + ')\\b') : null;
-    return nomes.some(function (nome) {
+    var palavrasQueDizem = function (s, comNumero) {
+      return s.split(/[^a-z0-9]+/).filter(function (w) {
+        if (!w) return false;
+        if (/^\d+$/.test(w)) return comNumero;
+        return w.length >= 3 && VAZIAS.indexOf(w) < 0 && !/^\d+(h|min)$/.test(w) && !/^\d+h\d+$/.test(w);
+      }).length;
+    };
+    var achados = [];
+    nomes.forEach(function (nome) {
       var rx = new RegExp('\\b' + esc(nome) + '\\b', 'g'), m;
       while ((m = rx.exec(t))) {
-        var resto = t.slice(m.index + m[0].length);
+        if (sigla && original.substr(m.index, m[0].length) !== original.substr(m.index, m[0].length).toUpperCase()) continue;
+        var antes = t.slice(Math.max(0, m.index - 12), m.index);
+        var resto = t.slice(m.index + m[0].length, m.index + m[0].length + 300);
+        // a data logo depois do nome ("Geografia dia 24: relevo") não corta o trecho
+        resto = resto.replace(/^\s*(dia\s+\d{1,2}(\/\d{1,2})?|\d{1,2}\/\d{1,2})/, '');
         var fim = resto.search(/[.;\n]|\bdia\s+\d|\d{1,2}\/\d{1,2}/);
         if (fim >= 0) resto = resto.slice(0, fim);
         if (corteOutra) { var o = resto.search(corteOutra); if (o >= 0) resto = resto.slice(0, o); }
-        if (NAO_VEIO.test(resto)) continue;
-        var palavras = resto.split(/[^a-z0-9]+/).filter(function (w) { return w.length >= 2 && !/^\d+(h|min)?$/.test(w) && !/^\d+h\d+$/.test(w); });
-        if (palavras.length >= 2) return true;
+        var veredito = null;
+        if (NAO_VEIO.test(resto)) veredito = 'nao';
+        else {
+          var mk = MARCADOR.exec(resto);
+          if (mk) {
+            if (palavrasQueDizem(resto.slice(mk[0].length), MARCADOR_NUMERO.test(resto)) >= 1) veredito = 'sim';
+          } else if (/\d{1,2}\/\d{1,2}\s*$/.test(antes) && !ESTUDO.test(resto) && palavrasQueDizem(resto, false) >= 2) {
+            veredito = 'sim';
+          }
+        }
+        if (veredito) achados.push({ pos: m.index, v: veredito });
       }
-      return false;
     });
+    if (!achados.length) return false;
+    achados.sort(function (a, b) { return a.pos - b.pos; });
+    return achados[achados.length - 1].v === 'sim';
   }
 
   /* O que um ajuste mudou, numa frase com a matéria e a ação: "Mudou: entrou

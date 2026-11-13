@@ -527,7 +527,9 @@ secao('12. O conteúdo escrito no pedido: o system, o esquema e a conferência d
     S.indexOf('Avalie cada prova separadamente') >= 0, S.indexOf('não aparece em lugar nenhum (nem nos prints, nem no pedido)') >= 0,
     S.indexOf('não apaga o conteúdo das outras') >= 0], [true, true, true, true]);
   conf('a regra velha (prova só no pedido entra com conteudo null) saiu', [/sem aviso da escola, entra em "provas" com conteudo null/.test(S), /Se o aviso não diz o conteúdo/.test(S)], [false, false]);
-  conf('o rascunho continua sem virar conteúdo', S.indexOf('As matérias que o rascunho põe para estudar em cada dia não são o conteúdo da prova.') >= 0, true);
+  conf('o rascunho e as regras de tempo e revisão não viram conteúdo; só o que cai NA PROVA', [
+    S.indexOf('O que o rascunho põe para estudar em cada dia (matéria, tema, exercício, duração) e as regras de tempo e de revisão do pedido não são o conteúdo da prova.') >= 0,
+    S.indexOf('Só é conteúdo o que ela diz que cai NA PROVA.') >= 0], [true, true]);
   conf('as regras seguem numeradas de 1 a 9, sem buraco', (S.match(/^\d+\. /gm) || []).map(x => parseInt(x, 10)), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   conf('a referência à regra das aulas aponta para a 6', [/regra 6\)/.test(S), /^6\. Nunca ponha aula/m.test(S)], [true, true]);
   const pr = P.ESQUEMA.properties.provas.items.properties;
@@ -563,6 +565,64 @@ secao('12. O conteúdo escrito no pedido: o system, o esquema e a conferência d
     e('Geografia sem conteúdo por enquanto', 'Geografia'), e('Inglês, a escola não mandou o conteúdo', 'Inglês')], [false, false, false]);
   conf('não acusa: só a duração ("Matemática 1h30, Português 30min")', e('Matemática 1h30, Português 30min', 'Matemática'), false);
   conf('não acusa: a matéria que nem está no pedido', e(LIA, 'Geografia'), false);
+
+  // a regra ESTRITA: os falsos positivos da lente (cada um seria um empurrão para ela inventar conteúdo)
+  const naoAcusa = [
+    ['a aluna tem prova de ELA dia 24. ela quer estudar uma materia por dia', 'ELA'],
+    ['prova de matemática na segunda e ciências na quarta', 'Matemática'],
+    ['Rascunho: dia 20 Matemática exercícios do livro (1h)', 'Matemática'],
+    ['20/11 Matemática exercícios do livro (1h)', 'Matemática'],
+    ['Matemática com a Nath na terça', 'Matemática'],
+    ['Matemática é a que ele mais precisa', 'Matemática'],
+    ['Matemática revisão na manhã da prova', 'Matemática'],
+    ['Matemática vale 10 pontos', 'Matemática'],
+    ['Matemática dia vinte e quatro', 'Matemática'],
+    ['Matemática 30 minutos por dia', 'Matemática'],
+    ['Matemática uma hora e meia', 'Matemática'],
+    ['Matemática, segunda e quarta, 1h por dia', 'Matemática'],
+    ['Matemática: 1h por dia', 'Matemática'],
+    ['História: ainda não sei', 'História'],
+    ['O Marcelo tem prova de Ciências dia 24 e de História dia 26. Monte uma matéria por dia, 1h.', 'Ciências'],
+    ['provas de Matemática e Ciências e Geografia', 'Matemática'],
+    ['Redação e Artes na semana que vem', 'Redação'],
+    ['Redação, Artes e Filosofia', 'Redação'],
+    ['Matemática: ainda não tem conteúdo', 'Matemática']
+  ];
+  conf('não acusa nenhum dos ' + naoAcusa.length + ' falsos positivos (dia da semana, "com a Nath", revisão, horas, pontos, rascunho com tema, "ela" minúsculo, Redação e Artes...)',
+    naoAcusa.filter(([t, d]) => e(t, d)).map(([t]) => t), []);
+  const acusa = [
+    ['Matemática: frações, sem calculadora, tem que levar régua', 'Matemática'],
+    ['Ciências: capítulo 3, ainda não sei se cai o 4', 'Ciências'],
+    ['Matemática cap 5', 'Matemática'],
+    ['Matemática sobre frações', 'Matemática'],
+    ['Science: solar system and planets', 'Science'],
+    ['Ciências: sistema solar e planetas', 'Science'],
+    ['Português: verbos e substantivos', 'Língua Portuguesa'],
+    ['História: Egito Antigo e Mesopotâmia', 'Historia'],
+    ['Writing: narrative essay, 200 words', 'Writing'],
+    ['24/11 Geografia relevo e clima', 'Geografia'],
+    ['Geografia dia 24: relevo e clima', 'Geografia'],
+    ['ELA: reading comprehension', 'ELA'],
+    [LIA, 'Matemática'], [LIA, 'Ciências']
+  ];
+  conf('acusa os ' + acusa.length + ' casos certos (marcador de conteúdo depois do nome, ou a lista "24/11 Geografia relevo e clima")', acusa.filter(([t, d]) => !e(t, d)).map(([t, d]) => d + ': ' + t), []);
+  conf('falso negativo aceito (seguro, cai na frase de sempre): o conteúdo ANTES do nome', e('frações e decimais cai na prova de Matemática', 'Matemática'), false);
+  // depois do Ajustar: vale a última menção decisiva
+  conf('o ajuste "Matemática ainda não tem conteúdo" desfaz o aviso do pedido', e(LIA + '\nMatemática ainda não tem conteúdo, tira o que eu falei', 'Matemática'), false);
+  conf('controle: um ajuste que não fala do conteúdo de Matemática mantém o aviso', e(LIA + '\npõe Geografia no dia 21', 'Matemática'), true);
+  conf('o ajuste que dá o conteúdo depois de "sem conteúdo" no pedido acusa (a última menção vale)', e('Matemática sem conteúdo por enquanto.\nMatemática: frações', 'Matemática'), true);
+
+  // a prioridade é da MESMA prova: duas provas no mesmo dia
+  const doisNoDia = { grade: [], provas: [prova('2026-11-24', 'Ciências', 'sistema solar'), prova('2026-11-24', 'Matemática', null)] };
+  conf('duas provas em 24/11: o "Confira o conteúdo" de Matemática não esconde o "Nenhum dia de estudo" de Ciências', textos(P.itensIncertos(doisNoDia, { texto: 'Matemática: frações e decimais.' })),
+    ['Nenhum dia de estudo de Ciências antes da prova de 24/11.', 'Confira o conteúdo de Matemática: você escreveu algo no pedido.']);
+  conf('e, na mesma prova, ele continua vencendo o "Nenhum dia de estudo"', textos(P.itensIncertos({ grade: [], provas: [prova('2026-11-24', 'Matemática', null)] }, { texto: 'Matemática: frações.' })),
+    ['Confira o conteúdo de Matemática: você escreveu algo no pedido.']);
+  conf('sem texto, as duas provas do mesmo dia têm cada uma o seu aviso', textos(P.itensIncertos(doisNoDia, {})),
+    ['Nenhum dia de estudo de Ciências antes da prova de 24/11.', 'Nenhum dia de estudo de Matemática antes da prova de 24/11.']);
+  const longo = ('a prova de matematica e de ciencias nao sei o que cai mas tem que estudar bastante ').repeat(2000);
+  const t0 = Date.now(); P.itensIncertos({ grade: [], provas: [prova('2026-11-24', 'Matemática', null), prova('2026-11-25', 'Ciências', null)] }, { texto: longo });
+  conf('texto ditado de 170 mil letras: a conferência leva menos de 2 s', Date.now() - t0 < 2000, true);
 })();
 
 console.log('\n' + passes + ' verificacoes passaram, ' + falhas + ' falharam');
