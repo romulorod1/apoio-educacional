@@ -150,6 +150,8 @@ def trava_campos(p, vinc):
             e('tom %r no %s' % (it.get('tom'), s))
         if not it.get('licenca') or '52.681/2011' not in it['licenca'] or 'não comercial' not in it['licenca']:
             e('licenca sem o decreto ou sem o uso nao comercial: %r' % it.get('licenca'))
+        if it.get('link') != cadernos_sme.FONTE['url'] or not str(it.get('link')).startswith('https://'):
+            e('link %r e o acervo e %r (o credito do app leva o endereco)' % (it.get('link'), cadernos_sme.FONTE['url']))
         pags = paginas_do_item(p, it)
         cita = 'p. %d' % pags[0] if len(pags) == 1 else 'p. %d a %d' % (pags[0], pags[-1])
         ano = cadernos_sme.NOME_SERIE[s]
@@ -675,6 +677,9 @@ def venenos(temp, pdfs, vinc_c, vinc, cur, placar, boa):
     q = pg.copia(boa, temp, 'v_licenca')
     q.itens[0]['licenca'] = 'livre'
     placar.conferir('licenca sem o decreto', trava_campos(q, vinc), True, 'licenca')
+    q = pg.copia(boa, temp, 'v_link')
+    del q.itens[0]['link']
+    placar.conferir('item sem o link do acervo', trava_campos(q, vinc), True, 'link')
     q = pg.copia(boa, temp, 'v_pagina')
     q.itens[0]['atribuicao'] = q.itens[0]['atribuicao'].replace('p. ', 'p. 9')
     placar.conferir('atribuicao com a pagina errada', trava_campos(q, vinc), True, 'atribuicao')

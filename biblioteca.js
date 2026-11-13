@@ -688,8 +688,17 @@
 
   /* A entrada do mapa onde a leitura está: no PDF, a que tem a página entre o
    * começo e o fim; no EPUB, a que tem a parte (posição na espinha). Com duas
-   * (capítulos que se cruzam), a que começa mais perto. */
-  function entradaDoMapa(mapa, formato, valor) {
+   * (capítulos que se cruzam), a que começa mais perto.
+   *
+   * Item 12a, parte 0: no EPUB, vários capítulos podem começar na MESMA parte,
+   * cada um na sua âncora (o FME de teoria). Com a `ancora` por onde ela
+   * entrou na parte (o "Abrir no livro" ou o sumário), vale o capítulo que
+   * começa nela; sem âncora, ou sem capítulo nela, a regra de sempre. */
+  function entradaDoMapa(mapa, formato, valor, ancora) {
+    if (formato === 'epub' && ancora) {
+      var naAncora = (mapa || []).filter(function (e) { return e.capitulo === valor && e.ancora === ancora; });
+      if (naAncora.length) return naAncora[0];
+    }
     var achada = null;
     (mapa || []).forEach(function (e) {
       var ini = formato === 'epub' ? e.capitulo : e.pagina;
@@ -809,9 +818,30 @@
     var uteis = marcadores.length - lixo;
     return lixo * 2 > marcadores.length || uteis * 2 < caps.length;
   }
+  /* Item 12a, parte 0: o EPUB com mapa de capítulos por parte e âncora. O
+   * gerador já põe o sumário do mapa no pacote quando o EPUB não tem sumário
+   * (sumario_origem "mapa"); aqui vale o mesmo para o pacote que chegou com o
+   * sumário vazio e o mapa. Só os capítulos com título com sentido e parte
+   * dentro da espinha, em ordem de parte e, na mesma parte, na ordem do mapa
+   * (o gerador já ordena pela âncora no texto). Forma do sumário de EPUB:
+   * { n, nivel: 1, titulo, capitulo, ancora?, mapa_n }. */
+  function sumarioDoMapaDoEpub(meta) {
+    var partes = ((meta.epub && meta.epub.espinha) || []).length;
+    return (Array.isArray(meta.mapa) ? meta.mapa : []).filter(function (e) {
+      return !!e && inteiro(e.n) && !e.obra_inteira && typeof e.titulo === 'string' && !marcadorSemSentido(e.titulo) &&
+        inteiro(e.capitulo) && e.capitulo >= 1 && e.capitulo <= partes;
+    }).map(function (e, i) { return { e: e, i: i }; })
+      .sort(function (a, b) { return a.e.capitulo - b.e.capitulo || a.i - b.i; })
+      .map(function (x, i) {
+        var s = { n: i + 1, nivel: 1, titulo: x.e.titulo, capitulo: x.e.capitulo, mapa_n: x.e.n };
+        if (typeof x.e.ancora === 'string' && x.e.ancora) s.ancora = x.e.ancora;
+        return s;
+      });
+  }
   function sumarioDoLivro(meta) {
     var sumario = meta && Array.isArray(meta.sumario) ? meta.sumario : [];
-    if (!meta || meta.formato === 'epub') return sumario;
+    if (meta && meta.formato === 'epub') return sumario.length ? sumario : sumarioDoMapaDoEpub(meta);
+    if (!meta) return sumario;
     var doMapa = !sumario.length ? capitulosDoMapaParaSumario(meta).length > 0 : sumarioDosMarcadoresInutil(meta);
     if (!doMapa) return sumario;
     var total = inteiro(meta.paginas) ? meta.paginas : Infinity;
