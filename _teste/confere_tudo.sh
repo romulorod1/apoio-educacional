@@ -277,6 +277,17 @@ roda "venenos existem" node _teste/testa_venenos_existem.js
 roda "venenos existem --envenenado-nome-falso" node _teste/testa_venenos_existem.js --envenenado-nome-falso
 roda "venenos existem --envenenado-letra-trocada" node _teste/testa_venenos_existem.js --envenenado-letra-trocada
 roda "venenos existem --envenenado-prefixo" node _teste/testa_venenos_existem.js --envenenado-prefixo
+# Nada da fonte privada de anos iniciais no repositorio publico: a arvore de
+# git ls-files e o historico que o merge leva (origin/main..HEAD; no push na
+# main, o before do evento), pelo TIPO (PDF, zip, gzip, 7z, rar e companhia
+# reprovam pelos bytes do comeco) e pelas marcas no nome e no conteudo. O SHA
+# contra a lista privada so roda na maquina que tem a lista; sem ela, a prova
+# diz que pulou e nao reprova (no CI nao ha segredo nenhum). Fica nesta secao, e nao no
+# mapa, para rodar no portao-rapido em TODO push, mexa o PR no que mexer:
+# arquivo novo de qualquer nome e pego. O veneno monta um repositorio temporario
+# com cada caso e tem de acusar cada um.
+roda "sem fonte privada" node _teste/testa_sem_fonte_privada.js
+roda "sem fonte privada --envenenado-com-fonte-privada" node _teste/testa_sem_fonte_privada.js --envenenado-com-fonte-privada
 # A tabela de materias e uma so (core.js) e as copias tem que bater com ela:
 # a do cartao.js, a do pdf.js, o banco/topicos/indice.json e a exportada para
 # o Python. Foi a divergencia entre quatro vocabularios de materia que deixou
@@ -596,6 +607,13 @@ roda "assunto lado a lado"                      node "_teste/testa_assunto_lado_
 roda "assunto lado a lado --envenenado-nao-trata-vira-sem-mapa" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-nao-trata-vira-sem-mapa
 roda "assunto lado a lado --envenenado-mapa-vazio-nao-trata" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-mapa-vazio-nao-trata
 roda "assunto lado a lado --envenenado-parcial-nao-trata" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-parcial-nao-trata
+# T2 (listas): o bloco "Teoria e exercicios" da pagina do assunto, numa pagina
+# de prova (a pagina do assunto e de outra executora), a 1280x800, 800x1280 e
+# 412x915: as quatro secoes, o exercicio grande numa coluna, nada marcado, o
+# selo graduado com o "Para mim" por cima, Abrir e Anexar pelos caminhos de
+# sempre e o vazio numa linha.
+roda "bloco teoria e exercicios"                node "_teste/testa_bloco_teoria_exercicios_navegador.js"
+roda "bloco teoria e exercicios --envenenado-sem-outro-ano" node "_teste/testa_bloco_teoria_exercicios_navegador.js" --envenenado-sem-outro-ano
 # C12: os pacotes de provas (OBMEP Mirim por nivel e ENEM) importam, as abas vao
 # do 2o ao 5o ano e os assuntos do aplicativo aparecem como modulos. O modo
 # envenenado serve o app.js que so espalhava o Banco pelas series equivalentes.
@@ -1487,6 +1505,18 @@ roda "livros (regras) --envenenado-fim-do-capitulo-tira" node "_teste/testa_livr
 # O sumario que a tela usa: marcadores lixo e sumario vazio dao lugar ao mapa.
 roda "livros (regras) --envenenado-sumario-dos-marcadores" node "_teste/testa_livros_regras.js" --envenenado-sumario-dos-marcadores
 roda "livros (regras) --envenenado-mapa-parcial-troca" node "_teste/testa_livros_regras.js" --envenenado-mapa-parcial-troca
+# T2 (listas): a Biblioteca.fontesDoAssunto, as fontes da pagina do assunto
+# (teoria, lista de base, exercicios e OBMEP) pelo modulo, pelo tema_app e pela
+# tabela de vinculos, com o acervo sintetico. O veneno tira a guarda do id ja
+# visto, e o item repetido aparece duas vezes no mesmo assunto. Sem Chrome.
+roda "fontes do assunto"                        node "_teste/testa_fontes_do_assunto.js"
+roda "fontes do assunto --envenenado-repete-item" node "_teste/testa_fontes_do_assunto.js" --envenenado-repete-item
+# 13/11: o ENEM separado da OBMEP, a lista de base com buraco e a entrada que nao pode mudar
+roda "fontes do assunto --envenenado-enem-na-obmep" node "_teste/testa_fontes_do_assunto.js" --envenenado-enem-na-obmep
+roda "fontes do assunto --envenenado-base-com-buraco" node "_teste/testa_fontes_do_assunto.js" --envenenado-base-com-buraco
+roda "fontes do assunto --envenenado-muda-entrada" node "_teste/testa_fontes_do_assunto.js" --envenenado-muda-entrada
+# o caso real do MAT08-15: sem modulo proprio, herda os vizinhos declarados no indice
+roda "fontes do assunto --envenenado-sem-vizinhos" node "_teste/testa_fontes_do_assunto.js" --envenenado-sem-vizinhos
 # B3: a pagina impressa do livro (trechos romanos e arabicos, mudanca no meio,
 # ida e volta em todas as paginas, tela e leitor mostrando a impressa e abrindo
 # e gravando em pagina do arquivo, e recusa so do livro com numeracao invalida).
