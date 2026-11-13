@@ -543,8 +543,14 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
      * e espera o Voltar ser PROCESSADO (a pergunta chegou, ou a janela fechou),
      * com teto largo, antes de afirmar o que aconteceu. */
     const tarefaDaPaginaRodou = () => pag.evaluate(() => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0))));
-    const voltarProcessado = async (antes) => (await esperar('o Voltar processado', async () =>
-      pag.dialogos.length > antes ? 'perguntou' : (!(await aberta(pag)) ? 'fechou' : ''), v => !!v, 15000)).valor || 'nada';
+    /* A pergunta chega pelo evento do puppeteer, e a janela pode fechar (com o
+     * "sim") antes de a leitura voltar: a contagem das perguntas é lida DEPOIS
+     * de ver a janela, para "perguntou e fechou" nunca virar "fechou sem perguntar". */
+    const voltarProcessado = async (antes) => (await esperar('o Voltar processado', async () => {
+      const fechada = !(await aberta(pag));
+      if (pag.dialogos.length > antes) return 'perguntou';
+      return fechada ? 'fechou' : '';
+    }, v => !!v, 15000)).valor || 'nada';
     pag.respostaDoDialogo = true;
     await H.irParaAba(pag, 'agenda');
     await pag.click('#nova-aula');
