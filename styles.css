@@ -3083,8 +3083,6 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-semana-bolinhas { display: flex; gap: 2px; min-height: 7px; }
 .cel-bolinha { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1px var(--branco); }
 .cel-abrir-vagos { margin: 0; min-height: var(--alvo-celular); }
-/* o relógio do Vagos só aparece quando o assistente divide a linha (abaixo) */
-.cel-abrir-vagos .ico { display: none; }
 .cel-semana-topo .cel-abrir-vagos { flex: 0 0 auto; min-width: var(--alvo-celular); padding: 4px; }
 .cel-vagos-topo { display: flex; align-items: center; gap: 4px; margin: 0 0 8px; padding: 4px 0; border-bottom: 1px solid var(--fio-claro); }
 .cel-vagos-topo .btn { flex: 0 0 auto; min-width: var(--alvo-celular); min-height: var(--alvo-celular); padding: 4px; }
@@ -4242,31 +4240,39 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 /* ==================== planejamento (fim) ==================== */
 
 /* ==================== assistente (IA, fase 3: só leitura) ==================== */
-/* O ícone no alto do tablet, ao lado do olho, com o alvo de 48 px. */
-.olho.assistente-topo { width: 48px; height: 48px; color: var(--navy); }
-.olho.assistente-topo[hidden] { display: none; }
+/* A porta do tablet: a pílula com o balão e a palavra "Perguntar", vizinha
+   do olho (a margem automática junta as duas à direita do cabeçalho), com a
+   mesma borda e o mesmo branco do olho. */
+.pilula-perguntar {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 48px; padding: 0 16px 0 12px;
+  border: 1px solid var(--fio); border-radius: 999px;
+  background: var(--branco); color: var(--navy);
+  font: inherit; font-size: var(--letra-14); font-weight: 600;
+  cursor: pointer; flex-shrink: 0;
+}
+.pilula-perguntar[hidden] { display: none; }
+.pilula-perguntar .ico { width: 20px; height: 20px; }
+.pilula-perguntar:hover { background: var(--soft); }
 @media (max-width: 720px) {
-  .olho.assistente-topo { position: absolute; top: 8px; right: 64px; }
+  .pilula-perguntar { position: absolute; top: 8px; right: 64px; }
 }
-/* No celular, o ícone na linha do dia. Com o assistente na linha, num
-   celular (até 430 px), as setas ficam só com a seta (o "1 dia" continua no
-   nome que o leitor de tela lê) e o dia da semana do título sai da vista (a
-   faixa dos dias logo abaixo já o diz; o leitor de tela continua lendo), para
-   a data não quebrar em três linhas com a letra a 130%. */
-.cel-semana-topo .cel-abrir-assistente { flex: 0 0 auto; min-width: var(--alvo-celular); min-height: var(--alvo-celular); padding: 0; color: var(--navy); }
-@media (max-width: 430px) {
-  .cel-semana-topo.com-assistente .cel-semana-passo { font-size: 0; min-width: var(--alvo-celular); padding: 0; }
-  .cel-semana-topo.com-assistente .cel-semana-passo .ico { width: 20px; height: 20px; }
-  .cel-semana-topo.com-assistente .cel-abrir-vagos { font-size: 0; padding: 0; }
-  .cel-semana-topo.com-assistente .cel-abrir-vagos .ico { display: inline-block; width: 22px; height: 22px; }
-  .cel-semana-topo.com-assistente .cel-titulo-semana { font-size: 0; }
+/* A porta do celular: a mesma pílula, numa segunda linha presa logo abaixo
+   da linha do dia (que fica como era), à direita, perto do polegar. */
+.cel-assistente-linha { display: flex; justify-content: flex-end; padding: 0 0 6px; }
+.cel-assistente-linha .cel-perguntar {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: var(--alvo-celular); padding: 0 16px 0 12px;
+  border-radius: 999px; color: var(--navy); font-weight: 600;
 }
-/* No celular mais estreito, com o selinho dos avisos também na linha, o "Hoje," sai da vista (o dia de hoje está marcado na faixa logo abaixo, e o botão "Hoje" aparece em qualquer outro dia). */
-@media (max-width: 380px) {
-  .cel-semana-topo.com-assistente .cel-titulo-hoje { font-size: 0; }
-}
+.cel-assistente-linha .cel-perguntar .ico { width: 20px; height: 20px; }
 
 .ass-modal { max-width: 640px; height: 88vh; }
+body.modo-celular #modal-assistente .ass-modal { height: 100%; max-height: 100%; }
+.modal-cabecalho .btn#ass-nova { min-height: 48px; margin-left: auto; white-space: nowrap; }
+/* o título recebe o foco ao abrir (o teclado não sobe); não é um controle, sem moldura */
+#titulo-modal-assistente:focus { outline: none; }
 .ass-conversa { display: flex; flex-direction: column; gap: 14px; }
 .ass-vez { display: flex; flex-direction: column; gap: 6px; scroll-margin-top: 8px; }
 .ass-pergunta {
@@ -4276,27 +4282,38 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 }
 .ass-resposta { font-size: var(--letra-16); line-height: 1.45; color: var(--texto); overflow-wrap: anywhere; }
 .ass-resposta p { margin: 0 0 4px; }
-.ass-resposta.ass-erro { color: var(--vermelho); margin: 0; }
+.ass-linha-valor { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--fio-claro); padding-bottom: 2px; }
+.ass-valor { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ass-pensando { color: var(--muted); font-style: italic; margin: 0; }
 .ass-entendido { margin: 0; font-size: var(--letra-14); color: var(--muted); }
 .ass-cartao {
-  border: 1px solid var(--fio); border-radius: 12px; padding: 12px; background: var(--branco);
-  display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+  border: 1px solid var(--fio); border-radius: 12px; padding: 10px 12px; background: var(--branco);
+  display: flex; flex-direction: column; gap: 8px;
 }
-.ass-cartao-titulo { font-weight: 600; color: var(--navy); font-size: var(--letra-14); }
-.ass-cartao-linha { font-size: var(--letra-16); overflow-wrap: anywhere; }
-.ass-cartao .ass-telefone { font-weight: 600; }
-.ass-mensagem { margin: 0; padding: 8px 12px; border-left: 3px solid var(--fio); background: var(--soft); border-radius: 4px; font-size: var(--letra-16); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; box-sizing: border-box; }
+.ass-cartao-linha { display: flex; align-items: flex-start; gap: 8px; font-size: var(--letra-16); overflow-wrap: anywhere; min-width: 0; }
+.ass-cartao-linha .ass-cartao-ico { width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; color: var(--navy); }
+.ass-cartao-quem { min-width: 0; font-weight: 600; color: var(--texto); }
+.ass-cinza { font-weight: 400; color: var(--muted); }
+.ass-numero { white-space: nowrap; }
+.ass-mensagem { width: 100%; box-sizing: border-box; min-height: 72px; resize: vertical; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 8px; background: var(--soft); }
+.ass-mensagem:focus { outline: 1px solid var(--navy); outline-offset: 0; }
 .ass-cartao-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
-.ass-link { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
+.ass-link { min-height: 48px; min-width: 48px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
 .ass-exemplos { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .ass-exemplo { min-height: 48px; text-align: left; white-space: normal; max-width: 100%; }
-.ass-falha { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ass-ideias > summary { min-height: 48px; display: flex; align-items: center; cursor: pointer; color: var(--navy); font-weight: 600; }
+.ass-ideias .ass-exemplos { padding-top: 4px; }
+.ass-falha { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ass-falha .ass-falha-ico { width: 20px; height: 20px; flex-shrink: 0; }
+.ass-falha span { flex: 1 1 160px; }
 .ass-falha .btn { min-height: 48px; }
 .modal-rodape.ass-rodape { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
 .ass-campo { display: flex; }
 .ass-texto { flex: 1; min-width: 0; min-height: 48px; resize: none; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 10px; box-sizing: border-box; }
+.ass-texto:focus { outline: 1px solid var(--navy); outline-offset: 0; }
 .ass-botoes { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
 .ass-botoes .btn { min-height: 48px; }
-.ass-botoes .esquerda, .ass-botoes .plan-ditar { margin-right: auto; }
+.ass-botoes .esquerda { margin-right: auto; }
+/* desligado, o Perguntar continua legível: texto escuro sobre cinza claro */
+.ass-botoes .btn.principal:disabled { background: var(--fio-claro); border-color: var(--fio); color: var(--texto); opacity: 1; }
 /* ==================== assistente (fim) ==================== */

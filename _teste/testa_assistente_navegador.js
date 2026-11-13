@@ -7,22 +7,28 @@
  * Nuvem.tokenParaIA, postos antes do app.js ler), e toda rede para fora do
  * servidor da prova é cortada e contada.
  *
- * O que prova:
- *   0. quem vê o botão: sem conta, ninguém; o observador de outra conta, não;
- *      a dona no tablet, no celular dela e no celular que só lê, sim;
- *   1. no tablet: os exemplos na primeira vez (e somem depois), o foco no
- *      campo, o Perguntar desligado sem texto, o laço com duas ferramentas
- *      (listar_aulas e preparar_whatsapp), o content do modelo de volta
- *      INTACTO, o "Entendi: terça, 17/11." e o cartão do WhatsApp com o texto,
- *      que só abre com o toque dela (nada abre nem sai sozinho);
- *   2. os cartões de ligar e do mapa, e o de contato (o número só na tela);
- *   3. o teto de 5 voltas, com a frase própria e a pergunta de volta no campo;
+ * O que prova (com as lentes do #191):
+ *   0. a porta: sem conta, ninguém; o observador, não; o celular que só lê,
+ *      a dona no celular (a pílula "Perguntar" numa segunda linha, abaixo da
+ *      linha do dia, que fica como a da main) e no tablet (a pílula vizinha
+ *      do olho);
+ *   1. no tablet: o foco no título ao abrir, os exemplos com o nome de um
+ *      aluno dela e o mês passado, tocar num exemplo pergunta, o laço com
+ *      duas ferramentas e o content intacto, o "Entendi:", o cartão do
+ *      WhatsApp com o texto EDITÁVEL (o link acompanha) que só abre com o
+ *      toque, e as "Ideias" depois da primeira pergunta;
+ *   2. os cartões compactos de ligar, mapa e contato (o WhatsApp é o único
+ *      principal; os nomes para o leitor de tela com o contexto);
+ *   3. o teto de 5 voltas, com a frase sem jargão e a pergunta de volta;
  *   4. os erros: ocupado (com "Tentar de novo") e sem_permissao (sem ele);
- *   5. no celular da dona e no que só lê: o ícone na linha do dia e o fluxo;
+ *   5. fechar durante o "Procurando..." devolve a pergunta ao campo; fechar e
+ *      abrir guarda a conversa; "Nova conversa" zera;
  *   6. NADA GRAVOU: o banco do aparelho e a fila de registros iguais antes e
  *      depois de tudo;
- *   7. a trava de transbordo da janela (com conversa e cartões) e da linha do
- *      dia, a 360, 390 e 412 px, letra normal e 130%.
+ *   7. no celular: o fluxo, a linha do dia igual à da main (a palavra Vagos,
+ *      o "1 dia" e o dia da semana à vista), a altura da linha nova, e a
+ *      trava de transbordo da janela e das duas linhas a 360, 390 e 412 px,
+ *      letra normal e 130%, com controle.
  *
  * Porta 8974. O service worker é contornado.
  */
@@ -45,16 +51,15 @@ const DB = {
   series: [],
   aulas: [
     { id: 'a1', alunoId: 'al1', data: HOJE, hora: '15:00', duracaoMin: 60, status: 'realizada', notaTexto: '', anexos: [], temas: [], areas: [] },
-    // ontem, sem registro: o aviso do alto (o selinho) divide a linha do dia com o ícone
+    // ontem, sem registro: o aviso do alto (o selinho) fica na linha do dia
     { id: 'a0', alunoId: 'al2', data: '2026-11-15', hora: '10:00', duracaoMin: 60, status: 'realizada', notaTexto: '', anexos: [], temas: [], areas: [] },
     { id: 'a2', alunoId: 'al2', data: '2026-11-18', hora: '09:00', duracaoMin: 60, status: 'realizada', notaTexto: '', anexos: [], temas: [], areas: [] }
   ]
 };
 
-/* O falso do endpoint: responde pela fila; guarda os pedidos. */
-const falso = { fila: [], pedidos: [], sempre: null };
-let contaUso = 0;
-function usage() { contaUso++; return { input_tokens: 12, output_tokens: 30, cache_read_input_tokens: 3000, cache_creation_input_tokens: 0 }; }
+/* O falso do endpoint: responde pela fila; guarda os pedidos; segura quando pedido. */
+const falso = { fila: [], pedidos: [], sempre: null, segurar: false, segurados: [] };
+function usage() { return { input_tokens: 12, output_tokens: 30, cache_read_input_tokens: 3000, cache_creation_input_tokens: 0 }; }
 function ferramentas(chamadas, sig) {
   return { ok: true, resposta: { id: 'msg_f', model: 'claude-sonnet-5-5', stop_reason: 'tool_use', usage: usage(),
     content: [{ type: 'thinking', thinking: '', signature: sig || ('sig-' + Math.random().toString(36).slice(2)) }]
@@ -67,15 +72,19 @@ function texto(t) {
 
 const aberta = (pag, id) => pag.evaluate(i => { const m = document.getElementById(i); return !!m && m.classList.contains('aberto'); }, id);
 const visivel = (pag, sel) => pag.evaluate(s => { const e = document.querySelector(s); if (!e || e.hidden) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }, sel);
+/* O toque espera o rodapé ficar livre (ele ignora toques por 400 ms depois de mudar). */
 async function clicar(pag, sel) {
   await esperar('à vista: ' + sel, () => visivel(pag, sel), v => v === true, 15000);
+  await pausa(450);
   await pag.evaluate(s => document.querySelector(s).click(), sel);
   await pausa(150);
 }
+const respondeu = pag => esperar('a resposta chegou', () => pag.evaluate(() => !document.querySelector('#ass-esperando')), v => v === true, 15000);
 async function perguntar(pag, frase) {
+  await pausa(450);
   await pag.evaluate(f => { const c = document.querySelector('#ass-texto'); c.value = f; c.dispatchEvent(new Event('input', { bubbles: true })); }, frase);
   await clicar(pag, '#ass-perguntar');
-  await esperar('a resposta chegou', () => pag.evaluate(() => !document.querySelector('#ass-esperando')), v => v === true, 15000);
+  await respondeu(pag);
 }
 const banco = pag => pag.evaluate(() => Promise.all([Store.carregar(), Store.lerRegistros()]).then(r => JSON.stringify(r[0]) + '|' + JSON.stringify(r[1])));
 async function modo(pag, nome, largura, altura) {
@@ -89,6 +98,7 @@ async function modo(pag, nome, largura, altura) {
 async function transbordo(pag, raizSel) {
   return pag.evaluate(sel => {
     const raiz = document.querySelector(sel);
+    if (!raiz) return ['não achei ' + sel];
     const falhas = [];
     const W = window.innerWidth;
     Array.from(raiz.querySelectorAll('*')).forEach(e => {
@@ -116,6 +126,7 @@ async function transbordo(pag, raizSel) {
     if (u.indexOf('/api/ia') >= 0) {
       let corpo = null; try { corpo = JSON.parse(req.postData() || 'null'); } catch (e) { corpo = 'nao-json'; }
       falso.pedidos.push({ corpo, autorizacao: req.headers().authorization || '' });
+      if (falso.segurar) { falso.segurados.push(req); return; }
       const vez = falso.sempre ? falso.sempre() : falso.fila.shift() || texto('(fila vazia)');
       req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(vez) }).catch(() => {});
       return;
@@ -124,11 +135,10 @@ async function transbordo(pag, raizSel) {
     req.continue().catch(() => {});
   });
   /* A conta de mentira, posta no instante em que o nuvem.js publica o Nuvem
-   * (antes de o app.js ler), conforme o modo da rodada. E o window.open
-   * contado: nada pode abrir sozinho. */
+   * (antes de o app.js ler), conforme o modo da rodada. E o window.open e os
+   * toques em link contados: nada pode abrir sozinho. */
   await pag.evaluateOnNewDocument(() => {
     window.__aberturas = [];
-    const abrir = window.open;
     window.open = function (u) { window.__aberturas.push(String(u)); return null; };
     document.addEventListener('click', ev => { const a = ev.target.closest && ev.target.closest('a[href]'); if (a) { window.__aberturas.push('toque ' + a.getAttribute('href')); ev.preventDefault(); } }, true);
     let modo = 'sem';
@@ -150,73 +160,99 @@ async function transbordo(pag, raizSel) {
   await pag.evaluate(async d => { await Store.salvar(d); }, DB);
 
   // ================================================================
-  secao('0. Quem vê o botão do assistente');
+  secao('0. A porta do assistente');
   await modo(pag, 'sem', 1280, 900);
-  conf('sem a conta da nuvem: o tablet não mostra o ícone', await visivel(pag, '#abrir-assistente'), false);
+  conf('sem a conta da nuvem: o tablet não mostra a pílula', await visivel(pag, '#abrir-assistente'), false);
   await modo(pag, 'observador', 390, 844);
   conf('(arranjo) o observador está no modo celular', await pag.evaluate(() => document.body.classList.contains('modo-celular')), true);
-  conf('o observador de outra conta: nem no alto do tablet nem na linha do dia', [await visivel(pag, '#abrir-assistente'), await visivel(pag, '#cel-assistente')], [false, false]);
+  conf('o observador de outra conta: nem no alto do tablet nem no celular', [await visivel(pag, '#abrir-assistente'), await visivel(pag, '#cel-assistente')], [false, false]);
   await modo(pag, 'so-le', 390, 844);
-  conf('o celular que só lê, com a conta: tem o ícone na linha do dia (perguntar é ler)', await visivel(pag, '#cel-assistente'), true);
+  conf('o celular que só lê, com a conta: tem a porta (perguntar é ler)', await visivel(pag, '#cel-assistente'), true);
   await modo(pag, 'dona-celular', 390, 844);
-  conf('o celular da dona: o ícone fica na linha do dia, antes do Vagos', await pag.evaluate(() => { const b = document.querySelector('#cel-assistente'); return !!b && b.nextElementSibling && b.nextElementSibling.id; }), 'cel-abrir-vagos');
-  conf('o ícone tem nome para o leitor de tela e o alvo de 48 px', await pag.evaluate(() => { const b = document.querySelector('#cel-assistente'); const r = b.getBoundingClientRect(); return [b.getAttribute('aria-label'), r.width >= 48 && r.height >= 48]; }), ['Perguntar ao assistente', true]);
+  const porta = await pag.evaluate(() => {
+    const b = document.querySelector('#cel-assistente'), linha = document.querySelector('.cel-semana-topo'), r = b.getBoundingClientRect(), rl = linha.getBoundingClientRect();
+    return { texto: b.textContent.trim(), icone: (b.querySelector('svg') || { getAttribute: () => '' }).getAttribute('data-icone-nome'), naLinhaDoDia: !!b.closest('.cel-semana-topo'),
+      abaixo: r.top >= rl.bottom - 1, presa: !!b.closest('#cel-semana'), alvo: r.height >= 48 && r.width >= 48 };
+  });
+  conf('no celular da dona: a pílula "Perguntar" com o balão, numa segunda linha presa abaixo da linha do dia (fora dela), alvo de 48 px', porta,
+    { texto: 'Perguntar', icone: 'perguntar', naLinhaDoDia: false, abaixo: true, presa: true, alvo: true });
+  conf('a linha do dia é a da main: "Hoje, seg 16/11", o Vagos com a palavra e o "1 dia" à vista', await pag.evaluate(() => {
+    const t = document.querySelector('#cel-dia-titulo'), v = document.querySelector('#cel-abrir-vagos'), p = document.querySelector('#cel-dia-anterior');
+    return [t.textContent, t.children.length, v.textContent, !v.querySelector('svg'), getComputedStyle(p).fontSize !== '0px', p.textContent.trim()];
+  }), ['Hoje, seg 16/11', 0, 'Vagos', true, true, '1 dia']);
   await modo(pag, 'dona-tablet', 1280, 900);
-  conf('a dona no tablet: o ícone no alto, ao lado do olho', await visivel(pag, '#abrir-assistente'), true);
+  const pilula = await pag.evaluate(() => {
+    const b = document.querySelector('#abrir-assistente'), o = document.querySelector('#alternar-valores'), rb = b.getBoundingClientRect(), ro = o.getBoundingClientRect();
+    return { visivel: rb.width > 0, texto: b.textContent.trim(), icone: (b.querySelector('svg') || { getAttribute: () => '' }).getAttribute('data-icone-nome'),
+      vizinha: Math.round(ro.left - rb.right) <= 16 && Math.round(ro.left - rb.right) >= 0, alinhada: Math.abs((rb.top + rb.bottom) / 2 - (ro.top + ro.bottom) / 2) <= 3, alvo: rb.height >= 48 };
+  });
+  conf('no tablet: a pílula "Perguntar" com o balão, vizinha do olho (até 16 px), alinhada a ele e com o alvo de 48 px', pilula,
+    { visivel: true, texto: 'Perguntar', icone: 'perguntar', vizinha: true, alinhada: true, alvo: true });
   const antes = await banco(pag);
 
   // ================================================================
-  secao('1. No tablet: os exemplos, o laço com duas ferramentas, o Entendi e o cartão');
+  secao('1. No tablet: os exemplos, tocar pergunta, o laço, o Entendi e o cartão editável');
   await clicar(pag, '#abrir-assistente');
   await esperar('a janela abriu', () => aberta(pag, 'modal-assistente'), v => v === true, 10000);
-  conf('o foco no campo; o Perguntar desligado sem texto', await pag.evaluate(() => [document.activeElement && document.activeElement.id, document.querySelector('#ass-perguntar').disabled]), ['ass-texto', true]);
-  conf('na primeira vez, três exemplos curtos', await pag.evaluate(() => Array.from(document.querySelectorAll('.ass-exemplo')).map(b => b.textContent)),
-    ['O que eu tenho amanhã?', 'Quem não pagou outubro?', 'Avisa a mãe do João que vou atrasar 10 min']);
-  await clicar(pag, '.ass-exemplo');
-  conf('tocar no exemplo põe a frase no campo e liga o Perguntar', await pag.evaluate(() => [document.querySelector('#ass-texto').value, document.querySelector('#ass-perguntar').disabled]), ['O que eu tenho amanhã?', false]);
-  const primeira = ferramentas([['listar_aulas', { inicio: '2026-11-17', fim: '2026-11-17', alunoId: null }], ['preparar_whatsapp', { alunoId: 'al1', texto: 'Olá! Vou atrasar 10 minutos para a aula de Zélia.' }]], 'sig-primeira');
-  falso.fila = [primeira, texto('Amanhã você não tem aula.\nPreparei a mensagem: é só tocar em Abrir no WhatsApp.')];
+  conf('o foco no título (o teclado não sobe ao abrir); o Perguntar desligado sem texto', await pag.evaluate(() => [document.activeElement && document.activeElement.id, document.querySelector('#ass-perguntar').disabled]), ['titulo-modal-assistente', true]);
+  conf('os exemplos: um de horário livre, o mês passado e o nome de um aluno dela (nunca "João")', await pag.evaluate(() => Array.from(document.querySelectorAll('#ass-exemplos .ass-exemplo')).map(b => b.textContent)),
+    ['O que eu tenho amanhã?', 'Tenho horário livre amanhã à tarde?', 'Quem não pagou outubro?', 'Avisa a família de Bruno que vou atrasar']);
+  conf('o Perguntar desligado é legível (texto escuro, sem transparência)', await pag.evaluate(() => { const c = getComputedStyle(document.querySelector('#ass-perguntar')); return [c.opacity, c.color]; }), ['1', 'rgb(26, 28, 31)']);
+  const primeira = ferramentas([['listar_aulas', { inicio: '2026-11-17', fim: '2026-11-17', alunoId: null }], ['preparar_whatsapp', { alunoId: 'al1', texto: 'Olá! Vou atrasar ___ min para a aula de Zélia.' }]], 'sig-primeira');
+  falso.fila = [primeira, texto('Amanhã você não tem aula.\nPreparei a mensagem: é só tocar em **Abrir no WhatsApp**.')];
   falso.pedidos = [];
-  await clicar(pag, '#ass-perguntar');
-  await esperar('a resposta chegou', () => pag.evaluate(() => !document.querySelector('#ass-esperando') && !!document.querySelector('.ass-vez')), v => v === true, 15000);
+  await clicar(pag, '#ass-exemplos .ass-exemplo');
+  await respondeu(pag);
   const p0 = falso.pedidos[0] && falso.pedidos[0].corpo, p1 = falso.pedidos[1] && falso.pedidos[1].corpo;
-  conf('dois pedidos ao endpoint, na rota assistente, com o login e as 16 ferramentas', [falso.pedidos.length, p0.rota, falso.pedidos[0].autorizacao, p0.tools.length], [2, 'assistente', 'Bearer token-falso-da-prova', 16]);
-  conf('o pedido leva o agora pelo relógio da tela (segunda, 16/11/2026, 11h) e os alunos só pelo primeiro nome', [/Agora: segunda-feira, 16\/11\/2026 \(2026-11-16\), 11:/.test(p0.messages[0].content[0].text), /Sobrenome/.test(JSON.stringify(p0)), /98765|Rua Sintética/.test(JSON.stringify(p0))], [true, false, false]);
+  conf('tocar no exemplo já pergunta: dois pedidos na rota assistente, com o login e as 16 ferramentas', [falso.pedidos.length, p0.rota, falso.pedidos[0].autorizacao, p0.tools.length, /O que eu tenho amanhã\?/.test(p0.messages[0].content[0].text)], [2, 'assistente', 'Bearer token-falso-da-prova', 16, true]);
+  conf('o pedido leva o agora pelo relógio da tela e os alunos só pelo primeiro nome', [/Agora: segunda-feira, 16\/11\/2026 \(2026-11-16\), 11:/.test(p0.messages[0].content[0].text), /Sobrenome/.test(JSON.stringify(p0)), /98765|Rua Sintética|Responsável/.test(JSON.stringify(p0))], [true, false, false]);
   conf('o segundo pedido devolve o content do modelo INTACTO e os dois resultados juntos', [JSON.stringify(p1.messages[1].content) === JSON.stringify(primeira.resposta.content), p1.messages[2].content.map(b => b.type + ':' + b.tool_use_id).join(',')],
     [true, 'tool_result:toolu_0_listar_aulas,tool_result:toolu_1_preparar_whatsapp']);
-  conf('o resultado ao modelo não leva o telefone', /98765|wa\.me/.test(JSON.stringify(p1.messages[2])), false);
+  conf('o resultado ao modelo não leva o telefone nem o responsável', /98765|wa\.me|Responsável/.test(JSON.stringify(p1.messages[2])), false);
   const vez = await pag.evaluate(() => ({
     pergunta: document.querySelector('.ass-pergunta').textContent,
     resposta: Array.from(document.querySelectorAll('.ass-resposta p')).map(p => p.textContent),
     entendido: (document.querySelector('.ass-entendido') || {}).textContent,
-    cartao: (document.querySelector('.ass-cartao[data-tipo="whatsapp"] .ass-mensagem') || {}).textContent,
+    entendidoLetra: getComputedStyle(document.querySelector('.ass-entendido')).fontSize,
+    linha: (document.querySelector('.ass-cartao[data-tipo="whatsapp"] .ass-cartao-linha') || {}).textContent,
+    campo: (document.querySelector('.ass-cartao[data-tipo="whatsapp"] textarea') || {}).value,
     href: (document.querySelector('.ass-cartao[data-tipo="whatsapp"] a') || { getAttribute: () => '' }).getAttribute('href'),
-    alvo: (document.querySelector('.ass-cartao[data-tipo="whatsapp"] a') || {}).target,
-    exemplos: !!document.querySelector('.ass-exemplos')
+    principal: Array.from(document.querySelectorAll('.ass-cartao[data-tipo="whatsapp"] a')).map(a => a.classList.contains('principal')),
+    exemplos: !!document.querySelector('#ass-exemplos'), ideias: !!document.querySelector('#ass-ideias:not([open])')
   }));
-  conf('a pergunta, a resposta em duas linhas e o dia que entendeu', [vez.pergunta, vez.resposta, vez.entendido],
-    ['O que eu tenho amanhã?', ['Amanhã você não tem aula.', 'Preparei a mensagem: é só tocar em Abrir no WhatsApp.'], 'Entendi: terça, 17/11; Zélia.']);
-  conf('o cartão do WhatsApp mostra o texto e abre a conversa com ele, numa aba nova', [vez.cartao, vez.href, vez.alvo],
-    ['Olá! Vou atrasar 10 minutos para a aula de Zélia.', 'https://wa.me/5521987654321?text=' + encodeURIComponent('Olá! Vou atrasar 10 minutos para a aula de Zélia.'), '_blank']);
-  conf('depois da primeira pergunta, os exemplos somem', vez.exemplos, false);
+  conf('a pergunta, a resposta em duas linhas sem markdown e o dia que entendeu, com letra de 14 px ou mais', [vez.pergunta, vez.resposta, vez.entendido, parseFloat(vez.entendidoLetra) >= 14],
+    ['O que eu tenho amanhã?', ['Amanhã você não tem aula.', 'Preparei a mensagem: é só tocar em Abrir no WhatsApp.'], 'Entendi: terça, 17/11; Zélia.', true]);
+  conf('o cartão do WhatsApp: uma linha com o responsável e o número, o texto num campo, e o WhatsApp é o único principal', [vez.linha, vez.campo, vez.principal, vez.href],
+    ['WhatsApp de Responsável Sintético (21) 98765-4321', 'Olá! Vou atrasar ___ min para a aula de Zélia.', [true], 'https://wa.me/5521987654321?text=' + encodeURIComponent('Olá! Vou atrasar ___ min para a aula de Zélia.')]);
+  conf('depois da primeira pergunta, os exemplos saem e as "Ideias" ficam recolhidas', [vez.exemplos, vez.ideias], [false, true]);
+  await pag.evaluate(() => { const c = document.querySelector('.ass-cartao[data-tipo="whatsapp"] textarea'); c.value = 'Olá! Vou atrasar 15 min para a aula de Zélia.'; c.dispatchEvent(new Event('input', { bubbles: true })); });
+  const hrefEditado = await pag.evaluate(() => document.querySelector('.ass-cartao[data-tipo="whatsapp"] a').getAttribute('href'));
+  conf('ela muda o texto antes de abrir, e o link acompanha', hrefEditado, 'https://wa.me/5521987654321?text=' + encodeURIComponent('Olá! Vou atrasar 15 min para a aula de Zélia.'));
   conf('nada abriu sozinho e nada foi para fora (' + paraFora.length + ')', [await pag.evaluate(() => window.__aberturas.length), paraFora.length], [0, 0]);
   await pag.evaluate(() => document.querySelector('.ass-cartao[data-tipo="whatsapp"] a').click());
-  conf('(controle) o toque dela no cartão é visto pelo instrumento', await pag.evaluate(() => window.__aberturas.join(' ; ')), 'toque ' + vez.href);
+  conf('(controle) o toque dela no cartão é visto pelo instrumento, com o texto dela', await pag.evaluate(() => window.__aberturas.join(' ; ')), 'toque ' + hrefEditado);
 
   // ================================================================
-  secao('2. Ligar, mapa e contato');
+  secao('2. Ligar, mapa e contato, compactos');
   falso.fila = [ferramentas([['preparar_ligacao', { alunoId: 'al1' }], ['preparar_mapa', { alunoId: 'al1' }], ['contato', { alunoId: 'al1' }]]), texto('Está nos cartões abaixo.')];
   await perguntar(pag, 'liga para a mãe da Zélia e me mostra o endereço');
-  const cartoes = await pag.evaluate(() => Array.from(document.querySelectorAll('.ass-vez:last-child .ass-cartao')).map(c => c.dataset.tipo + ' ' + Array.from(c.querySelectorAll('a')).map(a => a.getAttribute('href')).join(' ')));
-  conf('os três cartões: Ligar (tel:), Abrir no mapa e o contato com os três botões', cartoes, [
-    'ligar tel:+5521987654321',
-    'mapa https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('Rua Sintética, 10'),
-    'contato tel:+5521987654321 https://wa.me/5521987654321 https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('Rua Sintética, 10')]);
-  conf('o telefone aparece no cartão, na tela dela', await pag.evaluate(() => (document.querySelector('.ass-vez:last-child .ass-telefone') || {}).textContent), 'Telefone: (21) 98765-4321');
+  const cartoes = await pag.evaluate(() => Array.from(document.querySelectorAll('.ass-vez:last-of-type .ass-cartao')).map(c => ({
+    tipo: c.dataset.tipo, linha: Array.from(c.querySelectorAll('.ass-cartao-linha')).map(l => l.textContent).join(' | '),
+    links: Array.from(c.querySelectorAll('a')).map(a => a.dataset.cartao + (a.classList.contains('principal') ? '*' : '') + ' ' + a.getAttribute('aria-label')) })));
+  conf('ligar: o responsável e o número numa linha, e o "Ligar" secundário com o contexto para o leitor de tela', cartoes[0],
+    { tipo: 'ligar', linha: 'Responsável Sintético (21) 98765-4321', links: ['ligar Ligar para Responsável Sintético, (21) 98765-4321'] });
+  conf('mapa: o endereço em cinza para conferir, e o "Abrir no mapa" secundário', cartoes[1],
+    { tipo: 'mapa', linha: 'Endereço de Zélia Rua Sintética, 10', links: ['mapa Abrir no mapa o endereço de Zélia'] });
+  conf('contato: o WhatsApp é o principal; Ligar e Mapa secundários', [cartoes[2].tipo, cartoes[2].links.map(l => l.split(' ')[0])], ['contato', ['whatsapp*', 'ligar', 'mapa']]);
   falso.fila = [ferramentas([['preparar_whatsapp', { alunoId: 'al2', texto: 'Oi' }]]), texto('O Bruno não tem celular cadastrado.')];
   await perguntar(pag, 'avisa a mãe do Bruno');
   const ultimo = falso.pedidos[falso.pedidos.length - 1].corpo.messages;
-  conf('sem celular: a ferramenta volta como erro ao modelo e nenhum cartão aparece', [ultimo[ultimo.length - 1].content[0].is_error, await pag.evaluate(() => document.querySelectorAll('.ass-vez:last-child .ass-cartao').length)], [true, 0]);
+  conf('sem celular: a ferramenta volta como erro ao modelo e nenhum cartão aparece', [ultimo[ultimo.length - 1].content[0].is_error, await pag.evaluate(() => document.querySelectorAll('.ass-vez:last-of-type .ass-cartao').length)], [true, 0]);
+  falso.fila = [ferramentas([['preparar_whatsapp', { alunoId: 'al1', texto: 'Olá! Ficou R$ 9.999,00 de outubro.' }]]), texto('Para cobrar, uso a cobrança do app.')];
+  await perguntar(pag, 'manda a cobrança da Zélia');
+  const ultimo2 = falso.pedidos[falso.pedidos.length - 1].corpo.messages;
+  conf('VENENO: o modelo põe valor no WhatsApp e a ferramenta recusa, sem cartão', [ultimo2[ultimo2.length - 1].content[0].is_error, /preparar_cobranca/.test(ultimo2[ultimo2.length - 1].content[0].content),
+    await pag.evaluate(() => document.querySelectorAll('.ass-vez:last-of-type .ass-cartao').length)], [true, true, 0]);
 
   // ================================================================
   secao('3. O teto de 5 voltas');
@@ -224,31 +260,48 @@ async function transbordo(pag, raizSel) {
   falso.sempre = () => ferramentas([['valor_hora', { alunoId: 'al1' }]]);
   await perguntar(pag, 'quanto eu cobro da Zélia?');
   falso.sempre = null;
-  conf('no máximo 5 pedidos, a frase própria e a pergunta de volta no campo', [falso.pedidos.length, await pag.evaluate(() => (document.querySelector('#ass-erro') || {}).textContent), await pag.evaluate(() => document.querySelector('#ass-texto').value)],
-    [5, 'Não consegui responder em poucos passos. Tente perguntar de um jeito mais direto.', 'quanto eu cobro da Zélia?']);
+  conf('no máximo 5 pedidos, a frase sem jargão perto do campo, com o ícone, e a pergunta de volta no campo',
+    [falso.pedidos.length, await pag.evaluate(() => [document.querySelector('#ass-erro').textContent, !!document.querySelector('#ass-erro svg'), !!document.querySelector('#rodape-modal-assistente #ass-erro'), document.querySelector('#ass-texto').value])],
+    [5, ['Não achei essa resposta. Tente perguntar de outro jeito.', true, true, 'quanto eu cobro da Zélia?']]);
 
   // ================================================================
   secao('4. Erros: ocupado com "Tentar de novo"; sem permissão, neutro e sem ele');
   falso.fila = [{ ok: false, codigo: 'ocupado' }];
   await perguntar(pag, 'o que eu tenho hoje?');
   conf('ocupado: a frase e o "Tentar de novo"', await pag.evaluate(() => [document.querySelector('#ass-erro').getAttribute('role'), document.querySelector('#ass-erro span').textContent, !!document.querySelector('#ass-tentar')]),
-    ['alert', 'A IA está ocupada agora. Tente de novo daqui a pouco.', true]);
-  falso.fila = [texto('Hoje você tem a Zélia às 15h.')];
+    ['alert', 'Não consegui agora. Toque em Tentar de novo.', true]);
+  falso.fila = [texto('Hoje você tem a Zélia às 15:00.')];
   await clicar(pag, '#ass-tentar');
   await esperar('o tentar de novo respondeu', () => pag.evaluate(() => !document.querySelector('#ass-esperando') && !document.querySelector('#ass-erro')), v => v === true, 15000);
-  conf('"Tentar de novo" pergunta de novo e responde', await pag.evaluate(() => document.querySelector('.ass-vez:last-child .ass-resposta').textContent), 'Hoje você tem a Zélia às 15h.');
+  conf('"Tentar de novo" pergunta de novo e responde', await pag.evaluate(() => document.querySelector('.ass-vez:last-of-type .ass-resposta').textContent), 'Hoje você tem a Zélia às 15:00.');
   falso.fila = [{ ok: false, codigo: 'sem_permissao' }];
   await perguntar(pag, 'oi');
-  conf('sem_permissao: frase neutra, sem "Tentar de novo"', await pag.evaluate(() => [document.querySelector('#ass-erro span').textContent, !!document.querySelector('#ass-tentar')]), ['A IA ainda não está liberada nesta conta.', false]);
+  conf('sem_permissao: a frase neutra do planejamento, sem "Tentar de novo"', await pag.evaluate(() => [document.querySelector('#ass-erro span').textContent, !!document.querySelector('#ass-tentar')]), ['A IA ainda não está liberada nesta conta.', false]);
 
   // ================================================================
-  secao('5. Fechar e abrir de novo: a conversa da sessão fica');
-  const vezes = await pag.evaluate(() => document.querySelectorAll('.ass-vez').length);
+  secao('5. Fechar no meio devolve a pergunta; a conversa fica; "Nova conversa" zera');
+  falso.segurar = true;
+  await pausa(450);
+  await pag.evaluate(() => { const c = document.querySelector('#ass-texto'); c.value = 'pergunta que fica no meio'; c.dispatchEvent(new Event('input', { bubbles: true })); });
+  await clicar(pag, '#ass-perguntar');
+  await esperar('o "Procurando..." apareceu', () => visivel(pag, '#ass-esperando'), v => v === true, 10000);
   await pag.evaluate(() => document.querySelector('#modal-assistente .fechar').click());
   await esperar('a janela fechou', () => aberta(pag, 'modal-assistente'), v => v === false, 10000);
-  conf('o foco volta ao ícone', await pag.evaluate(() => document.activeElement && document.activeElement.id), 'abrir-assistente');
+  falso.segurar = false;
+  falso.segurados.forEach(r => r.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(texto('tarde demais')) }).catch(() => {}));
+  falso.segurados = [];
+  conf('o foco volta à pílula', await pag.evaluate(() => document.activeElement && document.activeElement.id), 'abrir-assistente');
   await clicar(pag, '#abrir-assistente');
-  conf('reabrir mostra o que já foi perguntado', await pag.evaluate(() => document.querySelectorAll('.ass-vez').length), vezes);
+  await pausa(300);
+  conf('reabrir: a pergunta de antes está no campo, e a resposta atrasada não entrou na conversa', await pag.evaluate(() => [document.querySelector('#ass-texto').value, /tarde demais/.test(document.querySelector('#ass-conversa').textContent)]), ['pergunta que fica no meio', false]);
+  const vezes = await pag.evaluate(() => document.querySelectorAll('.ass-vez').length);
+  conf('(arranjo) a conversa tem as perguntas de antes, e o "Nova conversa" está à vista', [vezes >= 5, await visivel(pag, '#ass-nova')], [true, true]);
+  await clicar(pag, '#ass-nova');
+  conf('"Nova conversa" zera a conversa e volta aos exemplos', await pag.evaluate(() => [document.querySelectorAll('.ass-vez').length, !!document.querySelector('#ass-exemplos'), document.querySelector('#ass-nova').hidden]), [0, true, true]);
+  falso.pedidos = [];
+  falso.fila = [texto('Nova.')];
+  await perguntar(pag, 'oi de novo');
+  conf('depois de "Nova conversa", o pedido começa do zero (com a lista de alunos)', [falso.pedidos[0].corpo.messages.length, /Alunos ativos/.test(falso.pedidos[0].corpo.messages[0].content[0].text)], [1, true]);
   await pag.evaluate(() => document.querySelector('#modal-assistente .fechar').click());
   await pausa(300);
 
@@ -258,17 +311,17 @@ async function transbordo(pag, raizSel) {
   conf('nenhum pedido saiu para fora do servidor da prova (' + paraFora.slice(0, 3).join(', ') + ')', paraFora.length, 0);
 
   // ================================================================
-  secao('7. No celular da dona: o fluxo e a trava de transbordo');
+  secao('7. No celular da dona: o fluxo, as duas linhas do alto e a trava de transbordo');
   await modo(pag, 'dona-celular', 390, 844);
   const antesCel = await banco(pag);
   await clicar(pag, '#cel-assistente');
   await esperar('a janela abriu no celular', () => aberta(pag, 'modal-assistente'), v => v === true, 10000);
-  falso.fila = [ferramentas([['preparar_whatsapp', { alunoId: 'al1', texto: 'Olá! Estou chegando para a aula de Zélia, em cerca de 10 minutos, por causa do trânsito na avenida principal.' }], ['preparar_ligacao', { alunoId: 'al1' }]]),
+  falso.fila = [ferramentas([['preparar_whatsapp', { alunoId: 'al1', texto: 'Olá! Vou atrasar ___ min para a aula de Zélia, por causa do trânsito na avenida principal.' }], ['preparar_ligacao', { alunoId: 'al1' }]]),
     texto('Preparei a mensagem e o atalho para ligar. É só tocar no botão; nada foi enviado.')];
-  await perguntar(pag, 'avisa a mãe da Zélia que estou chegando');
+  await perguntar(pag, 'avisa a família da Zélia que vou atrasar por causa do trânsito');
   conf('no celular, o cartão do WhatsApp e o de ligar', await pag.evaluate(() => Array.from(document.querySelectorAll('.ass-cartao')).map(c => c.dataset.tipo)), ['whatsapp', 'ligar']);
   conf('no celular, nada gravou (o banco e a fila iguais)', (await banco(pag)) === antesCel, true);
-  const falhas = [];
+  const falhas = [], linhas = [];
   for (const largura of [360, 390, 412]) {
     for (const letra of ['100%', '130%']) {
       await pag.setViewport({ width: largura, height: 800, hasTouch: true });
@@ -281,35 +334,26 @@ async function transbordo(pag, raizSel) {
   }
   await pag.evaluate(() => { document.documentElement.style.fontSize = ''; document.querySelector('#modal-assistente .fechar').click(); });
   await pausa(300);
-  const linhas = [];
   for (const largura of [360, 390, 412]) {
     for (const letra of ['100%', '130%']) {
       await pag.setViewport({ width: largura, height: 800, hasTouch: true });
       await pag.evaluate(l => { document.documentElement.style.fontSize = l; }, letra);
       await pausa(300);
-      (await transbordo(pag, '#cel-semana')).forEach(f => falhas.push(largura + '/' + letra + ' linha do dia: ' + f));
-      /* A linha do dia com o ícone, e a mesma linha sem ele (o desenho de
-       * antes, como controle): o ícone não pode empurrar a agenda para baixo. */
-      const m = await pag.evaluate(() => { const t = document.querySelector('#cel-dia-titulo'); const lh = parseFloat(getComputedStyle(t).lineHeight) || 20;
-        const linha = document.querySelector('.cel-semana-topo');
-        const r = { linhas: Math.round(t.getBoundingClientRect().height / lh), alto: Math.round(linha.getBoundingClientRect().height), semana: (t.textContent),
-          selo: !!linha.querySelector('#cel-avisos-selo'), relogio: getComputedStyle(document.querySelector('#cel-abrir-vagos .ico')).display };
-        const b = document.querySelector('#cel-assistente'); const prox = b.nextSibling;
-        b.remove(); linha.classList.remove('com-assistente');
-        r.altoSem = Math.round(linha.getBoundingClientRect().height); r.relogioSem = getComputedStyle(document.querySelector('#cel-abrir-vagos .ico')).display; r.linhasSem = Math.round(t.getBoundingClientRect().height / lh);
-        linha.insertBefore(b, prox); linha.classList.add('com-assistente');
-        return r; });
-      linhas.push(largura + '/' + letra + ': título em ' + m.linhas + ' linha(s) (sem o ícone: ' + m.linhasSem + '), a linha do dia com ' + m.alto + ' px (sem o ícone: ' + m.altoSem + ')');
-      if (m.linhas > Math.max(2, m.linhasSem)) falhas.push(largura + '/' + letra + ' o título da linha do dia quebra em ' + m.linhas + ' linhas (sem o ícone: ' + m.linhasSem + ')');
-      if (m.alto > m.altoSem) falhas.push(largura + '/' + letra + ' o ícone aumenta a linha do dia (' + m.altoSem + ' para ' + m.alto + ' px)');
-      if (m.semana.indexOf('Hoje, seg 16/11') !== 0) falhas.push('o texto do título mudou: ' + m.semana);
-      if (!m.selo) falhas.push(largura + '/' + letra + ' (arranjo) o selinho dos avisos não está na linha');
-      if (m.relogio === 'none' || m.relogioSem !== 'none') falhas.push(largura + '/' + letra + ' o relógio do Vagos: com o ícone ' + m.relogio + ', sem ' + m.relogioSem);
+      (await transbordo(pag, '#cel-semana')).forEach(f => falhas.push(largura + '/' + letra + ' alto: ' + f));
+      const m = await pag.evaluate(() => {
+        const t = document.querySelector('#cel-dia-titulo'), lh = parseFloat(getComputedStyle(t).lineHeight) || 20;
+        const dia = document.querySelector('.cel-semana-topo').getBoundingClientRect(), nova = document.querySelector('#cel-assistente-linha').getBoundingClientRect();
+        const cortado = Array.from(document.querySelectorAll('#cel-semana *')).filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (e.scrollHeight > e.clientHeight + 1 && getComputedStyle(e).overflowY === 'hidden'); }).map(e => e.id || e.className);
+        return { linhas: Math.round(t.getBoundingClientRect().height / lh), dia: Math.round(dia.height), nova: Math.round(nova.height), cortado };
+      });
+      linhas.push(largura + '/' + letra + ': título em ' + m.linhas + ' linha(s); linha do dia ' + m.dia + ' px; linha do "Perguntar" ' + m.nova + ' px');
+      if (m.nova > 56) falhas.push(largura + '/' + letra + ' a linha do "Perguntar" tem ' + m.nova + ' px');
+      if (m.cortado.length) falhas.push(largura + '/' + letra + ' cortado: ' + m.cortado.join(', '));
     }
   }
   linhas.forEach(l => console.log('   ' + l));
   await pag.evaluate(() => { document.documentElement.style.fontSize = ''; });
-  conf('a 360, 390 e 412 px, letra normal e 130%: nada passa da borda, alvos de 48 px, título em até 2 linhas e o rodapé contido (' + (falhas.slice(0, 6).join(' | ') || 'nenhuma falha') + ')', falhas.length, 0);
+  conf('a 360, 390 e 412 px, letra normal e 130%: nada passa da borda, nada cortado, alvos de 48 px, a linha nova até 56 px e o rodapé contido (' + (falhas.slice(0, 6).join(' | ') || 'nenhuma falha') + ')', falhas.length, 0);
   /* Controle: um elemento largo na janela é acusado pela varredura. */
   await pag.setViewport({ width: 360, height: 800, hasTouch: true });
   await clicar(pag, '#cel-assistente');

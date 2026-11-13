@@ -24,9 +24,10 @@
       <strong>Nathália Wajsenzon</strong>
       <span>Apoio Educacional</span>
     </div>
+    <!-- IA, fase 3: o assistente só de leitura, numa pílula com rótulo, vizinha do olho. Some sem a conta da
+         nuvem e no observador (app.js, podeUsarAssistente). -->
+    <button class="pilula-perguntar" id="abrir-assistente" type="button" title="Perguntar ao assistente" data-icone="perguntar" data-assistente="abrir" hidden>Perguntar</button>
     <button class="olho" id="alternar-valores" type="button" title="Esconder os valores" aria-label="Esconder os valores" data-icone="olho"></button>
-    <!-- IA, fase 3: o assistente só de leitura. Some sem a conta da nuvem e no observador (app.js, podeUsarAssistente). -->
-    <button class="olho assistente-topo" id="abrir-assistente" type="button" title="Perguntar ao assistente" aria-label="Perguntar ao assistente" data-icone="mic" data-assistente="abrir" hidden></button>
     <!-- B1: o trilho lateral do tablet (o "+" no alto, os quatro destinos e Ajustes no pé).
          Os ganchos das provas ficam: #abas, .aba, .ativa e data-tela.
          O ícone de Ajustes (controles deslizantes) foi desenhado aqui, no traço 1,75 da grade 24,
@@ -640,7 +641,8 @@
   <div class="fundo-modal" id="modal-assistente">
     <div class="modal ass-modal">
       <div class="modal-cabecalho">
-        <h3 id="titulo-modal-assistente">Assistente</h3>
+        <h3 id="titulo-modal-assistente" tabindex="-1">Assistente</h3>
+        <button class="btn pequeno" id="ass-nova" type="button" hidden>Nova conversa</button>
         <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
       </div>
       <div class="modal-corpo" id="corpo-modal-assistente"></div>
