@@ -64,9 +64,17 @@ const VENENOS = {
   listafolha: { arq: '/app.js', trocas: [['imagemNumerada(p.enunciado, i + 1, 0, p.credito)', 'imagemNumerada(p.enunciado, i + 1, 0, null)']] },
   pdf: { arq: '/pdf.js', trocas: [[NLP("      creditos('lista');\n"), ''], [NLP("      creditos('gabarito');\n"), '']] }
 };
+/* Os modos aceitos, por extenso: o testa_venenos_existem confere que cada
+ * veneno que o portão chama aparece escrito nesta prova. */
+const MODOS = {
+  '--envenenado-cartao': 'cartao', '--envenenado-visor': 'visor', '--envenenado-previa': 'previa',
+  '--envenenado-edicao': 'edicao', '--envenenado-link': 'link', '--envenenado-abrir': 'abrir',
+  '--envenenado-listafolha': 'listafolha', '--envenenado-pdf': 'pdf'
+};
 const arg = process.argv.find(a => a.indexOf('--envenenado-') === 0);
-const VENENO = arg ? arg.slice('--envenenado-'.length) : null;
-if (VENENO && !VENENOS[VENENO]) { console.error('veneno desconhecido: ' + VENENO); process.exit(2); }
+if (arg && !MODOS[arg]) { console.error('veneno desconhecido: ' + arg); process.exit(2); }
+const VENENO = arg ? MODOS[arg] : null;
+if (VENENO && !VENENOS[VENENO]) { console.error('veneno sem troca: ' + VENENO); process.exit(2); }
 const trocas = {};
 let contagemDoVeneno = [];
 if (VENENO) {
