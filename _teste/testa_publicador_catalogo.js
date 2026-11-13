@@ -40,12 +40,18 @@
  *   --envenenado-dois-lotes          cada escrita num commit: a falha do 5
  *                                    deixa livros gravados;
  *   --envenenado-regra-herda-escrita a regra do config/catalogo deixa a dona
- *                                    escrever (9).
+ *                                    escrever (9);
+ *   --envenenado-repetido-ultima-vence  na classificação repetida, a última
+ *                                    linha vence: o SAI seguido de FICA entra (8);
+ *   --envenenado-nome-cortado        a classificação casa pelo começo do
+ *                                    nome: os volumes compridos se confundem (8);
+ *   --envenenado-registro-vazio-passa  o registro de ids que sumiu vira um
+ *                                    registro vazio (11).
  *
  * Precisa do firebase-tools fora do repositório (FIREBASE_TOOLS) e de um JDK
  * 21 em JAVA_HOME, como o testa_nuvem.js; sem eles, REPROVA dizendo onde
- * procurou. Portas: 8986 (auth), 8987 (firestore), 8988 (hub), 8989 (log),
- * 8990 (websocket).
+ * procurou. Portas: 9031 (auth), 9032 (firestore), 9033 (hub), 9034 (log),
+ * 9035 (websocket).
  */
 'use strict';
 const fs = require('fs');
@@ -59,7 +65,7 @@ const PYTHON = process.env.PYTHON || 'python';
 const FIREBASE = process.env.FIREBASE_TOOLS ||
   'C:/Users/romul/ferramentas/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js';
 const JAVA_HOME = process.env.JAVA_HOME || '';
-const PORTA_AUTH = 8986, PORTA_FS = 8987, PORTA_HUB = 8988, PORTA_LOG = 8989, PORTA_WS = 8990;
+const PORTA_AUTH = 9031, PORTA_FS = 9032, PORTA_HUB = 9033, PORTA_LOG = 9034, PORTA_WS = 9035;
 const PROJETO = 'demo-nath-catalogo';
 const AUTH = 'http://127.0.0.1:' + PORTA_AUTH;
 const FS = 'http://127.0.0.1:' + PORTA_FS;
@@ -70,7 +76,10 @@ const FONTE = fs.readFileSync(PUBLICADOR, 'utf8').replace(/\r\n/g, '\n');
 const REGRAS = fs.readFileSync(path.join(RAIZ, 'firestore.rules'), 'utf8').replace(/\r\n/g, '\n');
 const VENENOS = {
   '--envenenado-aceita-id-trocado': ['py', '        if dono_do_sha and dono_do_sha != lid:\n', '        if False:\n'],
-  '--envenenado-escreve-fora-da-lista': ['py', "            if not CAMINHO_PERMITIDO.match(e['caminho']):\n", '            if False:\n'],
+  '--envenenado-escreve-fora-da-lista': ['py', "            if not CAMINHO_PERMITIDO.fullmatch(e['caminho']):\n", '            if False:\n'],
+  '--envenenado-repetido-ultima-vence': ['py', "        resultados = sorted({l['resultado'] for l in linhas})\n", "        resultados = [linhas[-1]['resultado']] if linhas else []\n"],
+  '--envenenado-nome-cortado': ['py', '        elif a == base:\n', '        elif a[:12] == base[:12]:\n'],
+  '--envenenado-registro-vazio-passa': ['py', "        if a.registro_ids and not os.path.isfile(a.registro_ids) and not a.primeira_publicacao:\n", '        if False:\n'],
   '--envenenado-dois-lotes': ['py', '            fs.commit(escritas)\n', '            [fs.commit([e]) for e in escritas]\n'],
   '--envenenado-regra-herda-escrita': ['regras', '      match /config/catalogo {\n        allow read: if podeLer(uid);\n        allow write: if false;',
     '      match /config/catalogo {\n        allow read: if podeLer(uid);\n        allow write: if dona(uid);']
@@ -107,9 +116,9 @@ fs.writeFileSync(CARREGADOR, [
   'exec(compile(texto, caminho, "exec"), m.__dict__)',
   'sys.exit(m.principal(sys.argv[1:]))', ''].join('\n'));
 
-function publicador(args, comEmulador) {
+function publicador(args, comEmulador, hostDoEmulador) {
   const env = Object.assign({}, process.env, { PYTHONIOENCODING: 'utf-8' });
-  if (comEmulador !== false) env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:' + PORTA_FS;
+  if (comEmulador !== false) env.FIRESTORE_EMULATOR_HOST = hostDoEmulador || ('127.0.0.1:' + PORTA_FS);
   else delete env.FIRESTORE_EMULATOR_HOST;
   const r = spawnSync(PYTHON, ['-X', 'utf8', CARREGADOR, '--projeto', PROJETO].concat(args), { encoding: 'utf8', env, timeout: 120000 });
   return { st: r.status, saida: (r.stdout || '') + (r.stderr || '') };
@@ -121,19 +130,25 @@ const cap = (n, titulo, ini, fim, ids) => ({ n, titulo, pagina: ini, pagina_fim:
 function livro(id, conteudo, extra) {
   return Object.assign({ id, formato: 'pdf', arquivo: 'livros/' + id + '.pdf', hash: 'sha256:' + hex(conteudo), bytes: conteudo.length * 1000,
     titulo: 'Livro de prova ' + id, volume: null, materia: 'matematica', materia_nome: 'Matemática', segmento: 'Fundamental II',
-    series: ['09'], paginas: 300, sumario: [], sumario_origem: 'mapa', mapa_origem: 'mapa', mapa_nota: 'Do mapa da orquestradora.' }, extra || {});
+    series: ['09'], paginas: 300, sumario: [], sumario_origem: 'mapa', mapa_origem: 'mapa', mapa_nota: 'Do mapa da orquestradora.',
+    arquivo_origem: 'Matematica/' + id + '.pdf' }, extra || {});
 }
 const MAPA_A = [cap(1, 'Números reais', 1, 40, ['MAT09-01']), cap(2, 'Proporcionalidade', 41, 120, ['MAT09-07'])];
 const MAPA_A2 = [cap(1, 'Números reais', 1, 40, ['MAT09-01']), cap(2, 'Círculo e cilindro', 41, 60, ['MAT09-12']),
   cap(3, 'Proporcionalidade', 61, 120, ['MAT09-07'])];
 const UID = 'donaDeTeste';   // trocado pelo uid da conta da dona do emulador ao subir
 let uid = UID;
-const escrever = (nome, dados) => { const p = path.join(TMP, nome); fs.writeFileSync(p, JSON.stringify(dados)); return p; };
+const escrever = (nome, dados) => { const p = path.join(TMP, nome); fs.writeFileSync(p, typeof dados === 'string' ? dados : JSON.stringify(dados)); return p; };
 const manifesto = (nome, livros) => escrever(nome, { esquema: 1, conteudo: 'livros', livros });
 const HERANCA = escrever('heranca.json', { 'livro-b': [{ titulo_antigo: 'PMR9_001_272', titulo_novo: 'Funções', pag_arquivo_inicio_antiga: 2 }] });
 const CHAVES = path.join(TMP, '_chaves');
 const IDS = path.join(TMP, '_ids.json');
-const comuns = () => ['--uid', uid, '--agora', '2026-11-13T10:00:00-03:00', '--chaves', CHAVES, '--registro-ids', IDS, '--heranca', HERANCA];
+// a classificação de todas as seções, pelo id (a seção 8 prova a do formato de 13/11, pelo caminho do arquivo)
+const CLASSIF = escrever('classificacao-geral.csv', 'id;resultado;motivo\nlivro-a;FICA;teoria\nlivro-b;FICA;teoria\nlivro-a-novo;FICA;teoria\n');
+const comuns = () => ['--emulador', '--uid', uid, '--agora', '2026-11-13T10:00:00-03:00', '--chaves', CHAVES, '--registro-ids', IDS, '--heranca', HERANCA,
+  '--classificacao', CLASSIF];
+// o arquivo de escrever devolve o caminho; o CSV vai como texto
+
 
 /* ---------- o emulador ---------- */
 const PASTA = path.join(TMP, 'emulador');
@@ -218,7 +233,11 @@ const retrato = async () => {
 
   secao('10. Fora do emulador, as portas de teste fecham e nada sai');
   let r = publicador(['--manifesto', manifesto('m0.json', [livro('livro-a', 'a1', { mapa: MAPA_A })]), '--uid', 'qualquer'], false);
-  conf('sem o emulador, --uid é recusado', r.st + '|' + /só valem contra o emulador/.test(r.saida), '2|true');
+  conf('sem --emulador, --uid é recusado', r.st + '|' + /só valem com --emulador/.test(r.saida), '2|true');
+  r = publicador(['--manifesto', manifesto('m0.json', [livro('livro-a', 'a1', { mapa: MAPA_A })]), '--uid', 'qualquer']);
+  conf('a variável do emulador sem a opção --emulador é recusada', r.st + '|' + /sem --emulador; nada foi feito/.test(r.saida), '2|true');
+  r = publicador(['--manifesto', manifesto('m0.json', [livro('livro-a', 'a1', { mapa: MAPA_A })]), '--emulador', '--uid', 'qualquer'], false);
+  conf('a opção --emulador sem a variável é recusada', r.st + '|' + /--emulador sem FIRESTORE_EMULATOR_HOST/.test(r.saida), '2|true');
   const semUid = path.join(TMP, 'uid.txt');
   fs.writeFileSync(semUid, 'abc123');
   r = publicador(['--manifesto', manifesto('m0.json', [livro('livro-a', 'a1', { mapa: MAPA_A })]), '--uid-arquivo', semUid,
@@ -228,6 +247,26 @@ const retrato = async () => {
   r = publicador(['--manifesto', manifesto('m0.json', [livro('livro-a', 'a1', { mapa: MAPA_A })]), '--uid-arquivo', semUid,
     '--gcloud-config', path.join(TMP, 'config-falsa'), '--gcloud', 'gcloud'], false);
   conf('o gcloud sem caminho absoluto é recusado (nada do PATH)', r.st + '|' + /caminho absoluto/.test(r.saida), '2|true');
+  // o gcloud falso, por caminho absoluto: diz a conta ativa e anota o ambiente que recebeu
+  const anotado = path.join(TMP, 'ambiente-do-gcloud.txt');
+  const falso = path.join(TMP, process.platform === 'win32' ? 'gcloud.cmd' : 'gcloud');
+  fs.writeFileSync(falso, process.platform === 'win32' ?
+    '@echo off\r\necho CONFIG=%CLOUDSDK_CONFIG% GAC=%GOOGLE_APPLICATION_CREDENTIALS% OVERRIDE=%CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE% TOKENFILE=%CLOUDSDK_AUTH_ACCESS_TOKEN_FILE% CONTA=%CLOUDSDK_CORE_ACCOUNT% IMPERSONA=%CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT% > "' + anotado + '"\r\necho outra-conta@exemplo.test\r\n' :
+    '#!/bin/sh\necho "CONFIG=$CLOUDSDK_CONFIG GAC=$GOOGLE_APPLICATION_CREDENTIALS OVERRIDE=$CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE TOKENFILE=$CLOUDSDK_AUTH_ACCESS_TOKEN_FILE CONTA=$CLOUDSDK_CORE_ACCOUNT IMPERSONA=$CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT" > "' + anotado + '"\necho outra-conta@exemplo.test\n');
+  if (process.platform !== 'win32') fs.chmodSync(falso, 0o755);
+  const envSujo = { GOOGLE_APPLICATION_CREDENTIALS: 'koli-adc.json', CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: 'koli-sa.json', CLOUDSDK_AUTH_ACCESS_TOKEN_FILE: 'koli-token.txt',
+    CLOUDSDK_CORE_ACCOUNT: 'koli@exemplo.test', CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT: 'sa-koli' };
+  Object.assign(process.env, envSujo);
+  r = publicador(['--manifesto', manifesto('m0.json', [livro('livro-a', 'a1', { mapa: MAPA_A })]), '--uid-arquivo', semUid,
+    '--gcloud-config', path.join(TMP, 'config-falsa'), '--gcloud', falso, '--conta', 'dono@exemplo.test'], false);
+  Object.keys(envSujo).forEach(k => { delete process.env[k]; });
+  conf('a conta ativa da configuração que não é a esperada recusa antes de pedir o token', r.st + '|' + /a conta ativa da configuração do dono é 'outra-conta@exemplo\.test'/.test(r.saida), '2|true');
+  const visto = fs.existsSync(anotado) ? fs.readFileSync(anotado, 'utf8').trim() : '';
+  conf('o gcloud recebeu só a configuração do dono: nenhuma variável que troca a conta passou', /^CONFIG=\S*config-falsa GAC=(%GOOGLE_APPLICATION_CREDENTIALS%)? OVERRIDE=(%\w+%)? TOKENFILE=(%\w+%)? CONTA=(%\w+%)? IMPERSONA=(%\w+%)?$/.test(visto) && !/koli/.test(visto), true);
+  r = publicador(['--manifesto', manifesto('m0.json', [livro('livro-a', 'a1', { mapa: MAPA_A })]), '--emulador', '--uid', 'qualquer', '--registro-ids', path.join(TMP, 'x.json'), '--chaves', CHAVES,
+    '--primeira-publicacao', '--classificacao', CLASSIF], true, '127.0.0.1:9');
+  conf('o Firestore que não responde (porta fechada) é RECUSADO, sem exceção solta', r.st + '|' + /RECUSADO: o Firestore não respondeu/.test(r.saida) + '|' + /Traceback/.test(r.saida), '2|true|false');
+  conf('e a saída diz EMULADOR em toda linha de resultado', /EMULADOR: RECUSADO/.test(r.saida), true);
 
   await subirEmulador();
   const dona = await conta('dona@exemplo.test');
@@ -241,12 +280,16 @@ const retrato = async () => {
   secao('1. Sem --publicar, nada é gravado');
   const M1 = manifesto('m1.json', [livro('livro-a', 'a1', { mapa: MAPA_A }), livro('livro-b', 'b1', { mapa: [cap(1, 'Funções', 2, 90, ['MAT09-06'])] })]);
   r = publicador(['--manifesto', M1].concat(comuns()));
+  conf('sem o registro de ids e sem --primeira-publicacao, recusa (registro sumido nunca vira vazio)', r.st + '|' + /o registro de ids não existe/.test(r.saida), '2|true');
+  r = publicador(['--manifesto', M1, '--primeira-publicacao'].concat(comuns()));
   conf('o relatório diz o que mudaria, e sai bem', r.st + '|' + /livro-a: novo/.test(r.saida) + '|' + /sem --publicar, nada foi gravado/.test(r.saida), '0|true|true');
   conf('nada no emulador', (await retrato()).indice + '|' + (await retrato()).livros, 'nenhum|');
   conf('e nenhum registro gravado', fs.existsSync(IDS) + '|' + fs.existsSync(CHAVES), 'false|false');
 
   secao('2. --publicar grava tudo num commit');
-  r = publicador(['--manifesto', M1, '--publicar'].concat(comuns()));
+  r = publicador(['--manifesto', M1, '--publicar'].concat(comuns()).filter(x => x !== '--classificacao' && x !== CLASSIF));
+  conf('--publicar sem a classificação é recusado', r.st + '|' + /--publicar pede a classificação do acervo/.test(r.saida), '2|true');
+  r = publicador(['--manifesto', M1, '--publicar', '--primeira-publicacao'].concat(comuns()));
   // (no veneno dos dois lotes, cada escrita vai num commit: quem diz que o defeito foi visto é a seção 5)
   const DOIS = MODO === '--envenenado-dois-lotes';
   const UM_COMMIT = DOIS ? /em \d+ commit/ : /em 1 commit/;
@@ -358,20 +401,42 @@ const retrato = async () => {
   conf('--retirar marca o livro como retirado no índice e no documento, que continua lá', [r.st, i7.livros['livro-a'].retiradoEm, a7.retiradoEm, !!a7.metaJson].join('|'),
     '0|2026-11-13T10:00:00-03:00|2026-11-13T10:00:00-03:00|true');
 
-  secao('8. A classificação do acervo (no formato da lista de 13/11: separador ";", pelo nome do arquivo)');
+  secao('8. A classificação do acervo (no formato da lista de 13/11: separador ";", pelo caminho do arquivo)');
   const classif = path.join(TMP, 'CLASSIFICACAO_ACERVO.csv');
   fs.writeFileSync(classif, '﻿arquivo;título;resultado;motivo;fonte\nLivro-B.pdf;B;FICA;teoria e exercícios;A\nlivro f.pdf;F;SO_TEORIA;livro do professor;B\n' +
     'livro-c.pdf;C;SAI;caderno de atividades;A\nlivro-d.pdf;D;DÚVIDA;pouca teoria;A\n');
-  r = publicador(['--manifesto', manifesto('m10.json', [livro('livro-b', 'b2', { formato: 'epub', mapa: [] }), livro('livro-f', 'f1', { mapa: [] }),
-    livro('livro-c', 'c1', { mapa: [] }), livro('livro-d', 'd1', { mapa: [] }), livro('livro-e', 'e1', { mapa: [] })]), '--classificacao', classif, '--publicar'].concat(comuns()));
+  const LONGO = 'x'.repeat(90);
+  fs.appendFileSync(classif, 'livro-g.pdf;G;SAI;caderno;A\nlivro-g.pdf;G;FICA;engano;A\n6ano/repetido.pdf;R6;SAI;caderno;A\n7ano/repetido.pdf;R7;FICA;teoria;A\n' +
+    'mesmo-nome.pdf;M;FICA;teoria;A\nlivro-h.pdf;H;FICA?;não sei;A\n' + LONGO + ' volume 1.pdf;L1;SAI;caderno;A\n' + LONGO + ' volume 2.pdf;L2;FICA;teoria;A\n');
+  const m10 = [livro('livro-b', 'b2', { formato: 'epub', mapa: [], arquivo_origem: 'Matematica/Livro-B.pdf' }), livro('livro-f', 'f1', { mapa: [], arquivo_origem: 'Matematica/livro f.pdf' }),
+    livro('livro-c', 'c1', { mapa: [] }), livro('livro-d', 'd1', { mapa: [] }), livro('livro-e', 'e1', { mapa: [] }), livro('livro-g', 'g1', { mapa: [] }),
+    livro('repetido', 'r6', { mapa: [], arquivo_origem: '6ano/repetido.pdf' }), livro('repetido-2', 'r7', { mapa: [], arquivo_origem: '7ano/repetido.pdf' }),
+    livro('mesmo-nome', 'm1', { mapa: [], arquivo_origem: 'Fisica/mesmo-nome.pdf' }), livro('mesmo-nome-2', 'm2', { mapa: [], arquivo_origem: 'Quimica/mesmo-nome.pdf' }),
+    livro('livro-h', 'h1', { mapa: [] }), livro('longo-1', 'l1', { mapa: [], arquivo_origem: 'Matematica/' + LONGO + ' volume 1.pdf' }),
+    livro('longo-2', 'l2', { mapa: [], arquivo_origem: 'Matematica/' + LONGO + ' volume 2.pdf' })];
+  r = publicador(['--manifesto', manifesto('m10.json', m10), '--publicar'].concat(comuns().filter(x => x !== CLASSIF && x !== '--classificacao')).concat(['--classificacao', classif]));
+  if (MODO === '--envenenado-repetido-ultima-vence') {
+    conf('VENENO visto: o livro com uma linha SAI e outra FICA entrou', /livro-g: novo/.test(r.saida), true);
+    return fim();
+  }
+  if (MODO === '--envenenado-nome-cortado') {
+    conf('VENENO visto: pelo nome cortado, o volume 2 casou com a linha SAI do volume 1 e ficou de fora', !/longo-2: novo/.test(r.saida), true);
+    return fim();
+  }
+  conf('a linha repetida com SAI deixa o livro de fora, e a repetição é avisada', /aviso: o livro livro-g aparece 2 vezes na classificação \(FICA, SAI\)/.test(r.saida) + '|' + /livro-g: novo/.test(r.saida), 'true|false');
+  conf('o mesmo nome em pastas diferentes casa pelo caminho inteiro', /repetido-2: novo/.test(r.saida) + '|' + /repetido: novo/.test(r.saida), 'true|false');
+  conf('o nome sem pasta de dois livros fica de fora como ambíguo', /fora da nuvem, nome de arquivo ambíguo \(dois livros com o mesmo nome\): 2 livro/.test(r.saida), true);
+  conf('o resultado desconhecido (FICA?) fica de fora', /fora da nuvem, resultado desconhecido \(FICA\?\): 1 livro/.test(r.saida), true);
+  conf('os nomes compridos que só diferem no fim não se confundem (nada é cortado)', /longo-2: novo/.test(r.saida) + '|' + /longo-1: novo/.test(r.saida), 'true|false');
   conf('FICA e SO_TEORIA entram; SAI, DÚVIDA e o ausente ficam de fora, listados pelo motivo', [r.st,
-    /fora da nuvem, SAI: 1 livro\(s\)\r?\n {4}- livro-c \(caderno de atividades\)/.test(r.saida),
+    /fora da nuvem, SAI: 4 livro\(s\)\r?\n {4}- livro-c \(caderno de atividades\)/.test(r.saida),
     /fora da nuvem, DÚVIDA \(tratada como SAI\): 1 livro\(s\)\r?\n {4}- livro-d \(pouca teoria\)/.test(r.saida),
     /fora da nuvem, ausente da classificação: 1 livro\(s\)\r?\n {4}- livro-e/.test(r.saida),
     /livro-f: novo/.test(r.saida), /livro-c: novo|livro-d: novo|livro-e: novo/.test(r.saida)].join('|'), '0|true|true|true|true|false');
   const f8 = JSON.parse(campos(await doc('usuarios/' + uid + '/catalogo/livro-f')).metaJson);
   const b8 = JSON.parse(campos(await doc('usuarios/' + uid + '/catalogo/livro-b')).metaJson);
   conf('o SO_TEORIA leva so_teoria no meta; o FICA, não', f8.so_teoria + '|' + ('so_teoria' in b8), 'true|false');
+  conf('o caminho de origem não vai para a nuvem', 'arquivo_origem' in b8, false);
   conf('os de fora não estão no catálogo', (await Promise.all(['livro-c', 'livro-d', 'livro-e'].map(x => doc('usuarios/' + uid + '/catalogo/' + x)))).map(d => d.status).join(','), '404,404,404');
 
   secao('9. As regras do catálogo');
@@ -392,6 +457,29 @@ const retrato = async () => {
     (await doc('usuarios/' + uid + '/catalogo/livro-b', estranho.idToken)).status, '403|403');
   conf('e a dona continua escrevendo o config/leitores (a regra irmã não mudou)', (await rest(DOCS + '/usuarios/' + uid + '/config/leitores', { metodo: 'PATCH', token: dona.idToken,
     corpo: { fields: { uids: { arrayValue: { values: [{ stringValue: obs.localId }] } } } } })).status, 200);
+
+  secao('11. Os registros: o que some é recusa; o que ficou para trás é refeito pela nuvem');
+  const guardado = fs.readFileSync(IDS, 'utf8');
+  fs.unlinkSync(IDS);
+  r = publicador(['--manifesto', manifesto('m11.json', [livro('livro-b', 'b2', { formato: 'epub', mapa: [] })]), '--publicar'].concat(comuns()));
+  if (MODO === '--envenenado-registro-vazio-passa') {
+    conf('VENENO visto: sem o registro de ids, o publicador seguiu como se estivesse vazio', /o registro de ids não existe/.test(r.saida), false);
+    return fim();
+  }
+  conf('o registro de ids que sumiu é recusa', r.st + '|' + /o registro de ids não existe/.test(r.saida), '2|true');
+  fs.writeFileSync(IDS, '{}');
+  const comAnovo = manifesto('m12.json', [livro('livro-b', 'b2', { formato: 'epub', mapa: [] }), livro('livro-f', 'f1', { mapa: [] }), livro('livro-a-novo', 'a1', { mapa: [] })]);
+  r = publicador(['--manifesto', comAnovo, '--retirar', 'livro-a', '--publicar'].concat(comuns()));
+  conf('com o registro local vazio, o índice da nuvem ainda pega o mesmo arquivo com outro id', r.st + '|' + /já foi publicado com o id livro-a/.test(r.saida), '2|true');
+  r = publicador(['--manifesto', manifesto('m13.json', m10)].concat(comuns().filter(x => x !== CLASSIF && x !== '--classificacao')).concat(['--classificacao', classif]));
+  conf('o registro que ficou para trás é refeito pelo índice da nuvem', r.st + '|' + /o registro de ids ganhou \d+ entrada\(s\) do índice da nuvem/.test(r.saida) + '|' + (JSON.parse(fs.readFileSync(IDS, 'utf8'))[hex('a1')] === 'livro-a'), '0|true|true');
+  fs.writeFileSync(IDS, guardado);
+  r = publicador(['--manifesto', M2, '--publicar'].concat(comuns().map(x => x === CHAVES ? path.join(TMP, 'chaves-que-nao-existem') : x)));
+  conf('a pasta das chaves que não existe é recusa', r.st + '|' + /a pasta das chaves não existe/.test(r.saida), '2|true');
+  r = publicador(['--manifesto', M2, '--mapas', path.join(TMP, 'mapas-que-nao-existem')].concat(comuns()));
+  conf('a pasta dos mapas que não existe é recusa', r.st + '|' + /a pasta dos mapas não existe/.test(r.saida), '2|true');
+  r = publicador(['--manifesto', M2, '--primeira-publicacao'].concat(comuns()));
+  conf('--primeira-publicacao com catálogo na nuvem é recusa', r.st + '|' + /a nuvem já tem catálogo/.test(r.saida), '2|true');
 
   if (MODO) conf('o veneno pedido foi visto pela seção dele', 'não visto', 'visto');
   return fim();

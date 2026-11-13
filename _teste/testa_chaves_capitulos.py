@@ -20,7 +20,16 @@ O que se prova, com mapas sintéticos:
      repete;
   7. livro sem registro: todas as chaves são novas e nenhuma é listada (não
      havia mapa com chave a conferir).
+  8. o título que se repete no mapa novo (um segundo "Exercícios" em outra
+     página) não leva a chave de outro capítulo: só casa pelo título quando
+     ele é único dos dois lados;
+  9. o título repetido no mesmo começo, ou sem começo, tem as mesmas chaves
+     em três rodadas.
 Venenos:
+  --envenenado-titulo-sem-unicidade  o título casa mesmo repetido: o caso 8
+                                  leva a chave para o capítulo errado;
+  --envenenado-repetido-sem-ordem  sem o casamento em ordem dos repetidos: as
+                                  chaves do caso 9 mudam a cada rodada;
   --envenenado-chave-pela-pagina  o mesmo começo basta, sem título parecido: o
                                   capítulo trocado do caso 3 herda a chave;
   --envenenado-sem-heranca        a tabela de herança é ignorada: o caso 4 perde
@@ -35,6 +44,8 @@ AQUI = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
 TROCAS = {
     '--envenenado-chave-pela-pagina': ['(semelhanca(a.get(\'titulo\'), e.get(\'titulo\')) >= SEMELHANCA_MINIMA or herda(a, e))', 'True'],
     '--envenenado-sem-heranca': ['    pares = pares_da_heranca(heranca)\n', '    pares = set()\n'],
+    '--envenenado-titulo-sem-unicidade': ['passo(lambda a, e: tn(a) == tn(e) and conta_a.get(tn(a)) == 1 and conta_n.get(tn(e)) == 1)', 'passo(lambda a, e: tn(a) == tn(e))'],
+    '--envenenado-repetido-sem-ordem': ['        if velhos and len(velhos) == len(novos):\n', '        if False:\n'],
 }
 MODO = next((m for m in TROCAS if m in sys.argv), '')
 passes = falhas = 0
@@ -146,6 +157,33 @@ print('\n=== 7. A chave nova não repete o registro ===')
 cheio = {'livro': 'x', 'entradas': [{'chave': C.chave_nova('x', cap('A', 1), set()), 'titulo': 'Outro', 'pagina': 99}]}
 mx, _, _ = C.estabilizar('x', [cap('A', 1)], cheio)
 conf('a chave que o registro já usa não é dada de novo', mx[0]['chave'] != cheio['entradas'][0]['chave'], True)
+
+print('\n=== 8. Um título que se repete no mapa novo não leva a chave de outro capítulo ===')
+ant8 = [cap('Exercícios', 50), cap('Exercícios', 70)]
+m8, r8, _ = C.estabilizar('ga9', ant8)
+nov8 = [cap('Exercícios', 50), cap('Exercícios', 20)]   # o da p. 70 saiu; nasceu um na p. 20
+n8m, _, n8n = C.estabilizar('ga9', nov8, r8)
+if MODO == '--envenenado-titulo-sem-unicidade':
+    conf('VENENO visto: o "Exercícios" novo da p. 20 levou a chave do da p. 70', n8m[1]['chave'] == m8[1]['chave'], True)
+    terminar()
+conf('o da p. 50 fica com a chave dele (o mesmo título e o mesmo começo)', n8m[0]['chave'], m8[0]['chave'])
+conf('o da p. 20 ganha chave nova, e é listado', (n8m[1]['chave'] not in chaves_de(m8), n8n), (True, ['Exercícios']))
+ant8b = [cap('Revisão', 10), cap('Exercícios', 50)]
+m8b, r8b, _ = C.estabilizar('pt8', ant8b)
+n8bm, _, _ = C.estabilizar('pt8', [cap('Revisão', 10), cap('Exercícios', 20), cap('Exercícios', 50)], r8b)
+conf('um antigo para dois novos: a chave fica no da mesma página, e não no que nasceu antes', (n8bm[2]['chave'] == m8b[1]['chave'], n8bm[1]['chave'] != m8b[1]['chave']), (True, True))
+
+print('\n=== 9. O título repetido no mesmo começo, ou sem começo, fica estável entre rodadas ===')
+for nome, mapa in [('na mesma página', [cap('Exercícios', 20), cap('Exercícios', 20)]),
+                   ('sem página', [{'titulo': 'Exercícios', 'assuntos': []}, {'titulo': 'Exercícios', 'assuntos': []}])]:
+    a9, ra9, _ = C.estabilizar('pt9', mapa)
+    b9, rb9, nb9 = C.estabilizar('pt9', mapa, ra9)
+    c9, _, _ = C.estabilizar('pt9', mapa, rb9)
+    estavel = chaves_de(a9) == chaves_de(b9) == chaves_de(c9)
+    if MODO == '--envenenado-repetido-sem-ordem':
+        conf('VENENO visto: as chaves do título repetido ' + nome + ' mudam a cada rodada', estavel, False)
+        terminar()
+    conf('as chaves do título repetido ' + nome + ' são as mesmas em três rodadas, sem chave nova', (estavel, nb9), (True, []))
 
 if MODO:
     conf('o veneno pedido foi visto pela seção dele', 'não visto', 'visto')

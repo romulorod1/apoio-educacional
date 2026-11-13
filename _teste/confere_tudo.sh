@@ -1042,12 +1042,16 @@ roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip
 # commit so; republicar igual nao escreve; a falha no meio do lote deixa a
 # versao anterior; as recusas (id trocado, livro que some, formato, assunto
 # fora do banco, caminho fora da lista); a classificacao do acervo; e as
-# regras do catalogo (a dona le e nao escreve). Portas 8986 a 8990.
+# regras do catalogo (a dona le e nao escreve); os registros que somem sao recusa
+# e o que ficou para tras e refeito pelo indice da nuvem. Portas 9031 a 9035.
 roda "publicador do catalogo"                       node "_teste/testa_publicador_catalogo.js"
 roda "publicador do catalogo --envenenado-aceita-id-trocado" node "_teste/testa_publicador_catalogo.js" --envenenado-aceita-id-trocado
 roda "publicador do catalogo --envenenado-escreve-fora-da-lista" node "_teste/testa_publicador_catalogo.js" --envenenado-escreve-fora-da-lista
 roda "publicador do catalogo --envenenado-dois-lotes" node "_teste/testa_publicador_catalogo.js" --envenenado-dois-lotes
 roda "publicador do catalogo --envenenado-regra-herda-escrita" node "_teste/testa_publicador_catalogo.js" --envenenado-regra-herda-escrita
+roda "publicador do catalogo --envenenado-repetido-ultima-vence" node "_teste/testa_publicador_catalogo.js" --envenenado-repetido-ultima-vence
+roda "publicador do catalogo --envenenado-nome-cortado" node "_teste/testa_publicador_catalogo.js" --envenenado-nome-cortado
+roda "publicador do catalogo --envenenado-registro-vazio-passa" node "_teste/testa_publicador_catalogo.js" --envenenado-registro-vazio-passa
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
@@ -1441,6 +1445,8 @@ roda "livros (gerador)"                         python biblioteca/_prova_livros.
 roda "chaves dos capitulos"                     python _teste/testa_chaves_capitulos.py
 roda "chaves dos capitulos --envenenado-chave-pela-pagina" python _teste/testa_chaves_capitulos.py --envenenado-chave-pela-pagina
 roda "chaves dos capitulos --envenenado-sem-heranca" python _teste/testa_chaves_capitulos.py --envenenado-sem-heranca
+roda "chaves dos capitulos --envenenado-titulo-sem-unicidade" python _teste/testa_chaves_capitulos.py --envenenado-titulo-sem-unicidade
+roda "chaves dos capitulos --envenenado-repetido-sem-ordem" python _teste/testa_chaves_capitulos.py --envenenado-repetido-sem-ordem
 # A revisao do C15.1: o pacote cortado recusado ja na espiada, sem ler o
 # arquivo inteiro, e o teto de 160 MB do aplicativo. Sem Chrome.
 roda "livros (regras)"                          node "_teste/testa_livros_regras.js"
