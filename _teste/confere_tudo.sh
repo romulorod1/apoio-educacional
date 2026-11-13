@@ -1121,8 +1121,8 @@ roda "Voltar sem entrada velha --envenenado-entrada-velha" node "_teste/testa_vo
 # versao mais nova, mesmo campo ou outro; Descartar volta ao que havia; a repeticao pede
 # o escopo. Os venenos tiram a conferencia, o rascunho na saida e o retrato por chave (A1).
 # TEMPORARIO (teste/f7-secao15-estavel): mede a secao 15, como hoje e com a espera nova; sai antes do merge.
-roda "mede secao 15 --como-hoje" node "_teste/testa_mede_secao15.js" --como-hoje --vezes=30
-roda "mede secao 15 --com-espera" node "_teste/testa_mede_secao15.js" --com-espera --vezes=30
+roda "mede secao 15 --como-hoje" node "_teste/testa_mede_secao15.js" --como-hoje --vezes=50
+roda "mede secao 15 --com-espera" node "_teste/testa_mede_secao15.js" --com-espera --vezes=50
 roda "aula salva sozinha"                          node "_teste/testa_aula_salva_sozinha.js"
 roda "aula salva sozinha --envenenado-grava-por-cima" node "_teste/testa_aula_salva_sozinha.js" --envenenado-grava-por-cima
 roda "aula salva sozinha --envenenado-sem-rascunho-ao-sair" node "_teste/testa_aula_salva_sozinha.js" --envenenado-sem-rascunho-ao-sair

@@ -10,7 +10,7 @@
  *               janela abre e espera o diálogo 5 s);
  * --com-espera  o passo novo (espera a tarefa da foto da janela rodar antes de
  *               mudar o campo, e espera o Voltar ser processado, com teto de 15 s).
- * Sempre sai 0: é medida, não trava. Dados fictícios.
+ * O placar É a taxa: "N passaram, M falharam" = perguntou N vezes, e M não. Dados fictícios.
  */
 'use strict';
 const H = require('./_bib_navegador');
@@ -58,7 +58,7 @@ async function escolher(pag, sel, valor) {
       pag.dialogos.length > d0 ? 'perguntou' : (!(await aberta(pag)) ? 'fechou' : ''), v => !!v, teto);
     const desfecho = r.ok ? r.valor : 'nada';
     conta[desfecho]++;
-    console.log('   vez ' + (i + 1) + ': ' + desfecho);
+    H.conf('vez ' + (i + 1) + ': o Voltar perguntou', desfecho, 'perguntou'); // o placar é a taxa
     // fecha o que ficou, para a próxima vez começar igual
     if (await aberta(pag)) {
       pag.respostaDoDialogo = true;
@@ -69,6 +69,6 @@ async function escolher(pag, sel, valor) {
   }
   console.log('MEDIDA seção 15 (' + (COMO_HOJE ? 'como hoje' : 'com espera') + '): ' + N + ' vezes, perguntou ' + conta.perguntou +
     ', fechou sem perguntar ' + conta.fechou + ', nada ' + conta.nada);
-  H.conf('a medida rodou as ' + N + ' vezes', conta.perguntou + conta.fechou + conta.nada, N);
+
   await H.fim(amb)();
 })().catch(e => H.fim(amb)(e));
