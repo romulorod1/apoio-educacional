@@ -46,7 +46,12 @@
  *   --envenenado-nome-cortado        a classificação casa pelo começo do
  *                                    nome: os volumes compridos se confundem (8);
  *   --envenenado-registro-vazio-passa  o registro de ids que sumiu vira um
- *                                    registro vazio (11).
+ *                                    registro vazio (11);
+ *   --envenenado-relatorio-grava     o relatório sem --publicar grava o
+ *                                    registro de ids (11);
+ *   --envenenado-so-pelo-id          só a linha pelo id conta, e o SAI pelo
+ *                                    arquivo passa (8);
+ *   --envenenado-homonimo-na-lista   o nome sem pasta repetido na lista casa (8).
  *
  * Precisa do firebase-tools fora do repositório (FIREBASE_TOOLS) e de um JDK
  * 21 em JAVA_HOME, como o testa_nuvem.js; sem eles, REPROVA dizendo onde
@@ -79,6 +84,10 @@ const VENENOS = {
   '--envenenado-escreve-fora-da-lista': ['py', "            if not CAMINHO_PERMITIDO.fullmatch(e['caminho']):\n", '            if False:\n'],
   '--envenenado-repetido-ultima-vence': ['py', "        resultados = sorted({l['resultado'] for l in linhas})\n", "        resultados = [linhas[-1]['resultado']] if linhas else []\n"],
   '--envenenado-nome-cortado': ['py', '        elif a == base:\n', '        elif a[:12] == base[:12]:\n'],
+  '--envenenado-relatorio-grava': ['py', "        if a.publicar and not plano['recusas'] and not plano['indice'] and plano.get('reconstruidos'):\n",
+    "        if not plano['recusas'] and plano.get('reconstruidos'):\n"],
+  '--envenenado-so-pelo-id': ['py', '    if origem:\n', '    if origem and not achadas:\n'],
+  '--envenenado-homonimo-na-lista': ['py', 'if basenames.get(base, 0) > 1 or na_lista.get(base, 0) > 1:', 'if basenames.get(base, 0) > 1:'],
   '--envenenado-registro-vazio-passa': ['py', "        if a.registro_ids and not os.path.isfile(a.registro_ids) and not a.primeira_publicacao:\n", '        if False:\n'],
   '--envenenado-dois-lotes': ['py', '            fs.commit(escritas)\n', '            [fs.commit([e]) for e in escritas]\n'],
   '--envenenado-regra-herda-escrita': ['regras', '      match /config/catalogo {\n        allow read: if podeLer(uid);\n        allow write: if false;',
@@ -280,7 +289,7 @@ const retrato = async () => {
   secao('1. Sem --publicar, nada é gravado');
   const M1 = manifesto('m1.json', [livro('livro-a', 'a1', { mapa: MAPA_A }), livro('livro-b', 'b1', { mapa: [cap(1, 'Funções', 2, 90, ['MAT09-06'])] })]);
   r = publicador(['--manifesto', M1].concat(comuns()));
-  conf('sem o registro de ids e sem --primeira-publicacao, recusa (registro sumido nunca vira vazio)', r.st + '|' + /o registro de ids não existe/.test(r.saida), '2|true');
+  if (MODO !== '--envenenado-registro-vazio-passa') conf('sem o registro de ids e sem --primeira-publicacao, recusa (registro sumido nunca vira vazio)', r.st + '|' + /o registro de ids não existe/.test(r.saida), '2|true');
   r = publicador(['--manifesto', M1, '--primeira-publicacao'].concat(comuns()));
   conf('o relatório diz o que mudaria, e sai bem', r.st + '|' + /livro-a: novo/.test(r.saida) + '|' + /sem --publicar, nada foi gravado/.test(r.saida), '0|true|true');
   conf('nada no emulador', (await retrato()).indice + '|' + (await retrato()).livros, 'nenhum|');
@@ -406,14 +415,21 @@ const retrato = async () => {
   fs.writeFileSync(classif, '﻿arquivo;título;resultado;motivo;fonte\nLivro-B.pdf;B;FICA;teoria e exercícios;A\nlivro f.pdf;F;SO_TEORIA;livro do professor;B\n' +
     'livro-c.pdf;C;SAI;caderno de atividades;A\nlivro-d.pdf;D;DÚVIDA;pouca teoria;A\n');
   const LONGO = 'x'.repeat(90);
-  fs.appendFileSync(classif, 'livro-g.pdf;G;SAI;caderno;A\nlivro-g.pdf;G;FICA;engano;A\n6ano/repetido.pdf;R6;SAI;caderno;A\n7ano/repetido.pdf;R7;FICA;teoria;A\n' +
-    'mesmo-nome.pdf;M;FICA;teoria;A\nlivro-h.pdf;H;FICA?;não sei;A\n' + LONGO + ' volume 1.pdf;L1;SAI;caderno;A\n' + LONGO + ' volume 2.pdf;L2;FICA;teoria;A\n');
+  fs.appendFileSync(classif, '6ano/repetido.pdf;R6;SAI;caderno;A\n7ano/repetido.pdf;R7;FICA;teoria;A\n' +
+    'mesmo-nome.pdf;M;FICA;teoria;A\nlivro-h.pdf;H;FICA?;não sei;A\n' + LONGO + ' volume 1.pdf;L1;SAI;caderno;A\n' + LONGO + ' volume 2.pdf;L2;FICA;teoria;A\n' +
+    'dup.pdf;D;FICA;teoria;A\nFisica/dup.pdf;D2;SAI;caderno;A\nlivro-i.pdf;I;SAI;caderno pelo arquivo;A\n');
+  // a mesma lista ganha uma coluna id para o livro-i: a linha pelo id diz FICA, a do arquivo diz SAI
+  fs.writeFileSync(classif, fs.readFileSync(classif, 'utf8').replace('\ufeffarquivo;título;resultado;motivo;fonte\n', '\ufeffid;arquivo;título;resultado;motivo;fonte\n')
+    .split('\n').map((l, i) => i === 0 || !l ? l : ';' + l).join('\n') + 'livro-i;;I;FICA;teoria pelo id;A\n' +
+    // o livro-g repetido pelo id (o repetido pelo nome sem pasta, na lista, é ambíguo)
+    'livro-g;;G;SAI;caderno;A\nlivro-g;;G;FICA;engano;A\n');
   const m10 = [livro('livro-b', 'b2', { formato: 'epub', mapa: [], arquivo_origem: 'Matematica/Livro-B.pdf' }), livro('livro-f', 'f1', { mapa: [], arquivo_origem: 'Matematica/livro f.pdf' }),
     livro('livro-c', 'c1', { mapa: [] }), livro('livro-d', 'd1', { mapa: [] }), livro('livro-e', 'e1', { mapa: [] }), livro('livro-g', 'g1', { mapa: [] }),
     livro('repetido', 'r6', { mapa: [], arquivo_origem: '6ano/repetido.pdf' }), livro('repetido-2', 'r7', { mapa: [], arquivo_origem: '7ano/repetido.pdf' }),
     livro('mesmo-nome', 'm1', { mapa: [], arquivo_origem: 'Fisica/mesmo-nome.pdf' }), livro('mesmo-nome-2', 'm2', { mapa: [], arquivo_origem: 'Quimica/mesmo-nome.pdf' }),
     livro('livro-h', 'h1', { mapa: [] }), livro('longo-1', 'l1', { mapa: [], arquivo_origem: 'Matematica/' + LONGO + ' volume 1.pdf' }),
-    livro('longo-2', 'l2', { mapa: [], arquivo_origem: 'Matematica/' + LONGO + ' volume 2.pdf' })];
+    livro('longo-2', 'l2', { mapa: [], arquivo_origem: 'Matematica/' + LONGO + ' volume 2.pdf' }),
+    livro('dup', 'dp', { mapa: [], arquivo_origem: 'Matematica/dup.pdf' }), livro('livro-i', 'i1', { mapa: [] })];
   r = publicador(['--manifesto', manifesto('m10.json', m10), '--publicar'].concat(comuns().filter(x => x !== CLASSIF && x !== '--classificacao')).concat(['--classificacao', classif]));
   if (MODO === '--envenenado-repetido-ultima-vence') {
     conf('VENENO visto: o livro com uma linha SAI e outra FICA entrou', /livro-g: novo/.test(r.saida), true);
@@ -423,13 +439,23 @@ const retrato = async () => {
     conf('VENENO visto: pelo nome cortado, o volume 2 casou com a linha SAI do volume 1 e ficou de fora', !/longo-2: novo/.test(r.saida), true);
     return fim();
   }
+  if (MODO === '--envenenado-so-pelo-id') {
+    conf('VENENO visto: só a linha pelo id contou, e o livro com SAI pelo arquivo entrou', /livro-i: novo/.test(r.saida), true);
+    return fim();
+  }
+  if (MODO === '--envenenado-homonimo-na-lista') {
+    conf('VENENO visto: o nome sem pasta repetido na lista casou e o livro entrou', /dup: novo/.test(r.saida), true);
+    return fim();
+  }
+  conf('as linhas pelo id e pelo arquivo contam juntas: o SAI pelo arquivo deixa de fora o FICA pelo id', /livro-i: novo/.test(r.saida) + '|' + /aviso: o livro livro-i aparece 2 vezes/.test(r.saida), 'false|true');
+  conf('o nome sem pasta repetido na lista não casa: o livro fica de fora como ambíguo', /dup: novo/.test(r.saida) + '|' + /- dup \(/.test(r.saida), 'false|true');
   conf('a linha repetida com SAI deixa o livro de fora, e a repetição é avisada', /aviso: o livro livro-g aparece 2 vezes na classificação \(FICA, SAI\)/.test(r.saida) + '|' + /livro-g: novo/.test(r.saida), 'true|false');
   conf('o mesmo nome em pastas diferentes casa pelo caminho inteiro', /repetido-2: novo/.test(r.saida) + '|' + /repetido: novo/.test(r.saida), 'true|false');
-  conf('o nome sem pasta de dois livros fica de fora como ambíguo', /fora da nuvem, nome de arquivo ambíguo \(dois livros com o mesmo nome\): 2 livro/.test(r.saida), true);
+  conf('o nome sem pasta de dois livros fica de fora como ambíguo', /fora da nuvem, nome de arquivo ambíguo \(o mesmo nome em dois livros ou em duas linhas da lista\): 3 livro/.test(r.saida), true);
   conf('o resultado desconhecido (FICA?) fica de fora', /fora da nuvem, resultado desconhecido \(FICA\?\): 1 livro/.test(r.saida), true);
   conf('os nomes compridos que só diferem no fim não se confundem (nada é cortado)', /longo-2: novo/.test(r.saida) + '|' + /longo-1: novo/.test(r.saida), 'true|false');
   conf('FICA e SO_TEORIA entram; SAI, DÚVIDA e o ausente ficam de fora, listados pelo motivo', [r.st,
-    /fora da nuvem, SAI: 4 livro\(s\)\r?\n {4}- livro-c \(caderno de atividades\)/.test(r.saida),
+    /fora da nuvem, SAI: 5 livro\(s\)\r?\n {4}- livro-c \(caderno de atividades\)/.test(r.saida),
     /fora da nuvem, DÚVIDA \(tratada como SAI\): 1 livro\(s\)\r?\n {4}- livro-d \(pouca teoria\)/.test(r.saida),
     /fora da nuvem, ausente da classificação: 1 livro\(s\)\r?\n {4}- livro-e/.test(r.saida),
     /livro-f: novo/.test(r.saida), /livro-c: novo|livro-d: novo|livro-e: novo/.test(r.saida)].join('|'), '0|true|true|true|true|false');
@@ -471,8 +497,18 @@ const retrato = async () => {
   const comAnovo = manifesto('m12.json', [livro('livro-b', 'b2', { formato: 'epub', mapa: [] }), livro('livro-f', 'f1', { mapa: [] }), livro('livro-a-novo', 'a1', { mapa: [] })]);
   r = publicador(['--manifesto', comAnovo, '--retirar', 'livro-a', '--publicar'].concat(comuns()));
   conf('com o registro local vazio, o índice da nuvem ainda pega o mesmo arquivo com outro id', r.st + '|' + /já foi publicado com o id livro-a/.test(r.saida), '2|true');
-  r = publicador(['--manifesto', manifesto('m13.json', m10)].concat(comuns().filter(x => x !== CLASSIF && x !== '--classificacao')).concat(['--classificacao', classif]));
-  conf('o registro que ficou para trás é refeito pelo índice da nuvem', r.st + '|' + /o registro de ids ganhou \d+ entrada\(s\) do índice da nuvem/.test(r.saida) + '|' + (JSON.parse(fs.readFileSync(IDS, 'utf8'))[hex('a1')] === 'livro-a'), '0|true|true');
+  const m13 = manifesto('m13.json', m10.concat([livro('livro-novo-n', 'n7', { mapa: [] })]));
+  fs.appendFileSync(classif, 'livro-novo-n;;N;FICA;teoria;A\n');
+  const comClassif = () => comuns().filter(x => x !== CLASSIF && x !== '--classificacao').concat(['--classificacao', classif]);
+  r = publicador(['--manifesto', m13].concat(comClassif()));
+  if (MODO === '--envenenado-relatorio-grava') {
+    conf('VENENO visto: o relatório (sem --publicar) gravou o registro de ids', fs.readFileSync(IDS, 'utf8').trim() !== '{}', true);
+    return fim();
+  }
+  conf('sem --publicar, o registro para trás é só anunciado, e NADA vai para o disco', r.st + '|' + /o registro de ids está para trás: \d+ entrada\(s\)/.test(r.saida) + '|' + fs.readFileSync(IDS, 'utf8').trim(), '0|true|{}');
+  r = publicador(['--manifesto', manifesto('m14.json', m10), '--publicar'].concat(comClassif()));
+  const refeito = JSON.parse(fs.readFileSync(IDS, 'utf8'));
+  conf('com --publicar e nada a publicar, o registro ganha só as entradas do índice da nuvem', r.st + '|' + (refeito[hex('a1')] === 'livro-a') + '|' + (hex('n7') in refeito), '0|true|false');
   fs.writeFileSync(IDS, guardado);
   r = publicador(['--manifesto', M2, '--publicar'].concat(comuns().map(x => x === CHAVES ? path.join(TMP, 'chaves-que-nao-existem') : x)));
   conf('a pasta das chaves que não existe é recusa', r.st + '|' + /a pasta das chaves não existe/.test(r.saida), '2|true');

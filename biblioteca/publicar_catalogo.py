@@ -322,35 +322,41 @@ def ler_classificacao(caminho):
         saida['linhas'].append(linha)
         if linha['id']:
             saida['por_id'].setdefault(linha['id'], []).append(linha)
+    # quantas linhas da lista têm cada nome de arquivo: o nome sem pasta só casa se for único aqui
+    saida['nomes'] = {}
+    for linha in saida['linhas']:
+        a = nome_comparavel(linha['arquivo'])
+        if a:
+            b = a.rsplit('/', 1)[-1]
+            saida['nomes'][b] = saida['nomes'].get(b, 0) + 1
     return saida
 
 
 def linhas_do_livro(meta, classificacao, basenames):
-    """As linhas da classificação que falam deste livro: pelo id, quando a
-    lista traz a coluna; senão pelo CAMINHO do arquivo na planilha
-    (`arquivo_origem`), inteiro quando a lista traz pasta, ou pelo nome do
-    arquivo inteiro quando não traz, e só se esse nome é de um livro só nesta
-    publicação. Nunca pelo nome cortado. Devolve (linhas, ambíguo)."""
-    por_id = classificacao['por_id'].get(meta.get('id'))
-    if por_id:
-        return por_id, False
+    """TODAS as linhas da classificação que falam deste livro, juntas antes de
+    decidir: as do id (coluna `id`) E as do caminho do arquivo na planilha
+    (`arquivo_origem`), comparado inteiro quando a lista traz pasta. A linha
+    sem pasta só casa pelo nome do arquivo inteiro quando esse nome é ÚNICO na
+    lista E nesta publicação; senão o livro fica de fora como ambíguo. Nunca
+    pelo nome cortado. Devolve (linhas, ambíguo)."""
+    achadas = list(classificacao['por_id'].get(meta.get('id')) or [])
+    ambiguo = False
     origem = nome_comparavel(meta.get('arquivo_origem'))
-    if not origem:
-        return [], False
-    base = origem.rsplit('/', 1)[-1]
-    achadas, ambiguo = [], False
-    for l in classificacao['linhas']:
-        a = nome_comparavel(l['arquivo'])
-        if not a or l['id']:
-            continue
-        if '/' in a:
-            if a == origem:
-                achadas.append(l)
-        elif a == base:
-            if basenames.get(base, 0) > 1:
-                ambiguo = True
-            else:
-                achadas.append(l)
+    if origem:
+        base = origem.rsplit('/', 1)[-1]
+        na_lista = classificacao.get('nomes') or {}
+        for l in classificacao['linhas']:
+            a = nome_comparavel(l['arquivo'])
+            if not a or any(l is x for x in achadas):
+                continue
+            if '/' in a:
+                if a == origem:
+                    achadas.append(l)
+            elif a == base:
+                if basenames.get(base, 0) > 1 or na_lista.get(base, 0) > 1:
+                    ambiguo = True
+                else:
+                    achadas.append(l)
     return achadas, ambiguo
 
 
@@ -378,8 +384,8 @@ def filtrar_pela_classificacao(livros_novos, classificacao):
         if len(linhas) > 1:
             avisos.append('- aviso: o livro %s aparece %d vezes na classificação (%s)' % (lid, len(linhas), ', '.join(resultados)))
         motivo = '; '.join(sorted({l['motivo'] for l in linhas if l['motivo']})) or 'sem motivo na lista'
-        if ambiguo and not linhas:
-            grupo = 'nome de arquivo ambíguo (dois livros com o mesmo nome)'
+        if ambiguo:
+            grupo = 'nome de arquivo ambíguo (o mesmo nome em dois livros ou em duas linhas da lista)'
         elif not linhas:
             grupo = 'ausente da classificação'
         elif any(r in FICAM_DE_FORA for r in resultados):
@@ -427,7 +433,9 @@ def planejar(livros_novos, indice, registro_ids, trocas=None, retirar=None, banc
             registro_ids[sha_n] = lid_n
             reconstruidos += 1
     if reconstruidos:
-        linhas.append('- o registro de ids ganhou %d entrada(s) do índice da nuvem (estava para trás)' % reconstruidos)
+        linhas.append('- o registro de ids está para trás: %d entrada(s) do índice da nuvem entram nele com --publicar' % reconstruidos)
+    # o registro só com o que JÁ está na nuvem: o que se grava com --publicar quando não há o que publicar
+    registro_da_nuvem = dict(registro_ids)
     registros_chaves = dict(registros_chaves or {})
     heranca = heranca or {}
     agora = agora or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).replace(microsecond=0).isoformat()
@@ -503,7 +511,8 @@ def planejar(livros_novos, indice, registro_ids, trocas=None, retirar=None, banc
         if lid in vistos or lid not in antes:
             recusas.append('--retirar %s pede um livro que não está publicado ou que continua na planilha' % lid)
     plano = {'recusas': recusas, 'linhas': linhas, 'docs': docs, 'registro_ids': registro_ids,
-             'registros_chaves': registros_chaves, 'indice': None, 'reconstruidos': reconstruidos}
+             'registros_chaves': registros_chaves, 'indice': None, 'reconstruidos': reconstruidos,
+             'registro_da_nuvem': registro_da_nuvem}
     if recusas or not docs:
         return plano
     indice_novo = {'versao': (indice.get('versao') or 0) + 1, 'publicadoEm': agora, 'gerador': gerador,
@@ -683,9 +692,10 @@ def principal(argv=None):
         plano = planejar(novos, indice, registro, ler_json(a.trocas, []), a.retirar, banco, citados,
                          registros_chaves, heranca, a.agora, gerar_pacote.commit_do_gerador())
         plano['linhas'] = fora_da_nuvem + plano['linhas']
-        # o registro local que ficou para trás é refeito do índice da nuvem, mesmo sem publicar
-        if a.registro_ids and plano.get('reconstruidos') and not plano['recusas']:
-            gravar_json(a.registro_ids, plano['registro_ids'])
+        # sem --publicar, NADA vai para o disco (nem a reconstrução do registro de ids); com --publicar e
+        # nada a publicar, o registro que ficou para trás ganha só as entradas que vieram do índice da nuvem
+        if a.publicar and not plano['recusas'] and not plano['indice'] and plano.get('reconstruidos'):
+            gravar_json(a.registro_ids, plano['registro_da_nuvem'])
         publicado = False
         if not plano['recusas'] and plano['indice'] and a.publicar:
             escritas = montar_escritas(plano, uid)
