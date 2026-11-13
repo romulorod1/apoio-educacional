@@ -27,6 +27,10 @@ Travas:
                livros "stored" e o manifest primeiro. Um veneno por regra.
   sumario      a origem certa em cada livro da amostra: marcadores, mapa da
                orquestradora, nenhum (com a nota dizendo isso) e o nav do EPUB.
+               Item 12a: `"sumario": "mapa"` no livro do mapa vence os
+               marcadores lixo do PDF; sem o campo, com valor desconhecido ou
+               com o mapa fora das paginas, os marcadores continuam. Veneno: o
+               campo ignorado.
   mapa         (C15.2) o mapa capitulo para assunto de cada livro da amostra:
                o da orquestradora (com o id fora do indice tirado e dito na
                nota), o passe automatico no PDF e no EPUB (marcado auto), o
@@ -357,6 +361,64 @@ def trava_mapa(manifest, catalogo):
     n = por.get('livro-sem-sumario', {})
     if (n.get('mapa'), n.get('mapa_origem')) != ([], 'nenhum') or 'sumário' not in (n.get('mapa_nota') or ''):
         erros.append('o livro sem sumário: %r %r' % (n.get('mapa_origem'), n.get('mapa_nota')))
+    return erros
+
+
+class QualquerId(dict):
+    """O veneno que aceita todo id: qualquer chave "esta" no indice, e a
+    disciplina da que nao esta e a fisica (a disciplina dita continua conferida)."""
+    def __contains__(self, k):
+        return True
+
+    def __getitem__(self, k):
+        return dict.get(self, k, 'fisica')
+
+    def get(self, k, padrao=None):
+        return dict.get(self, k, 'fisica')
+
+
+# O livro de quimica da 1a serie do item 12c, com o mapa da orquestradora. Os
+# ids sao os do banco de verdade (os casos pendentes da revisao L3: Q3, unidades
+# do SI no FISEM1-T01, e Q16, acidos nucleicos no BIOEM1-T07).
+MAPA_12C = {'livro': 'quimica-de-prova', 'serie': 'em1', 'capitulos': [
+    {'n': 1, 'titulo': 'Grandezas e medidas', 'pag_arquivo_inicio': 1, 'pag_arquivo_fim': 2,
+     'assuntos': [{'id': 'QUIEM1-T02', 'confianca': 'alta'}, {'id': 'FISEM1-T01', 'confianca': 'media'}]},
+    {'n': 2, 'titulo': 'Ácidos nucleicos', 'pag_arquivo_inicio': 3, 'pag_arquivo_fim': 4,
+     'assuntos': [{'id': 'BIOEM1-T07', 'confianca': 'alta', 'disciplina': 'biologia'}]},
+    {'n': 3, 'titulo': 'Capítulo com ids ruins', 'pag_arquivo_inicio': 5, 'pag_arquivo_fim': 6,
+     # o prefixo FIS sem o assunto no indice; o id certo com a disciplina errada; o id que nao e texto
+     'assuntos': [{'id': 'FISEM1-T99'}, {'id': 'FISEM2-T10', 'disciplina': 'quimica'}, {'id': ['FISEM1-T01']}]},
+    {'n': 4, 'titulo': 'Estrutura atômica', 'pag_arquivo_inicio': 7, 'pag_arquivo_fim': 8,
+     'assuntos': [{'id': 'QUIEM1-T01', 'confianca': 'alta'}]}]}
+
+
+def trava_entre_materias(catalogo):
+    """Item 12c: o mapa do livro de quimica liga o assunto de outra materia
+    (fisica, biologia) quando o id esta no indice; o id que o indice nao tem,
+    e o de disciplina dita errada, ficam de fora; o capitulo so de quimica fica
+    como sempre. A forma passa no conferir_mapa."""
+    livro = {'formato': 'pdf', 'titulo': 'Química de prova', 'materia': 'quimica', 'segmento': 'Ensino médio'}
+    m = livros.montar_mapa(livro, {'paginas': 8, 'sumario': []}, ('mapa_capitulos_quimica_prova.json', MAPA_12C), catalogo)
+    erros = []
+    obtido = [[(a['id'], a['confianca']) for a in e['assuntos']] for e in m.get('mapa') or []]
+    esperado = [[('QUIEM1-T02', 'alta'), ('FISEM1-T01', 'média')], [('BIOEM1-T07', 'alta')], [], [('QUIEM1-T01', 'alta')]]
+    if obtido != esperado:
+        erros.append('os assuntos do mapa: %r (esperado %r)' % (obtido, esperado))
+    if m.get('mapa_disciplina') != 'quimica' or m.get('series') != ['em1']:
+        erros.append('a disciplina e o ano do livro: %r %r' % (m.get('mapa_disciplina'), m.get('series')))
+    nota = m.get('mapa_nota') or ''
+    if '3 assunto(s) fora do índice' not in nota:
+        erros.append('a nota não conta os 3 ids recusados: %r' % nota)
+    if '2 assunto(s) de outra matéria: FISEM1-T01, BIOEM1-T07.' not in nota:
+        erros.append('a nota não diz as ligações de outra matéria: %r' % nota)
+    erros += conferir_mapa({'livros': [dict(livro, id='quimica-de-prova', paginas=8, **m)]}, catalogo)
+    # o livro de matematica do mapa de sempre nao ganha nota de outra materia
+    so_mat = livros.montar_mapa({'formato': 'pdf', 'titulo': 'M', 'materia': 'matematica', 'segmento': ''}, {'paginas': 4, 'sumario': []},
+                                ('m.json', {'livro': 'm', 'serie': '06', 'capitulos': [
+                                    {'n': 1, 'titulo': 'Frações', 'pag_arquivo_inicio': 1, 'pag_arquivo_fim': 4,
+                                     'assuntos': [{'id': 'MAT06-05'}]}]}), catalogo)
+    if [[a['id'] for a in e['assuntos']] for e in so_mat['mapa']] != [['MAT06-05']] or 'outra matéria' in so_mat['mapa_nota']:
+        erros.append('o mapa só da própria matéria mudou: %r' % so_mat)
     return erros
 
 
@@ -789,6 +851,24 @@ def amostra_rodada(temp, placar):
         erros_obra += conferir_mapa({'livros': [dict(livro_obra, id='obra', paginas=None, epub={'espinha': ['a', 'b', 'c', 'd']}, **mo)]},
                                     catalogo)
     placar.conferir('livros: mapa de obra inteira (literatura), no EPUB e no PDF', erros_obra)
+
+    # item 12c: a ligacao de assunto entre materias, dos dois lados
+    placar.conferir('livros: ligação entre matérias (a de outra matéria aceita, o id inválido e a disciplina errada recusados, '
+                    'a da própria matéria igual)', trava_entre_materias(catalogo))
+    venenos_12c = (
+        ('o mapa so com assunto da disciplina do livro (a regra de antes do 12c)',
+         lambda c: {a['id']: k for k, d in c.items() if k == 'quimica' for a in d['assuntos']}),
+        ('o mapa so com assunto de outra disciplina (a da propria materia some)',
+         lambda c: {a['id']: k for k, d in c.items() if k != 'quimica' for a in d['assuntos']}),
+        ('o mapa aceita qualquer id, mesmo fora do indice', lambda c: QualquerId(real_12c(c))))
+    real_12c = livros.disciplinas_dos_ids
+    for rot, troca in venenos_12c:
+        livros.disciplinas_dos_ids = troca
+        try:
+            erros_v = trava_entre_materias(catalogo)
+        finally:
+            livros.disciplinas_dos_ids = real_12c
+        placar.conferir('livros: ' + rot, erros_v, deve_reprovar=True)
     v = copy.deepcopy(m1)
     for e in next(x for x in v['livros'] if x['id'] == 'livro-sem-marcadores')['mapa']:
         e['assuntos'] = []
@@ -850,6 +930,66 @@ def amostra_rodada(temp, placar):
     numeracao_impressa(temp, placar)
 
 
+def sumario_explicito(temp, placar):
+    """Item 12a: `"sumario": "mapa"` no livro do mapa faz o sumario sair do
+    mapa mesmo com marcadores no PDF (o fme05, de marcadores "x, 1, gaba").
+    Sintetico: um PDF de 6 paginas com marcadores lixo, lido pelo caminho real
+    (ler_mapas de um mapa_*.json em disco, e ler_pdf)."""
+    pasta = os.path.join(temp, 'sumario-explicito')
+    os.makedirs(os.path.join(pasta, 'mapa'))
+    pdf = os.path.join(pasta, 'livro-marcadores-lixo.pdf')
+    doc = pymupdf.open()
+    for i in range(6):
+        doc.new_page().insert_text((72, 72), 'Página sintética %d' % (i + 1))
+    doc.set_toc([[1, 'x', 1], [1, '1', 2], [1, 'gaba', 4]])
+    doc.save(pdf)
+    doc.close()
+    capitulos = [{'n': 1, 'titulo': 'Análise combinatória', 'pag_arquivo_inicio': 1, 'pag_arquivo_fim': 3, 'assuntos': []},
+                 {'n': 2, 'titulo': 'Binômio de Newton', 'pag_arquivo_inicio': 4, 'pag_arquivo_fim': 6, 'assuntos': []}]
+
+    def ler(**extra):
+        livro = dict({'livro': 'fme-prova', 'arquivo': 'livro-marcadores-lixo.pdf', 'serie': 'em2', 'capitulos': capitulos}, **extra)
+        with open(os.path.join(pasta, 'mapa', 'mapa_capitulos_prova.json'), 'w', encoding='utf-8') as f:
+            json.dump([livro], f, ensure_ascii=False)
+        return livros.ler_pdf(pdf, livros.ler_mapas(os.path.join(pasta, 'mapa')))
+
+    def titulos(info):
+        return [(e['titulo'], e['pagina'], e['pagina_fim']) for e in info['sumario']]
+    do_mapa = [('Análise combinatória', 1, 3), ('Binômio de Newton', 4, 6)]
+    lixo = [('x', 1, 1), ('1', 2, 3), ('gaba', 4, 6)]
+
+    def regra():
+        erros = []
+        info = ler(sumario='mapa')
+        if (info['sumario_origem'], titulos(info)) != ('mapa', do_mapa) or '"sumario": "mapa"' not in info.get('sumario_nota', ''):
+            erros.append('com "sumario": "mapa": %r %r %r' % (info['sumario_origem'], titulos(info), info.get('sumario_nota')))
+        return erros
+    placar.conferir('livros: "sumario": "mapa" no mapa vence os marcadores lixo do PDF, e a nota diz', regra())
+    erros = []
+    info = ler()
+    if (info['sumario_origem'], titulos(info)) != ('marcadores', lixo) or info.get('sumario_nota'):
+        erros.append('sem o campo: %r %r %r' % (info['sumario_origem'], titulos(info), info.get('sumario_nota')))
+    info = ler(sumario='marcadores do PDF')
+    if (info['sumario_origem'], titulos(info)) != ('marcadores', lixo) or 'ignorado' not in info.get('sumario_nota', ''):
+        erros.append('com valor desconhecido: %r %r' % (info['sumario_origem'], info.get('sumario_nota')))
+    fora = [dict(c, pag_arquivo_inicio=90, pag_arquivo_fim=95) for c in capitulos]
+    livro = {'livro': 'fme-prova', 'arquivo': 'livro-marcadores-lixo.pdf', 'sumario': 'mapa', 'capitulos': fora}
+    with open(os.path.join(pasta, 'mapa', 'mapa_capitulos_prova.json'), 'w', encoding='utf-8') as f:
+        json.dump([livro], f, ensure_ascii=False)
+    info = livros.ler_pdf(pdf, livros.ler_mapas(os.path.join(pasta, 'mapa')))
+    if (info['sumario_origem'], titulos(info)) != ('marcadores', lixo) or 'valeram os marcadores' not in info.get('sumario_nota', ''):
+        erros.append('mapa fora das páginas: %r %r' % (info['sumario_origem'], info.get('sumario_nota')))
+    placar.conferir('livros: sem o campo, os marcadores continuam; valor desconhecido e mapa fora das páginas também, '
+                    'e a nota diz', erros)
+    guarda = livros.SUMARIO_DO_MAPA
+    livros.SUMARIO_DO_MAPA = 'nunca'
+    try:
+        rv = regra()
+    finally:
+        livros.SUMARIO_DO_MAPA = guarda
+    placar.conferir('livros: o campo "sumario" do mapa ignorado (os marcadores sempre na frente)', rv, deve_reprovar=True)
+
+
 def principal():
     ap = argparse.ArgumentParser()
     ap.add_argument('--zip')
@@ -867,6 +1007,7 @@ def principal():
                 placar.conferir('livros: nada de travessao ou meia-risca no manifest', trava_tracos(m))
         else:
             amostra_rodada(temp, placar)
+            sumario_explicito(temp, placar)
     finally:
         shutil.rmtree(temp, ignore_errors=True)
     print('%d verificacoes passaram, %d falharam' % (placar.ok, placar.falhas))

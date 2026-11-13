@@ -410,7 +410,19 @@ conf('CASO REAL: nem chegou a ler o PR no gh', r.chamadas.length, 0);
 const semVersao = path.join(tmp, 'sem_versao', 'merge_seguro.js');
 fs.mkdirSync(path.dirname(semVersao));
 fs.copyFileSync(path.join(__dirname, 'versao_publicada.js'), path.join(path.dirname(semVersao), 'versao_publicada.js'));
-fs.writeFileSync(semVersao, sem.replace("  const velho = conferirVersao();", "  const velho = null;"));
+// --guarda (o job do CI): nao faz a checagem de "sou a copia da main", imprime a
+// cabeca, e nunca faz merge. A copia velha que recusa acima passa no --guarda.
+r = rodar(prBom(), ['--guarda'], 0, velha, { main: script });
+conf('--guarda: a cópia diferente da main não recusa pela versão', r.saida.indexOf(FRASE) < 0 && r.codigo === 0, true);
+conf('--guarda: imprime a cabeça inteira', r.saida.indexOf('cabeca    ' + CABECA) >= 0, true);
+conf('--guarda: nunca chama o merge', r.chamadas.some(c => /^pr merge/.test(c)), false);
+conf('--guarda: nem faz o show do merge_seguro da main', r.chamadasGit.some(c => /_teste\/merge_seguro\.js/.test(c)), false);
+p = prBom(); p.comments = [];
+r = rodar(p, ['--guarda']);
+conf('--guarda: recusa como o --conferir, e imprime a cabeça antes', r.codigo === 1 && /falta revisao adversarial/.test(r.saida) && r.saida.indexOf('cabeca    ' + CABECA) >= 0, true);
+const LINHA_VERSAO = '  const velho = guarda ? null : conferirVersao();';
+conf('controle: achei a linha da checagem de versão para tirar', sem.indexOf(LINHA_VERSAO) >= 0, true);
+fs.writeFileSync(semVersao, sem.replace(LINHA_VERSAO, "  const velho = null;"));
 r = rodar(prBom(), ['--conferir'], 9, semVersao, { main: script });
 conf('controle: sem a checagem de versão e sem BEHIND, o PR 9 atrás diz ok', r.codigo === 0 && /^ok /m.test(r.saida), true);
 

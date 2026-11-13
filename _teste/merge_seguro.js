@@ -4,6 +4,7 @@
  *
  *   sh _teste/merge_seguro.sh 74            confere e faz o merge
  *   sh _teste/merge_seguro.sh 74 --conferir so confere, nao faz merge
+ *   node _teste/merge_seguro.js 74 --guarda o job portao-merge do CI (veja principal)
  *
  * Existe porque a protecao de branch do GitHub some quando o repositorio vira
  * privado no plano gratuito (onda 3, D1). Enquanto o repositorio e publico, a
@@ -78,6 +79,8 @@ const CAMPOS = 'number,state,isDraft,baseRefName,headRefOid,commits,comments,sta
 // restauração, nuvem, dinheiro, cache do sw.js), marcado com o rótulo `risco`.
 // PR de tela, de prova e de CI entra com a bateria verde na própria cabeça,
 // mesmo atrás; a main roda a bateria depois do merge (decisão de 09/11/2026).
+/* O status e o job do guarda de merge no CI (guarda-merge.yml), fora da conta. */
+const GUARDA = ['portao-merge', 'guarda-merge'];
 function ehRisco(pr) {
   return (pr.labels || []).some(l => String(l && l.name).toLowerCase() === 'risco');
 }
@@ -111,6 +114,11 @@ function decidir(pr) {
   const porNome = {};
   (pr.statusCheckRollup || []).forEach(c => {
     const nome = c.name || c.context || '?';
+    // O GUARDA NAO JULGA A SI MESMO. O status portao-merge e o job guarda-merge
+    // sao o veredito DESTA regra no CI: contados aqui, um vermelho antigo ou o
+    // proprio job em andamento recusariam para sempre a rodada que viria
+    // corrigi-lo.
+    if (GUARDA.indexOf(nome) >= 0) return;
     const terminou = c.__typename === 'StatusContext' ? !/PENDING|EXPECTED/i.test(c.state || '') : c.status === 'COMPLETED';
     let quando = valida(c.startedAt) || valida(c.createdAt) || valida(c.completedAt);
     if (quando === null) quando = terminou ? 0 : Infinity;
@@ -396,16 +404,25 @@ function conferirVersao() {
   }
 }
 
+/* --guarda: o modo do job portao-merge (.github/workflows/guarda-merge.yml).
+ * Confere como o --conferir, nunca faz merge, e imprime "cabeca <sha>" assim
+ * que le o PR, para o job publicar o veredito no commit que ele julgou. Nao faz
+ * a conferencia de "sou a copia da main": no CI o arquivo sai do checkout do
+ * evento, que nos quatro gatilhos e a main (pull_request_target, comentario,
+ * bateria e push), e a main pode ter andado desde o evento; quem cuida disso e o
+ * guarda, que nao publica veredito se a main andou durante o julgamento, e o job
+ * do push na main, que rejulga todos os PRs abertos. */
 function principal(argv) {
   const numero = argv[0];
-  const soConferir = argv.indexOf('--conferir') >= 0;
-  const velho = conferirVersao();
+  const guarda = argv.indexOf('--guarda') >= 0;
+  const soConferir = guarda || argv.indexOf('--conferir') >= 0;
+  const velho = guarda ? null : conferirVersao();
   if (velho) {
     console.log('RECUSADO  ' + velho);
     return 1;
   }
   if (!/^[0-9]+$/.test(numero || '')) {
-    console.log('uso: sh _teste/merge_seguro.sh <numero do PR> [--conferir]');
+    console.log('uso: sh _teste/merge_seguro.sh <numero do PR> [--conferir | --guarda]');
     return 2;
   }
   let pr;
@@ -415,6 +432,7 @@ function principal(argv) {
     console.log('RECUSADO  nao consegui ler o PR #' + numero + ': ' + String(e.message).split('\n')[0]);
     return 1;
   }
+  if (guarda) console.log('cabeca    ' + String(pr.headRefOid || ''));
   const r = decidir(pr);
   if (!r.ok) {
     console.log('RECUSADO  PR #' + numero + ':');

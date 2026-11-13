@@ -2157,7 +2157,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
   background: var(--branco); color: var(--navy); font: inherit; font-size: var(--letra-16); font-weight: 600; text-align: center; box-sizing: border-box; }
 .leitor-pdf-zoom { display: inline-flex; gap: 8px; margin-left: auto; }
 .leitor-pdf-quadrado { min-width: 44px; padding: 10px 0; font-size: var(--letra-20); line-height: 1; }
-.leitor-pdf-corpo { background: var(--fio-claro); overflow: auto; padding: 18px; }
+.leitor-pdf-corpo { background: var(--fio-claro); overflow: auto; padding: 18px;
+  /* o dedo rola nos dois sentidos; a pinça e o duplo toque são do leitor (app.js) */
+  touch-action: pan-x pan-y; }
 .leitor-pdf-navegacao { flex: 0 0 auto; padding: 0 18px; border-top: 1px solid var(--fio); background: var(--branco); }
 .leitor-pdf-navegacao[hidden] { display: none; }
 .leitor-pdf-navegacao input { display: block; width: 100%; min-height: var(--alvo); margin: 0; accent-color: var(--navy); }
@@ -3885,6 +3887,47 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bib-busca-livro-grupo { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; margin-top: 8px; border-top: 1px solid var(--fio); min-width: 0; }
 .bib-busca-livro-paginas { flex: 0 0 auto; min-width: 0; font-size: var(--letra-14); overflow-wrap: anywhere; }
 .bib-busca-livro-grupo .btn { min-height: var(--alvo); }
+/* por onde o capítulo foi achado (pelo capítulo, com o assunto, ou no texto) e o "Abrir no capítulo" */
+.bib-busca-como { margin: 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+.bib-busca-como-ponto { margin: 0 6px; }
+.bib-busca-acoes { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.bib-busca-acoes .btn { max-width: 100%; }
+.bib-busca-paginas[hidden] { display: none; }
+.bib-busca-obra { margin: 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+/* B1: os assuntos no alto da busca e a página do assunto */
+.bib-assuntos-da-busca { margin: 0 0 12px; }
+.bib-assuntos-da-busca[hidden] { display: none; }
+.bib-assuntos-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
+.bib-assunto { min-width: 0; }
+.bib-assunto-caminho { margin: 8px 0 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+.bib-assunto-passo + .bib-assunto-passo { margin-left: 6px; }
+.bib-assunto-titulo { margin: 4px 0 8px; font-size: 1.25rem; color: var(--navy); overflow-wrap: anywhere; }
+.bib-assunto-tambem { margin: 0 0 8px; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+.bib-assunto-tambem-rotulo { font-weight: var(--peso-forte); }
+.bib-assunto-secao { margin-top: 12px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
+.bib-assunto-secao-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
+.bib-assunto-livros { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 8px; min-width: 0; }
+.bib-assunto-livro { display: flex; flex-direction: column; gap: 4px; padding: 10px; border: 1px solid var(--fio); border-radius: 8px; min-width: 0; overflow-wrap: anywhere; }
+.bib-assunto-livro .btn, .bib-assunto-ver-outros { min-height: var(--alvo); }
+.bib-assunto-ver-outros { justify-self: start; }
+.bib-assunto-vizinhos { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.bib-assunto-vizinho { min-height: var(--alvo); max-width: 100%; white-space: normal; text-align: left; }
+.bib-assunto-vazio { margin: 0; }
+/* com a página do assunto aberta, o topo dos exercícios e a faixa do material saem: a página começa no alto */
+#tela-biblioteca.com-pagina-do-assunto #bib-exercicios-cabeca,
+#tela-biblioteca.com-pagina-do-assunto #bib-contexto,
+#tela-biblioteca.com-pagina-do-assunto #bib-carrinho { display: none; }
+.bib-assuntos-mais { min-height: var(--alvo); margin-top: 4px; }
+/* "Melhores resultados" no alto do grupo "Nos livros", e o resto recolhido em "Mais resultados (N)" */
+.bib-busca-melhores { margin-top: 8px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
+.bib-busca-melhores-titulo { margin: 0; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
+.bib-busca-mais { margin-top: 8px; }
+.bib-busca-mais > summary { list-style: none; cursor: pointer; min-height: var(--alvo); display: flex; align-items: center; gap: 4px;
+  font-weight: var(--peso-forte); color: var(--navy); }
+.bib-busca-mais > summary::-webkit-details-marker { display: none; }
+.bib-busca-mais[open] > summary .bib-grupo-seta { transform: rotate(90deg); }
+/* a faixa do material marcado vazia não gruda no alto durante a busca: rola junto */
+.bib-carrinho.vazia.na-busca { position: static; }
 .bib-busca-livros-aviso { margin-top: 8px; }
 .bibl-exercicios-cabeca .cresce { flex: 1; }
 .bibl-exercicios-titulo { font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); margin: 0; }
@@ -3995,6 +4038,25 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bibl-sumario-cabeca { display: flex; align-items: baseline; gap: 12px; padding: 4px 12px 8px; }
 .bibl-sumario-cabeca .bibl-apoio { margin-left: auto; }
 .bibl-sem-sumario { padding: 0 12px; }
+/* fase 1a da nuvem: onde ela estava antes da atualização, e as correções órfãs (uma linha discreta, recolhida) */
+#bib-livro-onde-estava { margin: 0 0 8px; padding: 0 12px; }
+.bibl-orfas { padding: 0 12px 8px; min-width: 0; }
+.bibl-orfas-linha {
+  display: block; width: 100%; min-height: var(--alvo); padding: 8px 0; border: 0; background: transparent;
+  font: inherit; font-size: var(--letra-14); color: var(--muted); text-align: left; text-decoration: underline;
+  text-underline-offset: 3px; overflow-wrap: anywhere; cursor: pointer;
+}
+.bibl-orfa { padding: 8px 0; border-top: 1px solid var(--fio-claro); min-width: 0; }
+.bibl-orfa-texto { margin: 0 0 8px; font-size: var(--letra-14); color: var(--texto); overflow-wrap: anywhere; }
+.bibl-orfa-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.bibl-orfa-acoes .btn { max-width: 100%; white-space: normal; }
+.bibl-orfa-pergunta { margin-top: 8px; padding: 8px 12px; border-radius: var(--raio); background: var(--soft); }
+.bibl-orfa-capitulos { display: flex; flex-direction: column; margin-top: 8px; }
+.bibl-orfa-capitulo {
+  min-height: var(--alvo); padding: 8px 12px; border: 0; border-top: 1px solid var(--fio-claro); background: transparent;
+  font: inherit; font-size: var(--letra-14); color: var(--texto); text-align: left; overflow-wrap: anywhere; cursor: pointer;
+}
+.bibl-orfa-capitulo:hover { background: var(--soft); }
 .bibl-cap, .bibl-sec {
   display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline;
   width: 100%; min-height: var(--alvo); padding: 10px 12px; border: 0; border-top: 1px solid var(--fio-claro);

@@ -10,7 +10,7 @@
  *
  * Agora:
  *   - No repositório, VERSAO e CACHE ficam FIXOS nos valores da última versão
- *     escrita à mão (1.42.61 e apoio-educacional-v141). São o valor de
+ *     escrita à mão (1.42.121 e apoio-educacional-v201). São o valor de
  *     desenvolvimento, que as provas usam, e o PISO da publicação. O PR não os
  *     muda: o merge_seguro recusa.
  *   - Na publicação, o .github/monta_site.sh chama este arquivo, que escreve no

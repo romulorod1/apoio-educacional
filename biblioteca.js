@@ -399,9 +399,14 @@
       linhas.push(contas.deOutroPacote.length + (contas.deOutroPacote.length === 1 ? ' livro ficou' : ' livros ficaram') +
         ' como estava, porque já veio de outro pacote.');
     }
-    if (contas.posicoesSoltas) {
-      linhas.push(contas.posicoesSoltas + (contas.posicoesSoltas === 1 ? ' livro atualizado mudou' : ' livros atualizados mudaram') +
-        ' de sumário e vai abrir no começo.');
+    /* Desde a fase 1a da nuvem a posição de leitura não sai mais quando o
+     * sumário muda. Ela só ANDA quando a página dela deixou de existir no
+     * arquivo novo (vai para a última) ou o EPUB virou PDF sem a página
+     * conhecida (vai para a primeira), e o leitor avisa onde ela estava. */
+    if (contas.posicoesAjustadas) {
+      linhas.push(contas.posicoesAjustadas === 1 ?
+        '1 livro atualizado não abre mais onde você parou; ao abrir, ele diz onde você estava.' :
+        contas.posicoesAjustadas + ' livros atualizados não abrem mais onde você parou; ao abrir, cada um diz onde você estava.');
     }
     return linhas;
   }
@@ -414,38 +419,238 @@
    * correção mora no aplicativo (app.js, db.ajustes.mapaDosLivros) e vai na
    * cópia de segurança.
    *
-   * `correcoes` é { <n do capítulo>: { titulo, assuntos: [ids], acao, quando } }
-   * de UM livro. A correção só vale para o capítulo de mesmo número E mesmo
-   * título: se um pacote novo renumerar o sumário, a correção velha não cai
-   * calada no capítulo vizinho.
+   * `correcoes` é { <chave>: { titulo, assuntos: [ids], acao, quando, n?, chave? } }
+   * de UM livro. A <chave> do objeto é o número do capítulo (String(n)), como
+   * sempre foi, para o aparelho com a versão antiga ler como hoje; só quando
+   * esse número já guarda outra correção dela a nova vai para "<n>~<algo>"
+   * (chaveParaGravarCorrecao), que a versão antiga não procura e não estraga.
    *
-   * Devolve uma lista de { n, titulo, pagina, pagina_fim, capitulo,
-   * capitulo_fim, ancora, assuntos: [ids], origem, estado }, com estado
+   * Desde a fase 1a da biblioteca na nuvem (12/11/2026), a correção não se
+   * perde quando o mapa muda (resolverCorrecoes): ela casa com UMA entrada do
+   * mapa, nesta ordem, e a que não casa com nada fica ÓRFÃ, à vista dela na
+   * tela do livro (correcoesOrfas), e nunca é apagada nem aplicada no
+   * capítulo vizinho. Nada disto grava no db: a resolução é feita a cada
+   * leitura.
+   *
+   * Devolve uma lista de { n, chave, titulo, pagina, pagina_fim, capitulo,
+   * capitulo_fim, ancora, assuntos: [ids], origem, estado, correcaoChave },
+   * com estado
    *   'a_confirmar' do passe automático, sem palavra dela ainda;
    *   'do_mapa'     do mapa da orquestradora, sem palavra dela;
    *   'confirmado'  ela confirmou o que o mapa dizia;
-   *   'corrigido'   ela escolheu outro assunto (ou nenhum). */
+   *   'corrigido'   ela escolheu outro assunto (ou nenhum).
+   * `correcaoChave` é a chave da correção que vale ali (null sem correção):
+   * é nela que a próxima palavra dela sobre esse capítulo é gravada. */
   function mapaDoLivro(meta, correcoes) {
-    var mapa = meta && Array.isArray(meta.mapa) ? meta.mapa : [];
-    correcoes = correcoes || {};
-    var saida = [];
-    mapa.forEach(function (e) {
-      if (!e || !inteiro(e.n) || typeof e.titulo !== 'string') return;
+    var r = resolverCorrecoes(meta, correcoes);
+    return r.entradas.map(function (e) {
       var ids = (Array.isArray(e.assuntos) ? e.assuntos : []).map(function (a) { return a && a.id; })
         .filter(function (id) { return typeof id === 'string' && id; });
-      var c = Object.prototype.hasOwnProperty.call(correcoes, String(e.n)) ? correcoes[String(e.n)] : null;
-      var vale = !!c && c.titulo === e.titulo && Array.isArray(c.assuntos);
-      saida.push({
-        n: e.n, titulo: e.titulo, pagina: e.pagina, pagina_fim: e.pagina_fim, capitulo: e.capitulo,
+      var casada = r.porN[e.n] || null;
+      var c = casada ? casada.correcao : null;
+      return {
+        n: e.n, chave: typeof e.chave === 'string' && e.chave ? e.chave : null,
+        titulo: e.titulo, pagina: e.pagina, pagina_fim: e.pagina_fim, capitulo: e.capitulo,
         capitulo_fim: e.capitulo_fim, ancora: e.ancora || null, obraInteira: !!e.obra_inteira,
         // o gabarito do capítulo (C15.5), do gerador; a correção dela não mexe nele
         gabarito: gabaritoDaEntrada(meta, e),
-        assuntos: vale ? c.assuntos.filter(function (id) { return typeof id === 'string' && id; }) : ids,
+        assuntos: c ? c.assuntos.filter(function (id) { return typeof id === 'string' && id; }) : ids,
         origem: e.origem === 'auto' ? 'auto' : 'mapa',
-        estado: vale ? (c.acao === 'corrigiu' ? 'corrigido' : 'confirmado') : (e.origem === 'auto' ? 'a_confirmar' : 'do_mapa')
-      });
+        estado: c ? (c.acao === 'corrigiu' ? 'corrigido' : 'confirmado') : (e.origem === 'auto' ? 'a_confirmar' : 'do_mapa'),
+        correcaoChave: casada ? casada.chave : null
+      };
     });
-    return saida;
+  }
+
+  /* O título comparado sem acento, sem caixa e sem espaço sobrando: a
+   * correção de acento ("Fracoes" para "Frações") não separa a correção dela
+   * do capítulo. */
+  function tituloNormalizado(t) {
+    return String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  // o número do capítulo que a correção diz: o `n` gravado nela, ou a chave do objeto quando é só o número
+  function numeroDaCorrecao(k, c) {
+    if (inteiro(c.n)) return c.n;
+    return /^\d+$/.test(k) ? parseInt(k, 10) : null;
+  }
+
+  /* A tabela de herança de títulos do livro (meta.heranca_titulos, que o
+   * gerador copia de revisao-mapas/L1/HERANCA_L1.json): os títulos que eram
+   * lixo de origem no mapa antigo (nome de arquivo, "pageN") e o título
+   * impresso que os substituiu, com a página do arquivo onde a entrada antiga
+   * começava. A faixa antiga de cada título vai do começo dele até a página
+   * antes do começo seguinte da tabela (o último, até o fim do livro). */
+  function herancaDoLivro(meta) {
+    var lista = (meta && Array.isArray(meta.heranca_titulos) ? meta.heranca_titulos : []).filter(function (h) {
+      return h && typeof h.titulo_antigo === 'string' && h.titulo_antigo && typeof h.titulo_novo === 'string' &&
+        inteiro(h.pag_arquivo_inicio_antiga) && h.pag_arquivo_inicio_antiga >= 1;
+    });
+    var inicios = lista.map(function (h) { return h.pag_arquivo_inicio_antiga; }).sort(function (a, b) { return a - b; });
+    var total = meta && inteiro(meta.paginas) ? meta.paginas : Infinity;
+    return lista.map(function (h) {
+      var ini = h.pag_arquivo_inicio_antiga;
+      var seguinte = inicios.filter(function (p) { return p > ini; })[0];
+      return { antigo: tituloNormalizado(h.titulo_antigo), novo: tituloNormalizado(h.titulo_novo), ini: ini, fim: seguinte ? seguinte - 1 : total };
+    });
+  }
+
+  /* Casa cada correção dela com uma entrada do mapa de agora. A regra que
+   * manda em tudo: NA DÚVIDA, A CORREÇÃO FICA ÓRFÃ À VISTA, nunca aplicada
+   * calada noutro capítulo. Só três passos APLICAM, nesta ordem (o primeiro
+   * que dá UMA entrada só):
+   *   1. a mesma `chave` de capítulo (a chave estável que o gerador dá a cada
+   *      entrada e reaproveita a cada geração), e com o mesmo título
+   *      normalizado, ou com o par título antigo e título novo na tabela de
+   *      herança, e aí também com um assunto em comum entre a correção e o
+   *      capítulo novo. Chave igual com título diferente fora disso não
+   *      aplica: vira sugestão (o gerador que reaproveitar uma chave não move
+   *      a correção calado) e segue para os passos seguintes;
+   *   2. o mesmo número E o mesmo título (a regra de antes, para as correções
+   *      gravadas sem chave);
+   *   3. a herança de títulos (herancaDoLivro): o título dela era um título
+   *      antigo da tabela, e cai no capítulo novo que começa DENTRO da faixa
+   *      antiga e tem o MESMO assunto que ela escolheu, quando há um só. Com
+   *      dois, com nenhum, ou sem assunto escolhido ("nenhum"), não aplica. A
+   *      herança não cai pelo começo da faixa nem pelo título novo da
+   *      tabela: na unidade 8 do Geração Alpha 7 e 9 a tabela diz "Medições"
+   *      e "Algumas grandezas" (o primeiro capítulo), e o volume está no
+   *      seguinte.
+   * O mesmo título normalizado em UMA entrada só NÃO aplica: é só sugestão
+   * (um mapa antigo com dois "Exercícios" e um novo com um só levaria a
+   * correção do segundo para o primeiro, calada). A sugestão aparece na linha
+   * das órfãs ("Ligar a “Exercícios” (p. X)"), e ela decide com um toque.
+   *
+   * Duas correções no MESMO capítulo de destino: vence a de `quando` mais
+   * recente, qualquer que seja o passo (no empate, o passo mais forte); a
+   * outra fica órfã, com o capítulo como sugestão. A exceção é a que diz o
+   * mesmo que a vencedora (mesmos assuntos e mesma ação): não tem o que
+   * mostrar e é contada em `absorvidas`, sem sair do db.
+   *
+   * Devolve { entradas, porN: { <n>: { chave, correcao, como } },
+   * orfas: [{ chave, titulo, assuntos, acao, quando, n, sugestao }], absorvidas }.
+   * `sugestao` é { n, titulo, pagina, capitulo, ocupado } ou null; `ocupado`
+   * diz que o capítulo já tem outra correção dela.
+   * Limite conhecido: o mapa com dois capítulos de mesmo `n` (mapa
+   * defeituoso) junta os dois numa casa só. */
+  function resolverCorrecoes(meta, correcoes) {
+    var entradas = (meta && Array.isArray(meta.mapa) ? meta.mapa : []).filter(function (e) {
+      return !!e && inteiro(e.n) && typeof e.titulo === 'string';
+    });
+    var todas = correcoes && typeof correcoes === 'object' ? correcoes : {};
+    var validas = Object.keys(todas).filter(function (k) {
+      var c = todas[k];
+      return !!c && typeof c === 'object' && typeof c.titulo === 'string' && Array.isArray(c.assuntos);
+    });
+    var idsDe = function (e) {
+      return (Array.isArray(e.assuntos) ? e.assuntos : []).map(function (a) { return a && a.id; })
+        .filter(function (id) { return typeof id === 'string' && id; });
+    };
+    var unica = function (lista) { return lista.length === 1 ? lista[0] : null; };
+    var heranca = herancaDoLivro(meta);
+    var herdaPara = function (c, e) {
+      var t = tituloNormalizado(c.titulo), te = tituloNormalizado(e.titulo);
+      return heranca.some(function (h) { return h.antigo === t && h.novo === te; });
+    };
+    var propostas = {}, sugestoes = {};
+    validas.forEach(function (k) {
+      var c = todas[k], tc = tituloNormalizado(c.titulo);
+      // 1. a chave, conferida pelo título
+      if (typeof c.chave === 'string' && c.chave) {
+        var porChave = unica(entradas.filter(function (e) { return e.chave === c.chave; }));
+        if (porChave) {
+          var mesmoTitulo = tituloNormalizado(porChave.titulo) === tc;
+          /* a chave que vale SÓ pela herança pede também um assunto em comum com
+           * o capítulo novo: "page12" herdado para "Medições", com o volume no
+           * capítulo seguinte, não leva a correção de volume para "Medições" */
+          var herdaComAssunto = !mesmoTitulo && herdaPara(c, porChave) &&
+            c.assuntos.some(function (id) { return idsDe(porChave).indexOf(id) >= 0; });
+          if (mesmoTitulo || herdaComAssunto) { propostas[k] = { e: porChave, como: 'chave' }; return; }
+          sugestoes[k] = porChave;
+        }
+      }
+      // 2. o mesmo número e o mesmo título
+      var porNumero = unica(entradas.filter(function (e) {
+        var mesmoNumeroETitulo = numeroDaCorrecao(k, c) === e.n && c.titulo === e.titulo;
+        return mesmoNumeroETitulo;
+      }));
+      if (porNumero) { propostas[k] = { e: porNumero, como: 'numero' }; return; }
+      // 3. a herança de títulos, pelo assunto que ela escolheu
+      var hs = heranca.filter(function (h) { return h.antigo === tc; });
+      if (hs.length === 1) {
+        var h = hs[0];
+        var naFaixa = entradas.filter(function (e) { return inteiro(e.pagina) && e.pagina >= h.ini && e.pagina <= h.fim; });
+        var escolhidos = c.assuntos.filter(function (id) { return typeof id === 'string' && id; });
+        var herdados = (function () {
+          // sem assunto escolhido ("nenhum"), não há o que comparar
+          if (!escolhidos.length) return [];
+          return naFaixa.filter(function (e) {
+            return idsDe(e).some(function (id) { return escolhidos.indexOf(id) >= 0; });
+          });
+        })();
+        var porHeranca = unica(herdados);
+        if (porHeranca) { propostas[k] = { e: porHeranca, como: 'heranca' }; return; }
+      }
+      // o mesmo título normalizado numa entrada só: SÓ sugestão, ela decide
+      if (!sugestoes[k]) {
+        var porTitulo = unica(entradas.filter(function (e) { return tituloNormalizado(e.titulo) === tc; }));
+        if (porTitulo) sugestoes[k] = porTitulo;
+      }
+    });
+    // o mesmo destino para duas: a mais recente vence (no empate, o passo mais forte)
+    var FORCA = { chave: 0, numero: 1, heranca: 2 };
+    var forca = function (k) { return FORCA[propostas[k].como]; };
+    var maisNova = function (a, b) {
+      var qa = String(todas[a].quando || ''), qb = String(todas[b].quando || '');
+      return qa < qb ? 1 : qa > qb ? -1 : 0;
+    };
+    var ordem = Object.keys(propostas);
+    ordem.sort(function (a, b) { return maisNova(a, b) || forca(a) - forca(b) || (a < b ? -1 : a > b ? 1 : 0); });
+    var porN = {}, absorvidas = {}, perdeu = {};
+    var mesmoQueODaEntrada = function (c, n) {
+      var outra = porN[n].correcao;
+      return (outra.acao === 'corrigiu') === (c.acao === 'corrigiu') &&
+        outra.assuntos.slice().sort().join('|') === c.assuntos.slice().sort().join('|');
+    };
+    ordem.forEach(function (k) {
+      var e = propostas[k].e;
+      if (!porN[e.n]) { porN[e.n] = { chave: k, correcao: todas[k], como: propostas[k].como }; return; }
+      if (mesmoQueODaEntrada(todas[k], e.n)) { absorvidas[k] = true; return; }
+      perdeu[k] = true;
+      sugestoes[k] = e;
+    });
+    var orfas = validas.filter(function (k) { return (!propostas[k] || perdeu[k]) && !absorvidas[k]; }).sort().map(function (k) {
+      var c = todas[k], s = sugestoes[k] || null;
+      return { chave: k, titulo: c.titulo, assuntos: c.assuntos.filter(function (id) { return typeof id === 'string' && id; }),
+        acao: c.acao === 'corrigiu' ? 'corrigiu' : 'confirmou', quando: c.quando || null, n: numeroDaCorrecao(k, c),
+        sugestao: s ? { n: s.n, titulo: s.titulo, pagina: inteiro(s.pagina) ? s.pagina : null,
+          capitulo: inteiro(s.capitulo) ? s.capitulo : null, ocupado: !!porN[s.n] } : null };
+    });
+    return { entradas: entradas, porN: porN, orfas: orfas, absorvidas: Object.keys(absorvidas).sort() };
+  }
+
+  /* As correções dela que não acharam capítulo no mapa de agora: a tela do
+   * livro mostra uma linha discreta com o número, e cada uma com "Ligar a um
+   * capítulo" e "Descartar" (com Desfazer). Nunca saem sozinhas. */
+  function correcoesOrfas(meta, correcoes) {
+    return resolverCorrecoes(meta, correcoes).orfas;
+  }
+
+  /* Onde gravar a próxima palavra dela sobre uma entrada do mapaDoLivro: na
+   * chave da correção que já vale ali (a palavra nova substitui a dela
+   * mesma); senão no número do capítulo, se ele estiver livre; senão (o
+   * número guarda OUTRA correção dela, que casou com outro capítulo ou é
+   * órfã) numa chave nova "<n>~<chave ou titulo>", sem tocar na que está. */
+  function chaveParaGravarCorrecao(correcoes, entrada) {
+    var todas = correcoes && typeof correcoes === 'object' ? correcoes : {};
+    var tem = function (k) { return Object.prototype.hasOwnProperty.call(todas, k); };
+    if (entrada.correcaoChave) return entrada.correcaoChave;
+    var k = String(entrada.n);
+    if (!tem(k)) return k;
+    var base = k + '~' + (entrada.chave || tituloNormalizado(entrada.titulo).replace(/[^a-z0-9]+/g, '-').slice(0, 24) || 'c');
+    if (!tem(base)) return base;
+    for (var i = 2; ; i++) if (!tem(base + '~' + i)) return base + '~' + i;
   }
 
   /* A entrada do mapa onde a leitura está: no PDF, a que tem a página entre o
@@ -613,6 +818,191 @@
       return String(a.meta.titulo || '').localeCompare(String(b.meta.titulo || ''), 'pt-BR') ||
         (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) || a.entrada.n - b.entrada.n;
     });
+  }
+
+  /* ------------------------- a ligação de assunto entre matérias (item 12c) */
+
+  /* O capítulo de química que trata de unidades do SI liga o assunto de
+   * física (FISEM1-T01): o mapa aceita o id de qualquer matéria do índice, e a
+   * tela diz de que matéria ele é ("Física: Unidades do SI e conversões").
+   * Quem decide a matéria do assunto é o índice (nomes.porId, com a
+   * `disciplina` de cada um), e não o prefixo do id: o id que o índice não tem
+   * aparece como veio, sem matéria nenhuma.
+   *
+   * disciplinaDoMapa(meta): a disciplina do índice do livro (o mapa_disciplina
+   *   do gerador; sem ele, a matéria da planilha, com filosofia e sociologia
+   *   na chave de lá).
+   * assuntoDeOutraMateria(meta, a): o assunto do índice é de outra matéria
+   *   que a do livro.
+   * nomeDoAssuntoNoLivro(meta, id, nomes, nomeDaMateria): o nome que a tela
+   *   mostra, com a matéria na frente quando é de outra; nomeDaMateria(id, a)
+   *   dá o rótulo da matéria (o do Core no app).
+   * opcoesDoCorrigir(meta, entrada, nomes): a lista do Corrigir: os assuntos
+   *   de outra matéria que o capítulo já tem (para ela ver e manter), e depois
+   *   os da matéria e do ano do livro, na ordem do índice. */
+  var DISCIPLINA_DA_MATERIA = { filosofia: 'filosofia-sociologia', sociologia: 'filosofia-sociologia' };
+  function disciplinaDoMapa(meta) {
+    var d = (meta && (meta.mapa_disciplina || meta.materia)) || '';
+    return DISCIPLINA_DA_MATERIA[d] || d;
+  }
+  function assuntoDeOutraMateria(meta, a) {
+    var d = disciplinaDoMapa(meta);
+    return !!(a && a.disciplina && d && a.disciplina !== d);
+  }
+  function nomeDoAssuntoNoLivro(meta, id, nomes, nomeDaMateria) {
+    var a = nomes && nomes.porId && nomes.porId[id];
+    if (!a) return String(id);
+    var titulo = a.titulo || String(id);
+    if (!assuntoDeOutraMateria(meta, a)) return titulo;
+    var materia = (typeof nomeDaMateria === 'function' && nomeDaMateria(a.disciplina, a)) || a.disciplinaNome || a.disciplina;
+    return materia + ': ' + titulo;
+  }
+  function opcoesDoCorrigir(meta, entrada, nomes) {
+    var series = Array.isArray(meta && meta.series) ? meta.series : [];
+    var disciplina = meta && meta.mapa_disciplina;
+    var porId = (nomes && nomes.porId) || {};
+    var deFora = [];
+    ((entrada && entrada.assuntos) || []).forEach(function (id) {
+      var a = porId[id];
+      if (a && assuntoDeOutraMateria(meta, a) && deFora.indexOf(a) < 0) deFora.push(a);
+    });
+    var daMateria = ((nomes && nomes.lista) || []).filter(function (a) {
+      return a.disciplina === disciplina && (a.eixo !== 'ano' || !series.length || series.indexOf(a.serie) >= 0);
+    });
+    return deFora.concat(daMateria);
+  }
+
+  /* ------------------------- a busca pelos capítulos e assuntos (12/11/2026) */
+
+  /* Pedido do dono: o livro escaneado (sem texto) não aparecia na busca da
+   * Biblioteca, mesmo com capítulos mapeados e assuntos ligados. A busca passa
+   * a procurar também, em TODO livro instalado:
+   *   - nos títulos dos capítulos do sumário que a tela usa (sumarioDoLivro);
+   *   - nos títulos das entradas do mapa, já com a correção dela por cima
+   *     (mapaDoLivro);
+   *   - nos títulos e nas chaves dos assuntos ligados a cada entrada do mapa.
+   * A chave do assunto são as palavras-chave que o índice de matemática
+   * guarda (chaves.r e chaves.d); o id ("MAT08-15") não entra, porque "mat"
+   * casaria todo assunto de matemática. Título casa por trecho,
+   * como o texto; chave casa pelo começo de uma palavra, porque são radicais
+   * soltos ("cubo", "litro"), e por trecho "de" casaria quase todas.
+   *
+   * Só lê: nada é gravado. O índice é montado UMA vez por desenho da
+   * Biblioteca (app.js), e a consulta é uma varredura em memória.
+   *
+   * indiceDeCapitulos(livros, correcoesPorLivro, nomes, normalizar)
+   *   livros: [{ id, meta }]; correcoesPorLivro: { <id>: correções };
+   *   nomes: { porId: { <id do assunto>: { titulo, chaves } } } (ou nada: o
+   *   assunto fica só com o id); normalizar: a mesma da busca no texto
+   *   (IndiceLivros.normalizar), com esta como reserva.
+   * Devolve { livros: [{ id, formato, capitulos: [...] }], capitulos: total }. */
+  function normalizarTermo(texto) {
+    return String(texto == null ? '' : texto).normalize('NFKD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+  function indiceDeCapitulos(livros, correcoesPorLivro, nomes, normalizar) {
+    var norm = typeof normalizar === 'function' ? normalizar : normalizarTermo;
+    var porId = (nomes && nomes.porId) || {};
+    var saida = { livros: [], capitulos: 0 };
+    var assuntoDoIndice = Object.create(null);
+    function assunto(id) {
+      if (assuntoDoIndice[id]) return assuntoDoIndice[id];
+      var a = porId[id];
+      var titulo = a && a.titulo ? String(a.titulo) : id;
+      var chaves = a && a.chaves ? [a.chaves.r, a.chaves.d].filter(function (x) { return typeof x === 'string'; }).join(' ') : '';
+      assuntoDoIndice[id] = { id: id, titulo: titulo, alvoTitulo: norm(titulo), alvoChaves: ' ' + norm(chaves) + ' ' };
+      return assuntoDoIndice[id];
+    }
+    (livros || []).forEach(function (l) {
+      if (!l || !l.meta) return;
+      var meta = l.meta, epub = meta.formato === 'epub';
+      var chaveIni = epub ? 'capitulo' : 'pagina';
+      var caps = [], doMapa = Object.create(null);
+      mapaDoLivro(meta, (correcoesPorLivro || {})[l.id]).forEach(function (e) {
+        var c = { n: e.n, mapaN: e.n, titulo: e.titulo, inicio: inteiro(e[chaveIni]) ? e[chaveIni] : null,
+          ancora: e.ancora || null, obraInteira: !!e.obraInteira,
+          // o título lixo (nome de arquivo, "page12") não entra na busca; os assuntos dele, sim
+          alvo: marcadorSemSentido(e.titulo) ? '' : norm(e.titulo),
+          assuntos: e.assuntos.map(assunto) };
+        doMapa[e.n] = c;
+        caps.push(c);
+      });
+      var sumario = sumarioDoLivro(meta);
+      var nivel = Infinity;
+      sumario.forEach(function (s) { if (s && typeof s.nivel === 'number' && s.nivel < nivel) nivel = s.nivel; });
+      if (nivel === Infinity) nivel = 1;
+      sumario.forEach(function (s) {
+        if (!s || typeof s.titulo !== 'string' || (typeof s.nivel === 'number' ? s.nivel : nivel) !== nivel) return;
+        var ini = inteiro(s[chaveIni]) ? s[chaveIni] : null, alvo = marcadorSemSentido(s.titulo) ? '' : norm(s.titulo);
+        // o capítulo do sumário que é a mesma entrada do mapa vira uma só, com o título que a tela mostra
+        var par = s.mapa_n !== undefined && doMapa[s.mapa_n] ? doMapa[s.mapa_n] : caps.filter(function (c) {
+          return c.mapaN !== undefined && c.sumarioN === undefined && c.inicio === ini && c.alvo === alvo;
+        })[0];
+        if (par) {
+          par.sumarioN = s.n;
+          par.titulo = s.titulo;
+          if (alvo) par.alvo = alvo;
+          return;
+        }
+        caps.push({ n: s.n, sumarioN: s.n, titulo: s.titulo, inicio: ini, ancora: s.ancora || null, obraInteira: false, alvo: alvo, assuntos: [] });
+      });
+      caps.sort(function (a, b) {
+        var ia = a.inicio === null ? Infinity : a.inicio, ib = b.inicio === null ? Infinity : b.inicio;
+        return ia - ib || (a.n || 0) - (b.n || 0);
+      });
+      saida.livros.push({ id: l.id, formato: epub ? 'epub' : 'pdf', capitulos: caps });
+      saida.capitulos += caps.length;
+    });
+    return saida;
+  }
+
+  /* procurarNosCapitulos(indice, termo, normalizar, palavras): os capítulos
+   * achados, livro a livro, na ordem do índice:
+   *   [{ id, capitulos: [{ capitulo, nivel, peloTitulo, assuntos: [{ id, titulo, pela }] }] }]
+   * A regra é a da busca no texto (indice-livros.js, palavrasDaBusca): o
+   * capítulo entra quando TODAS as palavras significativas estão no título
+   * dele ou nos assuntos ligados (título ou chave), juntos. `nivel` é
+   *   'frase'    o título do capítulo, ou o de um assunto, tem a frase inteira;
+   *   'palavras' as palavras estão todas lá, mas não em sequência.
+   * `peloTitulo` diz se o título do capítulo sozinho tem a frase ou todas as
+   * palavras; `assuntos` são os que casaram ao menos uma palavra, e `pela`
+   * diz se pelo 'titulo' ou pela 'chave'. `palavras` é a função das palavras
+   * significativas (IndiceLivros.palavrasDaBusca); sem ela, todas as palavras
+   * contam. Termo de menos de duas letras não procura. */
+  function casaPalavraNoTitulo(texto, p) {
+    if (!texto) return false;
+    if (p.length > 1) return texto.indexOf(p) >= 0;
+    return new RegExp('(^|[^a-z0-9])' + p + '([^a-z0-9]|$)').test(texto);
+  }
+  function procurarNosCapitulos(indice, termo, normalizar, palavras) {
+    var norm = typeof normalizar === 'function' ? normalizar : normalizarTermo;
+    var alvo = norm(termo);
+    var saida = [];
+    if (!indice || alvo.length < 2 || !/[a-z0-9]/.test(alvo)) return saida;
+    var lista = typeof palavras === 'function' ? palavras(alvo) : alvo.split(/[^a-z0-9]+/).filter(Boolean);
+    if (!lista.length) return saida;
+    indice.livros.forEach(function (l) {
+      var achados = [];
+      l.capitulos.forEach(function (c) {
+        var noTitulo = lista.filter(function (p) { return casaPalavraNoTitulo(c.alvo, p); });
+        var faltam = lista.filter(function (p) { return noTitulo.indexOf(p) < 0; });
+        var frase = !!c.alvo && c.alvo.indexOf(alvo) >= 0;
+        var assuntos = [];
+        c.assuntos.forEach(function (a) {
+          var peloTitulo = lista.filter(function (p) { return casaPalavraNoTitulo(a.alvoTitulo, p); });
+          var pelaChave = lista.filter(function (p) { return peloTitulo.indexOf(p) < 0 && a.alvoChaves.indexOf(' ' + p) >= 0; });
+          if (a.alvoTitulo.indexOf(alvo) >= 0) frase = true;
+          if (!peloTitulo.length && !pelaChave.length) return;
+          faltam = faltam.filter(function (p) { return peloTitulo.indexOf(p) < 0 && pelaChave.indexOf(p) < 0; });
+          assuntos.push({ id: a.id, titulo: a.titulo, pela: peloTitulo.length ? 'titulo' : 'chave' });
+        });
+        if (!frase && faltam.length) return;
+        achados.push({ capitulo: c, nivel: frase ? 'frase' : 'palavras', assuntos: assuntos,
+          peloTitulo: (!!c.alvo && c.alvo.indexOf(alvo) >= 0) || noTitulo.length === lista.length });
+      });
+      if (achados.length) saida.push({ id: l.id, capitulos: achados });
+    });
+    return saida;
   }
 
   /* ------------------------------ exportar o capítulo (C15.4) e o gabarito (C15.5) */
@@ -1334,7 +1724,11 @@
     sha256: sha256, tipoDoAsset: tipoDoAsset,
     paginaImpressa: paginaImpressa, paginaDoArquivo: paginaDoArquivo, paginaDaPosicao: paginaDaPosicao,
     resolverPaginaDoLeitor: resolverPaginaDoLeitor, conferirNumeracao: conferirNumeracao, paraRomano: paraRomano, deRomano: deRomano,
-    mapaDoLivro: mapaDoLivro, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
+    mapaDoLivro: mapaDoLivro, resolverCorrecoes: resolverCorrecoes, correcoesOrfas: correcoesOrfas,
+    chaveParaGravarCorrecao: chaveParaGravarCorrecao, tituloNormalizado: tituloNormalizado, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
+    indiceDeCapitulos: indiceDeCapitulos, procurarNosCapitulos: procurarNosCapitulos,
+    disciplinaDoMapa: disciplinaDoMapa, assuntoDeOutraMateria: assuntoDeOutraMateria,
+    nomeDoAssuntoNoLivro: nomeDoAssuntoNoLivro, opcoesDoCorrigir: opcoesDoCorrigir,
     marcadorSemSentido: marcadorSemSentido, sumarioDosMarcadoresInutil: sumarioDosMarcadoresInutil, sumarioDoLivro: sumarioDoLivro,
     coberturaDoMapa: coberturaDoMapa, COBERTURA_MINIMA_DO_MAPA: COBERTURA_MINIMA_DO_MAPA,
     TETO_DE_PAGINAS_EXPORTADAS: TETO_DE_PAGINAS_EXPORTADAS, livroTemGabarito: livroTemGabarito,
