@@ -28448,7 +28448,8 @@
       if (tipo === 'ajuste') {
         p.planoAnterior = p.plano;
         // o que ela disse no ajuste vem depois do pedido na conferência do conteúdo ("ainda não tem conteúdo" desfaz o aviso)
-        if (textoDoAjuste) p.textosDosAjustes.push(textoDoAjuste);
+        // um item por ajuste, mesmo vazio, para o "Desfazer ajuste" tirar o dele
+        p.textosDosAjustes.push(textoDoAjuste || '');
         p.mudou = Planejamento.resumoDaMudanca(p.plano, lido.plano);
         p.ajustando = false;
         p.textoAjuste = '';
@@ -28569,6 +28570,8 @@
              * Aluno escolhidos DEPOIS continuam */
             var agora = p.plano;
             p.plano = p.planoAnterior;
+            /* o que ela disse no ajuste desfeito deixa de valer na conferência */
+            if (p.textosDosAjustes && p.textosDosAjustes.length) p.textosDosAjustes.pop();
             p.plano.alunoId = agora.alunoId;
             p.plano.confiancaAluno = agora.confiancaAluno;
             p.plano.tratamento = agora.tratamento;
