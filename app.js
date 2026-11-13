@@ -85,6 +85,12 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
+      versao: '1.42.88',
+      itens: [
+        'Em Matemática, 10 assuntos passaram a abrir a lista e o Material do módulo certo, entre eles funções trigonométricas e adição de arcos (que estavam trocados entre si), média, estatística, leitura de gráficos, radiciação e juros compostos. Círculo (comprimento e área), notação científica, determinantes e distribuições e dispersão ficam sem lista pronta e sem Material, porque nenhum módulo trata deles.'
+      ]
+    },
+    {
       versao: '1.42.78',
       itens: [
         'Na Biblioteca, a busca também acha os capítulos pelo nome e pelos assuntos ligados, inclusive nos livros escaneados, e o botão Abrir no capítulo leva ao começo dele.',
