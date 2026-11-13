@@ -1541,6 +1541,8 @@
     olho_fechado: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>',
     // o planejamento de estudos com IA: ditar e anexar prints
     mic: '<rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5"/>',
+    // o assistente (IA, fase 3): o balão de conversa com a faísca
+    perguntar: '<path d="M13 4.5H6.5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2H8v3.5l4-3.5h5.5a2 2 0 0 0 2-2V11"/><path d="M18 2.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>',
     imagem: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4.5 3.5 3 3-2.5 4.5 4"/>'
   };
   function icone(nome, rotulo, classe) {
@@ -1982,7 +1984,8 @@
     'modal-leitor-epub': true,
     /* L1: a janela PDF pronto da Biblioteca. Sem a entrada, o Voltar do tablet
      * deixava a janela aberta e trocava a tela da Biblioteca por baixo dela. */
-    'modal-bib-compartilhar': true
+    'modal-bib-compartilhar': true,
+    'modal-assistente': true
   };
 
   function abrirModal(id) {
@@ -2051,6 +2054,8 @@
     // o planejamento fechado no meio do "montando" cancela o pedido à IA
     if (id === 'modal-planejamento') pararPlanejamento();
     if (id === 'modal-sair-planejamento') devolverFocoDaPergunta();
+    // o assistente fechado no meio de uma pergunta cancela o pedido
+    if (id === 'modal-assistente') pararAssistente();
     var e = $('#' + id);
     var estavaAberto = e.classList.contains('aberto');
     if (estavaAberto && !fechandoPorVoltar && MODAIS_HISTORICO[id]) {
@@ -3097,6 +3102,7 @@
     desenharFechamento();
     desenharAjustes();
     if (modoCelular) desenharCelular();
+    atualizarBotaoAssistente();
   }
 
   // ================= navegação =================
@@ -3316,6 +3322,8 @@
     $('#enviar-cartao').addEventListener('click', enviarCartaoDoMes);
 
     $('#alternar-valores').addEventListener('click', alternarValores);
+    $('#abrir-assistente').addEventListener('click', function (ev) { abrirAssistente(ev.currentTarget); });
+    $('#ass-nova').addEventListener('click', novaConversaDoAssistente);
     $('#versao-app').textContent = VERSAO;
     $('#procurar-atualizacao').addEventListener('click', procurarAtualizacao);
 
@@ -24798,6 +24806,17 @@
   var LEITOR_ZOOM_MIN = 0.5, LEITOR_ZOOM_MAX = 4;
   // teto de pixels do canvas: com zoom alto num tablet de tela densa a página passaria de 40 milhões
   var LEITOR_MAX_PIXELS = 12000000;
+  /* NITIDEZ NO ZOOM ALTO (fatia 3 do leitor), à moda do pdf.js. No livro, a
+   * página que na densidade da tela passaria do teto é desenhada inteira mais
+   * barata (LEITOR_TETO_COM_DETALHE) e, por cima, um CANVAS DE DETALHE
+   * desenha só o pedaço à vista na densidade da tela, refeito quando a rolagem
+   * para (LEITOR_DETALHE_MS). Antes, no zoom 4 do tablet, a página saía com
+   * 1,04 pixel de canvas por pixel de tela, metade do que a tela mostra.
+   * LEITOR_ORCAMENTO_PIXELS é o total de pixels de canvas que o leitor deixa
+   * vivo: a página pré-desenhada na direção da rolagem só entra no que sobra. */
+  var LEITOR_TETO_COM_DETALHE = 6000000;
+  var LEITOR_ORCAMENTO_PIXELS = 16000000;
+  var LEITOR_DETALHE_MS = 150;
 
   function bytesDoPdf(fonte) {
     if (fonte instanceof Blob) return fonte.arrayBuffer().then(function (b) { return new Uint8Array(b); });
@@ -25125,14 +25144,56 @@
     }).catch(function () { mostrarFalhaDoLeitor('pdf'); return false; });
   }
 
+  /* A densidade do canvas da página inteira (pixels de canvas por pixel de
+   * tela). Se a página na densidade da tela cabe no teto, é a da tela; se não
+   * cabe, o canvas de detalhe cuida do pedaço à vista, e a página inteira
+   * pode ser mais barata: o teto dela cai para LEITOR_TETO_COM_DETALHE. */
+  function densidadeDaBase(largura, altura) {
+    var dpr = window.devicePixelRatio || 1, area = Math.max(1, largura * altura);
+    var teto = area * dpr * dpr > LEITOR_MAX_PIXELS ? LEITOR_TETO_COM_DETALHE : LEITOR_MAX_PIXELS;
+    return Math.min(dpr, Math.sqrt(teto / area));
+  }
+
+  // a densidade que a página deve ter agora, pelo tamanho da caixa (a pré-desenhada pode ter um limite menor)
+  function alvoDaPagina(registro) {
+    var alvo = densidadeDaBase(parseFloat(registro.caixa.style.width) || 1, parseFloat(registro.caixa.style.height) || 1);
+    return registro.limite ? Math.min(alvo, registro.limite) : alvo;
+  }
+
+  /* O livro escaneado (sem texto na página aberta primeiro) sai em duas
+   * passadas: a primeira a meia densidade, que aparece logo, e em seguida a
+   * nítida. A sonda roda uma vez por livro, na primeira página desenhada. */
+  function sondarTextoDoLivro(estado, pagina) {
+    if (!estado.sondaTexto) {
+      estado.sondaTexto = pagina.getTextContent().then(function (t) {
+        estado.escaneado = !((t && t.items) || []).some(function (i) { return i.str && i.str.trim(); });
+      }, function () { estado.escaneado = false; });
+    }
+    return estado.sondaTexto;
+  }
+
+  /* corpo.dataset.ocupado diz se o leitor ainda tem desenho por fazer (página,
+   * segunda passada ou detalhe): '1' ou '0'. Recalculado do estado a cada
+   * troca, sem contador que possa se perder. */
+  function atualizarOcupacaoDoLeitor() {
+    var corpo = $('#corpo-modal-leitor-pdf');
+    if (!corpo) return;
+    var e = leitor;
+    var ocupado = !!(e && e.paginas && (e.detalheTimer || e.paginas.some(function (p) { return p.desenhando || p.tarefaDetalhe; })));
+    corpo.dataset.ocupado = ocupado ? '1' : '0';
+  }
+
   function desenharPaginaContinua(estado, registro) {
     if (registro.desenhando) return registro.promessa || Promise.resolve(false);
     // o canvas esticado depois de um gesto é provisório: a página se desenha de novo no tamanho certo
-    if (registro.caixa.querySelector('canvas') && !registro.esticado) return Promise.resolve(true);
+    if (registro.temCanvas && !registro.esticado && registro.densidade >= alvoDaPagina(registro) * 0.9) return Promise.resolve(true);
     if (estado !== leitor) return Promise.resolve(false);
     registro.desenhando = true;
+    atualizarOcupacaoDoLeitor();
     var tarefaDaPagina = null;
     registro.promessa = estado.doc.getPage(registro.n).then(function (pagina) {
+      return estado.escaneado === undefined ? sondarTextoDoLivro(estado, pagina).then(function () { return pagina; }) : pagina;
+    }).then(function (pagina) {
       // a página saiu de perto da tela enquanto o pdf.js a abria: nem cria o canvas
       if (estado !== leitor || !registro.visivel) return null;
       var corpo = $('#corpo-modal-leitor-pdf');
@@ -25142,8 +25203,12 @@
       registro.proporcao = base.height / base.width;
       registro.caixa.style.width = Math.floor(vp.width) + 'px';
       registro.caixa.style.height = Math.ceil(vp.height) + 'px';
-      var densidade = Math.min(window.devicePixelRatio || 1, Math.sqrt(LEITOR_MAX_PIXELS / (vp.width * vp.height)));
+      var alvo = densidadeDaBase(vp.width, vp.height);
+      if (registro.limite) alvo = Math.min(alvo, registro.limite);
+      // escaneado, sem nada na tela ainda: a primeira passada sai a meia densidade
+      var densidade = estado.escaneado && !registro.temCanvas ? alvo / 2 : alvo;
       var canvas = document.createElement('canvas');
+      canvas.className = 'leitor-pdf-base';
       canvas.width = Math.max(1, Math.floor(vp.width * densidade));
       canvas.height = Math.max(1, Math.floor(vp.height * densidade));
       canvas.style.width = Math.floor(vp.width) + 'px';
@@ -25155,12 +25220,16 @@
       registro.tarefa = tarefa;
       return tarefa.promise.then(function () {
         if (estado !== leitor || !registro.visivel || registro.tarefa !== tarefa) { canvas.width = 0; canvas.height = 0; return false; }
+        soltarDetalhe(registro);
         var antigo = registro.caixa.querySelector('canvas');
         if (antigo) { antigo.width = 0; antigo.height = 0; }
         registro.caixa.innerHTML = '';
         registro.caixa.appendChild(canvas);
         registro.temCanvas = true;
         registro.esticado = false;
+        registro.densidade = densidade;
+        registro.escala = vp.scale;
+        agendarDetalhe(estado);
         return true;
       });
     }).catch(function (e) {
@@ -25171,11 +25240,102 @@
         registro.tarefa = null;
         registro.desenhando = false;
       }
+      /* A segunda passada: a página à vista ficou abaixo da densidade que deve
+       * ter (a meia do escaneado, ou a pré-desenhada que entrou na tela). O
+       * canvas de agora fica até o nítido estar pronto. */
+      if (!registro.desenhando && estado === leitor && registro.visivel && registro.temCanvas && !registro.esticado &&
+          registro.densidade < alvoDaPagina(registro) * 0.9) desenharPaginaContinua(estado, registro);
+      atualizarOcupacaoDoLeitor();
     });
     return registro.promessa;
   }
 
+  /* O CANVAS DE DETALHE: depois que a rolagem para, cada página à vista cuja
+   * página inteira está abaixo da densidade da tela ganha, por cima, um
+   * canvas só do retângulo à vista, na densidade da tela. O de antes fica até
+   * o novo ficar pronto. Durante um gesto de dedos, espera. */
+  function agendarDetalhe(estado) {
+    if (!estado || estado !== leitor || !estado.continuo) return;
+    clearTimeout(estado.detalheTimer);
+    estado.detalheTimer = setTimeout(function () {
+      estado.detalheTimer = null;
+      desenharDetalhesDoLeitor(estado);
+      atualizarOcupacaoDoLeitor();
+    }, LEITOR_DETALHE_MS);
+    atualizarOcupacaoDoLeitor();
+  }
+
+  function soltarDetalhe(registro) {
+    if (registro.tarefaDetalhe) { registro.tarefaDetalhe.cancel(); registro.tarefaDetalhe = null; }
+    if (registro.detalhe) {
+      var c = registro.detalhe.canvas;
+      c.width = 0; c.height = 0;
+      if (c.parentNode) c.parentNode.removeChild(c);
+      registro.detalhe = null;
+    }
+  }
+
+  function desenharDetalhesDoLeitor(estado) {
+    if (estado !== leitor || !estado.continuo || !estado.paginas) return;
+    if (gestoLeitor.pinca || dedosDoGesto().length) { agendarDetalhe(estado); return; }
+    var corpo = $('#corpo-modal-leitor-pdf'), rc = corpo.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    var topo = rc.top + corpo.clientTop, esquerda = rc.left + corpo.clientLeft;
+    estado.paginas.forEach(function (p) {
+      if (!p.temCanvas && !p.detalhe) return;
+      if (!p.temCanvas || p.esticado || !(p.densidade < dpr * 0.95) || !p.visivel) { soltarDetalhe(p); return; }
+      var r = p.caixa.getBoundingClientRect();
+      var x0 = Math.max(0, Math.floor(esquerda - r.left)), y0 = Math.max(0, Math.floor(topo - r.top));
+      var x1 = Math.min(Math.floor(r.width), Math.ceil(esquerda + corpo.clientWidth - r.left));
+      var y1 = Math.min(Math.floor(r.height), Math.ceil(topo + corpo.clientHeight - r.top));
+      if (x1 - x0 < 1 || y1 - y0 < 1) { soltarDetalhe(p); return; }
+      var ret = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+      var d = p.detalhe;
+      if (d && !p.tarefaDetalhe && d.ret.x === ret.x && d.ret.y === ret.y && d.ret.w === ret.w && d.ret.h === ret.h) return;
+      desenharDetalhe(estado, p, ret, dpr);
+    });
+  }
+
+  function desenharDetalhe(estado, p, ret, densidade) {
+    if (p.tarefaDetalhe) { p.tarefaDetalhe.cancel(); p.tarefaDetalhe = null; }
+    var escala = p.escala;
+    // a vaga da tarefa é tomada já, antes do getPage: o leitor não parece ocioso nesse meio tempo
+    var vaga = { cancel: function () { vaga.cancelada = true; } };
+    p.tarefaDetalhe = vaga;
+    estado.doc.getPage(p.n).then(function (pagina) {
+      if (p.tarefaDetalhe !== vaga) return null;
+      p.tarefaDetalhe = null;
+      if (estado !== leitor || !p.temCanvas || p.esticado || p.escala !== escala) return null;
+      var vp = pagina.getViewport({ scale: escala });
+      var c = document.createElement('canvas');
+      c.className = 'leitor-pdf-detalhe';
+      c.setAttribute('aria-hidden', 'true');
+      c.width = Math.max(1, Math.round(ret.w * densidade));
+      c.height = Math.max(1, Math.round(ret.h * densidade));
+      c.style.left = ret.x + 'px';
+      c.style.top = ret.y + 'px';
+      c.style.width = ret.w + 'px';
+      c.style.height = ret.h + 'px';
+      var tarefa = pagina.render({ canvasContext: c.getContext('2d'), canvas: c, viewport: vp,
+        transform: [densidade, 0, 0, densidade, -ret.x * densidade, -ret.y * densidade] });
+      p.tarefaDetalhe = tarefa;
+      atualizarOcupacaoDoLeitor();
+      return tarefa.promise.then(function () {
+        if (p.tarefaDetalhe !== tarefa) { c.width = 0; c.height = 0; return; }
+        p.tarefaDetalhe = null;
+        if (estado !== leitor || !p.temCanvas || p.esticado || p.escala !== escala) { c.width = 0; c.height = 0; return; }
+        soltarDetalhe(p);
+        p.caixa.appendChild(c);
+        p.detalhe = { canvas: c, ret: ret };
+      }, function () {
+        if (p.tarefaDetalhe === tarefa) p.tarefaDetalhe = null;
+        c.width = 0; c.height = 0;
+      });
+    }).catch(function () { /* o detalhe é só nitidez: a página inteira continua lá */ }).then(atualizarOcupacaoDoLeitor);
+  }
+
   function liberarPaginaContinua(registro) {
+    soltarDetalhe(registro);
     if (registro.tarefa) { registro.tarefa.cancel(); registro.tarefa = null; }
     var c = registro.caixa.querySelector('canvas');
     if (c) { c.width = 0; c.height = 0; registro.caixa.removeChild(c); }
@@ -25226,15 +25386,6 @@
     var c = Math.max(1, Math.min(estado.total, centro || estado.pagina || 1));
     var ficam = {};
     ficam[c] = true;
-    /* As vizinhas ficam prontas para a rolagem, mas só se estiverem a menos
-     * de uma altura de tela da área à vista: no zoom alto a página é maior
-     * que a tela, e a vizinha lá longe só gastava memória (36 Mpx no zoom 4). */
-    var alcance = corpo.clientHeight;
-    [c - 1, c + 1].forEach(function (k) {
-      if (k < 1 || k > estado.total) return;
-      var r = estado.paginas[k - 1].caixa.getBoundingClientRect();
-      if (r.bottom >= rc.top - alcance && r.top <= rc.top + corpo.clientHeight + alcance) ficam[k] = true;
-    });
     // as caixas estão em ordem, uma embaixo da outra: anda do centro para os dois lados
     for (var cima = c; cima >= 1; cima--) {
       var rCima = estado.paginas[cima - 1].caixa.getBoundingClientRect();
@@ -25245,6 +25396,41 @@
       var rBaixo = estado.paginas[baixo - 1].caixa.getBoundingClientRect();
       if (rBaixo.top > fundo) break;
       if (rBaixo.bottom >= topo) ficam[baixo] = true;
+    }
+    estado.paginas.forEach(function (pagina) { if (ficam[pagina.n]) pagina.limite = null; });
+    /* PRÉ-DESENHO NA DIREÇÃO DA ROLAGEM (como a fila do pdf.js): a página
+     * seguinte à última à vista, ou a anterior à primeira quando ela sobe, já
+     * fica desenhada antes de entrar na tela. Antes eram as duas vizinhas, e
+     * só a menos de uma tela: deitado, a próxima não estava pronta. Ela entra
+     * no que sobra do orçamento de pixels, com densidade menor se for preciso,
+     * e é redesenhada nítida quando chega à tela. */
+    var numeros = Object.keys(ficam).map(Number);
+    var primeira = Math.min.apply(null, numeros), ultima = Math.max.apply(null, numeros);
+    var proxima = estado.direcao < 0 ? primeira - 1 : ultima + 1;
+    if (proxima >= 1 && proxima <= estado.total) {
+      var dpr = window.devicePixelRatio || 1, usados = 0, comDetalhe = false;
+      numeros.forEach(function (k) {
+        var q = estado.paginas[k - 1], w = parseFloat(q.caixa.style.width) || 1, h = parseFloat(q.caixa.style.height) || 1;
+        var d = densidadeDaBase(w, h);
+        if (d < dpr * 0.95) comDetalhe = true;
+        usados += w * h * d * d;
+      });
+      if (comDetalhe) usados += corpo.clientWidth * corpo.clientHeight * dpr * dpr;
+      var pp = estado.paginas[proxima - 1];
+      var pw = parseFloat(pp.caixa.style.width) || 1, ph = parseFloat(pp.caixa.style.height) || 1;
+      var sobra = LEITOR_ORCAMENTO_PIXELS - usados;
+      var limite = sobra > 0 ? Math.min(densidadeDaBase(pw, ph), Math.sqrt(sobra * 0.98 / (pw * ph))) : 0;
+      var feito = pp.temCanvas && !pp.esticado ? pp.caixa.querySelector('canvas') : null;
+      var atuais = feito ? feito.width * feito.height : 0;
+      /* já desenhada e cabe no que sobra: fica como está. A nova é pedida com 2% de margem
+       * (sobra * 0,98), para o arredondamento do canvas não a deixar logo acima e redesenhar */
+      if (atuais && atuais <= sobra) ficam[proxima] = true;
+      // menos de meio pixel de canvas por pixel de tela não serve nem de primeira passada
+      else if (limite >= 0.5) {
+        if (atuais) liberarPaginaContinua(pp);
+        ficam[proxima] = true;
+        pp.limite = limite;
+      }
     }
     estado.paginas.forEach(function (pagina) {
       if (ficam[pagina.n]) {
@@ -25280,9 +25466,15 @@
     window.requestAnimationFrame(function () {
       leitorRolarAgendado = false;
       if (!leitor || !leitor.continuo) return;
+      // a direção da rolagem, para o pré-desenho: fica a última que andou
+      var topoAgora = $('#corpo-modal-leitor-pdf').scrollTop;
+      if (typeof leitor.ultimoTopo === 'number' && topoAgora !== leitor.ultimoTopo) leitor.direcao = topoAgora > leitor.ultimoTopo ? 1 : -1;
+      leitor.ultimoTopo = topoAgora;
       var n = paginaMaisProximaDoCentro(leitor);
       leitor.ancora = ancoraDoLeitorContinuo(leitor, n);
       conciliarPaginasContinuas(leitor, n);
+      // o detalhe se refaz quando a rolagem para
+      agendarDetalhe(leitor);
       // Em uma navegação suave, o meio da tela ainda passa por páginas
       // anteriores. Não grave esse trecho intermediário como a última página.
       if (leitor.rolagemProgramaticaAte && n !== leitor.rolagemProgramaticaAte) return;
@@ -25327,6 +25519,9 @@
         }, 900);
       }
       p.caixa.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'start' });
+      /* o salto direto (Ir p., Sumário, barra) não é rolagem para trás nem para
+       * a frente: dali ela lê para a frente, e é a página seguinte que se pré-desenha */
+      if (!suave) { leitor.direcao = 1; leitor.ultimoTopo = $('#corpo-modal-leitor-pdf').scrollTop; }
       conciliarPaginasContinuas(leitor, p.n);
       // arrastando a barra, o desenho espera ela parar (a conciliação agenda)
       if ((leitor.arrastandoAte || 0) > Date.now()) return Promise.resolve(false);
@@ -25399,7 +25594,11 @@
     var estado = leitor;
     var corpo = $('#corpo-modal-leitor-pdf'), largura = Math.max(160, corpo.clientWidth - 36) * estado.zoom;
     var ancora = paraOAlto ? null : (ancoraDada || ancoraParaRedimensionar(estado));
+    // o detalhe é do tamanho de antes: sai, e volta quando a página nova estiver desenhada
+    clearTimeout(estado.detalheTimer);
+    estado.detalheTimer = null;
     estado.paginas.forEach(function (p) {
+      soltarDetalhe(p);
       var velho = esticar ? p.caixa.querySelector('canvas') : null;
       if (velho && velho.width > 0) {
         if (p.tarefa) { p.tarefa.cancel(); p.tarefa = null; }
@@ -25414,6 +25613,8 @@
     });
     if (paraOAlto || !ancora) { irAProximaPaginaDoLeitor(estado.pagina, false); return Promise.resolve(true); }
     voltarParaAncoraDoLeitor(estado, ancora);
+    // a rolagem que o zoom fez não é ela rolando: a direção do pré-desenho fica a de antes
+    estado.ultimoTopo = corpo.scrollTop;
     /* O contador e a posição guardada seguem a página que está à vista. No
      * gesto, a âncora é a página sob os DEDOS, que pode não ser a do meio; e
      * no começo ou no fim do livro a rolagem fica presa no limite, nenhum
@@ -26861,15 +27062,10 @@
   }
 
   /* Os horários livres de um dia para uma aula de `duracao` minutos, de meia
-   * em meia hora, pela mesma conta de choque do tablet. */
+   * em meia hora, pela mesma conta de choque do tablet. A conta mora no
+   * core (Core.horariosLivresDoDia), que o assistente também usa. */
   function horariosLivresCelular(data, duracao, ignorarId) {
-    var livres = [];
-    var dur = Number(duracao) || 60;
-    for (var m = INICIO_DIA_CELULAR; m + dur <= FIM_DIA_CELULAR; m += 30) {
-      var hora = horaDeMinutosCelular(m);
-      if (!choquesDaAulaCelular({ id: ignorarId || null, data: data, hora: hora, duracaoMin: dur, status: 'realizada' }).length) livres.push(hora);
-    }
-    return livres;
+    return Core.horariosLivresDoDia(db, data, duracao, ignorarId);
   }
 
   function irParaDiaCelular(dia) {
@@ -27604,6 +27800,13 @@
           aoClick: function () { abrirFormularioCelular({ tipo: 'aluno' }); } })
       ]));
     }
+    /* IA, fase 3 (lentes do #191): a porta do assistente, a pílula
+     * "Perguntar", fica no pé de Hoje, presa acima das abas, à direita (perto
+     * do polegar). Nada no alto: a linha do dia fica como era, e o alto preso
+     * continua dentro dos 20% (uma segunda linha lá em cima passava disso a
+     * 130%). No fim da rolagem ela ocupa o próprio lugar e não cobre a última
+     * aula. Também no celular que só lê: perguntar é ler. */
+    if (podeUsarAssistente()) caixa.appendChild(el('div', { class: 'cel-assistente-pe', id: 'cel-assistente-pe' }, [botaoDoAssistente('cel-assistente', 'btn cel-perguntar')]));
     if (folhaCelular) desenharFolhaCelular();
     hojeVistoCelular = hoje; // o dia em que esta linha do tempo foi desenhada (a virada da meia-noite)
     rolarHojeCelular(dia);
@@ -27637,11 +27840,7 @@
     for (var i = 0; i < 6; i++) dias.push(somarDiasCelular(inicio, i));
     if (!diaVagosCelular || dias.indexOf(diaVagosCelular) < 0) diaVagosCelular = dias.indexOf(hoje) >= 0 ? hoje : dias[0];
     dias.forEach(function (dia) {
-      var vagas = horariosLivresCelular(dia, duracaoVagosCelular).filter(function (hora) {
-        var inicioMinutos = Core.minutosDaHora(hora);
-        return dia >= hoje && inicioMinutos + duracaoVagosCelular <= 20 * 60 &&
-          (dia !== hoje || inicioMinutos >= minutosAgoraCelular());
-      });
+      var vagas = Core.vagasDoDia(db, dia, duracaoVagosCelular, hoje, minutosAgoraCelular());
       var selecionado = dia === diaVagosCelular;
       var conteudo = el('div', { class: 'cel-vagos-conteudo' });
       if (vagas.length) {
@@ -30333,6 +30532,413 @@
   /* Sem internet ou com ela de volta: o Montar acompanha. */
   window.addEventListener('online', function () { if (fluxoPlano && fluxoPlano.estado === 'pedido') desenharPlanejamento(); });
   window.addEventListener('offline', function () { if (fluxoPlano && fluxoPlano.estado === 'pedido') desenharPlanejamento(); });
+
+  // ================= o assistente (IA, fase 3: só leitura) =================
+
+  /* Ela pergunta, falando ou escrevendo; o modelo responde chamando as
+   * ferramentas do assistente.js, que ESTE aparelho executa sobre o banco
+   * local, e os atalhos viram cartões que ela toca. NADA GRAVA: nenhuma
+   * função daqui chama salvar(), comDesfazer ou comoAcaoDoCelular, e as
+   * ferramentas só leem (testa_assistente.js congela o banco e confere).
+   *
+   * A conversa e o histórico da tela ficam só na memória da sessão: fechar a
+   * janela guarda; recarregar o app, "Nova conversa", trocar de conta ou de
+   * banco apagam.
+   *
+   * Quem vê a porta (podeUsarAssistente): quem tem a conta da nuvem entrada,
+   * no tablet, no celular da dona e no celular que só lê (perguntar é ler).
+   * O observador de outra conta não vê; sem a conta, ninguém vê. */
+  var sessaoAssistente = null;      // a conversa com o modelo (Assistente.novaSessao)
+  var avisoDeConversaNova = false;   // a conta trocou: a próxima tela diz "Comecei uma conversa nova."
+  var historicoAssistente = [];     // o que a tela mostra: [{ pergunta, texto, cartoes, entendido, recomecou }]
+  var fluxoAssistente = null;       // { vez, texto, pedindo, controle, erro, origem, perguntaEmCurso, rodapeLivreEm }
+  var vezDoAssistente = 0;
+  var TRAVA_DO_RODAPE_ASSISTENTE_MS = 400;
+  var ESPERA_LONGA_MS = 10000;
+
+  function podeUsarAssistente() {
+    if (typeof Assistente === 'undefined' || !db || leOutraConta() || !temNuvem()) return false;
+    var est = Nuvem.estado();
+    return !!(est && est.entrada && est.entrada.uid);
+  }
+  function uidDoAssistente() {
+    var est = temNuvem() ? Nuvem.estado() : null;
+    return est && est.entrada ? est.entrada.uid : null;
+  }
+  /* A porta: o balão com faísca e a palavra "Perguntar" (o microfone fica só
+   * para o Ditar, dentro da janela). */
+  function botaoDoAssistente(id, classe) {
+    return el('button', { type: 'button', class: classe, id: id, title: 'Perguntar ao assistente',
+      icone: 'perguntar', texto: 'Perguntar', 'data-assistente': 'abrir', aoClick: function (ev) { abrirAssistente(ev.currentTarget); } });
+  }
+  /* A pílula do alto do tablet (ao lado do olho): aparece e some com a conta. */
+  function atualizarBotaoAssistente() {
+    var b = $('#abrir-assistente');
+    if (b) b.hidden = !podeUsarAssistente();
+  }
+
+  /* Trocou a conta (outra pessoa entrou): a conversa e o histórico de antes
+   * não seguem, e a tela avisa. A sincronização, que troca o objeto do
+   * banco a cada recebimento, não zera nada: a sessão é da conta (uid). */
+  function conferirSessaoDoAssistente() {
+    var uid = uidDoAssistente();
+    if (!sessaoAssistente || !Assistente.sessaoValida(sessaoAssistente, uid)) {
+      if (sessaoAssistente && historicoAssistente.length) avisoDeConversaNova = true;
+      sessaoAssistente = Assistente.novaSessao(uid);
+      historicoAssistente = [];
+    }
+  }
+  function novaConversaDoAssistente() {
+    var f = fluxoAssistente;
+    if (f && f.pedindo) return;
+    sessaoAssistente = Assistente.novaSessao(uidDoAssistente());
+    historicoAssistente = [];
+    avisoDeConversaNova = false;
+    // o que ela já escreveu no campo fica
+    var c = $('#ass-texto');
+    if (f) { f.erro = null; f.texto = c ? c.value : f.texto; }
+    desenharAssistente();
+    anunciar('Conversa nova.');
+    focarTituloDoAssistente();
+  }
+
+  /* As ferramentas leem o banco pelo relógio da TELA (Core.hojeIso e os
+   * minutos do celular), e os links são os da ficha mínima do celular. */
+  function contextoDoAssistente() {
+    return {
+      db: db, Core: Core, hoje: Core.hojeIso(), agoraMin: minutosAgoraCelular(),
+      links: {
+        contato: function (a) {
+          return { responsavel: String(a.responsavel || '').trim(), telefone: telefoneDoCampo(a) || telefoneDoAluno(a),
+            endereco: a.local === 'online' ? '' : String(a.endereco || '').trim() };
+        },
+        ligar: function (a) { return linkDeLigar(telefoneDoCampo(a)); },
+        whatsapp: function (a, texto) { return linkDoWhatsapp(telefoneDoCampo(a), texto); },
+        mapa: function (a) { return a.local === 'online' ? '' : linkDoMapa(a.endereco); },
+        familiaACobrar: function (a, hoje) { return familiasACobrarCelular(hoje).filter(function (f) { return f.aluno.id === a.id; })[0] || null; },
+        mensagemDeCobranca: mensagemDeCobrancaCelular
+      }
+    };
+  }
+
+  /* Os exemplos da janela vazia: com o primeiro nome de um aluno dela, um de
+   * horário livre e o mês passado no de dinheiro. */
+  function exemplosDoAssistente() {
+    var nomes = Assistente.nomesParaIA(db);
+    var primeiro = Object.keys(nomes).map(function (id) { return nomes[id]; }).sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); })[0];
+    var mesPassado = Assistente.rotuloDoMes(Assistente.mesAnterior(Core.hojeIso().slice(0, 7))).replace(/ de \d{4}$/, '');
+    return ['O que eu tenho amanhã?', 'Tenho horário livre amanhã à tarde?', 'Quem não pagou ' + mesPassado + '?']
+      .concat(primeiro ? ['Avisa a família de ' + primeiro + ' que vou atrasar'] : []);
+  }
+
+  function abrirAssistente(origem) {
+    if (!podeUsarAssistente()) return;
+    conferirSessaoDoAssistente();
+    vezDoAssistente++;
+    fluxoAssistente = { vez: vezDoAssistente, texto: fluxoAssistente ? fluxoAssistente.texto : '', pedindo: false, controle: null, erro: null,
+      origem: origem || document.activeElement, rodapeLivreEm: 0 };
+    abrirModal('modal-assistente');
+    var fundo = $('#modal-assistente');
+    if (modoCelular && fundo && !fundo.soltarTeclado) fundo.soltarTeclado = acompanharTecladoCelular(fundo);
+    desenharAssistente();
+    // o foco vai ao título, e não ao campo: no celular, o teclado não cobre a janela ao abrir
+    focarTituloDoAssistente();
+  }
+  function focarTituloDoAssistente() {
+    var t = $('#titulo-modal-assistente');
+    if (t) { try { t.focus({ preventScroll: true }); } catch (e) { t.focus(); } }
+  }
+  /* Fechar ou Voltar: o pedido em curso é cancelado e a pergunta volta ao
+   * campo; o ditado para. O que ela já perguntou fica para a próxima vez. */
+  function pararAssistente() {
+    var f = fluxoAssistente;
+    if (f && f.pedindo) {
+      f.texto = f.perguntaEmCurso || f.texto;
+      /* A conversa volta a como era antes da pergunta, numa lista NOVA: a
+       * pergunta velha, quando enfim voltar, não corta nada da conversa que
+       * ela começar ao reabrir (o desfazer só mexe na lista dele). */
+      if (f.sessaoDaPergunta && f.sessaoDaPergunta === sessaoAssistente && typeof f.tamanhoAntes === 'number') {
+        sessaoAssistente.mensagens = sessaoAssistente.mensagens.slice(0, f.tamanhoAntes);
+      }
+    }
+    if (f && f.controle) { try { f.controle.abort(); } catch (e) { /* já parou */ } }
+    if (f) { f.vez = -1; f.pedindo = false; clearTimeout(f.esperaLonga); }
+    pararDitado();
+    var fundo = $('#modal-assistente');
+    if (fundo && fundo.soltarTeclado) {
+      fundo.soltarTeclado(); fundo.soltarTeclado = null;
+      fundo.style.height = ''; fundo.style.top = '';
+    }
+    var origem = f && f.origem;
+    if (origem && !document.body.contains(origem) && origem.id) origem = document.getElementById(origem.id);
+    if (origem && document.body.contains(origem) && typeof origem.focus === 'function') setTimeout(function () { try { origem.focus(); } catch (e) { /* saiu */ } }, 0);
+  }
+
+  /* "(21) 98765-4321" a partir do campo telefone; vazio se não for telefone. */
+  function telefoneFormatado(texto) {
+    var d = telefoneValidado(texto);
+    if (!d) return '';
+    return '(' + d.slice(0, 2) + ') ' + d.slice(2, d.length - 4) + '-' + d.slice(-4);
+  }
+
+  /* Os cartões, compactos: uma linha com o ícone, quem e o número (ou o
+   * endereço, em cinza, para conferir), e os botões embaixo. O WhatsApp é o
+   * único botão principal. O texto do WhatsApp é editável antes de abrir. */
+  function cartaoDoAssistente(c, i) {
+    var aluno = alunoPorId(c.alunoId);
+    var resp = c.responsavel || ('a família de ' + (c.nome || ''));
+    var tel = c.telefone ? telefoneFormatado(c.telefone) : '';
+    var link = function (texto, href, principal, rotulo, tipo) {
+      var a = { class: 'btn ass-link' + (principal ? ' principal' : ''), href: href, texto: texto, 'data-cartao': tipo || c.tipo };
+      if (rotulo) a['aria-label'] = rotulo;
+      if (!/^tel:/.test(href)) { a.target = '_blank'; a.rel = 'noopener'; }
+      return el('a', a);
+    };
+    var linha = function (nomeIcone, principal, cinza, numero) {
+      return el('div', { class: 'ass-cartao-linha' }, [icone(nomeIcone, '', 'ass-cartao-ico'),
+        el('span', { class: 'ass-cartao-quem' }, [document.createTextNode(principal), cinza ? document.createTextNode(' ') : null,
+          cinza ? el('span', { class: 'ass-cinza' + (numero ? ' ass-numero' : ''), texto: cinza.trim() }) : null])]);
+    };
+    var filhos = [], botoes = [];
+    if (c.tipo === 'whatsapp') {
+      filhos.push(linha('msg', (c.cobranca ? 'Cobrança para ' : 'WhatsApp de ') + resp, tel, true));
+      var idCampo = 'ass-msg-' + i + '-' + Math.random().toString(36).slice(2, 7);
+      var campo = el('textarea', { class: 'ass-mensagem', id: idCampo, rows: '3', 'aria-label': 'Mensagem, pode mudar antes de abrir no WhatsApp' });
+      campo.value = c.texto || '';
+      /* O link nasce do texto do cartão (o que ela editou sobrevive ao
+       * redesenho): c.texto e c.href andam juntos. */
+      var hrefDoTexto = function (t) { return aluno ? linkDoWhatsapp(telefoneDoCampo(aluno), String(t || '').trim()) : ''; };
+      var abrir = link('Abrir no WhatsApp', hrefDoTexto(c.texto) || c.href, true, 'Abrir no WhatsApp de ' + resp + (tel ? ', ' + tel : '') + ' com a mensagem');
+      campo.addEventListener('input', function () {
+        c.texto = campo.value;
+        var novo = hrefDoTexto(campo.value);
+        if (novo) { c.href = novo; abrir.setAttribute('href', novo); }
+      });
+      filhos.push(campo);
+      botoes.push(abrir);
+      if (c.ligarJunto) botoes.push(link('Ligar', c.ligarJunto, false, 'Ligar para ' + resp + (tel ? ', ' + tel : ''), 'ligar'));
+    } else if (c.tipo === 'ligar') {
+      filhos.push(linha('phone', resp, tel, true));
+      botoes.push(link('Ligar', c.href, false, 'Ligar para ' + resp + (tel ? ', ' + tel : '')));
+    } else if (c.tipo === 'mapa') {
+      filhos.push(linha('pin', 'Endereço de ' + (c.nome || ''), c.endereco || ''));
+      botoes.push(link('Abrir no mapa', c.href, false, 'Abrir no mapa o endereço de ' + (c.nome || '')));
+    } else if (c.tipo === 'contato') {
+      var contatoValido = !!tel;
+      filhos.push(linha('phone', c.responsavel ? c.responsavel : 'Responsável não informado',
+        contatoValido ? tel : (c.telefone ? 'Contato: ' + c.telefone : 'Sem telefone'), contatoValido));
+      if (c.endereco) filhos.push(linha('pin', 'Endereço', c.endereco));
+      if (c.whatsapp) botoes.push(link('WhatsApp', c.whatsapp, true, 'Abrir o WhatsApp de ' + resp + (tel ? ', ' + tel : ''), 'whatsapp'));
+      if (c.ligar) botoes.push(link('Ligar', c.ligar, false, 'Ligar para ' + resp + (tel ? ', ' + tel : ''), 'ligar'));
+      if (c.mapa) botoes.push(link('Abrir no mapa', c.mapa, false, 'Abrir no mapa o endereço de ' + (c.nome || ''), 'mapa'));
+    }
+    if (botoes.length) filhos.push(el('div', { class: 'ass-cartao-botoes' }, botoes));
+    if (c.tipo === 'whatsapp') filhos.push(el('p', { class: 'ajuda u-margem-0', texto: 'Abre a conversa com o texto escrito. Quem envia é você.' }));
+    return el('div', { class: 'ass-cartao', 'data-tipo': c.tipo }, filhos);
+  }
+
+  /* WhatsApp e Ligar do mesmo aluno viram um cartão só, com os dois botões
+   * lado a lado, sem repetir o nome e o número. */
+  function cartoesJuntos(lista) {
+    var whats = {};
+    lista.forEach(function (c) { if (c.tipo === 'whatsapp' && !whats[c.alunoId]) whats[c.alunoId] = c; });
+    return lista.filter(function (c) {
+      if (c.tipo === 'ligar' && whats[c.alunoId]) { whats[c.alunoId].ligarJunto = c.href; return false; }
+      return true;
+    });
+  }
+
+  /* A resposta como linhas: sem markdown e sem travessão; com 3 itens ou
+   * mais, o valor fica à direita. */
+  function respostaDoAssistente(texto) {
+    var linhas = Assistente.linhasDaResposta(texto);
+    return el('div', { class: 'ass-resposta' }, linhas.map(function (l) {
+      return l.valor ? el('p', { class: 'ass-linha-valor' }, [el('span', { texto: l.texto }), el('span', { class: 'ass-valor', texto: l.valor })])
+        : el('p', { texto: l.texto });
+    }));
+  }
+
+  function rodapeLivre(f) { return Date.now() >= (f.rodapeLivreEm || 0); }
+
+  function desenharAssistente() {
+    var f = fluxoAssistente;
+    var corpo = $('#corpo-modal-assistente'), rodape = $('#rodape-modal-assistente');
+    if (!f || !corpo || !rodape) return;
+    pararDitado();
+    var janela = $('#modal-assistente');
+    var tinhaFoco = !!(janela && document.activeElement && janela.contains(document.activeElement));
+    var estado = f.pedindo ? 'pedindo' : 'livre';
+    if (f.estadoDesenhado !== estado) {
+      // a trava de 400 ms só quando o estado MUDA (no primeiro desenho, não)
+      if (f.estadoDesenhado) f.rodapeLivreEm = Date.now() + TRAVA_DO_RODAPE_ASSISTENTE_MS;
+      f.estadoDesenhado = estado;
+    }
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    var nova = $('#ass-nova');
+    if (nova) { nova.hidden = !historicoAssistente.length; nova.disabled = !!f.pedindo; }
+    var conversa = el('div', { class: 'ass-conversa', id: 'ass-conversa' });
+    var exemplos = function (id) {
+      return el('div', { class: 'ass-exemplos', id: id }, exemplosDoAssistente().map(function (t) {
+        return el('button', { type: 'button', class: 'chip-filtro ass-exemplo', texto: t, aoClick: function () {
+          if (!rodapeLivre(f) || f.pedindo) return;
+          perguntarAoAssistente(t);
+        } });
+      }));
+    };
+    if (avisoDeConversaNova && !historicoAssistente.length) conversa.appendChild(el('p', { class: 'ass-entendido', id: 'ass-conversa-nova', texto: 'Comecei uma conversa nova.' }));
+    if (!historicoAssistente.length && !f.pedindo) {
+      /* Na primeira pergunta da sessão, os exemplos à vista; tocar pergunta. */
+      conversa.appendChild(el('p', { class: 'ajuda u-margem-0', id: 'ass-dica', texto: 'Pergunte sobre a agenda, os alunos ou o mês. Por exemplo:' }));
+      conversa.appendChild(exemplos('ass-exemplos'));
+    }
+    historicoAssistente.forEach(function (h, i) {
+      var vez = el('div', { class: 'ass-vez', id: 'ass-vez-' + i }, [el('p', { class: 'ass-pergunta', texto: h.pergunta })]);
+      if (h.recomecou) vez.appendChild(el('p', { class: 'ass-entendido', texto: 'Comecei uma conversa nova.' }));
+      vez.appendChild(respostaDoAssistente(h.texto));
+      if (h.entendido && h.entendido.length) vez.appendChild(el('p', { class: 'ass-entendido', texto: 'Entendi: ' + h.entendido.join('; ') + '.' }));
+      cartoesJuntos(h.cartoes || []).forEach(function (c, k) { vez.appendChild(cartaoDoAssistente(c, i + '-' + k)); });
+      conversa.appendChild(vez);
+    });
+    if (f.pedindo) {
+      conversa.appendChild(el('div', { class: 'ass-vez', id: 'ass-esperando' }, [
+        el('p', { class: 'ass-pergunta', texto: f.perguntaEmCurso }),
+        el('p', { class: 'ass-resposta ass-pensando', id: 'ass-pensando', texto: f.esperaLongaVista ? 'Ainda procurando. Pode cancelar.' : 'Procurando no aplicativo...' })
+      ]));
+    }
+    if (historicoAssistente.length && !f.pedindo) {
+      // depois da primeira pergunta, as ideias ficam recolhidas, perto do campo
+      conversa.appendChild(el('details', { class: 'ass-ideias', id: 'ass-ideias' }, [el('summary', {}, [icone('chd', '', 'ass-ideias-seta'), document.createTextNode('Ideias')]), exemplos('ass-exemplos-ideias')]));
+    }
+    corpo.appendChild(conversa);
+
+    // o rodapé: o erro perto do campo, o campo, o Ditar (ou Cancelar) e o Perguntar
+    var semInternet = navigator.onLine === false;
+    if (f.erro) {
+      var faixa = el('div', { class: 'faixa-aviso ass-falha', id: 'ass-erro', role: 'alert' }, [icone('alerta', '', 'ass-falha-ico'), el('span', { texto: f.erro.frase })]);
+      if (f.erro.tentar) faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'ass-tentar', texto: 'Tentar de novo',
+        disabled: semInternet ? 'disabled' : null, aoClick: function () { if (rodapeLivre(f)) perguntarAoAssistente(f.erro.pergunta); } }));
+      rodape.appendChild(faixa);
+    }
+    var campo = el('textarea', { id: 'ass-texto', class: 'ass-texto' + (f.erro ? ' ass-texto-curto' : ''), rows: f.erro ? '1' : '2', maxlength: '600', 'aria-label': 'Sua pergunta',
+      placeholder: temDitado() ? 'Pergunte ou toque em Ditar' : 'Escreva sua pergunta' });
+    campo.value = f.texto || '';
+    var perguntar = el('button', { type: 'button', class: 'btn principal', id: 'ass-perguntar', texto: 'Perguntar',
+      disabled: f.pedindo || !campo.value.trim() || semInternet ? 'disabled' : null, aoClick: function () { if (rodapeLivre(f)) perguntarAoAssistente(campo.value); } });
+    campo.addEventListener('input', function () {
+      if (!campo.isConnected || f.pedindo || fluxoAssistente !== f) return;
+      f.texto = campo.value;
+      perguntar.disabled = !campo.value.trim() || navigator.onLine === false;
+    });
+    campo.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); if (!perguntar.disabled) perguntar.click(); }
+    });
+    if (f.pedindo) campo.disabled = true;
+    var botoes = [];
+    if (f.pedindo) botoes.push(el('button', { type: 'button', class: 'btn esquerda', id: 'ass-cancelar', texto: 'Cancelar', aoClick: function () { if (rodapeLivre(f) && f.controle) f.controle.abort(); } }));
+    else if (!f.erro) { var d = botaoDeDitar(campo, 'ass-ditar'); if (d) { d.classList.add('esquerda'); botoes.push(d); } }
+    botoes.push(perguntar);
+    if (semInternet && !f.pedindo) rodape.appendChild(el('p', { class: 'ajuda u-margem-0', id: 'ass-offline', texto: 'Sem internet: o assistente volta quando a conexão voltar.' }));
+    /* Com o erro aberto, o rodapé fica baixo: o campo numa linha e o
+     * Perguntar ao lado dele (o "Tentar de novo" já está na linha do erro). */
+    if (f.erro && !f.pedindo) rodape.appendChild(el('div', { class: 'ass-campo ass-campo-junto' }, [campo, perguntar]));
+    else {
+      rodape.appendChild(el('div', { class: 'ass-campo' }, [campo]));
+      rodape.appendChild(el('div', { class: 'ass-botoes' }, botoes));
+    }
+    // a última resposta (ou o erro) fica à vista
+    var alvo = $('#ass-esperando') || $('#ass-vez-' + (historicoAssistente.length - 1));
+    if (alvo && alvo.scrollIntoView) alvo.scrollIntoView({ block: 'start' });
+    var erro = $('#ass-erro');
+    if (erro && erro.scrollIntoView) erro.scrollIntoView({ block: 'nearest' });
+    // o foco que estava na janela volta: ao campo no tablet, ao título no celular (o teclado não sobe sozinho)
+    if (tinhaFoco) {
+      if (modoCelular) focarTituloDoAssistente();
+      else if (!campo.disabled) { try { campo.focus({ preventScroll: true }); } catch (e) { campo.focus(); } }
+      else focarTituloDoAssistente();
+    }
+  }
+
+  /* Com a internet indo e voltando, só os estados mudam: o rodapé não é
+   * recriado (o ditado e o que ela escreve continuam). */
+  function atualizarConexaoDoAssistente() {
+    var f = fluxoAssistente;
+    if (!f || !$('#modal-assistente.aberto')) return;
+    var sem = navigator.onLine === false;
+    var p = $('#ass-perguntar'), c = $('#ass-texto'), t = $('#ass-tentar'), aviso = $('#ass-offline');
+    if (p) p.disabled = f.pedindo || !(c && c.value.trim()) || sem;
+    if (t) t.disabled = sem;
+    if (sem && !aviso && !f.pedindo) {
+      var r = $('#rodape-modal-assistente'), campo = r && r.querySelector('.ass-campo');
+      if (campo) r.insertBefore(el('p', { class: 'ajuda u-margem-0', id: 'ass-offline', texto: 'Sem internet: o assistente volta quando a conexão voltar.' }), campo);
+    } else if (!sem && aviso) aviso.parentNode.removeChild(aviso);
+  }
+
+  function perguntarAoAssistente(texto) {
+    var f = fluxoAssistente;
+    var pergunta = String(texto || '').trim();
+    if (!f || f.pedindo || !pergunta || !podeUsarAssistente()) return;
+    conferirSessaoDoAssistente();
+    pararDitado();
+    var controle = typeof AbortController === 'function' ? new AbortController() : null;
+    var vez = f.vez;
+    f.pedindo = true; f.controle = controle; f.erro = null; f.perguntaEmCurso = pergunta; f.texto = ''; f.esperaLongaVista = false;
+    desenharAssistente();
+    anunciar('Procurando no aplicativo...');
+    f.esperaLonga = setTimeout(function () {
+      if (fluxoAssistente !== f || !f.pedindo) return;
+      f.esperaLongaVista = true;
+      var p = $('#ass-pensando');
+      if (p) p.textContent = 'Ainda procurando. Pode cancelar.';
+      anunciar('Ainda procurando. Pode cancelar.');
+    }, ESPERA_LONGA_MS);
+    var relogio = setTimeout(function () { if (controle) { controle.signal.motivo = 'prazo'; controle.abort(); } }, PRAZO_DA_IA_MS);
+    var cancelou = function () { return !!(controle && controle.signal.aborted) || fluxoAssistente !== f || f.vez !== vez; };
+    var agoraMin = minutosAgoraCelular();
+    var sessao = sessaoAssistente;
+    f.sessaoDaPergunta = sessao;
+    f.tamanhoAntes = sessao.mensagens.length;
+    Assistente.perguntar(sessao, pergunta, {
+      ctx: contextoDoAssistente(),
+      hora: horaDeMinutosCelular(agoraMin),
+      hojeBrasilia: typeof Planejamento !== 'undefined' ? Planejamento.hojeEmSaoPaulo() : null,
+      cancelado: cancelou,
+      chamar: function (corpoDoPedido) {
+        return chamarIA(corpoDoPedido, controle ? controle.signal : undefined);
+      }
+    }).then(function (r) {
+      clearTimeout(relogio);
+      clearTimeout(f.esperaLonga);
+      if (fluxoAssistente !== f || f.vez !== vez) return; // a janela fechou no meio (a pergunta já voltou ao campo)
+      f.pedindo = false; f.controle = null;
+      var codigo = r.erro === 'cancelado' && controle && controle.signal.motivo === 'prazo' ? 'prazo' : r.erro;
+      if (codigo === 'cancelado') { f.texto = pergunta; desenharAssistente(); anunciar('Cancelado.'); return; }
+      avisoDeConversaNova = false;
+      if (codigo) {
+        f.texto = pergunta; // a pergunta volta ao campo
+        f.erro = { frase: Assistente.fraseDoErro(codigo), tentar: Assistente.daParaTentarDeNovo(codigo), pergunta: pergunta };
+        desenharAssistente();
+        return;
+      }
+      if (sessao !== sessaoAssistente) return; // "Nova conversa" ou troca de conta no meio
+      historicoAssistente.push({ pergunta: pergunta, texto: r.texto, cartoes: r.cartoes, entendido: r.entendido, recomecou: r.recomecou });
+      if (historicoAssistente.length > 12) historicoAssistente.shift();
+      desenharAssistente();
+      anunciar(Assistente.linhasDaResposta(r.texto).map(function (l) { return l.texto + (l.valor ? ' ' + l.valor : ''); }).join(' ') +
+        (r.entendido.length ? ' Entendi: ' + r.entendido.join('; ') + '.' : ''));
+    }).catch(function () {
+      clearTimeout(relogio);
+      clearTimeout(f.esperaLonga);
+      if (fluxoAssistente !== f || f.vez !== vez) return;
+      f.pedindo = false; f.controle = null;
+      f.texto = pergunta;
+      f.erro = { frase: Assistente.fraseDoErro('interno'), tentar: true, pergunta: pergunta };
+      desenharAssistente();
+    });
+  }
+
+  window.addEventListener('online', atualizarConexaoDoAssistente);
+  window.addEventListener('offline', atualizarConexaoDoAssistente);
 
   // ================= partida =================
 
