@@ -263,7 +263,17 @@ def trava_recorte(p):
         a = letras(alvo)
         # a linha do titulo (ou do numero) e a mais alta da margem: acima dela, so
         # texto a direita (balao de fala do desenho que abre a atividade)
-        casa = [l for l in ls if casa_forte(l[1], alvo)]
+        def com_a_de_baixo(l):
+            # o titulo quebrado em linha curta ("O JARDIM" e "DOS SENTIDOS"): soma
+            # a linha logo abaixo, no mesmo corpo
+            t = l[1]
+            for o in sorted(ls, key=lambda o: o[0][1]):
+                if o is not l and abs(o[2] - l[2]) < 0.6 and 0 < o[0][1] - l[0][1] <= 1.6 * (l[0][3] - l[0][1]):
+                    t += ' ' + o[1]
+                    break
+            return t
+        casa = [l for l in ls if casa_forte(l[1], alvo) or (letras(alvo).startswith(letras(l[1])) and len(letras(l[1])) >= 3
+                                                           and casa_forte(com_a_de_baixo(l), alvo))]
         if not casa:
             erros.append('%s: o primeiro pedaco nao tem a linha %r' % (it['id'], alvo[:40]))
             continue

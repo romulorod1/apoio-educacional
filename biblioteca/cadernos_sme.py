@@ -367,12 +367,37 @@ def faixas(doc):
 def achar_titulo(pg, titulo, topo, pe):
     """A caixa da linha do titulo na pagina, ou None: a linha mais alta cujo texto
     e o comeco do titulo (o titulo pode quebrar em duas linhas)."""
-    cands = [l for l in linhas(pg) if topo - 1 <= l['bb'][1] <= pe and not l['girada'] and casa_titulo(l['texto'], titulo)]
+    ls = [l for l in linhas(pg) if topo - 1 <= l['bb'][1] <= pe and not l['girada']]
+    cands = linhas_de_titulo(ls, titulo)
     if not cands:
         return None
     # a mais alta; o corpo so desempata (a regra "o de maior corpo" pegava
     # "calculo:" de 17 pt no lugar do titulo de 12 pt, 3o ano, p. 100)
     return min(cands, key=lambda l: (round(l['bb'][1]), -round(l['tam']), l['bb'][0]))['bb']
+
+
+def linhas_de_titulo(ls, titulo):
+    """As linhas de `ls` que comecam o titulo: a linha sozinha, ou somada as
+    linhas logo abaixo dela, na mesma fonte e corpo, quando o titulo quebra
+    numa primeira linha curta ("O JARDIM" e "DOS SENTIDOS", 2o ano, p. 116)."""
+    out = []
+    for l in ls:
+        texto, ult = l['texto'], l
+        if not casa_titulo(texto, titulo):
+            alvo, n = so_letras(titulo), so_letras(texto)
+            if not (len(n) >= 3 and alvo.startswith(n)):
+                continue
+            for o in sorted(ls, key=lambda o: o['bb'][1]):
+                if o is l or o['fonte'] != l['fonte'] or abs(o['tam'] - l['tam']) > 0.5:
+                    continue
+                if 0 <= o['bb'][1] - ult['bb'][1] <= 1.6 * (ult['bb'][3] - ult['bb'][1]) and o['bb'][1] > ult['bb'][1]:
+                    texto, ult = texto + ' ' + o['texto'], o
+                    if casa_titulo(texto, titulo):
+                        break
+            if not casa_titulo(texto, titulo):
+                continue
+        out.append(l)
+    return out
 
 
 def casa_titulo(texto, titulo):
@@ -758,7 +783,7 @@ def comeca_pelo_titulo(doc, ps, alvo):
         (l['bb'][0] + l['bb'][2]) / 2, (l['bb'][1] + l['bb'][3]) / 2)) and not eh_credito(l)]
     if not ls:
         return False
-    casa = [l for l in ls if casa_titulo(l['texto'], alvo)]
+    casa = linhas_de_titulo(ls, alvo)
     if not casa:
         return False
     t = min(casa, key=lambda l: (round(l['bb'][1]), l['bb'][0]))
