@@ -2173,6 +2173,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-pdf-navegacao input { display: block; width: 100%; min-height: var(--alvo); margin: 0; accent-color: var(--navy); }
 .leitor-pdf-pagina { position: relative; margin: 0 auto 18px; background: var(--branco); box-shadow: var(--sombra); }
 .leitor-pdf-pagina canvas { display: block; margin: 0; background: var(--branco); }
+/* O canvas de detalhe do zoom alto (fatia 3): só o pedaço à vista, na densidade
+   da tela, por cima da página inteira; o toque passa direto para a página. */
+.leitor-pdf-pagina canvas.leitor-pdf-detalhe { position: absolute; pointer-events: none; }
 .leitor-pdf-pagina-vazia { width: 100%; height: 100%; background: var(--branco); }
 /* A frase do C3 ("Escolha a página e toque em...") fica colada embaixo da
    barra, de ponta a ponta, sem rolar junto com a página. */
@@ -4315,3 +4318,179 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 #modal-leitor-pdf.leitor-compacto .modal-rodape { flex-wrap: nowrap; }
 #modal-leitor-pdf.leitor-compacto #leitor-compartilhar { flex: 1; }
 /* ==================== planejamento (fim) ==================== */
+
+/* ==================== T2: o bloco "Teoria e exercícios" da página do assunto ==================== */
+/* Os tons da dificuldade (D3): três degraus do mesmo marinho, do claro ao
+   escuro, nos pontos (sinal gráfico, 3:1 sobre o branco), e o selo inteiro
+   acompanha: fundo e borda mais fortes a cada degrau. A letra do selo fica
+   sempre no marinho da casa, que passa dos 4,5:1. */
+:root {
+  --bte-dif-1: #5B86B3;
+  --bte-dif-2: #2F5A8A;
+}
+/* Uma coluna só, no tablet e no celular (D5 e a parte A do 12b). O teto é de
+   leitura: a página do assunto decide onde o bloco fica. */
+.bte { min-width: 0; max-width: 46rem; margin: 0 0 24px; }
+h3.subtitulo.bte-titulo { margin: 6px 0 0; padding-bottom: 0; border-bottom: 0; font-size: var(--letra-20); }
+.bte-vazio { margin: 10px 0 0; }
+.bte-secao { min-width: 0; }
+.bte-secao .bloco-exercicios { margin-top: 18px; }
+.bte-secao-titulo { display: flex; align-items: baseline; gap: 8px; }
+.bte-secao-quantos { color: var(--muted); font-weight: var(--peso-normal); }
+/* a teoria: uma linha por aula, com a capa pequena; tocar na linha abre, e a
+   caixa fica na mesma linha */
+.bte-teorias { min-width: 0; }
+.bte-teoria { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; padding: 4px 0;
+  border-bottom: 1px solid var(--fio-claro); }
+.bte-teoria.bte-marcado { background: var(--acao-clara); }
+.bte-teoria-abrir { flex: 1 1 12rem; min-width: 0; display: flex; align-items: center; gap: 12px;
+  min-height: var(--alvo); padding: 6px 0; border: 1px solid transparent; border-radius: 10px;
+  background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.bte-teoria-abrir:hover .nome { text-decoration: underline; }
+.bte-teoria-abrir > .ico { color: var(--muted); }
+.bte-teoria-capa.bib-mini { width: 56px; flex: none; }
+.bte-teoria-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bte-teoria-texto .nome { font-weight: var(--peso-forte); color: var(--navy); overflow-wrap: anywhere; }
+.bte-teoria-texto .detalhe { font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+/* a lista de base: um cartão, com Ver e Usar à mão */
+.bte-lista { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 12px 14px;
+  border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); }
+.bte-lista-texto { flex: 1 1 10rem; min-width: 0; }
+.bte-lista-texto .nome { font-weight: var(--peso-forte); color: var(--navy); }
+.bte-lista-texto .detalhe { font-size: var(--letra-14); color: var(--muted); }
+.bte-lista-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.bte-lista-acoes .btn { min-height: var(--alvo); }
+/* os exercícios: grandes, um embaixo do outro; a caixa na linha do nome, e
+   o recorte num cartão da largura da coluna */
+.bte-exercicios { display: flex; flex-direction: column; gap: 24px; margin-top: 10px; min-width: 0; }
+.bte-ex { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bte-ex-de { margin-top: 4px; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--muted); overflow-wrap: anywhere; }
+.bte-ex-cabeca { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; }
+.bte-ex-cabeca .cresce { flex: 1 1 0; min-width: 0; }
+/* a caixa fica sempre na ponta direita, mesmo quando a linha quebra no celular */
+.bte-ex-cabeca .bte-marcar { margin-left: auto; }
+.bte-ex-nome { font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); overflow-wrap: anywhere; }
+.bte-ex-abrir { display: block; width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--fio);
+  border-radius: 10px; background: var(--branco); cursor: pointer; text-align: left; }
+.bte-ex-abrir:hover { border-color: var(--acao); }
+.bte-ex-abrir .bib-mini { border: 0; border-radius: 0; }
+.bte-ex.bte-marcado .bte-ex-abrir { border-color: var(--acao); box-shadow: inset 0 0 0 1px var(--acao); }
+.bte-marcar { min-height: var(--alvo); }
+.bte-marcar input:indeterminate { accent-color: var(--acao); }
+.bte-mais { align-self: flex-start; margin-top: 14px; min-height: var(--alvo); }
+/* o selo da dificuldade (D3): pontos e nome, e cada degrau mais forte que o
+   de baixo; o "para mim" dela tem a borda grossa da cor de ação */
+.bte-dificuldade { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bte-selo { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 2px 10px;
+  border: 1px solid var(--fio); border-radius: 999px; background: var(--branco);
+  font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--navy); white-space: nowrap; }
+.bte-pontos { display: inline-flex; gap: 3px; }
+.bte-ponto { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; box-sizing: border-box; }
+.bte-ponto.cheio { background: currentColor; }
+.bte-dif-1 .bte-pontos { color: var(--bte-dif-1); }
+.bte-dif-2 { background: var(--acao-clara); border-color: var(--bte-dif-2); }
+.bte-dif-2 .bte-pontos { color: var(--bte-dif-2); }
+.bte-dif-3 { background: var(--soft-2); border: 2px solid var(--navy-escuro); }
+.bte-dif-3 .bte-pontos { color: var(--navy-escuro); }
+/* o "para mim" é o chip de dentro: a moldura do selo continua a do degrau,
+   para um Fácil dela não parecer Difícil */
+.bte-selo-para-mim { padding: 1px 8px; border: 1px solid var(--acao); border-radius: 999px;
+  background: var(--acao-clara); font-size: var(--letra-14); font-weight: var(--peso-forte); }
+/* o desafio é um sinal forte e próprio (D3), e não uma terceira etiqueta apagada */
+.tag.bte-desafio { padding: 3px 10px; border: 1px solid var(--aviso-borda); background: var(--aviso-fundo);
+  color: var(--aviso-texto); font-size: var(--letra-14); font-weight: var(--peso-forte); text-transform: none; letter-spacing: 0; }
+/* ==================== T2 (fim) ==================== */
+
+/* ==================== assistente (IA, fase 3: só leitura) ==================== */
+/* A porta do tablet: a pílula com o balão e a palavra "Perguntar", vizinha
+   do olho (a margem automática junta as duas à direita do cabeçalho), com a
+   mesma borda e o mesmo branco do olho. */
+.pilula-perguntar {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 48px; padding: 0 16px 0 12px;
+  border: 1px solid var(--fio); border-radius: 999px;
+  background: var(--branco); color: var(--navy);
+  font: inherit; font-size: var(--letra-14); font-weight: 600;
+  cursor: pointer; flex-shrink: 0;
+}
+.pilula-perguntar[hidden] { display: none; }
+.pilula-perguntar .ico { width: 20px; height: 20px; }
+.pilula-perguntar:hover { background: var(--soft); }
+@media (max-width: 720px) {
+  .pilula-perguntar { position: absolute; top: 8px; right: 64px; }
+}
+/* A porta do celular: a mesma pílula, presa no pé de Hoje, acima das abas,
+   à direita (perto do polegar). O alto (a linha do dia) fica como era. */
+.cel-assistente-pe { position: sticky; bottom: 12px; display: flex; justify-content: flex-end; margin-top: 8px; pointer-events: none; z-index: 3; }
+.cel-assistente-pe .cel-perguntar {
+  pointer-events: auto; box-shadow: var(--sombra-forte); background: var(--branco); border: 1px solid var(--fio);
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: var(--alvo-celular); padding: 0 16px 0 12px;
+  border-radius: 999px; color: var(--navy); font-weight: 600;
+}
+.cel-assistente-pe .cel-perguntar .ico { width: 20px; height: 20px; }
+/* No fim da rolagem de Hoje, a pílula fica no próprio lugar, depois de uma
+   folga do tamanho dela: a última aula rola até ficar livre. */
+#cel-hoje .cel-assistente-pe { padding-top: 12px; }
+
+.ass-modal { max-width: 640px; height: 88vh; }
+/* No celular, a janela desce até o fim da tela e cobre a barra de abas (os
+   rótulos não aparecem borrados por baixo). */
+body.modo-celular #modal-assistente { padding: 8px 0 0; align-items: stretch; }
+body.modo-celular #modal-assistente .ass-modal { height: 100%; max-height: 100%; max-width: 100%; border-radius: 16px 16px 0 0; }
+.modal-cabecalho .btn#ass-nova { min-height: 48px; margin-left: auto; white-space: nowrap; }
+/* o título recebe o foco ao abrir (o teclado não sobe); não é um controle, sem moldura */
+#titulo-modal-assistente:focus { outline: none; }
+.ass-conversa { display: flex; flex-direction: column; gap: 14px; }
+.ass-vez { display: flex; flex-direction: column; gap: 6px; scroll-margin-top: 8px; }
+.ass-pergunta {
+  align-self: flex-end; max-width: 85%; margin: 0;
+  background: var(--soft); border: 1px solid var(--fio); border-radius: 14px 14px 4px 14px;
+  padding: 8px 12px; font-size: var(--letra-16); color: var(--texto); overflow-wrap: anywhere;
+}
+.ass-resposta { font-size: var(--letra-16); line-height: 1.45; color: var(--texto); overflow-wrap: anywhere; }
+.ass-resposta p { margin: 0 0 4px; }
+.ass-linha-valor { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--fio-claro); padding-bottom: 2px; }
+.ass-valor { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ass-pensando { color: var(--muted); font-style: italic; margin: 0; }
+.ass-conversa .ass-entendido, .ass-entendido { margin: 0; font-size: var(--letra-14); line-height: 1.35; color: var(--muted); }
+.ass-cartao {
+  border: 1px solid var(--fio); border-radius: 12px; padding: 10px 12px; background: var(--branco);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.ass-cartao-linha { display: flex; align-items: flex-start; gap: 8px; font-size: var(--letra-16); overflow-wrap: anywhere; min-width: 0; }
+.ass-cartao-linha .ass-cartao-ico { width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; color: var(--navy); }
+.ass-cartao-quem { min-width: 0; font-weight: 600; color: var(--texto); }
+.ass-cinza { font-weight: 400; color: var(--muted); }
+.ass-numero { white-space: nowrap; }
+.ass-mensagem { width: 100%; box-sizing: border-box; min-height: 72px; resize: none; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 8px; background: var(--soft); }
+.ass-mensagem:focus { outline: 1px solid var(--navy); outline-offset: 0; }
+.ass-cartao-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.ass-link { min-height: 48px; min-width: 48px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
+.ass-exemplos { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.ass-exemplo { min-height: 48px; text-align: left; white-space: normal; max-width: 100%; }
+.ass-ideias > summary { min-height: 48px; display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--navy); font-weight: 600; list-style: none; }
+.ass-ideias > summary::-webkit-details-marker { display: none; }
+.ass-ideias .ass-ideias-seta { width: 20px; height: 20px; transform: rotate(-90deg); transition: transform .15s ease; }
+.ass-ideias[open] .ass-ideias-seta { transform: none; }
+.ass-ideias .ass-exemplos { padding-top: 4px; }
+/* Com o erro aberto, uma linha só: o ícone, o texto e o "Tentar de novo". */
+.ass-falha { margin: 0; display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; padding-top: 6px; padding-bottom: 6px; }
+.ass-falha .ass-falha-ico { width: 20px; height: 20px; flex-shrink: 0; }
+.ass-falha span { flex: 1 1 auto; min-width: 0; font-size: var(--letra-14); line-height: 1.3; }
+.ass-falha .btn { flex: 0 0 auto; white-space: nowrap; }
+.ass-texto.ass-texto-curto { min-height: 48px; height: 48px; }
+.ass-campo-junto { gap: 8px; align-items: center; }
+.ass-campo-junto .btn { min-height: 48px; flex: 0 0 auto; }
+.ass-falha .btn { min-height: 48px; }
+.modal-rodape.ass-rodape { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
+.ass-campo { display: flex; }
+.ass-texto { flex: 1; min-width: 0; min-height: 48px; resize: none; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 10px; box-sizing: border-box; }
+.ass-texto:focus { outline: 1px solid var(--navy); outline-offset: 0; }
+.ass-botoes { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
+.ass-botoes .btn { min-height: 48px; }
+.ass-botoes .esquerda { margin-right: auto; }
+/* desligado, o Perguntar continua legível: texto escuro sobre cinza claro */
+.ass-botoes .btn.principal:disabled { background: var(--fio-claro); border-color: var(--fio); color: var(--texto); opacity: 1; }
+/* ==================== assistente (fim) ==================== */

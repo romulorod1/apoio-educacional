@@ -277,6 +277,17 @@ roda "venenos existem" node _teste/testa_venenos_existem.js
 roda "venenos existem --envenenado-nome-falso" node _teste/testa_venenos_existem.js --envenenado-nome-falso
 roda "venenos existem --envenenado-letra-trocada" node _teste/testa_venenos_existem.js --envenenado-letra-trocada
 roda "venenos existem --envenenado-prefixo" node _teste/testa_venenos_existem.js --envenenado-prefixo
+# Nada da fonte privada de anos iniciais no repositorio publico: a arvore de
+# git ls-files e o historico que o merge leva (origin/main..HEAD; no push na
+# main, o before do evento), pelo TIPO (PDF, zip, gzip, 7z, rar e companhia
+# reprovam pelos bytes do comeco) e pelas marcas no nome e no conteudo. O SHA
+# contra a lista privada so roda na maquina que tem a lista; sem ela, a prova
+# diz que pulou e nao reprova (no CI nao ha segredo nenhum). Fica nesta secao, e nao no
+# mapa, para rodar no portao-rapido em TODO push, mexa o PR no que mexer:
+# arquivo novo de qualquer nome e pego. O veneno monta um repositorio temporario
+# com cada caso e tem de acusar cada um.
+roda "sem fonte privada" node _teste/testa_sem_fonte_privada.js
+roda "sem fonte privada --envenenado-com-fonte-privada" node _teste/testa_sem_fonte_privada.js --envenenado-com-fonte-privada
 # A tabela de materias e uma so (core.js) e as copias tem que bater com ela:
 # a do cartao.js, a do pdf.js, o banco/topicos/indice.json e a exportada para
 # o Python. Foi a divergencia entre quatro vocabularios de materia que deixou
@@ -358,6 +369,10 @@ roda "planejamento com IA (fase 2)" node _teste/testa_planejamento.js
 # o salvar com a gravacao pendente: a mudanca no meio grava de novo, com o mesmo id
 roda "planejamento (salvar pendente)" node _teste/testa_planejamento_salvar.js
 roda "planejamento --envenenado-zera-sem-comparar" node _teste/testa_planejamento_salvar.js --envenenado-zera-sem-comparar
+# O assistente so de leitura com IA (fase 3): cada ferramenta sobre um banco
+# sintetico CONGELADO (nada grava, byte a byte), o laco com o content intacto,
+# o teto de 5 voltas e as 20 frases de datas relativas.
+roda "assistente com IA (fase 3)" node _teste/testa_assistente.js
 # Politica de testes por checkpoint (09/11/2026): o nivel 1 (quais provas de
 # navegador rodam pelos arquivos tocados, com o mapa em mapa_provas.tsv) e o
 # nivel 3 (a main reaproveita a bateria inteira se o tree for igual ao da cabeca
@@ -571,6 +586,16 @@ roda "biblioteca livros tela --envenenado-pagina-presa" node "_teste/testa_bibli
 roda "leitor pinca"                              node "_teste/testa_leitor_pinca.js"
 roda "leitor pinca --envenenado-gesto-sem-ponto" node "_teste/testa_leitor_pinca.js" --envenenado-gesto-sem-ponto
 roda "leitor pinca --envenenado-gesto-grava-pela-ancora" node "_teste/testa_leitor_pinca.js" --envenenado-gesto-grava-pela-ancora
+# Fatia 3 do leitor: nitido em qualquer zoom e mais rapido no escaneado, com
+# densidade de tela 2. No zoom maximo, em pe e deitado, a nitidez fica em 1,9
+# ou mais (o canvas de detalhe) e os pixels de canvas vivos em 16 milhoes ou
+# menos; parada a rolagem, a pagina seguinte NA DIRECAO dela ja tem canvas; o
+# escaneado sai primeiro a meia densidade. Um veneno para cada peca.
+roda "leitor nitidez"                               node "_teste/testa_leitor_nitidez.js"
+roda "leitor nitidez --envenenado-sem-detalhe"      node "_teste/testa_leitor_nitidez.js" --envenenado-sem-detalhe
+roda "leitor nitidez --envenenado-sem-teto"         node "_teste/testa_leitor_nitidez.js" --envenenado-sem-teto
+roda "leitor nitidez --envenenado-direcao-errada"   node "_teste/testa_leitor_nitidez.js" --envenenado-direcao-errada
+roda "leitor nitidez --envenenado-sem-meia-densidade" node "_teste/testa_leitor_nitidez.js" --envenenado-sem-meia-densidade
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
@@ -582,6 +607,13 @@ roda "assunto lado a lado"                      node "_teste/testa_assunto_lado_
 roda "assunto lado a lado --envenenado-nao-trata-vira-sem-mapa" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-nao-trata-vira-sem-mapa
 roda "assunto lado a lado --envenenado-mapa-vazio-nao-trata" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-mapa-vazio-nao-trata
 roda "assunto lado a lado --envenenado-parcial-nao-trata" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-parcial-nao-trata
+# T2 (listas): o bloco "Teoria e exercicios" da pagina do assunto, numa pagina
+# de prova (a pagina do assunto e de outra executora), a 1280x800, 800x1280 e
+# 412x915: as quatro secoes, o exercicio grande numa coluna, nada marcado, o
+# selo graduado com o "Para mim" por cima, Abrir e Anexar pelos caminhos de
+# sempre e o vazio numa linha.
+roda "bloco teoria e exercicios"                node "_teste/testa_bloco_teoria_exercicios_navegador.js"
+roda "bloco teoria e exercicios --envenenado-sem-outro-ano" node "_teste/testa_bloco_teoria_exercicios_navegador.js" --envenenado-sem-outro-ano
 # C12: os pacotes de provas (OBMEP Mirim por nivel e ENEM) importam, as abas vao
 # do 2o ao 5o ano e os assuntos do aplicativo aparecem como modulos. O modo
 # envenenado serve o app.js que so espalhava o Banco pelas series equivalentes.
@@ -874,6 +906,10 @@ roda "planejamento (fluxo, IA fase 2)"              node "_teste/testa_planejame
 roda "planejamento --envenenado-salva-duplo"       node "_teste/testa_planejamento_navegador.js" --envenenado-salva-duplo
 roda "planejamento (registro e versao antiga)"      node "_teste/testa_planejamento_registro_navegador.js"
 roda "planejamento --envenenado-cascata-deixa-plano" node "_teste/testa_planejamento_registro_navegador.js" --envenenado-cascata-deixa-plano
+# IA, fase 3: o assistente no app (tablet e celular), com o /api/ia falso num roteiro
+# de tool_use: quem ve o botao, os cartoes que so abrem com o toque, o teto de 5
+# voltas, os erros, nada grava e o transbordo a 360, 390 e 412 px e 130%.
+roda "assistente (fluxo, IA fase 3)"                node "_teste/testa_assistente_navegador.js"
 # N1: a volta depois do rollback. O codigo da 4 republicado com o numero novo abre
 # um banco nesse numero sem os depositos novos; o codigo novo, voltando, sonda o
 # banco, cria o que falta na versao mais um e migra. O veneno sem a deteccao TEM
@@ -1464,6 +1500,18 @@ roda "livros (regras) --envenenado-fim-do-capitulo-tira" node "_teste/testa_livr
 # O sumario que a tela usa: marcadores lixo e sumario vazio dao lugar ao mapa.
 roda "livros (regras) --envenenado-sumario-dos-marcadores" node "_teste/testa_livros_regras.js" --envenenado-sumario-dos-marcadores
 roda "livros (regras) --envenenado-mapa-parcial-troca" node "_teste/testa_livros_regras.js" --envenenado-mapa-parcial-troca
+# T2 (listas): a Biblioteca.fontesDoAssunto, as fontes da pagina do assunto
+# (teoria, lista de base, exercicios e OBMEP) pelo modulo, pelo tema_app e pela
+# tabela de vinculos, com o acervo sintetico. O veneno tira a guarda do id ja
+# visto, e o item repetido aparece duas vezes no mesmo assunto. Sem Chrome.
+roda "fontes do assunto"                        node "_teste/testa_fontes_do_assunto.js"
+roda "fontes do assunto --envenenado-repete-item" node "_teste/testa_fontes_do_assunto.js" --envenenado-repete-item
+# 13/11: o ENEM separado da OBMEP, a lista de base com buraco e a entrada que nao pode mudar
+roda "fontes do assunto --envenenado-enem-na-obmep" node "_teste/testa_fontes_do_assunto.js" --envenenado-enem-na-obmep
+roda "fontes do assunto --envenenado-base-com-buraco" node "_teste/testa_fontes_do_assunto.js" --envenenado-base-com-buraco
+roda "fontes do assunto --envenenado-muda-entrada" node "_teste/testa_fontes_do_assunto.js" --envenenado-muda-entrada
+# o caso real do MAT08-15: sem modulo proprio, herda os vizinhos declarados no indice
+roda "fontes do assunto --envenenado-sem-vizinhos" node "_teste/testa_fontes_do_assunto.js" --envenenado-sem-vizinhos
 # B3: a pagina impressa do livro (trechos romanos e arabicos, mudanca no meio,
 # ida e volta em todas as paginas, tela e leitor mostrando a impressa e abrindo
 # e gravando em pagina do arquivo, e recusa so do livro com numeracao invalida).
