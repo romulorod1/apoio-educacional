@@ -1,0 +1,3 @@
+# Conserto do assistente: comparar e ordenar alunos com todos dentro. Uma linha por item, escrita para ela.
+No Perguntar, perguntas que comparam alunos, como "quem mais rende no mês, contando as aulas que ainda vão acontecer?", agora consideram todos os alunos de uma vez, sem deixar ninguém de fora.
+A linha "Entendi" ficou curta: quando a pergunta olha muitos alunos, ela diz só quantos foram.

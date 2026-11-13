@@ -2449,6 +2449,11 @@ button.alvo-rascunho:hover { background: var(--soft); }
   max-width: 300px;
   text-align: left;
 }
+.estado-salvamento-aula {
+  font-size: var(--letra-12);
+  color: var(--muted);
+  margin-right: auto;
+}
 
 .ajuda-exemplo-curto {
   font-size: var(--letra-14);
