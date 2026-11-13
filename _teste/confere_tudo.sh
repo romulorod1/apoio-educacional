@@ -1110,6 +1110,25 @@ roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip
 # 21 em JAVA_HOME; sem eles, a prova diz onde procurou e REPROVA, nunca passa
 # calada. Os venenos: a regra que deixa qualquer conta ler tem de ser vista pela
 # parte das regras; a que deixa quem le escrever registro, idem.
+# Fase 1b da biblioteca na nuvem (13/11/2026): o publicador do catalogo
+# (biblioteca/publicar_catalogo.py) contra o emulador do Firestore e do Auth,
+# com manifests sinteticos: sem --publicar nada e gravado; publicar grava num
+# commit so; republicar igual nao escreve; a falha no meio do lote deixa a
+# versao anterior; as recusas (id trocado, livro que some, formato, assunto
+# fora do banco, caminho fora da lista); a classificacao do acervo; e as
+# regras do catalogo (a dona le e nao escreve); os registros que somem sao recusa
+# e o que ficou para tras e refeito pelo indice da nuvem. Portas 9031 a 9035.
+roda "publicador do catalogo"                       node "_teste/testa_publicador_catalogo.js"
+roda "publicador do catalogo --envenenado-aceita-id-trocado" node "_teste/testa_publicador_catalogo.js" --envenenado-aceita-id-trocado
+roda "publicador do catalogo --envenenado-escreve-fora-da-lista" node "_teste/testa_publicador_catalogo.js" --envenenado-escreve-fora-da-lista
+roda "publicador do catalogo --envenenado-dois-lotes" node "_teste/testa_publicador_catalogo.js" --envenenado-dois-lotes
+roda "publicador do catalogo --envenenado-regra-herda-escrita" node "_teste/testa_publicador_catalogo.js" --envenenado-regra-herda-escrita
+roda "publicador do catalogo --envenenado-repetido-ultima-vence" node "_teste/testa_publicador_catalogo.js" --envenenado-repetido-ultima-vence
+roda "publicador do catalogo --envenenado-nome-cortado" node "_teste/testa_publicador_catalogo.js" --envenenado-nome-cortado
+roda "publicador do catalogo --envenenado-registro-vazio-passa" node "_teste/testa_publicador_catalogo.js" --envenenado-registro-vazio-passa
+roda "publicador do catalogo --envenenado-relatorio-grava" node "_teste/testa_publicador_catalogo.js" --envenenado-relatorio-grava
+roda "publicador do catalogo --envenenado-so-pelo-id" node "_teste/testa_publicador_catalogo.js" --envenenado-so-pelo-id
+roda "publicador do catalogo --envenenado-homonimo-na-lista" node "_teste/testa_publicador_catalogo.js" --envenenado-homonimo-na-lista
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
@@ -1507,6 +1526,14 @@ roda "mapa de EPUB (gerador)"                   python biblioteca/_prova_mapa_ep
 roda "mapa de EPUB (regras)"                    node "_teste/testa_livros_mapa_epub_regras.js"
 roda "mapa de EPUB (regras) --envenenado-sumario-so-do-pacote" node "_teste/testa_livros_mapa_epub_regras.js" --envenenado-sumario-so-do-pacote
 roda "mapa de EPUB (regras) --envenenado-cobre-sem-ancora" node "_teste/testa_livros_mapa_epub_regras.js" --envenenado-cobre-sem-ancora
+# Fase 1b: a chave estavel do capitulo (biblioteca/chaves.py), pelos mesmos
+# criterios que o aplicativo confere (titulo igual, par da heranca; o mesmo
+# comeco so com titulo parecido ou com o par). Sem Chrome e sem rede.
+roda "chaves dos capitulos"                     python _teste/testa_chaves_capitulos.py
+roda "chaves dos capitulos --envenenado-chave-pela-pagina" python _teste/testa_chaves_capitulos.py --envenenado-chave-pela-pagina
+roda "chaves dos capitulos --envenenado-sem-heranca" python _teste/testa_chaves_capitulos.py --envenenado-sem-heranca
+roda "chaves dos capitulos --envenenado-titulo-sem-unicidade" python _teste/testa_chaves_capitulos.py --envenenado-titulo-sem-unicidade
+roda "chaves dos capitulos --envenenado-repetido-sem-ordem" python _teste/testa_chaves_capitulos.py --envenenado-repetido-sem-ordem
 # A revisao do C15.1: o pacote cortado recusado ja na espiada, sem ler o
 # arquivo inteiro, e o teto de 160 MB do aplicativo. Sem Chrome.
 roda "livros (regras)"                          node "_teste/testa_livros_regras.js"
