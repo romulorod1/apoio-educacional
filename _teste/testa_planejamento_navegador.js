@@ -676,7 +676,14 @@ async function transbordo(pag) {
   })), ['2026-11-17', 'realizada']);
   await clicar(pag, '#plan-desfazer-ajuste');
   conf('Desfazer ajuste: a aula volta à folha', await aulasNaFolhaCompartilhada(), 1);
-  await esperar('o desfazer gravou o plano de antes', () => pag.evaluate(() => Store.carregar().then(d => (d.ajustes['planejamento:semente'].plano.aulasRemovidas || []).length)), v => v === 0, 10000);
+  /* o Desfazer volta ao plano de ANTES, no formato antigo: sem as chaves (e
+   * não com a lista vazia, que é outro estado) */
+  await esperar('o desfazer gravou o plano de antes', () => pag.evaluate(() => Store.carregar().then(d => {
+    const pl = d.ajustes['planejamento:semente'].plano; return ['aulasRemovidas' in pl, 'aulasExtras' in pl].join(',');
+  })), v => v === 'false,false', 10000);
+  conf('Desfazer: o plano gravado voltou ao formato antigo (sem aulasRemovidas e aulasExtras), não a listas vazias', await pag.evaluate(() => Store.carregar().then(d => {
+    const pl = d.ajustes['planejamento:semente'].plano; return ['aulasRemovidas' in pl, 'aulasExtras' in pl];
+  })), [false, false]);
   await fecharPlanejamento(pag);
   await pag.evaluate(() => document.querySelector('#modal-aluno .fechar').click());
   await esperar('a ficha fechou', () => aberta(pag, 'modal-aluno'), v => v === false, 10000);

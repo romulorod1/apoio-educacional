@@ -27549,6 +27549,11 @@
    * poder tirar uma da folha (aulasRemovidas): as do aluno, de `inicio` até o
    * teto do período (o ajuste pode esticar o fim). Só do aluno escolhido:
    * sem ele, nada vai. */
+  /* O aluno do plano, só quando é certo (veio da ficha, ela escolheu, ou o
+   * modelo teve confiança alta); com o palpite de confiança baixa, null. */
+  function alunoConfirmado(plano) {
+    return plano && plano.alunoId && plano.confiancaAluno === 'alta' && alunoPorId(plano.alunoId) ? plano.alunoId : null;
+  }
   function agendaParaIA(alunoId, inicio) {
     if (!alunoId || !alunoPorId(alunoId) || !Planejamento.dataValida(inicio)) return null;
     var ate = Planejamento.somaDias(inicio, Planejamento.MAX_DIAS - 1);
@@ -28019,6 +28024,9 @@
     var sinal = controle ? controle.signal : undefined;
     var relogio = setTimeout(function () { if (controle) { sinal.motivo = 'prazo'; controle.abort(); } }, PRAZO_DA_IA_MS);
     var vez = p.vez;
+    /* A resposta crua do turno anterior, quando o ajuste continua a conversa:
+     * o que o modelo só repetiu dela não é pedido novo (normalizarAulas). */
+    var cruAnterior = tipo === 'ajuste' && p.conversa ? p.conversa.cru || null : null;
     pararDitado();
     p.erro = null;
     p.erroAjuste = null;
@@ -28037,7 +28045,7 @@
       p.parar = null;
       if (fluxoPlano !== p || p.vez !== vez) return; // a janela fechou ou outro fluxo abriu
       // no ajuste, o plano de antes decide o pedido mais recente nas listas de aula
-      var lido = Planejamento.lerResposta(resposta, db.alunos.map(function (a) { return a.id; }), tipo === 'ajuste' ? p.plano : null);
+      var lido = Planejamento.lerResposta(resposta, db.alunos.map(function (a) { return a.id; }), tipo === 'ajuste' ? p.plano : null, cruAnterior);
       /* A conversa passou do teto do endpoint (texto ou turnos): recomeça
        * sozinha, com o plano atual como texto e o mesmo pedido de ajuste, em
        * vez de mandar ela encurtar. Uma vez só. */
@@ -28045,7 +28053,7 @@
         p.conversa = null;
         var hoje = Planejamento.hojeEmSaoPaulo();
         pedirPlano(p, Planejamento.pedidoDeAjusteDoSalvo(p.plano, textoDoAjuste, { alunos: alunosParaIA(hoje), hoje: hoje,
-          aulasDaAgenda: agendaParaIA(p.plano.alunoId, p.plano.periodo.inicio) }), 'ajuste', textoDoAjuste, true);
+          aulasDaAgenda: agendaParaIA(alunoConfirmado(p.plano), p.plano.periodo.inicio) }), 'ajuste', textoDoAjuste, true);
         return;
       }
       if (lido.erro) {
@@ -28064,12 +28072,20 @@
         return;
       }
       if (lido.uso) p.uso.push(lido.uso);
-      p.conversa = { pedido: corpoDoPedido, conteudo: lido.conteudo };
+      p.conversa = { pedido: corpoDoPedido, conteudo: lido.conteudo, cru: lido.cru };
       /* O que ela escolheu na prévia (o aluno, Aluna ou Aluno) vale nos
        * ajustes seguintes; senão, o aluno da ficha vale mais que o palpite. */
       if (p.alunoEscolhido) { lido.plano.alunoId = p.alunoEscolhido; lido.plano.confiancaAluno = 'alta'; }
       else if (p.alunoFixoId) { lido.plano.alunoId = p.alunoFixoId; lido.plano.confiancaAluno = 'alta'; }
       if (p.tratamentoEscolhido) lido.plano.tratamento = p.tratamentoEscolhido;
+      /* Com o aluno certo, a agenda dele no período arruma as listas: a
+       * remoção num dia sem aula sai, e a extra sem hora não apaga a hora da
+       * aula da agenda. Sem o aluno confirmado, as listas ficam como vieram. */
+      var alunoDaAgenda = alunoConfirmado(lido.plano);
+      if (alunoDaAgenda) {
+        lido.plano = Planejamento.normalizarAulas(lido.plano, null,
+          aulasDoAlunoNoPeriodo(alunoDaAgenda, lido.plano.periodo.inicio, lido.plano.periodo.fim));
+      }
       if (tipo === 'ajuste') {
         p.planoAnterior = p.plano;
         p.mudou = Planejamento.resumoDaMudanca(p.plano, lido.plano);
@@ -28233,9 +28249,13 @@
         var t = campoAjuste.value.trim();
         if (!t) { avisar('Escreva ou dite o que mudar.'); campoAjuste.focus(); return; }
         var corpoDoAjuste;
-        // as aulas da agenda vão no turno novo: é delas que ela pede para tirar uma da folha
-        var agenda = agendaParaIA(pl.alunoId, pl.periodo.inicio);
-        if (p.conversa) corpoDoAjuste = Planejamento.pedidoDeAjuste(p.conversa, t, agenda);
+        /* as aulas da agenda vão no turno novo: é delas que ela pede para tirar
+         * uma da folha. Só do aluno confirmado: com o palpite de confiança
+         * baixa, a agenda de outro aluno não sai. E o plano como está na
+         * folha vai junto, porque a resposta crua da conversa pode mostrar
+         * listas que o app arrumou. */
+        var agenda = agendaParaIA(alunoConfirmado(pl), pl.periodo.inicio);
+        if (p.conversa) corpoDoAjuste = Planejamento.pedidoDeAjuste(p.conversa, t, agenda, pl);
         else {
           var hoje = Planejamento.hojeEmSaoPaulo();
           corpoDoAjuste = Planejamento.pedidoDeAjusteDoSalvo(pl, t, { alunos: alunosParaIA(hoje), hoje: hoje, aulasDaAgenda: agenda });

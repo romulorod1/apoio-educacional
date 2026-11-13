@@ -145,8 +145,11 @@
     '- "feriados": as datas de feriado ou de dia sem aula na escola que o aviso ou o pedido citam. Vazio se não há.',
     '',
     'Ajustes: depois do primeiro plano, ela pode pedir mudanças ("põe Geografia no dia 21", "tira a aula com a Nath do dia 20", "põe aula com a Nath no dia 21 às 10h"). Devolva o plano INTEIRO de novo, mudando só o que ela pediu. Tirar ou pôr aula com a Nath é com "aulasRemovidas" e "aulasExtras" (regra 5).',
+    'Quando a mensagem traz "Plano atual, como está na folha", parta dele: é o estado que vale, mesmo onde a sua resposta anterior diz outra coisa (o aplicativo arruma as listas de aula e guarda o que ela escolheu na tela).',
     'Observações: frases curtas, só o que ela precisa conferir. Nada de explicar o que você fez.'
   ].join('\n');
+
+  var PLANO_ATUAL = 'Plano atual, como está na folha (é este que vale):';
 
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
@@ -284,13 +287,19 @@
    * vão por referência. */
   /* `aulasDaAgenda` (opcional): as aulas da agenda no período do plano, que
    * vão no turno novo, para o modelo saber o que pode tirar da folha. */
-  function pedidoDeAjuste(conversa, texto, aulasDaAgenda) {
+  /* `planoAtual` (opcional): o plano como está na folha (arrumado por
+   * normalizarAulas, e com o aluno e o Aluna ou Aluno que ela escolheu). A
+   * resposta do modelo vai intacta no turno dele, e por isso pode mostrar
+   * listas que o app arrumou (a remoção que venceu o "Aula com a Nath?", a
+   * extra que saiu): o estado que vale vai no turno novo, antes do pedido. */
+  function pedidoDeAjuste(conversa, texto, aulasDaAgenda, planoAtual) {
     if (!conversa || !conversa.pedido || !Array.isArray(conversa.conteudo)) throw new Error('conversa inválida');
     var p = conversa.pedido;
     var mensagens = p.messages.slice();
     mensagens.push({ role: 'assistant', content: conversa.conteudo });
     var bloco = blocoDasAulas(aulasDaAgenda);
-    mensagens.push({ role: 'user', content: [{ type: 'text', text: (bloco ? bloco + '\n\n' : '') +
+    var atual = planoAtual && typeof planoAtual === 'object' ? PLANO_ATUAL + '\n' + JSON.stringify(comListasDeAulas(planoAtual)) + '\n\n' : '';
+    mensagens.push({ role: 'user', content: [{ type: 'text', text: (bloco ? bloco + '\n\n' : '') + atual +
       'Ajuste pedido pela professora: ' + String(texto || '').trim() + '\nDevolva o plano inteiro, mudando só o que ela pediu.' }] });
     return { rota: p.rota, system: p.system, formato: p.formato, esforco: p.esforco, max_tokens: p.max_tokens, messages: mensagens };
   }
@@ -394,7 +403,15 @@
    *     é a nova a extra sai; senão ficam as duas, que é a troca de horário:
    *     a folha mostra a extra).
    * Devolve um plano novo; o recebido não muda. */
-  function normalizarAulas(plano, anterior) {
+  /* `anteriorCru` (opcional): a resposta CRUA do modelo no turno anterior da
+   * conversa, antes da arrumação. Uma data em conflito que o modelo só
+   * REPETIU (as mesmas listas, a mesma hora que ele já tinha dito) não é
+   * pedido novo: ela fica como a folha mostrava (o `anterior` arrumado).
+   * `aulasDaAgenda` (opcional, [{ data, hora }] do aluno): com ela, a remoção
+   * num dia sem aula na agenda sai (não tira nada da folha, e o resumo diria
+   * que saiu uma aula que não existe), e a extra sem hora num dia que já tem
+   * aula na agenda também (ela apagaria a hora da aula). */
+  function normalizarAulas(plano, anterior, aulasDaAgenda, anteriorCru) {
     var c = comListasDeAulas(plano);
     var per = c.periodo || {};
     var dentro = function (d) { return dataValida(d) && d >= per.inicio && d <= per.fim; };
@@ -404,6 +421,27 @@
     c.aulasExtras.forEach(function (a) { if (a && dentro(a.data)) ext[a.data] = horaValida(a.hora); });
     var conf = Array.isArray(c.aulaAConfirmar) ? c.aulaAConfirmar.slice() : [];
     var ant = anterior ? comListasDeAulas(anterior) : null;
+    /* O que o modelo disse de uma data: em quais listas ela está, e a hora. */
+    var marca = function (pl, d) {
+      if (!pl) return null;
+      var x = (Array.isArray(pl.aulasExtras) ? pl.aulasExtras : []).filter(function (a) { return a && a.data === d; });
+      return [(Array.isArray(pl.aulasRemovidas) ? pl.aulasRemovidas : []).indexOf(d) >= 0, x.length ? String(horaValida(x[x.length - 1].hora)) : '-',
+        (Array.isArray(pl.aulaAConfirmar) ? pl.aulaAConfirmar : []).indexOf(d) >= 0].join('|');
+    };
+    if (ant && anteriorCru && typeof anteriorCru === 'object') {
+      var datas = {};
+      rem.concat(Object.keys(ext), conf).forEach(function (d) { datas[d] = (datas[d] || 0) + 1; });
+      Object.keys(datas).forEach(function (d) {
+        if (datas[d] < 2 || marca(c, d) !== marca(anteriorCru, d)) return;
+        // só repetiu: volta ao que a folha mostrava nesse dia
+        rem = rem.filter(function (x) { return x !== d; });
+        delete ext[d];
+        conf = conf.filter(function (x) { return x !== d; });
+        if ((ant.aulasRemovidas || []).indexOf(d) >= 0) rem.push(d);
+        (ant.aulasExtras || []).forEach(function (a) { if (a && a.data === d) ext[d] = horaValida(a.hora); });
+        if ((ant.aulaAConfirmar || []).indexOf(d) >= 0) conf.push(d);
+      });
+    }
     var antes = function (lista, d) {
       if (!ant) return false;
       if (lista === 'rem') return (ant.aulasRemovidas || []).indexOf(d) >= 0;
@@ -426,6 +464,12 @@
     rem.slice().forEach(function (d) { if (conf.indexOf(d) >= 0) resolver(d, 'rem', 'conf', 'conf'); });
     Object.keys(ext).forEach(function (d) { if (conf.indexOf(d) >= 0) resolver(d, 'ext', 'conf', 'conf'); });
     rem.slice().forEach(function (d) { if (d in ext && antes('ext', d) && !antes('rem', d)) delete ext[d]; });
+    if (Array.isArray(aulasDaAgenda)) {
+      var naAgenda = {};
+      aulasDaAgenda.forEach(function (a) { if (a && dataValida(a.data)) naAgenda[a.data] = true; });
+      rem = rem.filter(function (d) { return naAgenda[d]; });
+      Object.keys(ext).forEach(function (d) { if (ext[d] === null && naAgenda[d] && rem.indexOf(d) < 0) delete ext[d]; });
+    }
     c.aulasRemovidas = rem.sort();
     c.aulasExtras = Object.keys(ext).sort().map(function (d) { return { data: d, hora: ext[d] }; });
     c.aulaAConfirmar = conf;
@@ -451,7 +495,10 @@
     });
     (Array.isArray(plano.aulasExtras) ? plano.aulasExtras : []).forEach(function (a) {
       if (!a || !noPeriodo(a.data)) return;
-      aulas[a.data] = horaValida(a.hora) || '';
+      var h = horaValida(a.hora) || '';
+      // a extra sem hora num dia que já tem aula não apaga a hora da aula
+      if (!h && aulas[a.data]) return;
+      aulas[a.data] = h;
     });
     var aConfirmar = {};
     (plano.aulaAConfirmar || []).forEach(function (d) { if (noPeriodo(d) && !(d in aulas)) aConfirmar[d] = true; });
@@ -462,7 +509,10 @@
    * ou { ok: false, codigo }). Devolve { plano, conteudo, uso } ou { erro, motivo }. */
   /* `anterior` (opcional): o plano de antes, num ajuste; decide o pedido mais
    * recente quando uma data cai em duas listas de aula (normalizarAulas). */
-  function lerResposta(resposta, idsDeAlunos, anterior) {
+  /* `anteriorCru` (opcional): a resposta crua do turno anterior da conversa
+   * (o `cru` que esta função devolve), para normalizarAulas saber o que o
+   * modelo só repetiu. Devolve também `cru`, o plano como o modelo escreveu. */
+  function lerResposta(resposta, idsDeAlunos, anterior, anteriorCru) {
     if (!resposta || typeof resposta !== 'object') return { erro: 'resposta_vazia' };
     if (resposta.ok !== true) return { erro: resposta.codigo || 'interno' };
     var r = resposta.resposta || {};
@@ -478,7 +528,7 @@
     try { plano = JSON.parse(texto); } catch (e) { return { erro: 'sem_plano', motivo: 'JSON inválido' }; }
     var problema = conferirPlano(plano, idsDeAlunos);
     if (problema) return { erro: 'plano_invalido', motivo: problema };
-    return { plano: normalizarAulas(plano, anterior || null), conteudo: blocos, uso: r.usage || null };
+    return { plano: normalizarAulas(plano, anterior || null, null, anteriorCru || null), cru: plano, conteudo: blocos, uso: r.usage || null };
   }
 
   /* As frases curtas da tela para cada código do endpoint e daqui. */
