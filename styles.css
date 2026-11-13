@@ -4336,11 +4336,23 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .ass-opcao-dinheiro { font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
 .ass-campo-rascunho { display: flex; flex-direction: column; gap: 4px; margin: 0; }
 .ass-campo-rascunho span { font-size: var(--letra-14); color: var(--muted); }
-.ass-rascunho { width: 100%; box-sizing: border-box; min-height: 72px; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 10px; resize: vertical; }
+.ass-rascunho { width: 100%; box-sizing: border-box; min-height: 72px; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 10px; resize: vertical; max-height: 40vh; overflow-y: auto; }
 .ass-fichas-rotulo { margin: 0; font-size: var(--letra-14); color: var(--muted); }
 .ass-fichas { display: flex; flex-wrap: wrap; gap: 6px; }
 .ass-ficha { min-height: 48px; white-space: normal; text-align: left; max-width: 100%; }
-.ass-confirmar { justify-content: flex-end; }
+/* O Confirmar fica à vista: preso ao pé da área que rola enquanto o cartão
+ * está na tela (padrão 3). O fundo cobre o que passa por baixo. */
+.ass-confirmar {
+  justify-content: flex-end; position: sticky; bottom: 0; z-index: 1;
+  margin: 0 -12px -12px; padding: 8px 12px 12px; background: var(--branco);
+  border-top: 1px solid var(--fio); border-radius: 0 0 12px 12px;
+}
+/* O texto que já estava: à parte, só para ler; o novo vem depois, destacado. */
+.ass-texto-antigo { background: var(--soft); border-radius: 8px; padding: 6px 10px; max-height: 30vh; overflow-y: auto; }
+.ass-texto-antigo p { margin: 2px 0 0; font-size: var(--letra-14); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ass-campo-rascunho span.ass-texto-antigo-rotulo, .ass-campo-rascunho span.ass-texto-novo-rotulo { font-size: var(--letra-14); }
+.ass-campo-rascunho span.ass-texto-novo-rotulo { color: var(--navy); font-weight: 600; }
+.ass-campo-rascunho.com-antigo .ass-rascunho { border: 2px solid var(--navy); }
 .ass-confirmar .btn { min-height: 48px; }
 .ass-estado { margin: 0; font-size: var(--letra-14); color: var(--muted); }
 /* ==================== assistente (fim) ==================== */

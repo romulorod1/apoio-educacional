@@ -331,11 +331,19 @@
       var p = partes[0] || 'Aluno';
       nomes[a.id] = porPrimeiro[p.toLowerCase()] > 1 && partes[1] ? p + ' ' + partes[1].charAt(0).toUpperCase() + '.' : p;
     });
+    /* Nome completo idêntico (dois "Marina Sintética" ativos): o nome com o
+     * número da ordem, "(1)" e "(2)", para os rótulos nunca coincidirem. */
+    var cheios = {}, ordemDoCheio = {};
+    lista.forEach(function (a) { var k = semAcento(String(a.nome || '').trim()); cheios[k] = (cheios[k] || 0) + 1; });
+    lista.forEach(function (a) {
+      var k = semAcento(String(a.nome || '').trim());
+      if (cheios[k] > 1) { ordemDoCheio[k] = (ordemDoCheio[k] || 0) + 1; nomes[a.id] = (String(a.nome || '').trim() || 'Aluno') + ' (' + ordemDoCheio[k] + ')'; }
+    });
     var vistos = {};
     lista.forEach(function (a) {
       var n = nomes[a.id];
       if (vistos[n]) nomes[a.id] = String(a.nome || '').trim();
-      vistos[n] = true;
+      vistos[nomes[a.id]] = true;
     });
     return nomes;
   }
@@ -729,10 +737,13 @@
     /* Só o artigo do começo sai ("a Marina", "o Tomás"); a inicial do meio
      * fica ("Ana O." é Ana Oliveira). Cada palavra depois do primeiro nome
      * tem de começar alguma parte do nome ("Ana Silva" é Ana da Silva). */
-    var palavras = semAcento(nomeDito).replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean);
+    /* O rótulo exato da lista ("Ana S.", "Marina Sintética (2)") é sempre
+     * inequívoco: é o que ela leu ou o que o modelo copiou da lista. */
+    var limpo = function (s) { return semAcento(s).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(); };
+    if (limpo(nomeDito) && limpo(nomeDito) === limpo(nomes[aluno.id])) return aluno;
+    var palavras = limpo(nomeDito).split(' ').filter(Boolean);
     if (palavras.length > 1 && (palavras[0] === 'a' || palavras[0] === 'o')) palavras.shift();
-    if (!palavras.length) return aluno;
-    var cands = ativos(ctx.db).filter(function (a) {
+    var cands = !palavras.length ? [] : ativos(ctx.db).filter(function (a) {
       var partes = semAcento(a.nome).split(/\s+/);
       return partes[0] === palavras[0] && palavras.slice(1).every(function (p) {
         return partes.slice(1).some(function (q) { return q.indexOf(p) === 0; });
@@ -742,6 +753,12 @@
       falha('ambiguo: "' + nomeDito + '" serve para ' + cands.map(function (a) { return nomes[a.id]; }).join(' e ') + '. Pergunte a ela qual, sem propor.');
     }
     if (cands.length === 1 && cands[0].id !== aluno.id) falha('o nome dito ("' + nomeDito + '") é de ' + nomes[cands[0].id] + ', e não de ' + nomes[aluno.id] + '. Confira o id.');
+    /* Nome dito vazio ou que não casa com ninguém (ditado trocado): só vale
+     * o id se nenhum outro ativo tiver o mesmo primeiro nome do aluno. */
+    if (!cands.length) {
+      var mesmo = ativos(ctx.db).filter(function (a) { return a.id !== aluno.id && semAcento(primeiroNome(a.nome)) === semAcento(primeiroNome(aluno.nome)); });
+      if (mesmo.length) falha('ambiguo: o nome dito ("' + (nomeDito || '') + '") não diz qual de ' + [aluno].concat(mesmo).map(function (a) { return nomes[a.id]; }).join(' e ') + '. Pergunte a ela qual, sem propor.');
+    }
     return aluno;
   }
 
@@ -766,6 +783,9 @@
         (doDia.length ? ' Nesse dia: ' + lista(doDia) + '.' : ' Nesse dia não há aula dele. Confira o dia com listar_aulas ou proximas_aulas e pergunte a ela.'));
     }
     if (cand.length > 1) falha('ambiguo: ' + nomes[aluno.id] + ' tem ' + cand.length + ' aulas em ' + rotuloDoDia(data, ctx.hoje) + ': ' + lista(cand) + '. Pergunte qual.');
+    /* A repetição prevista longe demais lançaria meses de aulas de todos os
+     * alunos no Confirmar (lente de dados, A4): até 12 meses de hoje. */
+    if (cand[0].prevista && data > somaDias(ctx.hoje, 366)) falha('a aula de ' + rotuloDoDia(data, ctx.hoje) + ' está a mais de 12 meses de hoje: mude essa aula na tela do aplicativo.');
     return cand[0];
   }
 
@@ -780,7 +800,7 @@
     return op;
   }
   function chaveDaOp(op) {
-    if (op.k === 'criar') return null;
+    if (op.k === 'criar') return 'criar:' + op.campos.alunoId + ':' + op.campos.data + ':' + op.campos.hora;
     if (op.k === 'feedback') return 'feedback:' + op.alunoId + ':' + op.mes;
     return op.aulaId ? 'aula:' + op.aulaId : 'serie:' + op.serieId + '@' + op.data;
   }
@@ -804,6 +824,20 @@
    * Primeiro lança as repetições que faltam e acha TODAS as aulas; se alguma
    * sumiu, lança erro antes de mudar qualquer aula (o app.js então volta o
    * banco ao retrato de antes). Devolve as trilhas que mexeram. */
+  /* Até que mês lançar as repetições antes de mexer: o da aula prevista e
+   * também o de DESTINO de um remarcar. Sem o destino, a aula movida para um
+   * dia da própria série num mês ainda não lançado ocupava a data, e o
+   * lançamento depois pulava a aula fixa daquele dia (a lente de dados, A1).
+   * Lançar antes é o que o tablet faz ao navegar até o mês. */
+  function mesesALancar(ops) {
+    var meses = [];
+    ops.forEach(function (o) {
+      if (o.materializar) meses.push(o.materializar);
+      if (o.k === 'editar' && o.mudancas && o.mudancas.data) meses.push(String(o.mudancas.data).slice(0, 7));
+    });
+    meses.sort();
+    return meses.length ? meses[meses.length - 1] : null;
+  }
   function aplicarPlano(db, ops, Core, fns) {
     fns = fns || {};
     var aplicarSo = fns.aplicarSo || function (id, m) { Core.aplicarEdicaoAula(db, id, m, 'esta'); };
@@ -812,8 +846,8 @@
     var criar = fns.criar || function (c) { db.aulas.push(aulaNova(Core, c)); };
     var assunto = fns.assunto || function (aula, item) { aula.temas = Core.temasDaAula(aula); aula.temas.push(item); delete aula.tema; return true; };
     var feedback = fns.feedback || function (alunoId, mes, texto) { Core.gravarTextoDoMes(db, alunoId, mes, texto); };
-    var meses = ops.map(function (o) { return o.materializar; }).filter(Boolean).sort();
-    if (meses.length) Core.garantirSeriesAte(db, meses[meses.length - 1]);
+    var ultimo = mesesALancar(ops);
+    if (ultimo) Core.garantirSeriesAte(db, ultimo);
     var ids = ops.map(function (o) {
       if (o.k !== 'editar' && o.k !== 'relato') return null;
       var a = (db.aulas || []).filter(function (x) { return o.aulaId ? x.id === o.aulaId : x.serieId === o.serieId && x.data === o.data; })[0];
@@ -843,8 +877,8 @@
    * mês de cada aluno e mês atingido, antes e depois, numa CÓPIA do banco. */
   function simular(ctx, ops) {
     var Core = ctx.Core, copia = clonar(ctx.db);
-    var meses = ops.map(function (o) { return o.materializar; }).filter(Boolean).sort();
-    if (meses.length) Core.garantirSeriesAte(copia, meses[meses.length - 1]);
+    var ultimo = mesesALancar(ops);
+    if (ultimo) Core.garantirSeriesAte(copia, ultimo);
     var alvos = {};
     ops.forEach(function (o) {
       if (o.k === 'feedback') return;
@@ -896,21 +930,34 @@
   }
   /* As saídas de um cancelamento: as três com dinheiro diferente, cada uma
    * com o nome que sai no PDF e o efeito no mês. */
+  /* A COBRANÇA NÃO DEPENDE DO PROMPT (lente de dados, 4): "com" e "sem" só
+   * valem se a fala DELA (ctx.fala, o texto da pergunta, nunca o que o modelo
+   * escreve) tem palavra de cobrança. Sem ela, o cancelamento pergunta no
+   * cartão, e a falta e a aula nova ficam com a cobrança padrão. */
+  var PALAVRAS_DE_COBRANCA = /cobr|cortesia|sem custo|de graca|\bpag[oa]\b/;
+  function falouDeCobranca(ctx) { return !!ctx && typeof ctx.fala === 'string' && PALAVRAS_DE_COBRANCA.test(semAcento(ctx.fala)); }
+  function cobrancaDita(v, ctx) { return (v === 'com' || v === 'sem') && falouDeCobranca(ctx) ? v : null; }
+
   function opcaoDeCancelamento(ctx, a, id) {
     var m = id === 'falta' ? { status: 'falta', cobravel: true }
       : { status: 'cancelada', cobravel: id === 'com' };
     var rot = id === 'falta' ? 'Falta sem aviso (cobrada)' : ctx.Core.rotuloDoCancelamento(id === 'com');
     var op = opDeEdicao(a, m);
     var ef = simular(ctx, [op]);
-    return { id: id, rotulo: rot, dinheiro: fraseDoDinheiro(ctx, ef), avisos: avisosDoDinheiro(ctx, ef), op: op };
+    var centavos = ef.reduce(function (t, e) { return t + e.depois - e.antes; }, 0);
+    return { id: id, rotulo: rot, dinheiro: fraseDoDinheiro(ctx, ef), centavos: centavos, avisos: avisosDoDinheiro(ctx, ef), op: op };
   }
 
   var PROPOR_AULA = {
     remarcar: function (it, ctx, aluno, nome) {
       var a = resolverAula(ctx, aluno, it.data, it.hora);
       if (a.status === 'cancelada') falha('a aula de ' + quando(a, ctx) + ' está cancelada. Para ela voltar, use voltar_a_dada; para outra data, criar_aula.');
+      /* A falta já aconteceu (e é cobrada): mover a data apagaria a falta do
+       * dia em que ela foi. Repor é outra aula (lente de dados, A3). */
+      if (a.status === 'falta') falha('a aula de ' + quando(a, ctx) + ' está como falta: ela não muda de data. Para repor, use criar_reposicao; se a falta foi engano, voltar_a_dada.');
       var nd = it.nova_data || a.data, nh = it.nova_hora || a.hora || '';
       exigeData(nd, 'nova_data');
+      if (nd > somaDias(ctx.hoje, 366)) falha('a data nova (' + rotuloDoDia(nd, ctx.hoje) + ') está a mais de 12 meses de hoje: mude essa aula na tela do aplicativo.');
       if (nh && !horaValida(nh)) falha('nova_hora inválida: "' + nh + '". Use HH:MM de 24 horas.');
       if (nd === a.data && nh === (a.hora || '')) falha('a data e a hora novas são as mesmas da aula; pergunte a ela para quando.');
       var dur = Number(a.duracaoMin) || 60;
@@ -939,7 +986,7 @@
     },
     cancelar: function (it, ctx, aluno, nome) {
       var a = resolverAula(ctx, aluno, it.data, it.hora);
-      var cob = it.cobranca === 'com' || it.cobranca === 'sem' ? it.cobranca : 'perguntar';
+      var cob = cobrancaDita(it.cobranca, ctx) || 'perguntar';
       var c = cobravel(a, ctx.Core);
       if (a.status === 'cancelada' && (cob === 'perguntar' || (cob === 'com') === c)) falha('a aula de ' + quando(a, ctx) + ' já está como ' + situacao(a, ctx).toLowerCase() + '.');
       var jaConta = a.status !== 'cancelada' && c && (a.status === 'falta' || jaAcabou(a, ctx) || a.data <= ctx.hoje);
@@ -951,7 +998,7 @@
       };
       if (cob === 'perguntar') {
         var ops = ['sem', 'com'];
-        if (a.data <= ctx.hoje) ops.push('falta');
+        if (a.data <= ctx.hoje && a.status !== 'falta') ops.push('falta');
         base.titulo = 'Cancelar a aula de ' + nome + ', ' + quandoCurto(a.data, a.hora) + ': com ou sem cobrança?';
         base.depois = null;
         base.opcoes = ops.map(function (id) { return opcaoDeCancelamento(ctx, a, id); });
@@ -967,7 +1014,7 @@
     falta: function (it, ctx, aluno, nome) {
       var a = resolverAula(ctx, aluno, it.data, it.hora);
       if (a.data > ctx.hoje) falha('a aula de ' + quando(a, ctx) + ' ainda não aconteceu: para aula futura, use cancelar (com cobranca "perguntar") ou remarcar.');
-      var cobrar = it.cobranca !== 'sem';
+      var cobrar = cobrancaDita(it.cobranca, ctx) !== 'sem';
       if (a.status === 'falta' && cobravel(a, ctx.Core) === cobrar) falha('a aula de ' + quando(a, ctx) + ' já está como falta.');
       return {
         tipo: 'falta', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
@@ -1005,7 +1052,7 @@
     if (typeof dur !== 'number' || Math.floor(dur) !== dur || dur < 15 || dur > 240 || dur % 15) falha('duracao_min precisa ser um múltiplo de 15 entre 15 e 240 minutos.');
     var mesma = aulasDoPeriodo(ctx, it.data, it.data, aluno.id).filter(function (a) { return (a.hora || '') === it.hora && a.status !== 'cancelada'; })[0];
     if (mesma) falha('já existe aula de ' + nome + ' em ' + quando(mesma, ctx) + '.');
-    var cobrar = it.cobranca !== 'sem';
+    var cobrar = cobrancaDita(it.cobranca, ctx) !== 'sem';
     var status = reposicao ? 'reposicao' : 'realizada';
     var op = { k: 'criar', alunoId: aluno.id, data: it.data, campos: { alunoId: aluno.id, data: it.data, hora: it.hora, duracaoMin: dur, status: status, cobravel: cobrar } };
     return {
@@ -1024,14 +1071,13 @@
     if (a.status === 'cancelada') falha('a aula de ' + quando(a, ctx) + ' está cancelada: não tem relato.');
     if (a.prevista) falha('a aula de ' + quando(a, ctx) + ' ainda não foi lançada no aplicativo.');
     var Core = ctx.Core;
-    var junta = function (antes, novo) { antes = String(antes || '').trim(); novo = limparMensagem(novo); return antes && novo ? antes + '\n\n' + novo : antes || novo; };
     var temas = Core.temasDaAula(a);
     var vistos = temas.map(function (t) { return Core.chaveDeBusca(t.titulo || ''); });
     var assuntos = [];
-    (it.assuntos || []).forEach(function (s) {
-      var item = s && s.ref && ctx.catalogo && ctx.catalogo.item(s.ref);
+    (Array.isArray(it.assuntos) ? it.assuntos : []).forEach(function (s) {
+      var item = s && typeof s.ref === 'string' && s.ref && ctx.catalogo && ctx.catalogo.item(s.ref);
       if (!item) {
-        var t = limparMensagem(s && s.titulo).slice(0, 70).trim();
+        var t = limparMensagem(soTexto(s && s.titulo)).slice(0, 70).trim();
         if (!t) return;
         item = { titulo: t, fonte: 'livre' };
       }
@@ -1040,17 +1086,20 @@
       vistos.push(k);
       assuntos.push(item);
     });
-    var validas = {};
+    var validas = Object.create(null);
     (Core.AREAS || []).forEach(function (g) { g.itens.forEach(function (i) { validas[i.id] = i.rotulo; }); });
-    var areas = (it.areas || []).filter(function (id, i, l) { return validas[id] && l.indexOf(id) === i && (a.areas || []).indexOf(id) < 0; });
-    var relato = junta(a.notaTexto, it.relato_familia), nota = junta(a.notaPrivada, it.nota_so_minha);
-    if (relato === String(a.notaTexto || '').trim() && nota === String(a.notaPrivada || '').trim() && !assuntos.length && !areas.length) falha('nada a registrar: o relato veio vazio.');
+    var areas = (Array.isArray(it.areas) ? it.areas : []).filter(function (id, i, l) { return typeof id === 'string' && Object.prototype.hasOwnProperty.call(validas, id) && l.indexOf(id) === i && (a.areas || []).indexOf(id) < 0; });
+    /* O texto NOVO fica separado do que já estava (que nunca muda): o
+     * cartão mostra o antigo à parte e o rascunho só com o novo, com teto. */
+    var relato = limparMensagem(soTexto(it.relato_familia)).slice(0, MAX_TEXTO_NOVO).trim();
+    var nota = limparMensagem(soTexto(it.nota_so_minha)).slice(0, MAX_TEXTO_NOVO).trim();
+    if (!relato && !nota && !assuntos.length && !areas.length) falha('nada a registrar: o relato veio vazio.');
     return {
       tipo: 'relato', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
       titulo: 'Como foi a aula de ' + nome + ', ' + quandoCurto(a.data, a.hora),
       antes: null, depois: null, dinheiro: null,
-      avisos: [String(a.notaTexto || '').trim() || String(a.notaPrivada || '').trim() ? 'Já havia registro nesta aula: o texto de antes fica no começo.' : null],
-      editavel: { relato: relato, nota: nota, assuntos: assuntos, areas: areas.map(function (id) { return { id: id, rotulo: validas[id] }; }) },
+      avisos: [String(a.notaTexto || '').trim() || String(a.notaPrivada || '').trim() ? 'Já havia registro nesta aula: ele continua, e o novo entra depois.' : null],
+      editavel: { relatoAntes: a.notaTexto || '', relato: relato, notaAntes: a.notaPrivada || '', nota: nota, max: MAX_TEXTO_NOVO, assuntos: assuntos, areas: areas.map(function (id) { return { id: id, rotulo: validas[id] }; }) },
       op: { k: 'relato', aulaId: a.id, alunoId: aluno.id, data: a.data, status: a.status || 'realizada',
         notaTextoAntes: a.notaTexto || '', notaPrivadaAntes: a.notaPrivada || '' }
     };
@@ -1060,10 +1109,19 @@
    * os assuntos e as áreas que ficaram marcados). Igual ao "Registrar como
    * foi" do celular: a situação de agora e o relato; a nota só dela só entra
    * se mudou. */
+  /* O texto antigo fica EXATAMENTE como estava, e o novo (com o teto)
+   * entra depois de uma linha em branco. Sem novo, fica só o antigo. */
+  var MAX_TEXTO_NOVO = 2000, MAX_FEEDBACK_NOVO = 3000;
+  function soTexto(v) { return typeof v === 'string' ? v : ''; }
+  function juntarAoAntigo(antes, novo, max) {
+    antes = String(antes || ''); novo = String(novo || '').slice(0, max || MAX_TEXTO_NOVO).trim();
+    if (!novo) return antes;
+    return antes.trim() ? antes + '\n\n' + novo : novo;
+  }
   function opDoRelato(l, ed) {
     var o = l.op, e = ed || {};
-    var relato = typeof e.relato === 'string' ? e.relato : l.editavel.relato;
-    var nota = typeof e.nota === 'string' ? e.nota : l.editavel.nota;
+    var relato = juntarAoAntigo(l.editavel.relatoAntes, typeof e.relato === 'string' ? e.relato : l.editavel.relato);
+    var nota = juntarAoAntigo(l.editavel.notaAntes, typeof e.nota === 'string' ? e.nota : l.editavel.nota);
     var m = { status: o.status, notaTexto: relato };
     if (nota !== o.notaPrivadaAntes) m.notaPrivada = nota;
     return { k: 'relato', aulaId: o.aulaId, alunoId: o.alunoId, data: o.data, mudancas: m,
@@ -1075,15 +1133,15 @@
     var aluno = alunoInequivoco(ctx, e.alunoId, e.nome_dito);
     exigeMes(e.mes);
     var nome = nomesParaIA(ctx.db)[aluno.id];
-    var texto = limparMensagem(e.texto);
+    var texto = limparMensagem(soTexto(e.texto)).slice(0, MAX_FEEDBACK_NOVO).trim();
     if (!texto) falha('o texto do feedback está vazio.');
-    var antes = String(ctx.Core.textoDoMes(ctx.db, aluno.id, e.mes) || '').trim();
+    var antes = String(ctx.Core.textoDoMes(ctx.db, aluno.id, e.mes) || '');
     return {
       tipo: 'feedback', alunoId: aluno.id, nome: nome, entendido: rotuloDoMes(e.mes) + ', ' + nome,
       titulo: 'Feedback de ' + rotuloDoMes(e.mes) + ' de ' + nome,
       antes: null, depois: null, dinheiro: null,
-      avisos: [antes ? 'Já havia um feedback deste mês: o texto de antes fica no começo.' : null].filter(Boolean),
-      editavel: { feedback: antes ? antes + '\n\n' + texto : texto },
+      avisos: [antes.trim() ? 'Já havia um feedback deste mês: ele continua, e o novo entra depois.' : null].filter(Boolean),
+      editavel: { feedbackAntes: antes, feedback: texto, max: MAX_FEEDBACK_NOVO },
       op: { k: 'feedback', alunoId: aluno.id, mes: e.mes }
     };
   }
@@ -1131,7 +1189,7 @@
       var linhas = e.itens.map(function (cru, i) {
         try {
           if (!cru || typeof cru !== 'object') falha('item inválido.');
-          var it = Object.assign({}, cru, { hora: semNulo(cru.hora), assuntos: (cru.assuntos || []).map(function (s) { return Object.assign({}, s, { ref: semNulo(s && s.ref) }); }) });
+          var it = Object.assign({}, cru, { hora: semNulo(typeof cru.hora === 'string' ? cru.hora : ''), assuntos: (Array.isArray(cru.assuntos) ? cru.assuntos : []).map(function (s) { return s && typeof s === 'object' ? Object.assign({}, s, { ref: semNulo(s.ref) }) : null; }) });
           var aluno = alunoInequivoco(ctx, it.alunoId, it.nome_dito);
           return proporRelato(it, ctx, aluno, nomesParaIA(ctx.db)[aluno.id]);
         } catch (x) {
@@ -1162,7 +1220,8 @@
   /* O cartão de uma pergunta: todas as linhas propostas nela, e as chamadas
    * que as geraram (o Confirmar as confere de novo contra o banco de agora:
    * se alguma coisa mudou, não grava). */
-  function conferirDeNovo(chamadas, ctx) {
+  function conferirDeNovo(chamadas, ctx, fala) {
+    ctx = Object.assign({}, ctx, { fala: typeof fala === 'string' ? fala : '' });
     var linhas = [];
     chamadas.forEach(function (c) {
       var r = PROPOSTAS[c.nome](c.entrada, ctx, linhas);
@@ -1173,7 +1232,7 @@
   /* A assinatura do que o cartão mostra e grava: muda se a agenda mudou. */
   function assinatura(linhas) {
     return JSON.stringify(linhas.map(function (l) {
-      return [l.titulo, l.antes, l.depois, l.dinheiro, l.op || null, (l.opcoes || []).map(function (o) { return [o.id, o.dinheiro, o.op]; }), l.editavel || null];
+      return [l.titulo, l.antes, l.depois, l.dinheiro, l.avisos || [], l.op || null, (l.opcoes || []).map(function (o) { return [o.id, o.dinheiro, o.avisos || [], o.op]; }), l.editavel || null];
     }));
   }
 
@@ -1197,7 +1256,7 @@
       else if (l.op.k === 'feedback') {
         var txt = e.edicao && e.edicao[i] && typeof e.edicao[i].feedback === 'string' ? e.edicao[i].feedback : l.editavel.feedback;
         if (!String(txt).trim()) return { falta: 'texto' };
-        ops.push({ k: 'feedback', alunoId: l.op.alunoId, mes: l.op.mes, texto: txt });
+        ops.push({ k: 'feedback', alunoId: l.op.alunoId, mes: l.op.mes, texto: juntarAoAntigo(l.editavel.feedbackAntes, txt, MAX_FEEDBACK_NOVO) });
       } else ops.push(l.op);
     }
     return { ops: ops };
@@ -1303,7 +1362,8 @@
     sessao.mensagens.push({ role: 'user', content: [{ type: 'text', text: partes.join('\n') }] });
     var usos = [], cartoes = [], entendido = [], voltas = 0, recomecou = false;
     var linhas = [], chamadas = [];
-    function proposta() { return linhas.length ? { linhas: linhas, chamadas: chamadas, assinatura: assinatura(linhas) } : null; }
+    var ctxDaFala = Object.assign({}, ctx, { fala: pergunta });
+    function proposta() { return linhas.length ? { linhas: linhas, chamadas: chamadas, fala: pergunta, assinatura: assinatura(linhas) } : null; }
 
     function desfazer() { sessao.mensagens.length = inicio; }
     function volta() {
@@ -1328,7 +1388,7 @@
         }
         if (voltas >= MAX_VOLTAS) { desfazer(); return { erro: 'voltas', usos: usos, voltas: voltas }; }
         var resultados = lido.chamadas.map(function (c) {
-          var r = executar(c.name, c.input, ctx, linhas);
+          var r = executar(c.name, c.input, ctxDaFala, linhas);
           if (r.linhas) { linhas = linhas.concat(r.linhas); chamadas.push({ nome: c.name, entrada: c.input }); }
           if (r.cartao) cartoes.push(r.cartao);
           r.entendido.forEach(function (t) { if (entendido.indexOf(t) < 0) entendido.push(t); });

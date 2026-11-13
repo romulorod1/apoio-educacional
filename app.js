@@ -28657,7 +28657,7 @@
    * que no celular é ação declarada (D6b). Estados: aberto, gravando, feito,
    * desfeito, recusado (Agora não), mudou (a agenda mudou desde a proposta). */
   var FRASE_DO_ESTADO = {
-    feito: 'Gravado. Para voltar, toque em Desfazer no aviso.',
+    feito: 'Gravado. O aviso de baixo traz o Desfazer por alguns segundos.',
     desfeito: 'Desfeito: ficou como estava antes.',
     recusado: 'Nada foi gravado.',
     mudou: 'A agenda mudou desde a proposta, e nada foi gravado. Pergunte de novo.',
@@ -28704,7 +28704,11 @@
     if (doConjunto) {
       var base = linhas[comPergunta[0]].opcoes.filter(function (o) { return o.id !== 'falta'; });
       caixa.appendChild(el('p', { class: 'ass-pergunta-conjunto', texto: 'Cobrança das ' + comPergunta.length + ' aulas canceladas:' }));
-      caixa.appendChild(escolhas([{ id: 'sem', rotulo: 'Sem cobrança para todas', dinheiro: 'saem do valor do mês' }, { id: 'com', rotulo: 'Cobrar todas', dinheiro: 'ficam no valor do mês' }].filter(function (o) {
+      /* Os reais de cada escolha somam as saídas das linhas (o core, em
+       * centavos, de cada uma); não há meio de dizer "o valor" sem o número. */
+      var soma = function (id) { return comPergunta.reduce(function (t, k) { var o = linhas[k].opcoes.filter(function (x) { return x.id === id; })[0]; return t + (o ? o.centavos || 0 : 0); }, 0); };
+      var fraseDaSoma = function (id) { var v = soma(id); return !v ? 'O valor dos meses não muda.' : (v < 0 ? 'Saem ' : 'Entram ') + dinheiro(Math.abs(v) / 100) + ' do valor dos meses.'; };
+      caixa.appendChild(escolhas([{ id: 'sem', rotulo: 'Sem cobrança para todas', dinheiro: fraseDaSoma('sem') }, { id: 'com', rotulo: 'Cobrar todas', dinheiro: fraseDaSoma('com') }].filter(function (o) {
         return base.some(function (b) { return b.id === o.id; });
       }), c.escolhaDoConjunto, function (id) { c.escolhaDoConjunto = id; }, 'Cobrança das aulas canceladas'));
     }
@@ -28738,13 +28742,27 @@
       if (l.dinheiro) bloco.appendChild(el('p', { class: 'ass-dinheiro', texto: l.dinheiro }));
       (l.avisos || []).forEach(function (a) { bloco.appendChild(el('p', { class: 'ass-aviso', texto: a })); });
       if (l.opcoes && !doConjunto) bloco.appendChild(escolhas(l.opcoes, c.escolha[i], function (id) { c.escolha[i] = id; }, 'Como fica a aula'));
+      if (l.opcoes && doConjunto) bloco.appendChild(el('p', { class: 'ass-dinheiro', texto: l.opcoes.filter(function (o) { return o.id !== 'falta'; }).map(function (o) { return o.rotulo + ': ' + o.dinheiro.replace(/\.$/, '').toLowerCase(); }).join('; ') + '.' }));
       if (l.editavel) {
         var ed = c.edicao[i] = c.edicao[i] || {};
+        /* O texto que já estava aparece à parte, só para ler (ele nunca muda);
+         * o campo traz só o NOVO, que entra depois dele. O campo cresce com o
+         * texto até um teto, e tem o limite de tamanho do assistente. */
         var area = function (chave, rotulo, id) {
-          var t = el('textarea', { class: 'ass-rascunho', id: id, rows: '3', 'aria-label': rotulo, disabled: aberto ? null : 'disabled' });
+          var antigo = String(l.editavel[chave + 'Antes'] || '');
+          var t = el('textarea', { class: 'ass-rascunho', id: id, rows: '2', 'aria-label': rotulo + (antigo.trim() ? ', o texto novo' : ''),
+            maxlength: String(l.editavel.max || 2000), disabled: aberto ? null : 'disabled' });
           t.value = typeof ed[chave] === 'string' ? ed[chave] : l.editavel[chave];
-          t.addEventListener('input', function () { ed[chave] = t.value; atualizar(); });
-          return el('label', { class: 'campo ass-campo-rascunho' }, [el('span', { texto: rotulo }), t]);
+          var crescer = function () { t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight + 2, Math.round(window.innerHeight * 0.4)) + 'px'; };
+          t.addEventListener('input', function () { ed[chave] = t.value; crescer(); atualizar(); });
+          setTimeout(crescer, 0);
+          var filhos = [el('span', { texto: rotulo })];
+          if (antigo.trim()) {
+            filhos.push(el('div', { class: 'ass-texto-antigo', 'data-antigo': chave }, [el('span', { class: 'ass-texto-antigo-rotulo', texto: 'Já estava (fica como está):' }), el('p', { texto: antigo })]));
+            filhos.push(el('span', { class: 'ass-texto-novo-rotulo', texto: 'Novo, entra depois:' }));
+          }
+          filhos.push(t);
+          return el('label', { class: 'campo ass-campo-rascunho' + (antigo.trim() ? ' com-antigo' : '') }, filhos);
         };
         if (l.op.k === 'feedback') bloco.appendChild(area('feedback', 'Feedback para a família (pode editar)', 'ass-feedback-' + n + '-' + i));
         else {
@@ -28841,7 +28859,7 @@
     c.estado = 'gravando';
     if (botao) botao.disabled = true;
     var linhas = null;
-    try { linhas = Assistente.conferirDeNovo(c.chamadas, contextoDoAssistente()); } catch (e) { linhas = null; }
+    try { linhas = Assistente.conferirDeNovo(c.chamadas, contextoDoAssistente(), c.fala); } catch (e) { linhas = null; }
     if (!linhas || Assistente.assinatura(linhas) !== c.assinatura) { c.estado = 'mudou'; desenharAssistente(); anunciar(FRASE_DO_ESTADO.mudou); return; }
     var r = Assistente.opsConfirmadas(linhas, c);
     if (!r.ops) { c.estado = 'aberto'; desenharAssistente(); return; }
@@ -28857,9 +28875,18 @@
     try {
       p = modoCelular ? comoAcaoDoCelular(fazer) : fazer();
     } catch (e) {
-      // nada foi guardado: a falha veio antes da gravação; a memória volta ao retrato
+      /* Nada foi guardado: a falha veio antes da gravação. A memória volta ao
+       * retrato com a MESMA limpeza do Desfazer do comDesfazer (os painéis
+       * abertos podiam apontar para o banco trocado: as janelas embaixo
+       * fecham, como no fecharTudo), e a do assistente fica, com o cartão
+       * dizendo que não gravou. */
       db = retrato;
       c.estado = 'erro';
+      mapeamentoEmEdicao = null;
+      if (editorAtual) { editorAtual.destruir(); editorAtual = null; }
+      $$('.fundo-modal.aberto').forEach(function (m) { if (m.id !== 'modal-assistente') fecharModal(m.id); });
+      aulaEmEdicao = null; alunoEmEdicao = null; painelTrilhasAtivo = null;
+      desenharTudo();
       desenharAssistente();
       anunciar(FRASE_DO_ESTADO.erro);
       return;

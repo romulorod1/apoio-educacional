@@ -220,7 +220,7 @@ async function transbordo(pag, raizSel) {
   const depoisRemarcar = await soBanco(pag);
   const esperado = await pag.evaluate(s => { const d = JSON.parse(s); Core.aplicarEdicaoAula(d, 's1@2026-11-19', { data: '2026-11-19', hora: '17:30', duracaoMin: 60 }, 'esta'); return JSON.stringify(d); }, antesSo);
   conf('o Confirmar gravou exatamente o Remarcar da tela (Core.aplicarEdicaoAula só nesta aula)', depoisRemarcar === esperado, true);
-  conf('o cartão diz que gravou', await pag.evaluate(s => document.querySelector(s).querySelector('.ass-estado').textContent, ultimoCartao), 'Gravado. Para voltar, toque em Desfazer no aviso.');
+  conf('o cartão diz que gravou', await pag.evaluate(s => document.querySelector(s).querySelector('.ass-estado').textContent, ultimoCartao), 'Gravado. O aviso de baixo traz o Desfazer por alguns segundos.');
   const aviso = await pag.evaluate(() => {
     const t = document.querySelector('#aviso-texto'), b = document.querySelector('#aviso-acao');
     const r = b.getBoundingClientRect();
@@ -270,6 +270,10 @@ async function transbordo(pag, raizSel) {
   if (MODO === V_ACAO) { await H.fim(amb)(); return; }
   const peloCartao = await soBanco(pag);
   conf('nenhuma caixa de confirmação do sistema no cartão (sem window.confirm)', dialogos.length, 0);
+  await esperar('o aviso com Desfazer no celular', () => visivel(pag, '#aviso-acao'), v => v === true, 10000);
+  conf('no celular, o aviso com Desfazer fica POR CIMA da janela do assistente', await pag.evaluate(() => {
+    const b = document.querySelector('#aviso-acao'); const r = b.getBoundingClientRect();
+    const topo = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!topo && (topo === b || b.contains(topo)); }), true);
   await desfazerPeloAviso(pag);
   igual('o Desfazer no celular volta ao exato de antes', await soBanco(pag), antesCel);
   await pag.evaluate(() => { const f = document.querySelector('#modal-assistente .fechar'); if (f) f.click(); });
@@ -336,6 +340,8 @@ async function transbordo(pag, raizSel) {
 
   // ================================================================
   secao('5. O transbordo do cartão a 360, 390 e 412 px, letra normal e 130%');
+  // a aula de hoje do Bruno já tem um relato: o cartão mostra o antigo à parte
+  await pag.evaluate(async () => { const b = await Store.carregar(); b.aulas.find(a => a.id === 'b1').notaTexto = 'Relato antigo da família.'; await Store.salvar(b); });
   await modo(pag, 'dona-celular', 390, 844);
   const antesT = await banco(pag);
   await clicar(pag, '#cel-assistente');
@@ -349,6 +355,13 @@ async function transbordo(pag, raizSel) {
   await clicar(pag, ultimoCartao + ' .ass-marca');
   conf('tirar o ✓ de uma linha muda o botão', await pag.evaluate(s => document.querySelector(s + ' [id^="ass-confirmar-"]').textContent, ultimoCartao), 'Confirmar 3 de 4');
   await clicar(pag, ultimoCartao + ' .ass-marca');
+  conf('o relato: o texto antigo à parte, só para ler, e o campo só com o novo, com teto de tamanho', await pag.evaluate(s => {
+    const c = document.querySelector(s); const t = c.querySelector('textarea[id^="ass-relato-"]');
+    return [(c.querySelector('.ass-texto-antigo[data-antigo="relato"] p') || {}).textContent, t.value.indexOf('Relato antigo') < 0, t.getAttribute('maxlength')]; }, ultimoCartao),
+    ['Relato antigo da família.', true, '2000']);
+  conf('o campo do rascunho cresce com o texto (sem barra de rolagem para duas linhas)', await pag.evaluate(s => {
+    const t = document.querySelector(s + ' textarea[id^="ass-relato-"]'); t.value = 'linha\nlinha\nlinha\nlinha\nlinha'; t.dispatchEvent(new Event('input', { bubbles: true }));
+    return t.scrollHeight <= t.clientHeight + 4; }, ultimoCartao), true);
   const falhas = [];
   for (const largura of [360, 390, 412]) {
     for (const letra of ['100%', '130%']) {
@@ -356,6 +369,14 @@ async function transbordo(pag, raizSel) {
       await pag.evaluate(l => { document.documentElement.style.fontSize = l; }, letra);
       await pausa(300);
       (await transbordo(pag, '#modal-assistente .modal')).forEach(f => falhas.push(largura + '/' + letra + ': ' + f));
+      /* O Confirmar à vista com o começo do cartão na tela (preso ao pé da
+       * área que rola), e não lá no fim de um cartão longo. */
+      const vis = await pag.evaluate(s => {
+        const c = document.querySelector(s); c.scrollIntoView({ block: 'start' });
+        const b = c.querySelector('[id^="ass-confirmar-"]'); const r = b.getBoundingClientRect();
+        const topo = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return r.bottom <= window.innerHeight + 1 && r.top >= 0 && !!topo && (topo === b || b.contains(topo)); }, ultimoCartao);
+      if (!vis) falhas.push(largura + '/' + letra + ': o Confirmar não fica à vista com o cartão aberto do começo');
     }
   }
   await pag.evaluate(() => { document.documentElement.style.fontSize = ''; });
