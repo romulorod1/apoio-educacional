@@ -92,6 +92,12 @@
       ]
     },
     {
+      versao: '1.42.105',
+      itens: [
+        'Remarcar uma aula da repetição para o dia de outra aula da mesma repetição, num mês que ainda não abriu, não faz mais sumir a aula fixa daquele dia: quando o mês abre, as duas aparecem e entram no fechamento.'
+      ]
+    },
+    {
       versao: '1.42.89',
       itens: [
         'O botão Voltar do tablet e do celular volta para a tela anterior dentro do aplicativo, e não fecha mais o app. Na tela inicial, toque em Voltar duas vezes para sair.'
