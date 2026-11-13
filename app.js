@@ -19101,6 +19101,17 @@
     if (/\b(livro didatico|colecao|volume [ivx0-9]+)\b/.test(titulo)) return 'livro-didatico';
     return 'complementar';
   }
+  /* A BIBLIOTECA É TEORIA, EXERCÍCIOS E GABARITO (decisão do dono, 13/11/2026):
+   * caderno de atividades, roteiro de experimento e sequência didática de sala
+   * não aparecem na busca. A classificação do acervo é outra fatia; aqui, só o
+   * gancho: o livro cujo pacote DECLARA um destes tipos em tipo_material sai
+   * do resultado da busca. A pista pelo título (tipoDoMaterial) não esconde
+   * nada: sem o campo declarado, o livro aparece como sempre. */
+  var TIPOS_FORA_DA_BUSCA = ['pratica', 'projeto', 'caderno-de-atividades', 'roteiro-de-experimento', 'sequencia-didatica'];
+  function foraDaBusca(meta) {
+    var declarado = String(meta && (meta.tipo_material || meta.tipoMaterial || '')).toLowerCase().replace(/[_\s]+/g, '-');
+    return !!declarado && TIPOS_FORA_DA_BUSCA.indexOf(declarado) >= 0;
+  }
   function rotuloDoTipo(tipo, longo) {
     var info = TIPOS_DE_MATERIAL.filter(function (x) { return x[0] === tipo; })[0];
     return info ? info[longo ? 1 : 2] : 'Outro';
@@ -19205,14 +19216,17 @@
     if (x) x.classList.toggle('bibl-na-busca', !!buscando || !!bibNav.assunto);
   }
 
-  /* B12: UM campo só. O campo do alto da Biblioteca busca nos exercícios e,
-   * com livro no tablet, também no texto dos livros. O resultado sai em dois
-   * grupos rotulados e recolhíveis, "Exercícios" e depois "Nos livros", cada
-   * um com a contagem no rótulo (divulgação progressiva, padrão 1), e no alto
-   * uma linha-resumo que leva a cada grupo: os dois ficam na primeira tela. */
+  /* B12 e P2: UM campo só. O campo do alto da Biblioteca busca nos assuntos,
+   * nos capítulos dos livros e nos exercícios. O resultado sai em três blocos
+   * rotulados e recolhíveis, nesta ordem: "Assuntos" (cada um abre a página
+   * do assunto), "Capítulos nos livros" (cada linha é um capítulo, com o
+   * livro, e abre o livro nele) e "Listas e exercícios", cada um com a
+   * contagem no rótulo (divulgação progressiva, padrão 1). A linha-resumo do
+   * alto saiu: com os três rótulos na tela, ela repetia o que eles dizem. */
   var BUSCA_LINHAS_VISIVEIS = 3;        // o grupo dos exercícios mostra 3 linhas e "Ver todos os N"
-  var BUSCA_LIVROS_POR_VEZ = 30;        // o grupo dos livros mostra 30 livros e "Mostrar mais"
-  var BUSCA_BLOCOS_POR_VEZ = 200;       // ...ou 200 capítulos, o que vier antes
+  var BUSCA_CAPITULOS_TODOS_ATE = 5;    // até 5 capítulos, todos; mais que isso, 3 e "Ver os outros N"
+  var BUSCA_CAPITULOS_NO_ALTO = 3;
+  var BUSCA_BLOCOS_POR_VEZ = 200;       // o "Ver os outros N" desenha 200 capítulos por vez
   var BUSCA_PAGINAS_POR_BLOCO = 16;     // as páginas de um capítulo, e "+N" abre o resto
   var avisoSemTextoDispensado = '';     // os ids do aviso dispensado; volta quando entra livro novo
 
@@ -19229,46 +19243,18 @@
     return { grupo: grupo, contagem: contagem, corpo: corpoGrupo };
   }
 
-  /* A linha-resumo no alto: "Exercícios 9 listas · Nos livros 3 páginas em
-   * 1 livro". Cada parte é um botão que abre o grupo e rola até ele. */
-  function resumoDaBusca() {
-    var caixa = el('p', { class: 'bib-busca-resumo', id: 'bib-busca-resumo' });
-    var partes = {};
-    function parte(chave, titulo) {
-      var valor = el('span', { class: 'bib-busca-resumo-valor' });
-      var b = el('button', { type: 'button', class: 'bib-busca-resumo-parte', 'data-alvo': chave, aoClick: function () {
-        var g = document.getElementById('bib-grupo-' + chave);
-        if (!g) return;
-        g.open = true;
-        g.scrollIntoView({ block: 'start' });
-      } }, [el('span', { class: 'bib-busca-resumo-titulo', texto: titulo }), valor]);
-      partes[chave] = { botao: b, valor: valor };
-      return b;
-    }
-    return {
-      caixa: caixa,
-      montar: function (comExercicios, comLivros) {
-        if (comExercicios) caixa.appendChild(parte('exercicios', 'Exercícios'));
-        if (comExercicios && comLivros) caixa.appendChild(el('span', { class: 'bib-busca-resumo-ponto', 'aria-hidden': 'true', texto: '·' }));
-        if (comLivros) caixa.appendChild(parte('livros', 'Nos livros'));
-      },
-      diz: function (chave, texto) { if (partes[chave]) partes[chave].valor.textContent = texto; }
-    };
-  }
-
   function rotuloDePaginaDoLivro(meta, pagina) {
     var impressa = Biblioteca.paginaImpressa(meta || {}, pagina);
     return impressa || (meta && meta.numeracao && meta.numeracao.length ? 'arquivo ' + pagina : String(pagina));
   }
 
-  /* O grupo "Nos livros" da busca: monta a caixa e consulta o índice local
-   * (só lê; nada é gravado). `resumo` e `aoVazio` vêm da busca dos dois
-   * grupos: o resumo do alto, e o estado vazio único quando nada aparece. */
-  function grupoNosLivros(termo, resumo, aoVazio) {
-    var g = grupoDaBusca('livros', 'Nos livros');
+  /* O bloco "Capítulos nos livros" da busca: monta a caixa e consulta o
+   * índice local (só lê; nada é gravado). `aoVazio` vem de quem monta os
+   * blocos: o estado vazio único quando nada aparece. */
+  function grupoNosLivros(termo, aoVazio) {
+    var g = grupoDaBusca('livros', 'Capítulos nos livros');
     g.status = el('p', { class: 'ajuda bib-busca-livros-status', role: 'status', 'aria-live': 'polite' });
     g.resultados = el('div', { class: 'bib-busca-livros-resultados', 'aria-busy': 'false' });
-    g.resumo = resumo || null;
     g.aoVazio = aoVazio || null;
     g.corpo.appendChild(g.status);
     g.corpo.appendChild(g.resultados);
@@ -19467,17 +19453,10 @@
       y.bloco.paginasComFrase.length - x.bloco.paginasComFrase.length ||
       y.bloco.paginas.length - x.bloco.paginas.length || x.ordem - y.ordem;
   }
-  var BUSCA_MELHORES = 5;               // o topo do grupo "Nos livros", de qualquer livro
-
   // "vol. 2" a partir de "Volume 2"; o volume que não começa assim fica como veio
   function rotuloDoVolume(volume) {
     var v = String(volume || '').trim();
     return v.replace(/^volume\s*/i, 'vol. ');
-  }
-  // o livro de vários volumes é uma obra só: o título, sem o volume
-  function chaveDaObra(livro, meta) {
-    var norm = normalizadorDaBusca() || function (t) { return String(t || '').toLowerCase(); };
-    return norm(livro.titulo || (meta && meta.titulo) || livro.id);
   }
 
   // "p. 267 a 301, 14 páginas"; com a página impressa quando o livro tem numeração
@@ -19488,12 +19467,6 @@
     var ini = paginas[0], fim = paginas[paginas.length - 1];
     var onde = (epub ? (paginas.length > 1 ? 'partes ' : 'parte ') : 'p. ') + rotulo(ini) + (fim !== ini ? ' a ' + rotulo(fim) : '');
     return onde + ', ' + plural(paginas.length, epub ? 'parte' : 'página', epub ? 'partes' : 'páginas');
-  }
-
-  // "2 capítulos e 3 páginas em 2 livros", "3 páginas em 1 livro", "1 capítulo em 1 livro"
-  function descreverAchadosNosLivros(capitulos, paginas, livros) {
-    return [capitulos ? plural(capitulos, 'capítulo', 'capítulos') : '', paginas ? plural(paginas, 'página', 'páginas') : '']
-      .filter(Boolean).join(' e ') + ' em ' + plural(livros, 'livro', 'livros');
   }
 
   /* Um capítulo do resultado, compacto: o nome, por onde foi achado, UMA
@@ -19572,100 +19545,105 @@
     return caixa;
   }
 
-  /* Desenha o grupo "Nos livros" com o que veio pelos capítulos (na hora) e
-   * pelo texto (`res`, da consulta ao índice; null enquanto ela corre, ou sem
-   * ela). `modo`: buscando (o texto ainda vem), semTexto (este aparelho não
-   * busca no texto) ou falhou (a consulta ao texto falhou).
+  /* Desenha o bloco "Capítulos nos livros" (P2) com o que veio pelos
+   * capítulos (na hora) e pelo texto (`res`, da consulta ao índice; null
+   * enquanto ela corre, ou sem ela). `modo`: buscando (o texto ainda vem),
+   * semTexto (este aparelho não busca no texto) ou falhou (a consulta ao
+   * texto falhou).
    *
-   * No alto, "Melhores resultados": até 5 capítulos de qualquer livro, pela
-   * relevância. O resto fica em "Mais resultados (N)", recolhido, um cartão
-   * por obra (os volumes do mesmo livro juntos, com o volume ao lado do
-   * capítulo), com os tetos do #162: 30 obras ou 200 capítulos por vez. */
+   * CADA LINHA É UM CAPÍTULO, com o livro e o volume escritos nela (um livro
+   * por linha, e não um cartão por obra), pela relevância. Até 5, todas; mais
+   * que isso, 3 e "Ver os outros N". O capítulo achado pelo mapa abre no
+   * começo dele; o achado só no texto abre na primeira página dele com a
+   * palavra, e as outras ficam atrás de "Ver páginas".
+   *
+   * PÁGINA SOLTA NÃO É RESULTADO. As páginas fora de todo capítulo ("Outras
+   * páginas do livro", o "Blank Page", o marcador sem nome) saem do bloco;
+   * se só houver delas, uma linha diz isso, sem lista de páginas.
+   *
+   * O ANO ESCRITO PRIORIZA E FILTRA (caso real de 13/11/2026, "volume 9º
+   * ano" com 1942 páginas em 87 livros): os capítulos dos livros do ano vêm
+   * primeiro; os de livro de outro ano vêm depois, marcados "de outro ano", e
+   * só os que casaram pelo mapa (título ou assunto). O que outro ano casou só
+   * no texto é ruído e sai. A contagem conta os capítulos que aparecem. */
   function desenharResultadosDosLivros(g, porCapitulo, res, modo) {
     var status = g.status, resultados = g.resultados;
-    var diz = function (t) { g.contagem.textContent = t; if (g.resumo) g.resumo.diz('livros', t); };
+    var diz = function (t) { g.contagem.textContent = t; };
     modo = modo || {};
     resultados.innerHTML = '';
+    status.classList.remove('so-leitor-de-tela');
     g.desenhadoPara = null;
+    var serie = anoDaBusca((normalizadorDaBusca() || Busca.semAcento)(String(bibTermo || ''))).serie;
     var livros = resultadosDosLivros(porCapitulo, res ? res.livros : []);
-    var paginas = 0, capitulos = 0, todos = [], obras = [], obraPorChave = Object.create(null);
+    var linhas = [], livrosDasLinhas = Object.create(null), nLivros = 0, fora = 0, livrosFora = Object.create(null), nFora = 0;
     livros.forEach(function (l) {
       var meta = bibLivrosCache[l.id] ? bibLivrosCache[l.id].meta : {};
-      var chave = chaveDaObra(l, meta);
-      if (!obraPorChave[chave]) { obraPorChave[chave] = { chave: chave, titulo: l.titulo || tituloDoLivro(meta) || l.id, volumes: [] }; obras.push(obraPorChave[chave]); }
-      obraPorChave[chave].volumes.push(l);
+      // caderno de atividades, roteiro e sequência de sala declarados no pacote não são resultado
+      if (foraDaBusca(meta)) return;
+      var series = Array.isArray(meta.series) && meta.series.length ? meta.series : null;
+      var outroAno = !!(serie && series && series.indexOf(serie) < 0);
       l.blocos.forEach(function (b) {
-        paginas += b.paginas.length;
-        if (b.achado) capitulos++;
-        todos.push({ livro: l, meta: meta, bloco: b, ordem: todos.length });
+        if (b.outras) {
+          if (outroAno || !b.paginas.length) return;
+          fora += b.paginas.length;
+          if (!livrosFora[l.id]) { livrosFora[l.id] = true; nFora++; }
+          return;
+        }
+        if (outroAno && !b.achado) return;
+        linhas.push({ livro: l, meta: meta, bloco: b, outroAno: outroAno, ordem: linhas.length });
+        if (!livrosDasLinhas[l.id]) { livrosDasLinhas[l.id] = true; nLivros++; }
       });
     });
-    var nomeComVolume = function (l, meta) {
-      var v = l.volume || meta.volume;
-      return (l.titulo || meta.titulo || l.id) + (v ? ', ' + rotuloDoVolume(v) : '');
+    linhas.sort(function (x, y) { return (x.outroAno ? 1 : 0) - (y.outroAno ? 1 : 0) || compararBlocos(x, y); });
+    var nomeDaLinha = function (x) {
+      var v = x.livro.volume || x.meta.volume;
+      return (x.livro.titulo || x.meta.titulo || x.livro.id) + (v ? ', ' + rotuloDoVolume(v) : '') + (x.outroAno ? ', de outro ano' : '');
     };
-    /* "Outras páginas do livro" só disputa o topo quando não há capítulo
-     * nenhum: o resultado todo nelas não pode deixar o topo vazio e tudo
-     * escondido em "Mais resultados", fechado. */
-    var capitulosDoResultado = todos.filter(function (x) { return !x.bloco.outras; });
-    var melhores = (capitulosDoResultado.length ? capitulosDoResultado : todos).sort(compararBlocos).slice(0, BUSCA_MELHORES);
-    if (melhores.length) {
-      var topo = el('section', { class: 'bib-busca-melhores', 'aria-label': 'Melhores resultados nos livros' }, [
-        el('h3', { class: 'bib-busca-melhores-titulo', texto: 'Melhores resultados' })]);
-      melhores.forEach(function (x) { topo.appendChild(blocoDoCapitulo(x.livro, x.meta, x.bloco, nomeComVolume(x.livro, x.meta))); });
-      resultados.appendChild(topo);
-    }
-    var noTopo = melhores.map(function (x) { return x.bloco; });
-    var restantes = todos.filter(function (x) { return noTopo.indexOf(x.bloco) < 0; });
-    if (restantes.length) {
-      var mais = el('details', { class: 'bib-busca-mais' });
-      mais.appendChild(el('summary', { class: 'bib-busca-mais-cabeca' }, [
-        el('span', { class: 'bib-grupo-seta', 'aria-hidden': 'true' }, [icone('chr')]),
-        el('span', { class: 'bib-busca-mais-titulo', texto: 'Mais resultados (' + restantes.length + ')' })]));
-      var corpoMais = el('div', { class: 'bib-busca-mais-corpo' });
-      mais.appendChild(corpoMais);
-      resultados.appendChild(mais);
-      // o teto: 30 obras ou 200 capítulos por vez, e "Mostrar mais" desenha o resto
-      var obrasComResto = obras.filter(function (o) {
-        return restantes.some(function (x) { return o.volumes.indexOf(x.livro) >= 0; });
-      });
-      var proxima = 0;
-      var botaoMais = el('button', { type: 'button', class: 'btn bib-busca-livros-mais', aoClick: function () { desenharMais(); } });
-      var desenharMais = function () {
-        var obrasAgora = 0, blocosAgora = 0;
-        while (proxima < obrasComResto.length && obrasAgora < BUSCA_LIVROS_POR_VEZ && blocosAgora < BUSCA_BLOCOS_POR_VEZ) {
-          var obra = obrasComResto[proxima++];
-          var cartao = el('article', { class: 'bib-busca-livro', 'data-obra': obra.chave });
-          cartao.appendChild(el('h3', { class: 'bib-busca-livro-titulo', texto: obra.titulo }));
-          var varios = obra.volumes.length > 1;
-          var doCartao = restantes.filter(function (x) { return obra.volumes.indexOf(x.livro) >= 0; });
-          // os capítulos primeiro (volume a volume), e as "Outras páginas" de todos os volumes juntas, no fim
-          doCartao.filter(function (x) { return !x.bloco.outras; }).concat(doCartao.filter(function (x) { return x.bloco.outras; }))
-            .forEach(function (x) {
-              blocosAgora++;
-              var v = x.livro.volume || x.meta.volume;
-              cartao.appendChild(blocoDoCapitulo(x.livro, x.meta, x.bloco, varios && v ? rotuloDoVolume(v) : null));
-            });
-          corpoMais.insertBefore(cartao, botaoMais.parentNode ? botaoMais : null);
-          obrasAgora++;
-        }
-        if (proxima < obrasComResto.length) {
-          botaoMais.textContent = 'Mostrar mais ' + plural(obrasComResto.length - proxima, 'livro', 'livros');
-          if (!botaoMais.parentNode) corpoMais.appendChild(botaoMais);
-        } else if (botaoMais.parentNode) botaoMais.parentNode.removeChild(botaoMais);
-      };
-      desenharMais();
+    var linhaDoCapitulo = function (x) {
+      var e = blocoDoCapitulo(x.livro, x.meta, x.bloco, nomeDaLinha(x));
+      if (x.outroAno) e.setAttribute('data-outro-ano', 'true');
+      return e;
+    };
+    if (linhas.length) {
+      var lista = el('div', { class: 'bib-busca-capitulos' });
+      var primeiras = linhas.length <= BUSCA_CAPITULOS_TODOS_ATE ? linhas.length : BUSCA_CAPITULOS_NO_ALTO;
+      linhas.slice(0, primeiras).forEach(function (x) { lista.appendChild(linhaDoCapitulo(x)); });
+      resultados.appendChild(lista);
+      var proxima = primeiras;
+      if (proxima < linhas.length) {
+        // o teto do #162: 200 capítulos por vez, e o botão diz quantos faltam
+        var ver = el('button', { type: 'button', class: 'btn pequeno bib-busca-capitulos-mais', aoClick: function () {
+          var ate = Math.min(linhas.length, proxima + BUSCA_BLOCOS_POR_VEZ);
+          linhas.slice(proxima, ate).forEach(function (x) { lista.appendChild(linhaDoCapitulo(x)); });
+          proxima = ate;
+          if (proxima < linhas.length) ver.textContent = 'Ver os outros ' + (linhas.length - proxima);
+          else ver.remove();
+        } });
+        ver.textContent = 'Ver os outros ' + (linhas.length - proxima);
+        resultados.appendChild(ver);
+      }
     }
     var pendentes = res ? (res.pendentes || []).length : 0;
-    if (livros.length) {
-      var achados = descreverAchadosNosLivros(capitulos, paginas, livros.length);
+    if (linhas.length) {
+      var achados = plural(linhas.length, 'capítulo', 'capítulos') + ' em ' + plural(nLivros, 'livro', 'livros');
       diz(achados);
-      var frase = capitulos ? achados + '.'
-        : plural(paginas, 'página encontrada', 'páginas encontradas') + ' em ' + plural(livros.length, 'livro', 'livros') + '.';
+      var frase = achados + '.';
       if (modo.buscando) frase += ' Buscando também no texto dos livros...';
       else if (modo.semTexto) frase += ' A busca no texto dos livros não está disponível neste aparelho.';
       else if (modo.falhou) frase += ' Não consegui consultar o texto dos livros agora.';
       status.textContent = frase;
+      // a contagem já está no rótulo do bloco: a frase só aparece quando diz algo a mais (fica para o leitor de tela)
+      status.classList.toggle('so-leitor-de-tela', frase === achados + '.');
+    } else if (modo.buscando) {
+      // o texto ainda vem: nada aqui ainda não quer dizer vazio
+      diz('');
+      status.textContent = 'Buscando nos livros deste tablet...';
+      return;
+    } else if (fora) {
+      // só páginas soltas: nenhuma vira resultado, e a linha diz o que houve
+      diz('0');
+      status.textContent = 'Nenhum capítulo com essa palavra. Ela aparece só em ' + plural(fora, 'página', 'páginas') + ' fora dos capítulos, em ' +
+        plural(nFora, 'livro', 'livros') + '.';
     } else if (modo.semTexto) {
       diz('');
       status.textContent = 'A busca no texto dos livros não está disponível neste aparelho.';
@@ -19692,9 +19670,10 @@
   function buscarTextoNosLivros(termo, g) {
     if (!g || !g.status || !g.resultados) return;
     var status = g.status, resultados = g.resultados;
+    status.classList.remove('so-leitor-de-tela');
     var consulta = String(termo || '').trim();
     var vez = ++buscaTextoLivrosVez;
-    var diz = function (t) { g.contagem.textContent = t; if (g.resumo) g.resumo.diz('livros', t); };
+    var diz = function (t) { g.contagem.textContent = t; };
     resultados.setAttribute('aria-busy', 'false');
     if (consulta.length < 2) {
       resultados.innerHTML = '';
@@ -24131,42 +24110,100 @@
    * ELA DIGITOU, com acento ("frações 6" vira "frações", e não "fracoes"): a
    * busca normaliza por conta própria, e a tela mostra o que ela escreveu. A
    * busca só de ano fica como veio. */
+  /* "ano" e "série" soltos (o que sobra de "volume do ano", "série 9") não são
+   * palavra de conteúdo: sozinhos, faziam casar toda página com "ano" no
+   * cabeçalho (caso real de 13/11/2026, "volume 9º ano" com 1942 páginas).
+   * Saem do termo dos grupos, desde que sobre outra palavra. */
+  var SO_DO_ANO = { ano: 1, anos: 1, serie: 1, series: 1 };
   function termoDosGrupos(termo) {
-    var original = String(termo || '').trim();
     var norm = normalizadorDaBusca() || function (x) { return Busca.semAcento(String(x || '')); };
-    var ano = anoDaBusca(norm(original));
+    var bruto = String(termo || '').trim();
+    var palavras = bruto.split(/\s+/).filter(Boolean);
+    var deConteudo = palavras.filter(function (w) { return !SO_DO_ANO[norm(w).replace(/[^a-z0-9]+/g, '')]; });
+    var original = deConteudo.length && deConteudo.length < palavras.length ? deConteudo.join(' ') : bruto;
+    var ano = anoDaBusca(norm(bruto));
     if (!ano.serie || !ano.resto) return original;
     var resto = ano.resto.split(' '), saida = [], i = 0;
+    var restoDeConteudo = resto.filter(function (p) { return !SO_DO_ANO[p]; });
+    if (restoDeConteudo.length) resto = restoDeConteudo;
     original.split(/\s+/).forEach(function (w) {
       var partes = norm(w).replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
       if (!partes.length) return;
       // a palavra fica se for a próxima do termo sem o ano; as do ano ("do", "8º", "ano") saem
       if (partes.every(function (p, k) { return resto[i + k] === p; })) { saida.push(w); i += partes.length; }
     });
-    return i === resto.length && saida.length ? saida.join(' ') : ano.resto;
+    return i === resto.length && saida.length ? saida.join(' ') : resto.join(' ');
   }
 
-  // a mesma regra da busca no texto (todas as palavras significativas), no título ou nas palavras-chave do assunto
+  /* OS ASSUNTOS DA BUSCA (P2). Cada palavra que ela digitou vira a raiz do
+   * busca.js (sem acento, sem maiúscula, no singular, com o apelido trocado
+   * pelo vocabulário do banco: "senos" é "seno", "frações" e "fração" são
+   * "fracao", "bhaskara" é "discriminante" ou "delta"), e a raiz casa com o
+   * COMEÇO de uma palavra do título do assunto ou das palavras-chave dele.
+   * Pelo começo da palavra, e não por trecho: por trecho, "fração" achava
+   * "Refração da luz" antes de "Frações". O assunto entra quando TODAS as
+   * exigências casam. O título do capítulo do livro NÃO entra aqui: o termo
+   * que só existe num capítulo aparece no bloco dos capítulos, e não aqui.
+   *
+   * A ordem, do melhor para o pior: o ano escrito na busca; tudo no título (e
+   * não nas palavras-chave); o título que começa pelo que ela digitou ("Seno,
+   * cosseno e tangente" para "senos", "Funções: a ideia" antes de "Organelas
+   * e suas funções"); a palavra igual antes da que só começa igual; a frase
+   * como ela escreveu; depois o ano escolar, o título mais curto e o nome. */
+  var raizesDosAssuntos = typeof WeakMap === 'function' ? new WeakMap() : { get: function () { return null; }, set: function () {} };
+  function raizesDoTexto(texto) {
+    return Busca.palavrasDe(texto).filter(function (p) { return !Busca.VAZIAS[p]; });
+  }
+  // como a raiz casa a palavra: 2 igual, 1 pelo começo (a partir de 3 letras), 0 não casa
+  function casaRaiz(alternativas, palavra) {
+    var melhor = 0;
+    for (var i = 0; i < alternativas.length; i++) {
+      var r = alternativas[i];
+      if (palavra === r) return 2;
+      if (r.length >= 3 && palavra.indexOf(r) === 0) melhor = 1;
+    }
+    return melhor;
+  }
   function assuntosDaBusca(nomes, termo) {
     var norm = normalizadorDaBusca() || function (t) { return Busca.semAcento(String(t || '')); };
-    var palavras = palavrasDaBuscaNosLivros();
     var ano = anoDaBusca(norm(termo));
-    var alvo = ano.resto;
-    // palavra curta ("de", "a") não acha assunto: casaria quase todos
-    var lista = (palavras ? palavras(alvo) : alvo.split(/[^a-z0-9]+/)).filter(function (p) { return p && p.length >= 3; });
-    if (!lista.length) return [];
+    var lido = Busca.lerBusca(ano.resto);
+    var grupos = lido.grupos.filter(function (g) { return g.length; });
+    // "ano" e "série" soltos não são assunto: saem, se sobrar outra palavra
+    var deConteudo = grupos.filter(function (g) { return !(g.length === 1 && SO_DO_ANO[g[0]]); });
+    if (deConteudo.length) grupos = deConteudo;
+    // só palavra de ligação, letra solta ou número solto ("de", "x", "8"): não acha assunto, casaria quase todos
+    if (!grupos.length) return [];
+    var literal = ' ' + ano.resto.replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
     var achados = [];
     (nomes && nomes.lista || []).forEach(function (a) {
-      var t = norm(a.titulo);
-      var chaves = a.chaves ? ' ' + norm([a.chaves.r, a.chaves.d].filter(Boolean).join(' ')) + ' ' : '';
-      var peloTitulo = lista.every(function (p) { return t.indexOf(p) >= 0; });
-      if (!peloTitulo && !lista.every(function (p) { return t.indexOf(p) >= 0 || chaves.indexOf(' ' + p) >= 0; })) return;
-      achados.push({ a: a, doAno: ano.serie && a.serie === ano.serie ? 0 : 1, titulo: peloTitulo ? 0 : 1,
-        frase: t.indexOf(alvo) >= 0 ? 0 : 1, tamanho: t.length });
+      // as raízes do título e as chaves, montadas uma vez por assunto, num mapa só da memória (o assunto fica intocado)
+      var guardado = raizesDosAssuntos.get(a);
+      if (!guardado) {
+        guardado = { titulo: raizesDoTexto(a.titulo),
+          chaves: a.chaves ? [a.chaves.r, a.chaves.d].filter(Boolean).join(' ').split(' ').filter(Boolean) : [] };
+        raizesDosAssuntos.set(a, guardado);
+      }
+      var doTitulo = guardado.titulo, dasChaves = guardado.chaves;
+      var peloTitulo = 0, iguais = 0, comeca = 0;
+      for (var i = 0; i < grupos.length; i++) {
+        var g = grupos[i], noTitulo = 0, k;
+        for (k = 0; k < doTitulo.length && noTitulo < 2; k++) {
+          var c = casaRaiz(g, doTitulo[k]);
+          if (c > noTitulo) { noTitulo = c; if (i === 0 && k === 0) comeca = 1; }
+        }
+        if (noTitulo) { peloTitulo++; if (noTitulo === 2) iguais++; continue; }
+        var naChave = false;
+        for (k = 0; k < dasChaves.length && !naChave; k++) naChave = casaRaiz(g, dasChaves[k]) > 0;
+        if (!naChave) return;
+      }
+      var t = ' ' + norm(a.titulo).replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+      achados.push({ a: a, doAno: ano.serie && a.serie === ano.serie ? 0 : 1, titulo: peloTitulo === grupos.length ? 0 : 1,
+        comeca: comeca ? 0 : 1, iguais: grupos.length - iguais, frase: literal.trim() && t.indexOf(literal) >= 0 ? 0 : 1, tamanho: t.length });
     });
     achados.sort(function (x, y) {
-      return x.doAno - y.doAno || x.titulo - y.titulo || x.frase - y.frase || ordemDoAno(x.a.serie) - ordemDoAno(y.a.serie) ||
-        x.tamanho - y.tamanho || String(x.a.titulo).localeCompare(String(y.a.titulo), 'pt-BR');
+      return x.doAno - y.doAno || x.titulo - y.titulo || x.comeca - y.comeca || x.iguais - y.iguais || x.frase - y.frase ||
+        ordemDoAno(x.a.serie) - ordemDoAno(y.a.serie) || x.tamanho - y.tamanho || String(x.a.titulo).localeCompare(String(y.a.titulo), 'pt-BR');
     });
     return achados.map(function (x) { return x.a; });
   }
@@ -24202,7 +24239,12 @@
    * O índice de assuntos pode vir incompleto na primeira abertura (um dos
    * arquivos ainda chegando); aí o bloco se refaz quando ele chega inteiro. */
   function grupoDeAssuntosDaBusca(termo) {
-    var caixa = el('section', { class: 'bib-assuntos-da-busca', id: 'bib-assuntos-da-busca', 'aria-label': 'Assuntos', hidden: true });
+    // o mesmo cabeçalho dos outros dois blocos (Capítulos nos livros, Listas e exercícios), com a contagem
+    var g = grupoDaBusca('assuntos', 'Assuntos');
+    var caixa = g.grupo;
+    caixa.id = 'bib-assuntos-da-busca';
+    caixa.classList.add('bib-assuntos-da-busca');
+    caixa.hidden = true;
     var tentativas = 0;
     function preencher() {
       Promise.all([carregarAssuntosDosLivros(), Store.listarLivros().catch(function () { return []; })]).then(function (r) {
@@ -24215,32 +24257,65 @@
           miolo.insertBefore(caixa, miolo.firstChild);
         }
         var nomes = r[0], livros = r[1] || [];
-        caixa.innerHTML = '';
+        var corpo = g.corpo;
+        corpo.innerHTML = '';
         caixa.hidden = true;
         var achados = assuntosDaBusca(nomes, termo);
         // o índice veio sem uma das partes: tenta de novo, até três vezes
         if (!assuntosDosLivros && tentativas++ < 3) setTimeout(preencher, 800);
+        // o bloco decidiu (com o índice inteiro): as provas esperam por isto, e não por tempo
+        if (assuntosDosLivros) caixa.setAttribute('data-decidido', 'true');
         if (!achados.length) return;
-        caixa.appendChild(el('h3', { class: 'bib-assuntos-titulo', texto: 'Assuntos' }));
+        /* O ANO ESCRITO SEPARA (caso real de 13/11/2026): "volume 8º ano" punha
+         * os do 5º e do 6º logo abaixo do 8º, no mesmo nível. Os do ano pedido
+         * vêm primeiro; os de outro ano ficam atrás de "Ver de outros anos", e
+         * cada um diz "de outro ano", como a página do assunto faz na teoria. */
+        var serie = anoDaBusca((normalizadorDaBusca() || Busca.semAcento)(termo)).serie;
+        var doAno = serie ? achados.filter(function (a) { return a.serie === serie; }) : achados;
+        var deOutros = serie ? achados.filter(function (a) { return a.serie !== serie; }) : [];
         var linha = function (a) {
-          var detalhe = [nomeDaDisciplina(a.disciplina, a), serieDoAssunto(a), nosLivrosEmPalavras(vinculosDoAssunto(livros, a))]
+          var outro = serie && a.serie !== serie;
+          var detalhe = [nomeDaDisciplina(a.disciplina, a), serieDoAssunto(a) + (outro ? ', de outro ano' : ''), nosLivrosEmPalavras(vinculosDoAssunto(livros, a))]
             .filter(Boolean).join(' · ');
           var l = linhaBib(a.titulo, detalhe, function () { abrirPaginaDoAssunto(a.id); });
           l.setAttribute('data-assunto', a.id);
+          if (outro) l.setAttribute('data-outro-ano', 'true');
           return l;
         };
-        var primeiros = achados.length <= ASSUNTOS_TODOS_ATE ? achados : achados.slice(0, ASSUNTOS_NA_BUSCA);
-        primeiros.forEach(function (a) { caixa.appendChild(linha(a)); });
-        if (primeiros.length < achados.length) {
-          var resto = achados.slice(primeiros.length);
-          var ver = el('button', { type: 'button', class: 'btn pequeno bib-assuntos-mais', texto: 'Ver os outros ' + resto.length,
-            aoClick: function () { resto.forEach(function (a) { caixa.insertBefore(linha(a), ver); }); ver.remove(); } });
-          caixa.appendChild(ver);
+        // 3 no alto e "Ver os outros N" quando passa de 5
+        var lista = function (itens, destino) {
+          var primeiros = itens.length <= ASSUNTOS_TODOS_ATE ? itens : itens.slice(0, ASSUNTOS_NA_BUSCA);
+          primeiros.forEach(function (a) { destino.appendChild(linha(a)); });
+          if (primeiros.length < itens.length) {
+            var resto = itens.slice(primeiros.length);
+            var ver = el('button', { type: 'button', class: 'btn pequeno bib-assuntos-mais', texto: 'Ver os outros ' + resto.length,
+              aoClick: function () { resto.forEach(function (a) { destino.insertBefore(linha(a), ver); }); ver.remove(); } });
+            destino.appendChild(ver);
+          }
+        };
+        if (doAno.length) lista(doAno, corpo);
+        if (deOutros.length) {
+          var outros = el('div', { class: 'bib-assuntos-outros-anos' });
+          if (doAno.length) {
+            // os do ano pedido bastam no primeiro olhar; os de outro ano, a um toque
+            var verOutros = el('button', { type: 'button', class: 'btn pequeno bib-assuntos-outros-anos-ver',
+              texto: 'Ver de outros anos (' + deOutros.length + ')', aoClick: function () {
+                verOutros.remove();
+                outros.appendChild(el('div', { class: 'bloco-exercicios', texto: 'De outros anos' }));
+                deOutros.forEach(function (a) { outros.appendChild(linha(a)); });
+              } });
+            outros.appendChild(verOutros);
+          } else {
+            outros.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Nada para ' + comArtigo(nomeDoAno(serie)) + '. De outros anos:' }));
+            lista(deOutros, outros);
+          }
+          corpo.appendChild(outros);
         }
+        g.contagem.textContent = plural(achados.length, 'assunto', 'assuntos');
         caixa.hidden = false;
         // o vazio de "nada com esse termo" não pode ficar ao lado de assuntos achados
-        var corpo = caixa.parentNode;
-        var vazio = corpo && corpo.querySelector(':scope > .vazio');
+        var miolo = caixa.parentNode;
+        var vazio = miolo && miolo.querySelector(':scope > .vazio');
         if (vazio) vazio.remove();
       }, function () { /* sem o índice de assuntos, a busca segue sem o bloco */ });
     }
@@ -24471,7 +24546,31 @@
     corpo.innerHTML = '';
     livrosNaBusca(true);
     corpo.appendChild(grupoDeAssuntosDaBusca(bibTermo.trim()));
-    corpo.appendChild(grupoNosLivros(termoDosGrupos(bibTermo.trim())));
+    var termo = termoDosGrupos(bibTermo.trim());
+    corpo.appendChild(grupoNosLivros(termo, function () { return vazioUnicoDaBusca(corpo, termo); }));
+  }
+
+  /* A BUSCA QUE NÃO ACHA NADA diz o que fazer, numa frase só e sem palavra
+   * técnica: tentar outra palavra, o nome do assunto ou do capítulo, ou
+   * navegar pelo ano. */
+  function vazioDaBusca(termo) {
+    return el('div', { class: 'vazio bib-busca-vazia' }, [
+      el('p', { class: 'bib-busca-vazia-frase', texto: 'Nada encontrado para "' + termo + '".' }),
+      el('p', { class: 'bib-busca-vazia-dica', texto: 'Tente uma palavra só, com o nome do assunto ou do capítulo (frações, volume, Pitágoras), ou apague a busca e escolha o ano.' })]);
+  }
+
+  /* Os capítulos voltaram vazios e as listas também: se nenhum assunto casou,
+   * um vazio só no lugar dos blocos. Com assuntos achados, os blocos ficam,
+   * com o zero deles. Devolve true quando trocou pelo vazio. */
+  function vazioUnicoDaBusca(miolo, termo) {
+    var assuntosAchados = miolo.querySelector('#bib-assuntos-da-busca');
+    if (assuntosAchados && !assuntosAchados.hidden) return false;
+    var assuntos = assuntosAchados && assuntosAchados.parentNode === miolo ? assuntosAchados : null;
+    miolo.innerHTML = '';
+    // a caixa dos assuntos fica no miolo, escondida: se o índice chegar depois com assunto, ela aparece e tira o vazio
+    if (assuntos) miolo.appendChild(assuntos);
+    miolo.appendChild(vazioDaBusca(String(bibTermo || termo).trim()));
+    return true;
   }
 
   function normalizarBusca(t) {
@@ -24601,37 +24700,26 @@
     var g = procurarNaBiblioteca(termo);
     var total = g.modulo.length + g.teoria.length + g.exercicio.length + g.banco.length;
     var corpo = corpoDaAba;
-    var vazioDaMain = function () {
-      return el('div', { class: 'vazio', texto: 'A biblioteca não tem nada com "' + termo + '". Procure por outra palavra, ou navegue pela série.' });
-    };
     buscaLivrosAtual = null;
-    var ex = null, resumo = null;
+    var ex = null;
     if (temLivrosNoTablet) {
-      // dois grupos e a linha-resumo no alto: primeiro os exercícios, depois o texto dos livros
-      resumo = resumoDaBusca();
-      resumo.montar(true, true);
-      ex = grupoDaBusca('exercicios', 'Exercícios');
-      corpoDaAba.appendChild(resumo.caixa);
-      corpoDaAba.appendChild(ex.grupo);
-      corpoDaAba.appendChild(grupoNosLivros(termo, resumo, function () {
+      // P2: três blocos, nesta ordem: Assuntos (acima), Capítulos nos livros e Listas e exercícios
+      ex = grupoDaBusca('exercicios', 'Listas e exercícios');
+      corpoDaAba.appendChild(grupoNosLivros(termo, function () {
         // os livros voltaram vazios: se os exercícios também, um estado vazio só
         if (total) return false;
-        // com assuntos achados (B1), os grupos ficam, com o zero deles
-        var assuntosAchados = corpoDaAba.querySelector('#bib-assuntos-da-busca');
-        if (assuntosAchados && !assuntosAchados.hidden) return false;
-        corpoDaAba.innerHTML = '';
-        corpoDaAba.appendChild(vazioDaMain());
-        return true;
+        return vazioUnicoDaBusca(corpoDaAba, termo);
       }));
+      corpoDaAba.appendChild(ex.grupo);
       corpo = ex.corpo;
       if (!total) {
         ex.contagem.textContent = '0';
-        resumo.diz('exercicios', '0');
-        corpo.appendChild(el('p', { class: 'ajuda bib-grupo-vazio', texto: 'Nenhum exercício com "' + termo + '".' }));
+        corpo.appendChild(el('p', { class: 'ajuda bib-grupo-vazio', texto: 'Nenhuma lista nem exercício com "' + termo + '".' }));
         return;
       }
     } else if (!total) {
-      corpo.appendChild(vazioDaMain());
+      // sem livros e sem exercício: o vazio único, se os assuntos também vierem vazios
+      corpo.appendChild(vazioDaBusca(String(bibTermo || termo).trim()));
       return;
     }
     var linhas = [];   // as linhas que aparecem, para a contagem e o "Ver todos"
@@ -24706,7 +24794,6 @@
     var tipos = Object.keys(porTipo).filter(function (k) { return porTipo[k]; });
     var conta = tipos.length === 1 ? plural(linhas.length, unidades[tipos[0]][0], unidades[tipos[0]][1]) : plural(linhas.length, 'resultado', 'resultados');
     ex.contagem.textContent = conta;
-    resumo.diz('exercicios', conta);
     // passou de 5 linhas: o grupo mostra as primeiras e "Ver todos os N", para os livros ficarem na primeira tela
     if (linhas.length > BUSCA_LINHAS_VISIVEIS) {
       var escondidas = linhas.slice(BUSCA_LINHAS_VISIVEIS);
