@@ -80,7 +80,8 @@
   var conflitoAutosaveAula = false;  // a aula mudou fora desta janela: nada mais grava daqui
   var baseDiscoRelatoAula = null;    // o relato da aula aberta como está no DISCO (a base do rascunho)
   var aberturaDaAula = null;         // { registro, valores } da aula ao abrir (o Descartar volta a isto)
-  var geracaoDoBanco = 0;            // anda quando a memória é trocada pelo que chegou (nunca "Salvo" sobre ela)
+  var geracaoDoBanco = 0;
+  var sobrescritosPelaJanela = {};   // B2: os valores que esta janela cobriu, por campo            // anda quando a memória é trocada pelo que chegou (nunca "Salvo" sobre ela)
   var alunoEmEdicao = null;
   /* Redesenha o resumo de etapas do alto da aba Dados. Quem marca a etapa é o
    * quadro da aba Mapeamento, e ele avisa aqui para as duas abas nunca
@@ -96,7 +97,7 @@
     {
       versao: '1.42.94',
       itens: [
-        'Na janela de uma aula que já existe, o relato e a nota só sua salvam sozinhos enquanto você escreve. Data, horário, duração, situação e cobrança gravam quando você fecha a aula ou toca em Concluir registro, com um aviso do que mudou e o Desfazer. "Descartar alterações" fecha sem gravar e volta o relato ao que era. Se a aula mudar em outro aparelho enquanto está aberta, nada é gravado por cima: o rodapé avisa e fechar pergunta antes.'
+        'Na janela de uma aula que já existe, o relato e a nota só sua salvam sozinhos enquanto você escreve. Data, horário, duração, situação e cobrança gravam quando você fecha a aula ou toca em Concluir registro, com um aviso do que mudou e o Desfazer. "Descartar alterações" fecha sem gravar o que ainda não foi gravado e volta o relato e a nota ao que eram; o assunto e os arquivos ficam. Se a aula mudar em outro aparelho enquanto está aberta, nada é gravado por cima: o rodapé avisa e fechar pergunta antes.'
       ]
     },
     {
@@ -2007,10 +2008,13 @@
      * sozinho; data, horário, duração, situação e cobrança só gravam pelo
      * Fechar ou pelo Concluir, e o aviso diz que não gravaram. */
     if (id === 'modal-aula' && !fechandoAulaPelasRegras && typeof janelaDaAulaAberta === 'function' &&
-        janelaDaAulaAberta() && !conflitoAutosaveAula) {
+        janelaDaAulaAberta() && !conflitoAutosaveAula &&
+        valoresDaAulaNoBanco(aulaEmEdicao.id)) { // B3: a aula excluída não tem o que gravar nem avisar
       if (relatoEmEdicaoAlterado()) gravarRelatoDaAula();
       if (camposPendentesDaAula(CAMPOS_FECHAMENTO_AULA).length) {
-        avisar('A mudança de data, horário, duração, situação ou cobrança desta aula não foi gravada. Abra a aula de novo para fazê-la.');
+        // B3: a frase vai junto do aviso da ação que fechou (dividir, material), e não por baixo dele
+        fraseAulaNaoGravada = 'A mudança de data, horário, duração, situação ou cobrança desta aula não foi gravada: abra a aula de novo para fazê-la.';
+        setTimeout(function () { if (fraseAulaNaoGravada) avisar(''); }, 0);
       }
     }
     if (id === 'modal-excluir-aluno' && exclusaoAlunoPendente) return;
@@ -2072,7 +2076,15 @@
     posicionarAviso();
   }
 
+  /* F7 (B3): a frase de que a aula fechada por uma ação não gravou a data, o
+   * horário, a duração, a situação ou a cobrança vai no PRÓXIMO aviso, junto
+   * do da ação (dividir, material), e não é coberta por ele. */
+  var fraseAulaNaoGravada = null;
   function avisar(texto, rotuloAcao, aoAgir, rotulo2, aoAgir2) {
+    if (fraseAulaNaoGravada) {
+      texto = texto ? texto + ' ' + fraseAulaNaoGravada : fraseAulaNaoGravada;
+      fraseAulaNaoGravada = null;
+    }
     var caixa = $('#aviso');
     caixa.classList.remove('aviso-dourado'); // só o Desfazer do dispensar (D6c) é dourado
     $('#aviso-texto').textContent = texto;
@@ -3795,10 +3807,15 @@
     }
     var aula = aulaEmEdicao;
     var valores = valoresEditadosDaAula();
-    var mudancas = {};
-    chaves.forEach(function (k) { mudancas[k] = valores[k]; });
-    // relato e nota não escorrem pela repetição: só esta aula
-    Core.aplicarEdicaoAula(db, aula.id, mudancas, 'esta');
+    /* B4: o relato e a nota só dela gravam DIRETO no registro desta aula, sem
+     * o escopo 'esta' e sem marcar "destacada": não são do padrão da série, e
+     * destacar a ocorrência por causa de um relato tirava a aula do "todas". */
+    var registroDaAula = (db.aulas || []).filter(function (x) { return x.id === aula.id; })[0];
+    chaves.forEach(function (k) {
+      // B2: o que esta janela cobre fica anotado, para reconhecer o disco que voltou atrás
+      (sobrescritosPelaJanela[k] = sobrescritosPelaJanela[k] || []).push(baseBancoAutosaveAula ? baseBancoAutosaveAula[k] : '');
+      if (registroDaAula) registroDaAula[k] = valores[k];
+    });
     absorverGravadoNaJanela(chaves, valores);
     var relatoGravado = { notaTexto: valores.notaTexto, notaPrivada: valores.notaPrivada };
     var geracao = geracaoDoBanco;
@@ -3909,10 +3926,12 @@
               : frasDoQueMudouNaAula(mudancas);
           return base + textoDeTrilha(mexeu);
         };
-        comDesfazer(rotulo, function () {
+        var acaoDaAula = function () {
           Core.aplicarEdicaoAula(db, aula.id, mudancas, escopo);
           mexeu = revisarTrilhasDoAluno(alunoId);
-        }).then(function () {
+        };
+        // numa aula só, o Desfazer volta só ela (e a série dela); nos escopos de várias, o banco de antes
+        (escopo === 'esta' ? comDesfazerDaAula(rotulo, aula.id, acaoDaAula) : comDesfazer(rotulo, acaoDaAula)).then(function () {
           if (aulaEmEdicao && aulaEmEdicao.id === aula.id) absorverGravadoNaJanela(pendentes, valores);
           fecharAulaPelasRegras(depois || null);
           desenharTudo();
@@ -3923,16 +3942,63 @@
     });
   }
 
+  /* B5: o Desfazer de uma mudança numa aula só volta SÓ essa aula (e a série
+   * dela, que a remarcação mexe nas exclusões): o que ela fez em outra aula
+   * depois do aviso fica. O ponto do histórico continua sendo o banco inteiro. */
+  function comDesfazerDaAula(rotulo, aulaId, acao) {
+    var antesDoBanco = JSON.parse(JSON.stringify(dbParaGravar()));
+    var doCelular = gravacaoDoCelular > 0;
+    var gravar = function (f) { return doCelular ? comoAcaoDoCelular(f) : f(); };
+    var copia = function (x) { return x === undefined ? undefined : JSON.parse(JSON.stringify(x)); };
+    var aulaAntes = (db.aulas || []).filter(function (x) { return x.id === aulaId; })[0];
+    var copiaAula = aulaAntes ? copia(aulaAntes) : null;
+    var serieAntes = aulaAntes && aulaAntes.serieId ? (db.series || []).filter(function (s) { return s.id === aulaAntes.serieId; })[0] : null;
+    var copiaSerie = serieAntes ? copia(serieAntes) : null;
+    var alunoAntes = aulaAntes ? alunoPorId(aulaAntes.alunoId) : null;
+    var trilhasAntes = alunoAntes ? copia(alunoAntes.trilhas) : undefined;
+    acao();
+    var texto = (typeof rotulo === 'function') ? rotulo() : rotulo;
+    return Store.registrarHistorico(texto, antesDoBanco).then(function () { return true; }, function () { return false; })
+      .then(function (comPonto) {
+        return gravar(salvar).then(function () {
+          if (!comPonto || !copiaAula) { avisar(texto); return; }
+          avisar(texto, 'Desfazer', function () {
+            /* só os campos do fechamento desta aula (o relato e a nota gravados
+             * depois ficam), as exclusões da série dela e os passos da trilha do
+             * aluno, que a mudança tinha revisado */
+            var agora = (db.aulas || []).filter(function (x) { return x.id === aulaId; })[0];
+            if (!agora) { avisar('Esta aula não existe mais: nada foi desfeito.'); return; }
+            CAMPOS_FECHAMENTO_AULA.concat(['destacada', 'dataOriginal']).forEach(function (k) {
+              if (Object.prototype.hasOwnProperty.call(copiaAula, k)) agora[k] = copia(copiaAula[k]); else delete agora[k];
+            });
+            if (copiaSerie) {
+              var j = (db.series || []).map(function (s) { return s.id; }).indexOf(copiaSerie.id);
+              if (j >= 0) db.series[j] = copia(copiaSerie);
+            }
+            var alunoAgora = alunoAntes ? alunoPorId(alunoAntes.id) : null;
+            if (alunoAgora) { if (trilhasAntes === undefined) delete alunoAgora.trilhas; else alunoAgora.trilhas = copia(trilhasAntes); }
+            if (aulaEmEdicao && aulaEmEdicao.id === aulaId) fecharTudo();
+            gravar(function () {
+              return salvarEDepois(function (gravou) {
+                desenharTudo();
+                if (gravou) avisar('Alteração desfeita.');
+              });
+            });
+          });
+        }, function () { avisar(texto); });
+      });
+  }
+
   /* "Descartar alterações": fecha sem gravar o que está pendente e volta o
-   * relato e a nota ao que havia ao abrir, com a marca de "destacada" da
-   * repetição como era (o relato salvo sozinho destaca a ocorrência). Só
-   * esses três campos: o assunto, o domínio e os arquivos, que gravam na hora
-   * por outros caminhos, ficam. E só se ninguém mais mexeu nela desde a última
-   * gravação daqui (regra 2). */
+   * relato e a nota ao que havia ao abrir (ou ao que chegou do outro aparelho
+   * depois: o rebase atualiza a abertura, B1). Só esses dois campos: o relato
+   * não destaca a aula da repetição (B4), e o assunto, o domínio e os
+   * arquivos, que gravam na hora por outros caminhos, ficam. E só se ninguém
+   * mais mexeu nela desde a última gravação daqui (regra 2). */
   function descartarAlteracoesDaAula() {
     if (!janelaDaAulaAberta()) return;
     var aula = aulaEmEdicao;
-    if (!confirmar('Descartar o que você mudou nesta aula desde que a abriu, inclusive o relato?')) return;
+    if (!confirmar('Descartar o relato, a nota e o que ainda não foi gravado nesta aula? O assunto e os arquivos ficam.')) return;
     if (temporizadorAutosaveAula) clearTimeout(temporizadorAutosaveAula);
     temporizadorAutosaveAula = null;
     limparRascunhoRelato(aula.id);
@@ -3945,13 +4011,13 @@
       return;
     }
     var era = aberturaDaAula.registro, agora = db.aulas[i];
-    ['notaTexto', 'notaPrivada', 'destacada'].forEach(function (k) {
+    ['notaTexto', 'notaPrivada'].forEach(function (k) {
       if (Object.prototype.hasOwnProperty.call(era, k)) agora[k] = era[k]; else delete agora[k];
     });
     salvarEDepois(function (gravou) {
       fecharAulaPelasRegras(null);
       desenharTudo();
-      if (gravou) avisar('Alterações descartadas: a aula voltou ao que era.');
+      if (gravou) avisar('Descartados o relato, a nota e o que ainda não estava gravado. O assunto e os arquivos ficaram.');
     });
   }
 
@@ -3978,15 +4044,41 @@
       rotuloEstadoAutosaveAula(FRASE_CONFLITO_AULA);
       return;
     }
+    /* B2: o banco voltou a um valor que esta janela já tinha coberto (a
+     * gravação daqui não chegou ao disco antes de a memória ser trocada). Não
+     * é mudança do outro aparelho: a caixa fica com o texto dela, o rascunho
+     * fica, e a janela entra em conflito (fechar pergunta). */
+    var voltouAtras = mudaram.filter(function (k) {
+      return (sobrescritosPelaJanela[k] || []).indexOf(noBanco[k]) >= 0;
+    });
+    if (voltouAtras.length) {
+      var sv = Object.assign({}, snapshotAutosaveAula || {});
+      voltouAtras.forEach(function (k) { sv[k] = noBanco[k]; }); // a caixa difere do banco: é dela, pendente
+      snapshotAutosaveAula = sv;
+      conflitoAutosaveAula = true;
+      rotuloEstadoAutosaveAula('A gravação daqui não chegou ao tablet antes de uma mudança de outro aparelho. O seu texto continua na caixa e no rascunho, e nada foi gravado por cima: feche e abra de novo.');
+      return;
+    }
     // o que ela não mexeu: o formulário passa a mostrar a versão nova
     var CAMPO = { data: '#campo-data', hora: '#campo-hora', duracaoMin: '#campo-duracao', status: '#campo-status',
       cobravel: '#campo-cobrar', notaTexto: '#campo-nota-texto', notaPrivada: '#campo-nota-privada' };
     var s = Object.assign({}, snapshotAutosaveAula || {});
+    // B5: situação e cobrança andam juntas (a cobrança sem valor no registro segue o padrão da situação)
+    if (mudaram.indexOf('status') >= 0 && mudaram.indexOf('cobravel') < 0) mudaram.push('cobravel');
     mudaram.forEach(function (k) {
       var c = $(CAMPO[k]);
       if (!c) return;
-      if (k === 'cobravel') c.checked = noBanco[k] !== false; else c.value = String(noBanco[k]);
+      if (k === 'cobravel') {
+        var st = Core.STATUS[noBanco.status] || Core.STATUS.realizada;
+        c.checked = noBanco.cobravel === null ? !!st.cobravelPadrao : !!noBanco.cobravel;
+      } else c.value = String(noBanco[k]);
       s[k] = valoresEditadosDaAula()[k];
+      // B1: o que chegou passa a ser a abertura desta janela: o Descartar volta ao que ESTA janela mudou
+      if (aberturaDaAula) {
+        aberturaDaAula.valores[k] = noBanco[k];
+        if (Object.prototype.hasOwnProperty.call(novo, k)) aberturaDaAula.registro[k] = novo[k];
+        else delete aberturaDaAula.registro[k];
+      }
     });
     snapshotAutosaveAula = s;
     baseBancoAutosaveAula = noBanco;
@@ -4041,6 +4133,7 @@
     conflitoAutosaveAula = false;
     baseDiscoRelatoAula = null;
     aberturaDaAula = null;
+    sobrescritosPelaJanela = {};
     if ($('#descartar-aula')) $('#descartar-aula').style.display = novo ? 'none' : '';
     // nada foi salvo ainda nesta abertura: o rodapé só fala quando há o que dizer
     rotuloEstadoAutosaveAula('');

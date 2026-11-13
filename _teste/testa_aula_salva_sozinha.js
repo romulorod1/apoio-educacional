@@ -21,11 +21,26 @@
  * 7. A falha de gravação aparece (rodapé e faixa) e a nova tentativa grava.
  * 8. O relato não se perde ao recarregar logo depois de escrever, com o disco
  *    recusando: volta pelo rascunho guardado na saída da página.
+ * Rodada 3:
+ * 9.  (B1) Descartar volta só o que ESTA janela mudou: a nota, a situação e a
+ *     cobrança que chegaram do celular ficam (e a janela as mostra coerentes).
+ * 10. (B2) A gravação falha e chega a nuvem com o relato de antes: a caixa
+ *     fica com o texto dela, a janela não diz que mostra a versão nova, e o
+ *     rascunho volta ao reabrir.
+ * 11. (B3) Excluir com mudança pendente: o aviso é o da exclusão, com o
+ *     Desfazer. Dividir com mudança pendente: um aviso só, com as duas frases.
+ * 12. (B4) O relato numa aula da repetição não a destaca, e o "todas" de uma
+ *     irmã muda o horário dela sem tocar o relato.
+ * 13. (B5) O Desfazer de "Aula atualizada" volta só aquela aula: o relato
+ *     gravado depois em outra aula fica.
  *
  * Venenos, cada um tem de cair:
  *   --envenenado-grava-por-cima        sem a conferência antes de gravar e sem o rebase;
  *   --envenenado-sem-rascunho-ao-sair  sem o rascunho na saída da página (a gravação fica);
- *   --envenenado-retrato-absorve-tudo  o retrato do gravado absorve todas as chaves (A1).
+ *   --envenenado-retrato-absorve-tudo  o retrato do gravado absorve todas as chaves (A1);
+ *   --envenenado-descartar-velho       o rebase não atualiza a abertura da janela (B1);
+ *   --envenenado-volta-atras           o rebase não reconhece o banco que voltou atrás (B2);
+ *   --envenenado-desfazer-tudo         o Desfazer de uma aula volta o banco inteiro (B5).
  * Dados fictícios.
  */
 'use strict';
@@ -35,24 +50,32 @@ const H = require('./_bib_navegador');
 const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const { conf, secao, esperar, pausa } = H;
 
-const MODOS = ['--envenenado-grava-por-cima', '--envenenado-sem-rascunho-ao-sair', '--envenenado-retrato-absorve-tudo'];
+const MODOS = ['--envenenado-grava-por-cima', '--envenenado-sem-rascunho-ao-sair', '--envenenado-retrato-absorve-tudo',
+  '--envenenado-descartar-velho', '--envenenado-volta-atras', '--envenenado-desfazer-tudo'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) >= 0)[0] || '';
 const CONFERE = '    return chaves.filter(function (k) { return noBanco[k] !== base[k]; });';
 const REBASE = '  function rebasearAulaAberta() {';
 const RASCUNHO_SAIDA = "      guardarRascunhoRelato(aulaEmEdicao, $('#campo-nota-texto'), $('#campo-nota-privada'), baseDiscoRelatoAula); // o rascunho, na hora";
 const RETRATO = '    chaves.forEach(function (k) { s[k] = valores[k]; });';
+const ABERTURA = '      if (aberturaDaAula) {';
+const VOLTOU = '      return (sobrescritosPelaJanela[k] || []).indexOf(noBanco[k]) >= 0;';
+const DESFAZ = "(escopo === 'esta' ? comDesfazerDaAula(rotulo, aula.id, acaoDaAula) : comDesfazer(rotulo, acaoDaAula))";
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 conf('(arranjo) as âncoras dos venenos estão cada uma num lugar só',
-  [CONFERE, REBASE, RASCUNHO_SAIDA, RETRATO].map(a => APP.split(a).length).join(','), '2,2,2,2');
+  [CONFERE, REBASE, RASCUNHO_SAIDA, RETRATO, ABERTURA, VOLTOU, DESFAZ].map(a => APP.split(a).length).join(','), '2,2,2,2,2,2,2');
 const trocas = {};
 if (MODO === MODOS[0]) trocas['/app.js'] = APP.replace(CONFERE, '    return [];').replace(REBASE, REBASE + ' return;');
 if (MODO === MODOS[1]) trocas['/app.js'] = APP.replace(RASCUNHO_SAIDA, '');
 if (MODO === MODOS[2]) trocas['/app.js'] = APP.replace(RETRATO, '    Object.keys(valores).forEach(function (k) { s[k] = valores[k]; });');
+if (MODO === MODOS[3]) trocas['/app.js'] = APP.replace(ABERTURA, '      if (false) {');
+if (MODO === MODOS[4]) trocas['/app.js'] = APP.replace(VOLTOU, '      return false;');
+if (MODO === MODOS[5]) trocas['/app.js'] = APP.replace(DESFAZ, 'comDesfazer(rotulo, acaoDaAula)');
 if (MODO) conf('(veneno) o app.js servido mudou', trocas['/app.js'] !== APP, true);
 const amb = H.criarAmbiente(8886, 'nath_f7_salva_sozinha', trocas);
 function fimDoVeneno() { throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true }); }
 
 const AVULSA = 'f7_aula';
+const EXCLUI = 'f7_exclui', DIVIDE = 'f7_divide', OUTRA = 'f7_outra';
 const lerAula = (pag, id) => pag.evaluate(id => Store.carregar().then(d => {
   const a = d.aulas.find(x => x.id === id);
   return a ? JSON.parse(JSON.stringify(a)) : null;
@@ -108,17 +131,19 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
   });
   await RELOGIO.naPagina(pag);
   await H.abrirApp(pag, amb.ORIGEM);
-  const serie = await pag.evaluate(async id => {
+  const serie = await pag.evaluate(async (id, EXCLUI, DIVIDE, OUTRA) => {
     const d = await Store.carregar();
     d.alunos = [{ id: 'f7_alfa', nome: 'Aluna Alfa Teste', ativo: true, precos: [] }];
     d.series = []; d.resumos = [];
     d.aulas = [{ id, alunoId: 'f7_alfa', data: Core.hojeIso(), hora: '10:00', duracaoMin: 60, status: 'realizada',
       cobravel: true, notaTexto: 'Relato de antes', notaPrivada: 'Nota de antes', anexos: [] }];
+    [[EXCLUI, '07:00'], [DIVIDE, '08:00'], [OUTRA, '13:00']].forEach(p => d.aulas.push({ id: p[0], alunoId: 'f7_alfa',
+      data: Core.hojeIso(), hora: p[1], duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', notaPrivada: '', anexos: [] }));
     Core.criarSerie(d, { alunoId: 'f7_alfa', dias: [Core.diaSemana(Core.hojeIso())], hora: '16:00', duracaoMin: 60, inicio: Core.hojeIso(), fim: null });
     await Store.salvar(d);
     const s = d.series[0];
     return { id: s.id, aula: d.aulas.find(a => a.serieId === s.id && a.data === Core.hojeIso()).id };
-  }, AVULSA);
+  }, AVULSA, EXCLUI, DIVIDE, OUTRA);
   await H.abrirApp(pag, amb.ORIGEM);
 
   if (MODO === MODOS[0] || !MODO) {
@@ -264,6 +289,142 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
     }
     conf('o relato escrito antes de recarregar voltou', volta.texto, 'Relato escrito logo antes de recarregar');
     conf('com o aviso "Rascunho recuperado às"', /Rascunho recuperado às/.test(volta.aviso), true);
+  }
+
+  const avisoAgora = pag => pag.evaluate(() => ({ texto: document.querySelector('#aviso-texto').textContent,
+    acao: (document.querySelector('#aviso-acao') || {}).textContent || '' }));
+
+  if (MODO === MODOS[3] || !MODO) {
+    secao('9. (B1) Descartar volta só o que esta janela mudou');
+    conf('(arranjo) a aula abriu', (await abrir(pag, AVULSA)).ok, true);
+    const abertura9 = await lerAula(pag, AVULSA);
+    await escrever(pag, '#campo-nota-texto', 'Relato A desta janela');
+    conf('(arranjo) o relato salvou sozinho', (await esperar('relato A', () => lerAula(pag, AVULSA), a => a && a.notaTexto === 'Relato A desta janela', 5000)).ok, true);
+    conf('(arranjo) chegou do celular outra nota, outra situação e a cobrança desligada',
+      await chegaDaNuvem(pag, AVULSA, { notaPrivada: 'Nota B do celular', status: 'cancelada', cobravel: false }), 1);
+    await pausa(900);
+    const janela9 = await pag.evaluate(() => ({ nota: document.querySelector('#campo-nota-privada').value,
+      status: document.querySelector('#campo-status').value, cobrar: document.querySelector('#campo-cobrar').checked }));
+    conf('a janela mostra a nota, a situação e a cobrança que chegaram, coerentes (' + JSON.stringify(janela9) + ')',
+      janela9.nota === 'Nota B do celular' && janela9.status === 'cancelada' && janela9.cobrar === false, true);
+    const d9 = pag.dialogos.length;
+    await pag.click('#descartar-aula');
+    conf('a pergunta diz exatamente o que volta e o que fica', pag.dialogos.slice(d9).join(' '),
+      'Descartar o relato, a nota e o que ainda não foi gravado nesta aula? O assunto e os arquivos ficam.');
+    const depois9 = await esperar('o relato voltou', () => lerAula(pag, AVULSA), a => a && a.notaTexto === abertura9.notaTexto, 5000);
+    const fim9 = await lerAula(pag, AVULSA);
+    if (MODO === MODOS[3]) {
+      conf('VENENO visto: a nota do celular sobreviveu ao Descartar, e quebrou (' + fim9.notaPrivada + ')', fim9.notaPrivada === 'Nota B do celular', false);
+      fimDoVeneno();
+    }
+    conf('o relato desta janela voltou ao de antes', depois9.ok, true);
+    conf('a nota, a situação e a cobrança do celular ficaram', fim9.notaPrivada === 'Nota B do celular' && fim9.status === 'cancelada' && fim9.cobravel === false, true);
+    conf('o aviso diz o que voltou e o que ficou', (await avisoAgora(pag)).texto,
+      'Descartados o relato, a nota e o que ainda não estava gravado. O assunto e os arquivos ficaram.');
+  }
+
+  if (MODO === MODOS[4] || !MODO) {
+    secao('10. (B2) Falha de gravação e chegada da nuvem: o texto dela fica');
+    conf('(arranjo) a aula abriu', (await abrir(pag, AVULSA)).ok, true);
+    const antes10 = await lerAula(pag, AVULSA);
+    await pag.evaluate(() => { window.__salvarOriginalB2 = Store.salvar; Store.salvar = () => Promise.reject(new Error('falha simulada')); });
+    await escrever(pag, '#campo-nota-texto', 'Texto C que o disco recusou');
+    await pausa(1500);
+    conf('(arranjo) o rodapé diz que não gravou', /Não foi possível gravar/.test(await rodape(pag)), true);
+    // a nuvem traz a aula como está no disco: o relato de antes, e a nota mudada no celular
+    conf('(arranjo) chegou da nuvem a aula com o relato de antes', await chegaDaNuvem(pag, AVULSA, { notaPrivada: 'Nota E do celular' }), 1);
+    await pausa(900);
+    const caixa10 = await pag.$eval('#campo-nota-texto', e => e.value);
+    if (MODO === MODOS[4]) {
+      conf('VENENO visto: o texto dela continua na caixa, e quebrou (' + caixa10 + ')', caixa10 === 'Texto C que o disco recusou', false);
+      fimDoVeneno();
+    }
+    conf('o texto dela continua na caixa', caixa10, 'Texto C que o disco recusou');
+    const rod10 = await rodape(pag);
+    conf('o rodapé não diz que a janela mostra a versão nova (' + rod10 + ')', /já mostra a versão nova/.test(rod10), false);
+    conf('o rascunho dela continua guardado', await pag.evaluate(id => {
+      const r = JSON.parse(localStorage.getItem('rascunho-relato-aula:' + id) || 'null');
+      return !!r && r.notaTexto === 'Texto C que o disco recusou';
+    }, AVULSA), true);
+    conf('nada foi gravado por cima do relato de antes', (await lerAula(pag, AVULSA)).notaTexto, antes10.notaTexto);
+    await pag.evaluate(() => { Store.salvar = window.__salvarOriginalB2; });
+    const d10 = pag.dialogos.length;
+    await pag.click('#cancelar-aula');
+    await pausa(500);
+    conf('fechar pergunta antes de largar o texto dela', /não foi gravado/.test(pag.dialogos.slice(d10).join(' ')) && !(await aberta(pag)), true);
+    conf('(arranjo) a aula reabriu', (await abrir(pag, AVULSA)).ok, true);
+    const volta10 = await pag.evaluate(() => ({ texto: document.querySelector('#campo-nota-texto').value,
+      aviso: (document.querySelector('#aviso-rascunho-relato') || {}).textContent || '' }));
+    conf('ao reabrir, o texto dela volta pelo rascunho', volta10.texto === 'Texto C que o disco recusou' && /Rascunho recuperado/.test(volta10.aviso), true);
+    await pag.click('#descartar-aula');
+    await pausa(800);
+  }
+
+  if (!MODO) {
+    secao('11. (B3) Excluir e Dividir com mudança pendente');
+    conf('(arranjo) a aula a excluir abriu', (await abrir(pag, EXCLUI)).ok, true);
+    await escolher(pag, '#campo-status', 'falta');
+    await pag.click('#excluir-aula');
+    await esperar('a aula saiu', () => lerAula(pag, EXCLUI), a => a === null, 5000);
+    await pausa(300);
+    const av11 = await avisoAgora(pag);
+    conf('o aviso é o da exclusão, com Desfazer, sem falar do que não gravou (' + av11.texto + ')',
+      /^Aula excluída/.test(av11.texto) && !/não foi gravada/.test(av11.texto) && /Desfazer/.test(av11.acao), true);
+    await pag.click('#aviso-acao');
+    await esperar('a exclusão desfeita', () => lerAula(pag, EXCLUI), a => !!a, 5000);
+    conf('(arranjo) a aula a dividir abriu', (await abrir(pag, DIVIDE)).ok, true);
+    await escolher(pag, '#campo-hora', '08:30');
+    await pag.evaluate(() => document.querySelector('#dividir-aula').click());
+    await esperar('a aula dividiu', () => lerAula(pag, DIVIDE), a => a && a.duracaoMin === 30, 5000);
+    await pausa(300);
+    const av11b = await avisoAgora(pag);
+    conf('um aviso só, com a divisão, o Desfazer e a frase do que não gravou (' + av11b.texto + ')',
+      /^Aula dividida em/.test(av11b.texto) && /não foi gravada/.test(av11b.texto) && /Desfazer/.test(av11b.acao), true);
+    conf('o horário pendente não gravou', (await lerAula(pag, DIVIDE)).hora, '08:00');
+
+    secao('12. (B4) O relato não destaca a aula da repetição');
+    const irmas = await pag.evaluate(sid => Store.carregar().then(d => d.aulas.filter(a => a.serieId === sid && !a.destacada)
+      .sort((x, y) => x.data.localeCompare(y.data)).map(a => a.id)), serie.id);
+    conf('(arranjo) há duas aulas não destacadas na repetição', irmas.length >= 2, true);
+    conf('(arranjo) a aula da repetição abriu', (await abrir(pag, irmas[0])).ok, true);
+    await escrever(pag, '#campo-nota-texto', 'Relato da irmã');
+    const r12 = await esperar('o relato salvou', () => lerAula(pag, irmas[0]), a => a && a.notaTexto === 'Relato da irmã', 5000);
+    conf('o relato gravou e a aula não ficou destacada', r12.ok && !r12.valor.destacada, true);
+    await pag.click('#cancelar-aula');
+    await pausa(400);
+    conf('(arranjo) a outra irmã abriu', (await abrir(pag, irmas[1])).ok, true);
+    await escolher(pag, '#campo-hora', '15:00');
+    await pag.click('#salvar-aula');
+    await esperar('pergunta de escopo', () => pag.evaluate(() => document.querySelector('#modal-escopo').classList.contains('aberto')), Boolean, 4000);
+    await pag.evaluate(() => Array.from(document.querySelectorAll('.opcao-escopo')).find(o => /Todas as aulas/.test(o.textContent)).click());
+    const t12 = await esperar('o todas chegou na irmã do relato', () => lerAula(pag, irmas[0]), a => a && a.hora === '15:00', 5000);
+    conf('o "todas" muda o horário da irmã do relato e não toca o relato', t12.ok && t12.valor.notaTexto === 'Relato da irmã', true);
+  }
+
+  if (MODO === MODOS[5] || !MODO) {
+    secao('13. (B5) O Desfazer volta só a aula dele');
+    conf('(arranjo) a aula abriu', (await abrir(pag, AVULSA)).ok, true);
+    const antes13 = await lerAula(pag, AVULSA);
+    await escolher(pag, '#campo-status', antes13.status === 'falta' ? 'reposicao' : 'falta');
+    await pag.click('#cancelar-aula');
+    await esperar('a situação gravou', () => lerAula(pag, AVULSA), a => a && a.status !== antes13.status, 5000);
+    conf('(arranjo) o aviso tem Desfazer', /Desfazer/.test((await avisoAgora(pag)).acao), true);
+    conf('(arranjo) a outra aula abriu', (await abrir(pag, OUTRA)).ok, true);
+    await escrever(pag, '#campo-nota-texto', 'Relato da outra aula');
+    conf('(arranjo) o relato da outra aula salvou', (await esperar('relato outra', () => lerAula(pag, OUTRA), a => a && a.notaTexto === 'Relato da outra aula', 5000)).ok, true);
+    await pag.click('#cancelar-aula');
+    await pausa(300);
+    const av13 = await avisoAgora(pag);
+    conf('(arranjo) o aviso de Desfazer continua (' + av13.texto + ')', /^Aula atualizada/.test(av13.texto) && /Desfazer/.test(av13.acao), true);
+    await pag.click('#aviso-acao');
+    await esperar('o Desfazer voltou a situação', () => lerAula(pag, AVULSA), a => a && a.status === antes13.status, 5000);
+    const outra13 = await lerAula(pag, OUTRA);
+    if (MODO === MODOS[5]) {
+      conf('VENENO visto: o relato da outra aula ficou, e quebrou (' + outra13.notaTexto + ')', outra13.notaTexto === 'Relato da outra aula', false);
+      fimDoVeneno();
+    }
+    conf('a situação desta aula voltou', (await lerAula(pag, AVULSA)).status, antes13.status);
+    conf('o relato gravado depois na outra aula ficou', outra13.notaTexto, 'Relato da outra aula');
   }
 
   conf('não houve erro de página', (pag.errosDePagina || []).join(' | '), '');
