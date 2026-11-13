@@ -441,12 +441,30 @@ async function transbordo(pag, raizSel) {
   /* 7: a trava de concorrência. Com o cartão aberto e a saída escolhida, o outro aparelho registra a aula de 20/11
    * (ela passa a ter relato). Chega pelo caminho de verdade: Store.aplicarRecebidos, que avisa o app (registrosChegaram). */
   const antesConc = await soBanco(pag);
-  const b2 = JSON.parse(antesConc).aulas.find(a => a.id === 'b2');
-  await pag.evaluate(async aula => {
-    const quando = new Date().toISOString();
-    await Store.aplicarRecebidos([{ id: 'aula:b2', tipo: 'aula', dados: Object.assign({}, aula, { notaTexto: 'Relato escrito no outro aparelho.' }), atualizadoEm: quando, apagadoEm: null,
-      aparelho: 'apOutroTablet', esquema: 1, servidorEm: quando, updateTime: quando, nome: 'x/registros/aula:b2' }]);
-  }, b2);
+  /* O registro chega como nas provas da nuvem que já passam (testa_aula_salva_sozinha):
+   * a fila de saída limpa (senão a edição local ainda não enviada vence, regra do Store, e o
+   * que chega é ignorado calado), os dados do registro local da aula, um aparelho válido e
+   * um carimbo do servidor mais novo que qualquer outro. */
+  const aplicados = await pag.evaluate(async () => {
+    await new Promise((resolve, reject) => {
+      const req = indexedDB.open('apoio-educacional');
+      req.onsuccess = () => {
+        const b = req.result;
+        const t = b.transaction('saida', 'readwrite');
+        t.objectStore('saida').clear();
+        t.oncomplete = () => { b.close(); resolve(); };
+        t.onerror = () => { b.close(); reject(t.error); };
+      };
+      req.onerror = () => reject(req.error);
+    });
+    const local = (await Store.lerRegistros()).find(r => r.id === 'aula:b2');
+    const dados = Object.assign({}, local.dados, { notaTexto: 'Relato escrito no outro aparelho.' });
+    const carimbo = '2099-01-01T00:00:00.000000Z';
+    const contas = await Store.aplicarRecebidos([{ id: 'aula:b2', tipo: 'aula', atualizadoEm: new Date().toISOString(), apagadoEm: null,
+      aparelho: 'ap000000000001', esquema: 1, servidorEm: carimbo, updateTime: carimbo, dados }]);
+    return contas && contas.aplicados;
+  });
+  conf('7: (arranjo) o Store aplicou o registro do outro aparelho', aplicados, 1);
   const chegou = await esperar('a mudança do outro aparelho chegou', () => soBanco(pag), v => JSON.parse(v).aulas.find(a => a.id === 'b2').notaTexto === 'Relato escrito no outro aparelho.', 8000);
   conf('7: a mudança chegou pelo caminho de verdade (o relato do outro aparelho está no banco)', chegou.ok, true);
   const depoisDaChegada = await soBanco(pag);
