@@ -280,9 +280,9 @@ roda "venenos existem --envenenado-prefixo" node _teste/testa_venenos_existem.js
 # Nada da fonte privada de anos iniciais no repositorio publico: a arvore de
 # git ls-files e o historico que o merge leva (origin/main..HEAD; no push na
 # main, o before do evento), pelo TIPO (PDF, zip, gzip, 7z, rar e companhia
-# reprovam pelos bytes do comeco), pelo nome, pelo conteudo, pelo SHA e pela
-# impressao do texto (os dois ultimos pelos segredos FONTE_PRIVADA_SHAS e
-# FONTE_PRIVADA_TEXTO; no CI, sem eles, reprova). Fica nesta secao, e nao no
+# reprovam pelos bytes do comeco) e pelas marcas no nome e no conteudo. O SHA
+# contra a lista privada so roda na maquina que tem a lista; sem ela, a prova
+# diz que pulou e nao reprova (no CI nao ha segredo nenhum). Fica nesta secao, e nao no
 # mapa, para rodar no portao-rapido em TODO push, mexa o PR no que mexer:
 # arquivo novo de qualquer nome e pego. O veneno monta um repositorio temporario
 # com cada caso e tem de acusar cada um.

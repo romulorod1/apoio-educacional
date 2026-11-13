@@ -1,6 +1,7 @@
 #!/bin/sh
 # Hook OPCIONAL de pre-push: roda a trava da fonte privada de anos iniciais
-# sobre os commits que vão ser enviados, ANTES de eles chegarem ao GitHub.
+# sobre os commits que vão ser enviados, ANTES de eles chegarem ao GitHub:
+# o tipo proibido, as marcas e, na máquina que tem a lista privada, o SHA.
 #
 # Existe porque o CI só barra o merge: um push num ramo já publica os commits
 # no repositório público, com o portão vermelho ou não. Nenhum clone o tem

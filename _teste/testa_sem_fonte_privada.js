@@ -12,7 +12,7 @@
  * isso a prova não precisa de exceção para si mesma: ela se varre junto com
  * todo o resto e sai limpa.
  *
- * AS CAMADAS, da que não depende de nada à que depende de segredo:
+ * AS CAMADAS, nenhuma depende de segredo:
  *
  *   1. TIPO PROIBIDO, pelos bytes do começo e não pela extensão: PDF, zip (e
  *      com ele docx, xlsx, odt, epub), gzip, bzip2, xz, zstd, 7z, rar, tar e
@@ -23,16 +23,16 @@
  *
  *   2. MARCAS no nome e no conteúdo, sem diferença de maiúscula nem de acento:
  *      a sigla como palavra inteira (sem letra colada; dígito, sublinhado e
- *      ponto separam), a sigla em maiúsculas colada em minúsculas como no
- *      CamelCase, a sigla com pontos entre as letras e o título dos cadernos
- *      com qualquer separador ou sem separador nenhum. Onde se procura:
+ *      ponto separam), a sigla em maiúsculas colada como no CamelCase, a sigla
+ *      com pontos entre as letras e o título dos cadernos com qualquer
+ *      separador ou sem separador nenhum. Onde se procura:
  *        texto        UTF-8, ou UTF-16 com ou sem BOM (um byte nulo cedo não
  *                     desliga a varredura: o que decodifica como UTF-16 é
  *                     texto);
  *        PDF          os bytes crus, as strings literais com escape octal, as
  *                     strings hexadecimais (UTF-16 com BOM inclusive, que é
- *                     como os metadados costumam vir) e cada stream que o zlib
- *                     abre, de todos os streams;
+ *                     como os metadados costumam vir) e todos os streams que o
+ *                     zlib abre;
  *        zip          o nome, o conteúdo e o SHA de cada entrada, zip dentro
  *                     de zip até LIMITE_ZIP níveis. Zip ilegível, zip64,
  *                     cifrado, de método desconhecido ou aninhado além do
@@ -41,21 +41,12 @@
  *        imagem, wasm só o nome e o SHA;
  *        outro binário os bytes como latin1, sem os nulos.
  *
- *   3. SHA-256 de cada arquivo e de cada entrada contra a lista da fonte. A
- *      lista vem do segredo FONTE_PRIVADA_SHAS do Actions (variável
- *      FONTE_PRIVADA_SHAS_CONTEUDO, com o conteúdo) e, na máquina, do arquivo
- *      FONTE_PRIVADA_SHAS ou do caminho padrão no Drive. Só o primeiro campo de
- *      cada linha conta (o formato do sha256sum); os nomes nunca são impressos.
- *
- *   4. IMPRESSÃO DO TEXTO: janelas de JANELA palavras, normalizadas e com hash
- *      exatamente como no _teste/gera_impressao_fonte_privada.py (a paridade é
- *      conferida em toda rodada), contra a amostra do segredo
- *      FONTE_PRIVADA_TEXTO (ou, na máquina, do arquivo FONTE_PRIVADA_TEXTO_ARQUIVO
- *      ou do caminho padrão). Reprova o arquivo com LIMIAR_JANELAS ou mais
- *      janelas na amostra.
- *
- *   No CI (GITHUB_ACTIONS=true) a falta de qualquer um dos dois segredos
- *   REPROVA. Na máquina, a falta é dita (PULADA) e não reprova.
+ *   3. SHA-256 de cada arquivo e de cada entrada contra a lista da fonte, SÓ
+ *      NA MÁQUINA: o arquivo FONTE_PRIVADA_SHAS ou o caminho padrão no Drive.
+ *      Só o primeiro campo de cada linha conta (o formato do sha256sum); os
+ *      nomes nunca são impressos. Sem a lista (no CI ela nunca existe), a
+ *      prova diz que pulou esta camada e NÃO reprova. Lista que existe e não
+ *      tem SHA nenhum reprova: o instrumento não estaria vendo.
  *
  * O QUE É VARRIDO: a árvore (todo arquivo de `git ls-files`, lido do disco) e o
  * HISTÓRICO que o merge leva junto: cada blob novo, cada caminho e cada
@@ -70,8 +61,9 @@
  *   node _teste/testa_sem_fonte_privada.js --envenenado-com-fonte-privada
  *        num repositório git temporário, fora desta árvore, monta cada caso que
  *        tem de reprovar (um de cada camada e de cada formato, e o histórico
- *        com um commit que acrescenta e outro que apaga) e os controles limpos
- *        que não podem reprovar. Cada caso tem de sair acusado pelo motivo
+ *        com um commit que acrescenta e outro que apaga), os controles limpos
+ *        que não podem reprovar e a camada de SHA dos dois lados (sem a lista,
+ *        passa e diz que pulou; com uma lista temporária, pega o PDF listado). Cada caso tem de sair acusado pelo motivo
  *        certo ("VENENO visto"). O índice desta árvore não é tocado, e a pasta
  *        temporária é apagada.
  */
@@ -112,14 +104,7 @@ const RE_TITULO = new RegExp(TITULO.join('[^a-z0-9]*'));
 /* Os caminhos padrão, na pasta privada do Drive. */
 const PASTA_PRIVADA = 'J:\\Meu Drive\\Vida Pessoal\\Família\\Material pra Nath\\Aplicativo\\Biblioteca\\privado\\' + SIGLA;
 const CAMINHO_SHAS = PASTA_PRIVADA + '\\shas.txt';
-const CAMINHO_TEXTO = PASTA_PRIVADA + '\\impressao_texto.txt';
 
-/* A impressão do texto: os mesmos números do gerador em Python. */
-const JANELA = 10;
-/* Calibrado em 13/11/2026 com a amostra real (2500 de 468.272 janelas): a
- * árvore inteira casa zero janelas, e um hash de 8 bytes não colide por acaso
- * (chance da ordem de 1e-10 na árvore toda). Uma janela casada é texto copiado. */
-const LIMIAR_JANELAS = 1;
 const LIMITE_ZIP = 3;
 
 /* Exceções ao TIPO proibido, uma por caminho, cada uma com o motivo. Vazia:
@@ -160,27 +145,7 @@ function marcasDe(texto) {
   return achou;
 }
 
-/* ------------------------------------------- a impressão do texto (= .py) */
-function palavras(texto) {
-  const t = texto.replace(/-[ \t]*\r?\n[ \t]*/g, '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
-  return t.replace(/[^a-z]+/g, ' ').split(' ').filter(Boolean);
-}
-function hashJanela(ps) {
-  return crypto.createHash('sha256').update(ps.join(' '), 'utf8').digest('hex').slice(0, 16);
-}
-/* Quantas janelas distintas do texto estão na amostra. */
-function janelasCasadas(texto, amostra) {
-  if (!amostra || !amostra.size) return 0;
-  const ps = palavras(texto);
-  const casadas = new Set();
-  for (let i = 0; i + JANELA <= ps.length; i++) {
-    const h = hashJanela(ps.slice(i, i + JANELA));
-    if (amostra.has(h)) casadas.add(h);
-  }
-  return casadas.size;
-}
-
-/* -------------------------------------------------------- os segredos */
+/* ------------------------------------------------- a lista de SHAs */
 /* Só o primeiro campo de cada linha, no formato do sha256sum. */
 function shasDe(texto) {
   const s = new Set();
@@ -191,39 +156,14 @@ function shasDe(texto) {
   });
   return s;
 }
-function impressaoDe(texto) {
-  const linhas = texto.replace(/^\uFEFF/, '').split(/\r?\n/);
-  const cab = linhas.find(l => /^#/.test(l)) || '';
-  if (!new RegExp('^# impressao-texto v1 janela=' + JANELA + ' hash=sha256-8').test(cab)) return { erro: 'cabeçalho ausente ou de outro formato' };
-  const s = new Set();
-  linhas.forEach(l => { const m = l.match(/^\s*([0-9a-f]{16})\s*$/); if (m) s.add(m[1]); });
-  return { conjunto: s };
-}
-/* Uma fonte de segredo: a variável com o conteúdo e, fora do CI, o arquivo.
- * Devolve {conjunto, de} ou {pulada} ou {erro}. */
-function leFonte(env, nomeConteudo, nomeArquivo, padrao, ler) {
-  const noCI = env.GITHUB_ACTIONS === 'true';
-  const partes = [];
-  const de = [];
-  if (env[nomeConteudo]) { partes.push(env[nomeConteudo]); de.push('variável ' + nomeConteudo); }
-  else if (noCI) return { erro: 'no CI a variável ' + nomeConteudo + ' é obrigatória (o segredo não chegou ao job)' };
-  const arq = env[nomeArquivo] || padrao;
-  if (!noCI && fs.existsSync(arq)) { partes.push(fs.readFileSync(arq, 'utf8')); de.push('arquivo ' + mascara(arq)); }
-  if (!partes.length) return { pulada: 'nem ' + nomeConteudo + ' nem o arquivo ' + mascara(arq) };
-  const conjunto = new Set();
-  for (const p of partes) {
-    const r = ler(p);
-    if (r.erro) return { erro: r.erro };
-    r.conjunto.forEach(x => conjunto.add(x));
-  }
-  if (!conjunto.size) return { erro: 'a fonte existe e não tem nenhum hash (' + de.join(', ') + ')' };
-  return { conjunto, de: de.join(' e ') };
-}
+/* A lista é só local: FONTE_PRIVADA_SHAS ou o caminho padrão. Devolve
+ * {conjunto, de} ou {pulada} ou {erro}; a falta nunca reprova, nem no CI. */
 function fonteShas(env) {
-  return leFonte(env, 'FONTE_PRIVADA_SHAS_CONTEUDO', 'FONTE_PRIVADA_SHAS', CAMINHO_SHAS, t => ({ conjunto: shasDe(t) }));
-}
-function fonteTexto(env) {
-  return leFonte(env, 'FONTE_PRIVADA_TEXTO', 'FONTE_PRIVADA_TEXTO_ARQUIVO', CAMINHO_TEXTO, impressaoDe);
+  const arq = env.FONTE_PRIVADA_SHAS || CAMINHO_SHAS;
+  if (!fs.existsSync(arq)) return { pulada: 'sem a lista privada, pulei a camada de SHA' };
+  const conjunto = shasDe(fs.readFileSync(arq, 'utf8'));
+  if (!conjunto.size) return { erro: 'a lista privada existe e não tem nenhum SHA (' + mascara(arq) + ')' };
+  return { conjunto, de: mascara(arq) };
 }
 
 /* ------------------------------------------------------------ os tipos */
@@ -354,11 +294,7 @@ function examina(onde, buf, ctx, prof, de) {
   if (ctx.shas && ctx.shas.has(crypto.createHash('sha256').update(buf).digest('hex'))) acha('sha256', 'SHA da lista da fonte privada');
   const tipo = tipoProibido(buf);
   if (tipo && !(prof === 0 && ctx.excecoes.has(onde))) acha('tipo proibido', tipo);
-  const texto = t => {
-    marcasDe(t).forEach(a => acha('marca', a.marca + (a.linha > 1 ? ', linha ' + a.linha : '')));
-    const n = janelasCasadas(t, ctx.impressao);
-    if (n >= LIMIAR_JANELAS) acha('impressão do texto', n + ' janela(s) de ' + JANELA + ' palavras da fonte');
-  };
+  const texto = t => marcasDe(t).forEach(a => acha('marca', a.marca + (a.linha > 1 ? ', linha ' + a.linha : '')));
   if (ehZip(buf)) {
     if (prof >= LIMITE_ZIP) { acha('zip', 'zip aninhado além de ' + LIMITE_ZIP + ' níveis'); return; }
     let entradas;
@@ -408,7 +344,7 @@ function faixaPadrao(env, raiz) {
 
 /* A varredura: a árvore de `git ls-files` e, com faixa, o histórico dela. */
 function varre(raiz, opcoes) {
-  const ctx = { shas: opcoes.shas, impressao: opcoes.impressao, excecoes: new Set(opcoes.excecoes || []), achados: [] };
+  const ctx = { shas: opcoes.shas, excecoes: new Set(opcoes.excecoes || []), achados: [] };
   const arquivos = git(raiz, ['ls-files', '-z']).toString('utf8').split('\0').filter(Boolean);
   const vistos = new Set();
   const ilegiveis = [];
@@ -463,29 +399,15 @@ function relatorio(achados) {
 /* ----------------------------------------------------- a prova normal */
 function provaNormal() {
   const env = process.env;
-  /* A normalização e o hash são os mesmos do gerador em Python. */
-  const py = spawnSync(env.PYTHON || 'python', [path.join(__dirname, 'gera_impressao_fonte_privada.py'), '--autoteste'], { encoding: 'utf8' });
-  const linhasPy = String(py.stdout || '').replace(/\r/g, '').trim().split('\n');
-  let frase = '';
-  try { frase = JSON.parse(linhasPy[0]); } catch (e) { /* saída sem a frase */ }
-  const psJs = palavras(frase);
-  const esperado = psJs.join(' ') + '\n' + hashJanela(psJs.slice(0, JANELA));
-  conf('a normalização e o hash da trava são os mesmos do gerador em Python (--autoteste)',
-    py.status === 0 && frase.length > 20 && linhasPy.slice(1).join('\n') === esperado,
-    py.status !== 0 ? String(py.stderr || py.error).split('\n')[0] : 'js: ' + psJs.slice(0, 4).join(' '));
-
   const fs1 = fonteShas(env);
-  const ft = fonteTexto(env);
-  [['lista de SHAs', fs1], ['impressão do texto', ft]].forEach(([nome, f]) => {
-    if (f.pulada) console.log('  PULADA a conferência por ' + nome + ': ' + f.pulada);
-    else conf('a ' + nome + ' da fonte privada foi lida' + (f.de ? ' (' + f.de + ', ' + f.conjunto.size + ')' : ''), !f.erro, f.erro);
-  });
+  if (fs1.pulada) console.log('  PULADA ' + fs1.pulada + ' (FONTE_PRIVADA_SHAS ou ' + mascara(CAMINHO_SHAS) + ')');
+  else conf('a lista privada de SHAs foi lida' + (fs1.de ? ' (' + fs1.de + ', ' + fs1.conjunto.size + ')' : ''), !fs1.erro, fs1.erro);
   const fx = faixaPadrao(env, RAIZ);
   if (fx.pulada) console.log('  PULADA a varredura do histórico: ' + fx.pulada);
   else conf('a faixa do histórico foi decidida (' + (fx.faixa ? fx.de : '') + ')', !fx.erro, fx.erro);
 
   const exc = EXCECOES_DE_TIPO.map(e => e.caminho);
-  const r = varre(RAIZ, { shas: fs1.conjunto, impressao: ft.conjunto, faixa: fx.faixa, excecoes: exc });
+  const r = varre(RAIZ, { shas: fs1.conjunto, faixa: fx.faixa, excecoes: exc });
   conf('a varredura viu os arquivos rastreados (controle: mais de 100)', r.arquivos.length > 100, String(r.arquivos.length));
   conf('esta prova está em git ls-files (prova fora do índice nunca roda)', r.arquivos.indexOf(EU) >= 0);
   conf('esta prova foi lida e varrida junto com o resto', r.vistos.has(EU));
@@ -583,14 +505,8 @@ function provaEnvenenada() {
     fs.rmSync(path.join(tmp, 'rascunho'), { recursive: true });
     g(['add', '-A']); g(['commit', '-q', '-m', 'apaga']);
 
-    /* A impressão temporária: um parágrafo inventado, todas as janelas dele. */
-    const paragrafo = 'Joana tinha doze figurinhas e ganhou mais sete do irmão; quantas figurinhas ela tem agora, ' +
-      'se depois deu três para a prima que mora na outra rua da escola?';
-    const ps = palavras(paragrafo);
-    const impressao = new Set();
-    for (let i = 0; i + JANELA <= ps.length; i++) impressao.add(hashJanela(ps.slice(i, i + JANELA)));
-
-    const binario = Buffer.concat([Buffer.from([0, 1, 2, 3, 0, 255]), crypto.randomBytes(256)]);
+    /* Um PDF "salvo de novo": limpo por dentro, pego só pelo SHA da lista. */
+    const pdfListado = pdfDe(['BT (pagina ' + crypto.randomBytes(8).toString('hex') + ') Tj ET']);
     const utf16 = s => Buffer.from(s, 'utf16le');
     const sujos = {
       'conteúdo com a sigla': ['notas/aula.md', '# Aula\n\nExercício tirado do caderno ' + S + ', volume 2.\n', 'marca'],
@@ -598,7 +514,7 @@ function provaEnvenenada() {
       'sigla com pontos': ['notas/pontos.txt', 'Ver ' + S.split('').join('.') + '. página 4\n', 'marca'],
       'título sem separador': ['notas/junto.txt', tituloCerto.replace(/ /g, '') + '\n', 'marca'],
       'sigla no nome': ['material/Caderno_' + S + '_3ano.txt', 'texto neutro\n', 'nome'],
-      'binário da lista de SHAs': ['figuras/pagina.bin', binario, 'sha256'],
+      'PDF de SHA listado': ['docs/caderno_salvo.pdf', pdfListado, 'sha256'],
       'PDF com a sigla no SEGUNDO stream Flate': ['docs/dois_streams.pdf', pdfDe(['BT (nada aqui) Tj ET', 'BT (Caderno ' + S + ') Tj ET']), 'marca'],
       'PDF com a sigla só nos metadados (hex UTF-16)': ['docs/meta.pdf',
         pdfDe(['BT <0041> Tj ET'], 'trailer << /Info << /Title <FEFF' + Buffer.from('Caderno ' + S, 'utf16le').swap16().toString('hex') + '> >> >>\n'), 'marca'],
@@ -608,7 +524,6 @@ function provaEnvenenada() {
       'zip aninhado': ['docs/aninhado.zip', zipDe([{ nome: 'dentro.zip', dados: zipDe([{ nome: 't.txt', dados: Buffer.from(tituloCerto), metodo: 8 }]) }]), 'marca'],
       'zip além do limite': ['docs/fundo.zip', [1, 2, 3, 4].reduce(z => zipDe([{ nome: 'z.zip', dados: z }]), zipDe([{ nome: 'a.txt', dados: Buffer.from('ok') }])), 'zip'],
       'zip de método desconhecido': ['docs/metodo.zip', zipDe([{ nome: 'a.txt', dados: Buffer.from('ok'), metodo: 99 }]), 'zip'],
-      'impressão do texto': ['banco/problema.md', '## Problema\n\n' + paragrafo.replace('quantas', 'Quantas') + '\n', 'impressão do texto'],
       'PDF renomeado (tipo)': ['figuras/foto.png', Buffer.from('%PDF-1.7\n%limpo\n%%EOF\n', 'latin1'), 'tipo proibido'],
       'docx (tipo)': ['docs/relatorio.docx', zipDe([{ nome: 'word/document.xml', dados: Buffer.from('<w>ok</w>'), metodo: 8 }]), 'tipo proibido'],
       'gzip (tipo)': ['dados/x.json', zlib.gzipSync(Buffer.from('{"a":1}')), 'tipo proibido'],
@@ -622,7 +537,6 @@ function provaEnvenenada() {
     const limpos = {
       'notas/email.txt': 'Mande um email ou EMAIL; o x' + SIGLA + ' e o ' + SIGLA + 'lx não são a sigla.\n',
       'notas/titulo_parcial.txt': tituloCerto.replace(/\S+$/, 'Finais') + '\n',
-      'notas/outro_problema.md': 'Joana tinha doze bolinhas e perdeu cinco no recreio da escola nova.\n',
       'icons/icone.png': Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), crypto.randomBytes(256)]),
       'vendor/m.wasm': Buffer.concat([Buffer.from([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0]), crypto.randomBytes(256)]),
       'docs/permitido.pdf': pdfDe(['BT (texto limpo) Tj ET']),
@@ -632,19 +546,20 @@ function provaEnvenenada() {
     g(['add', '-A']); g(['commit', '-q', '-m', 'o resto']);
 
     const arqShas = tmp + '_shas.txt';
-    fs.writeFileSync(arqShas, '# lista temporária\n' + crypto.createHash('sha256').update(binario).digest('hex') + ' *pagina.pdf\n');
-    const arqTexto = tmp + '_impressao.txt';
-    fs.writeFileSync(arqTexto, '# impressao-texto v1 janela=' + JANELA + ' hash=sha256-8 amostra=' + impressao.size + '\n' + Array.from(impressao).join('\n') + '\n');
+    fs.writeFileSync(arqShas, '# lista temporária\n' + crypto.createHash('sha256').update(pdfListado).digest('hex') + ' *pagina.pdf\n');
     try {
-      /* As fontes: arquivo fora do CI, variável no CI, e a falta no CI reprova. */
-      const envLocal = { FONTE_PRIVADA_SHAS: arqShas, FONTE_PRIVADA_TEXTO_ARQUIVO: arqTexto };
-      const fs1 = fonteShas(envLocal), ft = fonteTexto(envLocal);
-      conf('as fontes temporárias foram lidas (1 SHA, ' + impressao.size + ' janelas)', fs1.conjunto && fs1.conjunto.size === 1 && ft.conjunto && ft.conjunto.size === impressao.size);
-      const envCI = { GITHUB_ACTIONS: 'true', FONTE_PRIVADA_SHAS_CONTEUDO: fs.readFileSync(arqShas, 'utf8'), FONTE_PRIVADA_TEXTO: fs.readFileSync(arqTexto, 'utf8') };
-      conf('no CI as fontes vêm das variáveis dos segredos', fonteShas(envCI).conjunto && fonteTexto(envCI).conjunto && fonteTexto(envCI).conjunto.size === impressao.size);
-      conf('VENENO visto: no CI, sem o segredo da lista de SHAs, reprova', !!fonteShas({ GITHUB_ACTIONS: 'true' }).erro);
-      conf('VENENO visto: no CI, sem o segredo da impressão, reprova', !!fonteTexto({ GITHUB_ACTIONS: 'true' }).erro);
-      conf('VENENO visto: impressão de outro formato reprova', !!fonteTexto({ FONTE_PRIVADA_TEXTO: 'abc\n0123456789abcdef\n' }).erro);
+      /* A camada de SHA dos dois lados: sem a lista passa e diz que pulou,
+       * também no CI; com a lista temporária, lê e pega o PDF listado. */
+      const semLista = fonteShas({ GITHUB_ACTIONS: 'true', FONTE_PRIVADA_SHAS: tmp + '_nao_existe.txt' });
+      conf('sem a lista privada, mesmo no CI, a camada de SHA é pulada e dita, sem reprovar', !!semLista.pulada && !semLista.erro && /pulei a camada de SHA/.test(semLista.pulada));
+      const fs1 = fonteShas({ FONTE_PRIVADA_SHAS: arqShas });
+      conf('a lista temporária foi lida (1 SHA)', !!fs1.conjunto && fs1.conjunto.size === 1);
+      const vazia = tmp + '_vazia.txt';
+      fs.writeFileSync(vazia, '# sem nenhum SHA\n');
+      conf('VENENO visto: lista que existe sem SHA nenhum reprova', !!fonteShas({ FONTE_PRIVADA_SHAS: vazia }).erro);
+      fs.rmSync(vazia, { force: true });
+      const semShas = varre(tmp, { shas: null, faixa: null, excecoes });
+      conf('sem a lista, o PDF listado só sai pelo tipo, não pelo SHA', !semShas.achados.some(a => a.tipo === 'sha256'));
       /* A faixa do push na main sai do "before" do evento. */
       const evento = tmp + '_evento.json';
       fs.writeFileSync(evento, JSON.stringify({ before: base }));
@@ -653,7 +568,7 @@ function provaEnvenenada() {
       conf('VENENO visto: push sem before conhecido reprova', !!faixaPadrao({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'push', GITHUB_EVENT_PATH: evento }, tmp).erro);
       fs.rmSync(evento, { force: true });
 
-      const r = varre(tmp, { shas: fs1.conjunto, impressao: ft.conjunto, faixa: base + '..HEAD', excecoes });
+      const r = varre(tmp, { shas: fs1.conjunto, faixa: base + '..HEAD', excecoes });
       console.log('    relatório da varredura no repositório temporário:\n' + relatorio(r.achados));
       const de = (arq, tipo, ondeDe) => r.achados.some(a => (a.arquivo === arq || a.arquivo.indexOf(arq + '!') === 0) && (!tipo || a.tipo === tipo) && (!ondeDe || a.de.indexOf(ondeDe) === 0));
       Object.keys(sujos).forEach(k => conf('VENENO visto: ' + k + ' (' + mascara(sujos[k][0]) + ', ' + sujos[k][2] + ')', de(sujos[k][0], sujos[k][2], 'árvore')));
@@ -668,7 +583,6 @@ function provaEnvenenada() {
         r.historico.commits === 3 && r.historico.blobs >= 1 && r.historico.caminhos > 20, JSON.stringify(r.historico));
     } finally {
       fs.rmSync(arqShas, { force: true });
-      fs.rmSync(arqTexto, { force: true });
     }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
