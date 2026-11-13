@@ -131,7 +131,10 @@ const { conf, secao, esperar } = H;
     e.value = 'Relato após falha de gravação';
     e.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await new Promise(r => setTimeout(r, 1200));
+  await esperar('rascunho da falha gravado no armazenamento', () => pag.evaluate(() => {
+    const r = JSON.parse(localStorage.getItem('rascunho-relato-aula:a5_aula') || 'null');
+    return !!r && r.notaTexto === 'Relato após falha de gravação';
+  }), Boolean, 5000);
   await pag.click('#modal-aula .fechar');
   const falhaSaiu = await esperar('janela fecha com faixa de falha', () => pag.$eval('#modal-aula', e => !e.classList.contains('aberto')), Boolean, 5000);
   conf('falha de gravação não apaga o rascunho', falhaSaiu.ok && await pag.evaluate(() =>

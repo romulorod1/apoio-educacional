@@ -1,17 +1,18 @@
 /* testa_escopo_relato.js
  *
  * F7 (#159), regra da orquestradora (13/11/2026): no "todas" e no "desta em
- * diante" (Core.alvosDoEscopo), a aula que tem relato (notaTexto não vazio)
- * fica de fora. Aula com relato é aula dada e registrada: mudar o padrão da
+ * diante" (Core.alvosDoEscopo), a aula que tem relato ou a nota só dela
+ * (notaTexto ou notaPrivada não vazios) fica de fora, na edição e no excluir. Aula com relato é aula dada e registrada: mudar o padrão da
  * série não reescreve o passado dela (a duração, a situação e a cobrança de um
  * mês já cobrado). Antes isso vinha de carona no "destacada", que o relato
  * marcava; desde o F7 o relato grava direto, sem destacar.
  *
- * Os dois lados: a aula com relato NÃO muda, e a aula sem relato MUDA.
- * Sem navegador.
+ * Os dois lados: a aula com texto NÃO muda nem some, e a aula sem texto MUDA
+ * (ou é excluída). Sem navegador.
  *
- * Veneno, tem de cair só do lado da aula com relato:
- *   --envenenado-sem-regra-do-relato   o filtro volta a olhar só o destacada.
+ * Venenos, cada um tem de cair só do lado da aula com texto:
+ *   --envenenado-sem-regra-do-relato   o filtro volta a olhar só o destacada;
+ *   --envenenado-so-o-relato           a regra olha só o notaTexto (a nota só dela fica desprotegida).
  * Dados fictícios.
  */
 'use strict';
@@ -20,7 +21,9 @@ const os = require('os');
 const path = require('path');
 
 const VENENOS = {
-  '--envenenado-sem-regra-do-relato': ["      return !a.destacada && !String(a.notaTexto || '').trim();", '      return !a.destacada;']
+  '--envenenado-sem-regra-do-relato': ['      return !a.destacada && !temTextoDaAula(a);', '      return !a.destacada;'],
+  '--envenenado-so-o-relato': ["    return !!(String(a.notaTexto || '').trim() || String(a.notaPrivada || '').trim());",
+    "    return !!String(a.notaTexto || '').trim();"]
 };
 const pedidos = process.argv.slice(2);
 const desconhecidos = pedidos.filter(a => !VENENOS[a]);
@@ -61,17 +64,20 @@ function montar() {
   Core.materializarSerieNoMes(db, s, '2026-11');
   const dia = iso => db.aulas.filter(a => a.serieId && a.data === iso)[0];
   dia('2026-10-08').notaTexto = 'Equações do 1º grau, lista 3 feita.'; // o relato grava direto (F7, B4)
+  dia('2026-10-29').notaPrivada = 'Chegou cansada; conversar com a mãe.'; // só a nota só dela
   return { db, dia };
 }
 
 for (const escopo of ['todas', 'seguintes']) {
   const m = montar();
   const comRelato = m.dia('2026-10-08'), semRelato = m.dia('2026-10-15'), depois = m.dia('2026-11-12');
+  const soNota = m.dia('2026-10-29');
   conf('(arranjo, ' + escopo + ') a aula com relato existe e não está destacada', !!comRelato && !comRelato.destacada, true);
   const origem = escopo === 'todas' ? m.dia('2026-11-05') : m.dia('2026-10-01');
   Core.aplicarEdicaoAula(m.db, origem.id, { duracaoMin: 90 }, escopo);
   conf(escopo + ': a aula com relato (08/10) fica com 60 minutos', comRelato.duracaoMin, 60);
   conf(escopo + ': a aula com relato mantém o relato', comRelato.notaTexto, 'Equações do 1º grau, lista 3 feita.');
+  conf(escopo + ': a aula só com a nota só dela (29/10) fica com 60 minutos', soNota.duracaoMin, 60);
   conf(escopo + ': a aula sem relato (15/10) passa a 90 minutos', semRelato.duracaoMin, 90);
   conf(escopo + ': a aula sem relato de novembro (12/11) passa a 90 minutos', depois.duracaoMin, 90);
   conf(escopo + ': a aula editada passa a 90 minutos', origem.duracaoMin, 90);
@@ -84,11 +90,25 @@ for (const escopo of ['todas', 'seguintes']) {
   conf('todas a partir da própria aula com relato: ela muda', comRelato.status, 'cancelada');
   conf('todas a partir da própria aula com relato: a irmã sem relato muda', m.dia('2026-10-15').status, 'cancelada');
 }
+// o excluir: a aula com texto fica, com o texto; a sem texto sai
+for (const escopo of ['todas', 'seguintes']) {
+  const m = montar();
+  const origem = escopo === 'todas' ? m.dia('2026-11-05') : m.dia('2026-10-01');
+  Core.excluirAulas(m.db, origem.id, escopo);
+  const ficou = iso => m.db.aulas.filter(a => a.data === iso)[0];
+  conf('excluir ' + escopo + ': a aula com relato (08/10) fica, com o relato',
+    !!ficou('2026-10-08') && ficou('2026-10-08').notaTexto, 'Equações do 1º grau, lista 3 feita.');
+  conf('excluir ' + escopo + ': a aula só com a nota só dela (29/10) fica, com a nota',
+    !!ficou('2026-10-29') && ficou('2026-10-29').notaPrivada, 'Chegou cansada; conversar com a mãe.');
+  conf('excluir ' + escopo + ': a aula sem texto (15/10) sai', !ficou('2026-10-15'), true);
+  conf('excluir ' + escopo + ': a aula de onde saiu o excluir sai', !m.db.aulas.some(a => a.id === origem.id), true);
+}
 // relato só de espaços não conta como relato
 {
   const m = montar();
   const branco = m.dia('2026-10-22');
   branco.notaTexto = '   ';
+  branco.notaPrivada = ' ';
   Core.aplicarEdicaoAula(m.db, m.dia('2026-11-05').id, { duracaoMin: 45 }, 'todas');
   conf('relato só com espaços não protege a aula', branco.duracaoMin, 45);
 }
@@ -96,9 +116,17 @@ for (const escopo of ['todas', 'seguintes']) {
 if (VENENO) {
   const ESPERADO = {
     '--envenenado-sem-regra-do-relato': {
-      erra: ['todas: a aula com relato (08/10) fica com 60 minutos', 'seguintes: a aula com relato (08/10) fica com 60 minutos'],
+      erra: ['todas: a aula com relato (08/10) fica com 60 minutos', 'seguintes: a aula com relato (08/10) fica com 60 minutos',
+        'todas: a aula só com a nota só dela (29/10) fica com 60 minutos', 'excluir todas: a aula com relato (08/10) fica, com o relato',
+        'excluir seguintes: a aula só com a nota só dela (29/10) fica, com a nota'],
       acerta: ['todas: a aula sem relato (15/10) passa a 90 minutos', 'seguintes: a aula sem relato (15/10) passa a 90 minutos',
-        'todas: a aula com relato mantém o relato', 'relato só com espaços não protege a aula']
+        'excluir todas: a aula sem texto (15/10) sai', 'todas: a aula com relato mantém o relato', 'relato só com espaços não protege a aula']
+    },
+    '--envenenado-so-o-relato': {
+      erra: ['todas: a aula só com a nota só dela (29/10) fica com 60 minutos', 'seguintes: a aula só com a nota só dela (29/10) fica com 60 minutos',
+        'excluir todas: a aula só com a nota só dela (29/10) fica, com a nota', 'excluir seguintes: a aula só com a nota só dela (29/10) fica, com a nota'],
+      acerta: ['todas: a aula com relato (08/10) fica com 60 minutos', 'excluir todas: a aula com relato (08/10) fica, com o relato',
+        'todas: a aula sem relato (15/10) passa a 90 minutos', 'excluir todas: a aula sem texto (15/10) sai']
     }
   }[VENENO];
   const vf = (r, ok) => { if (ok) passes++; else falhas++; console.log((ok ? '  OK   ' : '  FALHA') + ' ' + r); };

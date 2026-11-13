@@ -515,6 +515,11 @@
 
   /* Alvos de uma edição em massa, respeitando o escopo escolhido.
    * escopo: 'esta' | 'seguintes' | 'todas' */
+  // o relato ou a nota só dela: o texto que o escopo de várias aulas não regrava nem apaga
+  function temTextoDaAula(a) {
+    return !!(String(a.notaTexto || '').trim() || String(a.notaPrivada || '').trim());
+  }
+
   function alvosDoEscopo(db, aula, escopo) {
     if (escopo === 'esta' || !aula.serieId) return [aula];
     var s = (db.series || []).filter(function (x) { return x.id === aula.serieId; })[0];
@@ -524,16 +529,19 @@
       if (x.id === raizId || x.serieOrigemId === raizId) seriesIds[x.id] = true;
     });
     seriesIds[aula.serieId] = true;
-    /* A aula com relato (notaTexto não vazio) fica de fora do "todas" e do
-     * "desta em diante", por regra declarada: aula com relato é aula dada e
-     * registrada, e mudar o padrão da série não reescreve o passado dela (a
-     * duração, a situação e a cobrança de um mês já cobrado). Antes isso vinha
-     * de carona no "destacada", que o relato marcava; desde o F7 o relato
-     * grava direto, sem destacar. A própria aula editada sempre entra. */
+    /* A aula com relato ou com a nota só dela (notaTexto ou notaPrivada não
+     * vazios) fica de fora do "todas" e do "desta em diante", por regra
+     * declarada: é aula dada e registrada, e mudar o padrão da série não
+     * reescreve o passado dela (a duração, a situação e a cobrança de um mês
+     * já cobrado), nem o "excluir" a apaga com o texto junto. Antes isso vinha
+     * de carona no "destacada", que o Salvar marcava; desde o F7 o relato e a
+     * nota gravam direto, sem destacar. Só os dois textos, e não o conteúdo
+     * inteiro da aula: a aula só com assunto o pai não protegia. A própria
+     * aula editada sempre entra. */
     var irmas = (db.aulas || []).filter(function (a) {
       if (!seriesIds[a.serieId]) return false;
       if (a.id === aula.id) return true;
-      return !a.destacada && !String(a.notaTexto || '').trim();
+      return !a.destacada && !temTextoDaAula(a);
     });
     if (escopo === 'seguintes') {
       return irmas.filter(function (a) { return a.data >= aula.data; });

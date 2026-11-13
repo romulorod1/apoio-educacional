@@ -318,6 +318,7 @@ roda "virada anual"          node _teste/testa_virada_anual.js
 # (core, alvosDoEscopo); o veneno tira a regra e so o lado da aula com relato cai.
 roda "escopo sem a aula com relato" node _teste/testa_escopo_relato.js
 roda "escopo sem a aula com relato --envenenado-sem-regra-do-relato" node _teste/testa_escopo_relato.js --envenenado-sem-regra-do-relato
+roda "escopo sem a aula com relato --envenenado-so-o-relato" node _teste/testa_escopo_relato.js --envenenado-so-o-relato
 roda "merge seguro"          node _teste/testa_merge_seguro.js
 # O guarda de merge no CI (item 13c): o guarda_merge.js julga pelo merge_seguro
 # e publica o status portao-merge na cabeca que julgou. Com gh e git falsos:
