@@ -157,7 +157,8 @@
  * lista. O endpoint de IA (/api/ia) só recebe POST, que o fetch abaixo já deixa
  * passar sem cache. O v148 traz o aviso de novidades do planejamento.
  * O v152 reorganiza a janela da aula em duas colunas no tablet.
- * O v161 traz o seletor de assunto com os sinais de teoria, exercícios e OBMEP.
+ * O v156 traz os 6 assuntos novos de química da revisão dos mapas dos livros no banco/topicos/quimica.json.
+ * O v161 traz o seletor de assunto da aula com os sinais de teoria da biblioteca e exercícios.
  */
 var CACHE = 'apoio-educacional-v161';
 var BAIXADOS = 'apoio-educacional-baixados';
