@@ -427,11 +427,12 @@ const cliPlano = pasta => {
   } catch (e) { return { codigo: e.status, n: -1, out: String(e.stderr || '') + String(e.stdout || '') }; }
 };
 const cSem = cliPlano(null), cBoa = cliPlano(pBoa), cVazia = cliPlano(pVazia);
-/* A pasta de verdade so ACRESCENTA as provas que ela mesma cita: com ela
- * ainda vazia (o #214), o numero era o da vazia; com a primeira prova nova
- * na pasta (a 4a), sao as provas a mais que ela liga ao app.js. */
-const extrasDaPastaReal = provasTocadas(['app.js'], leMapaTodo(MAPA, PASTA), nav).provas.filter(p => provasTocadas(['app.js'], mapaVazia, nav).provas.indexOf(p) < 0);
-conf('CLI: a pasta de verdade da o numero da vazia mais as provas que ela cita para o app.js (' + (extrasDaPastaReal.join(', ') || 'nenhuma') + ')', cSem.codigo + '/' + cSem.n, '0/' + (cVazia.n + extrasDaPastaReal.length));
+// A pasta de verdade so acrescenta: o app.js ganha exatamente as provas que algum
+// arquivo dela liga ao app.js e o mapa geral nao liga. Com a pasta vazia na main a
+// conta da zero; o PR que cria o primeiro arquivo dela nao quebra esta prova.
+const geralApp = new Set([].concat(...leMapa(fs.readFileSync(MAPA, 'utf8')).filter(l => l.re.test('app.js')).map(l => l.provas)));
+const daPastaApp = new Set(leMapaPasta().filter(l => l.re.test('app.js')).map(l => l.provas[0]).filter(p => !geralApp.has(p)));
+conf('CLI: a pasta de verdade so acrescenta ao app.js as provas dela que o mapa geral nao liga', cSem.codigo + '/' + (cSem.n - cVazia.n), '0/' + daPastaApp.size);
 conf('CLI: o instrumento ve um numero', cSem.n > 5, true);
 conf('CLI: com a pasta boa, uma prova a mais (a dela)', cBoa.codigo + '/' + (cBoa.n - cVazia.n), '0/1');
 const cRuim = cliPlano(comPasta({ [nomeAlvo]: 'app.js\t' + alvo + ' _teste/e2e.js\n' }));

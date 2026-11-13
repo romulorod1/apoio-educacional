@@ -2117,6 +2117,8 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-rotulo { font-size: var(--letra-14); font-weight: 600; color: var(--navy); }
 .bib-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .bib-origem { font-size: var(--letra-12); color: var(--muted); }
+/* o crédito que a licença da fonte pede (L6): sempre visível, nunca escondido */
+.bib-credito { font-size: var(--letra-12); color: var(--muted); overflow-wrap: anywhere; }
 .bib-visor { background: var(--fio-claro); }
 .bib-cheia { width: 100%; height: auto; display: block; margin: 0 auto; background: var(--branco); box-shadow: var(--sombra); }
 /* o selo "Marcado" sobre a imagem da tela cheia: ela anda pelo Anterior e
