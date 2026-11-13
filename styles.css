@@ -4285,9 +4285,15 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
   border-radius: 999px; color: var(--navy); font-weight: 600;
 }
 .cel-assistente-pe .cel-perguntar .ico { width: 20px; height: 20px; }
+/* No fim da rolagem de Hoje, a pílula fica no próprio lugar, depois de uma
+   folga do tamanho dela: a última aula rola até ficar livre. */
+#cel-hoje .cel-assistente-pe { padding-top: 12px; }
 
 .ass-modal { max-width: 640px; height: 88vh; }
-body.modo-celular #modal-assistente .ass-modal { height: 100%; max-height: 100%; }
+/* No celular, a janela desce até o fim da tela e cobre a barra de abas (os
+   rótulos não aparecem borrados por baixo). */
+body.modo-celular #modal-assistente { padding: 8px 0 0; align-items: stretch; }
+body.modo-celular #modal-assistente .ass-modal { height: 100%; max-height: 100%; max-width: 100%; border-radius: 16px 16px 0 0; }
 .modal-cabecalho .btn#ass-nova { min-height: 48px; margin-left: auto; white-space: nowrap; }
 /* o título recebe o foco ao abrir (o teclado não sobe); não é um controle, sem moldura */
 #titulo-modal-assistente:focus { outline: none; }
@@ -4303,7 +4309,7 @@ body.modo-celular #modal-assistente .ass-modal { height: 100%; max-height: 100%;
 .ass-linha-valor { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--fio-claro); padding-bottom: 2px; }
 .ass-valor { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ass-pensando { color: var(--muted); font-style: italic; margin: 0; }
-.ass-entendido { margin: 0; font-size: var(--letra-14); color: var(--muted); }
+.ass-conversa .ass-entendido, .ass-entendido { margin: 0; font-size: var(--letra-14); line-height: 1.35; color: var(--muted); }
 .ass-cartao {
   border: 1px solid var(--fio); border-radius: 12px; padding: 10px 12px; background: var(--branco);
   display: flex; flex-direction: column; gap: 8px;
@@ -4313,17 +4319,23 @@ body.modo-celular #modal-assistente .ass-modal { height: 100%; max-height: 100%;
 .ass-cartao-quem { min-width: 0; font-weight: 600; color: var(--texto); }
 .ass-cinza { font-weight: 400; color: var(--muted); }
 .ass-numero { white-space: nowrap; }
-.ass-mensagem { width: 100%; box-sizing: border-box; min-height: 72px; resize: vertical; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 8px; background: var(--soft); }
+.ass-mensagem { width: 100%; box-sizing: border-box; min-height: 72px; resize: none; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 8px; background: var(--soft); }
 .ass-mensagem:focus { outline: 1px solid var(--navy); outline-offset: 0; }
 .ass-cartao-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
 .ass-link { min-height: 48px; min-width: 48px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
 .ass-exemplos { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .ass-exemplo { min-height: 48px; text-align: left; white-space: normal; max-width: 100%; }
-.ass-ideias > summary { min-height: 48px; display: flex; align-items: center; cursor: pointer; color: var(--navy); font-weight: 600; }
+.ass-ideias > summary { min-height: 48px; display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--navy); font-weight: 600; list-style: none; }
+.ass-ideias > summary::-webkit-details-marker { display: none; }
+.ass-ideias .ass-ideias-seta { width: 20px; height: 20px; transform: rotate(-90deg); transition: transform .15s ease; }
+.ass-ideias[open] .ass-ideias-seta { transform: none; }
 .ass-ideias .ass-exemplos { padding-top: 4px; }
-.ass-falha { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* Com o erro aberto, uma linha só: o ícone, o texto e o "Tentar de novo". */
+.ass-falha { margin: 0; display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; padding-top: 6px; padding-bottom: 6px; }
 .ass-falha .ass-falha-ico { width: 20px; height: 20px; flex-shrink: 0; }
-.ass-falha span { flex: 1 1 160px; }
+.ass-falha span { flex: 1 1 auto; min-width: 0; font-size: var(--letra-14); line-height: 1.3; }
+.ass-falha .btn { flex: 0 0 auto; white-space: nowrap; }
+.ass-texto.ass-texto-curto { min-height: 48px; height: 48px; }
 .ass-falha .btn { min-height: 48px; }
 .modal-rodape.ass-rodape { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
 .ass-campo { display: flex; }

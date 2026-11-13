@@ -567,7 +567,7 @@
       if (!texto) falha('o texto da mensagem está vazio.');
       if (texto.length > MAX_TEXTO_MENSAGEM) falha('a mensagem passou de ' + MAX_TEXTO_MENSAGEM + ' letras; encurte.');
       /* Valor e link nunca vêm do modelo: cobrança é pela preparar_cobranca, com o valor do app. */
-      if (TEM_DINHEIRO.test(texto)) falha('sem_valor: a mensagem não pode ter valor em dinheiro. Para cobrar, use preparar_cobranca, que põe o valor certo do aplicativo.');
+      if (temDinheiro(texto)) falha('sem_valor: a mensagem não pode ter valor em dinheiro. Para cobrar, use preparar_cobranca, que põe o valor certo do aplicativo.');
       if (TEM_LINK.test(texto)) falha('sem_link: a mensagem não pode ter link.');
       var href = ctx.links.whatsapp(aluno, texto);
       var nomes = nomesParaIA(ctx.db);
@@ -610,7 +610,23 @@
 
   /* Valor em dinheiro (R$, reais, número com centavos) e link (http, www,
    * domínio) não entram na mensagem que o modelo escreve. */
-  var TEM_DINHEIRO = /R\$|\breais\b|\breal\b|\d+[.,]\d{2}\b/i;
+  /* Dinheiro: R$, reais, centavos, milhar com ponto ou vírgula, ou qualquer
+   * número de 3 dígitos ou mais (o "ficou 350.", o Pix só com números). A
+   * hora não conta: "às 15.30", "15:30", "15.30h", "15h30", "15 min" e
+   * "10 minutos" passam (lentes do #191, rodada 2, item 3). */
+  var TEM_DINHEIRO = /R\$|\breais\b|\breal\b|\d+,\d{2}\b|\d+[.,]\d{3}|\d{3,}/i;
+  var HORAS = [
+    /\b(?:às|as|até|ate|lá pelas|pelas|das|de)\s+\d{1,2}[.:h]\d{2}\b/gi,
+    /\b\d{1,2}[.:]\d{2}\s*(?:h|hs|horas?|min|minutos?)\b/gi,
+    /\b\d{1,2}:\d{2}\b/g,
+    /\b\d{1,2}h\d{2}\b/gi,
+    /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g   // datas: 20/11, 20/11/2026
+  ];
+  function temDinheiro(texto) {
+    var t = String(texto || '');
+    HORAS.forEach(function (rx) { t = t.replace(rx, ' '); });
+    return TEM_DINHEIRO.test(t);
+  }
   var TEM_LINK = /https?:\/\/|\bwww\.|\b[a-z0-9-]+\.(com|br|net|org|me|ly|app|io)\b/i;
   /* O que o cartão mostra na tela dela (nunca vai ao modelo). */
   function contatoDoCartao(aluno, ctx) {

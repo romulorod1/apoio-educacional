@@ -288,6 +288,13 @@ for (const veneno of ['Olá! Ficou R$ 9.999,00 de outubro.', 'O valor é 9999,00
   const v = ex('preparar_whatsapp', { alunoId: 'al1', texto: veneno });
   conf('VENENO recusado no WhatsApp: "' + veneno + '" (sem cartão; o erro manda usar a cobrança ou tirar o link)', [v.erro, v.cartao, /preparar_cobranca|link/.test(v.resultado.erro)], [true, null, true]);
 }
+for (const veneno of ['Olá! Ficou 350.', 'São 1.250 do mês.', 'Pix: 21987654321', 'O mês deu 1,250 no total.']) {
+  const v = ex('preparar_whatsapp', { alunoId: 'al1', texto: veneno });
+  conf('VENENO (rodada 2) recusado: "' + veneno + '", mandando usar a cobrança', [v.erro, /preparar_cobranca/.test(v.resultado.erro)], [true, true]);
+}
+for (const hora of ['Chego às 15.30', 'Chego às 15:30', 'Vou atrasar 15 min', 'Vou atrasar 10 minutos', 'Chego às 15h30', 'Chego 15.30h', 'Até 9:05!', 'Podemos remarcar a aula de 20/11/2026?']) {
+  conf('a hora passa no WhatsApp: "' + hora + '"', ex('preparar_whatsapp', { alunoId: 'al1', texto: hora }).erro, false);
+}
 conf('CONTROLE: a mensagem sem valor nem link passa, com minutos e horas', ex('preparar_whatsapp', { alunoId: 'al1', texto: 'Olá! Vou atrasar 10 minutos, chego às 15:40.' }).erro, false);
 conf('o cartão leva o responsável e o telefone só para a tela', (() => { const c = ex('preparar_whatsapp', { alunoId: 'al1', texto: 'Olá!' }).cartao; return [!!c.responsavel, !!c.telefone]; })(), [true, true]);
 r = ex('preparar_cobranca', { alunoId: 'al1', mes: null });
@@ -418,6 +425,22 @@ function respostaTexto(t) { return { ok: true, resposta: { stop_reason: 'end_tur
     const r8 = await pendente;
     conf('corrida: a pergunta que falha depois de uma "Nova conversa" não corta a conversa nova', [r8.erro, sessao8.mensagens.length, sessao8.mensagens[0].content[0].text], ['ocupado', 1, 'outra']);
     conf('(arranjo) antes da corrida havia 2 mensagens', antesDaCorrida, 2);
+    /* Fechar, reabrir e perguntar (o caminho do app): ao fechar no meio, o app
+     * troca a lista da sessão pela de antes da pergunta (pararAssistente);
+     * a pergunta nova vai na lista nova, e a velha, quando enfim volta, não
+     * corta nada. */
+    const sessao11 = A.novaSessao('u1');
+    fila = [respostaTexto('antes')];
+    await A.perguntar(sessao11, 'antes', { chamar, ctx, hora: '11:00' });
+    const tamanho = sessao11.mensagens.length;
+    let soltar11;
+    const velha = A.perguntar(sessao11, 'velha', { chamar: () => new Promise(r => { soltar11 = r; }), ctx, hora: '11:01' });
+    sessao11.mensagens = sessao11.mensagens.slice(0, tamanho);       // fechar (pararAssistente)
+    fila = [respostaTexto('nova')];
+    const r11 = await A.perguntar(sessao11, 'nova', { chamar, ctx, hora: '11:02' });  // reabrir e perguntar
+    soltar11({ ok: false, codigo: 'cancelado' });
+    await velha;
+    conf('corrida fechar, reabrir e perguntar: a pergunta nova fica inteira, e a velha não aparece', [r11.texto, sessao11.mensagens.length, sessao11.mensagens.some(m => /velha/.test(JSON.stringify(m.content)))], ['nova', tamanho + 2, false]);
     conf('a sessão sabe de quem é: outra conta não usa a conversa', [A.sessaoValida(sessao8, 'u1'), A.sessaoValida(sessao8, 'u2'), A.sessaoValida(null, 'u1')], [true, false, false]);
   }
   // recomeço (item 16): respeita as voltas que restam; e o teto de 36 mensagens recomeça avisando

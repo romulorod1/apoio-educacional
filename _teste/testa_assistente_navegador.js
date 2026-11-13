@@ -220,6 +220,7 @@ async function transbordo(pag, raizSel) {
     principal: Array.from(document.querySelectorAll('.ass-cartao[data-tipo="whatsapp"] a')).map(a => a.classList.contains('principal')),
     exemplos: !!document.querySelector('#ass-exemplos'), ideias: !!document.querySelector('#ass-ideias:not([open])')
   }));
+  conf('o "Entendi:" com 14 px e o cinza #5F6876, e o foco voltou ao campo (tablet) depois do redesenho', await pag.evaluate(() => { const c = getComputedStyle(document.querySelector('.ass-entendido')); return [c.fontSize, c.color, document.activeElement && document.activeElement.id]; }), ['14px', 'rgb(95, 104, 118)', 'ass-texto']);
   conf('a pergunta, a resposta em duas linhas sem markdown e o dia que entendeu, com letra de 14 px ou mais', [vez.pergunta, vez.resposta, vez.entendido, parseFloat(vez.entendidoLetra) >= 14],
     ['O que eu tenho amanhã?', ['Amanhã você não tem aula.', 'Preparei a mensagem: é só tocar em Abrir no WhatsApp.'], 'Entendi: terça, 17/11; Zélia.', true]);
   conf('o cartão do WhatsApp: uma linha com o responsável e o número, o texto num campo, e o WhatsApp é o único principal', [vez.linha, vez.campo, vez.principal, vez.href],
@@ -247,6 +248,10 @@ async function transbordo(pag, raizSel) {
   falso.fila = [ferramentas([['preparar_whatsapp', { alunoId: 'al2', texto: 'Oi' }]]), texto('O Bruno não tem celular cadastrado.')];
   await perguntar(pag, 'avisa a mãe do Bruno');
   const ultimo = falso.pedidos[falso.pedidos.length - 1].corpo.messages;
+  conf('ALTO da rodada 2: depois de outras perguntas (a janela redesenhou), o cartão do WhatsApp ainda tem o texto editado, no campo e no link', await pag.evaluate(() => {
+    const c = document.querySelector('.ass-cartao[data-tipo="whatsapp"]'); return [c.querySelector('textarea').value, c.querySelector('a').getAttribute('href')]; }),
+    ['Olá! Vou atrasar 15 min para a aula de Zélia.', hrefEditado]);
+  conf('as "Ideias" têm a seta e 48 px de toque', await pag.evaluate(() => { const s = document.querySelector('#ass-ideias summary'); return [!!s.querySelector('svg'), s.getBoundingClientRect().height >= 48]; }), [true, true]);
   conf('sem celular: a ferramenta volta como erro ao modelo e nenhum cartão aparece', [ultimo[ultimo.length - 1].content[0].is_error, await pag.evaluate(() => document.querySelectorAll('.ass-vez:last-of-type .ass-cartao').length)], [true, 0]);
   falso.fila = [ferramentas([['preparar_whatsapp', { alunoId: 'al1', texto: 'Olá! Ficou R$ 9.999,00 de outubro.' }]]), texto('Para cobrar, uso a cobrança do app.')];
   await perguntar(pag, 'manda a cobrança da Zélia');
@@ -296,7 +301,9 @@ async function transbordo(pag, raizSel) {
   conf('reabrir: a pergunta de antes está no campo, e a resposta atrasada não entrou na conversa', await pag.evaluate(() => [document.querySelector('#ass-texto').value, /tarde demais/.test(document.querySelector('#ass-conversa').textContent)]), ['pergunta que fica no meio', false]);
   const vezes = await pag.evaluate(() => document.querySelectorAll('.ass-vez').length);
   conf('(arranjo) a conversa tem as perguntas de antes, e o "Nova conversa" está à vista', [vezes >= 5, await visivel(pag, '#ass-nova')], [true, true]);
+  await pag.evaluate(() => { const c = document.querySelector('#ass-texto'); c.value = 'texto que ela começou'; c.dispatchEvent(new Event('input', { bubbles: true })); });
   await clicar(pag, '#ass-nova');
+  conf('"Nova conversa" mantém o que ela tinha escrito no campo', await pag.evaluate(() => document.querySelector('#ass-texto').value), 'texto que ela começou');
   conf('"Nova conversa" zera a conversa e volta aos exemplos', await pag.evaluate(() => [document.querySelectorAll('.ass-vez').length, !!document.querySelector('#ass-exemplos'), document.querySelector('#ass-nova').hidden]), [0, true, true]);
   falso.pedidos = [];
   falso.fila = [texto('Nova.')];
@@ -319,9 +326,29 @@ async function transbordo(pag, raizSel) {
   falso.fila = [ferramentas([['preparar_whatsapp', { alunoId: 'al1', texto: 'Olá! Vou atrasar ___ min para a aula de Zélia, por causa do trânsito na avenida principal.' }], ['preparar_ligacao', { alunoId: 'al1' }]]),
     texto('Preparei a mensagem e o atalho para ligar. É só tocar no botão; nada foi enviado.')];
   await perguntar(pag, 'avisa a família da Zélia que vou atrasar por causa do trânsito');
-  conf('no celular, o cartão do WhatsApp e o de ligar', await pag.evaluate(() => Array.from(document.querySelectorAll('.ass-cartao')).map(c => c.dataset.tipo)), ['whatsapp', 'ligar']);
+  conf('no celular, WhatsApp e Ligar do mesmo aluno num cartão só, lado a lado, com o nome e o número uma vez', await pag.evaluate(() => {
+    const cs = Array.from(document.querySelectorAll('.ass-cartao'));
+    const links = Array.from(cs[0].querySelectorAll('a')).map(a => a.dataset.cartao + (a.classList.contains('principal') ? '*' : ''));
+    const r = Array.from(cs[0].querySelectorAll('a')).map(a => a.getBoundingClientRect());
+    return [cs.map(c => c.dataset.tipo), links, r.length === 2 && Math.abs(r[0].top - r[1].top) < 2, (cs[0].textContent.match(/98765-4321/g) || []).length];
+  }), [['whatsapp'], ['whatsapp*', 'ligar'], true, 1]);
+  conf('no celular, a janela desce até o fim da tela e cobre a barra de abas', await pag.evaluate(() => {
+    const m = document.querySelector('#modal-assistente .modal').getBoundingClientRect(), abas = document.querySelector('#cel-abas').getBoundingClientRect();
+    return m.bottom >= abas.bottom - 1 && m.top < abas.top; }), true);
   conf('no celular, nada gravou (o banco e a fila iguais)', (await banco(pag)) === antesCel, true);
   const falhas = [], linhas = [];
+  falso.fila = [{ ok: false, codigo: 'ocupado' }];
+  await perguntar(pag, 'o que eu tenho hoje?');
+  await pag.setViewport({ width: 360, height: 780, hasTouch: true });
+  await pag.evaluate(() => { document.documentElement.style.fontSize = '130%'; });
+  await pausa(400);
+  const comErro = await pag.evaluate(() => {
+    const r = document.querySelector('#rodape-modal-assistente').getBoundingClientRect(), t = document.querySelector('#ass-tentar').getBoundingClientRect(), s = document.querySelector('#ass-erro span').getBoundingClientRect();
+    return { pct: Math.round(r.height / window.innerHeight * 100), mesmaLinha: t.top < s.bottom && t.bottom > s.top, campo: document.querySelector('#ass-texto').rows };
+  });
+  console.log('   rodapé com o erro aberto a 360 x 780 e 130%: ' + comErro.pct + '% da altura');
+  conf('com o erro aberto a 360 e 130%: o "Tentar de novo" na linha do texto, o campo numa linha e o rodapé até 30% da altura', [comErro.mesmaLinha, comErro.campo, comErro.pct <= 30], [true, 1, true]);
+  await pag.evaluate(() => { document.documentElement.style.fontSize = ''; });
   for (const largura of [360, 390, 412]) {
     for (const letra of ['100%', '130%']) {
       await pag.setViewport({ width: largura, height: 800, hasTouch: true });
@@ -364,6 +391,25 @@ async function transbordo(pag, raizSel) {
   await pag.evaluate(() => { const d = document.createElement('div'); d.id = 'largo-de-prova'; d.style.width = '600px'; d.style.height = '10px'; document.querySelector('#corpo-modal-assistente').appendChild(d); });
   const vistos = await transbordo(pag, '#modal-assistente .modal');
   conf('CONTROLE: um elemento de 600 px em 360 px é acusado', vistos.some(f => /largo-de-prova|rola de lado/.test(f)), true);
+  await pag.evaluate(() => document.querySelector('#modal-assistente .fechar').click());
+  await pausa(400);
+  const cruza = [];
+  for (const [w, h, letra] of [[360, 780, '130%'], [360, 780, ''], [390, 844, '']]) {
+    await pag.setViewport({ width: w, height: h, hasTouch: true });
+    await pag.evaluate(l => { document.documentElement.style.fontSize = l; }, letra);
+    await pag.evaluate(() => document.querySelector('#cel-dia-seguinte').click()); await pausa(300);
+    await pag.evaluate(() => document.querySelector('#cel-dia-hoje').click()); await pausa(500);
+    const m = await pag.evaluate(() => {
+      const c = document.querySelector('#cel-conteudo'); c.scrollTop = c.scrollHeight;
+      const b = document.querySelector('#cel-assistente').getBoundingClientRect();
+      const blocos = Array.from(document.querySelectorAll('#cel-tempo .cel-bloco')).map(x => x.getBoundingClientRect()).sort((x, y) => x.bottom - y.bottom);
+      const u = blocos[blocos.length - 1];
+      return { cruza: !!u && b.left < u.right && b.right > u.left && b.top < u.bottom && b.bottom > u.top, folga: u ? Math.round(b.top - u.bottom) : null };
+    });
+    if (m.cruza) cruza.push(w + '/' + (letra || '100%') + ' (folga ' + m.folga + ')');
+  }
+  await pag.evaluate(() => { document.documentElement.style.fontSize = ''; });
+  conf('rolado até o fim de Hoje, a pílula não cobre a última aula (360 a 130% e 100%, 390)', cruza.join(', '), '');
 
   conf('nenhum erro de página', pag.errosDePagina ? pag.errosDePagina.slice(0, 3).join(' | ') : '', '');
   await H.fim(amb)();

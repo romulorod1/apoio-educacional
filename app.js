@@ -28815,7 +28815,7 @@
    * no tablet, no celular da dona e no celular que só lê (perguntar é ler).
    * O observador de outra conta não vê; sem a conta, ninguém vê. */
   var sessaoAssistente = null;      // a conversa com o modelo (Assistente.novaSessao)
-  var bancoDaSessaoAssistente = null;
+  var avisoDeConversaNova = false;   // a conta trocou: a próxima tela diz "Comecei uma conversa nova."
   var historicoAssistente = [];     // o que a tela mostra: [{ pergunta, texto, cartoes, entendido, recomecou }]
   var fluxoAssistente = null;       // { vez, texto, pedindo, controle, erro, origem, perguntaEmCurso, rodapeLivreEm }
   var vezDoAssistente = 0;
@@ -28843,13 +28843,14 @@
     if (b) b.hidden = !podeUsarAssistente();
   }
 
-  /* Trocou a conta ou o banco (cópia restaurada, outra conta entrou): a
-   * conversa e o histórico de antes não seguem. */
+  /* Trocou a conta (outra pessoa entrou): a conversa e o histórico de antes
+   * não seguem, e a tela avisa. A sincronização, que troca o objeto do
+   * banco a cada recebimento, não zera nada: a sessão é da conta (uid). */
   function conferirSessaoDoAssistente() {
     var uid = uidDoAssistente();
-    if (!sessaoAssistente || !Assistente.sessaoValida(sessaoAssistente, uid) || bancoDaSessaoAssistente !== db) {
+    if (!sessaoAssistente || !Assistente.sessaoValida(sessaoAssistente, uid)) {
+      if (sessaoAssistente && historicoAssistente.length) avisoDeConversaNova = true;
       sessaoAssistente = Assistente.novaSessao(uid);
-      bancoDaSessaoAssistente = db;
       historicoAssistente = [];
     }
   }
@@ -28857,9 +28858,11 @@
     var f = fluxoAssistente;
     if (f && f.pedindo) return;
     sessaoAssistente = Assistente.novaSessao(uidDoAssistente());
-    bancoDaSessaoAssistente = db;
     historicoAssistente = [];
-    if (f) { f.erro = null; f.texto = ''; }
+    avisoDeConversaNova = false;
+    // o que ela já escreveu no campo fica
+    var c = $('#ass-texto');
+    if (f) { f.erro = null; f.texto = c ? c.value : f.texto; }
     desenharAssistente();
     anunciar('Conversa nova.');
     focarTituloDoAssistente();
@@ -28915,7 +28918,15 @@
    * campo; o ditado para. O que ela já perguntou fica para a próxima vez. */
   function pararAssistente() {
     var f = fluxoAssistente;
-    if (f && f.pedindo) { f.texto = f.perguntaEmCurso || f.texto; }
+    if (f && f.pedindo) {
+      f.texto = f.perguntaEmCurso || f.texto;
+      /* A conversa volta a como era antes da pergunta, numa lista NOVA: a
+       * pergunta velha, quando enfim voltar, não corta nada da conversa que
+       * ela começar ao reabrir (o desfazer só mexe na lista dele). */
+      if (f.sessaoDaPergunta && f.sessaoDaPergunta === sessaoAssistente && typeof f.tamanhoAntes === 'number') {
+        sessaoAssistente.mensagens = sessaoAssistente.mensagens.slice(0, f.tamanhoAntes);
+      }
+    }
     if (f && f.controle) { try { f.controle.abort(); } catch (e) { /* já parou */ } }
     if (f) { f.vez = -1; f.pedindo = false; clearTimeout(f.esperaLonga); }
     pararDitado();
@@ -28960,14 +28971,18 @@
       var idCampo = 'ass-msg-' + i + '-' + Math.random().toString(36).slice(2, 7);
       var campo = el('textarea', { class: 'ass-mensagem', id: idCampo, rows: '3', 'aria-label': 'Mensagem, pode mudar antes de abrir no WhatsApp' });
       campo.value = c.texto || '';
-      var abrir = link('Abrir no WhatsApp', c.href, true, 'Abrir no WhatsApp de ' + resp + (tel ? ', ' + tel : '') + ' com a mensagem');
+      /* O link nasce do texto do cartão (o que ela editou sobrevive ao
+       * redesenho): c.texto e c.href andam juntos. */
+      var hrefDoTexto = function (t) { return aluno ? linkDoWhatsapp(telefoneDoCampo(aluno), String(t || '').trim()) : ''; };
+      var abrir = link('Abrir no WhatsApp', hrefDoTexto(c.texto) || c.href, true, 'Abrir no WhatsApp de ' + resp + (tel ? ', ' + tel : '') + ' com a mensagem');
       campo.addEventListener('input', function () {
-        var novo = aluno ? linkDoWhatsapp(telefoneDoCampo(aluno), campo.value.trim()) : '';
-        if (novo) abrir.setAttribute('href', novo);
         c.texto = campo.value;
+        var novo = hrefDoTexto(campo.value);
+        if (novo) { c.href = novo; abrir.setAttribute('href', novo); }
       });
       filhos.push(campo);
       botoes.push(abrir);
+      if (c.ligarJunto) botoes.push(link('Ligar', c.ligarJunto, false, 'Ligar para ' + resp + (tel ? ', ' + tel : ''), 'ligar'));
     } else if (c.tipo === 'ligar') {
       filhos.push(linha('phone', resp, tel, true));
       botoes.push(link('Ligar', c.href, false, 'Ligar para ' + resp + (tel ? ', ' + tel : '')));
@@ -28988,6 +29003,17 @@
     return el('div', { class: 'ass-cartao', 'data-tipo': c.tipo }, filhos);
   }
 
+  /* WhatsApp e Ligar do mesmo aluno viram um cartão só, com os dois botões
+   * lado a lado, sem repetir o nome e o número. */
+  function cartoesJuntos(lista) {
+    var whats = {};
+    lista.forEach(function (c) { if (c.tipo === 'whatsapp' && !whats[c.alunoId]) whats[c.alunoId] = c; });
+    return lista.filter(function (c) {
+      if (c.tipo === 'ligar' && whats[c.alunoId]) { whats[c.alunoId].ligarJunto = c.href; return false; }
+      return true;
+    });
+  }
+
   /* A resposta como linhas: sem markdown e sem travessão; com 3 itens ou
    * mais, o valor fica à direita. */
   function respostaDoAssistente(texto) {
@@ -29005,9 +29031,13 @@
     var corpo = $('#corpo-modal-assistente'), rodape = $('#rodape-modal-assistente');
     if (!f || !corpo || !rodape) return;
     pararDitado();
-    if (f.estadoDesenhado !== (f.pedindo ? 'pedindo' : 'livre')) {
-      f.estadoDesenhado = f.pedindo ? 'pedindo' : 'livre';
-      f.rodapeLivreEm = Date.now() + TRAVA_DO_RODAPE_ASSISTENTE_MS;
+    var janela = $('#modal-assistente');
+    var tinhaFoco = !!(janela && document.activeElement && janela.contains(document.activeElement));
+    var estado = f.pedindo ? 'pedindo' : 'livre';
+    if (f.estadoDesenhado !== estado) {
+      // a trava de 400 ms só quando o estado MUDA (no primeiro desenho, não)
+      if (f.estadoDesenhado) f.rodapeLivreEm = Date.now() + TRAVA_DO_RODAPE_ASSISTENTE_MS;
+      f.estadoDesenhado = estado;
     }
     corpo.innerHTML = '';
     rodape.innerHTML = '';
@@ -29022,6 +29052,7 @@
         } });
       }));
     };
+    if (avisoDeConversaNova && !historicoAssistente.length) conversa.appendChild(el('p', { class: 'ass-entendido', id: 'ass-conversa-nova', texto: 'Comecei uma conversa nova.' }));
     if (!historicoAssistente.length && !f.pedindo) {
       /* Na primeira pergunta da sessão, os exemplos à vista; tocar pergunta. */
       conversa.appendChild(el('p', { class: 'ajuda u-margem-0', id: 'ass-dica', texto: 'Pergunte sobre a agenda, os alunos ou o mês. Por exemplo:' }));
@@ -29032,7 +29063,7 @@
       if (h.recomecou) vez.appendChild(el('p', { class: 'ass-entendido', texto: 'Comecei uma conversa nova.' }));
       vez.appendChild(respostaDoAssistente(h.texto));
       if (h.entendido && h.entendido.length) vez.appendChild(el('p', { class: 'ass-entendido', texto: 'Entendi: ' + h.entendido.join('; ') + '.' }));
-      (h.cartoes || []).forEach(function (c, k) { vez.appendChild(cartaoDoAssistente(c, i + '-' + k)); });
+      cartoesJuntos(h.cartoes || []).forEach(function (c, k) { vez.appendChild(cartaoDoAssistente(c, i + '-' + k)); });
       conversa.appendChild(vez);
     });
     if (f.pedindo) {
@@ -29043,7 +29074,7 @@
     }
     if (historicoAssistente.length && !f.pedindo) {
       // depois da primeira pergunta, as ideias ficam recolhidas, perto do campo
-      conversa.appendChild(el('details', { class: 'ass-ideias', id: 'ass-ideias' }, [el('summary', { texto: 'Ideias' }), exemplos('ass-exemplos-ideias')]));
+      conversa.appendChild(el('details', { class: 'ass-ideias', id: 'ass-ideias' }, [el('summary', {}, [icone('chd', '', 'ass-ideias-seta'), document.createTextNode('Ideias')]), exemplos('ass-exemplos-ideias')]));
     }
     corpo.appendChild(conversa);
 
@@ -29055,7 +29086,7 @@
         disabled: semInternet ? 'disabled' : null, aoClick: function () { if (rodapeLivre(f)) perguntarAoAssistente(f.erro.pergunta); } }));
       rodape.appendChild(faixa);
     }
-    var campo = el('textarea', { id: 'ass-texto', class: 'ass-texto', rows: '2', maxlength: '600', 'aria-label': 'Sua pergunta',
+    var campo = el('textarea', { id: 'ass-texto', class: 'ass-texto' + (f.erro ? ' ass-texto-curto' : ''), rows: f.erro ? '1' : '2', maxlength: '600', 'aria-label': 'Sua pergunta',
       placeholder: temDitado() ? 'Pergunte ou toque em Ditar' : 'Escreva sua pergunta' });
     campo.value = f.texto || '';
     var perguntar = el('button', { type: 'button', class: 'btn principal', id: 'ass-perguntar', texto: 'Perguntar',
@@ -29081,6 +29112,12 @@
     if (alvo && alvo.scrollIntoView) alvo.scrollIntoView({ block: 'start' });
     var erro = $('#ass-erro');
     if (erro && erro.scrollIntoView) erro.scrollIntoView({ block: 'nearest' });
+    // o foco que estava na janela volta: ao campo no tablet, ao título no celular (o teclado não sobe sozinho)
+    if (tinhaFoco) {
+      if (modoCelular) focarTituloDoAssistente();
+      else if (!campo.disabled) { try { campo.focus({ preventScroll: true }); } catch (e) { campo.focus(); } }
+      else focarTituloDoAssistente();
+    }
   }
 
   /* Com a internet indo e voltando, só os estados mudam: o rodapé não é
@@ -29120,6 +29157,8 @@
     var cancelou = function () { return !!(controle && controle.signal.aborted) || fluxoAssistente !== f || f.vez !== vez; };
     var agoraMin = minutosAgoraCelular();
     var sessao = sessaoAssistente;
+    f.sessaoDaPergunta = sessao;
+    f.tamanhoAntes = sessao.mensagens.length;
     Assistente.perguntar(sessao, pergunta, {
       ctx: contextoDoAssistente(),
       hora: horaDeMinutosCelular(agoraMin),
@@ -29135,6 +29174,7 @@
       f.pedindo = false; f.controle = null;
       var codigo = r.erro === 'cancelado' && controle && controle.signal.motivo === 'prazo' ? 'prazo' : r.erro;
       if (codigo === 'cancelado') { f.texto = pergunta; desenharAssistente(); anunciar('Cancelado.'); return; }
+      avisoDeConversaNova = false;
       if (codigo) {
         f.texto = pergunta; // a pergunta volta ao campo
         f.erro = { frase: Assistente.fraseDoErro(codigo), tentar: Assistente.daParaTentarDeNovo(codigo), pergunta: pergunta };
@@ -29147,6 +29187,14 @@
       desenharAssistente();
       anunciar(Assistente.linhasDaResposta(r.texto).map(function (l) { return l.texto + (l.valor ? ' ' + l.valor : ''); }).join(' ') +
         (r.entendido.length ? ' Entendi: ' + r.entendido.join('; ') + '.' : ''));
+    }).catch(function () {
+      clearTimeout(relogio);
+      clearTimeout(f.esperaLonga);
+      if (fluxoAssistente !== f || f.vez !== vez) return;
+      f.pedindo = false; f.controle = null;
+      f.texto = pergunta;
+      f.erro = { frase: Assistente.fraseDoErro('interno'), tentar: true, pergunta: pergunta };
+      desenharAssistente();
     });
   }
 
