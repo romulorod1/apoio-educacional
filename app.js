@@ -24793,6 +24793,17 @@
   var LEITOR_ZOOM_MIN = 0.5, LEITOR_ZOOM_MAX = 4;
   // teto de pixels do canvas: com zoom alto num tablet de tela densa a página passaria de 40 milhões
   var LEITOR_MAX_PIXELS = 12000000;
+  /* NITIDEZ NO ZOOM ALTO (fatia 3 do leitor), à moda do pdf.js. No livro, a
+   * página que na densidade da tela passaria do teto é desenhada inteira mais
+   * barata (LEITOR_TETO_COM_DETALHE) e, por cima, um CANVAS DE DETALHE
+   * desenha só o pedaço à vista na densidade da tela, refeito quando a rolagem
+   * para (LEITOR_DETALHE_MS). Antes, no zoom 4 do tablet, a página saía com
+   * 1,04 pixel de canvas por pixel de tela, metade do que a tela mostra.
+   * LEITOR_ORCAMENTO_PIXELS é o total de pixels de canvas que o leitor deixa
+   * vivo: a página pré-desenhada na direção da rolagem só entra no que sobra. */
+  var LEITOR_TETO_COM_DETALHE = 6000000;
+  var LEITOR_ORCAMENTO_PIXELS = 16000000;
+  var LEITOR_DETALHE_MS = 150;
 
   function bytesDoPdf(fonte) {
     if (fonte instanceof Blob) return fonte.arrayBuffer().then(function (b) { return new Uint8Array(b); });
@@ -25120,14 +25131,56 @@
     }).catch(function () { mostrarFalhaDoLeitor('pdf'); return false; });
   }
 
+  /* A densidade do canvas da página inteira (pixels de canvas por pixel de
+   * tela). Se a página na densidade da tela cabe no teto, é a da tela; se não
+   * cabe, o canvas de detalhe cuida do pedaço à vista, e a página inteira
+   * pode ser mais barata: o teto dela cai para LEITOR_TETO_COM_DETALHE. */
+  function densidadeDaBase(largura, altura) {
+    var dpr = window.devicePixelRatio || 1, area = Math.max(1, largura * altura);
+    var teto = area * dpr * dpr > LEITOR_MAX_PIXELS ? LEITOR_TETO_COM_DETALHE : LEITOR_MAX_PIXELS;
+    return Math.min(dpr, Math.sqrt(teto / area));
+  }
+
+  // a densidade que a página deve ter agora, pelo tamanho da caixa (a pré-desenhada pode ter um limite menor)
+  function alvoDaPagina(registro) {
+    var alvo = densidadeDaBase(parseFloat(registro.caixa.style.width) || 1, parseFloat(registro.caixa.style.height) || 1);
+    return registro.limite ? Math.min(alvo, registro.limite) : alvo;
+  }
+
+  /* O livro escaneado (sem texto na página aberta primeiro) sai em duas
+   * passadas: a primeira a meia densidade, que aparece logo, e em seguida a
+   * nítida. A sonda roda uma vez por livro, na primeira página desenhada. */
+  function sondarTextoDoLivro(estado, pagina) {
+    if (!estado.sondaTexto) {
+      estado.sondaTexto = pagina.getTextContent().then(function (t) {
+        estado.escaneado = !((t && t.items) || []).some(function (i) { return i.str && i.str.trim(); });
+      }, function () { estado.escaneado = false; });
+    }
+    return estado.sondaTexto;
+  }
+
+  /* corpo.dataset.ocupado diz se o leitor ainda tem desenho por fazer (página,
+   * segunda passada ou detalhe): '1' ou '0'. Recalculado do estado a cada
+   * troca, sem contador que possa se perder. */
+  function atualizarOcupacaoDoLeitor() {
+    var corpo = $('#corpo-modal-leitor-pdf');
+    if (!corpo) return;
+    var e = leitor;
+    var ocupado = !!(e && e.paginas && (e.detalheTimer || e.paginas.some(function (p) { return p.desenhando || p.tarefaDetalhe; })));
+    corpo.dataset.ocupado = ocupado ? '1' : '0';
+  }
+
   function desenharPaginaContinua(estado, registro) {
     if (registro.desenhando) return registro.promessa || Promise.resolve(false);
     // o canvas esticado depois de um gesto é provisório: a página se desenha de novo no tamanho certo
-    if (registro.caixa.querySelector('canvas') && !registro.esticado) return Promise.resolve(true);
+    if (registro.temCanvas && !registro.esticado && registro.densidade >= alvoDaPagina(registro) * 0.9) return Promise.resolve(true);
     if (estado !== leitor) return Promise.resolve(false);
     registro.desenhando = true;
+    atualizarOcupacaoDoLeitor();
     var tarefaDaPagina = null;
     registro.promessa = estado.doc.getPage(registro.n).then(function (pagina) {
+      return estado.escaneado === undefined ? sondarTextoDoLivro(estado, pagina).then(function () { return pagina; }) : pagina;
+    }).then(function (pagina) {
       // a página saiu de perto da tela enquanto o pdf.js a abria: nem cria o canvas
       if (estado !== leitor || !registro.visivel) return null;
       var corpo = $('#corpo-modal-leitor-pdf');
@@ -25137,8 +25190,12 @@
       registro.proporcao = base.height / base.width;
       registro.caixa.style.width = Math.floor(vp.width) + 'px';
       registro.caixa.style.height = Math.ceil(vp.height) + 'px';
-      var densidade = Math.min(window.devicePixelRatio || 1, Math.sqrt(LEITOR_MAX_PIXELS / (vp.width * vp.height)));
+      var alvo = densidadeDaBase(vp.width, vp.height);
+      if (registro.limite) alvo = Math.min(alvo, registro.limite);
+      // escaneado, sem nada na tela ainda: a primeira passada sai a meia densidade
+      var densidade = estado.escaneado && !registro.temCanvas ? alvo / 2 : alvo;
       var canvas = document.createElement('canvas');
+      canvas.className = 'leitor-pdf-base';
       canvas.width = Math.max(1, Math.floor(vp.width * densidade));
       canvas.height = Math.max(1, Math.floor(vp.height * densidade));
       canvas.style.width = Math.floor(vp.width) + 'px';
@@ -25150,12 +25207,16 @@
       registro.tarefa = tarefa;
       return tarefa.promise.then(function () {
         if (estado !== leitor || !registro.visivel || registro.tarefa !== tarefa) { canvas.width = 0; canvas.height = 0; return false; }
+        soltarDetalhe(registro);
         var antigo = registro.caixa.querySelector('canvas');
         if (antigo) { antigo.width = 0; antigo.height = 0; }
         registro.caixa.innerHTML = '';
         registro.caixa.appendChild(canvas);
         registro.temCanvas = true;
         registro.esticado = false;
+        registro.densidade = densidade;
+        registro.escala = vp.scale;
+        agendarDetalhe(estado);
         return true;
       });
     }).catch(function (e) {
@@ -25166,11 +25227,102 @@
         registro.tarefa = null;
         registro.desenhando = false;
       }
+      /* A segunda passada: a página à vista ficou abaixo da densidade que deve
+       * ter (a meia do escaneado, ou a pré-desenhada que entrou na tela). O
+       * canvas de agora fica até o nítido estar pronto. */
+      if (!registro.desenhando && estado === leitor && registro.visivel && registro.temCanvas && !registro.esticado &&
+          registro.densidade < alvoDaPagina(registro) * 0.9) desenharPaginaContinua(estado, registro);
+      atualizarOcupacaoDoLeitor();
     });
     return registro.promessa;
   }
 
+  /* O CANVAS DE DETALHE: depois que a rolagem para, cada página à vista cuja
+   * página inteira está abaixo da densidade da tela ganha, por cima, um
+   * canvas só do retângulo à vista, na densidade da tela. O de antes fica até
+   * o novo ficar pronto. Durante um gesto de dedos, espera. */
+  function agendarDetalhe(estado) {
+    if (!estado || estado !== leitor || !estado.continuo) return;
+    clearTimeout(estado.detalheTimer);
+    estado.detalheTimer = setTimeout(function () {
+      estado.detalheTimer = null;
+      desenharDetalhesDoLeitor(estado);
+      atualizarOcupacaoDoLeitor();
+    }, LEITOR_DETALHE_MS);
+    atualizarOcupacaoDoLeitor();
+  }
+
+  function soltarDetalhe(registro) {
+    if (registro.tarefaDetalhe) { registro.tarefaDetalhe.cancel(); registro.tarefaDetalhe = null; }
+    if (registro.detalhe) {
+      var c = registro.detalhe.canvas;
+      c.width = 0; c.height = 0;
+      if (c.parentNode) c.parentNode.removeChild(c);
+      registro.detalhe = null;
+    }
+  }
+
+  function desenharDetalhesDoLeitor(estado) {
+    if (estado !== leitor || !estado.continuo || !estado.paginas) return;
+    if (gestoLeitor.pinca || dedosDoGesto().length) { agendarDetalhe(estado); return; }
+    var corpo = $('#corpo-modal-leitor-pdf'), rc = corpo.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    var topo = rc.top + corpo.clientTop, esquerda = rc.left + corpo.clientLeft;
+    estado.paginas.forEach(function (p) {
+      if (!p.temCanvas && !p.detalhe) return;
+      if (!p.temCanvas || p.esticado || !(p.densidade < dpr * 0.95) || !p.visivel) { soltarDetalhe(p); return; }
+      var r = p.caixa.getBoundingClientRect();
+      var x0 = Math.max(0, Math.floor(esquerda - r.left)), y0 = Math.max(0, Math.floor(topo - r.top));
+      var x1 = Math.min(Math.floor(r.width), Math.ceil(esquerda + corpo.clientWidth - r.left));
+      var y1 = Math.min(Math.floor(r.height), Math.ceil(topo + corpo.clientHeight - r.top));
+      if (x1 - x0 < 1 || y1 - y0 < 1) { soltarDetalhe(p); return; }
+      var ret = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+      var d = p.detalhe;
+      if (d && !p.tarefaDetalhe && d.ret.x === ret.x && d.ret.y === ret.y && d.ret.w === ret.w && d.ret.h === ret.h) return;
+      desenharDetalhe(estado, p, ret, dpr);
+    });
+  }
+
+  function desenharDetalhe(estado, p, ret, densidade) {
+    if (p.tarefaDetalhe) { p.tarefaDetalhe.cancel(); p.tarefaDetalhe = null; }
+    var escala = p.escala;
+    // a vaga da tarefa é tomada já, antes do getPage: o leitor não parece ocioso nesse meio tempo
+    var vaga = { cancel: function () { vaga.cancelada = true; } };
+    p.tarefaDetalhe = vaga;
+    estado.doc.getPage(p.n).then(function (pagina) {
+      if (p.tarefaDetalhe !== vaga) return null;
+      p.tarefaDetalhe = null;
+      if (estado !== leitor || !p.temCanvas || p.esticado || p.escala !== escala) return null;
+      var vp = pagina.getViewport({ scale: escala });
+      var c = document.createElement('canvas');
+      c.className = 'leitor-pdf-detalhe';
+      c.setAttribute('aria-hidden', 'true');
+      c.width = Math.max(1, Math.round(ret.w * densidade));
+      c.height = Math.max(1, Math.round(ret.h * densidade));
+      c.style.left = ret.x + 'px';
+      c.style.top = ret.y + 'px';
+      c.style.width = ret.w + 'px';
+      c.style.height = ret.h + 'px';
+      var tarefa = pagina.render({ canvasContext: c.getContext('2d'), canvas: c, viewport: vp,
+        transform: [densidade, 0, 0, densidade, -ret.x * densidade, -ret.y * densidade] });
+      p.tarefaDetalhe = tarefa;
+      atualizarOcupacaoDoLeitor();
+      return tarefa.promise.then(function () {
+        if (p.tarefaDetalhe !== tarefa) { c.width = 0; c.height = 0; return; }
+        p.tarefaDetalhe = null;
+        if (estado !== leitor || !p.temCanvas || p.esticado || p.escala !== escala) { c.width = 0; c.height = 0; return; }
+        soltarDetalhe(p);
+        p.caixa.appendChild(c);
+        p.detalhe = { canvas: c, ret: ret };
+      }, function () {
+        if (p.tarefaDetalhe === tarefa) p.tarefaDetalhe = null;
+        c.width = 0; c.height = 0;
+      });
+    }).catch(function () { /* o detalhe é só nitidez: a página inteira continua lá */ }).then(atualizarOcupacaoDoLeitor);
+  }
+
   function liberarPaginaContinua(registro) {
+    soltarDetalhe(registro);
     if (registro.tarefa) { registro.tarefa.cancel(); registro.tarefa = null; }
     var c = registro.caixa.querySelector('canvas');
     if (c) { c.width = 0; c.height = 0; registro.caixa.removeChild(c); }
@@ -25221,15 +25373,6 @@
     var c = Math.max(1, Math.min(estado.total, centro || estado.pagina || 1));
     var ficam = {};
     ficam[c] = true;
-    /* As vizinhas ficam prontas para a rolagem, mas só se estiverem a menos
-     * de uma altura de tela da área à vista: no zoom alto a página é maior
-     * que a tela, e a vizinha lá longe só gastava memória (36 Mpx no zoom 4). */
-    var alcance = corpo.clientHeight;
-    [c - 1, c + 1].forEach(function (k) {
-      if (k < 1 || k > estado.total) return;
-      var r = estado.paginas[k - 1].caixa.getBoundingClientRect();
-      if (r.bottom >= rc.top - alcance && r.top <= rc.top + corpo.clientHeight + alcance) ficam[k] = true;
-    });
     // as caixas estão em ordem, uma embaixo da outra: anda do centro para os dois lados
     for (var cima = c; cima >= 1; cima--) {
       var rCima = estado.paginas[cima - 1].caixa.getBoundingClientRect();
@@ -25240,6 +25383,41 @@
       var rBaixo = estado.paginas[baixo - 1].caixa.getBoundingClientRect();
       if (rBaixo.top > fundo) break;
       if (rBaixo.bottom >= topo) ficam[baixo] = true;
+    }
+    estado.paginas.forEach(function (pagina) { if (ficam[pagina.n]) pagina.limite = null; });
+    /* PRÉ-DESENHO NA DIREÇÃO DA ROLAGEM (como a fila do pdf.js): a página
+     * seguinte à última à vista, ou a anterior à primeira quando ela sobe, já
+     * fica desenhada antes de entrar na tela. Antes eram as duas vizinhas, e
+     * só a menos de uma tela: deitado, a próxima não estava pronta. Ela entra
+     * no que sobra do orçamento de pixels, com densidade menor se for preciso,
+     * e é redesenhada nítida quando chega à tela. */
+    var numeros = Object.keys(ficam).map(Number);
+    var primeira = Math.min.apply(null, numeros), ultima = Math.max.apply(null, numeros);
+    var proxima = estado.direcao < 0 ? primeira - 1 : ultima + 1;
+    if (proxima >= 1 && proxima <= estado.total) {
+      var dpr = window.devicePixelRatio || 1, usados = 0, comDetalhe = false;
+      numeros.forEach(function (k) {
+        var q = estado.paginas[k - 1], w = parseFloat(q.caixa.style.width) || 1, h = parseFloat(q.caixa.style.height) || 1;
+        var d = densidadeDaBase(w, h);
+        if (d < dpr * 0.95) comDetalhe = true;
+        usados += w * h * d * d;
+      });
+      if (comDetalhe) usados += corpo.clientWidth * corpo.clientHeight * dpr * dpr;
+      var pp = estado.paginas[proxima - 1];
+      var pw = parseFloat(pp.caixa.style.width) || 1, ph = parseFloat(pp.caixa.style.height) || 1;
+      var sobra = LEITOR_ORCAMENTO_PIXELS - usados;
+      var limite = sobra > 0 ? Math.min(densidadeDaBase(pw, ph), Math.sqrt(sobra * 0.98 / (pw * ph))) : 0;
+      var feito = pp.temCanvas && !pp.esticado ? pp.caixa.querySelector('canvas') : null;
+      var atuais = feito ? feito.width * feito.height : 0;
+      /* já desenhada e cabe no que sobra: fica como está. A nova é pedida com 2% de margem
+       * (sobra * 0,98), para o arredondamento do canvas não a deixar logo acima e redesenhar */
+      if (atuais && atuais <= sobra) ficam[proxima] = true;
+      // menos de meio pixel de canvas por pixel de tela não serve nem de primeira passada
+      else if (limite >= 0.5) {
+        if (atuais) liberarPaginaContinua(pp);
+        ficam[proxima] = true;
+        pp.limite = limite;
+      }
     }
     estado.paginas.forEach(function (pagina) {
       if (ficam[pagina.n]) {
@@ -25275,9 +25453,15 @@
     window.requestAnimationFrame(function () {
       leitorRolarAgendado = false;
       if (!leitor || !leitor.continuo) return;
+      // a direção da rolagem, para o pré-desenho: fica a última que andou
+      var topoAgora = $('#corpo-modal-leitor-pdf').scrollTop;
+      if (typeof leitor.ultimoTopo === 'number' && topoAgora !== leitor.ultimoTopo) leitor.direcao = topoAgora > leitor.ultimoTopo ? 1 : -1;
+      leitor.ultimoTopo = topoAgora;
       var n = paginaMaisProximaDoCentro(leitor);
       leitor.ancora = ancoraDoLeitorContinuo(leitor, n);
       conciliarPaginasContinuas(leitor, n);
+      // o detalhe se refaz quando a rolagem para
+      agendarDetalhe(leitor);
       // Em uma navegação suave, o meio da tela ainda passa por páginas
       // anteriores. Não grave esse trecho intermediário como a última página.
       if (leitor.rolagemProgramaticaAte && n !== leitor.rolagemProgramaticaAte) return;
@@ -25322,6 +25506,9 @@
         }, 900);
       }
       p.caixa.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'start' });
+      /* o salto direto (Ir p., Sumário, barra) não é rolagem para trás nem para
+       * a frente: dali ela lê para a frente, e é a página seguinte que se pré-desenha */
+      if (!suave) { leitor.direcao = 1; leitor.ultimoTopo = $('#corpo-modal-leitor-pdf').scrollTop; }
       conciliarPaginasContinuas(leitor, p.n);
       // arrastando a barra, o desenho espera ela parar (a conciliação agenda)
       if ((leitor.arrastandoAte || 0) > Date.now()) return Promise.resolve(false);
@@ -25394,7 +25581,11 @@
     var estado = leitor;
     var corpo = $('#corpo-modal-leitor-pdf'), largura = Math.max(160, corpo.clientWidth - 36) * estado.zoom;
     var ancora = paraOAlto ? null : (ancoraDada || ancoraParaRedimensionar(estado));
+    // o detalhe é do tamanho de antes: sai, e volta quando a página nova estiver desenhada
+    clearTimeout(estado.detalheTimer);
+    estado.detalheTimer = null;
     estado.paginas.forEach(function (p) {
+      soltarDetalhe(p);
       var velho = esticar ? p.caixa.querySelector('canvas') : null;
       if (velho && velho.width > 0) {
         if (p.tarefa) { p.tarefa.cancel(); p.tarefa = null; }
@@ -25409,6 +25600,8 @@
     });
     if (paraOAlto || !ancora) { irAProximaPaginaDoLeitor(estado.pagina, false); return Promise.resolve(true); }
     voltarParaAncoraDoLeitor(estado, ancora);
+    // a rolagem que o zoom fez não é ela rolando: a direção do pré-desenho fica a de antes
+    estado.ultimoTopo = corpo.scrollTop;
     /* O contador e a posição guardada seguem a página que está à vista. No
      * gesto, a âncora é a página sob os DEDOS, que pode não ser a do meio; e
      * no começo ou no fim do livro a rolagem fica presa no limite, nenhum

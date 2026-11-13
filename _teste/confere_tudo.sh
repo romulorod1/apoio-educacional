@@ -571,6 +571,16 @@ roda "biblioteca livros tela --envenenado-pagina-presa" node "_teste/testa_bibli
 roda "leitor pinca"                              node "_teste/testa_leitor_pinca.js"
 roda "leitor pinca --envenenado-gesto-sem-ponto" node "_teste/testa_leitor_pinca.js" --envenenado-gesto-sem-ponto
 roda "leitor pinca --envenenado-gesto-grava-pela-ancora" node "_teste/testa_leitor_pinca.js" --envenenado-gesto-grava-pela-ancora
+# Fatia 3 do leitor: nitido em qualquer zoom e mais rapido no escaneado, com
+# densidade de tela 2. No zoom maximo, em pe e deitado, a nitidez fica em 1,9
+# ou mais (o canvas de detalhe) e os pixels de canvas vivos em 16 milhoes ou
+# menos; parada a rolagem, a pagina seguinte NA DIRECAO dela ja tem canvas; o
+# escaneado sai primeiro a meia densidade. Um veneno para cada peca.
+roda "leitor nitidez"                               node "_teste/testa_leitor_nitidez.js"
+roda "leitor nitidez --envenenado-sem-detalhe"      node "_teste/testa_leitor_nitidez.js" --envenenado-sem-detalhe
+roda "leitor nitidez --envenenado-sem-teto"         node "_teste/testa_leitor_nitidez.js" --envenenado-sem-teto
+roda "leitor nitidez --envenenado-direcao-errada"   node "_teste/testa_leitor_nitidez.js" --envenenado-direcao-errada
+roda "leitor nitidez --envenenado-sem-meia-densidade" node "_teste/testa_leitor_nitidez.js" --envenenado-sem-meia-densidade
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas

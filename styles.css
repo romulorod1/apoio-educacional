@@ -2171,6 +2171,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-pdf-navegacao input { display: block; width: 100%; min-height: var(--alvo); margin: 0; accent-color: var(--navy); }
 .leitor-pdf-pagina { position: relative; margin: 0 auto 18px; background: var(--branco); box-shadow: var(--sombra); }
 .leitor-pdf-pagina canvas { display: block; margin: 0; background: var(--branco); }
+/* O canvas de detalhe do zoom alto (fatia 3): só o pedaço à vista, na densidade
+   da tela, por cima da página inteira; o toque passa direto para a página. */
+.leitor-pdf-pagina canvas.leitor-pdf-detalhe { position: absolute; pointer-events: none; }
 .leitor-pdf-pagina-vazia { width: 100%; height: 100%; background: var(--branco); }
 /* A frase do C3 ("Escolha a página e toque em...") fica colada embaixo da
    barra, de ponta a ponta, sem rolar junto com a página. */
