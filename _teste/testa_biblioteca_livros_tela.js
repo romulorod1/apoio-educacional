@@ -387,7 +387,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     grupos: Array.from(document.querySelectorAll('#bib-corpo > .bib-grupo-busca')).map(d => d.dataset.grupo + ':' +
       d.querySelector('.bib-grupo-titulo').textContent + ':' + d.open).join(','),
     livros: (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''
-  })), v => !!v && /Buscando|Nenhum livro|preparada|encontrada/.test(v.livros) && !/Buscando/.test(v.livros), 10000);
+  })), v => !!v && /Buscando|Nenhum livro|preparada|encontrada|em \d+ livros?\./.test(v.livros) && !/Buscando/.test(v.livros), 10000);
   conf('um campo de busca só, e ele diz que busca nos exercícios e nos livros',
     grupos.valor.campos + ' | ' + grupos.valor.campo, '1 | Buscar nos exercícios e nos livros');
   conf('o resultado tem dois grupos abertos: Exercícios e depois Nos livros', grupos.valor.grupos,
