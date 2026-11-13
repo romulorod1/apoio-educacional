@@ -73,4 +73,6 @@ biblioteca/*	_teste/e2e.js _teste/e2e_correcoes.js _teste/testa_assunto.js _test
 # P2 (busca em tres blocos): a busca da Biblioteca, os capitulos e o ano escrito moram no app.js e no styles.css;
 # as provas de tela dela sao estas duas (secao 11 e secoes 3.1 a 3.3).
 app.js	_teste/testa_biblioteca_livros_tela.js _teste/testa_livros_indice.js
+app.js	_teste/testa_aula_salva_sozinha.js
+app.js	_teste/testa_voltar_android.js _teste/testa_relato_voltar.js
 styles.css	_teste/testa_biblioteca_livros_tela.js
