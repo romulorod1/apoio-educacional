@@ -460,6 +460,11 @@ done
 # { relogioReal: true }; o veneno serve o helper sem o padrao e a virada tem de
 # abrir ("VENENO visto").
 roda "relogio padrao --envenenado-sem-padrao"   node "_teste/testa_relogio_padrao.js" --envenenado-sem-padrao
+# F5 (#158): o seletor de assunto da aula. O Voltar do aparelho fecha so o painel
+# (o veneno tira o modal-tema do historico) e a lista de temas, que usa o mesmo
+# corpo, rola no tablet deitado (o veneno devolve a regra do corpo sem escopo).
+roda "assunto --envenenado-voltar-fecha-aula"   node "_teste/testa_assunto.js" --envenenado-voltar-fecha-aula
+roda "assunto --envenenado-corpo-sem-escopo"    node "_teste/testa_assunto.js" --envenenado-corpo-sem-escopo
 # F6 (#157): a janela da aula com a grade antiga (cartoes de altura fixa, cada um
 # com rolagem propria, o "Escrever a mao" cortado). A prova de rolagem e da
 # primeira dobra tem de ve-la ("VENENO visto").
@@ -1231,6 +1236,10 @@ roda "sistema visual --envenenado-fonte-11px"      node "_teste/testa_sistema_vi
 roda "sistema visual --envenenado-glifo-solto"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-glifo-solto
 roda "sistema visual --envenenado-icone-vazio"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-icone-vazio
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
+# F5 (#158): o seletor de temas pela trilha rola com o dedo e nao e o da aula; a
+# trilha do zero espera o Voltar do seletor antes de abrir (o veneno abre antes).
+roda "trilha do zero e Voltar"                     node "_teste/testa_trilha_do_zero_voltar.js"
+roda "trilha do zero --envenenado-trilha-antes-do-voltar" node "_teste/testa_trilha_do_zero_voltar.js" --envenenado-trilha-antes-do-voltar
 roda "preço descartado não vaza"                  node "_teste/testa_preco_cancelado.js"
 roda "ações de aula no fechamento"                node "_teste/testa_acoes_fechamento.js"
 # C9: o documento do ciclo na tela. A contagem do que abre sozinho (janelas,
