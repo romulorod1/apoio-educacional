@@ -114,7 +114,7 @@ async function perguntar(pag, frase, roteiro) {
   await esperar('a resposta chegou', () => pag.evaluate(() => !document.querySelector('#ass-esperando')), v => v === true, 15000);
   await pausa(450); // a trava de 400 ms do rodapé, que agora vale também para o Confirmar
 }
-const estadoDoCartao = (pag, sel) => pag.evaluate(s => { const c = document.querySelector(s); return c && c.getAttribute('data-estado'); }, sel || '.ass-vez:last-child .ass-proposta');
+const estadoDoCartao = (pag, sel) => pag.evaluate(s => { const c = document.querySelector(s); return c && c.getAttribute('data-estado'); }, sel || '#ass-conversa > .ass-vez:last-of-type .ass-proposta');
 const banco = pag => pag.evaluate(() => Promise.all([Store.carregar(), Store.lerRegistros()]).then(r => JSON.stringify(r[0]) + '|' + JSON.stringify(r[1])));
 const soBanco = pag => pag.evaluate(() => Store.carregar().then(b => JSON.stringify(b)));
 const semIdsNovos = s => { const d = JSON.parse(s); d.aulas.forEach(a => { if (!/^(s1@|b\d)/.test(a.id)) a.id = 'NOVA'; }); return JSON.stringify(d); };
@@ -128,7 +128,7 @@ function onde(a, b, cam, saida) {
   return saida;
 }
 function igual(rotulo, x, y) { conf(rotulo + (x === y ? '' : ' (' + onde(JSON.parse(x), JSON.parse(y)).join('; ') + ')'), x === y, true); }
-const ultimoCartao = '.ass-vez:last-child .ass-proposta';
+const ultimoCartao = '#ass-conversa > .ass-vez:last-of-type .ass-proposta';
 async function modo(pag, nome, largura, altura) {
   await pag.setViewport({ width: largura, height: altura, hasTouch: largura < 500 });
   await pag.evaluate(n => sessionStorage.setItem('modo-da-prova', n), nome);
@@ -252,7 +252,7 @@ async function transbordo(pag, raizSel) {
   falso.fila = [criar, texto('Confira.')]; falso.pedidos = [];
   const antesTrava = await soBanco(pag);
   await pag.evaluate(() => { const c = document.querySelector('#ass-texto'); c.value = 'marca aula'; c.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#ass-perguntar').click(); });
-  await esperar('a resposta chegou', () => pag.evaluate(() => !document.querySelector('#ass-esperando') && !!document.querySelector('.ass-vez:last-child .ass-proposta [id^="ass-confirmar-"]')), v => v === true, 15000);
+  await esperar('a resposta chegou', () => pag.evaluate(() => !document.querySelector('#ass-esperando') && !!document.querySelector('#ass-conversa > .ass-vez:last-of-type .ass-proposta [id^="ass-confirmar-"]')), v => v === true, 15000);
   await pag.evaluate(s => document.querySelector(s + ' [id^="ass-confirmar-"]').click(), ultimoCartao);
   await pausa(300);
   conf('5: o Confirmar tocado nos primeiros 400 ms depois da resposta não grava', [await estadoDoCartao(pag, ultimoCartao), (await soBanco(pag)) === antesTrava], ['aberto', true]);
