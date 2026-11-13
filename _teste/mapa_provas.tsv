@@ -35,6 +35,11 @@ _teste/merge_seguro.*	-
 _teste/guarda_merge.js	-
 _teste/divide_portao.js	-
 _teste/provas_tocadas.js	-
+# 13f: o gerador da publicacao e as novidades so mudam o site MONTADO; as provas
+# de navegador abrem o app.js do repositorio, com o valor fixo. Quem os cobre e o
+# portao-rapido (testa_versao_publicada, testa_publica_cloudflare, testa_ordem_versao).
+_teste/versao_publicada.js	-
+novidades/*	-
 _teste/testa_livros_impressa.js	-
 _teste/testa_*.js	-
 # Mexe em como o portao roda tudo: a bateria inteira.
