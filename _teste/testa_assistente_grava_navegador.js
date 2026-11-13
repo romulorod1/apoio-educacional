@@ -487,6 +487,13 @@ async function transbordo(pag, raizSel) {
       c.querySelectorAll('.ass-marca[role="checkbox"]').length, c.querySelector('[id^="ass-confirmar-"]').textContent]; }, ultimoCartao),
     [['fora:Fica de fora: de mês com pagamento.', 'fora:Fica de fora: já registrada.', 'entra:'], 1, 'Confirmar 1 de 3']);
   const antesLote = await soBanco(pag);
+  /* A frase cita o Bruno e a Zélia juntos: pela regra "na dúvida, o cartão pergunta" (lentes do
+   * #213), o "sem cobrar" é ambíguo para a linha da Zélia, e o cartão pergunta. Sem a escolha o
+   * Confirmar não grava; a prova confere a pergunta e escolhe "sem" antes de confirmar. */
+  conf('1: a frase com dois alunos deixa a cobrança da Zélia em pergunta, e sem escolha o Confirmar não grava',
+    await pag.evaluate(s => { const c = document.querySelector(s); return [!!c.querySelector('.ass-opcao[data-opcao="sem"]'), c.querySelector('[id^="ass-confirmar-"]').disabled]; }, ultimoCartao), [true, true]);
+  await clicar(pag, ultimoCartao + ' .ass-opcao[data-opcao="sem"]');
+  await pausa(450);
   await clicar(pag, ultimoCartao + ' [id^="ass-confirmar-"]');
   const gravouLote = await esperar('o lote gravou', () => soBanco(pag), v => v !== antesLote, 8000);
   const dLote = JSON.parse(await soBanco(pag)), aLote = JSON.parse(antesLote);
