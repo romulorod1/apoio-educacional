@@ -87,7 +87,7 @@
     {
       versao: '1.42.81',
       itens: [
-        'Ao escolher o assunto da aula, o alto da lista mostra o ano do aluno e a data da última aula dada, e cada assunto de Matemática mostra se a biblioteca tem teoria e exercícios dele, com a legenda uma vez no alto. No tablet deitado, a lista abre ao lado da aula, e o Voltar do aparelho fecha só a lista.'
+        'Ao escolher o assunto da aula, o alto da lista mostra o ano do aluno e a data da última aula dada. Nos assuntos de Matemática de "Continuar de onde parou", das sugestões do ano e da busca, dois sinais mostram se a biblioteca tem teoria e exercícios do assunto, com a legenda uma vez no alto. No tablet deitado, a lista abre ao lado da aula, e o Voltar do aparelho fecha só a lista.'
       ]
     },
     {
@@ -10388,8 +10388,11 @@
         rotuloVoltar: temTrilhaAtras ? 'Voltar para a trilha' : null,
         voltar: temTrilhaAtras ? function () { fecharModal('modal-tema'); } : null,
         aoEscolher: function (t) {
-          fecharModal('modal-tema');
-          aoEscolher(t);
+          /* Com o modal-tema no histórico (F5), fechar faz um history.back()
+           * que só termina depois. Quem vem a seguir (a trilha nova abre e
+           * empurra a entrada dela) espera esse Voltar acabar: senão o Voltar
+           * atrasado comia a entrada da trilha, e a pilha ficava errada. */
+          fecharModal('modal-tema', function () { aoEscolher(t); });
         }
       });
     }).catch(function () {
@@ -17979,10 +17982,15 @@
     return partes.join(' · ');
   }
 
-  function resumoDisponibilidadeDoAssunto(assunto) {
+  /* `modJaAchado`: quem já procurou o módulo do assunto (o seletor da aula, com
+   * memo por desenho) o passa, e a procura não se repete. */
+  function resumoDisponibilidadeDoAssunto(assunto, modJaAchado) {
     if (!bib || !assunto || assunto.disciplina && assunto.disciplina !== Core.MATERIA_PADRAO) return '';
-    var achado = moduloDoAssunto(assunto);
-    var mod = achado && bib.modulos[achado.chave];
+    var mod = modJaAchado;
+    if (!mod) {
+      var achado = moduloDoAssunto(assunto);
+      mod = achado && bib.modulos[achado.chave];
+    }
     if (!mod) return '';
     var partes = [];
     if (bib.listasPorModulo && (bib.listasPorModulo[mod.chave] || []).length) partes.push('lista pronta');

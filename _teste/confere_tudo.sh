@@ -1236,6 +1236,10 @@ roda "sistema visual --envenenado-fonte-11px"      node "_teste/testa_sistema_vi
 roda "sistema visual --envenenado-glifo-solto"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-glifo-solto
 roda "sistema visual --envenenado-icone-vazio"     node "_teste/testa_sistema_visual_navegador.js" --envenenado-icone-vazio
 roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vinculos_navegador.js"
+# F5 (#158): o seletor de temas pela trilha rola com o dedo e nao e o da aula; a
+# trilha do zero espera o Voltar do seletor antes de abrir (o veneno abre antes).
+roda "trilha do zero e Voltar"                     node "_teste/testa_trilha_do_zero_voltar.js"
+roda "trilha do zero --envenenado-trilha-antes-do-voltar" node "_teste/testa_trilha_do_zero_voltar.js" --envenenado-trilha-antes-do-voltar
 roda "preço descartado não vaza"                  node "_teste/testa_preco_cancelado.js"
 roda "ações de aula no fechamento"                node "_teste/testa_acoes_fechamento.js"
 # C9: o documento do ciclo na tela. A contagem do que abre sozinho (janelas,
