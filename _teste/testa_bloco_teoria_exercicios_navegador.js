@@ -405,6 +405,15 @@ const fecharModal = async pag => {
 
   // ================================================================
   secao('8. O vazio numa linha');
+  // o material herdado dos vizinhos declarados (o caso do MAT08-15): uma linha diz de onde veio
+  await desenhar(pag, 'MAT09-04', VINCULOS);
+  conf('o material dos vizinhos vem com a linha que diz de quais assuntos ele veio', await pag.evaluate(() => {
+    const caixa = document.querySelector('#prova-t2');
+    const f = Object.assign({}, window.__provaFontes, { vizinhos: [{ id: 'MAT06-12', titulo: 'Volume e unidades de medida', serie: '06' },
+      { id: 'MAT09-12', titulo: 'Volume de cilindros e outros sólidos', serie: '09' }] });
+    window.__provaT2.desenhar(caixa, f);
+    return (caixa.querySelector('.bte-vizinhos') || {}).textContent || '';
+  }), 'Este assunto ainda não tem material próprio no tablet. Abaixo, o de “Volume e unidades de medida” (6º ano) e de “Volume de cilindros e outros sólidos” (9º ano).');
   await desenhar(pag, 'MAT04-09');
   b = await ler(pag);
   conf('MAT04-09 (4º ano, sem livro): só a OBMEP', b.secoes.join(' | '), 'obmep:OBMEP 2');

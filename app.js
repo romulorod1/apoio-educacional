@@ -24178,6 +24178,15 @@
         'Ainda não há teoria nem exercícios ligados a este assunto.' }));
       return bloco;
     }
+    /* O material herdado dos vizinhos declarados no índice (fontes_vizinhas):
+     * a tela diz numa linha que não é do próprio assunto, e de quais veio. */
+    if ((f.vizinhos || []).length) {
+      bloco.appendChild(el('p', { class: 'ajuda bte-vizinhos', texto: 'Este assunto ainda não tem material próprio no tablet. ' +
+        'Abaixo, o ' + juntarComE(f.vizinhos.map(function (v) {
+          var ano = Core.ANOS_ESCOLARES[v.serie];
+          return 'de “' + v.titulo + '”' + (ano ? ' (' + ano + ')' : '');
+        })) + '.' }));
+    }
 
     function caixaNoMaterial(fonte, nome) {
       var chk = el('input', { type: 'checkbox', class: 'bte-marca', 'aria-label': 'No material: ' + nome });

@@ -1132,6 +1132,12 @@
    *             ou { assunto, lista } ou { assunto, modulo }, ou as linhas do
    *             vinculos-exercicios-C1.csv lidas como estão ({ pacote, item_id,
    *             ano, assuntos, confianca, justificativa }).
+   *   (do índice) fontes_vizinhas  a lista explícita, no próprio assunto, dos
+   *             assuntos de onde vem o material quando ele não tem nenhum
+   *             próprio (o MAT08-15 não tem módulo nos pacotes: herda o de
+   *             MAT06-12 e MAT09-12). Cada fonte herdada leva `deVizinho` (o id
+   *             do vizinho), e o retorno traz `vizinhos` [{ id, titulo, serie }].
+   *             Um nível só: o vizinho não passa adiante os vizinhos dele.
    *   modulosEquivalentes  as chaves de módulo de mesmo título que o app achou
    *             quando a chave do índice não está no aparelho (camada 'modulo').
    *
@@ -1357,6 +1363,36 @@
     bases.sort(function (a, b) { return porModulo(a, b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); });
     var listaBase = bases[0] || null;
 
+    /* OS VIZINHOS DECLARADOS. O assunto sem material próprio nenhum herda o
+     * dos assuntos que o índice lista em `fontes_vizinhas`, um nível só, e cada
+     * fonte herdada diz de qual vizinho veio. Não há adivinhação: sem a lista
+     * no índice, nada é herdado. */
+    var vizinhos = [];
+    var semMaterial = !teoria.length && !listaBase && !exercicios.length && !obmep.length && !enem.length;
+    if (semMaterial && tema && Array.isArray(tema.fontes_vizinhas) && !o.semVizinhos) {
+      var vistosDoVizinho = Object.create(null);
+      tema.fontes_vizinhas.forEach(function (vid) {
+        if (typeof vid !== 'string' || vid === id) return;
+        var r = fontesDoAssunto(vid, Object.assign({}, o, { semVizinhos: true, vinculos: null, modulosEquivalentes: null }));
+        var achou = false;
+        function herda(lista, destino) {
+          lista.forEach(function (f) {
+            if (vistosDoVizinho[f.tipo + '|' + f.id]) return;
+            vistosDoVizinho[f.tipo + '|' + f.id] = true;
+            f.deVizinho = vid;
+            destino.push(f);
+            achou = true;
+          });
+        }
+        herda(r.teoria, teoria);
+        herda(r.exercicios, exercicios);
+        herda(r.obmep, obmep);
+        herda(r.enem, enem);
+        if (r.listaBase && !listaBase) { r.listaBase.deVizinho = vid; listaBase = r.listaBase; achou = true; }
+        if (achou) vizinhos.push({ id: vid, titulo: r.titulo, serie: r.serie });
+      });
+    }
+
     /* O VAZIO DIZ O PORQUÊ, numa linha: o aparelho sem pacote nenhum, o pacote
      * do assunto que ainda não chegou, ou o assunto sem vínculo ainda. */
     var vazio = null;
@@ -1375,7 +1411,7 @@
 
     return {
       assunto: id, titulo: tema && tema.pt ? tema.pt.titulo || null : null, serie: tema ? tema.serie || null : null,
-      teoria: teoria, listaBase: listaBase, exercicios: exercicios, obmep: obmep, enem: enem, vazio: vazio
+      teoria: teoria, listaBase: listaBase, exercicios: exercicios, obmep: obmep, enem: enem, vizinhos: vizinhos, vazio: vazio
     };
   }
 

@@ -31,12 +31,19 @@
  *   9. o ENEM separado da OBMEP (contrato da orquestradora, 13/11): `obmep`
  *      só com o Banco e a Mirim, `enem` só com o ENEM, e o tipo segue a fonte;
  *  10. o tempo: os 171 assuntos de matemática num acervo sintético do tamanho
- *      do real (cerca de 5.800 exercícios), com teto por assunto.
+ *      do real (cerca de 5.800 exercícios), com teto por assunto;
+ *  11. o caso real do dono (13/11): "Volume e capacidade: bloco retangular e
+ *      cilindro" (MAT08-15, 8º ano) não tem módulo nos pacotes e mostrava
+ *      "ainda sem"; pelo índice de verdade, ele herda o material dos vizinhos
+ *      declarados em `fontes_vizinhas` (MAT06-12 e MAT09-12), marcado com o
+ *      vizinho de onde veio, e só quando não tem material próprio.
  *
  * Modos envenenados (cada um TEM de ser visto: "VENENO visto"):
  *   --envenenado-repete-item     a fontesDoAssunto perde a guarda do id já visto;
  *   --envenenado-enem-na-obmep   o ENEM volta a cair dentro da `obmep`;
  *   --envenenado-base-com-buraco a lista de base com exercício faltando aparece;
+ *   --envenenado-sem-vizinhos    o assunto sem material próprio não herda os
+ *                                vizinhos declarados (o caso do MAT08-15);
  *   --envenenado-muda-entrada    a função ordena a lista de itens que recebeu,
  *                                no lugar (mexe na entrada de quem chamou).
  *
@@ -49,7 +56,8 @@ const Module = require('module');
 const Sintetico = require('./_pacote_sintetico.js');
 
 const RAIZ = path.join(__dirname, '..');
-const VENENOS = ['--envenenado-repete-item', '--envenenado-enem-na-obmep', '--envenenado-base-com-buraco', '--envenenado-muda-entrada'];
+const VENENOS = ['--envenenado-repete-item', '--envenenado-enem-na-obmep', '--envenenado-base-com-buraco', '--envenenado-muda-entrada',
+  '--envenenado-sem-vizinhos'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 
 let passes = 0, falhas = 0;
@@ -85,6 +93,7 @@ const TROCAS = {
     "return FONTES_DE_OLIMPIADA[fonte] ? 'obmep' : 'exercicio';"],
   '--envenenado-base-com-buraco': ["if (!ids.length || ids.some(function (x) { return typeof x !== 'string' || !itemPorId[x]; })) return;",
     'if (!ids.length) return;'],
+  '--envenenado-sem-vizinhos': ['if (semMaterial && tema && Array.isArray(tema.fontes_vizinhas) && !o.semVizinhos) {', 'if (false) {'],
   '--envenenado-muda-entrada': ['var itens = Array.isArray(o.itens) ? o.itens : [];',
     'var itens = Array.isArray(o.itens) ? o.itens.sort(function (a, b) { return a.id < b.id ? -1 : 1; }) : [];']
 };
@@ -236,7 +245,7 @@ const vazioDeTudo = F('MAT09-04', { temas: TEMAS });
 conf('aparelho sem pacote nenhum: sem pacote', vazioDeTudo.vazio && vazioDeTudo.vazio.motivo, 'sem-pacote');
 conf('a frase do vazio é uma linha, com acento e sem travessão',
   [fora, semNada, vazioDeTudo].every(x => x.vazio.texto && !/\n/.test(x.vazio.texto) && !/[\u2013\u2014]/.test(x.vazio.texto) && /[ãçáéíóú]/.test(x.vazio.texto)), true);
-conf('sem argumento nenhum não quebra', JSON.stringify(Object.keys(F())), JSON.stringify(['assunto', 'titulo', 'serie', 'teoria', 'listaBase', 'exercicios', 'obmep', 'enem', 'vazio']));
+conf('sem argumento nenhum não quebra', JSON.stringify(Object.keys(F())), JSON.stringify(['assunto', 'titulo', 'serie', 'teoria', 'listaBase', 'exercicios', 'obmep', 'enem', 'vizinhos', 'vazio']));
 const furada = F('MAT09-04', Object.assign({}, ACERVO, { itens: ITENS_SEM_UM_DA_BASE() }));
 conf('a lista de base com um exercício que saiu do aparelho NÃO aparece (como no app)', furada.listaBase, null);
 
@@ -387,6 +396,45 @@ if (!MODO) {
   conf('o acervo grande tem o tamanho do real', grandes.length > 5000, true);
   conf('cada assunto sai em média em até 25 ms', total / TEMAS.length <= 25, true);
   conf('e nenhum passa de 100 ms', maior <= 100, true);
+
+}
+if (!MODO || MODO === '--envenenado-sem-vizinhos') {
+  // ================================================================
+  secao('11. O caso real: MAT08-15 herda dos vizinhos declarados no índice');
+  /* Os módulos dos dois vizinhos, como os pacotes de verdade os chamam (o
+   * índice real diz MAT06-12 = 6ano:unidades-de-medida-de-volume e MAT09-12 =
+   * 3em:geometria-espacial-3-volumes-e-areas-de-cilindros), feitos aqui de um
+   * exercício e uma aula de teoria do sintético. */
+  const v8 = tema('MAT08-15');
+  conf('no índice real, MAT08-15 não tem módulo e declara os vizinhos MAT06-12 e MAT09-12',
+    v8.modulo + ' ' + JSON.stringify(v8.fontes_vizinhas), 'null ["MAT06-12","MAT09-12"]');
+  const doModulo = (chave, titulo, n) => {
+    const [serie, slug] = chave.split(':');
+    return {
+      itens: Array.from({ length: n }, (_, k) => Object.assign({}, ITENS[k], { id: chave + ':lista:ex:' + (k + 1), serie,
+        modulo: { slug, titulo }, aula: { slug: 'lista', titulo: 'Lista de ' + titulo, n: 1 }, numero: k + 1, tema_app: null })),
+      teoria: [Object.assign({}, TEORIA[0], { id: chave + ':aula:teo', serie, modulo: { slug, titulo }, aula: { slug: 'aula', titulo: titulo, n: 1 } })]
+    };
+  };
+  const m6 = doModulo(tema('MAT06-12').modulo, 'Unidades de Medida de Volume', 3);
+  const m9 = doModulo(tema('MAT09-12').modulo, 'Geometria Espacial 3', 2);
+  const comVizinhos = { temas: TEMAS, itens: ITENS.concat(m6.itens, m9.itens), teoria: TEORIA.concat(m6.teoria, m9.teoria), listas: LISTAS };
+  const vol = F('MAT08-15', comVizinhos);
+  if (MODO === '--envenenado-sem-vizinhos') {
+    venenoVisto('o MAT08-15 voltou ao "ainda sem"', !!vol.vazio && !vol.teoria.length, 'vazio ' + (vol.vazio || {}).motivo);
+  }
+  conf('a página do 8º ano deixa de dizer "ainda sem": herda a teoria dos dois vizinhos', vol.teoria.map(t => t.deVizinho + ':' + t.titulo).join(' | '),
+    'MAT06-12:Unidades de Medida de Volume | MAT09-12:Geometria Espacial 3');
+  conf('e os exercícios, cada um com o vizinho de onde veio', vol.exercicios.map(e => e.deVizinho).join(','), 'MAT06-12,MAT06-12,MAT06-12,MAT09-12,MAT09-12');
+  conf('o retorno diz quais vizinhos deram material, com título e ano', JSON.stringify(vol.vizinhos),
+    JSON.stringify([{ id: 'MAT06-12', titulo: tema('MAT06-12').pt.titulo, serie: '06' }, { id: 'MAT09-12', titulo: tema('MAT09-12').pt.titulo, serie: '09' }]));
+  conf('e não é vazio', vol.vazio, null);
+  conf('sem nenhum vizinho no aparelho, continua o vazio honesto', (F('MAT08-15', ACERVO).vazio || {}).motivo, 'sem-vinculo');
+  conf('o vizinho não herda de volta: MAT09-12 mostra só o que é dele', F('MAT09-12', comVizinhos).teoria.map(t => t.titulo + ':' + (t.deVizinho || '')).join(), 'Geometria Espacial 3:');
+  const proprio = F('MAT08-15', Object.assign({}, comVizinhos, { vinculos: [{ assunto: 'MAT08-15', item: 'banco:2019:n2:6' }] }));
+  conf('com material próprio (a tabela da C1 liga um problema do Banco), não herda nada', proprio.obmep.length + ' ' + proprio.teoria.length + ' ' + proprio.vizinhos.length, '1 0 0');
+  const semLista = TEMAS.map(t => t.id === 'MAT08-15' ? Object.assign({}, t, { fontes_vizinhas: undefined }) : t);
+  conf('sem a lista no índice, nada é herdado (não há adivinhação)', (F('MAT08-15', Object.assign({}, comVizinhos, { temas: semLista })).vazio || {}).motivo, 'sem-vinculo');
 }
 
 console.log('\n' + passes + ' passaram, ' + falhas + ' falharam.');

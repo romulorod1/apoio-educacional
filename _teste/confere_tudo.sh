@@ -1440,6 +1440,8 @@ roda "fontes do assunto --envenenado-repete-item" node "_teste/testa_fontes_do_a
 roda "fontes do assunto --envenenado-enem-na-obmep" node "_teste/testa_fontes_do_assunto.js" --envenenado-enem-na-obmep
 roda "fontes do assunto --envenenado-base-com-buraco" node "_teste/testa_fontes_do_assunto.js" --envenenado-base-com-buraco
 roda "fontes do assunto --envenenado-muda-entrada" node "_teste/testa_fontes_do_assunto.js" --envenenado-muda-entrada
+# o caso real do MAT08-15: sem modulo proprio, herda os vizinhos declarados no indice
+roda "fontes do assunto --envenenado-sem-vizinhos" node "_teste/testa_fontes_do_assunto.js" --envenenado-sem-vizinhos
 # B3: a pagina impressa do livro (trechos romanos e arabicos, mudanca no meio,
 # ida e volta em todas as paginas, tela e leitor mostrando a impressa e abrindo
 # e gravando em pagina do arquivo, e recusa so do livro com numeracao invalida).
