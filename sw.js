@@ -160,9 +160,9 @@
  * O v156 traz os 6 assuntos novos de química da revisão dos mapas dos livros no banco/topicos/quimica.json.
  * O v158 traz a busca da Biblioteca nos capítulos e assuntos do mapa, com todas as palavras e os melhores resultados.
  * O v166 traz as aulas tiradas e postas só na folha do planejamento.
- * O v167 traz a página do assunto na Biblioteca (B1).
+ * O v175 traz a página do assunto na Biblioteca (B1).
  */
-var CACHE = 'apoio-educacional-v167';
+var CACHE = 'apoio-educacional-v175';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
