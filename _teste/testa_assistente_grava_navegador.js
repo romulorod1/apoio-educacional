@@ -229,8 +229,10 @@ async function transbordo(pag, raizSel) {
   await esperar('gravou', () => soBanco(pag), v => v !== antesSo, 10000);
   await esperar('o cartão diz feito (só depois de gravar)', () => estadoDoCartao(pag, ultimoCartao), v => v === 'feito', 10000);
   const depoisRemarcar = await soBanco(pag);
-  const esperado = await pag.evaluate(s => { const d = JSON.parse(s); Core.aplicarEdicaoAula(d, 's1@2026-11-19', { data: '2026-11-19', hora: '17:30', duracaoMin: 60 }, 'esta'); return JSON.stringify(d); }, antesSo);
-  conf('o Confirmar gravou exatamente o Remarcar da tela (Core.aplicarEdicaoAula só nesta aula)', depoisRemarcar === esperado, true);
+  /* O Confirmar passa pelo aplicarPlano, que lança o mês de destino (Core.garantirSeriesAte,
+   * lente A1) antes de mover: o esperado faz o mesmo pelo core, lançar e editar só esta aula. */
+  const esperado = await pag.evaluate(s => { const d = JSON.parse(s); Core.garantirSeriesAte(d, '2026-11'); Core.aplicarEdicaoAula(d, 's1@2026-11-19', { data: '2026-11-19', hora: '17:30', duracaoMin: 60 }, 'esta'); return JSON.stringify(d); }, antesSo);
+  igual('o Confirmar gravou exatamente o Remarcar da tela (o mês lançado e Core.aplicarEdicaoAula só nesta aula)', depoisRemarcar, esperado);
   conf('o cartão diz que gravou', await pag.evaluate(s => document.querySelector(s).querySelector('.ass-estado').textContent, ultimoCartao), 'Gravado. O aviso de baixo traz o Desfazer por alguns segundos.');
   const aviso = await pag.evaluate(() => {
     const t = document.querySelector('#aviso-texto'), b = document.querySelector('#aviso-acao');
@@ -376,6 +378,8 @@ async function transbordo(pag, raizSel) {
   // ================================================================
   secao('5. O transbordo do cartão a 360, 390 e 412 px, letra normal e 130%');
   // a aula de hoje do Bruno já tem um relato: o cartão mostra o antigo à parte
+  // o arranjo grava pelo Store: no tablet, porque desde a 1c o Store recusa gravar no aparelho que só lê
+  await modo(pag, 'dona-tablet', 1280, 900);
   await pag.evaluate(async () => { const b = await Store.carregar(); b.aulas.find(a => a.id === 'b1').notaTexto = 'Relato antigo da família.'; await Store.salvar(b); });
   await modo(pag, 'dona-celular', 390, 844);
   const antesT = await banco(pag);
