@@ -97,7 +97,8 @@
     {
       versao: 'F7-A-DEFINIR',
       itens: [
-        'Na janela de uma aula que já existe, o relato e a nota só sua salvam sozinhos enquanto você escreve. Data, horário, duração, situação e cobrança gravam quando você fecha a aula ou toca em Concluir registro, com um aviso do que mudou e o Desfazer. "Descartar alterações" fecha sem gravar o que ainda não foi gravado e volta o relato e a nota ao que eram; o assunto e os arquivos ficam. Se a aula mudar em outro aparelho enquanto está aberta, nada é gravado por cima: o rodapé avisa e fechar pergunta antes.'
+        'Na janela de uma aula que já existe, o relato e a nota só sua salvam sozinhos enquanto você escreve. Data, horário, duração, situação e cobrança gravam quando você fecha a aula ou toca em Concluir registro, com um aviso do que mudou e o Desfazer. "Descartar alterações" fecha sem gravar o que ainda não foi gravado e volta o relato e a nota ao que eram; o assunto e os arquivos ficam. Se a aula mudar em outro aparelho enquanto está aberta, nada é gravado por cima: o rodapé avisa e fechar pergunta antes.',
+        'Mudar ou excluir todas as aulas de uma repetição (ou desta em diante) não mexe nas aulas com relato ou nota, nem nas que já passaram num mês já pago. O aviso diz quantas ficaram de fora e por quê.'
       ]
     },
     {
@@ -3957,12 +3958,15 @@
       var naSerie = Core.serieDe(db, aula) && pendentes.some(function (k) { return CAMPOS_PADRAO_SERIE.indexOf(k) >= 0; });
       var aplicar = function (escopo) {
         var mexeu = null;
+        // antes de mexer: as irmãs que o lote não alcança (com texto, ou passadas e pagas)
+        var fora = Core.escopoDaRepeticao(db, aula, escopo);
         var rotulo = function () {
           // nos escopos de várias aulas, a frase de sempre; numa aula só, o que mudou nela
+          var poupou = fora.comTexto.length + fora.pagas.length;
           var base = escopo === 'seguintes' ? 'Aulas alteradas desta data em diante.'
-            : escopo === 'todas' ? 'Todas as aulas da repetição foram alteradas.'
+            : escopo === 'todas' ? (poupou ? 'Aulas da repetição alteradas.' : 'Todas as aulas da repetição foram alteradas.')
               : frasDoQueMudouNaAula(mudancas);
-          return base + textoDeTrilha(mexeu);
+          return base + fraseDoQueFicouDeFora(fora, false) + textoDeTrilha(mexeu);
         };
         var acaoDaAula = function () {
           Core.aplicarEdicaoAula(db, aula.id, mudancas, escopo);
@@ -5840,7 +5844,10 @@
       var alvo = aulaEmEdicao.id;
       var quem = aulaEmEdicao.alunoId;
       var mexeu = null;
-      comDesfazer(function () { return rotulos[escopo] + textoDeTrilha(mexeu); }, function () {
+      // antes de apagar: as irmãs que o lote não alcança (com texto, ou passadas e pagas)
+      var fora = Core.escopoDaRepeticao(db, aulaEmEdicao, escopo);
+      if (escopo === 'todas' && fora.comTexto.length + fora.pagas.length) rotulos.todas = 'Aulas da repetição excluídas.';
+      comDesfazer(function () { return rotulos[escopo] + fraseDoQueFicouDeFora(fora, true) + textoDeTrilha(mexeu); }, function () {
         Core.excluirAulas(db, alvo, escopo);
         mexeu = revisarTrilhasDoAluno(quem);
       }).then(function () {
@@ -5940,6 +5947,24 @@
   }
 
   /* A escolha de escopo do Google Agenda: só esta, esta e as seguintes, ou todas. */
+  /* F7 (decisão do dono, 13/11/2026): as ações em lote da repetição não
+   * mexem na aula com relato ou nota, nem na passada de mês já pago
+   * (Core.escopoDaRepeticao). O aviso diz quantas ficaram de fora e por quê.
+   * `exclusao`: no excluir, elas continuam na agenda; na edição, ficaram
+   * como estavam. Sem nenhuma de fora, a frase é vazia. */
+  function fraseDoQueFicouDeFora(fora, exclusao) {
+    var c = fora ? fora.comTexto.length : 0, p = fora ? fora.pagas.length : 0, n = c + p;
+    if (!n) return '';
+    var verbo = exclusao ? (n === 1 ? 'continua na agenda' : 'continuam na agenda')
+      : (n === 1 ? 'ficou como estava' : 'ficaram como estavam');
+    var comTexto = 'com relato ou nota';
+    var paga = 'de mês já pago';
+    if (c && p) {
+      return ' ' + n + ' aulas ' + verbo + ': ' + c + ' ' + comTexto + ' e ' + p + ' ' + paga + '.';
+    }
+    return ' ' + (n === 1 ? '1 aula' : n + ' aulas') + ' ' + (c ? comTexto : paga) + ' ' + verbo + '.';
+  }
+
   function perguntarEscopo(verbo, aoEscolher, ehExclusao) {
     $('#titulo-modal-escopo').textContent = 'Esta aula se repete';
     var corpo = $('#corpo-modal-escopo');
@@ -5952,7 +5977,7 @@
     var opcoes = [
       ['esta', 'Somente esta aula', 'As outras aulas da repetição continuam como estão.'],
       ['seguintes', 'Esta e as seguintes', 'Vale desta data em diante. As anteriores não mudam.'],
-      ['todas', 'Todas as aulas da repetição', 'Inclui as que já passaram. Dá para desfazer logo depois.']
+      ['todas', 'Todas as aulas da repetição', 'Inclui as que já passaram, menos as com relato ou nota e as de mês já pago. Dá para desfazer logo depois.']
     ];
     opcoes.forEach(function (o) {
       var b = el('button', {

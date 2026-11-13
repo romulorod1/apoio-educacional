@@ -319,6 +319,12 @@ roda "virada anual"          node _teste/testa_virada_anual.js
 roda "escopo sem a aula com relato" node _teste/testa_escopo_relato.js
 roda "escopo sem a aula com relato --envenenado-sem-regra-do-relato" node _teste/testa_escopo_relato.js --envenenado-sem-regra-do-relato
 roda "escopo sem a aula com relato --envenenado-so-o-relato" node _teste/testa_escopo_relato.js --envenenado-so-o-relato
+# F7 (decisao do dono, 13/11): a aula passada de mes ja pago tambem fica fora do lote; os
+# venenos tiram a regra, protegem toda passada e protegem a futura.
+roda "escopo sem a aula paga" node _teste/testa_escopo_pago.js
+roda "escopo sem a aula paga --envenenado-sem-regra-da-paga" node _teste/testa_escopo_pago.js --envenenado-sem-regra-da-paga
+roda "escopo sem a aula paga --envenenado-protege-toda-passada" node _teste/testa_escopo_pago.js --envenenado-protege-toda-passada
+roda "escopo sem a aula paga --envenenado-protege-futura" node _teste/testa_escopo_pago.js --envenenado-protege-futura
 roda "merge seguro"          node _teste/testa_merge_seguro.js
 # O guarda de merge no CI (item 13c): o guarda_merge.js julga pelo merge_seguro
 # e publica o status portao-merge na cabeca que julgou. Com gh e git falsos:

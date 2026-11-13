@@ -21,7 +21,7 @@ const os = require('os');
 const path = require('path');
 
 const VENENOS = {
-  '--envenenado-sem-regra-do-relato': ['      return !a.destacada && !temTextoDaAula(a);', '      return !a.destacada;'],
+  '--envenenado-sem-regra-do-relato': ['      if (temTextoDaAula(a)) { saida.comTexto.push(a); return; }', ''],
   '--envenenado-so-o-relato': ["    return !!(String(a.notaTexto || '').trim() || String(a.notaPrivada || '').trim());",
     "    return !!String(a.notaTexto || '').trim();"]
 };

@@ -520,8 +520,31 @@
     return !!(String(a.notaTexto || '').trim() || String(a.notaPrivada || '').trim());
   }
 
-  function alvosDoEscopo(db, aula, escopo) {
-    if (escopo === 'esta' || !aula.serieId) return [aula];
+  /* As aulas da repetição que uma ação em lote ("todas", "desta em diante",
+   * "excluir todas" e "excluir desta em diante") NÃO alcança, por regra
+   * declarada:
+   * - a aula com relato ou com a nota só dela (notaTexto ou notaPrivada não
+   *   vazios): é aula dada e registrada, e mudar o padrão da série não reescreve
+   *   o passado dela, nem o excluir a apaga com o texto junto. Antes isso vinha
+   *   de carona no "destacada", que o Salvar marcava; desde o F7 o relato e a
+   *   nota gravam direto, sem destacar. Só os dois textos, e não o conteúdo
+   *   inteiro da aula: a aula só com assunto o pai não protegia;
+   * - a aula PASSADA de um mês JÁ PAGO, mesmo sem texto (decisão do dono,
+   *   13/11/2026): o que a família já pagou não muda de duração, de situação nem
+   *   de cobrança, nem some, por uma ação na repetição. "Passada" é a mesma
+   *   regra do Fechamento (a aula de hoje conta como dada: só o que está depois
+   *   de hoje é previsto), e "paga" é o selo "pago" do Fechamento
+   *   (seloDoPagamento): há pagamento marcado e ele cobre o que se cobra do
+   *   mês. Pago a menos ("parcial") não protege, porque o mês ainda está em
+   *   aberto.
+   * A aula destacada continua fora, como sempre. A própria aula editada sempre
+   * entra. `hojeRef` existe para a prova fixar o dia.
+   * Devolve { alvos, comTexto, pagas }: as duas listas são as irmãs do mesmo
+   * trecho que ficaram de fora por cada motivo, para a tela dizer quantas e
+   * por quê (uma aula com texto e paga conta como com texto). */
+  function escopoDaRepeticao(db, aula, escopo, hojeRef) {
+    if (escopo === 'esta' || !aula.serieId) return { alvos: [aula], comTexto: [], pagas: [] };
+    var hoje = hojeRef || hojeIso();
     var s = (db.series || []).filter(function (x) { return x.id === aula.serieId; })[0];
     var raizId = s ? (s.serieOrigemId || s.id) : aula.serieId;
     var seriesIds = {};
@@ -529,29 +552,36 @@
       if (x.id === raizId || x.serieOrigemId === raizId) seriesIds[x.id] = true;
     });
     seriesIds[aula.serieId] = true;
-    /* A aula com relato ou com a nota só dela (notaTexto ou notaPrivada não
-     * vazios) fica de fora do "todas" e do "desta em diante", por regra
-     * declarada: é aula dada e registrada, e mudar o padrão da série não
-     * reescreve o passado dela (a duração, a situação e a cobrança de um mês
-     * já cobrado), nem o "excluir" a apaga com o texto junto. Antes isso vinha
-     * de carona no "destacada", que o Salvar marcava; desde o F7 o relato e a
-     * nota gravam direto, sem destacar. Só os dois textos, e não o conteúdo
-     * inteiro da aula: a aula só com assunto o pai não protegia. A própria
-     * aula editada sempre entra. */
-    var irmas = (db.aulas || []).filter(function (a) {
-      if (!seriesIds[a.serieId]) return false;
-      if (a.id === aula.id) return true;
-      return !a.destacada && !temTextoDaAula(a);
-    });
-    if (escopo === 'seguintes') {
-      return irmas.filter(function (a) { return a.data >= aula.data; });
+    var mesPago = {};
+    function passadaEPaga(a) {
+      if (!a.data || a.data > hoje) return false;
+      var chave = a.alunoId + '|' + mesDe(a.data);
+      if (!(chave in mesPago)) {
+        var f = calcularFechamento(db, a.alunoId, mesDe(a.data), hoje);
+        mesPago[chave] = !!f && seloDoPagamento(db, f).selo === 'pago';
+      }
+      return mesPago[chave];
     }
-    return irmas;
+    var saida = { alvos: [], comTexto: [], pagas: [] };
+    (db.aulas || []).forEach(function (a) {
+      if (!seriesIds[a.serieId]) return;
+      if (escopo === 'seguintes' && a.data < aula.data && a.id !== aula.id) return;
+      if (a.id === aula.id) { saida.alvos.push(a); return; }
+      if (a.destacada) return;
+      if (temTextoDaAula(a)) { saida.comTexto.push(a); return; }
+      if (passadaEPaga(a)) { saida.pagas.push(a); return; }
+      saida.alvos.push(a);
+    });
+    return saida;
+  }
+
+  function alvosDoEscopo(db, aula, escopo, hojeRef) {
+    return escopoDaRepeticao(db, aula, escopo, hojeRef).alvos;
   }
 
   /* Aplica mudanças de horário, duração, situação ou cobrança.
    * Devolve quantas aulas foram alteradas. */
-  function aplicarEdicaoAula(db, aulaId, mudancas, escopo) {
+  function aplicarEdicaoAula(db, aulaId, mudancas, escopo, hojeRef) {
     var aula = (db.aulas || []).filter(function (a) { return a.id === aulaId; })[0];
     if (!aula) return 0;
     /* Decidido ANTES de tudo, com a aula como ela estava: o laço abaixo marca
@@ -567,7 +597,7 @@
      * o dia em que ela está é de passagem, e gravá-lo como origem mentiria. */
     var origemConhecida = vaiMudarDeData && aula.serieId && !aula.dataOriginal
       ? (dataDeOrigem(aula) || (!aula.destacada ? aula.data : null)) : null;
-    var alvos = alvosDoEscopo(db, aula, escopo);
+    var alvos = alvosDoEscopo(db, aula, escopo, hojeRef);
     var campos = ['hora', 'duracaoMin', 'status', 'cobravel'];
     alvos.forEach(function (a) {
       campos.forEach(function (c) {
@@ -706,10 +736,10 @@
     return alvos.length;
   }
 
-  function excluirAulas(db, aulaId, escopo) {
+  function excluirAulas(db, aulaId, escopo, hojeRef) {
     var aula = (db.aulas || []).filter(function (a) { return a.id === aulaId; })[0];
     if (!aula) return 0;
-    var alvos = alvosDoEscopo(db, aula, escopo);
+    var alvos = alvosDoEscopo(db, aula, escopo, hojeRef);
     var ids = {};
     alvos.forEach(function (a) { ids[a.id] = true; });
 
@@ -5792,7 +5822,7 @@
     feriadoEm: feriadoEm, feriadosDoMes: feriadosDoMes, deBR: deBR,
     criarSerie: criarSerie, editarSerie: editarSerie, serieDe: serieDe, descreveSerie: descreveSerie,
     datasDaSerieNoMes: datasDaSerieNoMes, materializarSerieNoMes: materializarSerieNoMes,
-    garantirSeriesAte: garantirSeriesAte, aulasDaSerie: aulasDaSerie, alvosDoEscopo: alvosDoEscopo,
+    garantirSeriesAte: garantirSeriesAte, aulasDaSerie: aulasDaSerie, alvosDoEscopo: alvosDoEscopo, escopoDaRepeticao: escopoDaRepeticao,
     aplicarEdicaoAula: aplicarEdicaoAula, excluirAulas: excluirAulas, achaAula: achaAula,
     repetirParaTras: repetirParaTras, preverRetroativo: preverRetroativo, temConteudo: temConteudo,
     calcularFechamento: calcularFechamento, calcularMesInteiro: calcularMesInteiro,
