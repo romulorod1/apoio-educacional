@@ -61,9 +61,10 @@
  *   --envenenado-busca-sem-capitulos  o app.js servido não procura nos
  *                                 capítulos e assuntos do mapa: o livro
  *                                 escaneado some da busca (seção 3.2);
- *   --envenenado-topo-vazio        "Outras páginas do livro" nunca disputa
- *                                 o topo: o resultado só delas deixa os
- *                                 "Melhores resultados" vazios (seção 3.3).
+ *   --envenenado-pagina-solta-vira-resultado  as páginas fora de todo
+ *                                 capítulo voltam a ser linha do resultado
+ *                                 ("Outras páginas do livro"), o que a P2
+ *                                 tirou (seção 3.3).
  *
  * Porta 8898. Relógio fixo da rodada (relogioDaRodada).
  */
@@ -78,7 +79,7 @@ const { conf, secao, esperar, pausa } = H;
 const PORTA = 8898;
 const VENENOS = ['--envenenado-indice-na-copia', '--envenenado-refaz-indexado', '--envenenado-com-acento',
   '--envenenado-erro-vira-pronto', '--envenenado-apagar-espera-indice', '--envenenado-pagina-ruim-derruba-livro',
-  '--envenenado-busca-sem-capitulos', '--envenenado-topo-vazio'];
+  '--envenenado-busca-sem-capitulos', '--envenenado-pagina-solta-vira-resultado'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const PYTHON = process.env.PYTHON || 'python';
 const relogio = H.relogioDaRodada('2026-11-16', '10:00');
@@ -98,7 +99,7 @@ function prop(rotulo, ok, veneno) {
 
 const STORE = fs.readFileSync(path.join(H.RAIZ, 'store.js'), 'utf8');
 const INDICE = fs.readFileSync(path.join(H.RAIZ, 'indice-livros.js'), 'utf8');
-const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
+const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 
 // as âncoras dos venenos: cada uma tem de aparecer exatamente uma vez
 const COPIA_FECHA = /pacote\.biblioteca = \{ uso: \(bib\[0\] \|\| \[\]\)\.filter\(function \(r\) \{\r?\n        return idsAlunos\[r\.alunoId\] && idsAulas\[r\.aulaId\];\r?\n      \}\), etiquetas: bib\[1\] \|\| \[\], listas: bib\[2\] \|\| \[\] \};\r?\n      return pacote;/g;
@@ -117,8 +118,11 @@ const APAGA_ESPERANDO = "      return new Promise(function (ok) { var q = indexe
   "q.onsuccess = function () { ok(r); }; q.onerror = function () { ok(r); }; });";
 const SEM_ACENTO = ".replace(/[\\u0300-\\u036f]/g, '')";
 // 12/11/2026: a busca procura também nos capítulos e assuntos do mapa; o veneno desliga isso
-// a revisão do #181: com o resultado todo em "Outras páginas", elas disputam o topo; o veneno deixa o topo vazio
-const TOPO_NUNCA_VAZIO = '(capitulosDoResultado.length ? capitulosDoResultado : todos)';
+/* P2 (13/11/2026): página solta não é resultado. As páginas fora de todo
+ * capítulo ("Outras páginas do livro", o "Blank Page") saem do bloco, e uma
+ * linha diz onde a palavra está; o veneno as devolve como linha do resultado
+ * (substitui o veneno do topo vazio do #181, cuja regra saiu com a P2). */
+const PAGINA_SOLTA_FORA = 'if (b.outras) {\n          if (outroAno || !b.paginas.length) return;';
 const BUSCA_NOS_CAPITULOS = 'return Biblioteca.procurarNosCapitulos(indiceDosCapitulosDaBiblioteca(), termo, normalizadorDaBusca(), palavrasDaBuscaNosLivros());';
 
 secao('0. As âncoras e os venenos');
@@ -130,7 +134,7 @@ conf('a âncora da falha permanente aparece uma vez no indice-livros.js', INDICE
 conf('a âncora da página ruim aparece uma vez no indice-livros.js', INDICE.split(PAGINA_RUIM).length - 1, 1);
 conf('a âncora do apagar sem esperar o índice aparece uma vez no store.js', (STORE.match(APAGA_SEM_ESPERAR) || []).length, 1);
 conf('a âncora da busca nos capítulos aparece uma vez no app.js', APP.split(BUSCA_NOS_CAPITULOS).length - 1, 1);
-conf('a âncora do topo nunca vazio aparece uma vez no app.js', APP.split(TOPO_NUNCA_VAZIO).length - 1, 1);
+conf('a âncora da página solta fora do resultado aparece uma vez no app.js', APP.split(PAGINA_SOLTA_FORA).length - 1, 1);
 conf('o banco principal continua na versão 6 no store.js', /var VERSAO_BANCO = 6;/.test(STORE), true);
 
 const trocas = {};
@@ -141,7 +145,7 @@ if (MODO === '--envenenado-pagina-ruim-derruba-livro') trocas['/indice-livros.js
 if (MODO === '--envenenado-erro-vira-pronto') trocas['/indice-livros.js'] = INDICE.split(PERMANENTE).join(PERMANENTE + ' return true;');
 if (MODO === '--envenenado-apagar-espera-indice') trocas['/store.js'] = STORE.replace(APAGA_SEM_ESPERAR, APAGA_ESPERANDO);
 if (MODO === '--envenenado-busca-sem-capitulos') trocas['/app.js'] = APP.split(BUSCA_NOS_CAPITULOS).join('return [];');
-if (MODO === '--envenenado-topo-vazio') trocas['/app.js'] = APP.split(TOPO_NUNCA_VAZIO).join('capitulosDoResultado');
+if (MODO === '--envenenado-pagina-solta-vira-resultado') trocas['/app.js'] = APP.split(PAGINA_SOLTA_FORA).join('if (b.outras && false) {\n          if (outroAno || !b.paginas.length) return;');
 if (MODO) {
   const servido = trocas['/store.js'] || trocas['/indice-livros.js'] || trocas['/app.js'];
   const original = trocas['/store.js'] ? STORE : trocas['/indice-livros.js'] ? INDICE : APP;
@@ -431,7 +435,7 @@ async function importar(pag, arquivo) {
   const bancoAntes = await fotoDoBanco();
   await pag.evaluate(() => { const c = document.querySelector('#busca-biblioteca'); c.value = 'mediana'; c.dispatchEvent(new Event('input', { bubbles: true })); });
   await esperar('a busca por "mediana" com resultado', () => pag.evaluate(() =>
-    (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''), v => /encontrada/.test(v), 10000);
+    (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''), v => /em \d+ livros?\.|fora dos capítulos/.test(v), 10000);
   await pausa(600);
   const bancoDepois = await fotoDoBanco();
   conf('buscar não grava: o banco principal e livros_posicoes ficam idênticos', bancoDepois === bancoAntes && bancoAntes.indexOf('livros_posicoes') >= 0, true);
@@ -444,7 +448,7 @@ async function importar(pag, arquivo) {
     status: document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status').textContent,
     livro: [...document.querySelectorAll('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"] .bib-busca-pagina')].map(b => b.getAttribute('aria-label')).join('|'),
     botao: (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"] .bib-busca-pagina') || { getAttribute: () => '' }).getAttribute('aria-label')
-  })), v => !!v && (MODO === '--envenenado-busca-sem-capitulos' ? /2 páginas encontradas/ : /^1 capítulo e 2 páginas em 1 livro\./).test(v.status) &&
+  })), v => !!v && /^1 capítulo em 1 livro\./.test(v.status) &&
     v.livro === 'Abrir na p. 3|Abrir na p. 4' && v.botao === 'Abrir na p. 3', 10000);
   // "FRAÇÕES" casa o texto das p. 3 e 4 e o título "Capítulo 2: Frações": o capítulo é um bloco só, marcado das duas formas
   conf('a busca mostra o livro, o capítulo, as páginas e o atalho para a página encontrada', telaBusca.ok, true);
@@ -493,7 +497,7 @@ async function importar(pag, arquivo) {
       botao: caixa && caixa.querySelector('.bib-busca-abrir') ? caixa.querySelector('.bib-busca-abrir').getAttribute('aria-label') : '',
       aviso: aviso ? aviso.querySelector('summary').textContent : '', avisoAberto: aviso ? aviso.open : null,
       quais: aviso ? [...aviso.querySelectorAll('li')].map(li => li.dataset.livro + '=' + li.textContent).join('|') : '' };
-  }), v => !!v && /1 página encontrada em 1 livro/.test(v.status) && /p\. 200$/.test(v.botao), 10000);
+  }), v => !!v && /1 capítulo em 1 livro/.test(v.status) && /p\. 200$/.test(v.botao), 10000);
   conf('só o texto do Livro B tem "paralelepípedo": um livro, a parte e a página 200',
     telaLongo.valor && telaLongo.valor.livros + ' | ' + /Parte 2/.test(telaLongo.valor.grupo) + ' | ' + /1 página$/.test(telaLongo.valor.grupo) + ' | ' + telaLongo.valor.botao, 'indice-longo | true | true | Abrir na primeira página encontrada, p. 200');
   conf('o livro escaneado não aparece no resultado, e o aviso diz que há texto que não foi lido',
@@ -507,7 +511,7 @@ async function importar(pag, arquivo) {
   await pag.evaluate(() => document.querySelector('#bib-corpo .bib-busca-livros-sem-texto .bib-busca-livros-dispensar').click());
   await pag.evaluate(() => { const c = document.querySelector('#busca-biblioteca'); c.value = 'paralelepipedo'; c.dispatchEvent(new Event('input', { bubbles: true })); });
   await esperar('a busca de novo, sem acento', () => pag.evaluate(() =>
-    (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''), v => /1 página encontrada/.test(v), 10000);
+    (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''), v => /1 capítulo em 1 livro/.test(v), 10000);
   await pausa(300);
   conf('o aviso dispensado não volta na busca seguinte', await pag.evaluate(() => !document.querySelector('#bib-corpo .bib-busca-livros-sem-texto')), true);
   await pag.evaluate(() => document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-longo"] .bib-busca-abrir').click());
@@ -670,7 +674,7 @@ async function importar(pag, arquivo) {
   conf('cada livro aparece uma vez só', V.livros && V.livros.length === new Set(V.livros).size && V.livros.filter(x => /^cap-/.test(x)).length, 2);
   conf('a contagem do grupo e a linha-resumo dizem capítulos, páginas e livros',
     V.contagem + ' | ' + V.status + ' | ' + await pag.evaluate(() => (document.querySelector('#bib-busca-resumo') || {}).textContent || '(sem resumo)'),
-    '2 capítulos e 2 páginas em 2 livros | 2 capítulos e 2 páginas em 2 livros. | (sem resumo)');
+    '2 capítulos em 2 livros | 2 capítulos em 2 livros. | (sem resumo)');
   conf('o aviso dos escaneados diz que eles entram pelos capítulos e assuntos', /livros escaneados entram só pelos capítulos e assuntos/.test(V.aviso), true);
   await pausa(400);
   conf('buscar pelos capítulos não grava: o banco principal (meta e posição) e o índice ficam idênticos',
@@ -689,13 +693,24 @@ async function importar(pag, arquivo) {
   conf('um termo que casa só a chave do assunto acha o capítulo ligado a ele, e diz qual assunto',
     JSON.stringify(chave.valor && chave.valor.L), JSON.stringify([['Volume e capacidade', 'capitulo', 'Pelo capítulo, assunto: ' + volume.pt.titulo, '', true, '']]));
   // o id do assunto não é chave: "mat08" casaria todo assunto do 8º ano de matemática
+  /* P2: sem nada nos assuntos e nos capítulos, o miolo vira o vazio único
+   * (a frase que diz o que fazer); com algum assunto achado, o bloco fica com
+   * o zero dele. Os dois servem: o que conta é nenhum capítulo do K nem do L. */
+  const lerZero = () => pag.evaluate(() => {
+    const vazio = document.querySelector('#bib-corpo > .vazio');
+    const g = document.querySelector('#bib-corpo [data-grupo="livros"]');
+    const st = g ? g.querySelector('.bib-busca-livros-status').textContent : '';
+    if (!vazio && !/Nenhum livro/.test(st)) return null;
+    return { vazio: vazio ? vazio.textContent : '', linhas: g ? [...g.querySelectorAll('.bib-busca-livro-grupo[data-livro]')].map(x => x.dataset.livro) : [],
+      contagem: g ? g.querySelector('.bib-grupo-contagem').textContent : '0' };
+  });
   await digitar('mat08');
-  const peloId = await esperar('a busca pelo id do assunto', lerNosLivros, v => !!v && /Nenhum livro/.test(v.status), 15000);
-  conf('o id do assunto ("mat08") não acha o capítulo ligado a ele', peloId.ok && !peloId.valor.L && !peloId.valor.K, true);
+  const peloId = await esperar('a busca pelo id do assunto', lerZero, v => !!v && v.vazio.indexOf('mat08') >= 0, 15000);
+  conf('o id do assunto ("mat08") não acha o capítulo ligado a ele', peloId.ok && peloId.valor.linhas.length === 0, true);
   // o lado oposto: um termo que não está em nada não acha nada
   await digitar('zqxjkw capitulo');
-  const nada = await esperar('a busca por um termo que não existe', lerNosLivros, v => !!v && /Nenhum livro/.test(v.status), 15000);
-  conf('um termo que não está em nada não acha capítulo nem página', nada.valor && nada.valor.livros.length + ' | ' + nada.valor.contagem, '0 | 0');
+  const nada = await esperar('a busca por um termo que não existe', lerZero, v => !!v && v.vazio.indexOf('zqxjkw') >= 0, 15000);
+  conf('um termo que não está em nada não acha capítulo nem página', nada.valor && nada.valor.linhas.length + ' | ' + nada.valor.contagem, '0 | 0');
   // a busca por capítulo é instantânea: 79 livros e cerca de 1.500 capítulos, montar o índice e consultar abaixo de 50 ms
   const tempo = await pag.evaluate(() => {
     const porId = {};
@@ -731,7 +746,7 @@ async function importar(pag, arquivo) {
    *   Livro O  o marcador "Blank Page" como único sumário, e "o volume do
    *            cilindro de gás" na p. 2.
    * O 1º dos melhores resultados é o capítulo com o título; o de calor não
-   * aparece; e "Blank Page" não vira título: vai para "Outras páginas do livro". */
+   * aparece; e "Blank Page" não vira título nem resultado (P2: página solta sai). */
   const pdfDe = (nome, paginas) => {
     const arq = path.join(TMP, nome);
     const r = spawnSync(PYTHON, ['-X', 'utf8', '-c', 'import sys, json, pymupdf\nd = pymupdf.open()\n' +
@@ -766,7 +781,7 @@ async function importar(pag, arquivo) {
     const g = document.querySelector('#bib-corpo [data-grupo="livros"]');
     if (!g) return null;
     const blocos = [...g.querySelectorAll('.bib-busca-livros-resultados .bib-busca-livro-grupo[data-livro]')];
-    const melhores = [...g.querySelectorAll('.bib-busca-melhores .bib-busca-livro-grupo')];
+    const melhores = [...g.querySelectorAll('.bib-busca-capitulos .bib-busca-livro-grupo')];
     return { status: g.querySelector('.bib-busca-livros-status').textContent,
       primeiro: melhores[0] ? melhores[0].dataset.livro + ' | ' + melhores[0].querySelector('.bib-busca-livro-paginas strong').textContent + ' | ' +
         (melhores[0].querySelector('.bib-busca-obra') || {}).textContent : '',
@@ -782,23 +797,24 @@ async function importar(pag, arquivo) {
   conf('o 1º dos melhores resultados é o capítulo com "volume do cilindro" no título, com o volume ao lado da obra', R.primeiro,
     'rel-m | ' + TITULO_M + ' | Livro M de matemática, vol. 2');
   conf('o livro de calor (só "volume", sem "cilindro") não aparece', R.livros, 'rel-m,rel-o');
-  conf('"Blank Page" não vira título: a página dele vai para "Outras páginas do livro"', R.titulosO + ' | ' + R.blankPage,
-    'Parte II: Estática dos fluidos|Outras páginas do livro | false');
+  prop('"Blank Page" não vira título, e a página dele (fora de todo capítulo) não vira resultado',
+    R.titulosO + ' | ' + R.blankPage === 'Parte II: Estática dos fluidos | false', '--envenenado-pagina-solta-vira-resultado');
   // "Parte II" sozinho no topo, com seção dentro, é capítulo: ganha o nome da primeira seção (o caso do Moderna Plus)
   conf('a "Parte II" de cima não vira lixo: aparece como "Parte II: Estática dos fluidos"', /Parte II: Estática dos fluidos/.test(R.titulosO), true);
-  // o resultado todo em "Outras páginas do livro": o topo não fica vazio
+  /* P2: o resultado todo fora dos capítulos ("mistura de gases" só na página
+   * do "Blank Page"): nenhuma linha, e uma frase diz onde a palavra está */
   await digitar('mistura de gases');
-  const soOutras = await esperar('a busca que só acha "Outras páginas"', () => pag.evaluate(() => {
+  const soOutras = await esperar('a busca que só acha página solta', () => pag.evaluate(() => {
     const g = document.querySelector('#bib-corpo [data-grupo="livros"]');
     if (!g) return null;
-    const topo = [...g.querySelectorAll('.bib-busca-melhores .bib-busca-livro-grupo')];
+    const linhas = [...g.querySelectorAll('.bib-busca-livro-grupo')];
     return { status: g.querySelector('.bib-busca-livros-status').textContent,
-      topo: topo.map(b => b.dataset.livro + ':' + b.querySelector('.bib-busca-livro-paginas strong').textContent).join('|'),
-      mais: !!g.querySelector('.bib-busca-mais') };
-  }), v => !!v && /em 1 livro/.test(v.status), 15000);
+      linhas: linhas.map(b => b.dataset.livro + ':' + b.querySelector('.bib-busca-livro-paginas strong').textContent).join('|') };
+  }), v => !!v && /em 1 livro\.$/.test(v.status), 15000);
   console.log('   "mistura de gases": ' + JSON.stringify(soOutras.valor));
-  prop('com o resultado todo em "Outras páginas do livro", elas aparecem nos melhores resultados, e nada fica escondido',
-    !!soOutras.valor && soOutras.valor.topo === 'rel-o:Outras páginas do livro' && !soOutras.valor.mais, '--envenenado-topo-vazio');
+  prop('a página solta não é resultado: nenhuma linha, e a frase diz que a palavra está fora dos capítulos',
+    !!soOutras.valor && soOutras.valor.linhas === '' &&
+    soOutras.valor.status === 'Nenhum capítulo com essa palavra. Ela aparece só em 1 página fora dos capítulos, em 1 livro.', '--envenenado-pagina-solta-vira-resultado');
   conf('o capítulo mostra uma linha de páginas e um botão de abrir, sem os números soltos à vista',
     R.linhaM + ' | ' + R.abrirM + ' | ' + R.paginasVisiveis, 'No texto: p. 3, 1 página | Abrir no capítulo|Ver páginas | 0');
   await digitar('');
