@@ -655,6 +655,20 @@ roda "biblioteca mirim --envenenado-diversos"   node "_teste/testa_biblioteca_mi
 # serve o app.js sem a origem no cartao.
 roda "biblioteca cadernos sme"                 node "_teste/testa_biblioteca_cadernos_sme.js"
 roda "biblioteca cadernos sme --envenenado-sem-origem" node "_teste/testa_biblioteca_cadernos_sme.js" --envenenado-sem-origem
+# L6: o credito que a licenca da fonte pede (atribuicao, licenca e link do
+# item) no cartao da lista do assunto, na previa e na edicao da lista pronta,
+# na tela cheia, queimado no recorte do "Abrir como folha" e da lista como
+# folha, e no bloco "Creditos" da lista e do gabarito em PDF, sem depender da
+# caixa "origem"; item sem os campos nao ganha linha. Um veneno por superficie.
+roda "biblioteca credito da licenca"           node "_teste/testa_biblioteca_credito.js"
+roda "biblioteca credito da licenca --envenenado-cartao" node "_teste/testa_biblioteca_credito.js" --envenenado-cartao
+roda "biblioteca credito da licenca --envenenado-visor" node "_teste/testa_biblioteca_credito.js" --envenenado-visor
+roda "biblioteca credito da licenca --envenenado-previa" node "_teste/testa_biblioteca_credito.js" --envenenado-previa
+roda "biblioteca credito da licenca --envenenado-edicao" node "_teste/testa_biblioteca_credito.js" --envenenado-edicao
+roda "biblioteca credito da licenca --envenenado-link" node "_teste/testa_biblioteca_credito.js" --envenenado-link
+roda "biblioteca credito da licenca --envenenado-abrir" node "_teste/testa_biblioteca_credito.js" --envenenado-abrir
+roda "biblioteca credito da licenca --envenenado-listafolha" node "_teste/testa_biblioteca_credito.js" --envenenado-listafolha
+roda "biblioteca credito da licenca --envenenado-pdf" node "_teste/testa_biblioteca_credito.js" --envenenado-pdf
 # FRENTE B: selecionar e compor. Sem navegador, o compositor do pdf.js (lista
 # renumerada, gabarito separado, sem solucao escrito, quebra entre pedacos, marca
 # por cima so nesta folha e os outros documentos byte a byte iguais aos de main).

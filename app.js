@@ -21972,7 +21972,8 @@
         el('div', { class: 'bib-tags' }, [
           el('span', { class: 'tag bib-lp-min-item', texto: minutosEstimados(lp.minutosDe[it.id]) }),
           etiquetaDesafio(it)
-        ])
+        ]),
+        linhaDeCredito(it)
       ])]));
     });
     corpo.appendChild(grade);
@@ -22160,7 +22161,8 @@
             ? el('span', { class: 'tag bib-lp-min-item', texto: minutosEstimados(lp.minutosDe[id]) })
             : el('span', { class: 'tag bib-lp-min-item', texto: 'acrescentado por você' }),
           lp.minutosDe[id] !== undefined ? etiquetaDesafio(it) : null
-        ])
+        ]),
+        linhaDeCredito(it)
       ]);
       grade.appendChild(celulaComCaixa(cartao, 'itens', it.id, setas));
     });
@@ -22242,7 +22244,8 @@
           (it.titulo ? ': ' + it.titulo : '') }),
         miniaturaBib(it.pacote, it.assets.enunciado, it.medidas && it.medidas.enunciado, 520),
         el('div', { class: 'bib-tags' }, tags),
-        it.origem_citada ? el('div', { class: 'bib-origem', texto: it.origem_citada }) : null
+        it.origem_citada ? el('div', { class: 'bib-origem', texto: it.origem_citada }) : null,
+        linhaDeCredito(it)
       ]), 'itens', it.id, etiquetaDela(it)));
     });
     corpo.appendChild(barraFiltroDeDificuldade(grade, lista, mod.banco));
@@ -23562,8 +23565,54 @@
     abrirModal('modal-bib-gerar');
   }
 
+  /* O crédito que a licença da fonte pede (L6). Fonte aberta que exige
+   * atribuição (os Cadernos de Apoio e Aprendizagem da SME-SP, pelo Decreto
+   * municipal 52.681/2011, que equivale à CC BY-NC-SA) traz no item os campos
+   * `atribuicao` e `licenca`; o aplicativo desenha o que o item traz, sem texto
+   * de fonte nenhuma escrito aqui, no cartão, na tela cheia e na folha (lista e
+   * gabarito). Na folha ele NÃO depende da caixa "origem": a licença manda
+   * creditar, então ninguém o desliga. Item sem os dois campos devolve null e
+   * fica exatamente como era. O endereço entra só quando o item traz um. */
+  function creditoDaLicenca(it) {
+    if (!it) return null;
+    var limpo = function (v) { return typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : ''; };
+    var ponto = function (t) { return /[.!?]$/.test(t) ? t : t + '.'; };
+    var atrib = limpo(it.atribuicao), lic = limpo(it.licenca);
+    if (!atrib && !lic) return null;
+    var partes = [];
+    if (atrib) partes.push('Fonte: ' + ponto(atrib));
+    if (lic) partes.push('Licença: ' + ponto(lic));
+    /* O endereço: o do item e, na falta dele, o fonte.url do manifest do
+     * pacote (pacote importado antes do campo `link` também mostra). */
+    var ehLink = function (t) { return /^https?:\/\/\S+$/.test(t); };
+    var link = [limpo(it.link), limpo(it.url), limpo((fonteDoPacote(it) || {}).url)].filter(ehLink)[0];
+    if (link) partes.push(link);
+    return partes.join(' ');
+  }
+
+  /* A linha do crédito no cartão e na tela cheia, ou null (item sem os campos). */
+  function linhaDeCredito(it, classeExtra) {
+    var texto = creditoDaLicenca(it);
+    return texto ? el('div', { class: 'bib-credito' + (classeExtra ? ' ' + classeExtra : ''), texto: texto }) : null;
+  }
+
+  /* O nome da fonte para gente ler: os dois da OBMEP pelo nome de sempre; os
+   * outros pelo fonte.nome do manifest do pacote do item; o id cru
+   * ("cadernos-sme-sp") só quando o pacote não diz o nome. */
+  function fonteDoPacote(it) {
+    var p = ((bib && bib.pacotes) || []).filter(function (x) { return x.pacote === it.pacote; })[0];
+    return (p && p.manifest && p.manifest.fonte) || null;
+  }
+
+  function nomeDaFonte(it) {
+    if (it.fonte === 'obmep-portal') return 'Portal da OBMEP';
+    if (it.fonte === 'obmep-banco') return 'Banco de Questões da OBMEP';
+    var f = fonteDoPacote(it);
+    return (f && typeof f.nome === 'string' && f.nome.trim()) || it.fonte || '';
+  }
+
   function origemCurta(it) {
-    var fonte = it.fonte === 'obmep-portal' ? 'Portal da OBMEP' : it.fonte === 'obmep-banco' ? 'Banco de Questões da OBMEP' : (it.fonte || '');
+    var fonte = nomeDaFonte(it);
     return [fonte, it.modulo.titulo, (eDoBanco(it) ? 'problema ' : 'exercício ') + it.numero]
       .filter(Boolean).join(', ') + (it.origem_citada ? ' (' + it.origem_citada + ')' : '');
   }
@@ -23587,7 +23636,7 @@
         return Biblioteca.rasterizarRecorte(b, it.medidas.solucao, it.origem && it.origem.solucao && it.origem.solucao.pedacos);
       });
     return Promise.all([enun, sol]).then(function (r) {
-      return { id: it.id, origem: origemCurta(it), enunciado: r[0], solucao: r[1],
+      return { id: it.id, origem: origemCurta(it), credito: creditoDaLicenca(it), enunciado: r[0], solucao: r[1],
         semSolucao: !!(it.sem_solucao || !it.assets.solucao), resposta: respostaSemSolucao(it) };
     });
   }
@@ -23920,28 +23969,28 @@
   function listaComoFolha(aulaId, itens, pecas) {
     var L = Draw.FOLHA_L, A = Draw.FOLHA_A, MARGEM = 40, ESPACO = 150;
     var paginas = [], atual = null, y = 0;
-    var tarefas = [];
-    pecas.forEach(function (p, i) {
-      var e = p.enunciado;
-      var altPt = e.alturaPt + (numeroNoLugar(e, i + 1) ? 0 : 16);   // na faixa, o número soma 16 pt em cima
-      var esc = Math.min(1.9, (L - 2 * MARGEM) / e.larguraPt);
-      var h = altPt * esc;
-      if (h > A - 2 * MARGEM) { esc = (A - 2 * MARGEM) / altPt; h = A - 2 * MARGEM; }
-      if (!atual || y + h > A - MARGEM) { atual = { fundo: 'branco', itens: [] }; paginas.push(atual); y = MARGEM; }
+    /* Cada recorte é desenhado ANTES de ser posto na página: o crédito da
+     * licença (L6) vai queimado embaixo dele, e só o desenho pronto diz quantas
+     * linhas o crédito tomou. A altura sai da proporção da imagem final. */
+    var medidas = [];
+    var indice = 0;
+    return emFila(pecas, function (p, i) {
       var ref = Core.uid();
-      var destino = atual;
-      var pos = { x: MARGEM, y: y, w: e.larguraPt * esc, h: h };
-      tarefas.push(function () {
-        return imagemNumerada(e, i + 1, esc).then(function (r) {
-          return Store.salvarMidia(ref, r, { aulaId: aulaId }).then(function () {
-            destino.itens.push({ t: 'imagem', ref: ref, x: pos.x, y: pos.y, w: pos.w, h: pos.h });
-          });
+      return imagemNumerada(p.enunciado, i + 1, 0, p.credito).then(function (r) {
+        return Store.salvarMidia(ref, r, { aulaId: aulaId }).then(function () {
+          medidas[i] = { ref: ref, w: r.w, h: r.h };
         });
       });
-      y += h + ESPACO;
-    });
-    var indice = 0;
-    return emFila(tarefas, function (t) { return t(); }, 1).then(function () {
+    }, 1).then(function () {
+      pecas.forEach(function (p, i) {
+        var e = p.enunciado, m = medidas[i];
+        var w = e.larguraPt * Math.min(1.9, (L - 2 * MARGEM) / e.larguraPt);
+        var h = w * m.h / m.w;
+        if (h > A - 2 * MARGEM) { w = w * (A - 2 * MARGEM) / h; h = A - 2 * MARGEM; }
+        if (!atual || y + h > A - MARGEM) { atual = { fundo: 'branco', itens: [] }; paginas.push(atual); y = MARGEM; }
+        atual.itens.push({ t: 'imagem', ref: m.ref, x: MARGEM, y: y, w: w, h: h });
+        y += h + ESPACO;
+      });
       return Store.lerNota(aulaId);
     }).then(function (nota) {
       var temConteudo = nota && nota.paginas && nota.paginas.some(function (p) { return (p.itens || []).length; });
@@ -23972,7 +24021,7 @@
 
   /* O enunciado já rasterizado (JPEG, rótulo coberto), junto de novo num canvas
    * com "Exercício N." escrito onde o rótulo estava. */
-  function imagemNumerada(peca, n, escFolha) {
+  function imagemNumerada(peca, n, escFolha, credito) {
     var partes = peca.pedacos ? peca.pedacos : [{ img: peca.img, alturaPt: peca.alturaPt }];
     return Promise.all(partes.map(function (p) {
       return new Promise(function (ok, falha) {
@@ -24010,7 +24059,8 @@
         cx.font = 'bold ' + tam + 'px Helvetica, Arial, sans-serif';
         cx.textBaseline = 'alphabetic';
         cx.fillText(texto, r[0] * k, r[3] * k - 1.5 * k);
-        return { dataUrl: cv.toDataURL('image/jpeg', 0.9), w: cv.width, h: cv.height };
+        var cvc = comCreditoQueimado(cv, credito, k);
+        return { dataUrl: cvc.toDataURL('image/jpeg', 0.9), w: cvc.width, h: cvc.height };
       }
       // sem caixa do rótulo: uma faixa em cima com o número
       var faixa = Math.round(16 * k);
@@ -24022,8 +24072,49 @@
       c2.font = 'bold ' + Math.round(11 * k) + 'px Helvetica, Arial, sans-serif';
       c2.fillText(texto, 0, Math.round(12 * k));
       c2.drawImage(cv, 0, faixa);
-      return { dataUrl: cv2.toDataURL('image/jpeg', 0.9), w: cv2.width, h: cv2.height };
+      var cvf = comCreditoQueimado(cv2, credito, k);
+      return { dataUrl: cvf.toDataURL('image/jpeg', 0.9), w: cvf.width, h: cvf.height };
     });
+  }
+
+  /* O CRÉDITO DA LICENÇA QUEIMADO NO RECORTE (L6). A folha da aula guarda a
+   * imagem colada, e é ela que sai em todo PDF que a folha gera (a folha da
+   * aula, o PDF do aluno) e em toda cópia pela nuvem: com o crédito DENTRO da
+   * imagem, nenhum exportador precisa saber dele, e apagar o crédito é apagar
+   * o exercício. Faixa branca embaixo do recorte, em cinza, no corpo de 6,5 pt
+   * do recorte (pxPorPt é a escala do canvas), quebrada na largura dele. Sem
+   * crédito, devolve o mesmo canvas, intocado. */
+  var CREDITO_QUEIMADO_PT = 6.5;
+  function comCreditoQueimado(cv, credito, pxPorPt) {
+    if (!credito) return cv;
+    var tam = CREDITO_QUEIMADO_PT * pxPorPt, alt = Math.ceil(tam * 1.35), folga = Math.ceil(tam * 0.8);
+    var fonte = tam.toFixed(2) + 'px Helvetica, Arial, sans-serif';
+    var cx0 = cv.getContext('2d');
+    cx0.font = fonte;
+    var linhas = [], atual = '';
+    String(credito).split(/\s+/).filter(Boolean).forEach(function (p) {
+      var tenta = atual ? atual + ' ' + p : p;
+      if (cx0.measureText(tenta).width <= cv.width) { atual = tenta; return; }
+      if (atual) { linhas.push(atual); atual = ''; }
+      // palavra mais larga que o recorte (o endereço, num recorte estreito): quebra por caractere
+      Array.from(p).forEach(function (ch) {
+        if (atual && cx0.measureText(atual + ch).width > cv.width) { linhas.push(atual); atual = ''; }
+        atual += ch;
+      });
+    });
+    if (atual) linhas.push(atual);
+    var nv = document.createElement('canvas');
+    nv.width = cv.width;
+    nv.height = cv.height + folga + linhas.length * alt;
+    var c = nv.getContext('2d');
+    c.fillStyle = '#FFFFFF';
+    c.fillRect(0, 0, nv.width, nv.height);
+    c.drawImage(cv, 0, 0);
+    c.fillStyle = '#5B6573';
+    c.font = fonte;
+    c.textBaseline = 'top';
+    linhas.forEach(function (l, i) { c.fillText(l, 0, cv.height + folga + i * alt); });
+    return nv;
   }
 
 
@@ -25547,6 +25638,8 @@
     if (peca.item && peca.item.origem_citada) {
       corpo.appendChild(el('div', { class: 'bib-origem u-texto-centro', texto: peca.item.origem_citada }));
     }
+    var credVisor = linhaDeCredito(peca.item, 'u-texto-centro');
+    if (credVisor) corpo.appendChild(credVisor);
     // sem solução e com a letra do gabarito (ENEM): o "Ver resposta" mostra a letra
     var resposta = bibVendo.tipo === 'exercicio' ? respostaSemSolucao(peca.item) : null;
     if (resposta && bibVendo.solucao) {
@@ -25629,7 +25722,8 @@
       return;
     }
     var peca = pecaVista();
-    mostrarAulasParaFolha({ pacote: peca.pacote, caminho: peca.caminho, medidas: peca.medidas, forma: peca.forma, titulo: peca.titulo });
+    mostrarAulasParaFolha({ pacote: peca.pacote, caminho: peca.caminho, medidas: peca.medidas, forma: peca.forma, titulo: peca.titulo,
+      credito: peca.item ? creditoDaLicenca(peca.item) : null });
   }
 
   /* A escolha da aula, separada de quem pediu: a biblioteca e o leitor de PDF
@@ -25728,7 +25822,18 @@
        * recém-criada, por exemplo): sem a aula, nada é gravado. */
       aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
       if (!aula) { var sem = new Error('aula desfeita'); sem.desfeita = true; throw sem; }
-      return Store.salvarMidia(ref, { dataUrl: c.toDataURL('image/jpeg', 0.9), w: lpx, h: apx }, { aulaId: aulaId });
+      /* O crédito da licença (L6) entra queimado embaixo do recorte, e a caixa
+       * na folha cresce na mesma proporção; sem crédito, nada muda. */
+      if (alvo.credito) {
+        var wpt = (alvo.medidas && alvo.medidas.largura_pt) || 612;
+        c = comCreditoQueimado(c, alvo.credito, lpx / wpt);
+        pos.h = pos.w * c.height / c.width;
+        if (pos.y + pos.h > Draw.FOLHA_A - 16) {
+          var red = (Draw.FOLHA_A - 16 - pos.y) / pos.h;
+          pos.w *= red; pos.h *= red;
+        }
+      }
+      return Store.salvarMidia(ref, { dataUrl: c.toDataURL('image/jpeg', 0.9), w: alvo.credito ? c.width : lpx, h: alvo.credito ? c.height : apx }, { aulaId: aulaId });
     }).then(function () {
       return Store.lerNota(aulaId);
     }).then(function (nota) {

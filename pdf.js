@@ -4040,7 +4040,8 @@
    *   incluirTeoria, incluirLista, incluirGabarito, gabaritoSeparado,
    *   espacoParaResposta (pt), mostrarOrigem,
    *   teoria: [{ img: {bytes, wPx, hPx}, larguraPt, alturaPt }],
-   *   itens: [{ id, origem, semSolucao, resposta (letra, só sem solução),
+   *   itens: [{ id, origem, credito (texto ou null), semSolucao,
+   *             resposta (letra, só sem solução),
    *             enunciado: Peca, solucao: Peca | null }]
    * }
    * Peca = { larguraPt, alturaPt, rotulo: [x0,y0,x1,y1] | null,
@@ -4104,9 +4105,15 @@
         { tam: corpoDoRotulo(texto, r, k), bold: true, cor: COR.navy });
     }
 
+    /* A origem em letra pequena, quebrada na largura útil: a dos Cadernos da
+     * SME-SP passa de uma linha e estourava a margem direita. A de uma linha
+     * sai como sempre saiu. */
+    function linhasDeOrigem(origem) { return origem ? doc.quebrar(origem, UTIL, 6.5, false) : []; }
     function linhaDeOrigem(origem) {
-      doc.y -= 9;
-      doc.texto(origem, MARG_E, doc.y, { tam: 6.5, cor: COR.muted });
+      linhasDeOrigem(origem).forEach(function (l) {
+        doc.y -= 9;
+        doc.texto(l, MARG_E, doc.y, { tam: 6.5, cor: COR.muted });
+      });
     }
 
     /* Um recorte. Se ele inteiro não cabe numa folha e vem em pedaços (8a do
@@ -4115,7 +4122,8 @@
      * escala do item diminui. Nunca se corta recorte por altura fixa. */
     function recorte(parte, n, peca, extra, origem) {
       var rotuloNovo = (parte === 'lista' ? 'Exercício ' : '') + n + '.';
-      var cauda = extra + (origem ? 11 : 0) + 12;     // espaço para resposta, origem e folga
+      var nOrigem = linhasDeOrigem(origem).length;
+      var cauda = extra + (nOrigem ? 11 + 9 * (nOrigem - 1) : 0) + 12;     // espaço para resposta, origem e folga
       var pedacos = peca.pedacos && peca.pedacos.length ? peca.pedacos
         : [{ img: peca.img, alturaPt: peca.alturaPt }];
       var k = Math.min(1, UTIL / peca.larguraPt);
@@ -4172,6 +4180,26 @@
       doc.y -= extra + 12;        // folga entre um recorte e o seguinte
     }
 
+    /* OS CRÉDITOS DA LICENÇA (L6), no fim da lista e no fim do gabarito, cada
+     * linha com o número do exercício na folha. Fonte aberta que exige
+     * atribuição (os Cadernos de Apoio e Aprendizagem da SME-SP, CC BY-NC-SA)
+     * manda creditar em toda cópia, e o gabarito sai em arquivo separado: por
+     * isso os dois levam o bloco. Ele NÃO obedece ao mostrarOrigem, que é uma
+     * preferência dela; o crédito é condição da licença e não se desliga. O
+     * texto vem pronto do app (o que o item traz); folha sem item com crédito
+     * fica byte a byte como era. */
+    function creditos(parte) {
+      var com = [];
+      itens.forEach(function (it, i) { if (it.credito) com.push((parte === 'lista' ? 'Exercício ' : '') + (i + 1) + '. ' + it.credito); });
+      if (!com.length) return;
+      doc.garanteEspaco(14 + 2 * 7 * 1.4);   // o título nunca fica sozinho no pé da página
+      var antes = doc.paginas.length - 1;
+      doc.y -= 12;
+      doc.texto('Créditos', MARG_E, doc.y, { tam: 8, bold: true, cor: COR.muted });
+      com.forEach(function (linha) { doc.paragrafo(linha, { tam: 7, cor: COR.muted, alturaLinha: 7 * 1.4 }); });
+      for (var p = antes; p < doc.paginas.length; p++) if (mapa[parte].indexOf(p) < 0) mapa[parte].push(p);
+    }
+
     doc.novaPagina();
 
     if (op.incluirTeoria && op.teoria && op.teoria.length) {
@@ -4196,6 +4224,7 @@
       itens.forEach(function (it, i) {
         recorte('lista', i + 1, it.enunciado, op.espacoParaResposta || 0, op.mostrarOrigem ? it.origem : null);
       });
+      creditos('lista');
     }
 
     if (op.incluirGabarito && itens.length) {
@@ -4215,6 +4244,7 @@
         doc.y -= 8;
         anota('gabarito');
       });
+      creditos('gabarito');
     }
 
     /* A marca por tipo de página (decisão da orquestradora em 22/09, PLANO,
