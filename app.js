@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.75';
+  var VERSAO = '1.42.79';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,9 +85,21 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.75',
+      versao: '1.42.79',
       itens: [
         'No livro aberto, dá para ampliar com dois dedos, em volta do ponto que você está olhando. Dois toques rápidos ampliam o trecho tocado, e outros dois voltam à largura da tela. A caneta não muda o zoom, e os botões de zoom continuam lá.'
+      ]
+    },
+    {
+      versao: '1.42.76',
+      itens: [
+        'Química do ensino médio ganhou 6 assuntos, para escolher na aula e procurar na Biblioteca: a Química como ciência, laboratório e segurança, pilhas e baterias comerciais e três de funções orgânicas.'
+      ]
+    },
+    {
+      versao: '1.42.72',
+      itens: [
+        'No tablet, a janela da aula organiza os campos em duas colunas; os mesmos campos e ações continuam disponíveis.'
       ]
     },
     {
@@ -3288,6 +3300,9 @@
 
     var corpo = $('#corpo-modal-aula');
     corpo.innerHTML = '';
+    corpo.classList.remove('janela-aula-tablet');
+    // a tela cheia é só da aula que já existe: a Nova aula fica no modal estreito
+    $('#modal-aula').classList.remove('janela-aula-cheia');
     /* Ela mexeu na aula nova (aluno, data, hora...): o link do planejamento,
      * no pé, pergunta antes de fechar (IA, fase 2). */
     aulaNovaMexida = false;
@@ -3740,6 +3755,21 @@
       ])
     ]);
     grupoArquivos.appendChild(acoesAvancadas);
+
+    // F6: a janela de edição do tablet fica em duas colunas. Os grupos são
+    // apenas reorganizados no DOM; os campos e os caminhos de salvamento não mudam.
+    // Uma rolagem só por lado (no tablet, rolagem dentro de rolagem prende o
+    // dedo): à esquerda Preparar e, embaixo, Arquivos; à direita Registrar.
+    var colunaPreparar = el('div', { class: 'janela-aula-coluna janela-aula-preparar', id: 'janela-aula-preparar' });
+    var colunaRegistrar = el('div', { class: 'janela-aula-coluna janela-aula-registrar', id: 'janela-aula-registrar' });
+    var colunaArquivos = el('div', { class: 'janela-aula-coluna janela-aula-arquivos', id: 'janela-aula-arquivos' });
+    colunaPreparar.appendChild(grupoPreparar);
+    colunaRegistrar.appendChild(grupoRegistro);
+    colunaArquivos.appendChild(grupoArquivos);
+    corpo.classList.add('janela-aula-tablet');
+    $('#modal-aula').classList.add('janela-aula-cheia');
+    corpo.appendChild(el('div', { class: 'janela-aula-lado', id: 'janela-aula-esquerda' }, [colunaPreparar, colunaArquivos]));
+    corpo.appendChild(el('div', { class: 'janela-aula-lado', id: 'janela-aula-direita' }, [colunaRegistrar]));
 
     atualizarPrevisao();
     abrirModal('modal-aula');
