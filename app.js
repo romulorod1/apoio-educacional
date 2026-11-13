@@ -16947,11 +16947,13 @@
     ['livro', 'capitulo', 'estado', 'assuntos'].forEach(function (k) { delete caixa.dataset[k]; });
   }
 
-  function mostrarCobre(formato, reg, valor) {
+  /* `ancora` (só no EPUB): a âncora por onde ela entrou na parte, que escolhe
+   * o capítulo quando vários começam na mesma parte (item 12a, parte 0). */
+  function mostrarCobre(formato, reg, valor, ancora) {
     var caixa = caixaDoCobre(formato);
     if (!caixa || !reg || !reg.meta) return;
     var mapa = Biblioteca.mapaDoLivro(reg.meta, correcoesDosLivros()[reg.id]);
-    var e = Biblioteca.entradaDoMapa(mapa, formato, valor);
+    var e = Biblioteca.entradaDoMapa(mapa, formato, valor, ancora);
     if (!e) { esconderCobre(formato); return; }
     /* O mesmo capítulo, com o mesmo estado e os mesmos assuntos, já à vista:
      * nada a redesenhar. A página é desenhada de novo no zoom, no "Ajustar à
@@ -16964,7 +16966,7 @@
         (assuntosDosLivros || !e.assuntos.length) && !/abrindo o índice/.test(caixa.textContent)) {
       return;
     }
-    var redesenhar = function () { mostrarCobre(formato, reg, valor); };
+    var redesenhar = function () { mostrarCobre(formato, reg, valor, ancora); };
     desenharCobre(caixa, reg, e, assuntosDosLivros, redesenhar);
     if (!assuntosDosLivros) {
       carregarAssuntosDosLivros().then(function (nomes) {
@@ -17236,7 +17238,8 @@
       desenho: 0, relogio: null };
     espinha.forEach(function (c, i) { ep.indiceDe[c] = i; });
     $('#titulo-modal-leitor-epub').textContent = tituloDoLivro(meta);
-    $('#epub-sumario').hidden = !(meta.sumario && meta.sumario.length);
+    // item 12a, parte 0: o EPUB sem sumário mostra o do mapa (sumarioDaTela), como a tela do livro
+    $('#epub-sumario').hidden = !sumarioDaTela(meta).length;
     fecharSumarioEpub();
     esconderCobre('epub');
     var corpo = $('#corpo-modal-leitor-epub');
@@ -17385,7 +17388,7 @@
           } catch (e) { /* a caixa sem acesso: o texto continua à vista */ }
           ep.mostrado = i;
           corpo.dataset.capituloAberto = String(i + 1);
-          mostrarCobre('epub', { id: ep.id, meta: ep.meta }, i + 1);
+          mostrarCobre('epub', { id: ep.id, meta: ep.meta }, i + 1, ancora);
           guardarPosicaoEpub();
           ok(true);
         }, { once: true });
@@ -17443,7 +17446,8 @@
     var lista = $('#epub-sumario-lista');
     if (!ep || !lista) return;
     if (!lista.hidden) { fecharSumarioEpub(); return; }
-    desenharSumario(lista, ep.meta.sumario, entradaAtualDoSumario(ep.meta.sumario, 'capitulo', ep.capitulo + 1), function (e) {
+    var sumario = sumarioDaTela(ep.meta);
+    desenharSumario(lista, sumario, entradaAtualDoSumario(sumario, 'capitulo', ep.capitulo + 1), function (e) {
       fecharSumarioEpub();
       mostrarCapituloEpub(e.capitulo - 1, 0, e.ancora || null);
     });
@@ -19363,7 +19367,8 @@
     var epub = meta.formato === 'epub';
     var doMapa = e.mapa_n != null ? mapa.filter(function (m) { return m.n === e.mapa_n; })[0] : null;
     return doMapa || mapa.filter(function (m) { return m.titulo === e.titulo; })[0] ||
-      mapa.filter(function (m) { return epub ? m.capitulo === e.capitulo && !e.ancora : m.pagina === e.pagina; })[0] || null;
+      // no EPUB, a mesma parte E a mesma âncora: vários capítulos podem começar na mesma parte (item 12a, parte 0)
+      mapa.filter(function (m) { return epub ? m.capitulo === e.capitulo && (m.ancora || null) === (e.ancora || null) : m.pagina === e.pagina; })[0] || null;
   }
 
   function abrirCapitulo(l, e) {

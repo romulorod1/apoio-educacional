@@ -73,7 +73,7 @@ import fazer_amostra_livros as amostra  # noqa: E402
 TRACOS = re.compile('[' + chr(0x2013) + chr(0x2014) + ']')
 CAMPOS_DO_LIVRO = ('id', 'arquivo', 'formato', 'titulo', 'autoria', 'editora', 'edicao', 'ano', 'segmento',
                    'sumario', 'sumario_origem', 'hash', 'bytes', 'mapa', 'mapa_origem', 'mapa_nota', 'series')
-ORIGENS = {'pdf': {'marcadores', 'mapa', 'nenhum'}, 'epub': {'navegacao', 'ncx', 'nenhum'}}
+ORIGENS = {'pdf': {'marcadores', 'mapa', 'nenhum'}, 'epub': {'navegacao', 'ncx', 'mapa', 'nenhum'}}
 
 
 class Placar:

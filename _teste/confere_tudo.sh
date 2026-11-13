@@ -891,6 +891,15 @@ roda "livros mapa --envenenado-sem-ano-na-tela"   node "_teste/testa_livros_mapa
 # faixa e apagava a lista do Corrigir aberta; a prova esperava pela pagina que
 # ja estava a vista e falhava uma vez em dez. O veneno volta a refazer a faixa.
 roda "livros mapa --envenenado-faixa-refeita"     node "_teste/testa_livros_mapa.js" --envenenado-faixa-refeita
+# 12a, parte 0 (13/11/2026): o mapa de capitulos de EPUB, por parte e ancora,
+# sobre o EPUB sintetico do gerador (dois capitulos na mesma parte). O meta
+# novo nao mexe na posicao antiga, a tela e o leitor mostram o sumario do mapa
+# e o "Abrir no livro" leva a parte e a ancora, com a faixa do capitulo certo.
+# Porta 8983.
+roda "livros mapa epub"                           node "_teste/testa_livros_mapa_epub.js"
+roda "livros mapa epub --envenenado-sem-ancora"   node "_teste/testa_livros_mapa_epub.js" --envenenado-sem-ancora
+roda "livros mapa epub --envenenado-cobre-sem-ancora" node "_teste/testa_livros_mapa_epub.js" --envenenado-cobre-sem-ancora
+roda "livros mapa epub --envenenado-posicao-solta" node "_teste/testa_livros_mapa_epub.js" --envenenado-posicao-solta
 # 12/11/2026: a versao nova de um pacote de livros que so muda o mapa (o MAT08-15
 # de volume): mesmo arquivo, versao maior, so o meta trocado; a posicao de
 # leitura e a correcao dela intactas, inclusive no livro cujo sumario era vazio;
@@ -1372,6 +1381,16 @@ roda "corrigir pacote Mirim C7"                 python biblioteca/_prova_corrigi
 # livro), a origem do sumario (marcadores, mapa, nenhum, nav do EPUB) e o
 # determinismo. Sem Chrome.
 roda "livros (gerador)"                         python biblioteca/_prova_livros.py
+# 12a, parte 0: o mapa de capitulos de EPUB no gerador (parte, fim e ancora,
+# a ancora conferida na parte), o sumario do mapa sem sumario no EPUB e com
+# "sumario": "mapa", e o mapa de PDF fora do EPUB. Os venenos rodam dentro da
+# prova. Sem Chrome.
+roda "mapa de EPUB (gerador)"                   python biblioteca/_prova_mapa_epub.py
+# O lado do aplicativo, no biblioteca.js: o sumario do EPUB sem sumario sai do
+# mapa, e a ancora escolhe o capitulo na parte de varios. Sem Chrome.
+roda "mapa de EPUB (regras)"                    node "_teste/testa_livros_mapa_epub_regras.js"
+roda "mapa de EPUB (regras) --envenenado-sumario-so-do-pacote" node "_teste/testa_livros_mapa_epub_regras.js" --envenenado-sumario-so-do-pacote
+roda "mapa de EPUB (regras) --envenenado-cobre-sem-ancora" node "_teste/testa_livros_mapa_epub_regras.js" --envenenado-cobre-sem-ancora
 # A revisao do C15.1: o pacote cortado recusado ja na espiada, sem ler o
 # arquivo inteiro, e o teto de 160 MB do aplicativo. Sem Chrome.
 roda "livros (regras)"                          node "_teste/testa_livros_regras.js"
