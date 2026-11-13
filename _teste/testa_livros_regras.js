@@ -443,6 +443,40 @@ const Biblioteca = carregar('biblioteca.js', troca);
       Biblioteca.sumarioDosMarcadoresInutil(Object.assign({}, lixo40, { paginas: undefined })), '0|false');
   }
 
+  {
+    secao('7. A ligação de assunto entre matérias (item 12c)');
+    // os nomes como o app monta (carregarAssuntosDosLivros): o índice decide a matéria de cada id
+    const porId = {
+      'QUIEM1-T02': { id: 'QUIEM1-T02', titulo: 'Níveis e subníveis de energia', disciplina: 'quimica', eixo: 'ano', serie: 'em1' },
+      'QUIEM1-T01': { id: 'QUIEM1-T01', titulo: 'Isótopos, isóbaros e isótonos', disciplina: 'quimica', eixo: 'ano', serie: 'em1' },
+      'QUIEM2-T03': { id: 'QUIEM2-T03', titulo: 'Equação de Clapeyron', disciplina: 'quimica', eixo: 'ano', serie: 'em2' },
+      'FISEM1-T01': { id: 'FISEM1-T01', titulo: 'Unidades do SI e conversões', disciplina: 'fisica', eixo: 'ano', serie: 'em1', disciplinaNome: 'Física' },
+      'BIOEM1-T07': { id: 'BIOEM1-T07', titulo: 'Ácidos nucleicos, DNA e RNA', disciplina: 'biologia', eixo: 'ano', serie: 'em1' },
+      'FSOEM1-T01': { id: 'FSOEM1-T01', titulo: 'O que é filosofia', disciplina: 'filosofia-sociologia', eixo: 'ano', serie: 'em1' }
+    };
+    const nomes = { porId, lista: Object.keys(porId).map(k => porId[k]) };
+    const rotulo = id => ({ fisica: 'Física', biologia: 'Biologia', quimica: 'Química' })[id] || '';
+    const qui = { mapa_disciplina: 'quimica', materia: 'quimica', series: ['em1'] };
+    const nome = (meta, id, r) => Biblioteca.nomeDoAssuntoNoLivro(meta, id, nomes, r === undefined ? rotulo : r);
+    conf('o de física num livro de química vem com a matéria', nome(qui, 'FISEM1-T01'), 'Física: Unidades do SI e conversões');
+    conf('o de biologia também', nome(qui, 'BIOEM1-T07'), 'Biologia: Ácidos nucleicos, DNA e RNA');
+    conf('o da própria matéria sem mudança, sem matéria nenhuma', nome(qui, 'QUIEM1-T02'), 'Níveis e subníveis de energia');
+    conf('o de física num livro de física, sem matéria', nome({ mapa_disciplina: 'fisica' }, 'FISEM1-T01'), 'Unidades do SI e conversões');
+    conf('o id fora do índice fica como veio, sem matéria pelo prefixo', nome(qui, 'FISEM1-T99'), 'FISEM1-T99');
+    conf('sem o índice aberto, o id como veio', Biblioteca.nomeDoAssuntoNoLivro(qui, 'FISEM1-T01', null, rotulo), 'FISEM1-T01');
+    conf('sem o rótulo do Core, o nome da matéria do índice', nome(qui, 'FISEM1-T01', null), 'Física: Unidades do SI e conversões');
+    conf('o livro de filosofia (a matéria da planilha) é da disciplina filosofia-sociologia: o assunto dela não é de fora',
+      nome({ materia: 'filosofia' }, 'FSOEM1-T01'), 'O que é filosofia');
+    conf('o livro sem matéria nenhuma não marca nada', nome({}, 'FISEM1-T01'), 'Unidades do SI e conversões');
+    const ids = l => l.map(a => a.id).join(',');
+    conf('o Corrigir: o de outra matéria do capítulo primeiro, depois os da matéria e do ano do livro',
+      ids(Biblioteca.opcoesDoCorrigir(qui, { assuntos: ['QUIEM1-T02', 'FISEM1-T01', 'FISEM1-T99'] }, nomes)), 'FISEM1-T01,QUIEM1-T02,QUIEM1-T01');
+    conf('o Corrigir do capítulo só de química é o de antes (matéria e ano do livro)',
+      ids(Biblioteca.opcoesDoCorrigir(qui, { assuntos: ['QUIEM1-T01'] }, nomes)), 'QUIEM1-T02,QUIEM1-T01');
+    conf('o assunto de outra matéria que o capítulo não tem não entra no Corrigir',
+      ids(Biblioteca.opcoesDoCorrigir(qui, { assuntos: [] }, nomes)).indexOf('FISEM1-T01'), -1);
+  }
+
   console.log('\n' + passes + ' passaram, ' + falhas + ' falharam.');
   process.exit(falhas ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

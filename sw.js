@@ -162,8 +162,9 @@
  * O v166 traz as aulas tiradas e postas só na folha do planejamento.
  * O v168 traz a correção dos módulos ligados a 14 assuntos no banco/topicos/matematica.json.
  * O v169 traz o Voltar do aparelho dentro do aplicativo.
+ * O v178 traz a ligação de assunto entre matérias nos mapas dos livros (biblioteca.js e app.js).
  */
-var CACHE = 'apoio-educacional-v169';
+var CACHE = 'apoio-educacional-v178';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

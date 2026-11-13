@@ -360,6 +360,64 @@ def trava_mapa(manifest, catalogo):
     return erros
 
 
+class QualquerId(dict):
+    """O veneno que aceita todo id: qualquer chave "esta" no indice, e a
+    disciplina da que nao esta e a fisica (a disciplina dita continua conferida)."""
+    def __contains__(self, k):
+        return True
+
+    def __getitem__(self, k):
+        return dict.get(self, k, 'fisica')
+
+    def get(self, k, padrao=None):
+        return dict.get(self, k, 'fisica')
+
+
+# O livro de quimica da 1a serie do item 12c, com o mapa da orquestradora. Os
+# ids sao os do banco de verdade (os casos pendentes da revisao L3: Q3, unidades
+# do SI no FISEM1-T01, e Q16, acidos nucleicos no BIOEM1-T07).
+MAPA_12C = {'livro': 'quimica-de-prova', 'serie': 'em1', 'capitulos': [
+    {'n': 1, 'titulo': 'Grandezas e medidas', 'pag_arquivo_inicio': 1, 'pag_arquivo_fim': 2,
+     'assuntos': [{'id': 'QUIEM1-T02', 'confianca': 'alta'}, {'id': 'FISEM1-T01', 'confianca': 'media'}]},
+    {'n': 2, 'titulo': 'Ácidos nucleicos', 'pag_arquivo_inicio': 3, 'pag_arquivo_fim': 4,
+     'assuntos': [{'id': 'BIOEM1-T07', 'confianca': 'alta', 'disciplina': 'biologia'}]},
+    {'n': 3, 'titulo': 'Capítulo com ids ruins', 'pag_arquivo_inicio': 5, 'pag_arquivo_fim': 6,
+     # o prefixo FIS sem o assunto no indice; o id certo com a disciplina errada; o id que nao e texto
+     'assuntos': [{'id': 'FISEM1-T99'}, {'id': 'FISEM2-T10', 'disciplina': 'quimica'}, {'id': ['FISEM1-T01']}]},
+    {'n': 4, 'titulo': 'Estrutura atômica', 'pag_arquivo_inicio': 7, 'pag_arquivo_fim': 8,
+     'assuntos': [{'id': 'QUIEM1-T01', 'confianca': 'alta'}]}]}
+
+
+def trava_entre_materias(catalogo):
+    """Item 12c: o mapa do livro de quimica liga o assunto de outra materia
+    (fisica, biologia) quando o id esta no indice; o id que o indice nao tem,
+    e o de disciplina dita errada, ficam de fora; o capitulo so de quimica fica
+    como sempre. A forma passa no conferir_mapa."""
+    livro = {'formato': 'pdf', 'titulo': 'Química de prova', 'materia': 'quimica', 'segmento': 'Ensino médio'}
+    m = livros.montar_mapa(livro, {'paginas': 8, 'sumario': []}, ('mapa_capitulos_quimica_prova.json', MAPA_12C), catalogo)
+    erros = []
+    obtido = [[(a['id'], a['confianca']) for a in e['assuntos']] for e in m.get('mapa') or []]
+    esperado = [[('QUIEM1-T02', 'alta'), ('FISEM1-T01', 'média')], [('BIOEM1-T07', 'alta')], [], [('QUIEM1-T01', 'alta')]]
+    if obtido != esperado:
+        erros.append('os assuntos do mapa: %r (esperado %r)' % (obtido, esperado))
+    if m.get('mapa_disciplina') != 'quimica' or m.get('series') != ['em1']:
+        erros.append('a disciplina e o ano do livro: %r %r' % (m.get('mapa_disciplina'), m.get('series')))
+    nota = m.get('mapa_nota') or ''
+    if '3 assunto(s) fora do índice' not in nota:
+        erros.append('a nota não conta os 3 ids recusados: %r' % nota)
+    if '2 assunto(s) de outra matéria: FISEM1-T01, BIOEM1-T07.' not in nota:
+        erros.append('a nota não diz as ligações de outra matéria: %r' % nota)
+    erros += conferir_mapa({'livros': [dict(livro, id='quimica-de-prova', paginas=8, **m)]}, catalogo)
+    # o livro de matematica do mapa de sempre nao ganha nota de outra materia
+    so_mat = livros.montar_mapa({'formato': 'pdf', 'titulo': 'M', 'materia': 'matematica', 'segmento': ''}, {'paginas': 4, 'sumario': []},
+                                ('m.json', {'livro': 'm', 'serie': '06', 'capitulos': [
+                                    {'n': 1, 'titulo': 'Frações', 'pag_arquivo_inicio': 1, 'pag_arquivo_fim': 4,
+                                     'assuntos': [{'id': 'MAT06-05'}]}]}), catalogo)
+    if [[a['id'] for a in e['assuntos']] for e in so_mat['mapa']] != [['MAT06-05']] or 'outra matéria' in so_mat['mapa_nota']:
+        erros.append('o mapa só da própria matéria mudou: %r' % so_mat)
+    return erros
+
+
 def trava_tracos(manifest):
     erros = []
 
@@ -789,6 +847,24 @@ def amostra_rodada(temp, placar):
         erros_obra += conferir_mapa({'livros': [dict(livro_obra, id='obra', paginas=None, epub={'espinha': ['a', 'b', 'c', 'd']}, **mo)]},
                                     catalogo)
     placar.conferir('livros: mapa de obra inteira (literatura), no EPUB e no PDF', erros_obra)
+
+    # item 12c: a ligacao de assunto entre materias, dos dois lados
+    placar.conferir('livros: ligação entre matérias (a de outra matéria aceita, o id inválido e a disciplina errada recusados, '
+                    'a da própria matéria igual)', trava_entre_materias(catalogo))
+    venenos_12c = (
+        ('o mapa so com assunto da disciplina do livro (a regra de antes do 12c)',
+         lambda c: {a['id']: k for k, d in c.items() if k == 'quimica' for a in d['assuntos']}),
+        ('o mapa so com assunto de outra disciplina (a da propria materia some)',
+         lambda c: {a['id']: k for k, d in c.items() if k != 'quimica' for a in d['assuntos']}),
+        ('o mapa aceita qualquer id, mesmo fora do indice', lambda c: QualquerId(real_12c(c))))
+    real_12c = livros.disciplinas_dos_ids
+    for rot, troca in venenos_12c:
+        livros.disciplinas_dos_ids = troca
+        try:
+            erros_v = trava_entre_materias(catalogo)
+        finally:
+            livros.disciplinas_dos_ids = real_12c
+        placar.conferir('livros: ' + rot, erros_v, deve_reprovar=True)
     v = copy.deepcopy(m1)
     for e in next(x for x in v['livros'] if x['id'] == 'livro-sem-marcadores')['mapa']:
         e['assuntos'] = []

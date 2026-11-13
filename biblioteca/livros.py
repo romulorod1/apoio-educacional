@@ -624,12 +624,29 @@ def nivel_dos_capitulos(sumario):
     return niveis[0] if niveis else None
 
 
-def assuntos_do_mapa(lista, ids_validos):
-    """Os assuntos de uma entrada do mapa da orquestradora, so com id do indice. Devolve (assuntos, fora)."""
+def disciplinas_dos_ids(catalogo):
+    """{id do assunto: disciplina}, de TODAS as disciplinas do indice."""
+    return {a['id']: chave for chave, d in catalogo.items() for a in d['assuntos']}
+
+
+def assuntos_do_mapa(lista, disciplina_de):
+    """Os assuntos de uma entrada do mapa da orquestradora, so com id do indice. Devolve (assuntos, fora).
+
+    Item 12c (12/11/2026): o id vale em QUALQUER disciplina do indice
+    (`disciplina_de`, de disciplinas_dos_ids), e nao so na do livro: o
+    capitulo de quimica que trata de unidades do SI liga o FISEM1-T01. O id
+    que o indice nao tem fica de fora, como sempre. A entrada pode dizer a
+    disciplina (`"disciplina": "fisica"`); quando diz, tem de ser a do id no
+    indice, senao o assunto fica de fora (a disciplina escrita errada nao
+    liga o capitulo a um assunto que o mapa nao quis)."""
     saida, fora = [], 0
     for a in lista or []:
         aid = a.get('id') if isinstance(a, dict) else None
-        if aid not in ids_validos:
+        if not isinstance(aid, str) or aid not in disciplina_de:
+            fora += 1
+            continue
+        dita = a.get('disciplina')
+        if dita is not None and DISCIPLINA_DA_MATERIA.get(dita, dita) != disciplina_de[aid]:
             fora += 1
             continue
         if any(x['id'] == aid for x in saida):
@@ -641,6 +658,18 @@ def assuntos_do_mapa(lista, ids_validos):
     return saida, fora
 
 
+def nota_de_outra_materia(entradas, disciplina_id, disciplina_de):
+    """O pedaco da nota que conta as ligacoes a assunto de outra materia, com os ids."""
+    ids = []
+    for e in entradas:
+        for a in e.get('assuntos') or []:
+            if disciplina_de.get(a['id']) != disciplina_id and a['id'] not in ids:
+                ids.append(a['id'])
+    if not ids:
+        return ''
+    return ' %d assunto(s) de outra matéria: %s.' % (len(ids), ', '.join(ids))
+
+
 def montar_mapa(livro, info, achado, catalogo):
     """O mapa do livro (lista), a origem, o ano e a nota. Nao abre o livro:
     trabalha so com o sumario, as paginas e o mapa da orquestradora."""
@@ -648,7 +677,7 @@ def montar_mapa(livro, info, achado, catalogo):
     nome_mapa, do_mapa = achado if achado else (None, None)
     disciplina_id = DISCIPLINA_DA_MATERIA.get(livro.get('materia'), livro.get('materia'))
     disciplina = catalogo.get(disciplina_id)
-    ids_validos = {a['id'] for d in catalogo.values() for a in d['assuntos']}
+    ids_validos = disciplinas_dos_ids(catalogo)
     serie_mapa = str((do_mapa or {}).get('serie') or '').strip()
     if serie_mapa in ORDEM_DAS_SERIES:
         series, series_origem = [serie_mapa], 'mapa'
@@ -671,6 +700,7 @@ def montar_mapa(livro, info, achado, catalogo):
         nota = 'Assunto da obra inteira, do mapa de obras da orquestradora (%s).' % nome_mapa
         if fora:
             nota += ' %d assunto(s) fora do índice ficaram de fora.' % fora
+        nota += nota_de_outra_materia([e], disciplina_id, ids_validos)
         saida.update(mapa=[e], mapa_origem='mapa', mapa_nota=nota)
         return saida
 
@@ -698,6 +728,7 @@ def montar_mapa(livro, info, achado, catalogo):
             nota += ' %d capítulo(s) fora das páginas do arquivo ficaram de fora.' % fora_pag
         if fora_id:
             nota += ' %d assunto(s) fora do índice ficaram de fora.' % fora_id
+        nota += nota_de_outra_materia(entradas, disciplina_id, ids_validos)
         saida.update(mapa=[dict(n=i + 1, **e) for i, e in enumerate(entradas)], mapa_origem='mapa', mapa_nota=nota)
         return saida
 

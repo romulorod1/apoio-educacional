@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.89';
+  var VERSAO = '1.42.98';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -84,6 +84,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.98',
+      itens: [
+        'Na Biblioteca, o capítulo de um livro pode ficar ligado a um assunto de outra matéria, e a tela diz qual: no livro de Química, por exemplo, "Física: Unidades do SI e conversões". A busca da Biblioteca acha o capítulo por esse assunto, e o Corrigir mostra o assunto de outra matéria que o capítulo já tem.'
+      ]
+    },
     {
       versao: '1.42.89',
       itens: [
@@ -16927,7 +16933,8 @@
     caixa.dataset.capitulo = String(e.n);
     caixa.dataset.estado = e.estado;
     caixa.dataset.assuntos = e.assuntos.join(',');
-    var nome = function (id) { var a = nomes && nomes.porId[id]; return a ? a.titulo : id; };
+    // o assunto de outra matéria vem com a matéria na frente ("Física: Calorimetria", item 12c)
+    var nome = function (id) { return Biblioteca.nomeDoAssuntoNoLivro(reg.meta, id, nomes, nomeDaDisciplina); };
     var quais = !nomes && e.assuntos.length ? 'abrindo o índice de assuntos...'
       : e.assuntos.length ? e.assuntos.map(nome).join('; ') : 'nenhum assunto do índice';
     caixa.appendChild(el('div', { class: 'cobre-texto' }, [
@@ -16958,10 +16965,10 @@
       return;
     }
     var series = Array.isArray(reg.meta.series) ? reg.meta.series : [];
-    var disciplina = reg.meta.mapa_disciplina;
-    var opcoes = (nomes.lista || []).filter(function (a) {
-      return a.disciplina === disciplina && (a.eixo !== 'ano' || !series.length || series.indexOf(a.serie) >= 0);
-    });
+    /* Item 12c: o assunto de outra matéria que o capítulo já tem vem primeiro,
+     * com a matéria no nome, para ela ver e poder manter; depois os da matéria
+     * e do ano do livro (Biblioteca.opcoesDoCorrigir). */
+    var opcoes = Biblioteca.opcoesDoCorrigir(reg.meta, e, nomes);
     var escolher = function (ids) {
       gravarCorrecaoDoMapa(reg.id, e, ids, 'corrigiu').then(redesenhar, redesenhar);
     };
@@ -16980,7 +16987,9 @@
       return b;
     };
     opcoes.forEach(function (a) {
-      lista.appendChild(botao(a.id, a.titulo + (a.eixo === 'ano' && series.length > 1 ? ' (' + nomeDoAno(a.serie) + ')' : '')));
+      var deFora = Biblioteca.assuntoDeOutraMateria(reg.meta, a);
+      lista.appendChild(botao(a.id, deFora ? Biblioteca.nomeDoAssuntoNoLivro(reg.meta, a.id, nomes, nomeDaDisciplina) :
+        a.titulo + (a.eixo === 'ano' && series.length > 1 ? ' (' + nomeDoAno(a.serie) + ')' : '')));
     });
     lista.appendChild(botao('', 'Nenhum assunto do índice'));
     caixa.appendChild(lista);
@@ -18771,7 +18780,11 @@
       paginas.length ? el('span', { class: 'bib-busca-livro-quantas', texto: 'No texto: ' + faixaDePaginas(livro, meta, paginas) }) : null
     ].filter(Boolean)));
     if (achado) {
-      var assuntos = achado.assuntos.map(function (a) { return a.titulo; });
+      var nomesDaBusca = assuntosDosLivros || nomesDosCapitulos;
+      var assuntos = achado.assuntos.map(function (a) {
+        // o de outra matéria diz qual ("Física: Calorimetria"); sem o índice aberto, o título que a busca guardou
+        return nomesDaBusca ? Biblioteca.nomeDoAssuntoNoLivro(meta, a.id, nomesDaBusca, nomeDaDisciplina) : a.titulo;
+      });
       filhos.push(el('p', { class: 'bib-busca-como', 'data-pelo': 'capitulo',
         texto: 'Pelo capítulo' + (assuntos.length ? (assuntos.length === 1 ? ', assunto: ' : ', assuntos: ') + assuntos.join('; ') : '') }));
     }
@@ -19303,7 +19316,7 @@
     mapa.forEach(function (e) { e.assuntos.forEach(function (a) { ligados[a] = true; }); });
     var nLigados = Object.keys(ligados).length;
     var nomes = nomesLidos || assuntosDosLivros;
-    var nomeDoAssunto = function (id) { var a = nomes && nomes.porId[id]; return a ? a.titulo : id; };
+    var nomeDoAssunto = function (id) { return Biblioteca.nomeDoAssuntoNoLivro(meta, id, nomes, nomeDaDisciplina); };
 
     // o capítulo onde ela está: o que contém a posição guardada; sem posição, o primeiro
     var atual = null;
@@ -19459,10 +19472,8 @@
     return { tipo: revisado ? 'sem-vinculo' : 'sem-mapa' };
   }
   var DISCIPLINA_DA_MATERIA = { filosofia: 'filosofia-sociologia', sociologia: 'filosofia-sociologia' };
-  function disciplinaDoMapa(meta) {
-    var d = (meta && (meta.mapa_disciplina || meta.materia)) || '';
-    return DISCIPLINA_DA_MATERIA[d] || d;
-  }
+  // a regra mora em biblioteca.js, a mesma da ligação entre matérias (item 12c)
+  function disciplinaDoMapa(meta) { return Biblioteca.disciplinaDoMapa(meta); }
   // o livro entra na comparação do assunto: a mesma matéria e, no eixo de ano, o mesmo ano
   function livroDoAssunto(meta, a) {
     return disciplinaDoMapa(meta) === a.disciplina && (a.eixo !== 'ano' || Biblioteca.livroDoAno(meta, a.serie));
@@ -19596,7 +19607,11 @@
       if (!l || !l.meta) return;
       var doAno = livroDoAssunto(l.meta, base);
       if (!doAno && !ligaAlguma(mapas[i], linhas)) return;
-      colunas.push({ id: l.id, meta: l.meta, mapa: mapas[i], revisado: mapaFoiRevisado(mapas[i]), vizinho: !doAno,
+      // item 12c: o livro de outra matéria entra pelo capítulo ligado, e a coluna diz a matéria dele, não "de outro ano"
+      var dDoLivro = disciplinaDoMapa(l.meta);
+      var outraMateria = !!dDoLivro && dDoLivro !== base.disciplina;
+      colunas.push({ id: l.id, meta: l.meta, mapa: mapas[i], revisado: mapaFoiRevisado(mapas[i]), vizinho: !doAno && !outraMateria,
+        outraMateria: outraMateria ? nomeDaDisciplina(dDoLivro) : null,
         cor: CORES_DAS_CAPAS[colunas.length % CORES_DAS_CAPAS.length] });
     });
     var celulas = visiveis.map(function (a) {
@@ -19606,12 +19621,14 @@
     var serieNome = serieDoAssunto(base);
     var titulo = (base.temaNome || base.titulo) + (serieNome ? ', ' + serieNome : '');
     var vizinhos = colunas.filter(function (c) { return c.vizinho; }).length;
+    var deOutraMateria = colunas.filter(function (c) { return c.outraMateria; }).length;
     var aConfirmar = colunas.filter(function (c) { return c.mapa.length && !c.revisado; }).length;
     var semMapa = colunas.filter(function (c) { return !c.mapa.length; }).length;
     // Descreve cada estado sem sugerir que os mapas confirmados cobrem o livro inteiro.
     var resumo = !colunas.length ? 'nenhum livro no tablet' : [
-      pluralLivros(colunas.length) + (vizinhos ? '' : serieNome ? ' do ' + serieNome : ''),
+      pluralLivros(colunas.length) + (vizinhos || deOutraMateria ? '' : serieNome ? ' do ' + serieNome : ''),
       vizinhos ? vizinhos + ' de outro ano, com capítulo ligado' : null,
+      deOutraMateria ? deOutraMateria + ' de outra matéria, com capítulo ligado' : null,
       aConfirmar ? aConfirmar + (aConfirmar === 1 ? ' com sugestão a confirmar' : ' com sugestões a confirmar') : null,
       semMapa ? semMapa + (semMapa === 1 ? ' sem mapa de assuntos' : ' sem mapa de assuntos') : null,
       !aConfirmar && !semMapa ? (colunas.length > 1 ? 'vínculos registrados revisados em todos' : 'vínculos registrados revisados') : null
@@ -19695,6 +19712,7 @@
           el('span', { class: 'bibl-forte', texto: tituloDoLivro(c.meta) }),
           el('span', { class: 'bibl-apoio', texto: nComVinculo + ' de ' + linhas.length + ' com vínculo no mapa' }),
           c.vizinho ? el('span', { class: 'bibl-apoio', 'data-vizinho': 'sim', texto: 'de outro ano' }) : null,
+          c.outraMateria ? el('span', { class: 'bibl-apoio', 'data-outra-materia': 'sim', texto: 'livro de ' + c.outraMateria }) : null,
           !c.mapa.length ? el('span', { class: 'tag lado-tag', 'data-falta': 'mapa', texto: 'sem mapa de assuntos' }) :
             !c.revisado ? el('span', { class: 'tag lado-tag', 'data-falta': 'revisao', texto: 'mapa a confirmar' }) : null
         ])
