@@ -34,7 +34,7 @@
  *     está (regra do core, testa_escopo_relato.js).
  * 13. (B5) O Desfazer de "Aula atualizada" volta só aquela aula: o relato
  *     gravado depois em outra aula fica.
- * 14. A aula passada de mês já pago fica fora do "todas" e do "excluir todas",
+ * 14. A aula passada de mês com pagamento fica fora do "todas" e do "excluir todas",
  *     e o aviso diz quantas ficaram de fora e por quê (regra no core,
  *     testa_escopo_pago.js).
  *
@@ -455,7 +455,7 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
   }
 
   if (!MODO) {
-    secao('14. Aula passada de mês já pago fica fora do lote, e o aviso diz quantas');
+    secao('14. Aula passada de mês com pagamento fica fora do lote, e o aviso diz quantas');
     // outra aluna, toda quinta desde 01/10, com outubro pago inteiro e novembro em aberto
     const beta = await pag.evaluate(async () => {
       const d = await Store.carregar();
@@ -475,8 +475,8 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
     await escolher(pag, '#campo-duracao', '90');
     await pag.click('#salvar-aula');
     await esperar('pergunta de escopo', () => pag.evaluate(() => document.querySelector('#modal-escopo').classList.contains('aberto')), Boolean, 4000);
-    conf('a pergunta do "todas" avisa que as de mês já pago ficam de fora', await pag.evaluate(() =>
-      /menos as com relato ou nota e as de mês já pago/.test(document.querySelector('#modal-escopo').textContent)), true);
+    conf('a pergunta do "todas" avisa que as de mês com pagamento ficam de fora', await pag.evaluate(() =>
+      /menos as com relato ou nota e as de mês com pagamento/.test(document.querySelector('#modal-escopo').textContent)), true);
     await pag.evaluate(() => Array.from(document.querySelectorAll('.opcao-escopo')).find(o => /Todas as aulas/.test(o.textContent)).click());
     const mudou = await esperar('o todas gravou', () => lerAula(pag, beta.outra), a => a && a.duracaoMin === 90, 5000); // a de 26/11, outra irmã
     conf('(arranjo) o "todas" gravou nas aulas que podia', mudou.ok, true);
@@ -485,7 +485,7 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
       /^10-01=60 10-08=60 10-15=60 10-22=60 10-29=60 11-05=90 11-12=90 11-19=90 11-26=90/.test(d14), true);
     const av14 = (await avisoAgora(pag)).texto;
     conf('o aviso diz quantas ficaram de fora e por quê (' + av14 + ')',
-      /^Aulas da repetição alteradas\. 5 aulas de mês já pago ficaram como estavam\./.test(av14), true);
+      /^Aulas da repetição alteradas\. 5 aulas de mês com pagamento ficaram como estavam\./.test(av14), true);
     conf('(arranjo) a aula da repetição abriu de novo', (await abrir(pag, beta.aula)).ok, true);
     await pag.click('#excluir-aula');
     await esperar('pergunta de escopo do excluir', () => pag.evaluate(() => document.querySelector('#modal-escopo').classList.contains('aberto')), Boolean, 4000);
@@ -495,7 +495,7 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
     conf('no excluir, as cinco de outubro, pago, continuam (' + (sobrou.valor || '') + ')', sobrou.ok && sobrou.valor, '10-01 10-08 10-15 10-22 10-29');
     const av14b = (await avisoAgora(pag)).texto;
     conf('o aviso do excluir diz quantas continuam e por quê (' + av14b + ')',
-      /^Aulas da repetição excluídas\. 5 aulas de mês já pago continuam na agenda\./.test(av14b), true);
+      /^Aulas da repetição excluídas\. 5 aulas de mês com pagamento continuam na agenda\./.test(av14b), true);
   }
 
   conf('não houve erro de página', (pag.errosDePagina || []).join(' | '), '');

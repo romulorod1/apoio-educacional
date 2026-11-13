@@ -529,14 +529,13 @@
    *   de carona no "destacada", que o Salvar marcava; desde o F7 o relato e a
    *   nota gravam direto, sem destacar. Só os dois textos, e não o conteúdo
    *   inteiro da aula: a aula só com assunto o pai não protegia;
-   * - a aula PASSADA de um mês JÁ PAGO, mesmo sem texto (decisão do dono,
-   *   13/11/2026): o que a família já pagou não muda de duração, de situação nem
-   *   de cobrança, nem some, por uma ação na repetição. "Passada" é a mesma
-   *   regra do Fechamento (a aula de hoje conta como dada: só o que está depois
-   *   de hoje é previsto), e "paga" é o selo "pago" do Fechamento
-   *   (seloDoPagamento): há pagamento marcado e ele cobre o que se cobra do
-   *   mês. Pago a menos ("parcial") não protege, porque o mês ainda está em
-   *   aberto.
+   * - a aula PASSADA de um mês COM PAGAMENTO REGISTRADO, mesmo sem texto
+   *   (decisão do dono, 13/11/2026): mudar ou apagar uma aula dessas muda o que
+   *   a família pagou, ou o que falta receber de um mês que ela já está
+   *   cobrando. Vale para qualquer pagamento do mês (pagamentoDe), inteiro ou
+   *   a menos: na dúvida com dinheiro, protege. "Passada" é a mesma regra do
+   *   Fechamento (a aula de hoje conta como dada: só o que está depois de hoje
+   *   é previsto).
    * A aula destacada continua fora, como sempre. A própria aula editada sempre
    * entra. `hojeRef` existe para a prova fixar o dia.
    * Devolve { alvos, comTexto, pagas }: as duas listas são as irmãs do mesmo
@@ -557,8 +556,7 @@
       if (!a.data || a.data > hoje) return false;
       var chave = a.alunoId + '|' + mesDe(a.data);
       if (!(chave in mesPago)) {
-        var f = calcularFechamento(db, a.alunoId, mesDe(a.data), hoje);
-        mesPago[chave] = !!f && seloDoPagamento(db, f).selo === 'pago';
+        mesPago[chave] = !!pagamentoDe(db, a.alunoId, mesDe(a.data));
       }
       return mesPago[chave];
     }

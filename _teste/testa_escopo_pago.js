@@ -1,21 +1,21 @@
 /* testa_escopo_pago.js
  *
- * F7 (#159), decisão do dono (13/11/2026): a aula PASSADA de um mês JÁ PAGO
- * fica de fora do "todas", do "desta em diante" e do "excluir" da repetição,
- * mesmo sem texto (Core.escopoDaRepeticao). "Passada" é a regra do
- * Fechamento (a de hoje conta como dada) e "paga" é o selo "pago" do
- * Fechamento (seloDoPagamento).
+ * F7 (#159), decisão do dono (13/11/2026): a aula PASSADA de um mês COM
+ * PAGAMENTO REGISTRADO (inteiro ou a menos) fica de fora do "todas", do
+ * "desta em diante" e do "excluir" da repetição, mesmo sem texto
+ * (Core.escopoDaRepeticao). "Passada" é a regra do Fechamento (a de hoje
+ * conta como dada) e o pagamento é o registro do mês (pagamentoDe).
  *
  * Os lados:
- *   - a passada e paga, sem texto, não muda nem some;
- *   - a passada NÃO paga (nem paga a menos), sem texto, muda e some como antes;
+ *   - a passada de mês pago, inteiro ou a menos, sem texto, não muda nem some;
+ *   - a passada de mês SEM pagamento, sem texto, muda e some como antes;
  *   - a futura, mesmo num mês pago, muda e some como antes;
  *   - a contagem do que ficou de fora, por motivo, que a tela usa no aviso.
  * Sem navegador. Dados fictícios.
  *
  * Venenos, cada um tem de cair só do seu lado:
  *   --envenenado-sem-regra-da-paga     a paga volta a entrar no lote;
- *   --envenenado-protege-toda-passada  toda passada fica de fora, paga ou não;
+ *   --envenenado-protege-toda-passada  toda passada fica de fora, com pagamento ou não;
  *   --envenenado-protege-futura        a futura de mês pago também fica de fora.
  */
 'use strict';
@@ -25,7 +25,7 @@ const path = require('path');
 
 const VENENOS = {
   '--envenenado-sem-regra-da-paga': ['      if (passadaEPaga(a)) { saida.pagas.push(a); return; }', ''],
-  '--envenenado-protege-toda-passada': ["        mesPago[chave] = !!f && seloDoPagamento(db, f).selo === 'pago';", '        mesPago[chave] = true;'],
+  '--envenenado-protege-toda-passada': ['        mesPago[chave] = !!pagamentoDe(db, a.alunoId, mesDe(a.data));', '        mesPago[chave] = true;'],
   '--envenenado-protege-futura': ['      if (!a.data || a.data > hoje) return false;', '      if (!a.data) return false;']
 };
 const pedidos = process.argv.slice(2);
@@ -57,15 +57,15 @@ function conf(rotulo, obtido, esperado) {
 }
 
 const HOJE = '2026-11-16';
-/* Série toda quinta, 60 minutos, R$ 120 a hora, desde 03/09/2026.
- * Setembro: pago a MENOS (parcial). Outubro: pago inteiro. Novembro: pago o
- * que já aconteceu (05 e 12/11); 19 e 26/11 ainda vêm. */
+/* Série toda quinta, 60 minutos, R$ 120 a hora, desde 06/08/2026.
+ * Agosto: SEM pagamento. Setembro: pago a MENOS (parcial). Outubro: pago
+ * inteiro. Novembro: pago o que já aconteceu (05 e 12/11); 19 e 26/11 ainda vêm. */
 function montar() {
-  const db = { versao: 1, ajustes: { pagamentosDesde: '2026-09' }, resumos: [], pagamentos: [], series: [], aulas: [],
+  const db = { versao: 1, ajustes: { pagamentosDesde: '2026-08' }, resumos: [], pagamentos: [], series: [], aulas: [],
     alunos: [{ id: 'al', nome: 'Aluna Sintética', ativo: true, precos: [{ id: 'p1', inicio: '2026-01-01', fim: null, valorHora: 120 }] }] };
-  Core.criarSerie(db, { alunoId: 'al', dias: [4], hora: '16:00', duracaoMin: 60, inicio: '2026-09-03', fim: null });
+  Core.criarSerie(db, { alunoId: 'al', dias: [4], hora: '16:00', duracaoMin: 60, inicio: '2026-08-06', fim: null });
   const s = db.series[0];
-  ['2026-09', '2026-10', '2026-11', '2026-12'].forEach(m => Core.materializarSerieNoMes(db, s, m));
+  ['2026-08', '2026-09', '2026-10', '2026-11', '2026-12'].forEach(m => Core.materializarSerieNoMes(db, s, m));
   const devido = m => Core.valorACobrarDoMes(Core.calcularFechamento(db, 'al', m, HOJE));
   Core.marcarPagamento(db, 'al', '2026-09', '2026-10-05', devido('2026-09') - 120);
   Core.marcarPagamento(db, 'al', '2026-10', '2026-11-05', devido('2026-10'));
@@ -77,32 +77,35 @@ function montar() {
 {
   const m = montar();
   const selo = mes => Core.seloDoPagamento(m.db, Core.calcularFechamento(m.db, 'al', mes, HOJE)).selo;
-  conf('(arranjo) setembro parcial, outubro e novembro pagos', [selo('2026-09'), selo('2026-10'), selo('2026-11')].join(','), 'parcial,pago,pago');
+  conf('(arranjo) agosto em aberto, setembro parcial, outubro e novembro pagos',
+    [selo('2026-08'), selo('2026-09'), selo('2026-10'), selo('2026-11')].join(','), 'aberto,parcial,pago,pago');
   conf('(arranjo) nenhuma aula com texto', m.db.aulas.some(a => (a.notaTexto || '').trim() || (a.notaPrivada || '').trim()), false);
 }
 
 for (const escopo of ['todas', 'seguintes']) {
   const m = montar();
-  const origem = escopo === 'todas' ? m.dia('2026-12-03') : m.dia('2026-09-03');
+  const origem = escopo === 'todas' ? m.dia('2026-12-03') : m.dia('2026-08-06');
   const fora = Core.escopoDaRepeticao(m.db, origem, escopo, HOJE);
-  conf(escopo + ': ficam de fora por estarem pagas as 7 passadas de outubro e novembro', fora.pagas.length, 7);
+  conf(escopo + ': ficam de fora por pagamento as 11 passadas de setembro, outubro e novembro', fora.pagas.length, 11);
   conf(escopo + ': nenhuma de fora por texto', fora.comTexto.length, 0);
   Core.aplicarEdicaoAula(m.db, origem.id, { duracaoMin: 90 }, escopo, HOJE);
   conf(escopo + ': a passada e paga de outubro (08/10) fica com 60', m.dia('2026-10-08').duracaoMin, 60);
   conf(escopo + ': a passada e paga de novembro (12/11) fica com 60', m.dia('2026-11-12').duracaoMin, 60);
-  conf(escopo + ': a passada de setembro, paga a menos (10/09), vai a 90', m.dia('2026-09-10').duracaoMin, 90);
+  conf(escopo + ': a passada de setembro, paga a menos (10/09), fica com 60', m.dia('2026-09-10').duracaoMin, 60);
+  conf(escopo + ': a passada de agosto, sem pagamento (13/08), vai a 90', m.dia('2026-08-13').duracaoMin, 90);
   conf(escopo + ': a futura de novembro, mês pago (19/11), vai a 90', m.dia('2026-11-19').duracaoMin, 90);
   conf(escopo + ': a futura de dezembro (10/12) vai a 90', m.dia('2026-12-10').duracaoMin, 90);
 }
 
 for (const escopo of ['todas', 'seguintes']) {
   const m = montar();
-  const origem = escopo === 'todas' ? m.dia('2026-12-03') : m.dia('2026-09-03');
+  const origem = escopo === 'todas' ? m.dia('2026-12-03') : m.dia('2026-08-06');
   Core.excluirAulas(m.db, origem.id, escopo, HOJE);
   const existe = iso => m.db.aulas.some(a => a.data === iso);
   conf('excluir ' + escopo + ': a passada e paga de outubro (08/10) fica', existe('2026-10-08'), true);
   conf('excluir ' + escopo + ': a passada e paga de novembro (12/11) fica', existe('2026-11-12'), true);
-  conf('excluir ' + escopo + ': a passada de setembro, paga a menos (10/09), sai', existe('2026-09-10'), false);
+  conf('excluir ' + escopo + ': a passada de setembro, paga a menos (10/09), fica', existe('2026-09-10'), true);
+  conf('excluir ' + escopo + ': a passada de agosto, sem pagamento (13/08), sai', existe('2026-08-13'), false);
   conf('excluir ' + escopo + ': a futura de novembro, mês pago (19/11), sai', existe('2026-11-19'), false);
   conf('excluir ' + escopo + ': a futura de dezembro (10/12) sai', existe('2026-12-10'), false);
   // o pago continua pago: nada do que a família pagou sumiu do mês
@@ -132,26 +135,27 @@ for (const escopo of ['todas', 'seguintes']) {
   const m = montar();
   m.dia('2026-10-22').notaTexto = 'Revisão para a prova.';
   const fora = Core.escopoDaRepeticao(m.db, m.dia('2026-12-03'), 'todas', HOJE);
-  conf('a aula paga com relato conta uma vez, como com texto', [fora.comTexto.length, fora.pagas.length].join(','), '1,6');
+  conf('a aula paga com relato conta uma vez, como com texto', [fora.comTexto.length, fora.pagas.length].join(','), '1,10');
 }
 
 if (VENENO) {
   const ESPERADO = {
     '--envenenado-sem-regra-da-paga': {
       erra: ['todas: a passada e paga de outubro (08/10) fica com 60', 'excluir todas: a passada e paga de outubro (08/10) fica',
+        'todas: a passada de setembro, paga a menos (10/09), fica com 60', 'excluir seguintes: a passada de setembro, paga a menos (10/09), fica',
         'seguintes: a passada e paga de novembro (12/11) fica com 60', 'excluir seguintes: a passada e paga de novembro (12/11) fica'],
-      acerta: ['todas: a passada de setembro, paga a menos (10/09), vai a 90', 'excluir todas: a futura de dezembro (10/12) sai',
+      acerta: ['todas: a passada de agosto, sem pagamento (13/08), vai a 90', 'excluir todas: a futura de dezembro (10/12) sai',
         'todas: a futura de novembro, mês pago (19/11), vai a 90']
     },
     '--envenenado-protege-toda-passada': {
-      erra: ['todas: a passada de setembro, paga a menos (10/09), vai a 90', 'excluir todas: a passada de setembro, paga a menos (10/09), sai',
-        'seguintes: a passada de setembro, paga a menos (10/09), vai a 90'],
+      erra: ['todas: a passada de agosto, sem pagamento (13/08), vai a 90', 'excluir todas: a passada de agosto, sem pagamento (13/08), sai',
+        'seguintes: a passada de agosto, sem pagamento (13/08), vai a 90'],
       acerta: ['todas: a passada e paga de outubro (08/10) fica com 60', 'excluir todas: a passada e paga de outubro (08/10) fica',
         'todas: a futura de dezembro (10/12) vai a 90']
     },
     '--envenenado-protege-futura': {
       erra: ['todas: a futura de novembro, mês pago (19/11), vai a 90', 'excluir todas: a futura de novembro, mês pago (19/11), sai'],
-      acerta: ['todas: a passada e paga de outubro (08/10) fica com 60', 'todas: a passada de setembro, paga a menos (10/09), vai a 90',
+      acerta: ['todas: a passada e paga de outubro (08/10) fica com 60', 'todas: a passada de agosto, sem pagamento (13/08), vai a 90',
         'todas: a futura de dezembro (10/12) vai a 90']
     }
   }[VENENO];
