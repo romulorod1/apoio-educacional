@@ -73,7 +73,11 @@ async function escrever(pag, sel, texto) {
 /* Chega da nuvem uma versão da aula com `mudanca` (outro aparelho). A fila
  * de envio é esvaziada antes: a aula já tinha subido, senão a edição local
  * pendente venceria (regra do Store) e nada chegaria. */
-const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca) => {
+/* Cada chegada leva um carimbo do servidor mais novo que o anterior: o que
+ * chega com carimbo igual ao que o aparelho já conhece é ignorado (regra do Store). */
+let carimboDaChegada = 0;
+const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) => {
+  const carimbo = '2099-01-' + String(n).padStart(2, '0') + 'T00:00:00.000000Z';
   await new Promise((resolve, reject) => {
     const req = indexedDB.open('apoio-educacional');
     req.onsuccess = () => {
@@ -87,10 +91,10 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca) => {
   });
   const local = (await Store.lerRegistros()).find(r => r.id === 'aula:' + id);
   const dados = Object.assign({}, local.dados, mudanca);
-  const contas = await Store.aplicarRecebidos([{ id: local.id, tipo: 'aula', atualizadoEm: '2099-01-01T00:00:00.000Z', apagadoEm: null,
-    aparelho: 'ap000000000001', esquema: 1, servidorEm: '2099-01-01T00:00:00.000000Z', updateTime: '2099-01-01T00:00:00.000000Z', dados }]);
+  const contas = await Store.aplicarRecebidos([{ id: local.id, tipo: 'aula', atualizadoEm: carimbo.slice(0, 23) + 'Z', apagadoEm: null,
+    aparelho: 'ap000000000001', esquema: 1, servidorEm: carimbo, updateTime: carimbo, dados }]);
   return contas.aplicados;
-}, id, mudanca);
+}, id, mudanca, ++carimboDaChegada);
 
 (async () => {
   await amb.subir();
