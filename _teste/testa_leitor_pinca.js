@@ -31,11 +31,11 @@
  *      segura o ponto a menos de 24 px;
  *   6. os limites: a pinça que pede menos de 0,5 para em 0,5 e a que pede
  *      mais de 4 para em 4 (largura conferida em px);
- *   7. a posição gravada nas bordas do livro: na p. 1, com a rolagem presa
- *      no alto, uma pinça com os dedos na p. 2 deixa gravada a página do meio
- *      (a 1), e não a dos dedos; no fim do livro, com os dedos na página de
- *      cima da área, a gravada também é a do meio (ali a altura do livro muda
- *      e a rolagem dispara de qualquer jeito, então só a p. 1 pega o veneno);
+ *   7. a posição gravada nas bordas do livro, com o evento de rolagem
+ *      segurado e o leitor antes numa terceira página: no alto (leitor na
+ *      p. 3, rolagem em 0, a p. 1 no meio), uma pinça com os dedos na p. 2
+ *      grava a p. 1; no fim (leitor na p. 397, a p. 400 no meio), com os dedos
+ *      na p. 399, grava a p. 400;
  *   8. deitado (1280x800), o duplo toque dobra a largura, e uma pinça de 120
  *      a 180 px a partir dali (zoom 2 a 3, com o ponto médio andando 20 px)
  *      também segura o ponto sob os dedos a menos de 24 px;
@@ -44,13 +44,15 @@
  * Venenos:
  *   node _teste/testa_leitor_pinca.js --envenenado-gesto-grava-pela-ancora
  *     o app.js servido volta ao de antes: o gesto grava a página sob os
- *     dedos. Na p. 1, a rolagem fica presa no alto, nenhum evento de
- *     rolagem corrige, e a seção 7 TEM de ver a p. 2 gravada.
+ *     dedos. A seção 7 TEM de ver a p. 2 gravada no alto e a p. 399 no fim.
  *   node _teste/testa_leitor_pinca.js --envenenado-gesto-sem-ponto
  *     o app.js servido faz o zoom do gesto com a âncora do MEIO da tela, e
  *     não a do ponto dos dedos: a pinça fora do meio e o duplo toque têm de
  *     deixar o ponto longe do lugar dele, e a prova TEM de ver ("VENENO visto").
  *
+ *   --app-de <pasta>   serve o app.js e o styles.css dessa pasta (os da main,
+ *                      para os prints do antes); as verificações do gesto
+ *                      reprovam nesse modo, e é o esperado.
  *   --prints <pasta>   grava 4 prints para o painel cego: em pé antes e depois
  *                      da pinça, deitado antes e depois do duplo toque.
  */
@@ -78,6 +80,16 @@ const PYTHON = process.env.PYTHON || 'python';
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 const trocas = {};
 if (VENENO) trocas['/app.js'] = APP.split(VENENOS_GESTO[VENENO][0]).join(VENENOS_GESTO[VENENO][1]);
+/* --app-de <pasta>: serve o app.js e o styles.css dessa pasta (por exemplo os
+ * da main, tirados com git show), para os prints do ANTES no painel cego.
+ * Nesse modo as verificações do gesto reprovam, e é o esperado: a main não
+ * tem pinça. Só serve com --prints. */
+const iAppDe = process.argv.indexOf('--app-de');
+const APP_DE = iAppDe > 0 ? process.argv[iAppDe + 1] : null;
+if (APP_DE) {
+  trocas['/app.js'] = fs.readFileSync(path.join(APP_DE, 'app.js'), 'utf8');
+  trocas['/styles.css'] = fs.readFileSync(path.join(APP_DE, 'styles.css'), 'utf8');
+}
 
 const amb = H.criarAmbiente(PORTA, 'perfil_leitor_pinca', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'leitor_pinca_'));
@@ -451,7 +463,10 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
    *   - o evento de rolagem do leitor fica segurado durante a medida (fase de
    *     captura no documento), e quem grava é só o gesto;
    *   - antes do gesto, o leitor e a posição gravada estão numa página
-   *     DIFERENTE da do meio (Ir p. 2 e depois a rolagem ao alto, sem evento);
+   *     DIFERENTE da do meio E da dos dedos (Ir p. 3 e depois a rolagem ao
+   *     alto, sem evento; no fim, Ir p. 397). Assim o veneno grava de fato a
+   *     página dos dedos, e a prova acusa pelo VALOR ("gravou p. 2, esperava
+   *     p. 1"), e não só pela falta da gravação;
    *   - a prova espera uma gravação NOVA (o contador de concluídas sobe e não
    *     sobra nenhuma pendente). Sem ela no prazo, reprova com o nome, sem ler
    *     o valor velho. */
@@ -495,8 +510,8 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   s6 = await estadoDoLeitor();
   await pinca(s6.area.x + s6.area.w * 0.5, s6.area.y + s6.area.h * 0.5, 150, 180, 0, 0, 6);
   await depoisDoZoom('o zoom 0,6 na p. 1', s6.largura);
-  // ---- o alto do livro: o leitor na p. 2, a rolagem em 0 (a p. 1 no meio), os dedos na p. 2
-  const s7 = await prepararBorda('no alto', 2, 0);
+  // ---- o alto do livro: o leitor na p. 3, a rolagem em 0 (a p. 1 no meio), os dedos na p. 2
+  const s7 = await prepararBorda('no alto', 3, 0);
   const alto = await pag.evaluate(() => {
     const c = document.querySelector('#corpo-modal-leitor-pdf'), r = c.getBoundingClientRect();
     const p2 = document.querySelector('[data-pagina-arquivo="2"]').getBoundingClientRect();
@@ -513,11 +528,11 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   console.log('   no alto: a rolagem ficou em ' + Math.round(d7.scrollTop) + ' px, a p. ' + d7.meio + ' no meio, a gravação do gesto: ' + (pos7 === null ? 'nenhuma no prazo' : 'p. ' + pos7));
   conf('a pinça reduziu a página (a troca aconteceu)', d7.largura < s7.largura - 10, true);
   checa('perto da p. 1, o gesto gravou uma posição nova', pos7 !== null, true, 'gesto-grava-pela-ancora');
-  if (pos7 !== null) checa('e ela é a página do meio (a 1), e não a dos dedos', pos7 + '|' + d7.meio, '1|1', 'gesto-grava-pela-ancora');
+  if (pos7 !== null) checa('perto da p. 1, o gesto gravou a p. ' + pos7 + ', e esperava a página do meio, a p. 1 (a dos dedos é a 2)', pos7 + '|' + d7.meio, '1|1', 'gesto-grava-pela-ancora');
   checa('e o contador diz a página do meio', contaDiz(d7, d7.meio), true, 'gesto-grava-pela-ancora');
   await segurarRolagem(false);
-  // ---- o fim do livro: o leitor na p. 399, a rolagem no fim (a p. 400 no meio), os dedos na p. 399
-  const s8 = await prepararBorda('no fim', 399, 'fim');
+  // ---- o fim do livro: o leitor na p. 397, a rolagem no fim (a p. 400 no meio), os dedos na p. 399
+  const s8 = await prepararBorda('no fim', 397, 'fim');
   const cima = await pontoDoConteudo(s8.area.x + s8.area.w * 0.5, s8.area.y + 30);
   console.log('   no fim: a p. ' + s8.meio + ' no meio, a p. ' + (cima && cima.n) + ' no alto da área');
   conf('no fim, a p. 400 no meio e a p. 399 no alto da área, onde os dedos vão', s8.meio + '|' + (cima && cima.n), '400|399');
@@ -528,7 +543,7 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   const d8 = await estadoDoLeitor();
   console.log('   no fim: a p. ' + d8.meio + ' no meio, a gravação do gesto: ' + (pos8 === null ? 'nenhuma no prazo' : 'p. ' + pos8));
   checa('no fim do livro, o gesto gravou uma posição nova', pos8 !== null, true, 'gesto-grava-pela-ancora');
-  if (pos8 !== null) checa('e ela é a página do meio, e não a dos dedos', pos8 + '|' + (pos8 === d8.meio), '400|true', 'gesto-grava-pela-ancora');
+  if (pos8 !== null) checa('no fim, o gesto gravou a p. ' + pos8 + ', e esperava a página do meio, a p. 400 (a dos dedos é a 399)', pos8 + '|' + (pos8 === d8.meio), '400|true', 'gesto-grava-pela-ancora');
   checa('e o contador diz a página do meio', contaDiz(d8, d8.meio), true, 'gesto-grava-pela-ancora');
   await segurarRolagem(false);
   void antes7;
