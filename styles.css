@@ -2121,8 +2121,11 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-credito { font-size: var(--letra-12); color: var(--muted); overflow-wrap: anywhere; }
 /* a marca da resposta de duas IAs conferida: sempre à vista; tocar abre o porquê */
 .bib-marca-ia { font-size: var(--letra-12); color: var(--muted); margin-top: 6px; }
-.bib-marca-ia > summary { display: inline-flex; align-items: center; min-height: var(--alvo); cursor: pointer; color: var(--navy); font-weight: 600; }
+.bib-marca-ia > summary { display: inline-flex; align-items: center; gap: 4px; min-height: var(--alvo); cursor: pointer; color: var(--navy); font-weight: 600; list-style: none; }
+.bib-marca-ia > summary::-webkit-details-marker { display: none; }
+.bib-marca-ia[open] > summary .bib-grupo-seta { transform: rotate(90deg); }
 .bib-marca-ia-explica { margin: 0 0 6px; }
+.bib-sem-resposta { font-style: italic; color: var(--muted); }
 .bib-visor { background: var(--fio-claro); }
 .bib-cheia { width: 100%; height: auto; display: block; margin: 0 auto; background: var(--branco); box-shadow: var(--sombra); }
 /* o selo "Marcado" sobre a imagem da tela cheia: ela anda pelo Anterior e

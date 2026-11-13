@@ -4043,7 +4043,7 @@
    *   itens: [{ id, origem, credito (texto ou null), semSolucao,
    *             resposta (letra, só sem solução),
    *             gabaritoAgente (linhas prontas da resposta de duas IAs
-   *               conferida, só sem solução, ou null),
+   *               conferida, [{ texto, semResposta }], só sem solução, ou null),
    *             enunciado: Peca, solucao: Peca | null }]
    * }
    * Peca = { larguraPt, alturaPt, rotulo: [x0,y0,x1,y1] | null,
@@ -4213,9 +4213,11 @@
     function linhasDoAgente(linhas) {
       var x = MARG_E + 20, larg = UTIL - 20;
       linhas.forEach(function (l, k) {
-        doc.quebrar(l, larg, 10, true).forEach(function (q, j) {
+        // o subitem sem resposta conferida (parcial, de propósito) sai apagado
+        var estilo = l.semResposta ? { tam: 9.5, italic: true, cor: COR.muted } : { tam: 10, bold: true, cor: COR.navy };
+        doc.quebrar(l.texto, larg, estilo.tam, !!estilo.bold).forEach(function (q, j) {
           if (k || j) { doc.garanteEspaco(13); doc.y -= 13; }
-          doc.texto(q, x, doc.y, { tam: 10, bold: true, cor: COR.navy });
+          doc.texto(q, x, doc.y, estilo);
           anota('gabarito');
         });
       });

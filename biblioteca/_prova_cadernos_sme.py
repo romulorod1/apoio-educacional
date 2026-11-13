@@ -29,8 +29,15 @@ Travas proprias (cada uma le a pagina, e nao o detector):
   gabarito    o gabarito de fora (--gabarito-externo): so origem
               agente-conferido, so em item sem solucao, cada entrada no seu
               item, a contagem itens_com_gabarito_agente do manifest bate, e
-              o item sem entrada fica byte a byte como sem a opcao; origem
-              recusada, id desconhecido e item com solucao param o gerador
+              o item sem entrada fica byte a byte como sem a opcao; a
+              resposta parcial (subitem sem resposta conferida) conta em
+              itens_com_gabarito_agente_parcial; origem recusada, id
+              desconhecido ou que nao e texto, item com solucao, subitem que
+              o item nao tem, subitem null em item com subitens, " - " e
+              caractere que o PDF nao desenha param o gerador
+  desenho     as listas do Python do que o PDF desenha sao as do pdf.js
+  linha de comando  o --gabarito-externo chega ao gerador pelo principal(),
+              o json mal formado e recusado, e o --fonte livros o recusa
 e as genericas do Portal (determinismo, svg, xml, manifesto, tracos, PyMuPDF
 no manifest, curadoria, glifos e fidelidade no Chrome).
 """
@@ -521,10 +528,18 @@ def trava_gabarito(p, entradas=None, sem=None):
             erros.append('%s: respostas mal formadas: %r' % (iid, rs))
         if it['assets'].get('solucao') or not it.get('sem_solucao') or it.get('resposta') is not None:
             erros.append('%s: gabarito de fora num item que ja tem solucao ou resposta da fonte' % iid)
+        subs = it.get('subitens') or []
+        for r in rs or []:
+            if (r.get('subitem') not in subs) if subs else (r.get('subitem') is not None or len(rs) != 1):
+                erros.append('%s: resposta do subitem %r e o item tem os subitens %r' % (iid, r.get('subitem'), subs))
     c = p.manifest['contagens']
     if com and c.get('itens_com_gabarito_agente') != len(com):
         erros.append('manifest diz itens_com_gabarito_agente %r e o itens.json tem %d'
                      % (c.get('itens_com_gabarito_agente'), len(com)))
+    parciais = sum(1 for i in com if i.get('subitens') and len(i['gabarito'].get('respostas') or []) < len(i['subitens']))
+    if com and c.get('itens_com_gabarito_agente_parcial') != parciais:
+        erros.append('manifest diz itens_com_gabarito_agente_parcial %r e o itens.json tem %d parciais'
+                     % (c.get('itens_com_gabarito_agente_parcial'), parciais))
     if entradas is not None:
         esperado = {}
         for e in entradas:
@@ -547,6 +562,25 @@ def trava_gabarito(p, entradas=None, sem=None):
                 erros.append('%s: mudou alem do campo gabarito' % it['id'])
         if 'itens_com_gabarito_agente' in sem.manifest['contagens']:
             erros.append('sem --gabarito-externo, o manifest ganhou itens_com_gabarito_agente')
+    return erros
+
+
+def trava_desenho():
+    """As listas do que o PDF desenha (gerar_pacote) sao as do pdf.js."""
+    import gerar_pacote as gp
+    js = io.open(os.path.join(os.path.dirname(AQUI), 'pdf.js'), encoding='utf-8').read()
+    erros = []
+    m = re.search(r'var CP1252 = \{([^}]*)\}', js)
+    cp = {chr(int(h, 16)) for h in re.findall(r'0x([0-9A-F]{4}):', m.group(1))} if m else set()
+    m = re.search(r'var SIMBOLOS = \{([^}]*)\}', js)
+    sim = set(re.findall(r"'(.)':", m.group(1))) if m else set()
+    m = re.search(r'var WINANSI_VAZIO = \{([^}]*)\}', js)
+    vaz = {int(h, 16) for h in re.findall(r'0x([0-9A-F]{2}):', m.group(1))} if m else set()
+    for nome, py, dojs in (('CP1252', gp.PDF_CP1252, cp), ('SIMBOLOS', gp.PDF_SIMBOLOS, sim),
+                           ('WINANSI_VAZIO', gp.PDF_WINANSI_VAZIO, vaz)):
+        if not dojs or set(py) != dojs:
+            erros.append('%s do gerador difere do pdf.js: sobra %r, falta %r'
+                         % (nome, sorted(set(py) - dojs), sorted(dojs - set(py))))
     return erros
 
 
@@ -651,6 +685,12 @@ def amostra(temp, placar, navegador):
     pgab = pg.Pacote(g, pdfs)
     placar.conferir('cadernos: gabarito de fora no item e na contagem',
                     trava_gabarito(pgab, GABARITO_DA_AMOSTRA, sem=p))
+    c = pgab.manifest['contagens']
+    placar.conferir('cadernos: a amostra tem 2 itens com gabarito, 1 parcial (p007 so com 1 e 2 de 4)',
+                    [] if (c.get('itens_com_gabarito_agente'), c.get('itens_com_gabarito_agente_parcial')) == (2, 1)
+                    else ['contagens %r' % c])
+    placar.conferir('cadernos: listas do que o PDF desenha iguais as do pdf.js', trava_desenho())
+    linha_de_comando(temp, pdfs, vinc_c, cur, placar)
     travas(pgab, vinc, placar, zip_caminho=os.path.join(g + '_zip', 'matematica-cadernos-sme-sp-v1.zip'),
            rot=' (com gabarito)')
     venenos(temp, pdfs, vinc_c, vinc, cur, placar, p)
@@ -780,6 +820,29 @@ def venenos_do_gabarito(temp, pdfs, vinc_c, cur, placar, boa, sem):
     placar.conferir('gabarito de item desconhecido', [r] if r else [], True, 'nao e item')
     r = gera('subitem', [dict(GABARITO_DA_AMOSTRA[0], subitem='9')])
     placar.conferir('gabarito de subitem que o item nao tem', [r] if r else [], True, 'subitem')
+    # o item sem subitens (a questao da revisao) com a resposta de um subitem '7'
+    r = gera('subitem7', [dict(um, subitem='7')])
+    placar.conferir('gabarito de subitem num item sem subitens', [r] if r else [], True, 'nao tem subitens')
+    # subitem null num item com subitens: nao diz de qual e a resposta
+    r = gera('nulo', [dict(GABARITO_DA_AMOSTRA[0], subitem=None)])
+    placar.conferir('gabarito sem subitem num item com subitens', [r] if r else [], True, 'subitem null')
+    # id que nao e texto: recusa com frase, e nao TypeError
+    try:
+        r = gera('id_numero', [dict(um, id_item=['sme:3ano:p007'])])
+    except TypeError as e:
+        r = 'TypeError: %s' % e
+    placar.conferir('gabarito com id que nao e texto', [r] if r else [], True, 'nao e texto')
+    r = gera('desenho', [dict(um, resposta='raiz c\u00fabica \u221b8 = 2')])
+    placar.conferir('gabarito com caractere que o PDF nao desenha', [r] if r else [], True, 'U+221B')
+    r = gera('emoji', [dict(um, resposta='25 \U0001F600')])
+    placar.conferir('gabarito com emoji', [r] if r else [], True, 'nao desenha')
+    r = gera('hifen', [dict(um, resposta='25 - 3')])
+    placar.conferir('gabarito com " - "', [r] if r else [], True, '" - "')
+    r = gera('menos', [dict(um, resposta='\u22123')])
+    placar.conferir('gabarito com o sinal de menos U+2212', [r] if r else [], True, 'U+2212')
+    # e o que o PDF desenha passa: pi, raiz, acento, ordinal
+    r = gera('desenha', [dict(um, resposta='\u221a9 = 3; 2\u03c0 cm; 3\u00ba lugar; n\u00e3o')])
+    placar.conferir('gabarito com o que o PDF desenha passa', [r] if r else [])
     # a regra e do gerador, para toda fonte: item com solucao de verdade (o Portal) recusa
     com_sol = [{'id': 'x:1', 'sem_solucao': False, 'resposta': None, 'subitens': [],
                 'assets': {'enunciado': 'e.svg', 'solucao': 's.svg'}}]
@@ -792,6 +855,12 @@ def venenos_do_gabarito(temp, pdfs, vinc_c, cur, placar, boa, sem):
     q = pg.copia(boa, temp, 'vg_contagem')
     q.manifest['contagens']['itens_com_gabarito_agente'] = 1
     placar.conferir('contagem de gabarito errada', trava_gabarito(q), True, 'itens_com_gabarito_agente')
+    q = pg.copia(boa, temp, 'vg_parcial')
+    q.manifest['contagens']['itens_com_gabarito_agente_parcial'] = 0
+    placar.conferir('contagem de parciais errada', trava_gabarito(q), True, 'parcial')
+    q = pg.copia(boa, temp, 'vg_sub_fora')
+    next(i for i in q.itens if i['id'] == 'sme:3ano:p008:q1')['gabarito']['respostas'][0]['subitem'] = '7'
+    placar.conferir('resposta de subitem que o item nao tem no pacote', trava_gabarito(q), True, 'subitem')
     q = pg.copia(boa, temp, 'vg_sobra')
     next(i for i in q.itens if 'gabarito' not in i)['gabarito'] = {
         'origem': 'agente-conferido', 'respostas': [{'subitem': None, 'resposta': '3'}]}
@@ -799,6 +868,45 @@ def venenos_do_gabarito(temp, pdfs, vinc_c, cur, placar, boa, sem):
     q = pg.copia(boa, temp, 'vg_mexe')
     next(i for i in q.itens if 'gabarito' not in i)['tom'] = 'outro'
     placar.conferir('item sem entrada mudou', trava_gabarito(q, sem=sem), True, 'alem do campo')
+
+
+def linha_de_comando(temp, pdfs, vinc_c, cur, placar):
+    """O --gabarito-externo pelo principal() do gerador, como a linha de comando o chama."""
+    gp = cadernos_sme.gerar_pacote
+    arq = os.path.join(temp, 'gabarito.json')
+    with io.open(arq, 'w', encoding='utf-8') as f:
+        json.dump(GABARITO_DA_AMOSTRA, f, ensure_ascii=False)
+    torto = os.path.join(temp, 'gabarito_torto.json')
+    with io.open(torto, 'w', encoding='utf-8') as f:
+        f.write('{"id_item": "sme:3ano:p007"}')
+    quebrado = os.path.join(temp, 'gabarito_quebrado.json')
+    with io.open(quebrado, 'w', encoding='utf-8') as f:
+        f.write('[{"id_item": ')
+    placar.conferir('linha de comando: ler_gabarito_externo le a lista',
+                    [] if gp.ler_gabarito_externo(arq) == GABARITO_DA_AMOSTRA else ['leu outra coisa'])
+    r = recusa_do_gerador(lambda: gp.ler_gabarito_externo(torto))
+    placar.conferir('linha de comando: json que nao e lista', [r] if r else [], True, 'lista de entradas')
+    r = recusa_do_gerador(lambda: gp.ler_gabarito_externo(quebrado))
+    placar.conferir('linha de comando: json quebrado', [r] if r else [], True, 'nao consegui ler')
+    # a versao do PyMuPDF e conferida antes de tudo; aqui ela nao e o assunto
+    antes = gp.confere_versao_do_pymupdf
+    gp.confere_versao_do_pymupdf = lambda versao=None: None
+    try:
+        t = os.path.join(temp, 'cli')
+        gp.principal(['--fonte', 'cadernos-sme-sp', '--pdfs', pdfs, '--vinculos', vinc_c, '--curadoria', cur,
+                      '--versao', '1', '--saida', t + '_zip', '--trabalho', t, '--gerado-em',
+                      '2026-11-13T00:00:00-03:00', '--commit', 'amostra', '--sem-zip', '--gabarito-externo', arq])
+        q = pg.Pacote(t, pdfs)
+        placar.conferir('linha de comando: o --gabarito-externo chega ao pacote',
+                        trava_gabarito(q, GABARITO_DA_AMOSTRA) or
+                        ([] if q.manifest['contagens'].get('itens_com_gabarito_agente') == 2 else ['sem a contagem']))
+        r = recusa_do_gerador(lambda: gp.principal(['--fonte', 'livros', '--planilha', 'x.csv', '--rotulo', 'x',
+                                                    '--versao', '1', '--saida', os.path.join(temp, 'livros'),
+                                                    '--gabarito-externo', arq]))
+        placar.conferir('linha de comando: --fonte livros recusa o --gabarito-externo', [r] if r else [], True,
+                        'nao vale com --fonte livros')
+    finally:
+        gp.confere_versao_do_pymupdf = antes
 
 
 def principal():

@@ -2181,7 +2181,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
         contagens['kits'] = len(kits_gerados)
     if n_gabarito is not None:
         # so com --gabarito-externo: sem ele o manifest sai como saia antes
-        contagens['itens_com_gabarito_agente'] = n_gabarito
+        contagens['itens_com_gabarito_agente'], contagens['itens_com_gabarito_agente_parcial'] = n_gabarito
     manifest = {
         'esquema': 1, 'pacote': nome, 'versao': versao,
         'gerado_em': gerado_em or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).replace(microsecond=0).isoformat(),
@@ -2269,23 +2269,56 @@ def comparar_com_anterior(itens, caminho):
 # O resto do item fica como estava (sem_solucao true, assets.solucao null): o
 # aplicativo mostra a resposta com a marca "Resposta conferida por duas IAs",
 # e quem ler o pacote nunca confunde essa resposta com a solucao da fonte.
-# Item sem entrada fica exatamente como antes. Recusa, em vez de seguir calado:
-# origem fora da lista, id que nao e item do pacote, item que ja tem solucao
-# de verdade (ou a resposta oficial da fonte), subitem que o item nao tem,
-# resposta vazia, repetida ou com travessao.
+# Item sem entrada fica exatamente como antes.
+#
+# Item com subitens: toda entrada nomeia um subitem dele (subitem null e
+# recusado), e a resposta PARCIAL vale de proposito: o subitem em que as duas
+# IAs nao concordaram fica sem entrada, e o aplicativo o mostra como "sem
+# resposta conferida". Item sem subitens: uma entrada so, com subitem null.
+#
+# Recusa, em vez de seguir calado: origem fora da lista, id que nao e item do
+# pacote (ou nem e texto), item que ja tem solucao de verdade (ou a resposta
+# oficial da fonte), subitem que o item nao tem, resposta vazia, repetida, com
+# travessao, com " - " ou com caractere que o PDF nao desenha.
 ORIGENS_DE_GABARITO_EXTERNO = ('agente-conferido',)
+
+# O que o PDF sabe desenhar: a MESMA regra do caracteresQueNaoDesenha do
+# pdf.js (desenhavel/paraWinAnsi): a fonte de simbolo (SIMBOLOS), o WinAnsi
+# (Latin-1 mais os de CP1252) menos os bytes vazios (WINANSI_VAZIO). A prova
+# (_prova_cadernos_sme.py, trava desenho) le as tres listas do pdf.js e
+# confere que estas sao iguais.
+PDF_SIMBOLOS = frozenset('π√≥≤≠∞ΔΣαβθ')
+PDF_CP1252 = frozenset(map(chr, (
+    0x20AC, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152,
+    0x017D, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A,
+    0x0153, 0x017E, 0x0178)))
+PDF_WINANSI_VAZIO = frozenset((0x81, 0x8D, 0x8F, 0x90, 0x9D))
+
+
+def caracteres_que_o_pdf_nao_desenha(texto):
+    fora = []
+    for ch in texto:
+        c = ord(ch)
+        ok = ch in PDF_SIMBOLOS or ch in PDF_CP1252 or (c < 256 and c not in PDF_WINANSI_VAZIO)
+        if not ok and ch not in fora:
+            fora.append(ch)
+    return fora
 
 
 def ler_gabarito_externo(caminho):
-    with io.open(caminho, encoding='utf-8') as f:
-        dados = json.load(f)
+    try:
+        with io.open(caminho, encoding='utf-8') as f:
+            dados = json.load(f)
+    except (OSError, ValueError) as e:
+        raise SystemExit('erro: --gabarito-externo %s: nao consegui ler o json (%s)' % (caminho, e))
     if not isinstance(dados, list):
         raise SystemExit('erro: --gabarito-externo %s: o arquivo e uma lista de entradas' % caminho)
     return dados
 
 
 def aplicar_gabarito_externo(itens, entradas):
-    """Grava o campo `gabarito` nos itens que tem entrada; devolve quantos ganharam."""
+    """Grava o campo `gabarito` nos itens que tem entrada. Devolve (quantos
+    ganharam, quantos ficaram parciais: com subitem sem resposta conferida)."""
     por_id = {i['id']: i for i in itens}
     respostas = collections.OrderedDict()
     vistos, origens = set(), {}
@@ -2297,6 +2330,8 @@ def aplicar_gabarito_externo(itens, entradas):
         if sobra:
             raise SystemExit('erro: %s tem campos desconhecidos: %s' % (onde, ', '.join(sorted(sobra))))
         iid, sub, resp, origem = e.get('id_item'), e.get('subitem'), e.get('resposta'), e.get('origem')
+        if not isinstance(iid, str) or not iid:
+            raise SystemExit('erro: %s: id_item %r nao e texto' % (onde, iid))
         if origem not in ORIGENS_DE_GABARITO_EXTERNO:
             raise SystemExit('erro: %s (%s): origem %r recusada; so vale %s'
                              % (onde, iid, origem, ', '.join(ORIGENS_DE_GABARITO_EXTERNO)))
@@ -2308,28 +2343,36 @@ def aplicar_gabarito_externo(itens, entradas):
                              % (onde, iid))
         if it.get('resposta') is not None:
             raise SystemExit('erro: %s: %s ja tem a resposta oficial da fonte (%r)' % (onde, iid, it['resposta']))
-        if sub is not None:
-            if not isinstance(sub, str) or not sub.strip():
-                raise SystemExit('erro: %s (%s): subitem %r nao e texto' % (onde, iid, sub))
-            if it.get('subitens') and sub not in it['subitens']:
-                raise SystemExit('erro: %s: %s nao tem o subitem %r (tem %s)' % (onde, iid, sub, ', '.join(it['subitens'])))
+        subs = it.get('subitens') or []
+        if sub is None and subs:
+            raise SystemExit('erro: %s: %s tem os subitens %s, e a entrada nao diz qual (subitem null)'
+                             % (onde, iid, ', '.join(subs)))
+        if sub is not None and sub not in subs:
+            raise SystemExit('erro: %s: %s nao tem o subitem %r (%s)'
+                             % (onde, iid, sub, 'tem ' + ', '.join(subs) if subs else 'nao tem subitens'))
         if not isinstance(resp, str) or not resp.strip():
             raise SystemExit('erro: %s (%s): resposta vazia' % (onde, iid))
-        if '–' in resp or '—' in resp:
-            raise SystemExit('erro: %s (%s): resposta com travessao ou meia-risca: %r' % (onde, iid, resp))
+        resp = ' '.join(resp.split())
+        if '–' in resp or '—' in resp or ' - ' in resp:
+            raise SystemExit('erro: %s (%s): resposta com travessao, meia-risca ou " - ": %r' % (onde, iid, resp))
+        fora = caracteres_que_o_pdf_nao_desenha(resp)
+        if fora:
+            raise SystemExit('erro: %s (%s): resposta com caractere que o PDF nao desenha (%s): %r'
+                             % (onde, iid, ' '.join('U+%04X' % ord(c) for c in fora), resp))
         if (iid, sub) in vistos:
             raise SystemExit('erro: %s: %s, subitem %r, repetido' % (onde, iid, sub))
         vistos.add((iid, sub))
         if origens.setdefault(iid, origem) != origem:
             raise SystemExit('erro: %s: %s com duas origens (%s e %s)' % (onde, iid, origens[iid], origem))
-        respostas.setdefault(iid, []).append({'subitem': sub, 'resposta': ' '.join(resp.split())})
+        respostas.setdefault(iid, []).append({'subitem': sub, 'resposta': resp})
+    parciais = 0
     for iid, rs in respostas.items():
-        if len(rs) > 1 and any(r['subitem'] is None for r in rs):
-            raise SystemExit('erro: gabarito externo: %s mistura resposta sem subitem com resposta por subitem' % iid)
         ordem = por_id[iid].get('subitens') or []
         rs.sort(key=lambda r: ordem.index(r['subitem']) if r['subitem'] in ordem else len(ordem))
+        if ordem and len(rs) < len(ordem):
+            parciais += 1
         por_id[iid]['gabarito'] = {'origem': origens[iid], 'respostas': rs}
-    return len(respostas)
+    return len(respostas), parciais
 
 
 # A versao do PyMuPDF que gera os pacotes publicados (biblioteca/requirements-gerador.txt).

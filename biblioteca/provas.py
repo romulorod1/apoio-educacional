@@ -1326,7 +1326,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                  'itens': len(itens), 'itens_com_solucao': sum(1 for i in itens if i['assets']['solucao']),
                  'itens_excluidos': len(relatorio['excluidos'])}
     if n_gabarito is not None:
-        contagens['itens_com_gabarito_agente'] = n_gabarito
+        contagens['itens_com_gabarito_agente'], contagens['itens_com_gabarito_agente_parcial'] = n_gabarito
     manifest = {
         'esquema': 1, 'pacote': nome, 'versao': versao,
         'gerado_em': gerado_em or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).replace(microsecond=0).isoformat(),

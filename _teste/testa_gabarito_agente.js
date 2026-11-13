@@ -9,18 +9,24 @@
  * "Resposta conferida por duas IAs" vai SEMPRE junto; tocar nela diz o porquê.
  *
  * Usa um pacote SINTÉTICO (nenhum conteúdo real de caderno): o dos Cadernos do
- * _pacote_sintetico.js, com o campo `gabarito` escrito no PRIMEIRO item da
- * lista "Adição com reagrupamento" do 3º ano antes de montar o zip (o
- * importador o recebe como recebe qualquer campo aditivo). O SEGUNDO item da
- * mesma lista fica sem o campo.
+ * _pacote_sintetico.js, com o campo `gabarito` escrito antes de montar o zip
+ * (o importador o recebe como recebe qualquer campo aditivo):
+ *   com     o 1º item da lista "Adição com reagrupamento" do 3º ano, com os
+ *           subitens 1, 2 e 3 e resposta PARCIAL (o 2 sem resposta conferida,
+ *           de propósito: as duas IAs não concordaram);
+ *   sem     o 2º item da mesma lista, sem o campo;
+ *   unico   o 1º item de "Relógio e calendário", sem subitens e com a resposta
+ *           única ("Resposta: X").
  *
  * O que prova:
  *   visor   a tela cheia do item com gabarito: a marca à vista antes de abrir a
- *           resposta, o "Ver resposta", as respostas por subitem e a marca
- *           depois de abrir; tocar na marca mostra o porquê;
- *   pdf     o gabarito do material, com a caixa "origem" DESMARCADA: as
- *           respostas do 1 e a marca com o porquê, uma vez só; o 2 continua
- *           "Sem solução na fonte."; a lista não leva resposta nem marca;
+ *           resposta, o "Ver resposta", TODOS os subitens (o sem resposta
+ *           como "sem resposta conferida") e a marca depois de abrir; tocar
+ *           na marca mostra o porquê; o item de resposta única, "Resposta: X";
+ *   pdf     o gabarito do material, com a caixa "origem" DESMARCADA: os
+ *           subitens do 1, a resposta única do 3 e a marca com o porquê em
+ *           cada um; o 2 continua "Sem solução na fonte."; a lista não leva
+ *           resposta nem marca;
  *   o item sem `gabarito` não mostra nada novo (nem marca, nem botão de
  *   resposta), e nenhum erro de JavaScript.
  *
@@ -113,8 +119,12 @@ function pacoteComGabarito(saida) {
   const itens = JSON.parse(JSON.stringify(base.itens));
   const daLista = itens.filter(i => i.tema_app === 'MAT03-02');
   const com = daLista[0], sem = daLista[1];
+  com.subitens = ['1', '2', '3'];
   com.gabarito = { origem: 'agente-conferido', respostas: [
-    { subitem: '1', resposta: '38 figurinhas' }, { subitem: '2', resposta: '12 a mais que o Caio' }] };
+    { subitem: '1', resposta: '38 figurinhas' }, { subitem: '3', resposta: '12 a mais que o Caio' }] };
+  const unico = itens.filter(i => i.tema_app === 'MAT03-11')[0];
+  unico.subitens = [];
+  unico.gabarito = { origem: 'agente-conferido', respostas: [{ subitem: null, resposta: '25 minutos' }] };
   const json = o => Buffer.from(JSON.stringify(o, null, 1) + '\n', 'utf8');
   const sha = b => 'sha256:' + crypto.createHash('sha256').update(b).digest('hex');
   const arquivos = Object.assign({}, base.arquivos, { 'itens.json': { dados: json(itens), metodo: 8 } });
@@ -122,11 +132,12 @@ function pacoteComGabarito(saida) {
   const manifest = JSON.parse(JSON.stringify(base.manifest));
   manifest.arquivos = {};
   nomes.forEach(n => { manifest.arquivos[n] = sha(arquivos[n].dados); });
-  manifest.contagens.itens_com_gabarito_agente = 1;
+  manifest.contagens.itens_com_gabarito_agente = 2;
+  manifest.contagens.itens_com_gabarito_agente_parcial = 1;
   const zip = Sintetico.montarZip([{ nome: 'manifest.json', dados: json(manifest), metodo: 8 }]
     .concat(nomes.map(n => ({ nome: n, dados: arquivos[n].dados, metodo: arquivos[n].metodo }))));
   fs.writeFileSync(saida, zip);
-  return { com, sem };
+  return { com, sem, unico };
 }
 
 const amb = H.criarAmbiente(PORTA, 'perfil_gabarito_agente', trocas);
@@ -195,8 +206,10 @@ const lerVisor = pag => pag.evaluate(() => {
   return {
     marca: m ? m.querySelector('summary').textContent : null,
     marcaVisivel: !!m && m.getClientRects().length > 0,
+    seta: !!m && !!m.querySelector('summary .bib-grupo-seta svg') && m.querySelector('summary .bib-grupo-seta').getClientRects().length > 0,
     porqueVisivel: !!ex && ex.getClientRects().length > 0 ? ex.innerText.trim() : '',
     respostas: r ? Array.from(r.children).map(x => x.textContent) : null,
+    apagadas: r ? Array.from(r.children).filter(x => getComputedStyle(x).fontStyle === 'italic').map(x => x.textContent) : null,
     botao: b && b.style.display !== 'none' ? b.textContent : null,
     corpoTemIA: /IAs/.test(corpo ? corpo.innerText : '')
   };
@@ -213,9 +226,9 @@ const lerVisor = pag => pag.evaluate(() => {
     if (contagemDoVeneno !== 1) throw Object.assign(new Error('veneno não aplicado'), { jaContado: true });
   }
   const zc = path.join(TMP, 'cadernos-gabarito.zip');
-  const { com, sem } = pacoteComGabarito(zc);
+  const { com, sem, unico } = pacoteComGabarito(zc);
   conf('o primeiro item da lista tem gabarito agente-conferido e o segundo não', [!!com.gabarito, 'gabarito' in sem].join(','), 'true,false');
-  conf('os dois são sem solução', [com, sem].every(i => i.sem_solucao && !i.assets.solucao), true);
+  conf('os três são sem solução', [com, sem, unico].every(i => i.sem_solucao && !i.assets.solucao), true);
 
   await amb.subir();
   const pag = await amb.pagina();
@@ -243,12 +256,15 @@ const lerVisor = pag => pag.evaluate(() => {
   let v = await lerVisor(pag);
   deve('visor', 'antes de abrir a resposta, a marca já está à vista', v.marcaVisivel && v.marca, MARCA);
   conf('e o porquê fica fechado até tocar', v.porqueVisivel, '');
+  if (SUPERFICIE !== 'visor') conf('a marca tem a seta de quem abre ao toque', v.seta, true);
   conf('as respostas ainda não aparecem', v.respostas, null);
   conf('o botão diz "Ver resposta"', v.botao, 'Ver resposta');
   await pag.click('#bib-solucao');
   await pausa(150);
   v = await lerVisor(pag);
-  conf('depois do toque, as respostas por subitem', (v.respostas || []).join(' | '), '1) 38 figurinhas | 2) 12 a mais que o Caio');
+  conf('depois do toque, TODOS os subitens, o 2 sem resposta conferida', (v.respostas || []).join(' | '),
+    '1) 38 figurinhas | 2) sem resposta conferida | 3) 12 a mais que o Caio');
+  conf('e só o sem resposta sai apagado (itálico)', (v.apagadas || []).join(' | '), '2) sem resposta conferida');
   deve('visor', 'com as respostas abertas, a marca continua embaixo', v.marcaVisivel && v.marca, MARCA);
   conf('e o botão vira "Esconder a resposta"', v.botao, 'Esconder a resposta');
   if (SUPERFICIE !== 'visor') {
@@ -268,9 +284,23 @@ const lerVisor = pag => pag.evaluate(() => {
   await pag.click('#bib-fechar-visor');
   await pausa(200);
 
+  secao('2b. A tela cheia do item de resposta única (visor)');
+  await escolherSerie(pag, '3º ano');
+  await tocarLinha(pag, 'Relógio e calendário');
+  await tocarLinha(pag, 'Cadernos de Apoio e Aprendizagem, 3º ano');
+  await esperar('cartões de Relógio e calendário', () => pag.evaluate(i => !!document.querySelector('#bib-corpo .bib-cartao[data-id="' + i + '"]'), unico.id), v => v === true, 10000);
+  conf('abriu a tela cheia do item de resposta única', await abrirVisorDe(pag, unico.id), true);
+  deve('visor', 'a marca à vista no item de resposta única', (await lerVisor(pag)).marca, MARCA);
+  await pag.click('#bib-solucao');
+  await pausa(150);
+  v = await lerVisor(pag);
+  conf('a resposta única sai como "Resposta: X"', (v.respostas || []).join(' | '), 'Resposta: 25 minutos');
+  await pag.click('#bib-fechar-visor');
+  await pausa(200);
+
   // ================================================================
   secao('3. O gabarito do material em PDF, com a caixa "origem" desmarcada (pdf)');
-  await pag.evaluate(i => localStorage.setItem('apoio-educacional:bib-carrinho', JSON.stringify({ itens: i, paginas: [] })), [com.id, sem.id]);
+  await pag.evaluate(i => localStorage.setItem('apoio-educacional:bib-carrinho', JSON.stringify({ itens: i, paginas: [] })), [com.id, sem.id, unico.id]);
   await recarregar(pag);
   await esperar('seleção de volta', () => pag.evaluate(() => { const b = document.querySelector('#bib-carrinho-gerar'); return !!b && !b.disabled; }), v => v === true, 10000);
   await pag.click('#bib-carrinho-gerar');
@@ -292,16 +322,21 @@ const lerVisor = pag => pag.evaluate(() => {
   const lista = await ler('lista');
   const gabarito = await ler('gabarito');
   const g = gabarito.join(' ');
-  conf('o gabarito traz as respostas do 1, por subitem',
-    ['1) 38 figurinhas', '2) 12 a mais que o Caio'].filter(t => gabarito.indexOf(t) >= 0).length, 2);
-  deve('pdf', 'e a marca com o porquê, uma vez só (é um item com gabarito)',
-    g.split(MARCA + '. ' + PORQUE).length - 1, 1);
-  conf('a resposta vem antes da marca, depois do número 1',
-    gabarito.indexOf('1.') >= 0 && gabarito.indexOf('1.') < gabarito.indexOf('1) 38 figurinhas'), true);
-  conf('o 2 (sem gabarito) continua "Sem solução na fonte."', gabarito.indexOf('Sem solução na fonte.') > gabarito.indexOf('2) 12 a mais que o Caio'), true);
+  const pos = t => gabarito.indexOf(t);
+  conf('o gabarito traz TODOS os subitens do 1, na ordem, o 2 sem resposta conferida',
+    ['1.', '1) 38 figurinhas', '2) sem resposta conferida', '3) 12 a mais que o Caio'].map(pos)
+      .every((p, k, a) => p >= 0 && (!k || p > a[k - 1])), true);
+  conf('o 2 (sem gabarito) continua "Sem solução na fonte.", depois do 1',
+    pos('Sem solução na fonte.') > pos('3) 12 a mais que o Caio'), true);
   conf('só uma vez "Sem solução na fonte." (o do 2)', gabarito.filter(t => t === 'Sem solução na fonte.').length, 1);
-  conf('a lista não leva resposta nem marca', /IAs|38 figurinhas/.test(lista.join(' ')), false);
-  conf('a lista tem os dois exercícios', ['Exercício 1.', 'Exercício 2.'].filter(t => lista.indexOf(t) >= 0).length, 2);
+  conf('o 3 traz a resposta única "Resposta: 25 minutos", depois do 2',
+    pos('Resposta: 25 minutos') > pos('Sem solução na fonte.'), true);
+  deve('pdf', 'e a marca com o porquê, uma vez por item com gabarito (o 1 e o 3)',
+    g.split(MARCA + '. ' + PORQUE).length - 1, 2);
+  deve('pdf', 'a marca do 3 vem depois da resposta única dele',
+    g.lastIndexOf(MARCA) > g.indexOf('Resposta: 25 minutos'), true);
+  conf('a lista não leva resposta nem marca', /IAs|38 figurinhas|25 minutos|conferida/.test(lista.join(' ')), false);
+  conf('a lista tem os três exercícios', ['Exercício 1.', 'Exercício 2.', 'Exercício 3.'].filter(t => lista.indexOf(t) >= 0).length, 3);
   conf('nada de travessão nem " - " no gabarito', /[–—]| - /.test(g), false);
 
   if (pag.errosDePagina.length) console.log('   erros de página: ' + pag.errosDePagina.join(' | ').slice(0, 400));

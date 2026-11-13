@@ -23657,25 +23657,42 @@
    * Onde a resposta aparece (a tela cheia e o gabarito do PDF), a marca vai
    * SEMPRE junto, e nenhuma caixa a desliga: quem lê precisa saber que aquela
    * resposta não veio do livro. Item sem o campo, ou de outra origem, devolve
-   * null e fica exatamente como era. As linhas saem prontas para mostrar:
-   * "1) 38" por subitem, ou "Resposta: 38" quando a resposta é uma só. */
+   * null e fica exatamente como era. As linhas saem prontas para mostrar,
+   * como { texto, semResposta }: "1) 38" por subitem, ou "Resposta: 38"
+   * quando o item não tem subitens. A resposta PARCIAL é de propósito (o
+   * subitem em que as duas IAs não concordaram fica sem entrada): item com
+   * subitens lista TODOS, e o que não tem resposta sai "sem resposta
+   * conferida". */
   var MARCA_GABARITO_AGENTE = 'Resposta conferida por duas IAs';
   var EXPLICA_GABARITO_AGENTE = 'Este livro não traz gabarito. Duas IAs resolveram separadas e chegaram à mesma resposta.';
+  var SEM_RESPOSTA_CONFERIDA = 'sem resposta conferida';
   function respostasDoAgente(it) {
     var g = it && it.gabarito;
     if (!g || g.origem !== 'agente-conferido' || !Array.isArray(g.respostas)) return null;
     var limpo = function (v) { return typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : ''; };
     var rs = g.respostas.filter(function (r) { return r && limpo(r.resposta); });
     if (!rs.length) return null;
-    if (rs.length === 1 && !limpo(rs[0].subitem)) return ['Resposta: ' + limpo(rs[0].resposta)];
-    return rs.map(function (r) { return (limpo(r.subitem) ? limpo(r.subitem) + ') ' : '') + limpo(r.resposta); });
+    var subs = (Array.isArray(it.subitens) ? it.subitens : []).map(limpo).filter(Boolean);
+    if (subs.length) {
+      var de = {};
+      rs.forEach(function (r) { if (limpo(r.subitem)) de[limpo(r.subitem)] = limpo(r.resposta); });
+      return subs.map(function (s) {
+        return de[s] ? { texto: s + ') ' + de[s], semResposta: false }
+          : { texto: s + ') ' + SEM_RESPOSTA_CONFERIDA, semResposta: true };
+      });
+    }
+    if (rs.length === 1 && !limpo(rs[0].subitem)) return [{ texto: 'Resposta: ' + limpo(rs[0].resposta), semResposta: false }];
+    return rs.map(function (r) {
+      return { texto: (limpo(r.subitem) ? limpo(r.subitem) + ') ' : '') + limpo(r.resposta), semResposta: false };
+    });
   }
 
   /* A marca, que se toca para ler o porquê. Um <details>: sem script, e o
    * leitor de tela anuncia que abre. */
   function marcaDoAgente() {
     return el('details', { id: 'bib-marca-ia', class: 'bib-marca-ia u-texto-centro' }, [
-      el('summary', { texto: MARCA_GABARITO_AGENTE }),
+      el('summary', {}, [el('span', { class: 'bib-grupo-seta', 'aria-hidden': 'true' }, [icone('chr')]),
+        el('span', { texto: MARCA_GABARITO_AGENTE })]),
       el('p', { id: 'bib-marca-ia-explica', class: 'bib-marca-ia-explica', texto: EXPLICA_GABARITO_AGENTE })
     ]);
   }
@@ -25682,8 +25699,8 @@
      * "Ver resposta", e a marca embaixo SEMPRE, aberta ou não a resposta. */
     var doAgente = bibVendo.tipo === 'exercicio' ? respostasDoAgente(peca.item) : null;
     if (doAgente && bibVendo.solucao) {
-      corpo.appendChild(el('div', { id: 'bib-resposta-agente', class: 'bib-resposta u-texto-centro u-peso-negrito u-cor-navy u-margem-topo-10' },
-        doAgente.map(function (l) { return el('div', { texto: l }); })));
+      corpo.appendChild(el('div', { id: 'bib-resposta-agente', class: 'bib-resposta u-texto-centro u-margem-topo-10' },
+        doAgente.map(function (l) { return el('div', { class: l.semResposta ? 'bib-sem-resposta' : 'u-peso-negrito u-cor-navy', texto: l.texto }); })));
     }
     if (doAgente) corpo.appendChild(marcaDoAgente());
     var vez = ++bibVezDoVisor;
