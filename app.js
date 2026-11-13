@@ -4,7 +4,12 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.119';
+  /* VERSAO é gerada na publicação (13f, _teste/versao_publicada.js): o site
+   * recebe 1.43.N, em que N é o contador de publicações da main. Aqui fica
+   * FIXA no valor de desenvolvimento, que é o último escrito à mão e o piso da
+   * publicação. Não mude no PR: o merge_seguro recusa. O que ela ganha vai num
+   * arquivo novidades/<nome>.txt, e não no NOVIDADES abaixo. */
+  var VERSAO = '1.42.121';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -92,15 +97,11 @@
 
   /* O que mudou em cada versão, para ela não descobrir por acaso.
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
-   * ganha, e onde encontrar. */
+   * ganha, e onde encontrar.
+   * Desde o 13f esta lista é só o histórico: cada PR escreve as dele em
+   * novidades/<nome>.txt (uma linha por item), e a publicação as põe aqui na
+   * frente, com a versão gerada do commit que as trouxe. */
   var NOVIDADES = [
-    {
-      versao: 'F7-A-DEFINIR',
-      itens: [
-        'Na janela de uma aula que já existe, o relato e a nota só sua salvam sozinhos enquanto você escreve. Data, horário, duração, situação e cobrança gravam quando você fecha a aula ou toca em Concluir registro, com um aviso do que mudou e o Desfazer. "Descartar alterações" fecha sem gravar o que ainda não foi gravado e volta o relato e a nota ao que eram; o assunto e os arquivos ficam. Se a aula mudar em outro aparelho enquanto está aberta, nada é gravado por cima: o rodapé avisa e fechar pergunta antes.',
-        'Mudar ou excluir todas as aulas de uma repetição (ou desta em diante) não mexe nas aulas com relato ou nota, nem nas que já passaram num mês com pagamento registrado. O aviso diz quantas ficaram de fora e por quê.'
-      ]
-    },
     {
       versao: '1.42.119',
       itens: [
@@ -1394,13 +1395,17 @@
       return;
     }
 
-    /* Só mostra novidades da versão ATUAL (se houver anúncio formal para ela)
-     * e se a professora ainda não tiver visto essa versão. Notícias de versões
-     * intermediárias anteriores (como 1.18.0 de Português) nunca são requentadas
-     * como novidade da versão atual. Se a versão atual não tiver novidades
-     * cadastradas (lançamento silencioso), apenas atualiza versaoVista. */
+    /* Mostra as novidades de TODAS as versões depois da última que ela viu, até
+     * a atual, da mais nova para a mais antiga (13f). Até o 13f só entrava a da
+     * versão atual, e quem pulava uma publicação (o tablet ficou dias sem abrir,
+     * ou duas publicações saíram seguidas) perdia a novidade da pulada. Notícia
+     * de versão que ela já viu (como a 1.18.0 de Português para quem está na
+     * 1.27.0) continua de fora: só entra versão MAIOR que a versaoVista. Sem
+     * nenhuma novidade nesse intervalo (lançamento silencioso), apenas atualiza
+     * versaoVista. */
     var novas = NOVIDADES.filter(function (n) {
-      return n.versao === VERSAO && compararVersao(n.versao, vista) > 0;
+      return Core.versaoAntes(vista, n.versao) === true && Core.versaoAntes(VERSAO, n.versao) !== true &&
+        n.itens && n.itens.length > 0;
     });
     if (!novas.length) {
       db.ajustes.versaoVista = VERSAO;
