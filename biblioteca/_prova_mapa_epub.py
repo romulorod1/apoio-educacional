@@ -27,6 +27,9 @@ Livros:
   nav-lixo      nav com titulos lixo ("x", "1") e "sumario": "mapa": o mapa vence;
   nav-bom       nav bom, sem o campo: o sumario continua o do nav, e o mapa
                 de capitulos vale;
+  nav-proprio   nav bom e SEM mapa: sai igual, byte a byte, ao do gerador de
+                antes (e o nav-bom guarda o sumario do nav), com o controle
+                do outro lado: o sem-sumario muda;
   mapa-de-pdf   o mapa diz "formato": "pdf" (com o nome do .epub): o mapa
                 inteiro fica de fora, e a nota diz.
 
@@ -36,6 +39,8 @@ Venenos (cada um TEM de reprovar a trava, e a prova passa dizendo que viu):
   ancora perdida                a entrada sai sem a ancora;
   parte trocada                 a parte contada de 0 (uma a menos);
   ancora de outra parte aceita  a conferencia da ancora desligada;
+  mapa vencendo sempre         o mapa no lugar de um sumario proprio sem o
+                                campo "sumario": "mapa";
   mapa de PDF aplicado ao EPUB  a guarda do formato desligada e as paginas
                                 lidas como partes.
 Saida no dialeto do portao: "N verificacoes passaram, M falharam".
@@ -119,7 +124,7 @@ def capitulos_do_mapa(ids):
 
 
 def montar(pasta):
-    """Os quatro EPUBs, o mapa e a planilha em <pasta>/Livros. Devolve (planilha, mapas, ids)."""
+    """Os cinco EPUBs, o mapa e a planilha em <pasta>/Livros. Devolve (planilha, mapas, ids)."""
     base = os.path.join(pasta, 'Livros')
     catalogo = livros.ler_catalogo()
     ids = [x['id'] for x in catalogo['matematica']['assuntos'] if x.get('serie') == 'em1'][:2]
@@ -130,6 +135,9 @@ def montar(pasta):
     epub_sintetico(os.path.join(base, 'matematica', 'nav-bom.epub'),
                    [('Capa', 'capa.xhtml'), ('Começo', 'texto/p2.xhtml'), ('Meio', 'texto/p3.xhtml'), ('Fim', 'texto/p4.xhtml')])
     epub_sintetico(os.path.join(base, 'matematica', 'mapa-de-pdf.epub'), start)
+    # o EPUB com sumario proprio e SEM mapa: tem de sair igual ao do gerador de antes
+    epub_sintetico(os.path.join(base, 'matematica', 'nav-proprio.epub'),
+                   [('Capa', 'capa.xhtml'), ('Começo', 'texto/p2.xhtml'), ('Meio', 'texto/p3.xhtml#p8'), ('Fim', 'texto/p4.xhtml')])
     caps = capitulos_do_mapa(ids)
     mapa = [
         {'livro': 'ep1', 'arquivo': 'sem-sumario.epub', 'formato': 'epub', 'serie': 'em1', 'capitulos': caps},
@@ -143,7 +151,7 @@ def montar(pasta):
     with open(os.path.join(mapas, 'mapa_capitulos_prova_epub.json'), 'w', encoding='utf-8', newline='') as f:
         f.write(json.dumps(mapa, ensure_ascii=False, indent=1) + '\n')
     linhas = [amostra.linha('matematica', 'EPUB de prova %s' % n, 'matematica/%s.epub' % n, Segmento='Ensino médio')
-              for n in ('sem-sumario', 'nav-lixo', 'nav-bom', 'mapa-de-pdf')]
+              for n in ('sem-sumario', 'nav-lixo', 'nav-bom', 'mapa-de-pdf', 'nav-proprio')]
     planilha = os.path.join(base, 'livros_prova_epub.csv')
     with open(planilha, 'w', encoding='utf-8-sig', newline='') as f:
         w = csv.DictWriter(f, fieldnames=amostra.CABECALHO)
@@ -227,6 +235,27 @@ def trava_sumario_epub(manifest):
     return erros
 
 
+def trava_igual_ao_de_antes(novo, antes):
+    """O nav-proprio (sumario proprio, sem mapa) sai igual ao do gerador de antes, inteiro; o nav-bom
+    (sumario proprio, com mapa) guarda o sumario de antes; e o controle: o sem-sumario e o mapa do
+    nav-bom MUDAM (o comparador enxerga diferenca)."""
+    erros = []
+    n = {l['id']: l for l in novo['livros']}
+    a = {l['id']: l for l in antes['livros']}
+    sem = lambda l: json.dumps(l, ensure_ascii=False, sort_keys=True)
+    if sem(n.get('nav-proprio')) != sem(a.get('nav-proprio')):
+        erros.append('nav-proprio mudou: %r' % sorted(k for k in set(n['nav-proprio']) | set(a['nav-proprio'])
+                                                       if n['nav-proprio'].get(k) != a['nav-proprio'].get(k)))
+    for k in ('sumario', 'sumario_origem', 'sumario_nota'):
+        if n['nav-bom'].get(k) != a['nav-bom'].get(k):
+            erros.append('nav-bom: %s mudou' % k)
+    if n['nav-bom'].get('mapa') == a['nav-bom'].get('mapa'):
+        erros.append('controle: o mapa do nav-bom não mudou (o comparador não vê o mapa novo)')
+    if n['sem-sumario'].get('sumario') == a['sem-sumario'].get('sumario'):
+        erros.append('controle: o sumário do sem-sumario não mudou')
+    return erros
+
+
 def trava_pacote(manifest, zip_caminho, catalogo):
     """A forma que o aplicativo confere (manifesto, mapa dentro da espinha, sem travessao)."""
     with zipfile.ZipFile(zip_caminho) as z:
@@ -254,7 +283,7 @@ def rodar(placar):
         catalogo = livros.ler_catalogo()
         m, rel, _ = gerar(temp, planilha, mapas, 'p1')
         print('pacote de prova: %d livros, %d recusados' % (m['contagens']['livros'], len(rel['recusados'])))
-        placar.conferir('mapa de EPUB: os quatro livros no pacote', [] if m['contagens']['livros'] == 4 else [rel['recusados']])
+        placar.conferir('mapa de EPUB: os cinco livros no pacote', [] if m['contagens']['livros'] == 5 else [rel['recusados']])
         placar.conferir('mapa de EPUB: por parte e âncora, em ordem, com os assuntos e a nota das três entradas ruins',
                         trava_mapa_epub(m, ids))
         placar.conferir('mapa de EPUB: o sumário do mapa (sem sumário e com "sumario": "mapa"), o nav bom fica, o mapa de PDF não entra',
@@ -283,6 +312,15 @@ def rodar(placar):
                   'montar_mapa': lambda o: (lambda l, i, a, c: o(l, i, None if l['formato'] == 'epub' else a, c))}, 'v-ignorado')
         placar.conferir('o mapa ignorado no EPUB (o gerador de antes)', trava_mapa_epub(mv, ids), deve_reprovar=True)
         placar.conferir('o mapa ignorado no EPUB: o sumário também', trava_sumario_epub(mv), deve_reprovar=True)
+
+        # O EPUB com sumario proprio nao muda de comportamento: contra o gerador de antes (o mv acima), o
+        # livro sem mapa sai igual byte a byte e o nav-bom guarda o sumario do nav. O controle do outro
+        # lado: o comparador ve a diferenca onde ela tem de existir (o sem-sumario e o mapa do nav-bom).
+        placar.conferir('o EPUB com sumário próprio, contra o gerador de antes (controle: o sem-sumário muda)',
+                        trava_igual_ao_de_antes(m, mv))
+        mv2 = com({'ler_epub': lambda o: (lambda c, mapas=None: o(c, {k: (v[0], dict(v[1], sumario='mapa'))
+                                                                     for k, v in (mapas or {}).items()}))}, 'v-mapa-vence')
+        placar.conferir('o mapa vencendo sempre o sumário do EPUB', trava_igual_ao_de_antes(mv2, mv), deve_reprovar=True)
 
         # 2. a ancora perdida no caminho
         def sem_ancora(o):
