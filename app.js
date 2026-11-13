@@ -87,7 +87,7 @@
     {
       versao: '1.42.81',
       itens: [
-        'Ao escolher o assunto da aula, a lista diz para quem é e a data da última aula, e cada assunto mostra se há teoria no livro, exercícios e lista OBMEP, com a legenda uma vez no alto.'
+        'Ao escolher o assunto da aula, o alto da lista mostra o ano do aluno e a data da última aula dada, e cada assunto de Matemática mostra se a biblioteca tem teoria e exercícios dele, com a legenda uma vez no alto. No tablet deitado, a lista abre ao lado da aula, e o Voltar do aparelho fecha só a lista.'
       ]
     },
     {
@@ -1594,7 +1594,9 @@
     'modal-nuvem-senha': true,
     'modal-planejamento': true,
     'modal-sair-planejamento': true,
-    'modal-plan-print': true
+    'modal-plan-print': true,
+    // F5: o Voltar do aparelho fecha só o painel de assunto, e a aula atrás continua aberta
+    'modal-tema': true
   };
 
   function abrirModal(id) {
@@ -10353,7 +10355,10 @@
    * fechar a trilha continua atrás, do jeito que ela deixou. */
   function escolherTemaDeMatematica(aluno, titulo, aoEscolher, temTrilhaAtras) {
     $('#titulo-modal-tema').textContent = titulo;
+    // o painel lateral é do seletor da aula; o da trilha fica no modal de sempre
+    $('#modal-tema').classList.remove('seletor-da-aula');
     var corpo = $('#corpo-modal-tema');
+    corpo.classList.remove('seletor-assunto');
     var rodape = $('#rodape-modal-tema');
     corpo.innerHTML = '';
     rodape.innerHTML = '';
@@ -11846,6 +11851,8 @@
     var aluno = alunoPorId(aula.alunoId);
 
     $('#titulo-modal-tema').textContent = 'Assunto da aula' + (aluno ? ', ' + aluno.nome : '');
+    // no tablet deitado, o seletor da aula abre como painel à direita, com a aula atrás
+    $('#modal-tema').classList.add('seletor-da-aula');
     var corpo = $('#corpo-modal-tema');
     var rodape = $('#rodape-modal-tema');
     corpo.innerHTML = '';
@@ -12046,19 +12053,25 @@
     var rodape = $('#rodape-modal-tema');
     corpo.innerHTML = '';
     rodape.innerHTML = '';
+    /* O corpo em coluna, com a lista rolando sozinha, é SÓ deste seletor: o
+     * seletor de temas (desenharEscolhaTema, também o da trilha) usa o mesmo
+     * corpo e precisa da rolagem normal dele. */
+    corpo.classList.add('seletor-assunto');
 
     var anoDoAluno = aluno && Core.anoEscolarDe(aluno);
-    // a última aula que aconteceu antes desta (a cancelada não conta como aula dada)
+    // a última aula que aconteceu antes desta: cancelada e falta não contam como aula dada
     var chaveDaAula = function (a) { return a.data + ' ' + (a.hora || ''); };
     var aulaAnterior = db.aulas.filter(function (a) {
-      return a.alunoId === aula.alunoId && a.id !== aula.id && (a.status || 'realizada') !== 'cancelada' &&
+      var s = a.status || 'realizada';
+      return a.alunoId === aula.alunoId && a.id !== aula.id && s !== 'cancelada' && s !== 'falta' &&
         chaveDaAula(a) < chaveDaAula(aula);
     }).sort(function (a, b) { return chaveDaAula(b).localeCompare(chaveDaAula(a)); })[0];
-    corpo.appendChild(el('div', { class: 'tema-contexto', id: 'tema-contexto' }, [
-      el('strong', { texto: 'Para ' + (aluno ? aluno.nome : 'este aluno') }),
+    // o nome já está no título da janela ("Assunto da aula, Nome"): aqui, o ano e a última aula
+    var contexto = [
       anoDoAluno ? el('span', { class: 'tag', texto: nomeDoAno(anoDoAluno) }) : null,
       aulaAnterior ? el('span', { class: 'tema-ultima-aula', texto: 'Última aula: ' + Core.ddmm(aulaAnterior.data) }) : null
-    ].filter(Boolean)));
+    ].filter(Boolean);
+    if (contexto.length) corpo.appendChild(el('div', { class: 'tema-contexto', id: 'tema-contexto' }, contexto));
 
     var busca = '';
     var textoLivre = '';
@@ -12075,11 +12088,16 @@
       desenhar();
     });
     corpo.appendChild(el('div', { class: 'barra tema-busca' }, [campoBusca]));
-    corpo.appendChild(el('div', { class: 'tema-legenda', 'aria-label': 'Legenda dos materiais relacionados' }, [
-      el('span', {}, [icone('book'), document.createTextNode('Teoria')]),
-      el('span', {}, [icone('exerc'), document.createTextNode('Exercícios')]),
-      el('span', {}, [icone('medal'), document.createTextNode('OBMEP')])
-    ]));
+    /* Os sinais só existem nos assuntos de Matemática (onde a biblioteca tem
+     * módulos): a legenda só aparece quando há sinal na tela, para "apagado"
+     * nunca querer dizer "não se aplica". O sinal de OBMEP fica de fora até
+     * haver fonte confiável de listas por assunto (T2, fontesDoAssunto). */
+    var legenda = el('div', { class: 'tema-legenda', id: 'tema-legenda', 'aria-label': 'Legenda dos materiais relacionados' }, [
+      el('span', {}, [icone('book'), document.createTextNode('Teoria da biblioteca')]),
+      el('span', {}, [icone('exerc'), document.createTextNode('Exercícios')])
+    ]);
+    legenda.hidden = true;
+    corpo.appendChild(legenda);
 
     var lista = el('div', { id: 'lista-assuntos' });
     corpo.appendChild(lista);
@@ -12108,48 +12126,65 @@
       return item;
     }
 
+    var ROTULOS_SINAL = { teoria: 'teoria da biblioteca', exercicios: 'exercícios' };
+    function ehDeMatematica(assunto) {
+      return !!assunto && (!assunto.disciplina || assunto.disciplina === Core.MATERIA_PADRAO);
+    }
+
     function linhaComDisponibilidade(titulo, detalhe, assunto, aoTocar) {
       var item = linha(titulo, detalhe, aoTocar);
       item._assuntoDisponibilidade = assunto;
       item._detalheBase = detalhe;
-      var sinais = el('span', { class: 'tema-sinais', 'aria-label': 'Materiais relacionados' }, [
-        el('span', { class: 'tema-sinal', 'data-tipo-sinal': 'teoria', 'aria-label': 'Teoria no livro', role: 'img' }, [icone('book')]),
-        el('span', { class: 'tema-sinal', 'data-tipo-sinal': 'exercicios', 'aria-label': 'Exercícios', role: 'img' }, [icone('exerc')]),
-        el('span', { class: 'tema-sinal', 'data-tipo-sinal': 'obmep', 'aria-label': 'Lista OBMEP', role: 'img' }, [icone('medal')])
-      ]);
-      item.appendChild(sinais);
-      item._sinaisTema = sinais;
+      if (ehDeMatematica(assunto)) {
+        var sinais = el('span', { class: 'tema-sinais', 'aria-label': 'Materiais relacionados' }, [
+          el('span', { class: 'tema-sinal', 'data-tipo-sinal': 'teoria', 'aria-label': 'Sem ' + ROTULOS_SINAL.teoria, role: 'img' }, [icone('book')]),
+          el('span', { class: 'tema-sinal', 'data-tipo-sinal': 'exercicios', 'aria-label': 'Sem ' + ROTULOS_SINAL.exercicios, role: 'img' }, [icone('exerc')])
+        ]);
+        // escondidos até a biblioteca carregar: sinal apagado antes de saber seria mentira
+        sinais.hidden = true;
+        item.appendChild(sinais);
+        item._sinaisTema = sinais;
+      }
       return item;
     }
 
+    /* O módulo do assunto é procurado UMA vez por assunto a cada desenho (o
+     * memo zera no desenho seguinte): dele saem o resumo da linha e os sinais. */
+    var memoDisponibilidade = {};
     function disponibilidadeDoAssunto(assunto) {
-      var estado = { teoria: false, exercicios: false, obmep: false };
-      if (!bib || !assunto || assunto.disciplina && assunto.disciplina !== Core.MATERIA_PADRAO) return estado;
-      var achado = moduloDoAssunto(assunto);
-      var mod = achado && bib.modulos[achado.chave];
-      if (!mod) return estado;
-      estado.teoria = !!(mod.teorias && mod.teorias.length);
-      estado.exercicios = !!contarItens(mod);
-      estado.obmep = !!((bib.listasPorModulo && bib.listasPorModulo[mod.chave]) || []).some(function (l) {
-        return /obmep|olimp/i.test((l && (l.titulo || l.nome)) || '');
-      });
-      return estado;
+      var chave = (assunto && (assunto.id || '')) + '|' + (assunto && (assunto.titulo || ''));
+      if (Object.prototype.hasOwnProperty.call(memoDisponibilidade, chave)) return memoDisponibilidade[chave];
+      var r = { resumo: '', estado: { teoria: false, exercicios: false } };
+      if (bib && ehDeMatematica(assunto)) {
+        var achado = moduloDoAssunto(assunto);
+        var mod = achado && bib.modulos[achado.chave];
+        if (mod) {
+          r.resumo = resumoDisponibilidadeDoAssunto(assunto, mod);
+          r.estado.teoria = !!(mod.teorias && mod.teorias.length);
+          r.estado.exercicios = !!contarItens(mod);
+        }
+      }
+      memoDisponibilidade[chave] = r;
+      return r;
     }
 
     function atualizarDisponibilidadeVisivel() {
+      memoDisponibilidade = {};
       Array.prototype.forEach.call(lista.querySelectorAll('.item-assunto'), function (item) {
         if (!item._assuntoDisponibilidade) return;
+        var disp = disponibilidadeDoAssunto(item._assuntoDisponibilidade);
         var detalhe = item.querySelector('.detalhe');
-        if (!detalhe) return;
-        var disponivel = resumoDisponibilidadeDoAssunto(item._assuntoDisponibilidade);
-        detalhe.textContent = item._detalheBase + (disponivel ? ' · ' + disponivel : '');
-        var estado = disponibilidadeDoAssunto(item._assuntoDisponibilidade);
+        if (detalhe) detalhe.textContent = item._detalheBase + (disp.resumo ? ' · ' + disp.resumo : '');
+        if (!item._sinaisTema || !bib) return;
+        item._sinaisTema.hidden = false;
         Array.prototype.forEach.call(item._sinaisTema.querySelectorAll('[data-tipo-sinal]'), function (sinal) {
-          var ativo = !!estado[sinal.dataset.tipoSinal];
+          var tipo = sinal.dataset.tipoSinal;
+          var ativo = !!disp.estado[tipo];
           sinal.classList.toggle('disponivel', ativo);
-          sinal.setAttribute('aria-hidden', ativo ? 'false' : 'true');
+          sinal.setAttribute('aria-label', (ativo ? 'Tem ' : 'Sem ') + ROTULOS_SINAL[tipo]);
         });
       });
+      legenda.hidden = !lista.querySelector('.tema-sinais:not([hidden])');
     }
 
     function voltarPara(rotulo, titulo, aoTocar) {
@@ -12176,10 +12211,12 @@
       if (campoLivreAnterior) textoLivre = campoLivreAnterior.value;
       lista.innerHTML = '';
       var termo = busca.trim();
-      if (termo) { desenharBusca(termo); return; }
-      if (nivel.tipo === 'disciplina') { desenharDisciplina(nivel.d); return; }
-      if (nivel.tipo === 'grupo') { desenharGrupo(nivel.d, nivel.g); return; }
-      desenharRaiz();
+      if (termo) desenharBusca(termo);
+      else if (nivel.tipo === 'disciplina') desenharDisciplina(nivel.d);
+      else if (nivel.tipo === 'grupo') desenharGrupo(nivel.d, nivel.g);
+      else desenharRaiz();
+      // a legenda só com sinal na tela (a busca e a raiz podem não ter nenhum)
+      legenda.hidden = !lista.querySelector('.tema-sinais:not([hidden])');
     }
 
     function desenharRaiz() {
@@ -12212,7 +12249,7 @@
       // 2. Continuar trabalhando / Assuntos recentes deste aluno
       var recentes = sugestoesRecentesDeAssunto(aula, aluno);
       if (recentes.length) {
-        lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Sugestões para ' + (aluno ? aluno.nome : 'este aluno') }));
+        lista.appendChild(el('div', { class: 'bloco-exercicios', texto: 'Continuar de onde parou' }));
         recentes.forEach(function (s) {
           lista.appendChild(criarLinhaSugestao(s));
         });
@@ -12467,6 +12504,7 @@
     var rodape = $('#rodape-modal-tema');
     corpo.innerHTML = '';
     rodape.innerHTML = '';
+    corpo.classList.remove('seletor-assunto'); // a lista de temas rola com o corpo
 
     if (opcoes.voltar) {
       corpo.appendChild(el('div', { class: 'barra u-margem-baixo-8' }, [

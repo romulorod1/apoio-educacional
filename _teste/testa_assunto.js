@@ -34,6 +34,10 @@ const fs = require('fs');
 
 const CHROME = (process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe');
 const URL_APP = 'http://127.0.0.1:8777/index.html';
+/* Venenos do F5 (seletor de assunto), cada um tem de cair:
+ *   --envenenado-voltar-fecha-aula  o modal-tema fora do MODAIS_HISTORICO;
+ *   --envenenado-corpo-sem-escopo   a regra do corpo do seletor vale para a lista de temas. */
+const VENENO = ['--envenenado-voltar-fecha-aula', '--envenenado-corpo-sem-escopo'].filter(v => process.argv.indexOf(v) >= 0)[0] || '';
 
 /* ---- o assunto de outra matéria, tirado do banco ---- */
 const TOPICOS = JSON.parse(
@@ -75,6 +79,36 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     defaultViewport: { width: 1280, height: 1000, hasTouch: true }
   });
   const pag = await navegador.newPage();
+  /* Os venenos do F5: terminam a rodada logo depois da conferência que tem de cair. */
+  const terminarCedo = async () => {
+    await navegador.close();
+    console.log('\n' + passes + ' verificações passaram, ' + falhas + ' falharam.');
+    if (falhas) erros.forEach(e => console.log(' - ' + e));
+    process.exit(falhas ? 1 : 0);
+  };
+  if (VENENO === '--envenenado-voltar-fecha-aula') {
+    // serve o app.js sem o modal-tema no MODAIS_HISTORICO (o Voltar fechava a aula)
+    const appOriginal = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+    const appEnvenenado = appOriginal.replace(/\n\s*\/\/ F5: o Voltar do aparelho fecha só o painel[^\n]*\n\s*'modal-tema': true/, '');
+    conf('(veneno) o app.js servido perdeu o modal-tema do histórico', appEnvenenado !== appOriginal, true);
+    await pag.setRequestInterception(true);
+    pag.on('request', r => {
+      let caminho = '';
+      try { caminho = new URL(r.url()).pathname; } catch (e) { /* ok */ }
+      if (caminho.endsWith('/app.js')) r.respond({ status: 200, contentType: 'application/javascript; charset=utf-8', body: appEnvenenado });
+      else r.continue();
+    });
+  }
+  if (VENENO === '--envenenado-corpo-sem-escopo') {
+    // a regra do corpo do seletor de assunto sem o escopo (como na 6a5c61b)
+    await pag.evaluateOnNewDocument(() => {
+      document.addEventListener('DOMContentLoaded', () => {
+        const s = document.createElement('style');
+        s.textContent = '@media (min-width: 1100px) and (min-height: 700px) { #corpo-modal-tema { display: flex; flex-direction: column; min-height: 0; overflow: hidden; } }';
+        document.head.appendChild(s);
+      });
+    });
+  }
   await RELOGIO.naPagina(pag);
   const errosDePagina = [];
   pag.on('pageerror', e => errosDePagina.push(e.message));
@@ -320,18 +354,44 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('e ela diz de quem é a aula',
     await pag.$eval('#titulo-modal-tema', e => e.textContent),
     'Assunto da aula, ' + marcelo.nome);
-  const painelAssunto = await pag.evaluate(() => {
+  const painelAssunto = await pag.evaluate(nome => {
     const r = document.querySelector('#modal-tema .modal').getBoundingClientRect();
+    const legenda = document.querySelector('#corpo-modal-tema .tema-legenda');
+    const contexto = document.querySelector('#tema-contexto');
     return {
       lateral: Math.abs(r.right - innerWidth) < 1 && r.left > innerWidth - 460,
       altura: Math.abs(r.height - innerHeight) < 1,
       aulaVisivelAoFundo: document.querySelector('#modal-aula').classList.contains('aberto'),
-      contexto: document.querySelector('#tema-contexto').textContent.includes('Aluno Referência Teste'),
-      legenda: !!document.querySelector('#corpo-modal-tema .tema-legenda')
+      naoRepeteNome: !contexto || !contexto.textContent.includes(nome),
+      legendaCoerente: !!legenda && legenda.hidden === !document.querySelector('#lista-assuntos .tema-sinais:not([hidden])'),
+      legendaSemObmep: !!legenda && !/OBMEP/.test(legenda.textContent),
+      semSinalObmep: !document.querySelector('[data-tipo-sinal="obmep"]'),
+      sinaisSoEmMatematica: Array.from(document.querySelectorAll('#lista-assuntos .tema-sinais')).every(s => s.children.length === 2)
     };
-  });
+  }, marcelo.nome);
   conf('o seletor abre em painel lateral mantendo a aula atrás', painelAssunto.lateral && painelAssunto.altura && painelAssunto.aulaVisivelAoFundo, true);
-  conf('o seletor mostra o contexto do aluno e a legenda dos sinais', painelAssunto.contexto && painelAssunto.legenda, true);
+  conf('o contexto do seletor não repete o nome que já está no título', painelAssunto.naoRepeteNome, true);
+  conf('a legenda só aparece quando há sinal na tela, e sem OBMEP',
+    painelAssunto.legendaCoerente + '|' + painelAssunto.legendaSemObmep + '|' + painelAssunto.semSinalObmep + '|' + painelAssunto.sinaisSoEmMatematica, 'true|true|true|true');
+
+  /* F5 (revisão): o Voltar do aparelho fecha SÓ o painel de assunto; a aula
+   * atrás continua aberta. O veneno --envenenado-voltar-fecha-aula serve o
+   * app.js sem o modal-tema no MODAIS_HISTORICO, e a prova tem de cair. */
+  await pag.evaluate(() => history.back());
+  await espera(700);
+  const depoisDoVoltar = await pag.evaluate(() => ({
+    tema: document.querySelector('#modal-tema').classList.contains('aberto'),
+    aula: document.querySelector('#modal-aula').classList.contains('aberto')
+  }));
+  if (VENENO === '--envenenado-voltar-fecha-aula') {
+    conf('VENENO visto: o Voltar fecha só o painel e a aula fica, e quebrou', !depoisDoVoltar.tema && depoisDoVoltar.aula, false);
+    return terminarCedo();
+  }
+  conf('o Voltar do aparelho fecha só o painel de assunto, e a aula continua aberta',
+    depoisDoVoltar.tema + '|' + depoisDoVoltar.aula, 'false|true');
+  await tocarNaAula('Escolher o assunto da aula');
+  await espera(1800);
+  conf('o painel de assunto reabre depois do Voltar', await visivel('#modal-tema'), true);
 
   /* Regra do tablet: nada de foco automático. O teclado sobe por cima da lista
    * e ela perde de vista justamente o que veio escolher. */
@@ -362,6 +422,24 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await espera(1800);
   const quantosTemas = await pag.$$eval('#lista-temas .item-tema', e => e.length);
   conf('a lista de temas de matemática abriu', quantosTemas > 5, true);
+  /* F5 (revisão): a regra do corpo em coluna sem rolagem é só do seletor de
+   * assunto. A lista de temas (a mesma da trilha) usa o mesmo corpo e tem de
+   * rolar no tablet deitado. O veneno --envenenado-corpo-sem-escopo devolve a
+   * regra sem escopo, e a prova tem de cair. */
+  const rolagemDosTemas = await pag.evaluate(() => {
+    const c = document.querySelector('#corpo-modal-tema');
+    const antes = c.scrollTop;
+    c.scrollTop = antes + 300;
+    const r = { maior: c.scrollHeight > c.clientHeight + 1, rolou: c.scrollTop > antes, semEscopo: !c.classList.contains('seletor-assunto') };
+    c.scrollTop = antes;
+    return r;
+  });
+  if (VENENO === '--envenenado-corpo-sem-escopo') {
+    conf('VENENO visto: a lista de temas rola no tablet deitado, e quebrou', rolagemDosTemas.maior && rolagemDosTemas.rolou, false);
+    return terminarCedo();
+  }
+  conf('a lista de temas rola no tablet deitado (o corpo não herda a regra do seletor de assunto)',
+    rolagemDosTemas.maior + '|' + rolagemDosTemas.rolou + '|' + rolagemDosTemas.semEscopo, 'true|true|true');
 
   const tituloMat = await pag.$eval('#lista-temas .item-tema .nome',
     e => (e.firstChild ? e.firstChild.textContent : e.textContent).trim());

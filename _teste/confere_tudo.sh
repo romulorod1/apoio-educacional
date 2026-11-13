@@ -452,6 +452,11 @@ done
 # { relogioReal: true }; o veneno serve o helper sem o padrao e a virada tem de
 # abrir ("VENENO visto").
 roda "relogio padrao --envenenado-sem-padrao"   node "_teste/testa_relogio_padrao.js" --envenenado-sem-padrao
+# F5 (#158): o seletor de assunto da aula. O Voltar do aparelho fecha so o painel
+# (o veneno tira o modal-tema do historico) e a lista de temas, que usa o mesmo
+# corpo, rola no tablet deitado (o veneno devolve a regra do corpo sem escopo).
+roda "assunto --envenenado-voltar-fecha-aula"   node "_teste/testa_assunto.js" --envenenado-voltar-fecha-aula
+roda "assunto --envenenado-corpo-sem-escopo"    node "_teste/testa_assunto.js" --envenenado-corpo-sem-escopo
 # F6 (#157): a janela da aula com a grade antiga (cartoes de altura fixa, cada um
 # com rolagem propria, o "Escrever a mao" cortado). A prova de rolagem e da
 # primeira dobra tem de ve-la ("VENENO visto").
