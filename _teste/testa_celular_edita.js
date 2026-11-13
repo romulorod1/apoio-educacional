@@ -159,7 +159,13 @@ if (MODO === V_TODAS) comNuvemIgual(APP.replace(REMARCA, "comoAcaoDoCelular(func
   "Core.aplicarEdicaoAula(db, a.id, { data: v.data }, 'esta'); return salvar(); }).then(function () { diaCelular = v.data; desenharCelular(); });"));
 if (MODO === V_SOLTA) comNuvemIgual(APP.replace(REMARCA, 'comoAcaoDoCelular(function () { fecharFolhaCelular(); var n = novaAulaAvulsa({ alunoId: a.alunoId, data: v.data, hora: v.hora, ' +
   "duracaoMin: v.duracaoMin, status: a.status, cobravel: a.cobravel }); Core.excluirAulas(db, a.id, 'esta'); db.aulas.push(n); return salvar(); }).then(function () { diaCelular = v.data; desenharCelular(); });"));
-if (MODO === V_CHOQUE) comNuvemIgual(APP.replace(CHOQUE, '    return [];'));
+/* #191: os horários livres do celular saíram do app.js para o Core.horariosLivresDoDia
+ * (o assistente usa a mesma conta). O veneno do choque desliga as DUAS pontas: o aviso
+ * (app.js) e os livres (core.js), senão a prova dos livres deixa de ver o veneno. */
+const CORE = fs.readFileSync(path.join(H.RAIZ, 'core.js'), 'utf8');
+const CHOQUE_LIVRES = "      if (!conflitosComRepeticoes(db, { id: ignorarId || null, data: dataIso, hora: hora, duracaoMin: dur, status: 'realizada' }).length) livres.push(hora);";
+conf('(D6c) a conta de choque dos horários livres está num lugar só, no core', CORE.split(CHOQUE_LIVRES).length, 2);
+if (MODO === V_CHOQUE) { comNuvemIgual(APP.replace(CHOQUE, '    return [];')); trocas['/core.js'] = CORE.replace(CHOQUE_LIVRES, '      livres.push(hora);'); }
 if (MODO === V_DURACAO) comNuvemIgual(APP.replace(DURACAO, 'duracaoMin: 60 }, a.id, a.status,'));
 if (MODO === V_COBRANCA) comNuvemIgual(APP.replace(MESMA_SITUACAO, '    if (false) {'));
 /* (#168) As âncoras do Ajustar duração: a gravação só nesta aula e a duração atual na lista. */
