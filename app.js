@@ -2560,7 +2560,9 @@
   /* `aoDesfazer` (opcional, do assistente, fase 4a): roda quando ela toca no
    * Desfazer do aviso, para o cartão dizer que voltou. Os outros chamadores
    * não passam. */
-  function comDesfazer(rotulo, acao, aoDesfazer) {
+  /* `aoTerminar` (opcional, do assistente): recebe { ponto, gravou } quando a
+   * gravação termina, para o cartão só dizer "gravado" depois de gravar. */
+  function comDesfazer(rotulo, acao, aoDesfazer, aoTerminar) {
     var antes = JSON.parse(JSON.stringify(dbParaGravar()));
     /* A ação do celular da dona (D6b) grava depois, fora do toque: a permissão
      * é guardada aqui e vale para a gravação e para o Desfazer dela. */
@@ -2570,7 +2572,9 @@
     var texto = (typeof rotulo === 'function') ? rotulo() : rotulo;
     return Store.registrarHistorico(texto, antes).then(function () { return true; }, function () { return false; })
       .then(function (comPonto) {
+        var terminou = function (gravou) { if (aoTerminar) { try { aoTerminar({ ponto: comPonto, gravou: gravou }); } catch (e) { /* só o cartão */ } } };
         return gravar(salvar).then(function () {
+          terminou(true);
           if (!comPonto) { avisar(texto); return resultado; }
           avisar(texto, 'Desfazer', function () {
             db = antes;
@@ -2591,6 +2595,7 @@
           });
           return resultado;
         }, function () {
+          terminou(false);
           // o que aconteceu (e quantos passos da trilha voltaram) é dito do mesmo jeito; a faixa diz que falta guardar
           avisar(texto);
           return resultado;
@@ -15521,6 +15526,7 @@
               Store.desfazer(r.id).then(function (estado) {
                 if (!estado) return;
                 db = estado;
+                cartoesDoAssistenteVoltaram(r.quando);
                 var frase = memoriaSubstituida();
                 desenharTudo();
                 avisar('Estado restaurado.' + frase);
@@ -31240,7 +31246,11 @@
   var ICONE_DA_PROPOSTA = { remarcar: 'cal', mudar_duracao: 'clock', cancelar: 'x', falta: 'x', nao_cobrar: 'wallet', voltar_a_dada: 'undo',
     criar_aula: 'plus', criar_reposicao: 'repeat', relato: 'pencil', feedback: 'msg' };
   var FRASE_DO_ESTADO = {
+    gravando: 'Gravando...',
     feito: 'Gravado. O aviso de baixo traz o Desfazer por alguns segundos.',
+    semPonto: 'Gravado, mas sem o Desfazer: não deu para guardar o ponto de volta.',
+    pendente: 'Mudou neste aparelho, mas ainda não foi guardado. A faixa de cima avisa e tenta de novo.',
+    substituido: 'Trocado pelo cartão de baixo. Nada foi gravado por este.',
     desfeito: 'Desfeito: ficou como estava antes.',
     recusado: 'Nada foi gravado.',
     mudou: 'A agenda mudou desde a proposta, e nada foi gravado. Pergunte de novo.',
@@ -31261,21 +31271,34 @@
       botaoConfirmar.disabled = !r.ops || c.estado !== 'aberto';
       botaoConfirmar.textContent = !varias ? 'Confirmar' : marcadas === linhas.length ? 'Confirmar tudo' : 'Confirmar ' + marcadas + ' de ' + linhas.length;
       var dica = caixa.querySelector('.ass-falta-escolher');
-      if (dica) dica.hidden = r.falta !== 'cobranca';
+      var porque = { cobranca: 'Escolha a cobrança para confirmar.', nada: 'Marque ao menos uma aula para confirmar.', texto: 'Escreva o texto para confirmar.' }[r.falta];
+      if (dica) { dica.hidden = !porque; dica.textContent = porque || ''; }
+      if (porque) botaoConfirmar.setAttribute('aria-describedby', 'ass-dica-' + n); else botaoConfirmar.removeAttribute('aria-describedby');
     }
     /* A pergunta da cobrança: botões de uma escolha só (radio), cada um com
      * o nome que sai no PDF e o que acontece com o valor do mês. */
     function escolhas(opcoes, atual, aoEscolher, rotulo) {
       var grupo = el('div', { class: 'ass-opcoes', role: 'radiogroup', 'aria-label': rotulo });
-      opcoes.forEach(function (o) {
+      var focavel = opcoes.some(function (o) { return o.id === atual; }) ? atual : (opcoes[0] && opcoes[0].id);
+      opcoes.forEach(function (o, k) {
         var b = el('button', { type: 'button', class: 'ass-opcao' + (o.id === atual ? ' escolhida' : ''), role: 'radio', 'aria-checked': o.id === atual ? 'true' : 'false',
+          tabindex: o.id === focavel ? '0' : '-1',
           'data-opcao': o.id, disabled: aberto ? null : 'disabled' }, [el('span', { class: 'ass-opcao-nome', texto: o.rotulo }), el('span', { class: 'ass-opcao-dinheiro', texto: o.dinheiro })]);
+        /* As setas andam entre as opções e escolhem (o padrão do radiogroup). */
+        b.addEventListener('keydown', function (ev) {
+          var passo = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[ev.key];
+          if (!passo) return;
+          ev.preventDefault();
+          var todos = grupo.querySelectorAll('.ass-opcao');
+          var alvo = todos[(k + passo + todos.length) % todos.length];
+          if (alvo) { alvo.focus(); alvo.click(); }
+        });
         b.addEventListener('click', function () {
           if (c.estado !== 'aberto') return;
           aoEscolher(o.id);
           Array.prototype.forEach.call(grupo.querySelectorAll('.ass-opcao'), function (x) {
             var sim = x.getAttribute('data-opcao') === o.id;
-            x.classList.toggle('escolhida', sim); x.setAttribute('aria-checked', sim ? 'true' : 'false');
+            x.classList.toggle('escolhida', sim); x.setAttribute('aria-checked', sim ? 'true' : 'false'); x.setAttribute('tabindex', sim ? '0' : '-1');
           });
           atualizar();
         });
@@ -31376,10 +31399,10 @@
       caixa.appendChild(bloco);
     });
     if (aberto || c.estado === 'gravando') {
-      if (comPergunta.length) caixa.appendChild(el('p', { class: 'ajuda u-margem-0 ass-falta-escolher', texto: 'Escolha a cobrança para confirmar.' }));
+      caixa.appendChild(el('p', { class: 'ajuda u-margem-0 ass-falta-escolher', id: 'ass-dica-' + n }));
       var oQue = linhas.map(function (l) { return l.titulo; }).join('; ');
       botaoConfirmar = botaoDeAcaoCelular('assistente-confirmar', { class: 'btn principal', id: 'ass-confirmar-' + n, texto: 'Confirmar', 'aria-label': 'Confirmar e gravar: ' + oQue,
-        aoClick: function (ev) { confirmarProposta(h, ev.currentTarget); } });
+        aoClick: function (ev) { if (!rodapeLivre(fluxoAssistente)) return; confirmarProposta(h, ev.currentTarget); } });
       caixa.appendChild(el('div', { class: 'ass-cartao-botoes ass-confirmar' }, [
         el('button', { type: 'button', class: 'btn', id: 'ass-agora-nao-' + n, texto: 'Agora não', 'aria-label': 'Agora não: nada é gravado', aoClick: function () {
           if (c.estado !== 'aberto') return;
@@ -31390,11 +31413,22 @@
       atualizar();
       if (c.estado === 'gravando') botaoConfirmar.disabled = true;
     } else {
-      var ruim = c.estado === 'mudou' || c.estado === 'erro';
-      caixa.appendChild(el('p', { class: 'ass-estado' + (ruim ? ' ass-estado-erro' : ''), role: ruim ? 'alert' : 'status' },
-        [icone(ruim ? 'alerta' : c.estado === 'feito' ? 'check' : c.estado === 'desfeito' ? 'undo' : 'x', '', 'ass-cartao-ico'), el('span', { texto: FRASE_DO_ESTADO[c.estado] || '' })]));
+      var ruim = c.estado === 'mudou' || c.estado === 'erro' || c.estado === 'pendente';
+      var mudouAgora = c.estadoAnunciado !== c.estado;
+      c.estadoAnunciado = c.estado;
+      caixa.appendChild(el('p', { class: 'ass-estado' + (ruim ? ' ass-estado-erro' : ''), role: ruim && mudouAgora ? 'alert' : null },
+        [icone(ruim ? 'alerta' : c.estado === 'feito' || c.estado === 'semPonto' ? 'check' : c.estado === 'desfeito' ? 'undo' : 'x', '', 'ass-cartao-ico'), el('span', { texto: FRASE_DO_ESTADO[c.estado] || '' })]));
     }
+    /* Olho fechado: todo valor em reais do cartão vira a máscara, de um
+     * jeito só (o mesmo do resto do app). */
+    if (valoresOcultos) mascararValores(caixa);
     return caixa;
+  }
+  function mascararValores(raiz) {
+    var andar = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT, null), no;
+    var nos = [];
+    while ((no = andar.nextNode())) nos.push(no);
+    nos.forEach(function (t) { if (/R\$\s?[\d.]+,\d{2}/.test(t.nodeValue)) t.nodeValue = t.nodeValue.replace(/R\$\s?[\d.]+,\d{2}/g, MASCARA); });
   }
 
   /* O que o aviso diz depois de gravar. */
@@ -31456,7 +31490,12 @@
     var fazer = function () {
       return comDesfazer(function () { return frase + textoDeTrilha(somaDasTrilhas(trilhas)); }, function () {
         trilhas = Assistente.aplicarPlano(db, r.ops, Core, funcoesDaTela());
-      }, function () { c.estado = 'desfeito'; });
+      }, function () { c.estado = 'desfeito'; if (fluxoAssistente) desenharAssistente(); }, function (fim) {
+        c.estado = !fim.gravou ? 'pendente' : fim.ponto ? 'feito' : 'semPonto';
+        c.pontoEm = Date.now();
+        if (fluxoAssistente && $('#modal-assistente.aberto')) desenharAssistente();
+        anunciar(FRASE_DO_ESTADO[c.estado]);
+      });
     };
     var p;
     try {
@@ -31478,15 +31517,25 @@
       anunciar(FRASE_DO_ESTADO.erro);
       return;
     }
-    c.estado = 'feito';
+    // "gravando" até o comDesfazer terminar (aoTerminar diz como foi)
     desenharAssistente();
     // a agenda por baixo mostra a mudança (a janela do assistente fica aberta)
     p.then(desenharTudo, desenharTudo);
   }
 
+  /* A volta a um ponto antigo pelo Ajustes desfaz também os cartões gravados
+   * a partir dali: o cartão e o que vai ao modelo dizem isso. */
+  function cartoesDoAssistenteVoltaram(quando) {
+    historicoAssistente.forEach(function (x) {
+      var c = x.proposta;
+      if (c && (c.estado === 'feito' || c.estado === 'semPonto' || c.estado === 'pendente') && c.pontoEm >= quando) c.estado = 'desfeito';
+    });
+  }
+
   /* Para a próxima pergunta: o que aconteceu com os cartões desta sessão. */
   function cartoesAnterioresDoAssistente() {
-    var estado = { aberto: 'ainda aberto, não confirmado', gravando: 'gravado', feito: 'confirmado e gravado', desfeito: 'gravado e desfeito por ela',
+    var estado = { aberto: 'ainda aberto, não confirmado', gravando: 'gravando', feito: 'confirmado e gravado', desfeito: 'gravado e desfeito por ela',
+      semPonto: 'confirmado e gravado, sem Desfazer', pendente: 'confirmado, ainda não guardado', substituido: 'trocado por um cartão novo; nada gravado',
       recusado: 'ela tocou em Agora não; nada gravado', mudou: 'não gravado (a agenda mudou)', erro: 'não gravado' };
     return historicoAssistente.filter(function (x) { return x.proposta; }).slice(-3).map(function (x) {
       return x.proposta.linhas.map(function (l) { return l.titulo; }).join('; ') + ': ' + (estado[x.proposta.estado] || x.proposta.estado);
@@ -31580,7 +31629,8 @@
     var campo = el('textarea', { id: 'ass-texto', class: 'ass-texto' + (f.erro ? ' ass-texto-curto' : ''), rows: f.erro ? '1' : '2', maxlength: '600', 'aria-label': 'Sua pergunta',
       placeholder: temDitado() ? 'Pergunte ou toque em Ditar' : 'Escreva sua pergunta' });
     campo.value = f.texto || '';
-    var perguntar = el('button', { type: 'button', class: 'btn principal', id: 'ass-perguntar', texto: 'Perguntar',
+    var temCartaoAberto = historicoAssistente.some(function (x) { return x.proposta && x.proposta.estado === 'aberto'; });
+    var perguntar = el('button', { type: 'button', class: temCartaoAberto ? 'btn' : 'btn principal', id: 'ass-perguntar', texto: 'Perguntar',
       disabled: f.pedindo || !campo.value.trim() || semInternet ? 'disabled' : null, aoClick: function () { if (rodapeLivre(f)) perguntarAoAssistente(campo.value); } });
     campo.addEventListener('input', function () {
       if (!campo.isConnected || f.pedindo || fluxoAssistente !== f) return;
@@ -31682,6 +31732,8 @@
       /* A proposta vira o cartão de confirmação: aberto até ela tocar em
        * Confirmar ou em Agora não. Nada gravou até aqui. */
       var proposta = r.proposta ? Object.assign(r.proposta, { estado: 'aberto', semLinha: {}, escolha: {}, escolhaDoConjunto: null, edicao: {} }) : null;
+      /* Só o último cartão confirma: os abertos de antes viram "trocado". */
+      if (proposta) Assistente.substituirCartoesAbertos(historicoAssistente);
       historicoAssistente.push({ pergunta: pergunta, texto: r.texto, cartoes: r.cartoes, entendido: r.entendido.filter(function (t) {
         return !proposta || !proposta.linhas.some(function (l) { return l.entendido === t; });
       }), recomecou: r.recomecou, proposta: proposta });

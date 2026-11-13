@@ -104,7 +104,9 @@ async function perguntar(pag, frase, roteiro) {
   await pag.evaluate(f => { const c = document.querySelector('#ass-texto'); c.value = f; c.dispatchEvent(new Event('input', { bubbles: true })); }, frase);
   await clicar(pag, '#ass-perguntar');
   await esperar('a resposta chegou', () => pag.evaluate(() => !document.querySelector('#ass-esperando')), v => v === true, 15000);
+  await pausa(450); // a trava de 400 ms do rodapé, que agora vale também para o Confirmar
 }
+const estadoDoCartao = (pag, sel) => pag.evaluate(s => { const c = document.querySelector(s); return c && c.getAttribute('data-estado'); }, sel || '.ass-vez:last-child .ass-proposta');
 const banco = pag => pag.evaluate(() => Promise.all([Store.carregar(), Store.lerRegistros()]).then(r => JSON.stringify(r[0]) + '|' + JSON.stringify(r[1])));
 const soBanco = pag => pag.evaluate(() => Store.carregar().then(b => JSON.stringify(b)));
 const semIdsNovos = s => { const d = JSON.parse(s); d.aulas.forEach(a => { if (!/^(s1@|b\d)/.test(a.id)) a.id = 'NOVA'; }); return JSON.stringify(d); };
@@ -217,6 +219,7 @@ async function transbordo(pag, raizSel) {
   conf('a pergunta seguinte conta ao modelo que ela tocou em Agora não', /Cartões anteriores: Remarcar Zélia[^|]*Agora não/.test(JSON.stringify(falso.pedidos[0].messages.filter(m => m.role === 'user').slice(-1))), true);
   await clicar(pag, ultimoCartao + ' [id^="ass-confirmar-"]');
   await esperar('gravou', () => soBanco(pag), v => v !== antesSo, 10000);
+  await esperar('o cartão diz feito (só depois de gravar)', () => estadoDoCartao(pag, ultimoCartao), v => v === 'feito', 10000);
   const depoisRemarcar = await soBanco(pag);
   const esperado = await pag.evaluate(s => { const d = JSON.parse(s); Core.aplicarEdicaoAula(d, 's1@2026-11-19', { data: '2026-11-19', hora: '17:30', duracaoMin: 60 }, 'esta'); return JSON.stringify(d); }, antesSo);
   conf('o Confirmar gravou exatamente o Remarcar da tela (Core.aplicarEdicaoAula só nesta aula)', depoisRemarcar === esperado, true);
@@ -236,13 +239,37 @@ async function transbordo(pag, raizSel) {
   // ================================================================
   secao('2. Toque duplo em Confirmar grava uma vez só');
   const criar = ferramentas([['propor_aulas', { itens: [item({ acao: 'criar_aula', alunoId: 'al2', nome_dito: 'Bruno', data: '2026-11-21', hora: '10:00' })] }]]);
+  /* A trava de 400 ms (lente do #213, 5): o toque no Confirmar logo depois
+   * de a resposta chegar não grava; passado o tempo, grava. */
+  falso.fila = [criar, texto('Confira.')]; falso.pedidos = [];
+  const antesTrava = await soBanco(pag);
+  await pag.evaluate(() => { const c = document.querySelector('#ass-texto'); c.value = 'marca aula'; c.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#ass-perguntar').click(); });
+  await esperar('a resposta chegou', () => pag.evaluate(() => !document.querySelector('#ass-esperando') && !!document.querySelector('.ass-vez:last-child .ass-proposta [id^="ass-confirmar-"]')), v => v === true, 15000);
+  await pag.evaluate(s => document.querySelector(s + ' [id^="ass-confirmar-"]').click(), ultimoCartao);
+  await pausa(300);
+  conf('5: o Confirmar tocado nos primeiros 400 ms depois da resposta não grava', [await estadoDoCartao(pag, ultimoCartao), (await soBanco(pag)) === antesTrava], ['aberto', true]);
+  conf('9: com o cartão aberto, o Perguntar fica secundário (o principal é o Confirmar)', await pag.evaluate(() => document.querySelector('#ass-perguntar').classList.contains('principal')), false);
+  /* O cartão trocado (lente do #213, 4): o pedido seguinte traz um cartão
+   * novo, e o de antes perde os botões. */
+  const nAntes = await pag.evaluate(() => document.querySelectorAll('.ass-proposta').length);
+  await perguntar(pag, 'não, às 11:00', [ferramentas([['propor_aulas', { itens: [item({ acao: 'criar_aula', alunoId: 'al2', nome_dito: 'Bruno', data: '2026-11-21', hora: '11:00' })] }]]), texto('Confira.')]);
+  conf('4: o cartão de antes virou "trocado", sem Confirmar, e só o novo confirma', await pag.evaluate(n => { const cs = document.querySelectorAll('.ass-proposta'); const velho = cs[n - 1];
+    return [velho.getAttribute('data-estado'), !!velho.querySelector('[id^="ass-confirmar-"]'), Array.from(cs).filter(c => c.querySelector('[id^="ass-confirmar-"]')).length]; }, nAntes), ['substituido', false, 1]);
+  await clicar(pag, ultimoCartao + ' [id^="ass-agora-nao-"]');
   await perguntar(pag, 'marca uma aula com o Bruno sábado às 10h', [criar, texto('Confira e toque em Confirmar.')]);
   conf('o cartão da aula nova, com o dinheiro do core', await pag.evaluate(s => [document.querySelector(s + ' .ass-linha-titulo').textContent, document.querySelector(s + ' .ass-dinheiro').textContent], ultimoCartao),
     ['Marcar aula de Bruno, sáb 21/11, 10:00 (1h)', 'O valor de novembro aumenta R$ 150,00.']);
+  /* O que só a trava segura (lente do #213, 7): sem ela, o segundo toque
+   * chega à reconferência, que acha a aula recém-criada e anuncia "a agenda
+   * mudou". Contam os anúncios da região viva e as aulas criadas. */
+  await pag.evaluate(() => { window.__anuncios = []; const r = document.querySelector('#plan-anuncio');
+    new MutationObserver(() => { if (r.textContent) window.__anuncios.push(r.textContent); }).observe(r, { childList: true, characterData: true, subtree: true }); });
   await pag.evaluate(s => { const b = document.querySelector(s + ' [id^="ass-confirmar-"]'); b.click(); b.click(); }, ultimoCartao);
   await pausa(1500);
-  const novas = await pag.evaluate(() => Store.carregar().then(b => b.aulas.filter(a => a.alunoId === 'al2' && a.data === '2026-11-21').length));
-  prop('dois toques seguidos no Confirmar: UMA aula nova (' + novas + ')', novas === 1, V_DUPLO);
+  const novas = await pag.evaluate(() => Store.carregar().then(b => b.aulas.filter(a => a.alunoId === 'al2' && a.data === '2026-11-21' && a.hora === '10:00').length));
+  const anuncios = await pag.evaluate(() => window.__anuncios.slice());
+  prop('dois toques seguidos no Confirmar: UMA aula nova (' + novas + '), e o segundo toque nem chega à reconferência (' + anuncios.join(' | ') + ')',
+    novas === 1 && !anuncios.some(a => /A agenda mudou/.test(a)), V_DUPLO);
   if (MODO === V_DUPLO) { await H.fim(amb)(); return; }
   await pag.evaluate(() => { const f = document.querySelector('#modal-assistente .fechar'); if (f) f.click(); });
   await pausa(300);
