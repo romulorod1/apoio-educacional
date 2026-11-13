@@ -15,8 +15,11 @@
  *      está DESENHADA no canvas (a conta vem da geometria do gerador, não da
  *      camada), e copiar (Ctrl+C) põe "Exercício 206" na área de
  *      transferência;
- *   3. o mesmo arrasto com o ponteiro da caneta (pen, a S Pen) não seleciona
- *      nada;
+ *   3. o toque da caneta (ponteiro pen do CDP) não começa seleção: o
+ *      navegador dispara o selectstart, o app o cancela e o cursor da seleção
+ *      não é posto (o arrasto pen do CDP nunca estende a seleção neste
+ *      Chrome, nem sem o bloqueio; ver a seção 3). O caminho da S Pen no
+ *      tablet não é exercitado;
  *   4. elementos de texto vivos só nas páginas desenhadas: em 80 passos de
  *      300 px, a cada passo, nenhuma camada de texto numa página sem canvas;
  *   5. no escaneado, 0 elementos de texto (nenhuma camada) depois de todas as
@@ -319,16 +322,39 @@ const checa = (rotulo, obtido, esperado, doVeneno) => {
   const cdp = await pag.target().createCDPSession();
   const caneta = (type, p, buttons) => cdp.send('Input.dispatchMouseEvent',
     { type, x: p.x, y: p.y, button: 'left', buttons, clickCount: 1, pointerType: 'pen' });
-  await pag.evaluate(() => { window.__ponteiros = []; });
+  // o selectstart que chega ao documento, e se o app o cancelou (o leitor o ouve antes, no corpo)
+  await pag.evaluate(() => {
+    window.__ponteiros = [];
+    window.__inicios = [];
+    if (!window.__ouveInicio) {
+      window.__ouveInicio = true;
+      document.addEventListener('selectstart', e => window.__inicios.push(e.defaultPrevented ? 'cancelado' : 'livre'));
+    }
+  });
   await caneta('mouseMoved', de, 0);
   await caneta('mousePressed', de, 1);
+  // como no mouse: o arrasto só anda depois do cursor da seleção (sem o bloqueio, ele aparece)
+  const ancCaneta = await esperar('o cursor da seleção onde a caneta desceu', ancoraSel, v => !!v, 3000);
   for (let i = 1; i <= 12; i++) await caneta('mouseMoved', { x: de.x + (ate.x - de.x) * i / 12, y: de.y }, 1);
   await caneta('mouseReleased', ate, 0);
   const ponteiros = await pag.evaluate(() => window.__ponteiros.join(','));
+  const inicios = await pag.evaluate(() => window.__inicios.join(','));
   const selCaneta = await selecao();
-  console.log('   ponteiros vistos: ' + ponteiros + '; seleção da caneta: ' + JSON.stringify(selCaneta));
+  console.log('   ponteiros vistos: ' + ponteiros + '; selectstart: ' + (inicios || 'nenhum') + '; cursor: ' + (ancCaneta.valor || 'nenhum') +
+    '; seleção da caneta: ' + JSON.stringify(selCaneta));
   conf('o arrasto foi mesmo da caneta (pointerType pen)', ponteiros, 'pen');
-  checa('o mesmo arrasto com a caneta não seleciona nada', selCaneta, '', 'caneta-seleciona');
+  /* O INSTRUMENTO: neste Chrome o arrasto pen do CDP NUNCA estende a seleção,
+   * nem sem o bloqueio (medido com o veneno: 0 de 10 e depois 0 de 1 com a
+   * espera do cursor). Mas o toque da caneta faz o PRÓPRIO navegador disparar
+   * o selectstart e, sem o bloqueio, pôr o cursor da seleção no texto. Então
+   * a prova confere o que o navegador fez com a caneta de verdade do CDP: o
+   * selectstart veio (controle do instrumento, nos dois modos), o app o
+   * cancelou, e o cursor da seleção não foi posto. NÃO prova o caminho da S
+   * Pen no tablet (o toque longo e as alças do Android). */
+  conf('o toque da caneta fez o navegador disparar o selectstart (o instrumento enxerga)', inicios.length > 0, true);
+  checa('o app cancelou o selectstart da caneta', inicios.split(',').every(v => v === 'cancelado'), true, 'caneta-seleciona');
+  checa('e o cursor da seleção não foi posto onde a caneta desceu', ancCaneta.valor || '', '', 'caneta-seleciona');
+  conf('e nada ficou selecionado', selCaneta, '');
   if (await pararNoVeneno(3)) return;
 
   // ================================================================

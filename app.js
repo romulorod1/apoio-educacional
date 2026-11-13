@@ -25349,7 +25349,15 @@
       camada.temTexto = true;
       if (registro.temCanvas && !camada.div.parentNode) registro.caixa.appendChild(camada.div);
       camada.tarefa = new r[0].TextLayer({ textContentSource: r[1], container: camada.div, viewport: vp });
-      return camada.tarefa.render().then(function () { if (registro.texto === camada) registro.caixa.dataset.texto = '1'; });
+      return camada.tarefa.render().then(function () {
+        if (registro.texto !== camada) return;
+        /* a letra de cada pedaço no tamanho que ele tem na página: geometria do
+         * PDF, em px, e não tipografia do app (por isso não está no styles.css) */
+        Array.prototype.forEach.call(camada.div.querySelectorAll('span'), function (s) {
+          s.style.fontSize = 'calc(var(--text-scale-factor) * var(--font-height))';
+        });
+        registro.caixa.dataset.texto = '1';
+      });
     }).catch(function () { /* sem a camada a página continua lá; só não seleciona */ });
   }
 
