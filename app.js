@@ -26470,7 +26470,7 @@
     var camadas = function () { return document.querySelectorAll('#corpo-modal-leitor-pdf .leitor-pdf-texto'); };
     var devolver = function (camada) {
       var fim = camada.querySelector('.endOfContent');
-      if (fim) { fim.style.width = ''; fim.style.height = ''; if (fim.parentNode !== camada || fim.nextSibling) camada.appendChild(fim); }
+      if (fim) { fim.style.width = ''; fim.style.height = ''; fim.style.userSelect = ''; if (fim.parentNode !== camada || fim.nextSibling) camada.appendChild(fim); }
       camada.classList.remove('selecting');
     };
     var devolverTodas = function () { Array.prototype.forEach.call(camadas(), devolver); };
@@ -26507,6 +26507,10 @@
       if (fim && ponta !== fim) {
         fim.style.width = camada.clientWidth + 'px';
         fim.style.height = camada.clientHeight + 'px';
+        // no Chrome o fim do conteúdo tem de ser selecionável enquanto está atrás
+        // da ponta (o TextLayerBuilder do pdf.js faz o mesmo): com user-select
+        // none, o ponteiro que passa do fim da linha cai num ponto do meio dela
+        fim.style.userSelect = 'text';
         ponta.parentElement.insertBefore(fim, mexeInicio ? ponta : ponta.nextSibling);
       }
       anterior = r.cloneRange();
