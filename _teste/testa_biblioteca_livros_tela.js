@@ -621,15 +621,24 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     const t = document.querySelector('.bibl-topo .titulo').getBoundingClientRect();
     const c = document.querySelector('#bib-livros-contagem').getBoundingClientRect();
     const b = document.querySelector('#bib-busca-cartao').getBoundingClientRect();
-    const cont = document.querySelector('.bibl-continuar').getBoundingClientRect();
+    const nav = document.querySelector('#bib-livros .bibl-paineis').getBoundingClientRect();
     const area = document.querySelector('.conteudo').getBoundingClientRect();
     const meio = r => r.top + r.height / 2;
     return { umaLinha: Math.abs(meio(t) - meio(c)) < 12 && Math.abs(meio(t) - meio(b)) < 12,
       lupa: !!document.querySelector('#bib-busca-cartao svg[data-icone-nome="search"]'),
-      continuar: Math.round(cont.top - area.top) };
+      assuntos: !!document.querySelector('#bib-livros .bibl-assunto-linha'),
+      navegacao: Math.round(nav.top - area.top) };
   });
   conf('título, contagem e busca (com a lupa) numa linha só', topo.umaLinha && topo.lupa, true);
-  conf('o Continuar lendo logo abaixo do topo (a menos de 120 px do alto)', topo.continuar < 120, true);
+  // P3: o alto da aba é a navegação por assunto; o Continuar lendo foi para a Estante
+  conf('a navegação por assunto logo abaixo do topo (a menos de 120 px do alto)', topo.assuntos && topo.navegacao < 120, true);
+  await abrirEstante(pag);
+  const contNaEstante = await pag.evaluate(() => {
+    const cont = document.querySelector('#bib-livros .bibl-painel-estante .bibl-continuar');
+    const area = document.querySelector('.conteudo').getBoundingClientRect();
+    return cont ? Math.round(cont.getBoundingClientRect().top - area.top) : null;
+  });
+  conf('na Estante, o Continuar lendo fica no alto dela (a menos de 260 px do alto da área)', contNaEstante !== null && contNaEstante < 260, true);
   console.log('   Continuar lendo a ' + topo.continuar + ' px do alto');
   ruins = await medir(pag, '.bibl-topo');
   conf('o topo não transborda', ruins.join('; '), '');
@@ -735,6 +744,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await H.irParaAba(pag, 'biblioteca');
   await pausa(300);
   await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  await abrirEstante(pag);
   await clicar(pag, '#bib-livros .bibl-ano[data-ano="06"]');
   await esperar('os livros de prova na aba', () => lerSecao(pag), v => /prova-marcadores-lixo/.test(v.livros), 10000);
   const cartao = id => pag.evaluate(i => {
