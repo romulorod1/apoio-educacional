@@ -555,6 +555,9 @@ roda "biblioteca livros tela --envenenado-largura-vai-ao-alto" node "_teste/test
 roda "biblioteca livros tela --envenenado-vizinhas-sem-desenho" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-vizinhas-sem-desenho
 roda "biblioteca livros tela --envenenado-canvas-sem-soltar" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-canvas-sem-soltar
 roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-sumario-dos-marcadores
+# B1 (revisao cega do #192): a navegacao sai da pagina do assunto; o veneno a
+# deixa presa, e ela volta no Limpar e no Voltar do modulo.
+roda "biblioteca livros tela --envenenado-pagina-presa" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-pagina-presa
 # Fatia 2 do leitor: pinca e duplo toque no livro sintetico de 400 paginas,
 # com toques de verdade do Chrome. O ponto sob os dedos fica sob eles (24 px),
 # o duplo toque leva o ponto ao meio e volta, a caneta nao da zoom e um dedo
