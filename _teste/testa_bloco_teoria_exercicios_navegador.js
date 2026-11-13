@@ -30,7 +30,14 @@
  *   7. nada transborda (100% e 130% da letra), alvos de 48 px, sem travessão;
  *   8. a seção do app.js do bloco não grava nada por conta própria.
  *
+ *   9. a marca ", de outro ano": um assunto do 8º ano ligado (pela tabela de
+ *      vínculos) ao módulo do 9º ano mostra a marca no cartão do exercício, na
+ *      linha da teoria e na lista de base, e o do 9º ano não a mostra.
+ *
  *   --prints <pasta>   grava os prints dos três tamanhos (até 4).
+ *
+ * Veneno (TEM de ser visto: "VENENO visto"):
+ *   --envenenado-sem-outro-ano   o adaptador nunca marca a fonte de outro ano.
  */
 'use strict';
 const fs = require('fs');
@@ -49,7 +56,13 @@ const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g
 const ANCORA = '  function desenharBlocoTeoriaExercicios(elemento, fontes, contexto) {\n';
 const GANCHO = '  window.__provaT2 = { desenhar: function (e, f, c) { return desenharBlocoTeoriaExercicios(e, f, c); },\n' +
   '    carregar: function (id, v) { return carregarFontesDoAssunto(id, v); } };\n';
+const MODO = ['--envenenado-sem-outro-ano'].filter(m => process.argv.indexOf(m) !== -1)[0] || '';
+const MARCA_OUTRO_ANO = '      f.outroAno = !!(serieDoAno && m && !m.series[serieDoAno]);\n';
 const trocas = { '/app.js': APP.split(ANCORA).join(GANCHO + ANCORA) };
+if (MODO === '--envenenado-sem-outro-ano') {
+  if (APP.split(MARCA_OUTRO_ANO).length !== 2) { console.log('  FALHA o ponto do veneno não existe uma vez no app.js'); process.exit(1); }
+  trocas['/app.js'] = trocas['/app.js'].split(MARCA_OUTRO_ANO).join('      f.outroAno = false;\n');
+}
 
 const amb = H.criarAmbiente(PORTA, 'perfil_bloco_teoria_exercicios', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 't2_bloco_'));
@@ -231,6 +244,33 @@ const fecharModal = async pag => {
   await pag.evaluate(id => window.Store.gravarEtiquetaBiblioteca({ itemId: id, dificuldade: 3, data: '2026-11-12' }), PARA_MIM);
   await H.irParaAba(pag, 'biblioteca');
   await pausa(400);
+
+  // ================================================================
+  secao('1b. A marca ", de outro ano"');
+  /* MAT08-01 é do 8º ano; a tabela de vínculos liga a ele o módulo das
+   * equações, que no aparelho só serve ao 9º: a teoria, a lista de base e os
+   * exercícios vêm de outro ano. */
+  await desenhar(pag, 'MAT08-01', [{ assunto: 'MAT08-01', modulo: '9ano:equacoes-do-segundo-grau' }]);
+  const outroAno = await pag.evaluate(() => {
+    const b = document.querySelector('#prova-t2 .bte');
+    const ex = b.querySelector('.bte-ex .bte-ex-de'), teo = b.querySelector('.bte-teoria .detalhe'), base = b.querySelector('.bte-lista .nome');
+    return { ex: ex ? ex.textContent : '', teo: teo ? teo.textContent : '', base: base ? base.textContent : '' };
+  });
+  console.log('   ' + JSON.stringify(outroAno));
+  const marcas = [outroAno.ex, outroAno.teo, outroAno.base].map(t => /, de outro ano$/.test(t));
+  if (MODO === '--envenenado-sem-outro-ano') {
+    secao('VENENO: ' + MODO);
+    if (conf('envenenado-sem-outro-ano: a marca sumiu do exercício, da teoria e da lista de base (defeito detectado)',
+      marcas.every(x => !x), true)) console.log('VENENO visto: nenhuma das três fontes de outro ano disse isso');
+    await H.fim(amb)();
+    return;
+  }
+  conf('o exercício de outro ano diz isso na origem', marcas[0], true);
+  conf('a teoria de outro ano diz isso, com vírgula', marcas[1], true);
+  conf('a lista de base de outro ano diz isso', marcas[2], true);
+  await desenhar(pag, 'MAT09-04', VINCULOS);
+  conf('no assunto do 9º ano, nada é de outro ano', await pag.evaluate(() =>
+    /de outro ano/i.test(document.querySelector('#prova-t2 .bte').innerText)), false);
 
   // ================================================================
   secao('2. MAT09-04 a 1280x800: as quatro seções');

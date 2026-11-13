@@ -1111,12 +1111,23 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     const q = indexedDB.open('apoio-educacional');
     q.onerror = () => rej(q.error);
     q.onsuccess = () => {
-      /* as miniaturas que a Biblioteca desenha ficam guardadas em 'midias' (o cache
-       * de desenho dela, que nunca é dado da professora): o bloco da T2 mostra os
-       * exercícios em miniatura, e esse cache não conta como gravação */
-      const b = q.result, nomes = Array.from(b.objectStoreNames).filter(n => n !== 'livros' && n !== 'midias').sort(), saida = {};
+      /* as miniaturas que a Biblioteca desenha ficam em 'midias' com a chave
+       * 'bib:' (store.js, PREFIXO_MINIATURA): é cache de desenho, e não conta
+       * como gravação; o resto de 'midias' (as fotos dela e o "Abrir como
+       * folha") continua conferido */
+      const b = q.result, nomes = Array.from(b.objectStoreNames).filter(n => n !== 'livros').sort(), saida = {};
       const t = b.transaction(nomes, 'readonly');
-      nomes.forEach(n => { const r = t.objectStore(n).getAll(); r.onsuccess = () => { saida[n] = r.result; }; });
+      nomes.forEach(n => {
+        const st = t.objectStore(n), r = st.getAll(), k = st.getAllKeys();
+        let valores = null, chaves = null;
+        const junta = () => {
+          if (!valores || !chaves) return;
+          saida[n] = n !== 'midias' ? valores
+            : chaves.map((c, i) => [c, valores[i]]).filter(par => !String(par[0]).startsWith('bib:'));
+        };
+        r.onsuccess = () => { valores = r.result; junta(); };
+        k.onsuccess = () => { chaves = k.result; junta(); };
+      });
       t.oncomplete = () => { b.close(); res(JSON.stringify(saida)); };
       t.onerror = () => rej(t.error);
     };

@@ -23586,7 +23586,7 @@
     /* Teoria e exercícios, a OBMEP e o ENEM: o bloco da T2, dentro da seção da
      * página (o título da seção é o da página; o bloco não repete o dele). */
     var caixaT2 = el('div', { class: 'bib-assunto-teoria' });
-    if (bib) desenharBlocoTeoriaExercicios(caixaT2, fontesDoAssuntoNoApp(a.id), { semTitulo: true });
+    if (bib) desenharBlocoTeoriaExercicios(caixaT2, fontesDoAssuntoNoApp(a.id, null, a.serie), { semTitulo: true });
     else caixaT2.appendChild(el('p', { class: 'ajuda bib-assunto-vazio', texto: 'Não consegui abrir os exercícios agora. Tente de novo daqui a pouco.' }));
     pagina.appendChild(secaoDoAssunto('teoria', 'Teoria e exercícios', [caixaT2]));
 
@@ -23995,7 +23995,9 @@
 
   /* As fontes de um assunto, com a Biblioteca e o índice já carregados. A
    * outra executora chama a de baixo, que carrega os dois antes. */
-  function fontesDoAssuntoNoApp(assuntoId, vinculos) {
+  /* anoDoAssunto (opcional, '09', 'em1'): o ano do assunto para o "de outro
+   * ano" quando o índice de assuntos não abriu (a página do assunto o tem). */
+  function fontesDoAssuntoNoApp(assuntoId, vinculos, anoDoAssunto) {
     var opcoes = opcoesDasFontesDoAssunto(vinculos);
     /* A chave do índice que não está no aparelho: vale o módulo de mesmo
      * título, na mesma série e sem ambiguidade, a mesma regra do botão
@@ -24007,10 +24009,10 @@
     /* DE OUTRO ANO: o módulo da fonte não serve ao ano do assunto (a teoria do
      * 8º ano ligada a um assunto do 6º). A conta é a de antes da página do
      * assunto: as séries do módulo no aparelho contra o ano do assunto. */
-    var anoDoAssunto = serieDosExercicios(fontes.serie);
+    var serieDoAno = serieDosExercicios(fontes.serie || anoDoAssunto);
     var marcar = function (f) {
       var m = f && f.modulo && f.modulo.chave && bib && temChave(bib.modulos, f.modulo.chave) ? bib.modulos[f.modulo.chave] : null;
-      f.outroAno = !!(anoDoAssunto && m && !m.series[anoDoAssunto]);
+      f.outroAno = !!(serieDoAno && m && !m.series[serieDoAno]);
     };
     ['teoria', 'exercicios', 'obmep', 'enem'].forEach(function (k) { (fontes[k] || []).forEach(marcar); });
     if (fontes.listaBase) marcar(fontes.listaBase);
@@ -24260,7 +24262,9 @@
     }
     function deDoExercicio(e) {
       var de = e.fonte === 'obmep-banco' ? [e.modulo.titulo, e.lista.titulo].filter(Boolean).join(', ') : e.lista.titulo;
-      return de && e.outroAno ? de + ', de outro ano' : de;
+      // a marca não some quando a lista da fonte vem sem título
+      if (!e.outroAno) return de;
+      return de ? de + ', de outro ano' : 'De outro ano';
     }
 
     function secao(chave, titulo, quantos) {
@@ -24327,7 +24331,7 @@
               el('span', { class: 'bte-teoria-texto' }, [
                 el('span', { class: 'nome', texto: t.titulo }),
                 el('span', { class: 'detalhe', texto: plural(t.quantidade, 'página', 'páginas') +
-                  (variosModulos && t.modulo.titulo ? ' · ' + t.modulo.titulo : '') + (t.outroAno ? ' · de outro ano' : '') })
+                  (variosModulos && t.modulo.titulo ? ' · ' + t.modulo.titulo : '') + (t.outroAno ? ', de outro ano' : '') })
               ]),
               icone('chr')
             ]),

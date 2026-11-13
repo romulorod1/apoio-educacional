@@ -582,6 +582,7 @@ roda "assunto lado a lado --envenenado-parcial-nao-trata" node "_teste/testa_ass
 # selo graduado com o "Para mim" por cima, Abrir e Anexar pelos caminhos de
 # sempre e o vazio numa linha.
 roda "bloco teoria e exercicios"                node "_teste/testa_bloco_teoria_exercicios_navegador.js"
+roda "bloco teoria e exercicios --envenenado-sem-outro-ano" node "_teste/testa_bloco_teoria_exercicios_navegador.js" --envenenado-sem-outro-ano
 # C12: os pacotes de provas (OBMEP Mirim por nivel e ENEM) importam, as abas vao
 # do 2o ao 5o ano e os assuntos do aplicativo aparecem como modulos. O modo
 # envenenado serve o app.js que so espalhava o Banco pelas series equivalentes.
