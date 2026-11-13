@@ -1,0 +1,1 @@
+# 13f: VERSAO, CACHE e NOVIDADES passam a ser gerados na publicacao. Nada muda para ela; o tablet atualiza para a 1.43.N.
