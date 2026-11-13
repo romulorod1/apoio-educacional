@@ -1,0 +1,5 @@
+Na Biblioteca, a busca agora mostra o resultado em três partes: primeiro os assuntos, depois os capítulos dos livros e, por último, as listas e os exercícios.
+Toque num assunto para abrir a página dele, com os capítulos, a teoria e os exercícios juntos.
+Toque em "Abrir no capítulo" para abrir o livro direto no capítulo encontrado.
+Escrever o ano junto, como "volume 8º ano", põe os assuntos e os livros daquele ano na frente; os de outros anos ficam marcados e a um toque.
+A busca entende plural, acento e maiúscula: "senos", "fração" e "FRAÇÕES" acham o assunto certo.
