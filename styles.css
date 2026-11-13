@@ -2157,7 +2157,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
   background: var(--branco); color: var(--navy); font: inherit; font-size: var(--letra-16); font-weight: 600; text-align: center; box-sizing: border-box; }
 .leitor-pdf-zoom { display: inline-flex; gap: 8px; margin-left: auto; }
 .leitor-pdf-quadrado { min-width: 44px; padding: 10px 0; font-size: var(--letra-20); line-height: 1; }
-.leitor-pdf-corpo { background: var(--fio-claro); overflow: auto; padding: 18px; }
+.leitor-pdf-corpo { background: var(--fio-claro); overflow: auto; padding: 18px;
+  /* o dedo rola nos dois sentidos; a pinça e o duplo toque são do leitor (app.js) */
+  touch-action: pan-x pan-y; }
 .leitor-pdf-navegacao { flex: 0 0 auto; padding: 0 18px; border-top: 1px solid var(--fio); background: var(--branco); }
 .leitor-pdf-navegacao[hidden] { display: none; }
 .leitor-pdf-navegacao input { display: block; width: 100%; min-height: var(--alvo); margin: 0; accent-color: var(--navy); }

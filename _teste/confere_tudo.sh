@@ -560,6 +560,13 @@ roda "biblioteca livros tela --envenenado-largura-vai-ao-alto" node "_teste/test
 roda "biblioteca livros tela --envenenado-vizinhas-sem-desenho" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-vizinhas-sem-desenho
 roda "biblioteca livros tela --envenenado-canvas-sem-soltar" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-canvas-sem-soltar
 roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-sumario-dos-marcadores
+# Fatia 2 do leitor: pinca e duplo toque no livro sintetico de 400 paginas,
+# com toques de verdade do Chrome. O ponto sob os dedos fica sob eles (24 px),
+# o duplo toque leva o ponto ao meio e volta, a caneta nao da zoom e um dedo
+# rola. O veneno ancora o gesto no meio da tela, e a prova tem de ver.
+roda "leitor pinca"                              node "_teste/testa_leitor_pinca.js"
+roda "leitor pinca --envenenado-gesto-sem-ponto" node "_teste/testa_leitor_pinca.js" --envenenado-gesto-sem-ponto
+roda "leitor pinca --envenenado-gesto-grava-pela-ancora" node "_teste/testa_leitor_pinca.js" --envenenado-gesto-grava-pela-ancora
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
