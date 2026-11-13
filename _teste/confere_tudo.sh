@@ -585,6 +585,17 @@ roda "leitor nitidez --envenenado-sem-detalhe"      node "_teste/testa_leitor_ni
 roda "leitor nitidez --envenenado-sem-teto"         node "_teste/testa_leitor_nitidez.js" --envenenado-sem-teto
 roda "leitor nitidez --envenenado-direcao-errada"   node "_teste/testa_leitor_nitidez.js" --envenenado-direcao-errada
 roda "leitor nitidez --envenenado-sem-meia-densidade" node "_teste/testa_leitor_nitidez.js" --envenenado-sem-meia-densidade
+# Fatia 6 do leitor: voltar para onde eu estava. Depois do Sumario, do Ir p. e
+# da barra de pagina aparece por 10 s "Voltar a p. 45", e o toque volta ao
+# mesmo trecho no meio (24 px); tres saltos e tres voltas refazem o caminho;
+# rolar, o zoom e a Proxima nao sao salto. Um veneno por criterio, e o
+# controle no commit pai (a39e13f), onde os criterios tem de falhar.
+roda "leitor voltar"                               node "_teste/testa_leitor_voltar.js"
+roda "leitor voltar --envenenado-volta-no-topo"    node "_teste/testa_leitor_voltar.js" --envenenado-volta-no-topo
+roda "leitor voltar --envenenado-pilha-de-um"      node "_teste/testa_leitor_voltar.js" --envenenado-pilha-de-um
+roda "leitor voltar --envenenado-nao-some"         node "_teste/testa_leitor_voltar.js" --envenenado-nao-some
+roda "leitor voltar --envenenado-aparece-na-rolagem" node "_teste/testa_leitor_voltar.js" --envenenado-aparece-na-rolagem
+roda "leitor voltar --controle-pai"                node "_teste/testa_leitor_voltar.js" --controle-pai
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
