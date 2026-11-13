@@ -340,13 +340,13 @@ sme:4ano:p083;MAT03-05;;leitura C5 (Sonnet);divisões exatas em tabelas de caixa
 sme:4ano:p084;MAT04-04;;leitura C5 (Sonnet);esquema de divisão e divisão por 10, 100, 1.000;média
 sme:4ano:p086;MAT04-02;;leitura C5 (Sonnet);subtração com números maiores;alta
 sme:4ano:p087;MAT05-08;;leitura C5 (Sonnet);planificação do cubo;alta
-sme:4ano:p088;MAT05-08;;leitura C5 (Sonnet);planificações do cilindro e do cubo;alta
+sme:4ano:p088;MAT05-08;depende da forma do cilindro de outra atividade, que não vem no recorte (lente C5);leitura C5 (Sonnet) + lente C5 (Opus);planificações do cilindro e do cubo;alta
 sme:4ano:p089:q1;MAT04-03;;leitura C5 (Sonnet);problemas de multiplicação e divisão;média
 sme:4ano:p089:q2;MAT04-03;;leitura C5 (Sonnet);multiplicar por decomposição;alta
 sme:4ano:p089:q3;MAT04-02;;leitura C5 (Sonnet);subtrações com números grandes;alta
 sme:4ano:p089:q4;MAT05-08;;leitura C5 (Sonnet);escolher planificação de cubo;alta
 sme:4ano:p089:q5;MAT03-04;;leitura C5 (Sonnet);dobro, triplo e metade;baixa
-sme:4ano:p089:q6;MAT04-04;;leitura C5 (Sonnet);divisão pelo esquema;alta
+sme:4ano:p089:q6;MAT04-04;depende do modelo de esquema de outra atividade, que não vem no recorte (lente C5);leitura C5 (Sonnet) + lente C5 (Opus);divisão pelo esquema;alta
 sme:4ano:p092;MAT04-03;;leitura C5 (Sonnet);multiplicar voltas por 400 metros;média
 sme:4ano:p093;MAT04-10;;leitura C5 (Sonnet);metros e quilômetros em provas;média
 sme:4ano:p094;MAT03-04;;leitura C5 (Sonnet);combinações e contagem de partidas;média
@@ -629,7 +629,7 @@ sme:6ano:p037;MAT06-03;;leitura C5 (Sonnet);Eventos periódicos tratados como m�
 sme:6ano:p038;MAT06-03;;leitura C5 (Sonnet);Relações de múltiplo e divisor;alta
 sme:6ano:p039;MAT06-03;;leitura C5 (Sonnet);Múltiplos de 2, 3, 4, 6 e 5 em quadro;alta
 sme:6ano:p040;MAT06-04;;leitura C5 (Sonnet);Decomposição em fatores primos do 36;alta
-sme:6ano:p041;MAT06-04;;leitura C5 (Sonnet);Fatorar números e reconhecer primos;alta
+sme:6ano:p041;MAT06-04;erro da fonte: pede escrever 13, 17 e 37 como produto de dois ou mais primos (lente C5);leitura C5 (Sonnet) + lente C5 (Opus);Fatorar números e reconhecer primos;alta
 sme:6ano:p042;MAT06-04;;leitura C5 (Sonnet);Crivo de Eratóstenes para primos até 100;alta
 sme:6ano:p043;MAT06-03;;leitura C5 (Sonnet);Anos bissextos como múltiplos de 4;média
 sme:6ano:p044;MAT06-03;;leitura C5 (Sonnet);Divisores comuns e maior divisor comum;alta

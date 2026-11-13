@@ -168,6 +168,34 @@ def trava_campos(p, vinc):
     return erros
 
 
+def casa_forte(texto, titulo):
+    """A linha e o titulo: cobre ao menos 10 letras dele (ou ele todo)."""
+    a, t = letras(titulo), letras(texto)
+    return bool(t) and bool(a) and len(t) >= min(len(a), 10) and (a.startswith(t) or t.startswith(a))
+
+
+def trava_titulo_alheio(p):
+    """Nenhum recorte leva a linha de titulo de OUTRA atividade do caderno."""
+    erros = []
+    titulos = {}
+    for lista in (p.itens, p.relatorio['excluidos'], p.relatorio['fora_do_alvo']):
+        for x in lista:
+            if ':q' not in x['id'] and not letras(x['titulo']).startswith('agoraecomvoce'):
+                titulos.setdefault(x['id'].split(':')[1], {})[x['id']] = x['titulo']
+    for it in p.itens:
+        doc = p.doc(it['origem']['arquivo'])
+        outros = {k: v for k, v in titulos.get(it['serie'], {}).items() if k != it['id']}
+        proprio = it['origem_detalhe']['atividade']
+        for pz in pg.pedacos(it, 'enunciado'):
+            for bb, t, corpo, girada, _ in linhas_no(doc[pz['pagina'] - 1], pz['bbox']):
+                if girada or corpo < 10 or casa_forte(t, proprio):
+                    continue
+                for k, tit in outros.items():
+                    if casa_forte(t, tit):
+                        erros.append('%s: leva o titulo %r, de %s (p%d)' % (it['id'], t[:40], k, pz['pagina']))
+    return erros
+
+
 def borda_fora_da_beira(doc, pz):
     lados = borda_corta_tinta(doc, pz)
     W, H = doc[pz['pagina'] - 1].rect.width, doc[pz['pagina'] - 1].rect.height
@@ -201,7 +229,7 @@ def trava_recorte(p):
         a = letras(alvo)
         # a linha do titulo (ou do numero) e a mais alta da margem: acima dela, so
         # texto a direita (balao de fala do desenho que abre a atividade)
-        casa = [l for l in ls if letras(l[1]) and (a.startswith(letras(l[1])) or letras(l[1]).startswith(a))]
+        casa = [l for l in ls if casa_forte(l[1], alvo)]
         if not casa:
             erros.append('%s: o primeiro pedaco nao tem a linha %r' % (it['id'], alvo[:40]))
             continue
@@ -281,9 +309,13 @@ def trava_cobertura(p):
             por_cad.setdefault(cad, {}).setdefault(pz['pagina'], []).append(pymupdf.Rect(pz['bbox']) + (-1, -1, 1, 1))
     for cad, pags in sorted(por_cad.items()):
         doc = p.doc(arquivos[cad])
-        for pno in range(min(pags), max(pags) + 1):
+        # da primeira unidade ate a pagina de anotacoes do fim (e nao so ate a
+        # ultima unidade: a pagina que sobra depois dela tambem precisa de dono)
+        for pno in range(min(pags), doc.page_count + 1):
             pgn = doc[pno - 1]
             W, H = pgn.rect.width, pgn.rect.height
+            if pno > max(pags) and letras(pgn.get_text()).startswith('anotacoes'):
+                break
             ls = [l for l in linhas_no(pgn, (0, H * 0.12, W, H * 0.88)) if not l[3] and l[2] > 6
                   and not (l[2] <= 8.5 and CREDITO.search(l[1]))]
             ims = [pymupdf.Rect(b['bbox']) for b in pgn.get_text('dict')['blocks'] if b['type'] == 1
@@ -292,7 +324,10 @@ def trava_cobertura(p):
             rs = pags.get(pno)
             if not rs:
                 txt = ' '.join(letras(l[1]) for l in ls)
-                if re.search(r'unidade\d', txt) or txt.startswith('anotacoes') or (not ls and not ims):
+                # o desenho vetorial tambem e conteudo (o tabuleiro do 5o ano, p. 91, e so desenho)
+                des = [d for d in pgn.get_drawings() if d['rect'].get_area() > 100 and d['rect'].y0 >= H * 0.12
+                       and d['rect'].y1 <= H * 0.88 and (d.get('color') or d.get('fill'))]
+                if re.search(r'unidade\d', txt) or txt.startswith('anotacoes') or (not ls and not ims and not des):
                     continue
                 erros.append('%s p%d: pagina com conteudo e sem unidade nenhuma' % (cad, pno))
                 continue
@@ -419,6 +454,7 @@ def travas(p, vinc, placar, zip_caminho=None, rot=''):
     placar.conferir('cadernos%s: desenho da questao seguinte fica com ela' % rot, trava_continuacao(p))
     placar.conferir('cadernos%s: nada que remete a outra atividade' % rot, trava_referencia(p))
     placar.conferir('cadernos%s: toda a tinta do caderno tem dono' % rot, trava_cobertura(p))
+    placar.conferir('cadernos%s: nenhum titulo de outra atividade' % rot, trava_titulo_alheio(p))
     placar.conferir('cadernos%s: enunciado comum da revisao nao se perde' % rot, trava_enunciado_comum(p))
     placar.conferir('cadernos%s: svg autocontido' % rot, pg.trava_svg(p))
     placar.conferir('cadernos%s: svg bem formado' % rot, pg.trava_xml(p))
@@ -565,6 +601,12 @@ def venenos(temp, pdfs, vinc_c, vinc, cur, placar, boa):
             b = u['pedacos'][0]['bbox']
             u['pedacos'][0]['bbox'] = [b[0], b[1], b[2], b[3] - 30]
     placar.conferir('recorte encolhido', trava_entre(q), True, 'Mostre como pensou')
+    # sem o titulo forte, "QUADRO:" em corpo maior passa pelo titulo de "Quadro de numeros"
+    q = com('TITULO_FORTE', False, lambda: gera('titulo_forte'))
+    placar.conferir('titulo pela linha errada', trava_titulo_alheio(q) + trava_recorte(q), True, 'QUADRO DE')
+    # a pagina so de desenho encerrava a revisao, e o tabuleiro ficava sem dono
+    q = com('PAGINA_SO_DE_DESENHO', False, lambda: gera('so_desenho'))
+    placar.conferir('pagina so de desenho sem dono', trava_cobertura(q), True, 'sem unidade nenhuma')
     # pagina que nenhuma unidade cobre (a continuacao de "Pastores e ovelhas" some)
     q = pg.copia(boa, temp, 'v_cobertura')
     for u in q.relatorio['unidades']:

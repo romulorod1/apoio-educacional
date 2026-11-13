@@ -6,7 +6,7 @@ para a prova do tipo de fonte cadernos-sme-sp (biblioteca/_prova_cadernos_sme.py
 Conteudo proprio, escrito aqui, para a prova rodar no portao sem o Drive. Imita
 o que o C5 mediu nos cadernos reais (ver o cabecalho de biblioteca/cadernos_sme.py):
 
-CadernosApoioAprendizagemMatematicaAluno3Ano.pdf, 11 paginas:
+CadernosApoioAprendizagemMatematicaAluno3Ano.pdf, 12 paginas:
 - p1 capa; p2 o Indice em DUAS colunas, com guia de pontos, a linha da
   unidade com pontos depois do numero, um titulo que quebra em duas linhas e
   uma guia de um ponto so;
@@ -29,7 +29,10 @@ CadernosApoioAprendizagemMatematicaAluno3Ano.pdf, 11 paginas:
   e a 9, que remete a "questao anterior" (sai: nao se resolve sozinha);
 - p10 (10) outra revisao, com "Use a tabela abaixo..." e a tabela antes da
   questao 1: sai inteira, num item so;
-- p11 ANOTACOES (fim: nada dali entra).
+- p11 (11) um tabuleiro so de desenho, sem texto, que e da revisao de cima;
+- p12 ANOTACOES (fim: nada dali entra).
+Em "Quadro de numeros", abaixo do titulo, um rotulo "QUADRO:" em corpo maior
+que o do titulo (nao pode ser lido como o titulo).
 O numero de cada pagina fica num selo (circulo claro) que sobe acima do
 texto do numero; a questao 5 tem o credito da foto em 8 pt, girado, sem
 palavra de credito, encostado na foto.
@@ -44,7 +47,8 @@ import pymupdf
 FIXO = {'creationDate': 'D:20261113000000', 'modDate': 'D:20261113000000', 'producer': 'amostra', 'creator': 'amostra'}
 W, H = 555.0, 774.0
 NOME = 'CadernosApoioAprendizagemMatematicaAluno3Ano.pdf'
-EXTENSO = {3: 'tres', 4: 'quatro', 5: 'cinco', 6: 'seis', 7: 'sete', 8: 'oito', 9: 'nove', 10: 'dez', 11: 'onze'}
+EXTENSO = {3: 'tres', 4: 'quatro', 5: 'cinco', 6: 'seis', 7: 'sete', 8: 'oito', 9: 'nove', 10: 'dez', 11: 'onze',
+           12: 'doze'}
 
 
 def texto(pg, x, y, t, corpo=12, fonte='helv', rot=0):
@@ -128,10 +132,12 @@ def fazer(pasta):
     foto(pg, (120, 145, 300, 265))
     texto(pg, 112, 262, 'Fulano de Tal/Agencia Imagens', corpo=5, rot=90)
     item(pg, 100, 300, 2, 'Se ganhar mais 12, com quantas ficara?')
+    texto(pg, 100, 340, 'QUADRO DE')  # rotulo do album, comeco do titulo seguinte (nao pode ser lido como ele)
     titulo(pg, 380, 'QUADRO DE NUMEROS')
     item(pg, 100, 410, 1, 'Complete o quadro com os numeros de 101 a 110.')
     desenho(pg, (110, 425, 450, 520), cor=(0.6, 0.3, 0.1))
     item(pg, 100, 550, 2, 'Qual numero vem depois de 199?')
+    texto(pg, 300, 580, 'QUADRO:', corpo=17, fonte='hebo')  # rotulo de corpo maior que o titulo, abaixo dele
     rodape(pg, 6)
     # p7: duas colunas
     pg = doc.new_page(width=W, height=H)
@@ -178,10 +184,16 @@ def fazer(pasta):
     item(pg, 100, 250, 1, 'Qual coluna tem o maior valor?')
     item(pg, 100, 300, 2, 'Quanto a primeira coluna tem a mais que a segunda?')
     rodape(pg, 10)
-    # p11: anotacoes
+    # p11: um tabuleiro so de desenho, sem texto, que e da revisao de cima
+    pg = doc.new_page(width=W, height=H)
+    for i in range(6):
+        for j in range(8):
+            pg.draw_rect(pymupdf.Rect(100 + 50 * i, 120 + 50 * j, 145 + 50 * i, 165 + 50 * j), color=(0.2, 0.4, 0.6), width=1)
+    rodape(pg, 11)
+    # p12: anotacoes
     pg = doc.new_page(width=W, height=H)
     texto(pg, 100, 100, 'ANOTACOES', corpo=15, fonte='hebo')
-    rodape(pg, 11)
+    rodape(pg, 12)
     doc.set_metadata(FIXO)
     caminho = os.path.join(pasta, NOME)
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)

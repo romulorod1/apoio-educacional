@@ -142,6 +142,8 @@ TIRA_CORRIDO = True      # cabecalho e rodape corridos ficam fora do recorte; Fa
 CONFERE_BORDA = True     # recorte que corta tinta na borda sai com motivo; False so no veneno
 FIO_FINO = True          # o desenho vetorial claro ou fino (linha de resposta, quadro) entra no recorte; False so no veneno
 IMAGEM_ACIMA_E_DA_SEGUINTE = True  # desenho no alto da pagina, acima do numero, e da questao seguinte; False so no veneno
+TITULO_FORTE = True      # a linha do titulo cobre ao menos 10 letras dele; False so no veneno
+PAGINA_SO_DE_DESENHO = True  # pagina so de desenho, sem texto, nao encerra a atividade; False so no veneno
 SELO_DO_RODAPE = True    # o desenho que encosta no numero da pagina e do rodape; False so no veneno
 TIRA_REFERENCIA = True   # o item que remete a outra atividade, questao ou pagina sai com motivo; False so no veneno
 REVISAO_COM_ENUNCIADO_INTEIRA = True  # revisao com texto comum antes do "1." nao se separa; False so no veneno
@@ -149,10 +151,12 @@ REVISAO_COM_ENUNCIADO_INTEIRA = True  # revisao com texto comum antes do "1." na
 # o item que remete a outra atividade ou pagina nao se resolve sozinho (achado
 # da revisao do C5: "ordene os numeros da atividade anterior", "a tabela que
 # voce montou na atividade anterior", "os prismas da pagina anterior")
-REFERENCIA = re.compile(r'\b(?:atividades?|quest[oõ](?:es)?|quest[aã]o|p[aá]ginas?|exerc[ií]cios?|itens?|problemas?)\s+'
-                        r'anterior(?:es)?\b|\banteriormente\b|\bp[aá]gina\s+\d+', re.I)
+REFERENCIA = re.compile(r'\b(?:atividades?|p[aá]ginas?)\s+anterior(?:es)?\b|\bp[aá]gina\s+\d+', re.I)
+# so na questao solta: "a questao anterior" e outra questao; na atividade inteira
+# ("os itens anteriores", "como vimos anteriormente") a referencia e interna
+REFERENCIA_QUESTAO = re.compile(r'\b(?:quest[oõ](?:es)?|quest[aã]o|exerc[ií]cios?|itens?|problemas?)\s+anterior(?:es)?\b', re.I)
 # a questao solta da revisao que cita "o quadro 1" ou "a tabela 2" sem traze-los
-ROTULO = re.compile(r'\b(quadro|tabela|figura|gr[aá]fico)\s+(\d+)\b', re.I)
+ROTULO = re.compile(r'\b(quadro|tabela|figura|grafico)(s?)\s+(\d+)((?:\s*(?:,|e)\s*\d+)*)(\s*:)?', re.I)
 
 PALAVRA_DE_CREDITO = re.compile(
     r'\bfotos?\b|wiki(?:pedia|media)|getty|pulsar|folha\s*(?:press|imagem)|folhapress|\bafp\b|\bnasa\b|reprodu[cç][aã]o'
@@ -207,8 +211,13 @@ def eh_credito(l, imagens=()):
     if l['girada'] and l['tam'] <= CREDITO_GIRADO_MAX:
         return True
     if l['girada'] and l['tam'] <= CREDITO_GIRADO_IMAGEM:
-        r = pymupdf.Rect(l['bb']) + (-6, -6, 6, 6)
-        if any(r.intersects(pymupdf.Rect(i)) for i in imagens):
+        # ao lado da imagem, e nao em cima dela: o rotulo do eixo de um grafico
+        # feito como imagem ("Quantidade de alunos", 4o ano, p. 165) fica dentro
+        bb = pymupdf.Rect(l['bb'])
+        r = bb + (-6, -6, 6, 6)
+        dentro = any(not (bb & pymupdf.Rect(i)).is_empty and (bb & pymupdf.Rect(i)).get_area() > 0.2 * bb.get_area()
+                     for i in imagens)
+        if not dentro and any(r.intersects(pymupdf.Rect(i)) for i in imagens):
             return True
     return l['tam'] <= CREDITO_MIUDO_MAX and bool(PALAVRA_DE_CREDITO.search(l['texto']))
 
@@ -358,18 +367,25 @@ def faixas(doc):
 def achar_titulo(pg, titulo, topo, pe):
     """A caixa da linha do titulo na pagina, ou None: a linha mais alta cujo texto
     e o comeco do titulo (o titulo pode quebrar em duas linhas)."""
-    alvo = so_letras(titulo)
-    cands = []
-    for l in linhas(pg):
-        n = so_letras(l['texto'])
-        if len(n) >= 3 and topo - 1 <= l['bb'][1] <= pe and (alvo.startswith(n) or n.startswith(alvo)) and not l['girada']:
-            cands.append(l)
+    cands = [l for l in linhas(pg) if topo - 1 <= l['bb'][1] <= pe and not l['girada'] and casa_titulo(l['texto'], titulo)]
     if not cands:
         return None
-    # o de maior corpo (a fonte do titulo), e entre esses o mais alto: "pirâmide:"
-    # no corpo do texto nao passa pelo titulo "Pirâmides"
-    maior = max(round(l['tam']) for l in cands)
-    return min([l for l in cands if round(l['tam']) == maior], key=lambda l: (l['bb'][1], l['bb'][0]))['bb']
+    # a mais alta; o corpo so desempata (a regra "o de maior corpo" pegava
+    # "calculo:" de 17 pt no lugar do titulo de 12 pt, 3o ano, p. 100)
+    return min(cands, key=lambda l: (round(l['bb'][1]), -round(l['tam']), l['bb'][0]))['bb']
+
+
+def casa_titulo(texto, titulo):
+    """A linha e o titulo (ou o comeco dele, quando quebra em duas linhas)?
+    Tem de cobrir uma parte real do titulo: ao menos 10 letras, ou ele todo.
+    "calculo:" nao casa com "Calculos e decomposicoes", nem "piramide:" com
+    "Piramides e superficies" (achado da segunda revisao)."""
+    alvo, n = so_letras(titulo), so_letras(texto)
+    if not n or not alvo:
+        return False
+    if TITULO_FORTE and len(n) < min(len(alvo), 10):
+        return False
+    return alvo.startswith(n) or n.startswith(alvo)
 
 
 def texto_acima(pg, bb, topo):
@@ -399,6 +415,8 @@ def pagina_vazia(pg, topo, pe):
     ts = [t for t in ts if t]
     if ts:
         return all(t in ('anotacoes',) for t in ts)
+    if not PAGINA_SO_DE_DESENHO:
+        return True
     caixas = [tuple(d['rect']) for d in pg.get_drawings()] + imagens_da_pagina(pg)
     return not any(r[1] >= topo - 1 and r[3] <= pe + 1 and (r[2] - r[0]) * (r[3] - r[1]) > 100 for r in caixas)
 
@@ -492,9 +510,9 @@ def fronteira_livre(doc, pno, y, topo, cache):
     if FIO_FINO:
         # o desenho claro conta como tinta aqui tambem (o quadro azul claro da
         # questao de cima nao pode ficar do lado de baixo da fronteira); o de
-        # mais de 200 pt de altura (fio lateral da pagina) nao barra fronteira
+        # mais de 300 pt de altura (fio lateral da pagina) nao barra fronteira
         for fy0, fy1, _x0, _x1 in desenhos_visiveis(doc, pno, cache):
-            if fy1 - fy0 <= 200:
+            if fy1 - fy0 <= 300:  # o mesmo limite do desenho_cortado
                 a = max(0, int(math.floor(fy0)))
                 linha[a:max(a + 1, int(math.ceil(fy1)))] = True
     r = int(math.floor(y))
@@ -740,8 +758,7 @@ def comeca_pelo_titulo(doc, ps, alvo):
         (l['bb'][0] + l['bb'][2]) / 2, (l['bb'][1] + l['bb'][3]) / 2)) and not eh_credito(l)]
     if not ls:
         return False
-    a = so_letras(alvo)
-    casa = [l for l in ls if so_letras(l['texto']) and (a.startswith(so_letras(l['texto'])) or so_letras(l['texto']).startswith(a))]
+    casa = [l for l in ls if casa_titulo(l['texto'], alvo)]
     if not casa:
         return False
     t = min(casa, key=lambda l: (round(l['bb'][1]), l['bb'][0]))
@@ -870,16 +887,24 @@ def referencia_de_fora(texto, tipo):
     solta da revisao, tambem "quadro 1", "tabela 2" quando o rotulo so aparece
     uma vez no recorte (a mencao, e nao o quadro)."""
     t = ' '.join(texto.split())
-    m = REFERENCIA.search(t)
+    m = REFERENCIA.search(t) or (REFERENCIA_QUESTAO.search(t) if tipo == 'questao' else None)
     if m:
         return m.group(0)
     if tipo == 'questao':
-        vistos = {}
+        # cada rotulo citado ("quadro 1", "quadros 1 e 2") tem de aparecer mais
+        # de uma vez, ou como etiqueta ("Figura 1:"): senao e mencao a algo de fora
+        vistos, etiquetas, texto_de = {}, set(), {}
         for r in ROTULO.finditer(sem_acento(t)):
-            vistos.setdefault((r.group(1), r.group(2)), []).append(r.group(0))
-        for chave, ms in sorted(vistos.items()):
-            if len(ms) == 1:
-                return ms[0]
+            nums = [r.group(3)] + re.findall(r'\d+', r.group(4) or '')
+            for n in nums:
+                chave = (r.group(1), n)
+                vistos[chave] = vistos.get(chave, 0) + 1
+                texto_de.setdefault(chave, r.group(0).strip())
+                if r.group(5):
+                    etiquetas.add(chave)
+        for chave in sorted(vistos):
+            if vistos[chave] == 1 and chave not in etiquetas:
+                return texto_de[chave]
     return None
 
 
