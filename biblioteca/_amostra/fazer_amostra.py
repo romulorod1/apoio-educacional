@@ -532,6 +532,94 @@ def teoria(caminho):
     doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
 
 
+def lista_comentario(caminho):
+    """Lista no modelo CM com o comentario ao professor dentro do enunciado (decisao D2).
+
+    Fica FORA de fazer(): a amostra das outras provas nao muda. Imita o que foi
+    medido em 12/11/2026 nas 7 series (6 enunciados, como Introducao a
+    Porcentagem, 7o ano, exercicio 22): titulo "Comentario para professores:" em
+    negrito na margem, o texto do comentario em fonte normal na mesma linha e
+    nas seguintes, ate o proximo marcador.
+
+    - exercicio 2: enunciado com "presente para o professor" em fonte normal (nao e
+      titulo e fica), e o comentario, que comeca no pe da coluna esquerda e
+      continua no alto da direita, antes do exercicio 3. O enunciado tem de sair
+      sem ele; a solucao 2, com ele no fim, nos dois pedacos;
+    - exercicio 3: "Observacao:" em negrito na margem, que fala com o aluno: fica
+      no enunciado;
+    - solucao 3, na coluna da direita (o titulo das solucoes esta na da
+      esquerda), e continuando numa terceira pagina, que ja abre nas solucoes:
+      um "Comentario para professores:" em cada uma das duas partes, que ja
+      estao no gabarito: nao cortam a solucao e nao vao para lugar nenhum.
+    """
+    g = MODELOS['cm']
+    X0, X1, T = g['x0'], g['x1'], g['topo']
+    doc = pymupdf.open()
+    capa = doc.new_page(width=612, height=792)
+    capa.insert_text((150, 80), 'Módulo de Amostra Sintética', fontname='hebo', fontsize=14.3)
+    capa.insert_text((150, 150), 'Lista com Comentário.', fontname='hebo', fontsize=14.3)
+    capa.insert_text((258, 225), 'Nono Ano', fontname='hebo', fontsize=14.3)
+    p = Pagina(doc, g)
+    p.fios(1)
+    p.secao(X0, T + 60, 1, 'Exercícios Introdutórios')
+    xt = p.marcador(X0, T + 90, 1)
+    p.pg.insert_text((xt, T + 90), 'Quanto é 7 vezes 8?', fontname='helv', fontsize=10)
+    p.texto(X0, T + 102, ['Escreva a conta antes de responder.'])
+    # comentario que a solucao 1 repete palavra por palavra (5 dos 6 casos reais)
+    titulo = 'Comentário para professores:'
+    largura = pymupdf.get_text_length(titulo, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X0, T + 126), titulo, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X0 + largura + 4, T + 126), 'Peça a tabuada', fontname='helv', fontsize=10)
+    p.texto(X0, T + 138, ['do sete inteira antes de multiplicar.'])
+    y = g['yrod'] - 170
+    xt = p.marcador(X0, y, 2)
+    p.pg.insert_text((xt, y), 'Um grupo de alunos quer comprar', fontname='helv', fontsize=10)
+    p.texto(X0, y + 12, ['um presente para o professor. Se cada um', 'der 20 reais, quantos alunos há?'])
+    p.pg.insert_text((X0, y + 48), titulo, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X0 + largura + 4, y + 48), 'Peça uma', fontname='helv', fontsize=10)
+    p.texto(X0, y + 60, ['estimativa antes da conta. Texto RESERVADO', 'à professora, que segue até o pé da',
+                         'coluna e continua na coluna da direita.'])
+    # continua no alto da coluna direita, antes do exercicio 3
+    p.texto(X1, T + 20, ['Continuação RESERVADA do comentário.'])
+    xt = p.marcador(X1, T + 70, 3)
+    p.pg.insert_text((xt, T + 70), 'Leia a regra e responda.', fontname='helv', fontsize=10)
+    obs = 'Observação:'
+    largura = pymupdf.get_text_length(obs, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X1, T + 94), obs, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X1 + largura + 4, T + 94), 'no xadrez o rei anda', fontname='helv', fontsize=10)
+    p.texto(X1, T + 106, ['uma casa por vez. Quantas casas ele anda?'])
+    # solucoes
+    p = Pagina(doc, g)
+    p.fios(2)
+    p.pg.insert_text((114, T + 12), 'Respostas e Soluções.', fontname='hebo', fontsize=10)
+    p.secao(X0, T + 40, 1, 'Exercícios Introdutórios')
+    p.numero_solucao(X0, T + 70, 1)
+    p.texto(X0 + 14, T + 70, ['7 · 8 = 56.'])
+    p.pg.insert_text((X0, T + 86), titulo, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X0 + largura + 4, T + 86), 'Peça a tabuada', fontname='helv', fontsize=10)
+    p.texto(X0, T + 98, ['do sete inteira antes de multiplicar.'])
+    p.numero_solucao(X0, T + 124, 2)
+    p.texto(X0 + 14, T + 124, ['Com x alunos, 20x mais 60 é o preço.'])
+    # a solucao 3 na coluna da direita, com o titulo das solucoes na da esquerda: o
+    # comentario dela vem depois do titulo pela ordem de leitura (coluna, altura)
+    p.numero_solucao(X1, T + 40, 3)
+    p.texto(X1 + 14, T + 40, ['O rei anda uma casa.'])
+    largura = pymupdf.get_text_length(titulo, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X1, T + 64), titulo, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X1 + largura + 4, T + 64), 'este já', fontname='helv', fontsize=10)
+    p.texto(X1, T + 76, ['está no gabarito e fica onde está.'])
+    # e continua numa pagina que ja abre nas solucoes, com outro comentario
+    p = Pagina(doc, g)
+    p.fios(3)
+    p.texto(X0, T + 20, ['Continuação da solução 3, numa casa por vez.'])
+    p.pg.insert_text((X0, T + 44), titulo, fontname='hebo', fontsize=10)
+    p.pg.insert_text((X0 + largura + 4, T + 44), 'este', fontname='helv', fontsize=10)
+    p.texto(X0, T + 56, ['também fica na solução.'])
+    p.texto(X1 + 30, T + 40, ['Elaborado por Autor da Amostra', 'Produzido por Amostra Sintética'])
+    doc.set_metadata(FIXO)
+    doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
+
+
 def fazer(pasta, sem_item=None, duplica=None):
     os.makedirs(pasta, exist_ok=True)
     lista(os.path.join(pasta, 'amostra-sintetica__exercicios-lista-de-amostra.pdf'), 'palladio', sem_item, duplica)

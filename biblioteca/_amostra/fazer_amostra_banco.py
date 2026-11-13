@@ -115,5 +115,49 @@ def fazer(pasta, nome='banco-de-questoes-2099.pdf'):
     return caminho
 
 
+def fazer_com_comentario(pasta, nome='banco-de-questoes-2098.pdf'):
+    """Volume curto com o comentario ao professor dentro de um enunciado (decisao D2).
+
+    Fica fora de fazer(): a amostra das outras provas nao muda. Problema 1: o
+    enunciado e, em seguida, "Comentario para professores:" em negrito do corpo
+    do texto, que tem de ir para o fim da solucao 1. Problema 2: "Observacao:" em
+    negrito, que fala com o aluno e fica no enunciado. Na solucao 2, um
+    "Comentario para professores:" que ja e do gabarito e fica onde esta.
+    """
+    os.makedirs(pasta, exist_ok=True)
+    doc = pymupdf.open()
+    Folha(doc, 1).pg.insert_text((99, 120), 'Nível 1 ....... 2', fontname='helv', fontsize=11)
+    f = Folha(doc, 2)
+    f.secao(120, 'NÍVEL 1')
+    f.cab(200, '1 O presente do professor', 1)
+    f.texto(230, ['Um grupo de alunos quer comprar um presente para o professor. Se cada',
+                  'um der 20 reais, faltam 60; se der 30, sobram 90. Quantos alunos há?'])
+    f.pg.insert_text((f.x, 280), 'Comentário para professores:', fontname='hebo', fontsize=11)
+    f.texto(294.5, ['Peça uma estimativa antes da conta. Texto RESERVADO à professora.'])
+    f.cab(370, '2 O rei no tabuleiro', 2)
+    f.texto(400, ['Quantas casas o rei anda numa jogada?'])
+    f.pg.insert_text((f.x, 429), 'Observação:', fontname='hebo', fontsize=11)
+    f.texto(443.5, ['no xadrez, o rei se movimenta uma casa por vez.'])
+    f = Folha(doc, 3)
+    f.secao(120, 'ENUNCIADOS E SOLUÇÕES DO NÍVEL 1')
+    f.cab(190, '1 O presente do professor', 1)
+    f.texto(220, ['Um grupo de alunos quer comprar um presente para o professor.'])
+    f.cab(270, '1 O presente do professor - Solução', 1)
+    f.texto(300, ['Com x alunos, 20x + 60 = 30x - 90, e x = 15.'])
+    f.cab(370, '2 O rei no tabuleiro', 2)
+    f.texto(400, ['Quantas casas o rei anda numa jogada?'])
+    f.cab(450, '2 O rei no tabuleiro - Solução', 2)
+    f.texto(480, ['Uma casa.'])
+    f.pg.insert_text((f.x, 509), 'Comentário para professores:', fontname='hebo', fontsize=11)
+    f.texto(523.5, ['este já está no gabarito e fica onde está.'])
+    f = Folha(doc, 4)
+    f.secao(120, 'ÍNDICE REMISSIVO')
+    f.texto(200, ['O presente do professor, 1', 'O rei no tabuleiro, 2'])
+    doc.set_metadata(FIXO)
+    caminho = os.path.join(pasta, nome)
+    doc.save(caminho, garbage=3, deflate=True, no_new_id=True)
+    return caminho
+
+
 if __name__ == '__main__':
     print(fazer(sys.argv[1]))

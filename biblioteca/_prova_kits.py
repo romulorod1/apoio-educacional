@@ -500,6 +500,33 @@ def main():
             else ['piso %s teto %s' % (CK.minutos_da_altura(0), CK.minutos_da_altura(5000))])
     p.limpo('item sem medidas.solucao usa a mediana e da 4,5',
             [] if str(CK.minutos_do_item({'medidas': {}})) == '4.5' else ['deu %s' % CK.minutos_do_item({'medidas': {}})])
+    # L2 (decisao D2): o comentario ao professor no fim da solucao nao conta tempo.
+    # A solucao de 256 pt com o comentario de 99 pt empilhado (256 + 6 + 99 = 361)
+    # tem os minutos da de 256; sem a regra, daria os de 361. O lado do gerador
+    # (kits.py) e conferido por esta mesma confere_kits sobre o pacote gerado
+    sol_sem = {'medidas': {'solucao': {'altura_pt': 256.0}},
+               'origem': {'solucao': {'pagina': 8, 'coluna': 1, 'bbox': [24, 321, 290, 577]}}}
+    sol_com = {'medidas': {'solucao': {'altura_pt': 361.0}},
+               'origem': {'solucao': {'pagina': 8, 'coluna': 1, 'bbox': [24, 321, 290, 577],
+                                      'pedacos': [{'pagina': 8, 'coluna': 1, 'bbox': [24, 321, 290, 577]},
+                                                  {'pagina': 4, 'coluna': 1, 'bbox': [24, 636, 290, 735],
+                                                   'comentario': True}]}}}
+    erros_c = []
+    if CK.minutos_do_item(sol_com) != CK.minutos_do_item(sol_sem):
+        erros_c.append('%s minutos com o comentario, %s sem' % (CK.minutos_do_item(sol_com), CK.minutos_do_item(sol_sem)))
+    if float(CK.minutos_da_altura(361)) == float(CK.minutos_do_item(sol_sem)):
+        erros_c.append('a amostra nao distingue: 361 pt e 256 pt dao os mesmos minutos')
+    p.limpo('comentario ao professor fora do tempo-v1', erros_c)
+    # veneno: a altura de antes do L2, a do asset inteiro, conta o comentario
+    antiga = CK.altura_da_solucao
+    CK.altura_da_solucao = lambda it: ((it.get('medidas') or {}).get('solucao') or {}).get(
+        'altura_pt', CK.MEDIANA_SOLUCAO_PT)
+    try:
+        erros_v = [] if CK.minutos_do_item(sol_com) == CK.minutos_do_item(sol_sem) else \
+            ['o comentario conta tempo: %s minutos contra %s' % (CK.minutos_do_item(sol_com), CK.minutos_do_item(sol_sem))]
+    finally:
+        CK.altura_da_solucao = antiga
+    p.veneno('comentario ao professor contando tempo', erros_v, 'o comentario conta tempo')
     p.limpo('a amostra inteira passa na confere_kits', confere(peca))
 
     # A CONFERENCIA NAO PODE SER GEMEA DO GERADOR, e isto se MEDE, nao se le.

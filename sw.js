@@ -157,6 +157,7 @@
  * lista. O endpoint de IA (/api/ia) só recebe POST, que o fetch abaixo já deixa
  * passar sem cache. O v148 traz o aviso de novidades do planejamento.
  * O v152 reorganiza a janela da aula em duas colunas no tablet.
+ * O v156 traz os 6 assuntos novos de química da revisão dos mapas dos livros no banco/topicos/quimica.json.
  *
  * DESDE O 13f ESTE HISTÓRICO PAROU, e o CACHE abaixo fica fixo. O nome que o
  * tablet vê é gerado na publicação (_teste/versao_publicada.js):
