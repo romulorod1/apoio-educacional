@@ -201,6 +201,15 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
   conf('a aba nova abre na Agenda', (await lugar(pag)).aba, 'agenda');
   await clicar(pag, '#abas .aba[data-tela="biblioteca"]');
   await esperarBib(pag);
+  /* P3: com livro no tablet, a aba abre na Matemática por assunto, e os
+   * módulos por série moram na Estante, a um toque: é de lá que ela entra no
+   * módulo, e é para lá que o Voltar do módulo devolve. */
+  const naEstante = await esperar('a Estante com os módulos', async () => {
+    if (await pag.evaluate(() => !document.querySelector('#bib-livros') || document.querySelector('#bib-livros').hidden)) return true;
+    await clicar(pag, '#bib-abrir-estante');
+    return pag.evaluate(() => !!document.querySelector('#bib-livros .bibl-painel-estante') && getComputedStyle(document.querySelector('#bib-corpo')).display !== 'none');
+  }, v => v, 10000);
+  conf('os módulos estão à vista (na Estante, com livro no tablet)', naEstante.ok, true);
   const rolagemAntes = await pag.evaluate(() => { const c = document.querySelector('.conteudo'); c.scrollTop = Math.min(180, c.scrollHeight - c.clientHeight); return Math.round(c.scrollTop); });
   conf('entrou no módulo', await tocarLinha(pag, 'Equações do Segundo Grau'), true);
   await pausa(200);
