@@ -1526,11 +1526,14 @@ def relatorio_md(manifest, rel):
 
 
 def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapas=None, trabalho=None,
-          gerado_em=None, commit=None, gravar=True, topicos=None, conferencia=None):
+          gerado_em=None, commit=None, gravar=True, topicos=None, conferencia=None, origem=None):
     """Gera o pacote livros-<rotulo>. Devolve (manifest, relatorio, pasta de trabalho).
 
     `conferencia`: a pasta das planilhas de conferencia do gabarito (C15.5),
-    uma por livro; sem ela, <trabalho>/gabaritos."""
+    uma por livro; sem ela, <trabalho>/gabaritos.
+
+    `origem`: um dicionário que, se vier, recebe {id: caminho do arquivo na
+    planilha} (o publicador do catálogo o usa; não entra no manifest)."""
     t0 = time.time()
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]*', rotulo or ''):
         raise SystemExit('erro: --rotulo tem de ser minusculo, sem acento nem espaco (por exemplo matematica-6ano)')
@@ -1574,6 +1577,8 @@ def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapa
             lid = '%s-%d' % (slug(os.path.splitext(os.path.basename(arq))[0])[:76], k)
             k += 1
         ids.add(lid)
+        if origem is not None:
+            origem[lid] = arq   # o publicador do catálogo casa a classificação pelo caminho, fora do manifest
         no_zip = 'livros/%s.%s' % (lid, formato)
         h = sha_do_arquivo(caminho)
         livro = {
