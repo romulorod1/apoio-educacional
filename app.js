@@ -3413,6 +3413,8 @@
     }
     $('#corpo-modal-leitor-pdf').addEventListener('scroll', rolarLeitorContinuo, { passive: true });
     ligarGestosDoLeitor($('#corpo-modal-leitor-pdf'));
+    ligarCanetaSemSelecao($('#corpo-modal-leitor-pdf'));
+    ligarFimDoConteudo();
     $('#leitor-slider-pagina').addEventListener('input', function () {
       // rolagem DIRETA: a suave atravessava as páginas do caminho, desenhava cada uma
       // e deixava o temporizador gravar posições intermediárias depois de soltar
@@ -26622,6 +26624,7 @@
         if (antigo) { antigo.width = 0; antigo.height = 0; }
         registro.caixa.innerHTML = '';
         registro.caixa.appendChild(canvas);
+        criarCamadaDeTexto(estado, registro, pagina, vp);
         registro.temCanvas = true;
         registro.esticado = false;
         registro.densidade = densidade;
@@ -26731,11 +26734,131 @@
     }).catch(function () { /* o detalhe é só nitidez: a página inteira continua lá */ }).then(atualizarOcupacaoDoLeitor);
   }
 
+  /* A CAMADA DE TEXTO (fatia 7 do leitor): o texto da página, transparente,
+   * por cima do canvas, para o dedo selecionar e copiar (o TextLayer do
+   * pdf.js). Nasce com o canvas da página (desenharPaginaContinua) e sai com
+   * ele (liberarPaginaContinua): só as páginas desenhadas têm texto vivo.
+   * Página sem texto (a do escaneado) não ganha camada, e o livro escaneado
+   * (a sonda da fatia 3) é dito uma vez por abertura. O anexo da aula (página
+   * única) continua sem camada. */
+  var LEITOR_SEM_TEXTO = 'Este livro é imagem: o texto não pode ser selecionado nem buscado.';
+  function criarCamadaDeTexto(estado, registro, pagina, vp) {
+    if (estado.escaneado && !estado.avisouImagem) { estado.avisouImagem = true; avisar(LEITOR_SEM_TEXTO); }
+    var velha = registro.texto;
+    // a página foi redesenhada no mesmo tamanho (a segunda passada): a camada pronta volta
+    if (velha && velha.escala === vp.scale) { if (velha.temTexto) registro.caixa.appendChild(velha.div); return; }
+    soltarCamadaDeTexto(registro);
+    var camada = { div: el('div', { class: 'textLayer leitor-pdf-texto' }), escala: vp.scale, tarefa: null, temTexto: false };
+    camada.div.style.setProperty('--total-scale-factor', String(vp.scale));
+    registro.texto = camada;
+    Promise.all([carregarPdfJs(), pagina.getTextContent({ includeMarkedContent: true, disableNormalization: true })]).then(function (r) {
+      // a página saiu (ou foi redesenhada em outro tamanho) enquanto o texto chegava
+      if (registro.texto !== camada || estado !== leitor) return null;
+      var temTexto = (r[1].items || []).some(function (i) { return i.str && i.str.trim(); });
+      // caixa.dataset.texto diz que a página já foi lida: '1' com camada pronta, '0' sem texto
+      if (!temTexto) { registro.caixa.dataset.texto = '0'; return null; }
+      camada.temTexto = true;
+      if (registro.temCanvas && !camada.div.parentNode) registro.caixa.appendChild(camada.div);
+      camada.tarefa = new r[0].TextLayer({ textContentSource: r[1], container: camada.div, viewport: vp });
+      return camada.tarefa.render().then(function () {
+        if (registro.texto !== camada) return;
+        /* a letra de cada pedaço no tamanho que ele tem na página: geometria do
+         * PDF, em px, e não tipografia do app (por isso não está no styles.css) */
+        Array.prototype.forEach.call(camada.div.querySelectorAll('span'), function (s) {
+          s.style.fontSize = 'calc(var(--text-scale-factor) * var(--font-height))';
+        });
+        camada.div.appendChild(el('div', { class: 'endOfContent' }));
+        registro.caixa.dataset.texto = '1';
+      });
+    }).catch(function () { /* sem a camada a página continua lá; só não seleciona */ });
+  }
+
+  function soltarCamadaDeTexto(registro) {
+    var camada = registro.texto;
+    delete registro.caixa.dataset.texto;
+    if (!camada) return;
+    registro.texto = null;
+    if (camada.tarefa) { try { camada.tarefa.cancel(); } catch (e) { /* já terminou */ } }
+    if (camada.div.parentNode) camada.div.parentNode.removeChild(camada.div);
+  }
+
+  /* A S Pen não seleciona o texto do livro: a caneta é da folha (padrão 4.5
+   * do benchmark). O navegador começa a seleção depois do pointerdown; se ele
+   * veio da caneta, o selectstart é cancelado. O dedo e o mouse selecionam. */
+  var canetaNoLeitor = false;
+  function ligarCanetaSemSelecao(corpo) {
+    corpo.addEventListener('pointerdown', function (ev) { canetaNoLeitor = ev.pointerType === 'pen'; }, true);
+    corpo.addEventListener('selectstart', function (ev) { if (canetaNoLeitor) ev.preventDefault(); });
+  }
+
+  /* O FIM DO CONTEÚDO: o mecanismo do TextLayerBuilder do visualizador do
+   * pdf.js (web/text_layer_builder.js), que o TextLayer do núcleo não traz.
+   * Sem ele, o arrasto que termina depois do fim da linha (o dedo quase sempre
+   * passa) cai no vazio da camada e o Chrome põe a ponta da seleção longe: a
+   * seleção some ou pula para a linha de cima. Cada camada tem no fim um
+   * div.endOfContent; enquanto há seleção nela (classe selecting) ele cobre a
+   * camada inteira por baixo dos pedaços de texto (styles.css), e a cada
+   * mudança da seleção ele é posto logo depois do pedaço em que a ponta está:
+   * o arrasto no vazio pega até o fim daquele pedaço, e não mais. Uma escuta
+   * só, no documento, para todas as páginas. */
+  function ligarFimDoConteudo() {
+    var apertado = false, anterior = null;
+    var camadas = function () { return document.querySelectorAll('#corpo-modal-leitor-pdf .leitor-pdf-texto'); };
+    var devolver = function (camada) {
+      var fim = camada.querySelector('.endOfContent');
+      if (fim) { fim.style.width = ''; fim.style.height = ''; fim.style.userSelect = ''; if (fim.parentNode !== camada || fim.nextSibling) camada.appendChild(fim); }
+      camada.classList.remove('selecting');
+    };
+    var devolverTodas = function () { Array.prototype.forEach.call(camadas(), devolver); };
+    document.addEventListener('pointerdown', function (ev) {
+      apertado = true;
+      var camada = ev.pointerType !== 'pen' && ev.target.closest && ev.target.closest('.leitor-pdf-texto');
+      if (camada) camada.classList.add('selecting');
+    });
+    document.addEventListener('pointerup', function () { apertado = false; devolverTodas(); });
+    window.addEventListener('blur', function () { apertado = false; devolverTodas(); });
+    document.addEventListener('keyup', function () { if (!apertado) devolverTodas(); });
+    document.addEventListener('selectionchange', function () {
+      var sel = document.getSelection();
+      if (!sel.rangeCount) { devolverTodas(); return; }
+      var r = sel.getRangeAt(0), ativa = false;
+      Array.prototype.forEach.call(camadas(), function (c) {
+        if (r.intersectsNode(c)) { c.classList.add('selecting'); ativa = true; } else devolver(c);
+      });
+      if (!ativa) { anterior = null; return; }
+      // a ponta que o arrasto está mexendo: a do começo, se a do fim ficou parada
+      var mexeInicio = !!anterior && (r.compareBoundaryPoints(Range.END_TO_END, anterior) === 0 ||
+        r.compareBoundaryPoints(Range.START_TO_END, anterior) === 0);
+      var ponta = mexeInicio ? r.startContainer : r.endContainer;
+      if (ponta.nodeType === Node.TEXT_NODE) ponta = ponta.parentNode;
+      if (!mexeInicio && r.endOffset === 0) {
+        // a ponta no começo de um pedaço: o fim vai depois do pedaço com texto anterior
+        do {
+          while (ponta && !ponta.previousSibling) ponta = ponta.parentNode;
+          ponta = ponta && ponta.previousSibling;
+        } while (ponta && !ponta.childNodes.length);
+      }
+      var camada = ponta && ponta.parentElement && ponta.parentElement.closest('.leitor-pdf-texto');
+      var fim = camada && camada.querySelector('.endOfContent');
+      if (fim && ponta !== fim) {
+        fim.style.width = camada.clientWidth + 'px';
+        fim.style.height = camada.clientHeight + 'px';
+        // no Chrome o fim do conteúdo tem de ser selecionável enquanto está atrás
+        // da ponta (o TextLayerBuilder do pdf.js faz o mesmo): com user-select
+        // none, o ponteiro que passa do fim da linha cai num ponto do meio dela
+        fim.style.userSelect = 'text';
+        ponta.parentElement.insertBefore(fim, mexeInicio ? ponta : ponta.nextSibling);
+      }
+      anterior = r.cloneRange();
+    });
+  }
+
   function liberarPaginaContinua(registro) {
     soltarDetalhe(registro);
     if (registro.tarefa) { registro.tarefa.cancel(); registro.tarefa = null; }
     var c = registro.caixa.querySelector('canvas');
     if (c) { c.width = 0; c.height = 0; registro.caixa.removeChild(c); }
+    soltarCamadaDeTexto(registro);
     registro.caixa.innerHTML = '';
     registro.caixa.appendChild(el('div', { class: 'leitor-pdf-pagina-vazia', 'aria-hidden': 'true' }));
     registro.desenhando = false;
