@@ -1136,7 +1136,10 @@
    *             quando a chave do índice não está no aparelho (camada 'modulo').
    *
    * Devolve { assunto, titulo, serie, teoria: [], listaBase: null|{...},
-   * exercicios: [], obmep: [], vazio: null|{ motivo, texto } }. Cada fonte tem
+   * exercicios: [], obmep: [], enem: [], vazio: null|{ motivo, texto } }. A OBMEP
+   * (o Banco de Questões e a Mirim) e o ENEM vêm separados, como a página do
+   * assunto os mostra, e o `tipo` de cada um segue a fonte ('obmep' ou 'enem').
+   * Cada fonte tem
    * { tipo, id, titulo, serie, quantidade, abrir, anexar, vinculo } e, conforme o
    * tipo, os campos de desenho: imagem (o recorte ou a capa), modulo, lista,
    * numero, dificuldade (1 a 3, a do pacote), dificuldadeOrigem ('proxy' é a
@@ -1153,8 +1156,12 @@
     Object.keys(o).forEach(function (k) { t[k] = o[k]; });
     return t;
   }
+  // as provas de fora: a OBMEP (Banco e Mirim) num grupo, o ENEM noutro
   var FONTES_DE_OLIMPIADA = tabela({ 'obmep-banco': true, 'obmep-mirim': true, enem: true });
   var ORDEM_DA_OLIMPIADA = tabela({ 'obmep-mirim': 1, 'obmep-banco': 2, enem: 3 });
+  function grupoDaFonte(fonte) {
+    return fonte === 'enem' ? 'enem' : FONTES_DE_OLIMPIADA[fonte] ? 'obmep' : 'exercicio';
+  }
   // as provas (Mirim e ENEM): nelas o módulo é o assunto, ou é o Diversos (C12)
   var FONTES_DE_PROVA = tabela({ 'obmep-mirim': true, enem: true });
   // a força de cada camada: quando o mesmo id chega por duas, fica a mais forte
@@ -1244,7 +1251,8 @@
      * para a ordem da entrada não mudar a saída. A segunda monta as fontes, e
      * o id que já entrou não entra de novo. */
     var itemPorId = Object.create(null), melhor = Object.create(null), vistos = Object.create(null);
-    var exercicios = [], obmep = [], moduloPresente = Object.create(null);
+    var exercicios = [], obmep = [], enem = [], moduloPresente = Object.create(null);
+    var destinoDoGrupo = { exercicio: exercicios, obmep: obmep, enem: enem };
     function vinculoDoItem(it, chave) {
       var prova = !!FONTES_DE_PROVA[it.fonte] && moduloDiversos(it);
       if (chave && modulos[chave] === 'modulo') return 'modulo';
@@ -1271,14 +1279,14 @@
       if (vistos[it.id]) return;
       vistos[it.id] = true;
       var chave = m.chave, vinculo = m.vinculo;
-      var olimpiada = !!FONTES_DE_OLIMPIADA[it.fonte];
       var aula = it.aula || {};
       // a dificuldade neutra (o ENEM traz um 2 sem graduação, proxy.neutro) não é dificuldade
       var neutra = !!(it.proxy && it.proxy.neutro);
       var dif = !neutra && (it.dificuldade === 1 || it.dificuldade === 2 || it.dificuldade === 3) ? it.dificuldade : null;
       var assets = it.assets || {}, medidas = it.medidas || {};
-      (olimpiada ? obmep : exercicios).push({
-        tipo: olimpiada ? 'obmep' : 'exercicio', id: it.id, titulo: nomeDoExercicio(it),
+      var grupo = grupoDaFonte(it.fonte);
+      destinoDoGrupo[grupo].push({
+        tipo: grupo, id: it.id, titulo: nomeDoExercicio(it),
         serie: it.serie, quantidade: 1, numero: it.numero, fonte: it.fonte || null,
         modulo: { chave: chave, titulo: (it.modulo && it.modulo.titulo) || '' },
         lista: { slug: aula.slug || '', titulo: aula.titulo || '', n: aula.n || 0 },
@@ -1296,6 +1304,7 @@
         ((a.numero || 0) - (b.numero || 0)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
     }
     exercicios.sort(function (a, b) { return porModulo(a, b) || porLugarNaFonte(a, b); });
+    enem.sort(function (a, b) { return porModulo(a, b) || porLugarNaFonte(a, b); });
     obmep.sort(function (a, b) {
       return ((ORDEM_DA_OLIMPIADA[a.fonte] || 9) - (ORDEM_DA_OLIMPIADA[b.fonte] || 9)) || porModulo(a, b) || porLugarNaFonte(a, b);
     });
@@ -1351,7 +1360,7 @@
     /* O VAZIO DIZ O PORQUÊ, numa linha: o aparelho sem pacote nenhum, o pacote
      * do assunto que ainda não chegou, ou o assunto sem vínculo ainda. */
     var vazio = null;
-    if (!teoria.length && !listaBase && !exercicios.length && !obmep.length) {
+    if (!teoria.length && !listaBase && !exercicios.length && !obmep.length && !enem.length) {
       if (!itens.length && !aulas.length) {
         vazio = { motivo: 'sem-pacote', texto: 'A teoria e os exercícios da Biblioteca ainda não estão neste aparelho.' };
       } else if (ordemDosModulos.some(function (k) { return !moduloPresente[k]; })) {
@@ -1366,7 +1375,7 @@
 
     return {
       assunto: id, titulo: tema && tema.pt ? tema.pt.titulo || null : null, serie: tema ? tema.serie || null : null,
-      teoria: teoria, listaBase: listaBase, exercicios: exercicios, obmep: obmep, vazio: vazio
+      teoria: teoria, listaBase: listaBase, exercicios: exercicios, obmep: obmep, enem: enem, vazio: vazio
     };
   }
 

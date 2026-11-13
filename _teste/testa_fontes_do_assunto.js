@@ -27,10 +27,18 @@
  *      dele e com dados sintéticos, entra só com confiança alta ou média;
  *   7. pura: não mexe na entrada e dá o mesmo resultado duas vezes;
  *   8. O VENENO: o mesmo item repetido na entrada, e ligado ao assunto pelas
- *      três camadas, aparece UMA vez só.
+ *      três camadas, aparece UMA vez só;
+ *   9. o ENEM separado da OBMEP (contrato da orquestradora, 13/11): `obmep`
+ *      só com o Banco e a Mirim, `enem` só com o ENEM, e o tipo segue a fonte;
+ *  10. o tempo: os 171 assuntos de matemática num acervo sintético do tamanho
+ *      do real (cerca de 5.800 exercícios), com teto por assunto.
  *
- * Modo envenenado (TEM de ser visto: "VENENO visto"):
- *   --envenenado-repete-item  a fontesDoAssunto perde a guarda do id já visto.
+ * Modos envenenados (cada um TEM de ser visto: "VENENO visto"):
+ *   --envenenado-repete-item     a fontesDoAssunto perde a guarda do id já visto;
+ *   --envenenado-enem-na-obmep   o ENEM volta a cair dentro da `obmep`;
+ *   --envenenado-base-com-buraco a lista de base com exercício faltando aparece;
+ *   --envenenado-muda-entrada    a função ordena a lista de itens que recebeu,
+ *                                no lugar (mexe na entrada de quem chamou).
  *
  *   node _teste/testa_fontes_do_assunto.js [--envenenado-repete-item]
  */
@@ -41,7 +49,8 @@ const Module = require('module');
 const Sintetico = require('./_pacote_sintetico.js');
 
 const RAIZ = path.join(__dirname, '..');
-const MODO = ['--envenenado-repete-item'].filter(m => process.argv.indexOf(m) !== -1)[0] || '';
+const VENENOS = ['--envenenado-repete-item', '--envenenado-enem-na-obmep', '--envenenado-base-com-buraco', '--envenenado-muda-entrada'];
+const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 
 let passes = 0, falhas = 0;
 function conf(rotulo, obtido, esperado) {
@@ -70,7 +79,16 @@ function carregar(troca) {
   m._compile(texto, caminho);
   return m.exports;
 }
-const Biblioteca = carregar(MODO === '--envenenado-repete-item' ? [GUARDA, ''] : null);
+const TROCAS = {
+  '--envenenado-repete-item': [GUARDA, ''],
+  '--envenenado-enem-na-obmep': ["return fonte === 'enem' ? 'enem' : FONTES_DE_OLIMPIADA[fonte] ? 'obmep' : 'exercicio';",
+    "return FONTES_DE_OLIMPIADA[fonte] ? 'obmep' : 'exercicio';"],
+  '--envenenado-base-com-buraco': ["if (!ids.length || ids.some(function (x) { return typeof x !== 'string' || !itemPorId[x]; })) return;",
+    'if (!ids.length) return;'],
+  '--envenenado-muda-entrada': ['var itens = Array.isArray(o.itens) ? o.itens : [];',
+    'var itens = Array.isArray(o.itens) ? o.itens.sort(function (a, b) { return a.id < b.id ? -1 : 1; }) : [];']
+};
+const Biblioteca = carregar(TROCAS[MODO] || null);
 const F = Biblioteca.fontesDoAssunto;
 
 // ------------------------------------------------------------------ o acervo sintético
@@ -90,6 +108,39 @@ const LISTAS = [Sintetico.LISTA_BASE].concat(Sintetico.LISTAS);
 const ACERVO = { temas: TEMAS, itens: ITENS, teoria: TEORIA, listas: LISTAS };
 
 const MOD_EQ = '9ano:equacoes-do-segundo-grau';
+
+/* Uma cópia profunda e congelada do acervo: com 'use strict' no
+ * biblioteca.js, qualquer escrita na entrada lança erro. */
+function congelada(o) {
+  const c = JSON.parse(JSON.stringify(o));
+  (function gela(x) { if (x && typeof x === 'object') { Object.values(x).forEach(gela); Object.freeze(x); } })(c);
+  return c;
+}
+const ITENS_SEM_UM_DA_BASE = () => ITENS.filter(it => it.id !== Sintetico.LISTA_BASE.degraus[1].item);
+function venenoVisto(rotulo, visto, detalhe) {
+  secao('VENENO: ' + MODO);
+  if (conf(MODO.slice(2) + ': ' + rotulo + ' (defeito detectado)', visto, true)) console.log('VENENO visto: ' + detalhe);
+  console.log('\n' + passes + ' passaram, ' + falhas + ' falharam.');
+  process.exit(falhas ? 1 : 0);
+}
+if (MODO === '--envenenado-enem-na-obmep') {
+  const r = F('MATEM3-11', ACERVO);
+  venenoVisto('o ENEM caiu dentro da obmep', r.obmep.some(q => q.fonte === 'enem') && !(r.enem || []).length,
+    r.obmep.length + ' questões do ENEM na obmep');
+}
+if (MODO === '--envenenado-base-com-buraco') {
+  const r = F('MAT09-04', Object.assign({}, ACERVO, { itens: ITENS_SEM_UM_DA_BASE() }));
+  venenoVisto('a lista de base com buraco apareceu', !!r.listaBase, 'lista ' + (r.listaBase && r.listaBase.id) + ' com um exercício faltando');
+}
+if (MODO === '--envenenado-muda-entrada') {
+  let erro = null;
+  try { F('MAT09-04', congelada(ACERVO)); } catch (e) { erro = e; }
+  const copia = Object.assign({}, ACERVO, { itens: ITENS.slice().reverse() });
+  const antes = JSON.stringify(copia.itens.map(it => it.id));
+  F('MAT09-04', copia);
+  const mexeu = JSON.stringify(copia.itens.map(it => it.id)) !== antes;
+  venenoVisto('a função mexeu na entrada', !!erro && mexeu, 'na entrada congelada: ' + (erro && erro.message));
+}
 const ids = lista => lista.map(x => x.id);
 const semRepetir = lista => new Set(ids(lista)).size === lista.length;
 
@@ -148,11 +199,12 @@ conf('a lista de base abre como lista pronta e vai inteira para o material',
 // ================================================================
 secao('2. Assunto com tema_app');
 const prob = F('MATEM3-11', ACERVO);
-conf('MATEM3-11: as questões do ENEM chegam pelo tema_app', prob.obmep.length + ' ' + prob.obmep.map(q => q.vinculo).join(','),
+conf('MATEM3-11: as questões do ENEM chegam pelo tema_app', prob.enem.length + ' ' + prob.enem.map(q => q.vinculo).join(','),
   '3 tema_app,tema_app,tema_app');
-conf('e são do ENEM', prob.obmep.every(q => q.fonte === 'enem' && q.tipo === 'obmep'), true);
-conf('a questão do ENEM sem solução vem dita', prob.obmep.every(q => q.semSolucao), true);
-conf('o título da questão de prova', prob.obmep[0].titulo, 'Questão 136');
+conf('e são do ENEM, no grupo do ENEM, com o tipo da fonte', prob.enem.every(q => q.fonte === 'enem' && q.tipo === 'enem'), true);
+conf('e nenhuma na obmep', prob.obmep.length, 0);
+conf('a questão do ENEM sem solução vem dita', prob.enem.every(q => q.semSolucao), true);
+conf('o título da questão de prova', prob.enem[0].titulo, 'Questão 136');
 const semModulo = TEMAS.map(t => t.id === 'MAT04-09' ? Object.assign({}, t, { modulo: undefined }) : t);
 const peri = F('MAT04-09', Object.assign({}, ACERVO, { temas: semModulo }));
 conf('com o módulo apagado do índice, a Mirim de MAT04-09 chega pelo tema_app',
@@ -184,8 +236,8 @@ const vazioDeTudo = F('MAT09-04', { temas: TEMAS });
 conf('aparelho sem pacote nenhum: sem pacote', vazioDeTudo.vazio && vazioDeTudo.vazio.motivo, 'sem-pacote');
 conf('a frase do vazio é uma linha, com acento e sem travessão',
   [fora, semNada, vazioDeTudo].every(x => x.vazio.texto && !/\n/.test(x.vazio.texto) && !/[\u2013\u2014]/.test(x.vazio.texto) && /[ãçáéíóú]/.test(x.vazio.texto)), true);
-conf('sem argumento nenhum não quebra', JSON.stringify(Object.keys(F())), JSON.stringify(['assunto', 'titulo', 'serie', 'teoria', 'listaBase', 'exercicios', 'obmep', 'vazio']));
-const furada = F('MAT09-04', Object.assign({}, ACERVO, { itens: ITENS.filter(it => it.id !== Sintetico.LISTA_BASE.degraus[1].item) }));
+conf('sem argumento nenhum não quebra', JSON.stringify(Object.keys(F())), JSON.stringify(['assunto', 'titulo', 'serie', 'teoria', 'listaBase', 'exercicios', 'obmep', 'enem', 'vazio']));
+const furada = F('MAT09-04', Object.assign({}, ACERVO, { itens: ITENS_SEM_UM_DA_BASE() }));
 conf('a lista de base com um exercício que saiu do aparelho NÃO aparece (como no app)', furada.listaBase, null);
 
 // ================================================================
@@ -239,7 +291,7 @@ const p4d = F('MAT04-09', Object.assign({}, ACERVO, { itens: ITENS.filter(it => 
 conf('questão de prova no Diversos não entra pelo tema_app (a regra do eDiversos)', p4d.obmep.some(q => q.id === diversos.id), false);
 const p4c = F('MAT04-09', Object.assign({}, ACERVO, { vinculos: [{ assunto: 'MAT04-09', item: diversos.id }] }));
 conf('mas entra pela linha da tabela que cita o item (é o que a C1 faz)', p4c.obmep.filter(q => q.id === diversos.id).map(q => q.vinculo).join(), 'curadoria');
-conf('o ENEM com a dificuldade neutra não ganha dificuldade', prob.obmep.every(q => q.dificuldade === null && q.dificuldadeNeutra && !q.desafio), true);
+conf('o ENEM com a dificuldade neutra não ganha dificuldade', prob.enem.every(q => q.dificuldade === null && q.dificuldadeNeutra && !q.desafio), true);
 const p4g = F('MAT04-09', ACERVO);
 conf('a Mirim, graduada, ganha', p4g.obmep.every(q => q.dificuldade >= 1 && !q.dificuldadeNeutra), true);
 const semPagina = Object.assign({}, TEORIA[0], { id: TEORIA[0].id + '-vazia', paginas: [] });
@@ -267,6 +319,9 @@ conf('a entrada ficou igual', JSON.stringify(ACERVO) === antes, true);
 conf('duas chamadas, o mesmo resultado', r1 === r2, true);
 const embaralhado = Object.assign({}, ACERVO, { itens: ITENS.slice().reverse(), teoria: TEORIA.slice().reverse() });
 conf('a ordem da entrada não muda a ordem da saída', JSON.stringify(F('MAT09-04', embaralhado)) === r1, true);
+let erroCongelada = null, rCongelada = null;
+try { rCongelada = JSON.stringify(F('MAT09-04', congelada(ACERVO))); } catch (e) { erroCongelada = e.message; }
+conf('com a entrada inteira congelada, nada é escrito nela e o resultado é o mesmo', erroCongelada || (rCongelada === r1), true);
 
 // ================================================================
 secao('8. O veneno: o mesmo item repetido aparece UMA vez só');
@@ -287,6 +342,51 @@ if (MODO === '--envenenado-repete-item') {
   conf('o item ligado por três camadas e repetido três vezes na entrada aparece uma vez', vezes, 1);
   conf('pelo vínculo mais forte, o do módulo', rep.exercicios.filter(e => e.id === alvo.id)[0].vinculo, 'modulo');
   conf('e o assunto continua com 48 exercícios', rep.exercicios.length, 48);
+}
+
+// ================================================================
+if (!MODO) {
+  secao('9. O ENEM separado da OBMEP, em todos os assuntos');
+  const comTabela = Object.assign({}, ACERVO, { vinculos: [{ assunto: 'MATEM3-11', item: 'banco:2019:n2:1' }] });
+  const todos = TEMAS.map(t => F(t.id, comTabela));
+  conf('a obmep só traz Banco e Mirim, com o tipo obmep',
+    todos.every(r => r.obmep.every(q => (q.fonte === 'obmep-banco' || q.fonte === 'obmep-mirim') && q.tipo === 'obmep')), true);
+  conf('o enem só traz o ENEM, com o tipo enem', todos.every(r => r.enem.every(q => q.fonte === 'enem' && q.tipo === 'enem')), true);
+  const m311 = F('MATEM3-11', comTabela);
+  conf('no mesmo assunto, os dois grupos lado a lado', m311.obmep.length + ' OBMEP e ' + m311.enem.length + ' ENEM', '1 OBMEP e 3 ENEM');
+  conf('e ninguém nos dois', m311.obmep.some(q => m311.enem.some(e => e.id === q.id)), false);
+
+  // ================================================================
+  secao('10. O tempo: os 171 assuntos num acervo do tamanho do real');
+  /* O acervo grande é feito aqui, de um exercício e uma aula de teoria do
+   * sintético: 34 exercícios e uma aula por assunto, no módulo dele, cerca de
+   * 5.800 exercícios (o acervo real tinha 5.539 em 12/11). */
+  const ex = ITENS[0], te = TEORIA[0], grandes = [], aulas = [];
+  TEMAS.forEach((t, ti) => {
+    const k = t.modulo || ('9ano:sem-modulo-' + ti);
+    const [serie, slug] = k.split(':');
+    for (let n = 1; n <= 34; n++) {
+      grandes.push(Object.assign({}, ex, { id: k + ':lista:ex:' + n + ':' + ti, serie, modulo: { slug, titulo: 'Módulo ' + ti },
+        aula: { slug: 'lista-' + (n % 3), titulo: 'Lista', n: n % 3 }, numero: n, tema_app: n % 7 ? null : t.id }));
+    }
+    aulas.push(Object.assign({}, te, { id: k + ':aula:teo:' + ti, serie, modulo: { slug, titulo: 'Módulo ' + ti } }));
+  });
+  const grande = { temas: TEMAS, itens: grandes, teoria: aulas, listas: LISTAS };
+  TEMAS.slice(0, 5).forEach(t => F(t.id, grande));   // aquece o JIT
+  const tempos = TEMAS.map(t => {
+    const t0 = process.hrtime.bigint();
+    F(t.id, grande);
+    return Number(process.hrtime.bigint() - t0) / 1e6;
+  });
+  const total = tempos.reduce((a, b) => a + b, 0), maior = Math.max.apply(null, tempos);
+  console.log('   ' + grandes.length + ' exercícios: ' + total.toFixed(1) + ' ms nos ' + TEMAS.length + ' assuntos, ' +
+    (total / TEMAS.length).toFixed(2) + ' ms por assunto, o mais lento ' + maior.toFixed(2) + ' ms');
+  /* O TETO: medido em 13/11 nesta máquina, 1,6 ms por assunto. O tablet é
+   * umas 5 a 10 vezes mais lento que um PC; 25 ms por assunto (um quadro e
+   * meio de tela) deixa a folga para isso e para a máquina do CI ocupada. */
+  conf('o acervo grande tem o tamanho do real', grandes.length > 5000, true);
+  conf('cada assunto sai em média em até 25 ms', total / TEMAS.length <= 25, true);
+  conf('e nenhum passa de 100 ms', maior <= 100, true);
 }
 
 console.log('\n' + passes + ' passaram, ' + falhas + ' falharam.');

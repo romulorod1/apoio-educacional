@@ -1402,6 +1402,10 @@ roda "livros (regras) --envenenado-mapa-parcial-troca" node "_teste/testa_livros
 # visto, e o item repetido aparece duas vezes no mesmo assunto. Sem Chrome.
 roda "fontes do assunto"                        node "_teste/testa_fontes_do_assunto.js"
 roda "fontes do assunto --envenenado-repete-item" node "_teste/testa_fontes_do_assunto.js" --envenenado-repete-item
+# 13/11: o ENEM separado da OBMEP, a lista de base com buraco e a entrada que nao pode mudar
+roda "fontes do assunto --envenenado-enem-na-obmep" node "_teste/testa_fontes_do_assunto.js" --envenenado-enem-na-obmep
+roda "fontes do assunto --envenenado-base-com-buraco" node "_teste/testa_fontes_do_assunto.js" --envenenado-base-com-buraco
+roda "fontes do assunto --envenenado-muda-entrada" node "_teste/testa_fontes_do_assunto.js" --envenenado-muda-entrada
 # B3: a pagina impressa do livro (trechos romanos e arabicos, mudanca no meio,
 # ida e volta em todas as paginas, tela e leitor mostrando a impressa e abrindo
 # e gravando em pagina do arquivo, e recusa so do livro com numeracao invalida).

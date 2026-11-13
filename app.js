@@ -23738,10 +23738,8 @@
       : function (id) { return (bibEtiquetas && bibEtiquetas[id]) || null; };
     var f = fontes || {};
     var teoria = f.teoria || [], base = f.listaBase || null, exercicios = f.exercicios || [], obmep = f.obmep || [];
-    // o nome da seção diz as provas que estão nela: OBMEP, ENEM ou as duas
-    var temEnem = obmep.some(function (x) { return x.fonte === 'enem'; });
-    var temObmep = obmep.some(function (x) { return x.fonte !== 'enem'; });
-    var nomeDaOlimpiada = temEnem && temObmep ? 'OBMEP e ENEM' : temEnem ? 'ENEM' : 'OBMEP';
+    // o ENEM vem num grupo próprio (contrato de 13/11), e ganha a seção dele
+    var enem = f.enem || [];
 
     // as miniaturas do bloco de antes saem dos observadores, que senão as guardariam para sempre
     Array.prototype.slice.call(elemento.querySelectorAll('img.bib-mini')).forEach(function (i) {
@@ -23752,7 +23750,7 @@
     elemento.appendChild(bloco);
     bloco.appendChild(el('h3', { class: 'subtitulo bte-titulo', texto: 'Teoria e exercícios' }));
 
-    if (!teoria.length && !base && !exercicios.length && !obmep.length) {
+    if (!teoria.length && !base && !exercicios.length && !obmep.length && !enem.length) {
       // o vazio numa linha, e com o porquê
       bloco.appendChild(el('p', { class: 'ajuda bte-vazio', texto: (f.vazio && f.vazio.texto) ||
         'Ainda não há teoria nem exercícios ligados a este assunto.' }));
@@ -23939,7 +23937,11 @@
         'exercício', 'exercícios', cartaoDaLista);
     }
     if (obmep.length) {
-      listaComMais(secao('obmep', nomeDaOlimpiada, obmep.length), 'bte-exercicios', obmep, OBMEP_A_VISTA,
+      listaComMais(secao('obmep', 'OBMEP', obmep.length), 'bte-exercicios', obmep, OBMEP_A_VISTA,
+        'questão', 'questões', cartaoDaLista);
+    }
+    if (enem.length) {
+      listaComMais(secao('enem', 'ENEM', enem.length), 'bte-exercicios', enem, OBMEP_A_VISTA,
         'questão', 'questões', cartaoDaLista);
     }
 

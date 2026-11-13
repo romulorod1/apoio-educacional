@@ -293,7 +293,7 @@ const fecharModal = async pag => {
   conf('e três tons diferentes nos pontos', new Set([1, 2, 3].map(d => graus[d] && graus[d].cor)).size, 3);
   const desafios = await pag.evaluate(() => {
     const doPacote = {};
-    window.__provaFontes.exercicios.concat(window.__provaFontes.obmep).forEach(e => { doPacote[e.id] = e.dificuldade; });
+    window.__provaFontes.exercicios.concat(window.__provaFontes.obmep, window.__provaFontes.enem).forEach(e => { doPacote[e.id] = e.dificuldade; });
     const cards = Array.from(document.querySelectorAll('#prova-t2 .bte-ex'));
     return { certos: cards.every(c => (doPacote[c.dataset.id] === 3) === !!c.querySelector('.bte-desafio')),
       quantos: cards.filter(c => c.querySelector('.bte-desafio')).length };
@@ -375,12 +375,12 @@ const fecharModal = async pag => {
   conf('e uma linha só, com o porquê', b.vazios.join(' | '), 'O pacote com a teoria e os exercícios deste assunto ainda não está neste aparelho.');
   await desenhar(pag, 'MATEM3-11');
   b = await ler(pag);
-  conf('MATEM3-11 (só ENEM): a seção leva o nome do ENEM', b.secoes.join(' | '), 'obmep:ENEM 3');
+  conf('MATEM3-11 (só ENEM): a seção própria do ENEM', b.secoes.join(' | '), 'enem:ENEM 3');
   conf('o ENEM, de dificuldade neutra, fica sem selo', await pag.evaluate(() =>
     document.querySelectorAll('#prova-t2 .bte-selo').length), 0);
   await desenhar(pag, 'MATEM3-11', [{ assunto: 'MATEM3-11', item: 'banco:2019:n2:1' }]);
   b = await ler(pag);
-  conf('com uma questão do Banco ligada, "OBMEP e ENEM"', b.secoes.join(' | '), 'obmep:OBMEP e ENEM 4');
+  conf('com uma questão do Banco ligada, a OBMEP e o ENEM em seções separadas', b.secoes.join(' | '), 'obmep:OBMEP 1 | enem:ENEM 3');
 
   // ================================================================
   secao('8b. As miniaturas do bloco não dependem da fila da Biblioteca');
