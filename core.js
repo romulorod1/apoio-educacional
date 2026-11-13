@@ -828,6 +828,14 @@
       (aula.areas && aula.areas.length)));
   }
 
+  /* ATENÇÃO, PARA QUEM FOR LIGAR ISTO NO APP (F7, rodada 6): hoje o editarSerie
+   * não tem chamador no app, só nas provas. Ele poupa a aula registrada e a
+   * passada de mês com pagamento (motivoParaPoupar), mas CRIA as datas novas do
+   * padrão também no passado. Trocar quinta por terça com corte em 01/10 e
+   * outubro pago deixa as quintas pagas e cria as terças: outubro vai de
+   * R$ 600 para R$ 1.080 e o selo vira "parcial". Antes de ligar, decida o que
+   * acontece com o mês já pago (não criar data nova em mês com pagamento, por
+   * exemplo) e prove. */
   function editarSerie(db, serieId, novoPadrao, aPartirDe) {
     var s = (db.series || []).filter(function (x) { return x.id === serieId; })[0];
     if (!s) return 0;

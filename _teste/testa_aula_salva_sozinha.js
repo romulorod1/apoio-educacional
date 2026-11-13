@@ -45,6 +45,8 @@
  * 18. O fecharTudo do Desfazer não grava: o relato pendente fica no rascunho.
  * 19. O Encerrar da ficha do aluno também poupa a aula já registrada, e o aviso
  *     diz quantas continuam (regra no core, testa_encerrar_repeticao.js).
+ * 20. O Desfazer do passo da trilha (e de todo comDesfazer) acaba quando outra
+ *     gravação vem depois: o relato salvo sozinho não some.
  *
  * Venenos, cada um tem de cair:
  *   --envenenado-grava-por-cima        sem a conferência antes de gravar e sem o rebase;
@@ -52,7 +54,8 @@
  *   --envenenado-retrato-absorve-tudo  o retrato do gravado absorve todas as chaves (A1);
  *   --envenenado-descartar-velho       o rebase não atualiza a abertura da janela (B1);
  *   --envenenado-volta-atras           o rebase não reconhece o banco que voltou atrás (B2);
- *   --envenenado-desfazer-tudo         o Desfazer de uma aula volta o banco inteiro (B5).
+ *   --envenenado-desfazer-tudo         o Desfazer de uma aula volta o banco inteiro (B5);
+ *   --envenenado-desfazer-so-no-lote   a trava "gravou depois, o Desfazer acaba" só vale no lote.
  * Dados fictícios.
  */
 'use strict';
@@ -63,7 +66,7 @@ const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const { conf, secao, esperar, pausa } = H;
 
 const MODOS = ['--envenenado-grava-por-cima', '--envenenado-sem-rascunho-ao-sair', '--envenenado-retrato-absorve-tudo',
-  '--envenenado-descartar-velho', '--envenenado-volta-atras', '--envenenado-desfazer-tudo'];
+  '--envenenado-descartar-velho', '--envenenado-volta-atras', '--envenenado-desfazer-tudo', '--envenenado-desfazer-so-no-lote'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) >= 0)[0] || '';
 const CONFERE = '    return chaves.filter(function (k) { return noBanco[k] !== base[k]; });';
 const REBASE = '  function rebasearAulaAberta() {';
@@ -72,9 +75,10 @@ const RETRATO = '    chaves.forEach(function (k) { s[k] = valores[k]; });';
 const ABERTURA = '      if (aberturaDaAula) {';
 const VOLTOU = '      return (sobrescritosPelaJanela[k] || []).indexOf(noBanco[k]) >= 0;';
 const DESFAZ = "(escopo === 'esta' ? comDesfazerDaAula(rotulo, aula.id, acaoDaAula) : comDesfazer(rotulo, acaoDaAula, true))";
+const TRAVA = '          encerrarDesfazerDeLote(); registroDoLote = desfazerDeLoteAberto = { marca: gravacoesPedidas };';
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 conf('(arranjo) as âncoras dos venenos estão cada uma num lugar só',
-  [CONFERE, REBASE, RASCUNHO_SAIDA, RETRATO, ABERTURA, VOLTOU, DESFAZ].map(a => APP.split(a).length).join(','), '2,2,2,2,2,2,2');
+  [CONFERE, REBASE, RASCUNHO_SAIDA, RETRATO, ABERTURA, VOLTOU, DESFAZ, TRAVA].map(a => APP.split(a).length).join(','), '2,2,2,2,2,2,2,2');
 const trocas = {};
 if (MODO === MODOS[0]) trocas['/app.js'] = APP.replace(CONFERE, '    return [];').replace(REBASE, REBASE + ' return;');
 if (MODO === MODOS[1]) trocas['/app.js'] = APP.replace(RASCUNHO_SAIDA, '');
@@ -82,6 +86,7 @@ if (MODO === MODOS[2]) trocas['/app.js'] = APP.replace(RETRATO, '    Object.keys
 if (MODO === MODOS[3]) trocas['/app.js'] = APP.replace(ABERTURA, '      if (false) {');
 if (MODO === MODOS[4]) trocas['/app.js'] = APP.replace(VOLTOU, '      return false;');
 if (MODO === MODOS[5]) trocas['/app.js'] = APP.replace(DESFAZ, 'comDesfazer(rotulo, acaoDaAula)');
+if (MODO === MODOS[6]) trocas['/app.js'] = APP.replace(TRAVA, '          if (deLote) { encerrarDesfazerDeLote(); registroDoLote = desfazerDeLoteAberto = { marca: gravacoesPedidas }; }');
 if (MODO) conf('(veneno) o app.js servido mudou', trocas['/app.js'] !== APP, true);
 const amb = H.criarAmbiente(8886, 'nath_f7_salva_sozinha', trocas);
 function fimDoVeneno() { throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true }); }
@@ -619,6 +624,48 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
     const av19 = (await avisoAgora(pag)).texto;
     const n19 = antes19.registradas.length;
     conf('o aviso diz quantas continuam e por quê (' + av19 + ')', av19.indexOf('Repetição encerrada. ' + (n19 === 1 ? '1 aula já registrada continua na agenda.' : n19 + ' aulas já registradas continuam na agenda.')) === 0, true);
+  }
+
+  if (MODO === MODOS[6] || !MODO) {
+    secao('20. O Desfazer do passo da trilha não apaga o relato salvo depois');
+    pag.respostaDoDialogo = true;
+    await pag.evaluate(async aulaId => {
+      const d = await Store.carregar();
+      const al = d.alunos.find(a => a.id === 'f7_alfa');
+      al.trilhas = [Core.criarTrilha({ alunoId: al.id, titulo: 'Trilha Teste', alvoId: 'MAT07-10', materia: 'matematica',
+        passos: [{ temaId: 'MAT07-10', titulo: 'Equações do 1º grau', serie: '07', modulo: '7ano:equacoes', duracaoMin: 60 }] })];
+      al.trilhas[0].passos[0].feitoEm = Core.hojeIso();
+      al.trilhas[0].passos[0].aulaId = aulaId;
+      await Store.salvar(d);
+    }, AVULSA);
+    await H.abrirApp(pag, amb.ORIGEM);
+    await H.irParaAba(pag, 'alunos');
+    await pag.evaluate(() => document.querySelector('#lista-alunos .item-lista[data-aluno="f7_alfa"]').click());
+    await pag.evaluate(() => { const b = Array.from(document.querySelectorAll('#modal-aluno .aba-perfil')).find(x => x.textContent.trim() === 'Mapeamento'); if (b) b.click(); });
+    const passo = await esperar('o passo marcado no painel', () => pag.evaluate(() => {
+      const c = document.querySelector('#painel-trilhas .marca-passo'); return !!c && c.checked; }), Boolean, 8000);
+    conf('(arranjo) o passo marcado aparece no painel da ficha', passo.ok, true);
+    await pag.evaluate(() => { const c = document.querySelector('#painel-trilhas .marca-passo'); c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); });
+    const desmarcou = await esperar('o passo voltou para a fila', () => pag.evaluate(() => Store.carregar().then(d =>
+      !d.alunos.find(a => a.id === 'f7_alfa').trilhas[0].passos[0].feitoEm)), Boolean, 5000);
+    conf('(arranjo) desmarcar o passo gravou, com Desfazer (' + (await avisoAgora(pag)).texto + ')', desmarcou.ok && /Desfazer/.test((await avisoAgora(pag)).acao), true);
+    await pag.evaluate(() => { const b = document.querySelector('#modal-aluno [data-fechar]'); if (b) b.click(); });
+    await esperar('a ficha fechou', () => pag.evaluate(() => !document.querySelector('#modal-aluno').classList.contains('aberto')), Boolean, 5000);
+    conf('(arranjo) a aula abriu', (await abrir(pag, AVULSA)).ok, true);
+    await escrever(pag, '#campo-nota-texto', 'Relato escrito depois do passo');
+    conf('(arranjo) o relato salvou ("Salvo")', (await esperar('relato depois do passo', () => lerAula(pag, AVULSA), a => a && a.notaTexto === 'Relato escrito depois do passo', 5000)).ok, true);
+    const botao20 = await pag.evaluate(() => { const b = document.querySelector('#aviso-acao'); return { vivo: getComputedStyle(b).display !== 'none' && !!b.onclick }; });
+    // o toque no Desfazer do passo, mesmo que o aviso já tenha recolhido
+    await pag.evaluate(() => { const b = document.querySelector('#aviso-acao'); if (b.onclick) b.onclick(); });
+    await pausa(1200);
+    const relato20 = (await lerAula(pag, AVULSA)) ? (await lerAula(pag, AVULSA)).notaTexto : '(aula sumiu)';
+    if (MODO === MODOS[6]) {
+      conf('VENENO visto: o relato continua depois do Desfazer do passo, e quebrou (' + relato20 + ')', relato20 === 'Relato escrito depois do passo', false);
+      fimDoVeneno();
+    }
+    conf('depois do "Salvo", o Desfazer do passo some', botao20.vivo, false);
+    conf('o relato salvo depois do passo continua gravado (' + relato20 + ')', relato20, 'Relato escrito depois do passo');
+    if (await aberta(pag)) { await pag.click('#cancelar-aula'); await pausa(400); }
   }
 
   conf('não houve erro de página', (pag.errosDePagina || []).join(' | '), '');

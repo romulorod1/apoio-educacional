@@ -2343,10 +2343,10 @@
       return Promise.reject(recusa);
     }
     gravacoesPedidas++;
-    /* F7 (rodada 5): uma gravação qualquer depois de um lote da repetição
-     * encerra o Desfazer daquele lote. O Desfazer volta o banco inteiro de
-     * antes, e apagaria o que foi gravado depois (o relato salvo sozinho em
-     * outra aula, por exemplo). O botão some; o texto do aviso fica. */
+    /* F7 (rodadas 5 e 6): uma gravação qualquer depois de uma ação com
+     * Desfazer (comDesfazer) encerra o Desfazer dela. O Desfazer volta o banco
+     * inteiro de antes, e apagaria o que foi gravado depois (o relato salvo
+     * sozinho, por exemplo). O botão some; o texto do aviso fica. */
     if (desfazerDeLoteAberto && desfazerDeLoteAberto.marca !== gravacoesPedidas) encerrarDesfazerDeLote();
     var p = Store.salvar(semCorteDoCelular(dbParaGravar()));
     p.then(gravacaoConfirmada, falhaDeGravacao);
@@ -2354,7 +2354,7 @@
   }
 
   var gravacoesPedidas = 0;
-  var desfazerDeLoteAberto = null;   // { marca }: a gravação do lote; outra depois encerra o Desfazer
+  var desfazerDeLoteAberto = null;   // { marca }: a gravação da ação com Desfazer; outra depois o encerra
   function encerrarDesfazerDeLote() {
     if (!desfazerDeLoteAberto) return;
     desfazerDeLoteAberto.encerrado = true;
@@ -2644,8 +2644,10 @@
         var registroDoLote = null;
         var gravou = gravar(function () {
           var p = salvar();
-          // a gravação do próprio lote: só uma DEPOIS dela encerra o Desfazer
-          if (deLote) { encerrarDesfazerDeLote(); registroDoLote = desfazerDeLoteAberto = { marca: gravacoesPedidas }; }
+          /* a gravação da própria ação: só uma DEPOIS dela encerra o Desfazer.
+           * Vale para TODO comDesfazer (rodada 6): o Desfazer volta o banco
+           * inteiro, e o relato salvo sozinho depois sumiria com ele. */
+          encerrarDesfazerDeLote(); registroDoLote = desfazerDeLoteAberto = { marca: gravacoesPedidas };
           return p;
         });
         return gravou.then(function () {
@@ -2653,7 +2655,7 @@
           if (registroDoLote && registroDoLote.encerrado) { avisar(texto); return resultado; }
           avisar(texto, 'Desfazer', function () {
             if (registroDoLote && (registroDoLote.encerrado || registroDoLote.marca !== gravacoesPedidas)) {
-              avisar('Outra mudança foi gravada depois, então esta alteração em várias aulas não se desfaz mais.');
+              avisar('Outra mudança foi gravada depois, então esta alteração não se desfaz mais.');
               return;
             }
             if (registroDoLote) desfazerDeLoteAberto = null;
