@@ -204,7 +204,12 @@ async function abrirPaginaDoAssunto(pag, disciplina, ano, id, titulo) {
     await clicar(pag, '#bib-livros .bibl-assunto-linha[data-assunto="' + id + '"]');
   } else {
     await pag.evaluate(t => { const i = document.querySelector('#busca-biblioteca'); i.value = t; i.dispatchEvent(new Event('input', { bubbles: true })); }, titulo);
-    await esperar('o ' + id + ' na busca', () => pag.evaluate(i => !!document.querySelector('#bib-assuntos-da-busca [data-assunto="' + i + '"]'), id), v => v, 10000);
+    // o título pode casar mais de 5 assuntos: o "Ver os outros N" (e o "Ver de outros anos") mostra o resto
+    await esperar('o ' + id + ' na busca', () => pag.evaluate(i => {
+      if (document.querySelector('#bib-assuntos-da-busca [data-assunto="' + i + '"]')) return true;
+      document.querySelectorAll('#bib-assuntos-da-busca .bib-assuntos-mais, #bib-assuntos-da-busca .bib-assuntos-outros-anos-ver').forEach(b => b.click());
+      return false;
+    }, id), v => v, 10000);
     await clicar(pag, '#bib-assuntos-da-busca [data-assunto="' + id + '"]');
   }
   await esperar('o "Comparar os livros" na página do ' + id, () => pag.evaluate(i =>
@@ -220,6 +225,7 @@ function tituloNoCatalogo(materia, id) {
   const anda = x => {
     if (achado || !x || typeof x !== 'object') return;
     if (x.id === id) { achado = x.titulo || (x.pt && x.pt.titulo) || null; return; }
+    if (Array.isArray(x.ids) && Array.isArray(x.topicos) && x.ids.indexOf(id) >= 0) { achado = x.topicos[x.ids.indexOf(id)] || null; return; }
     Object.keys(x).forEach(k => anda(x[k]));
   };
   anda(JSON.parse(fs.readFileSync(path.join(H.RAIZ, 'banco', 'topicos', materia + '.json'), 'utf8')));
@@ -391,6 +397,13 @@ const medir = pag => pag.evaluate(() => {
 
   // ================================================================
   secao('3. O "N livros" do painel do capítulo chega à mesma tabela');
+  // P3: a página do assunto aberta antes sai pelo Voltar dela, e a capa está na Estante
+  await clicar(pag, '#bib-corpo .bib-assunto .bib-voltar');
+  await esperar('a capa do livro-a na Estante', async () => {
+    await clicar(pag, '#bib-abrir-estante');
+    await clicar(pag, '#bib-livros .bibl-painel-estante .bibl-ano[data-ano="06"]');
+    return pag.evaluate(() => !!document.querySelector('#bib-livros .bibl-painel-estante [data-livro="livro-a"]'));
+  }, v => v, 10000);
   await clicar(pag, '#bib-livros [data-livro="livro-a"]');
   await esperar('a tela do livro-a', () => pag.evaluate(() => { const t = document.querySelector('#bib-livro'); return !!t && !t.hidden && t.dataset.livro === 'livro-a'; }), v => v, 5000);
   const painel = (await esperar('o "N livros" do assunto ligado', () => pag.evaluate(() =>

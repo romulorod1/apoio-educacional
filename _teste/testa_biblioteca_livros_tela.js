@@ -581,6 +581,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   // ================================================================
   secao('6. O livro sem sumário diz isso');
   await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  await abrirEstante(pag);
   await clicar(pag, '#bib-livros .bibl-ano[data-ano="06"]');
   await clicar(pag, '#bib-livros [data-livro="livro-sem-sumario"]');
   await esperar('a tela do livro sem sumário', () => lerLivro(pag), v => v.visivel && v.livro === 'livro-sem-sumario', 5000);
