@@ -68,6 +68,7 @@
 const fs = require('fs');
 const { execFileSync } = require('child_process');
 const VP = require('./versao_publicada.js');
+const PUBLICA_YML = '.github/workflows/publica-cloudflare.yml';
 
 const REPO = process.env.REPO_MERGE_SEGURO || 'romulorod1/apoio-educacional';
 const GH = process.env.GH || 'gh';
@@ -294,6 +295,16 @@ function decidirPublicacao(v) {
   } else {
     motivos.push('o PR nao leva arquivo do site para a main' + (novas.length ? ' (traz ' + novas.join(', ') + ')' : ''));
   }
+  // O GitHub Pages: o publica-cloudflare.yml publica o endereco antigo por Actions
+  // (deploy-pages), o que so funciona com o Pages do repositorio em build_type
+  // "workflow". O PR que mexe nesse arquivo so entra com o Pages em Actions. Quem
+  // le e o lerPublicacao (gh api, no merge); a conferencia do portao, sem rede, nao
+  // traz o campo, e ai nao se afirma nada sobre o Pages.
+  if (v.mudancas.some(m => m.caminho === PUBLICA_YML) && Object.prototype.hasOwnProperty.call(v, 'pages')) {
+    if (v.pages === 'workflow') motivos.push('o PR mexe no ' + PUBLICA_YML + ' e o Pages publica por Actions (build_type workflow)');
+    else recusas.push('o PR mexe no ' + PUBLICA_YML + ' e o Pages esta em build_type ' + (v.pages == null ? '(nao consegui ler)' : '"' + v.pages + '"') +
+      ': troque o Pages para Actions antes (gh api -X PUT repos/' + REPO + '/pages -f build_type=workflow)');
+  }
   return { ok: !recusas.length, motivos, recusas };
 }
 
@@ -334,7 +345,12 @@ function lerPublicacaoGit(g, alvo, main) {
 /* No merge: busca a origin/main e a cabeca do PR AGORA, e le o que ele leva. */
 function lerPublicacao(numero, cabeca) {
   git(['fetch', 'origin', 'main', 'refs/pull/' + numero + '/head']);
-  return lerPublicacaoGit(git, cabeca, 'origin/main');
+  const v = lerPublicacaoGit(git, cabeca, 'origin/main');
+  // So pergunta ao GitHub quando importa. Leitura que falha vira null, e null recusa.
+  if (v.mudancas.some(m => m.caminho === PUBLICA_YML)) {
+    try { v.pages = String(gh(['api', 'repos/' + REPO + '/pages', '--jq', '.build_type'])).trim(); } catch (e) { v.pages = null; }
+  }
+  return v;
 }
 
 /* Quantos commits a cabeca esta atras da main. Lanca se nao conseguir medir. */

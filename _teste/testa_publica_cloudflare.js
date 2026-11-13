@@ -75,6 +75,7 @@ function defeitosDoPublica(texto) {
   if (/\|\|/.test(se)) d.push('if do publica tem um "ou": qualquer ramo dele publicaria sem as outras condicoes');
 
   if (!/ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/.test(pub)) d.push('checkout nao e do commit do portao');
+  if (!/      publicar: \$\{\{ steps\.ponta\.outputs\.publicar \}\}/.test(pub)) d.push('o publica nao expoe o veredito da ponta (outputs.publicar)');
   // 13f: o monta_site gera VERSAO e CACHE pelo contador, que exige a historia inteira.
   if (!/ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}\n\s+fetch-depth: 0/.test(pub)) d.push('checkout do publica sem fetch-depth: 0 (o contador da publicacao sairia menor)');
   const ps = passos(pub);
@@ -116,7 +117,19 @@ function defeitosDoPublica(texto) {
   if (!gp) d.push('sem o job publica-github-pages (o endereco antigo ficaria com o sw.js fixo)');
   else {
     if (!/needs: publica\n/.test(gp)) d.push('o GitHub Pages nao espera o publica');
-    if (!/if: needs\.publica\.outputs\.publicou == 'sim'/.test(gp)) d.push('o GitHub Pages publica sem o endereco novo ter publicado');
+    // Depende da PONTA (portao verde e commit na ponta), e nao do envio ao
+    // Cloudflare: uma falha do wrangler nao pode deixar o endereco antigo parado.
+    if (!/if: \$\{\{ !cancelled\(\) && needs\.publica\.outputs\.publicar == 'sim' \}\}/.test(gp)) d.push('o GitHub Pages nao depende da ponta com !cancelled() (needs.publica.outputs.publicar)');
+    if (/outputs\.publicou/.test(gp)) d.push('o GitHub Pages depende do envio ao Cloudflare (publicou)');
+    // A CONDICAO do build_type: o primeiro passo le e falha alto se nao for workflow.
+    const pgp = passos(gp);
+    const pTipo = pgp.findIndex(p => /gh api "repos\/\$\{\{ github\.repository \}\}\/pages" --jq \.build_type/.test(p));
+    if (pTipo !== 0) d.push('o primeiro passo do GitHub Pages nao confere o build_type do Pages');
+    else {
+      if (!/if \[ "\$tipo" != "workflow" \]; then[\s\S]*?exit 1/.test(pgp[0])) d.push('o passo do build_type nao falha quando nao e workflow');
+      if (!/GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}/.test(pgp[0])) d.push('o passo do build_type sem o GH_TOKEN');
+      if (!/\|\| \{[\s\S]*?exit 1; \}/.test(pgp[0])) d.push('leitura do Pages que falha nao falha o passo');
+    }
     if (!/pages: write/.test(gp) || !/id-token: write/.test(gp)) d.push('o GitHub Pages sem as permissoes pages e id-token');
     if (!/ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}\n\s+fetch-depth: 0/.test(gp)) d.push('o GitHub Pages sem o checkout do commit com a historia inteira');
     if (!/sh \.github\/monta_site\.sh _site_antigo --endereco-antigo/.test(gp)) d.push('o GitHub Pages nao usa o montador com --endereco-antigo');
@@ -188,10 +201,20 @@ const venenos = [
   ['envio com working-directory', PUBLICA.replace(/(id: envio\n)/, '$1        working-directory: _site\n')],
   ['checkout raso', PUBLICA.replace(/(ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}\n\s+)fetch-depth: 0/, '$1fetch-depth: 1')],
   ['sem o job do GitHub Pages', PUBLICA.replace('  publica-github-pages:\n', '  outro-job:\n')],
-  ['GitHub Pages sem a guarda do publicou', PUBLICA.replace(/(  publica-github-pages:\n    needs: publica\n)    if: needs\.publica\.outputs\.publicou == 'sim'\n/, '$1')],
+  ['GitHub Pages sem guarda nenhuma', PUBLICA.replace(/(  publica-github-pages:\n    needs: publica\n)    if: .*\n/, '$1')],
   ['GitHub Pages com o icone novo (sem --endereco-antigo)', PUBLICA.replace('monta_site.sh _site_antigo --endereco-antigo', 'monta_site.sh _site_antigo')],
   ['GitHub Pages com checkout raso', PUBLICA.replace(/(  publica-github-pages:[\s\S]*?)fetch-depth: 0/, '$1fetch-depth: 1')],
-  ['sem a conferencia do antigo', PUBLICA.replace('  conferencia-antigo:\n', '  outra-conferencia:\n')]
+  ['sem a conferencia do antigo', PUBLICA.replace('  conferencia-antigo:\n', '  outra-conferencia:\n')],
+  ['GitHub Pages dependendo do envio ao Cloudflare', PUBLICA.replace("if: ${{ !cancelled() && needs.publica.outputs.publicar == 'sim' }}", "if: needs.publica.outputs.publicou == 'sim'")],
+  ['GitHub Pages sem o !cancelled() (nao roda com o envio vermelho)', PUBLICA.replace("${{ !cancelled() && needs.publica.outputs.publicar == 'sim' }}", "needs.publica.outputs.publicar == 'sim'")],
+  ['o publica sem expor a ponta', PUBLICA.replace('      publicar: ${{ steps.ponta.outputs.publicar }}\n', '')],
+  ['sem o passo do build_type', PUBLICA.replace('--jq .build_type', '--jq .status')],
+  ['passo do build_type que nao falha', PUBLICA.replace(/(if \[ "\$tipo" != "workflow" \]; then\n.*\n\s+)exit 1/, '$1true')],
+  ['passo do build_type depois do deploy', (() => {
+    const m = PUBLICA.match(/      - name: O Pages do repositorio publica por Actions \(build_type workflow\)\n(?:        .*\n)+/);
+    if (!m) return PUBLICA;
+    return PUBLICA.replace(m[0], '').replace('        uses: actions/deploy-pages@v4\n', '        uses: actions/deploy-pages@v4\n' + m[0]);
+  })()]
 ];
 venenos.forEach(([nome, texto]) => {
   conf('veneno "' + nome + '" foi aplicado', texto !== PUBLICA);

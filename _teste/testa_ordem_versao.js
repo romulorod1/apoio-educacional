@@ -121,6 +121,12 @@ const TABELA = [
   ['PR que muda o CACHE: recusa', caso(mud('sw.js', add(NOV)), { [NOV]: 'item\n' }, { cache: { agora: 'apoio-educacional-v142', main: 'apoio-educacional-v141' } }), 'reprova', 'livre'],
   ['PR que BAIXA a VERSAO, so de prova: recusa', caso(mud('_teste/x.js'), {}, { versao: { agora: '1.42.60', main: '1.42.61' } }), 'reprova', 'livre'],
   ['VERSAO ilegivel (null): recusa', caso(mud('_teste/x.js'), {}, { versao: { agora: null, main: '1.42.61' } }), 'reprova'],
+  // O GitHub Pages: quem mexe no publica-cloudflare.yml so entra com o Pages em Actions.
+  ['mexe no publica-cloudflare.yml com o Pages em legacy: recusa', caso(mud('.github/workflows/publica-cloudflare.yml'), {}, { pages: 'legacy' }), 'reprova'],
+  ['mexe no publica-cloudflare.yml sem conseguir ler o Pages (null): recusa', caso(mud('.github/workflows/publica-cloudflare.yml'), {}, { pages: null }), 'reprova'],
+  ['mexe no publica-cloudflare.yml com o Pages em workflow: passa', caso(mud('.github/workflows/publica-cloudflare.yml'), {}, { pages: 'workflow' }), 'passa'],
+  ['portao sem rede (sem o campo pages): nao afirma nada, passa', caso(mud('.github/workflows/publica-cloudflare.yml')), 'passa'],
+  ['nao mexe no publica-cloudflare.yml, Pages em legacy: passa', caso(mud('_teste/x.js'), {}, { pages: 'legacy' }), 'passa'],
   // A TRANSICAO (a main sem o gerador: o merge do proprio 13f): vale a regra antiga, MAIORES.
   ['transicao: VERSAO e CACHE maiores, com novidade: passa', caso(mud('app.js', add(NOV)), { [NOV]: '# nada\n' }, { transicao: true,
     versao: { agora: '1.42.69', main: '1.42.63' }, cache: { agora: 'apoio-educacional-v149', main: 'apoio-educacional-v143' } }), 'passa'],

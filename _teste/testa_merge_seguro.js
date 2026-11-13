@@ -183,7 +183,12 @@ fs.writeFileSync(falso,
   "const fs = require('fs');\n" +
   "const a = process.argv.slice(2);\n" +
   "fs.appendFileSync(process.env.FALSO_LOG, a.join(' ') + '\\n');\n" +
-  "if (a[0] === 'api') {\n" +
+  // 13f: o build_type do GitHub Pages (FALSO_PAGES; 'erro' falha a leitura). O
+  // gh falso e de caminho absoluto e nao tem credencial: nada vai a rede.
+  "if (a[0] === 'api' && /\\/pages$/.test(a[1] || '')) {\n" +
+  "  if (process.env.FALSO_PAGES === 'erro') { process.stderr.write('HTTP 404: Not Found'); process.exit(1); }\n" +
+  "  process.stdout.write((process.env.FALSO_PAGES || 'workflow') + '\\n');\n" +
+  "} else if (a[0] === 'api') {\n" +
   "  if (process.env.FALSO_BEHIND === 'erro') { process.stderr.write('HTTP 403: sem permissao'); process.exit(1); }\n" +
   "  process.stdout.write(JSON.stringify({ behind_by: Number(process.env.FALSO_BEHIND || 0), ahead_by: 1 }));\n" +
   "} else if (a[0] === 'pr' && a[1] === 'view') process.stdout.write(fs.readFileSync(process.env.FALSO_PR, 'utf8'));\n" +
@@ -252,6 +257,7 @@ function rodar(pr, extra, behind, scriptAlvo, git) {
       env: Object.assign({}, process.env, { GH: falso, FALSO_LOG: log, FALSO_PR: json, FALSO_BEHIND: String(behind === undefined ? 0 : behind),
         GIT: gitFalso, FALSO_GIT_LOG: logGit, FALSO_MAIN: git.main || scriptAlvo || script,
         FALSO_MAIN_VP: git.mainVp || path.join(__dirname, 'versao_publicada.js'),
+        FALSO_PAGES: git.pages || '',
         FALSO_FETCH: git.fetch || '', FALSO_SHOW: git.show || '',
         FALSO_CABECA: CABECA, FALSO_ORDEM: git.ordem ? JSON.stringify(git.ordem) : '', FALSO_ORDEM_ERRO: git.ordemErro || '', FALSO_TRANSICAO: git.transicao ? '1' : '' })
     });
@@ -447,6 +453,18 @@ conf('transicao: VERSAO e CACHE maiores que os da main, com novidade, passa e me
 conf('transicao: perguntou se a main tem o gerador', r.chamadasGit.indexOf('cat-file -e origin/main:_teste/versao_publicada.js') >= 0, true);
 r = rodar(semRisco(), [], 0, undefined, { transicao: true, ordem: COM_NOV });
 conf('transicao: VERSAO e CACHE iguais aos da main recusa e nao mergeia', r.codigo === 1 && !r.chamadas.some(c => /^pr merge/.test(c)) && /transicao/.test(r.saida), true);
+// O PR que mexe no publica-cloudflare.yml so entra com o GitHub Pages em Actions.
+const MEXE_PUBLICA = pub([['M', '.github/workflows/publica-cloudflare.yml'], ['M', '_teste/testa_x.js']]);
+r = rodar(semRisco(), [], 0, undefined, { ordem: MEXE_PUBLICA, pages: 'legacy' });
+conf('mexe no publica-cloudflare.yml com o Pages em legacy: recusa e NAO chama o merge', r.codigo === 1 && !r.chamadas.some(c => /^pr merge/.test(c)), true);
+conf('e o motivo manda trocar o Pages para Actions antes', /troque o Pages para Actions antes/.test(r.saida) && /build_type "legacy"/.test(r.saida), true);
+conf('e perguntou o build_type ao GitHub', r.chamadas.some(c => /^api repos\/.*\/pages --jq \.build_type$/.test(c)), true);
+r = rodar(semRisco(), [], 0, undefined, { ordem: MEXE_PUBLICA, pages: 'erro' });
+conf('leitura do Pages que falha recusa (null nao vira workflow)', r.codigo === 1 && /nao consegui ler/.test(r.saida), true);
+r = rodar(semRisco(), [], 0, undefined, { ordem: MEXE_PUBLICA, pages: 'workflow' });
+conf('controle: com o Pages em workflow, o mesmo PR passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge 9 /.test(c)).length === 1, true);
+r = rodar(semRisco(), [], 0, undefined, { ordem: COM_NOV, pages: 'legacy' });
+conf('PR que nao mexe no publica-cloudflare.yml nem pergunta pelo Pages (e passa com legacy)', r.codigo === 0 && !r.chamadas.some(c => /\/pages /.test(c)), true);
 // Controle: sem o bloco, o mesmo PR sem novidade passaria e mergearia.
 const semOrdem = fonte.replace(/ *\/\/ ORDEM-INICIO[\s\S]*?\/\/ ORDEM-FIM\r?\n/, '');
 conf('controle: achei o bloco da publicacao para tirar', semOrdem !== fonte, true);
