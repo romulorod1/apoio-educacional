@@ -264,9 +264,17 @@
    * vazio, o 0 ou "nao_disse", e o semNulo() abaixo os lê como null. */
   var ACOES = ['criar_aula', 'criar_reposicao', 'remarcar', 'mudar_duracao', 'cancelar', 'falta', 'nao_cobrar', 'voltar_a_dada'];
   var HORA_OU_NULO = { type: 'string', description: 'HH:MM, 24 horas; texto vazio quando ela não disse.' };
-  /* Os feedbacks recentes (o tom dela) só vão ao modelo quando a fala dela
-   * pede o feedback do mês (lente da romul-ac, 6). */
-  function pedeOFeedback(ctx) { return /\b(feedback|feedbacks|devolutiva|mensagem do mes|recado do mes)\b/.test(semAcento(soTexto(ctx && ctx.fala))); }
+  /* Os feedbacks recentes (o tom dela) só vão ao modelo quando a PERGUNTA
+   * ATUAL (ctx.pergunta; nunca a fala anterior) pede o RASCUNHO: escrever,
+   * preparar, fazer ou montar o feedback, a devolutiva, a mensagem ou o
+   * retorno do mês. A palavra "feedback" numa consulta ("feedbacks
+   * pendentes?", "de quem falta o feedback?") não basta (lente da romul-ac, 6;
+   * rodada final da orquestradora, 3). Entre o verbo e o objeto, só palavras
+   * de ligação ("faz pra mim o feedback"). */
+  var PEDE_RASCUNHO = new RegExp('\\b(escrev\\w*|prepar\\w*|faz|faca|fazer|faria|monta\\w*|redig\\w*|rascunh\\w*)' +
+    '(\\s+(o|a|os|as|um|uma|me|mim|pra|para|pro|ai|la|ja|logo|so|de|novo|nova|esse|essa|este|esta|rascunho|texto|do|da|seu|sua|meu|minha)){0,4}' +
+    '\\s+(feedback|devolutiva|(mensagem|retorno|recado)\\s+(do mes|mensal|de (janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)|para a familia|pra familia|para os pais|pros pais))\\b');
+  function pedeOFeedback(ctx) { return PEDE_RASCUNHO.test(semAcento(soTexto(ctx && ctx.pergunta)).toLowerCase()); }
   function semNulo(v) { return v === '' || v === 0 || v === 'nao_disse' || v === undefined ? null : v; }
   var NOME_DITO = { type: 'string', description: 'O nome do aluno como ela falou, sem corrigir.' };
   function ferramentasDeProposta(Core) {
@@ -1385,8 +1393,10 @@
    * linhas vão ao cartão; o resultado vai ao modelo, que só fica sabendo do
    * que está no cartão (e que nada foi gravado). `jaNoCartao` são as linhas
    * já propostas nesta pergunta: a mesma aula duas vezes é recusada. */
-  function resultadoDaProposta(linhas) {
-    var fora = linhas.length > 1 ? linhas.filter(function (l) { return l.poupada; }).map(function (l) { return l.titulo + ' (' + (l.poupada === 'registrada' ? 'já registrada' : 'mês com pagamento') + ')'; }) : [];
+  function resultadoDaProposta(linhas, jaNoCartao) {
+    /* O lote é do cartão inteiro (as linhas desta chamada e as de antes). */
+    var todas = (jaNoCartao || []).concat(linhas);
+    var fora = todas.filter(function (l, i) { var x = situacaoDaLinha(todas, i); return x && x.fora; }).map(function (l) { return l.titulo + ' (' + (l.poupada === 'registrada' ? 'já registrada' : 'mês com pagamento') + ')'; });
     return { cartao: 'mostrado na tela dela', linhas: linhas.map(function (l) { return l.titulo; }),
       ficam_de_fora: fora.length ? fora : undefined,
       perguntas: linhas.filter(function (l) { return l.pergunta; }).length ? 'o cartão pergunta a ela com ou sem cobrança' : undefined,
@@ -1410,10 +1420,16 @@
     var mais = [];
     /* A REGRA DO LOTE (lente da romul-ac, 1): a mesma do app, Core.motivoParaPoupar.
      * A aula que já tem registro, ou a passada de um mês com pagamento
-     * marcado, fica marcada: num cartão de várias linhas ela fica de fora;
-     * num de uma linha só (ela pediu aquela aula), segue com o destaque. */
-    if (op.k === 'editar' && op.aulaId && ctx.Core.motivoParaPoupar) {
-      var aulaDaOp = ((ctx.db && ctx.db.aulas) || []).filter(function (x) { return x.id === op.aulaId; })[0];
+     * marcado, fica marcada: no lote (duas ou mais linhas da MESMA ação) ela
+     * fica de fora; sozinha na sua ação (ela pediu aquela aula), segue com o
+     * destaque (situacaoDaLinha).
+     * A aula PREVISTA (a da repetição ainda não lançada, pela série e pela
+     * data) entra na mesma regra: o motivoParaPoupar lê o aluno, a data e o
+     * conteúdo, e a prevista não tem conteúdo; o mês pago vem do
+     * Core.pagamentoDe, dentro dele (rodada final da orquestradora, 2). */
+    if (op.k === 'editar' && (op.aulaId || op.serieId) && ctx.Core.motivoParaPoupar) {
+      var aulaDaOp = op.aulaId ? ((ctx.db && ctx.db.aulas) || []).filter(function (x) { return x.id === op.aulaId; })[0]
+        : { alunoId: op.alunoId, serieId: op.serieId, data: op.data, prevista: true };
       var motivo = aulaDaOp ? ctx.Core.motivoParaPoupar(ctx.db, aulaDaOp, ctx.hoje, {}) : null;
       if (motivo) {
         l.poupada = motivo;
@@ -1450,7 +1466,7 @@
         }
       });
       semRepetir(linhas, jaNoCartao);
-      return { linhas: linhas, resultado: resultadoDaProposta(linhas) };
+      return { linhas: linhas, resultado: resultadoDaProposta(linhas, jaNoCartao) };
     },
     propor_relato: function (e, ctx, jaNoCartao) {
       if (!Array.isArray(e.itens) || !e.itens.length) falha('itens vazio: mande um item por aula.');
@@ -1466,12 +1482,12 @@
         }
       });
       semRepetir(linhas, jaNoCartao);
-      return { linhas: linhas, resultado: resultadoDaProposta(linhas) };
+      return { linhas: linhas, resultado: resultadoDaProposta(linhas, jaNoCartao) };
     },
     propor_feedback: function (e, ctx, jaNoCartao) {
       var linhas = [proporFeedback(e, ctx)];
       semRepetir(linhas, jaNoCartao);
-      return { linhas: linhas, resultado: resultadoDaProposta(linhas) };
+      return { linhas: linhas, resultado: resultadoDaProposta(linhas, jaNoCartao) };
     }
   };
   /* buscar_assunto é leitura, mas só existe junto das propostas: o catálogo
@@ -1507,19 +1523,30 @@
   /* O que o Confirmar grava: as linhas marcadas, com a escolha de cobrança
    * (por linha, ou uma para o conjunto) e o que ela editou. Devolve
    * { ops } ou { falta: 'cobranca' | 'nada' }. */
-  /* O que o cartão diz da linha poupada (Core.motivoParaPoupar). Num cartão de
-   * várias linhas (o lote) ela fica de fora, com o motivo escrito como no app;
-   * num de uma linha só, segue, com o destaque antes do Confirmar. */
+  /* O que o cartão diz da linha poupada (Core.motivoParaPoupar). No lote ela
+   * fica de fora, com o motivo escrito como no app; sozinha na sua ação,
+   * segue, com o destaque antes do Confirmar.
+   * O LOTE é o grupo de linhas da MESMA ação (rodada final da orquestradora,
+   * 1): várias canceladas, várias remarcadas, várias faltas. Num cartão de
+   * ações diferentes cada linha é um pedido à parte e segue a regra da linha
+   * sozinha; o cartão que mistura aplica o lote só dentro de cada ação com
+   * duas linhas ou mais. A ação é o tipo da linha (cancelar, falta,
+   * remarcar, criar_reposicao, relato...). */
+  function noLote(linhas, i) {
+    var tipo = linhas[i].tipo;
+    return linhas.filter(function (x) { return x && x.tipo === tipo; }).length > 1;
+  }
   function situacaoDaLinha(linhas, i) {
     var l = linhas && linhas[i];
     if (!l || !l.poupada) return null;
-    if (linhas.length > 1) return { fora: true, texto: 'Fica de fora: ' + (l.poupada === 'registrada' ? 'já registrada' : 'de mês com pagamento') + '.' };
+    if (noLote(linhas, i)) return { fora: true, texto: 'Fica de fora: ' + (l.poupada === 'registrada' ? 'já registrada' : 'de mês com pagamento') + '.' };
     return { fora: false, texto: l.poupada === 'registrada' ? 'Esta aula já tem registro.' : 'Este mês já tem pagamento marcado' + (l.poupadaMuda ? ': o valor muda.' : '.') };
   }
   function opsConfirmadas(linhas, estado) {
     var e = estado || {};
-    /* Cartão de várias linhas é um LOTE: as linhas poupadas (motivoParaPoupar)
-     * ficam de fora, como no app. Cartão de uma linha só, segue. */
+    /* No LOTE (duas ou mais linhas da mesma ação) as linhas poupadas
+     * (motivoParaPoupar) ficam de fora, como no app. A linha sozinha na sua
+     * ação segue, com o destaque. */
     var poupada = function (i) { var x = situacaoDaLinha(linhas, i); return !!(x && x.fora); };
     var fora = function (l, i) { return (e.semLinha && e.semLinha[i]) || poupada(i); };
     var marcadas = linhas.filter(function (l, i) { return !fora(l, i); });
@@ -1700,7 +1727,7 @@
     var usos = [], cartoes = [], entendido = [], voltas = 0;
     var linhas = [], chamadas = [];
     var falaDaConversa = (o.falasAnteriores || []).filter(function (x) { return typeof x === 'string' && x.trim(); }).concat([pergunta]).join('\n');
-    var ctxDaFala = Object.assign({}, ctx, { fala: falaDaConversa });
+    var ctxDaFala = Object.assign({}, ctx, { fala: falaDaConversa, pergunta: pergunta });
     function proposta() { return linhas.length ? { linhas: linhas, chamadas: chamadas, fala: falaDaConversa, assinatura: assinatura(linhas) } : null; }
 
     /* Tira desta conversa só o que é desta pergunta, e só se a conversa
