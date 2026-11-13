@@ -582,7 +582,7 @@ secao('12. O conteúdo escrito no pedido: o system, o esquema e a conferência d
     ['Matemática, segunda e quarta, 1h por dia', 'Matemática'],
     ['Matemática: 1h por dia', 'Matemática'],
     ['História: ainda não sei', 'História'],
-    ['O Marcelo tem prova de Ciências dia 24 e de História dia 26. Monte uma matéria por dia, 1h.', 'Ciências'],
+    ['O Téo tem prova de Ciências dia 24 e de História dia 26. Monte uma matéria por dia, 1h.', 'Ciências'],
     ['provas de Matemática e Ciências e Geografia', 'Matemática'],
     ['Redação e Artes na semana que vem', 'Redação'],
     ['Redação, Artes e Filosofia', 'Redação'],
