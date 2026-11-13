@@ -116,7 +116,15 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   // o id do livro, para ler a posição gravada depois (sai da gravação que o leitor faz)
   await pag.evaluate(() => {
     const original = Store.gravarPosicaoLivro;
-    Store.gravarPosicaoLivro = function (pos) { if (pos && pos.id) window.__idLivro = pos.id; return original.apply(Store, arguments); };
+    window.__gravando = 0;
+    Store.gravarPosicaoLivro = function (pos) {
+      if (pos && pos.id) window.__idLivro = pos.id;
+      window.__gravando++;
+      const fim = () => { window.__gravando--; };
+      const p = original.apply(Store, arguments);
+      Promise.resolve(p).then(fim, fim);
+      return p;
+    };
   });
 
   // ---- importar e abrir o livro
@@ -178,14 +186,46 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
     return { x: r.left + p.fx * r.width, y: r.top + p.fy * r.height };
   }, ponto);
   const contaDiz = (m, n) => new RegExp('(Página|p\\.) ' + n + ' de 400').test(m.contador);
+  const contaDizNaPagina = (texto, n) => new RegExp('(Página|p\\.) ' + n + ' de 400').test(texto);
+  /* ESPERAS POR CONDIÇÃO, e não por tempo. A primeira rodada do veneno
+   * gesto-sem-ponto no CI só passou na segunda vez: as leituras vinham depois
+   * de pausas fixas, e o duplo toque dependia de duas pausas caberem na
+   * janela de 320 ms do app. Agora cada leitura espera o que ela precisa. */
+  // a rolagem parada: scrollTop e scrollLeft iguais em dois quadros seguidos
+  const estavel = rotulo => pag.evaluate(() => new Promise(fim => {
+    const c = document.querySelector('#corpo-modal-leitor-pdf');
+    let antes = null, iguais = 0, quadros = 0;
+    const olha = () => {
+      const agora = c.scrollTop + '|' + c.scrollLeft;
+      iguais = agora === antes ? iguais + 1 : 0;
+      antes = agora;
+      if (iguais >= 2 || ++quadros > 240) { fim(iguais >= 2); return; }
+      requestAnimationFrame(olha);
+    };
+    requestAnimationFrame(olha);
+  })).then(ok => { if (!ok) conf((rotulo || 'a rolagem') + ' parou em até 240 quadros', false, true); return ok; });
   const irParaPagina = async n => {
     await pag.evaluate(v => { const i = document.querySelector('#leitor-ir-pagina'); i.value = String(v); i.dispatchEvent(new Event('change')); }, n);
     const r = await esperar('a página ' + n + ' no meio', estadoDoLeitor, v => v.meio === n && v.malDesenhadas === '', 20000);
-    await pausa(400);
+    await estavel('a ida à p. ' + n);
     return r;
   };
-  const redesenhado = rotulo => esperar(rotulo + ': as páginas à vista redesenhadas no tamanho novo', estadoDoLeitor,
-    v => v.malDesenhadas === '' && v.transformadas === 0, 8000);
+  const redesenhado = async rotulo => {
+    const r = await esperar(rotulo + ': as páginas à vista redesenhadas no tamanho novo', estadoDoLeitor,
+      v => v.malDesenhadas === '' && v.transformadas === 0, 8000);
+    await estavel(rotulo);
+    return r;
+  };
+  /* depois de um gesto que muda o zoom: espera a largura MUDAR e o canvas novo
+   * ficar pronto; um gesto que não pegou falha aqui, com o nome, e não numa
+   * medida lida em cima do estado de antes */
+  const depoisDoZoom = async (rotulo, larguraAntes) => {
+    const r = await esperar(rotulo + ': a largura mudou e as páginas à vista foram redesenhadas', estadoDoLeitor,
+      v => Math.abs(v.largura - larguraAntes) > 1 && v.malDesenhadas === '' && v.transformadas === 0, 8000);
+    conf(rotulo + ': o zoom mudou e a página foi redesenhada', r.ok, true);
+    await estavel(rotulo);
+    return r;
+  };
 
   // os dedos, pelo Chrome
   const toque = (tipo, pontos) => cdp.send('Input.dispatchTouchEvent', { type: tipo,
@@ -194,6 +234,7 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
    * em `passos` movimentos, e o ponto médio anda (dx, dy) no caminho. Devolve
    * o que se viu depois do PRIMEIRO movimento e o ponto médio final. */
   const pinca = async (cx, cy, d0, d1, dx, dy, passos) => {
+    await estavel('antes da pinça');
     const dedos = (t) => { const d = d0 + (d1 - d0) * t, mx = cx + dx * t, my = cy + dy * t;
       return [{ x: mx - d / 2, y: my }, { x: mx + d / 2, y: my }]; };
     await pag.evaluate(() => {
@@ -201,24 +242,39 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
       window.__criarOriginal = document.createElement;
       document.createElement = function (n) { if (String(n).toLowerCase() === 'canvas') window.__canvasNoGesto++; return window.__criarOriginal.apply(document, arguments); };
     });
+    /* o primeiro quadro é medido DENTRO da página: no fim do primeiro
+     * pointermove (o leitor já tratou, ele vem antes na subida), quantas
+     * caixas já têm o transform e quanto tempo passou desde o evento. A volta
+     * do CDP até o Node media a carga da máquina do CI, e não o leitor. */
+    await pag.evaluate(() => {
+      window.__primeiro = null;
+      window.__olhaPrimeiro = e => {
+        if (window.__primeiro || e.pointerType !== 'touch') return;
+        const c = document.querySelector('#corpo-modal-leitor-pdf');
+        window.__primeiro = { ms: performance.now() - e.timeStamp,
+          transformadas: Array.from(c.querySelectorAll('.leitor-pdf-pagina')).filter(b => /scale/.test(b.style.transform)).length };
+      };
+      window.addEventListener('pointermove', window.__olhaPrimeiro);
+    });
     await toque('touchStart', dedos(0));
-    await pausa(30);
-    const t0 = Date.now();
     await toque('touchMove', dedos(1 / passos));
     const primeiro = await pag.evaluate(() => {
-      const c = document.querySelector('#corpo-modal-leitor-pdf');
-      return { transformadas: Array.from(c.querySelectorAll('.leitor-pdf-pagina')).filter(b => /scale/.test(b.style.transform)).length };
+      window.removeEventListener('pointermove', window.__olhaPrimeiro);
+      return window.__primeiro || { ms: Infinity, transformadas: 0 };
     });
-    primeiro.ms = Date.now() - t0;
-    for (let i = 2; i <= passos; i++) { await toque('touchMove', dedos(i / passos)); await pausa(16); }
+    primeiro.ms = Math.round(primeiro.ms * 10) / 10;
+    for (let i = 2; i <= passos; i++) await toque('touchMove', dedos(i / passos));
     const noFim = await pag.evaluate(() => ({ canvas: window.__canvasNoGesto, scrollTop: document.querySelector('#corpo-modal-leitor-pdf').scrollTop }));
     await toque('touchEnd', []);
     await pag.evaluate(() => { document.createElement = window.__criarOriginal; });
     const f = dedos(1);
     return { primeiro, noFim, fim: { x: (f[0].x + f[1].x) / 2, y: (f[0].y + f[1].y) / 2 } };
   };
-  const toqueRapido = async (x, y) => { await toque('touchStart', [{ x, y }]); await pausa(40); await toque('touchEnd', []); };
-  const duploToque = async (x, y) => { await toqueRapido(x, y); await pausa(90); await toqueRapido(x, y); };
+  /* o duplo toque: quatro eventos seguidos, sem pausa. Com as pausas de antes
+   * (40 + 90 + 40 ms mais a volta do CDP), numa máquina carregada os dois
+   * toques podiam sair da janela de 320 ms do app e o gesto não pegava. */
+  const toqueRapido = async (x, y) => { await toque('touchStart', [{ x, y }]); await toque('touchEnd', []); };
+  const duploToque = async (x, y) => { await estavel('antes do duplo toque'); await toqueRapido(x, y); await toqueRapido(x, y); };
   const distancia = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
   // checa: no modo normal é um conf; no veneno, a falha da verificação marcada é o que se quer ver
@@ -243,10 +299,10 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   const g1 = await pinca(c1.x, c1.y, 120, 240, 30, 20, 10);
   console.log('   primeiro movimento: ' + g1.primeiro.transformadas + ' caixas esticadas, ' + g1.primeiro.ms + ' ms');
   conf('no primeiro movimento, as caixas à vista já estão esticadas por transform', g1.primeiro.transformadas > 0, true);
-  conf('e isso em menos de 50 ms (medido do envio do toque à leitura)', g1.primeiro.ms < 50, true);
+  conf('e isso em menos de 50 ms (do evento ao fim do tratamento, medido na página)', g1.primeiro.ms < 50, true);
   conf('durante o gesto, nenhum canvas novo foi criado', g1.noFim.canvas, 0);
   conf('durante o gesto, a rolagem não se mexeu (o navegador não rolou junto)', Math.abs(g1.noFim.scrollTop - e0.scrollTop) < 1, true);
-  const r1 = await redesenhado('a pinça');
+  const r1 = await depoisDoZoom('a pinça', e0.largura);
   conf('depois da pinça, as páginas à vista estão redesenhadas', r1.ok, true);
   let e1 = await estadoDoLeitor();
   const razao1 = e1.largura / e0.largura;
@@ -262,14 +318,14 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   // ================================================================
   secao('2. Duplo toque na p. 120: vai ao dobro com o ponto no meio, e volta');
   await clicar(pag, '#leitor-largura');
-  await pausa(600);
+  await depoisDoZoom('a volta à largura depois da pinça', e1.largura);
   await irParaPagina(120);
   e0 = await estadoDoLeitor();
   conf('de volta à largura antes do duplo toque', Math.abs(e0.largura - a206.valor.largura) <= 1, true);
   const q = { x: e0.area.x + e0.area.w * 0.30, y: e0.area.y + e0.area.h * 0.35 };
   const sob2 = await pontoDoConteudo(q.x, q.y);
   await duploToque(q.x, q.y);
-  await redesenhado('o duplo toque');
+  await depoisDoZoom('o duplo toque', e0.largura);
   const e2 = await estadoDoLeitor();
   const razao2 = e2.largura / e0.largura;
   const meio2 = { x: e2.area.x + e2.area.w / 2, y: e2.area.y + e2.area.h / 2 };
@@ -280,7 +336,7 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   // o segundo duplo toque, no meio (onde o ponto está agora): volta à largura
   const sob3 = await pontoDoConteudo(meio2.x, meio2.y);
   await duploToque(meio2.x, meio2.y);
-  await redesenhado('o segundo duplo toque');
+  await depoisDoZoom('o segundo duplo toque', e2.largura);
   const e3 = await estadoDoLeitor();
   const agora3 = await ondeEsta(sob3);
   const dv3 = Math.abs(agora3.y - meio2.y);
@@ -298,7 +354,7 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   const caneta = async (tipo, x, y) => cdp.send('Input.dispatchMouseEvent', { type: tipo, x: Math.round(x), y: Math.round(y),
     button: 'left', buttons: tipo === 'mousePressed' ? 1 : 0, clickCount: 1, pointerType: 'pen' });
   for (let i = 0; i < 2; i++) { await caneta('mousePressed', q.x, q.y); await pausa(40); await caneta('mouseReleased', q.x, q.y); await pausa(90); }
-  await pausa(800);
+  await estavel('depois da caneta');
   const depoisCaneta = await estadoDoLeitor();
   const tiposCaneta = await pag.evaluate(() => { document.querySelector('#corpo-modal-leitor-pdf').removeEventListener('pointerdown', window.__olhaCaneta); return window.__tiposCaneta.join(','); });
   conf('os dois toques chegaram à área como ponteiro pen', tiposCaneta, 'pen,pen');
@@ -320,9 +376,9 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   });
   const yd = antesDedo.area.y + antesDedo.area.h * 0.7;
   await toque('touchStart', [{ x: q.x, y: yd }]);
-  for (let i = 1; i <= 12; i++) { await toque('touchMove', [{ x: q.x, y: yd - i * 35 }]); await pausa(16); }
+  for (let i = 1; i <= 12; i++) await toque('touchMove', [{ x: q.x, y: yd - i * 35 }]);
   await toque('touchEnd', []);
-  await pausa(700);
+  await estavel('depois do arrasto de um dedo');
   const dedo = await pag.evaluate(() => {
     window.removeEventListener('touchmove', window.__contaToque, { passive: true });
     return { movidos: window.__movidos, cancelados: window.__cancelados,
@@ -343,23 +399,24 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   let s5 = await estadoDoLeitor();
   // dois dedos que só arrastam (a distância não muda): a página anda junto, sem zoom
   await pinca(s5.area.x + s5.area.w * 0.5, s5.area.y + s5.area.h * 0.6, 150, 150, 0, -100, 8);
-  await pausa(700);
+  await esperar('o arrasto de dois dedos chegou à rolagem', estadoDoLeitor, v => Math.abs(v.scrollTop - s5.scrollTop) > 50, 5000);
+  await estavel('depois do arrasto de dois dedos');
   const pan = await estadoDoLeitor();
   console.log('   dois dedos arrastando 100 px para cima: a rolagem andou ' + Math.round(pan.scrollTop - s5.scrollTop) + ' px');
   conf('arrastar dois dedos sem abrir nem fechar leva a página junto (100 px, ±3)', Math.abs(pan.scrollTop - s5.scrollTop - 100) <= 3, true);
   conf('e não muda o zoom', Math.abs(pan.largura - s5.largura) <= 1, true);
   s5 = pan;
   await duploToque(s5.area.x + s5.area.w * 0.5, s5.area.y + s5.area.h * 0.45);
-  await redesenhado('o duplo toque na p. 150');
+  await depoisDoZoom('o duplo toque na p. 150', s5.largura);
   s5 = await estadoDoLeitor();
   await pinca(s5.area.x + s5.area.w * 0.5, s5.area.y + s5.area.h * 0.5, 120, 180, 0, 0, 8);
-  await redesenhado('a pinça até o zoom 3');
+  await depoisDoZoom('a pinça até o zoom 3', s5.largura);
   const z3 = await estadoDoLeitor();
   conf('antes de reduzir, a página está no zoom 3 (±5%)', z3.largura / wBase > 2.85 && z3.largura / wBase < 3.15, true);
   const c6 = { x: z3.area.x + z3.area.w * 0.45, y: z3.area.y + z3.area.h * 0.55 };
   const sob6 = await pontoDoConteudo(c6.x, c6.y);
   const g6 = await pinca(c6.x, c6.y, 180, 90, 10, -15, 10);
-  await redesenhado('a pinça de reduzir');
+  await depoisDoZoom('a pinça de reduzir', z3.largura);
   const z15 = await estadoDoLeitor();
   const dv6 = distancia(await ondeEsta(sob6), g6.fim);
   console.log('   reduzir: largura ' + Math.round(z3.largura) + ' -> ' + Math.round(z15.largura) + ' px; o ponto a ' + dv6.toFixed(1) + ' px do centro dos dedos');
@@ -370,34 +427,42 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   secao('6. Os limites do zoom: 0,5 e 4');
   let s6 = await estadoDoLeitor();
   await pinca(s6.area.x + s6.area.w * 0.5, s6.area.y + s6.area.h * 0.5, 240, 30, 0, 0, 10);
-  await redesenhado('a pinça abaixo do mínimo');
+  await depoisDoZoom('a pinça abaixo do mínimo', s6.largura);
   const zMin = await estadoDoLeitor();
   console.log('   pedindo 1,5 x 0,125: largura ' + Math.round(zMin.largura) + ' px (a largura é ' + Math.round(wBase) + ')');
   conf('a pinça que pede menos de 0,5 para em 0,5 (largura à metade, ±2 px)', Math.abs(zMin.largura - wBase * 0.5) <= 2, true);
   await clicar(pag, '#leitor-largura');
-  await redesenhado('a volta à largura');
+  await depoisDoZoom('a volta à largura', zMin.largura);
   s6 = await estadoDoLeitor();
   await pinca(s6.area.x + s6.area.w * 0.5, s6.area.y + s6.area.h * 0.5, 40, 240, 0, 0, 10);
-  await redesenhado('a pinça acima do máximo');
+  await depoisDoZoom('a pinça acima do máximo', s6.largura);
   const zMax = await estadoDoLeitor();
   console.log('   pedindo 1 x 6: largura ' + Math.round(zMax.largura) + ' px');
   conf('a pinça que pede mais de 4 para em 4 (largura 4 vezes, ±4 px)', Math.abs(zMax.largura - wBase * 4) <= 4, true);
   await clicar(pag, '#leitor-largura');
-  await redesenhado('a volta à largura depois do máximo');
+  await depoisDoZoom('a volta à largura depois do máximo', zMax.largura);
 
   // ================================================================
   secao('7. A posição gravada nas bordas do livro');
-  const posicaoGravada = () => pag.evaluate(() => window.__idLivro ? Store.lerPosicaoLivro(window.__idLivro).then(r => r ? r.pagina : null) : null);
+  // a posição lida só depois de toda gravação pedida terminar (o contador de gravações em curso em zero)
+  const posicaoGravada = async () => {
+    await estavel('antes de ler a posição');
+    const g = await esperar('as gravações de posição terminaram', () => pag.evaluate(() => window.__gravando || 0), v => v === 0, 5000);
+    conf('as gravações de posição terminaram', g.ok, true);
+    return pag.evaluate(() => window.__idLivro ? Store.lerPosicaoLivro(window.__idLivro).then(r => r ? r.pagina : null) : null);
+  };
   // zoom 0,5 e depois 0,6: a p. 1 e o alto da p. 2 cabem juntos na área
   await irParaPagina(1);
   s6 = await estadoDoLeitor();
   await pinca(s6.area.x + s6.area.w * 0.5, s6.area.y + s6.area.h * 0.5, 240, 30, 0, 0, 8);
-  await redesenhado('o zoom 0,5 na p. 1');
+  await depoisDoZoom('o zoom 0,5 na p. 1', s6.largura);
   s6 = await estadoDoLeitor();
   await pinca(s6.area.x + s6.area.w * 0.5, s6.area.y + s6.area.h * 0.5, 150, 180, 0, 0, 6);
-  await redesenhado('o zoom 0,6 na p. 1');
+  await depoisDoZoom('o zoom 0,6 na p. 1', s6.largura);
+  // a posição fixada antes do gesto medido: o alto do livro, e a página do meio já tratada pela rolagem
   await pag.evaluate(() => { document.querySelector('#corpo-modal-leitor-pdf').scrollTop = 0; });
-  await pausa(900);
+  await esperar('o alto do livro com a p. 1 no meio e no contador', estadoDoLeitor, v => v.scrollTop === 0 && v.meio === 1 && contaDizNaPagina(v.contador, 1) && v.malDesenhadas === '', 8000);
+  await estavel('o alto do livro');
   const alto = await pag.evaluate(() => {
     const c = document.querySelector('#corpo-modal-leitor-pdf'), r = c.getBoundingClientRect();
     const p2 = document.querySelector('[data-pagina-arquivo="2"]').getBoundingClientRect();
@@ -409,8 +474,7 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   conf('e o alto da p. 2 à vista, onde os dedos vão', yDedos < alto.fundo - 10, true);
   conf('antes da pinça, a posição gravada é a p. 1', await posicaoGravada(), 1);
   await pinca(s7.area.x + s7.area.w * 0.5, yDedos, 180, 150, 0, 0, 6);
-  await redesenhado('a pinça com os dedos na p. 2');
-  await pausa(900);
+  await depoisDoZoom('a pinça com os dedos na p. 2', s7.largura);
   const d7 = await estadoDoLeitor();
   const pos7 = await posicaoGravada();
   console.log('   no alto: a rolagem ficou em ' + Math.round(d7.scrollTop) + ' px, a p. ' + d7.meio + ' no meio, a posição gravada é a p. ' + pos7);
@@ -420,38 +484,39 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   // o fim do livro: a rolagem no máximo, os dedos na página de cima da área
   await irParaPagina(400);
   await pag.evaluate(() => { const c = document.querySelector('#corpo-modal-leitor-pdf'); c.scrollTop = c.scrollHeight; });
-  await pausa(900);
+  await esperar('o fim do livro à vista e desenhado', estadoDoLeitor, v => v.meio === 400 && v.malDesenhadas === '', 8000);
+  await estavel('o fim do livro');
   const s8 = await estadoDoLeitor();
   const cima = await pontoDoConteudo(s8.area.x + s8.area.w * 0.5, s8.area.y + 30);
   console.log('   no fim: a p. ' + s8.meio + ' no meio, a p. ' + (cima && cima.n) + ' no alto da área');
   await pinca(s8.area.x + s8.area.w * 0.5, s8.area.y + 30, 150, 180, 0, 0, 6);
-  await redesenhado('a pinça no fim do livro');
-  await pausa(900);
+  await depoisDoZoom('a pinça no fim do livro', s8.largura);
   const d8 = await estadoDoLeitor();
   const pos8 = await posicaoGravada();
   console.log('   no fim: a p. ' + d8.meio + ' no meio, a posição gravada é a p. ' + pos8);
   checa('no fim do livro, a posição gravada é a página do meio', pos8, d8.meio, 'gesto-grava-pela-ancora');
   checa('e o contador diz a página do meio', contaDiz(d8, d8.meio), true, 'gesto-grava-pela-ancora');
   await clicar(pag, '#leitor-largura');
-  await redesenhado('a volta à largura no fim');
+  await depoisDoZoom('a volta à largura no fim', d8.largura);
 
   // ================================================================
   secao('8. Deitado: duplo toque e pinça a partir do zoom 2');
   await pag.setViewport({ width: 1280, height: 800, hasTouch: true, deviceScaleFactor: 1 });
-  await pausa(900);
+  // o giro: espera a página alargar para a janela deitada e ser redesenhada (o app redesenha 250 ms depois do resize)
+  await depoisDoZoom('o giro para deitado', wBase);
   await irParaPagina(300);
   if (PRINTS) await pag.screenshot({ path: path.join(PRINTS, 'deitado_antes_do_duplo_toque.png') });
   let d0 = await estadoDoLeitor();
   const q5 = { x: d0.area.x + d0.area.w * 0.62, y: d0.area.y + d0.area.h * 0.45 };
   await duploToque(q5.x, q5.y);
-  await redesenhado('o duplo toque deitado');
+  await depoisDoZoom('o duplo toque deitado', d0.largura);
   if (PRINTS) await pag.screenshot({ path: path.join(PRINTS, 'deitado_depois_do_duplo_toque.png') });
   d0 = await estadoDoLeitor();
   conf('deitado, o duplo toque dobrou a largura (±5%)', d0.largura / (await pag.evaluate(() => document.querySelector('#corpo-modal-leitor-pdf').clientWidth - 36)) > 1.9, true);
   const c5 = { x: d0.area.x + d0.area.w * 0.40, y: d0.area.y + d0.area.h * 0.60 };
   const sob5 = await pontoDoConteudo(c5.x, c5.y);
   const g5 = await pinca(c5.x, c5.y, 120, 180, -20, 0, 10);
-  await redesenhado('a pinça deitada');
+  await depoisDoZoom('a pinça deitada', d0.largura);
   const d5 = await estadoDoLeitor();
   const razao5 = d5.largura / d0.largura;
   const dv5 = distancia(await ondeEsta(sob5), g5.fim);
