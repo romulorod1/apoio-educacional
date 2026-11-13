@@ -2128,6 +2128,83 @@ def trava_so_com_resposta_portal(p, pdfs, temp, curadoria):
     return erros
 
 
+# as duas listas que o veneno de tem_resposta tira da amostra: a pareada com a
+# teoria e a do modelo CM
+LISTAS_TIRADAS = ('lista-de-amostra', 'lista-cm')
+
+
+def gerar_com_listas_tiradas(pdfs, temp, curadoria, nome='so_com_resposta_tira'):
+    """A amostra com --so-com-resposta e --listas, com tem_resposta dizendo não
+    aos itens de LISTAS_TIRADAS: o caminho em que item sai do Portal."""
+    antes = gerar_pacote.tem_resposta
+    gerar_pacote.tem_resposta = lambda it: antes(it) and it['aula']['slug'] not in LISTAS_TIRADAS
+    try:
+        t = os.path.join(temp, nome)
+        gerar(pdfs, t, curadoria, so_com_resposta=True, com_listas=True)
+    finally:
+        gerar_pacote.tem_resposta = antes
+    return Pacote(t, pdfs)
+
+
+def trava_portal_tirado(q, p):
+    """O Portal com as duas listas tiradas: o pareamento da teoria esquece a
+    lista que sumiu, o resumo do módulo na busca deixa de citar a lista do
+    modelo CM, itens_no_pacote e as contagens contam o que ficou, o
+    exclusoes.json traz os tirados, e o numero de quem ficou não muda."""
+    erros = []
+    tirados = sorted(i['id'] for i in p.itens if i['aula']['slug'] in LISTAS_TIRADAS)
+    if sorted(e['id'] for e in q.relatorio.get('sem_resposta') or []) != tirados:
+        erros.append('sem_resposta %s, e o certo é %s' % ([e['id'] for e in q.relatorio.get('sem_resposta') or []],
+                                                         tirados))
+    vivas = {'%s:%s:%s' % (i['serie'], i['modulo']['slug'], i['aula']['slug']) for i in q.itens}
+    for t in q.teoria:
+        for l in t.get('exercicios_pareados', []):
+            if l not in vivas:
+                erros.append('teoria %s pareada com %s, que sumiu' % (t['id'], l))
+    for d in q.busca['temas']:
+        if d['k'] == 'modulo' and {'modelo', 'cm'} & set(d['r'].split()):
+            erros.append('busca: o resumo do módulo %s ainda cita a lista do modelo CM: %r' % (d['i'], d['r']))
+    for l in q.relatorio['listas']:
+        n = sum(1 for i in q.itens if os.path.basename(i['origem']['arquivo']) == l['arquivo'])
+        if 'itens_no_pacote' in l and l['itens_no_pacote'] != n:
+            erros.append('%s: itens_no_pacote %d e o pacote tem %d' % (l['arquivo'], l['itens_no_pacote'], n))
+    c = q.manifest['contagens']
+    aulas = len({(i['modulo']['slug'], i['aula']['slug']) for i in q.itens})
+    if (c['itens'], c['aulas_exercicios'], c.get('itens_sem_resposta_excluidos')) != (len(q.itens), aulas, len(tirados)):
+        erros.append('contagens %r, e o pacote tem %d itens em %d listas, %d tirados' % (c, len(q.itens), aulas,
+                                                                                        len(tirados)))
+    excl = {e['id'] for e in json.loads(q.bytes_de('exclusoes.json'))}
+    if set(tirados) - excl:
+        erros.append('exclusoes.json sem os tirados por falta de resposta: %s' % sorted(set(tirados) - excl)[:3])
+    antes = {i['id']: i['numero'] for i in p.itens}
+    for i in q.itens:
+        if antes.get(i['id']) != i['numero']:
+            erros.append('%s: numero %r, e sem a opção era %r' % (i['id'], i['numero'], antes.get(i['id'])))
+    erros.extend(trava_contagens(q))
+    erros.extend(trava_manifesto(q))
+    return erros
+
+
+def provas_portal_tirado(p, pdfs, temp, curadoria, placar):
+    q = gerar_com_listas_tiradas(pdfs, temp, curadoria)
+    placar.conferir('so-com-resposta no Portal, com duas listas tiradas', trava_portal_tirado(q, p))
+    v = copia(q, temp, 'v_pareada')
+    v.teoria[0]['exercicios_pareados'] = ['9ano:amostra-sintetica:lista-de-amostra']
+    placar.conferir('teoria pareada com lista que sumiu', trava_portal_tirado(v, p), True, 'que sumiu')
+    v = copia(q, temp, 'v_resumo')
+    for d in v.busca['temas']:
+        if d['k'] == 'modulo':
+            d['r'] += ' cm modelo'
+    placar.conferir('resumo do módulo cita a lista que sumiu', trava_portal_tirado(v, p), True, 'modelo CM')
+    v = copia(q, temp, 'v_no_pacote')
+    next(l for l in v.relatorio['listas'] if 'itens_no_pacote' in l and l['aula'] == 'lista-cm')['itens_no_pacote'] = 3
+    placar.conferir('itens_no_pacote sem a remoção', trava_portal_tirado(v, p), True, 'itens_no_pacote')
+    v = copia(q, temp, 'v_exclusoes')
+    v.gravar('exclusoes.json', [e for e in json.loads(v.bytes_de('exclusoes.json'))
+                                if not e['motivo'].startswith('sem solução')])
+    placar.conferir('exclusoes.json sem os tirados', trava_portal_tirado(v, p), True, 'exclusoes.json')
+
+
 def trava_curadoria(p):
     """Toda linha de curadoria desta serie achou o seu item."""
     return ['%s nao achou o item no pacote' % k for k in p.relatorio.get('curadoria_sem_item', [])]
@@ -2939,6 +3016,7 @@ def principal():
                                       for i in p.itens) else ['a linha do dificuldade.csv nao chegou ao item'])
             placar.conferir('apelidos', trava_apelidos(p))
             placar.conferir('so-com-resposta no Portal', trava_so_com_resposta_portal(p, pdfs, temp, cur))
+            provas_portal_tirado(p, pdfs, temp, cur, placar)
             placar.conferir('variantes: sem titulo, recuo, duas partes', trava_variantes(p))
             placar.conferir('bordas: expoente alto, tabela no fio, nota com fracao', trava_bordas(p))
             placar.conferir('divisa fina entre itens colados', trava_divisa_fina())

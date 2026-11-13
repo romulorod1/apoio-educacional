@@ -1318,7 +1318,12 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     n_gabarito = (gerar_pacote.aplicar_gabarito_externo(itens, gabarito_externo)
                   if gabarito_externo is not None else None)
     # --so-com-resposta (gerar_pacote.tirar_sem_resposta), depois do gabarito de fora
-    sem_resposta = gerar_pacote.tirar_sem_resposta(itens, conteudo, docs_busca) if so_com_resposta else None
+    sem_resposta = None
+    if so_com_resposta:
+        sem_resposta = gerar_pacote.tirar_sem_resposta(itens, conteudo, docs_busca)
+        gerar_pacote.recusar_pacote_vazio(itens, sem_resposta, [serie])
+        for rel in relatorio['provas']:
+            rel['itens'] = sum(1 for i in itens if os.path.basename(i['origem']['arquivo']) == os.path.basename(rel['prova']))
     conteudo['itens.json'] = gerar_pacote.json_bytes(itens)
     conteudo['teoria.json'] = gerar_pacote.json_bytes([])
     conteudo['busca.json'] = gerar_pacote.json_bytes(gerar_pacote.montar_busca(docs_busca))
