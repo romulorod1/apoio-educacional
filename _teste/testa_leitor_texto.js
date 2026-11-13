@@ -26,9 +26,10 @@
  *      páginas lidas, e a frase "Este livro é imagem: o texto não pode ser
  *      selecionado nem buscado." aparece UMA vez; no livro de texto, nenhuma;
  *   2b. o arrasto que termina DEPOIS do fim da linha (2 e 20 pt além da
- *      tinta) copia a linha inteira, "Exercício 206. Calcule a soma dos
- *      números de 1 a 206."; e o que sai do começo do título e termina 2 pt
- *      além da tinta do exercício copia as duas linhas;
+ *      tinta e do texto da camada) copia a linha inteira, "Exercício 206.
+ *      Calcule a soma dos números de 1 a 206."; e o que sai do começo do
+ *      título e termina 2 pt além do fim da linha do exercício copia as duas
+ *      linhas;
  *   6. nenhum erro de página.
  *   1b. (a B12 honesta, logo depois do 1) todo pedaço da camada do leitor tem
  *      a cor computada transparente (alfa 0), e o tamanho de letra inline
@@ -374,8 +375,9 @@ const checa = (rotulo, obtido, esperado, doVeneno) => {
   checa('arrastar o mouse pela linha e copiar põe na área de transferência o texto que começa em "Exercício 206"', /^Exercício 206/.test(copiado), true, 'sem-selecao');
 
   /* 2b. O arrasto que passa do fim da linha (o dedo no tablet quase sempre
-   * passa). O fim da linha é o da TINTA no canvas, e não o da camada: o último
-   * pixel escuro na faixa da linha do exercício (126 a 142 pt). Sem o fim do
+   * passa). O fim da linha é o da TINTA no canvas (o último pixel escuro na
+   * faixa da linha do exercício, 126 a 142 pt) ou o do texto da camada, o que
+   * vier mais à direita (ver abaixo). Sem o fim do
    * conteúdo (div.endOfContent com a classe selecting, como no visualizador do
    * pdf.js), o arrasto 2 pt depois da tinta copiava "\r\n", e o que saía do
    * título até ali copiava só o título. A cópia tem de ser a linha inteira, e
@@ -392,8 +394,20 @@ const checa = (rotulo, obtido, esperado, doVeneno) => {
     }
     return maxX < 0 ? null : (maxX + 1) * 595 / k.width;
   });
-  console.log('   fim da tinta da linha do exercício: ' + (tinta === null ? 'nenhum' : tinta.toFixed(1) + ' pt'));
+  /* e o fim do texto da camada na mesma linha: no Chrome do CI (Linux) o pedaço
+   * da camada passa da tinta (2 pt depois da tinta ainda caía dentro de "206."),
+   * e o arrasto que termina em cima do pedaço não mede o que passa do fim. O fim
+   * do arrasto fica depois dos DOIS fins, o desenhado e o selecionável. */
+  const fimCamada = await pag.evaluate(() => {
+    const b = document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="206"]'), q = b.getBoundingClientRect();
+    const ps = Array.from(b.querySelectorAll('.textLayer span')).filter(s => /Exercício|Calcule|206\./.test(s.textContent) && !s.children.length);
+    if (!ps.length) return null;
+    return (Math.max.apply(null, ps.map(s => s.getBoundingClientRect().right)) - q.left) * 595 / q.width;
+  });
+  console.log('   fim da tinta da linha do exercício: ' + (tinta === null ? 'nenhum' : tinta.toFixed(1) + ' pt') +
+    '; fim do texto da camada na linha: ' + (fimCamada === null ? 'nenhum' : fimCamada.toFixed(1) + ' pt'));
   conf('a prova achou a tinta da linha do exercício no canvas', tinta !== null && tinta > 300 && tinta < 560, true);
+  conf('e o fim do texto da camada na mesma linha', fimCamada !== null && fimCamada > 300 && fimCamada < 560, true);
   const LINHA = 'Exercício 206. Calcule a soma dos números de 1 a 206.';
   const TITULO = 'Página 206 do livro do leitor.';
   const arrastaECopia = async (dePt, atePt) => {
@@ -413,14 +427,14 @@ const checa = (rotulo, obtido, esperado, doVeneno) => {
     // o fim de linha do sistema (\r\n no Windows) vira \n; só o fim de linha final é tirado
     return c.replace(/\r\n/g, '\n').replace(/\n$/, '');
   };
-  const fimX = (tinta || 0);
+  const fimX = Math.max(tinta || 0, fimCamada || 0);
   for (const passa of [2, 20]) {
     const c = await arrastaECopia([74, 135], [fimX + passa, 135]);
-    console.log('   da linha do exercício até ' + passa + ' pt depois da tinta: copiado ' + JSON.stringify(c));
+    console.log('   da linha do exercício até ' + passa + ' pt depois do fim da linha (' + (fimX + passa).toFixed(1) + ' pt): copiado ' + JSON.stringify(c));
     checa('arrastar do começo de "Exercício" até ' + passa + ' pt depois do fim da linha copia a linha inteira', c, LINHA, 'sem-fim-do-conteudo');
   }
   const c2 = await arrastaECopia([74, 83], [fimX + 2, 135]);
-  console.log('   do título até 2 pt depois da tinta do exercício: copiado ' + JSON.stringify(c2));
+  console.log('   do título até 2 pt depois do fim da linha do exercício: copiado ' + JSON.stringify(c2));
   checa('arrastar do começo do título até 2 pt depois do fim da linha do exercício copia as duas linhas', c2, TITULO + '\n' + LINHA, 'sem-fim-do-conteudo');
   await limparSelecao();
   if (await pararNoVeneno(2)) return;
