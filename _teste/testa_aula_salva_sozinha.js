@@ -55,7 +55,8 @@
  *   --envenenado-descartar-velho       o rebase não atualiza a abertura da janela (B1);
  *   --envenenado-volta-atras           o rebase não reconhece o banco que voltou atrás (B2);
  *   --envenenado-desfazer-tudo         o Desfazer de uma aula volta o banco inteiro (B5);
- *   --envenenado-desfazer-so-no-lote   a trava "gravou depois, o Desfazer acaba" só vale no lote.
+ *   --envenenado-desfazer-so-no-lote   a trava "gravou depois, o Desfazer acaba" só vale no lote;
+ *   --envenenado-voltar-nao-pergunta   o Voltar na aula nova preenchida volta a fechar sem perguntar (seção 15).
  * Dados fictícios.
  */
 'use strict';
@@ -66,7 +67,8 @@ const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const { conf, secao, esperar, pausa } = H;
 
 const MODOS = ['--envenenado-grava-por-cima', '--envenenado-sem-rascunho-ao-sair', '--envenenado-retrato-absorve-tudo',
-  '--envenenado-descartar-velho', '--envenenado-volta-atras', '--envenenado-desfazer-tudo', '--envenenado-desfazer-so-no-lote'];
+  '--envenenado-descartar-velho', '--envenenado-volta-atras', '--envenenado-desfazer-tudo', '--envenenado-desfazer-so-no-lote',
+  '--envenenado-voltar-nao-pergunta'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) >= 0)[0] || '';
 const CONFERE = '    return chaves.filter(function (k) { return noBanco[k] !== base[k]; });';
 const REBASE = '  function rebasearAulaAberta() {';
@@ -76,9 +78,10 @@ const ABERTURA = '      if (aberturaDaAula) {';
 const VOLTOU = '      return (sobrescritosPelaJanela[k] || []).indexOf(noBanco[k]) >= 0;';
 const DESFAZ = "(escopo === 'esta' ? comDesfazerDaAula(rotulo, aula.id, acaoDaAula) : comDesfazer(rotulo, acaoDaAula, true))";
 const TRAVA = '          encerrarDesfazerDeLote(); registroDoLote = desfazerDeLoteAberto = { marca: gravacoesPedidas };';
+const PERGUNTA_VOLTAR = '    if (JANELAS_COM_CAMPOS[topo.id] && !aulaPeloFechar && janelaMudou(topo.id)) {';
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 conf('(arranjo) as âncoras dos venenos estão cada uma num lugar só',
-  [CONFERE, REBASE, RASCUNHO_SAIDA, RETRATO, ABERTURA, VOLTOU, DESFAZ, TRAVA].map(a => APP.split(a).length).join(','), '2,2,2,2,2,2,2,2');
+  [CONFERE, REBASE, RASCUNHO_SAIDA, RETRATO, ABERTURA, VOLTOU, DESFAZ, TRAVA, PERGUNTA_VOLTAR].map(a => APP.split(a).length).join(','), '2,2,2,2,2,2,2,2,2');
 const trocas = {};
 if (MODO === MODOS[0]) trocas['/app.js'] = APP.replace(CONFERE, '    return [];').replace(REBASE, REBASE + ' return;');
 if (MODO === MODOS[1]) trocas['/app.js'] = APP.replace(RASCUNHO_SAIDA, '');
@@ -86,6 +89,7 @@ if (MODO === MODOS[2]) trocas['/app.js'] = APP.replace(RETRATO, '    Object.keys
 if (MODO === MODOS[3]) trocas['/app.js'] = APP.replace(ABERTURA, '      if (false) {');
 if (MODO === MODOS[4]) trocas['/app.js'] = APP.replace(VOLTOU, '      return false;');
 if (MODO === MODOS[5]) trocas['/app.js'] = APP.replace(DESFAZ, 'comDesfazer(rotulo, acaoDaAula)');
+if (MODO === MODOS[7]) trocas['/app.js'] = APP.replace(PERGUNTA_VOLTAR, "    if (JANELAS_COM_CAMPOS[topo.id] && topo.id !== 'modal-aula' && !aulaPeloFechar && janelaMudou(topo.id)) {");
 if (MODO === MODOS[6]) trocas['/app.js'] = APP.replace(TRAVA, '          if (deLote) { encerrarDesfazerDeLote(); registroDoLote = desfazerDeLoteAberto = { marca: gravacoesPedidas }; }');
 if (MODO) conf('(veneno) o app.js servido mudou', trocas['/app.js'] !== APP, true);
 const amb = H.criarAmbiente(8886, 'nath_f7_salva_sozinha', trocas);
@@ -528,26 +532,44 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
       /^Aulas da repetição excluídas\. 5 aulas de mês com pagamento continuam na agenda\./.test(av14b), true);
   }
 
-  if (!MODO) {
+  if (MODO === MODOS[7] || !MODO) {
     secao('15. O Voltar na aula NOVA preenchida pergunta antes de sair');
+    /* Estável por condição (teste/f7-secao15-estavel): a janela tira a foto dos
+     * campos numa tarefa logo depois de abrir (tirarFotoDaJanela, setTimeout 0),
+     * e é contra ela que o Voltar compara. Mudar o campo antes dessa tarefa
+     * rodar fazia a foto já sair com a mudança, e o Voltar fechava sem
+     * perguntar (no CI, uma vez ou outra). A prova espera a tarefa da página
+     * rodar (um quadro e uma tarefa depois de aberta) antes de mudar o campo,
+     * e espera o Voltar ser PROCESSADO (a pergunta chegou, ou a janela fechou),
+     * com teto largo, antes de afirmar o que aconteceu. */
+    const tarefaDaPaginaRodou = () => pag.evaluate(() => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0))));
+    const voltarProcessado = async (antes) => (await esperar('o Voltar processado', async () =>
+      pag.dialogos.length > antes ? 'perguntou' : (!(await aberta(pag)) ? 'fechou' : ''), v => !!v, 15000)).valor || 'nada';
+    pag.respostaDoDialogo = true;
     await H.irParaAba(pag, 'agenda');
     await pag.click('#nova-aula');
-    await esperar('a aula nova abriu', () => aberta(pag), Boolean, 5000);
+    conf('(arranjo) a aula nova abriu', (await esperar('a aula nova abriu', () => aberta(pag), Boolean, 5000)).ok, true);
+    await tarefaDaPaginaRodou();
     await escolher(pag, '#campo-hora', '07:30');
     const temRelatoNaNova = await pag.evaluate(() => !!document.querySelector('#campo-nota-texto'));
     if (temRelatoNaNova) await escrever(pag, '#campo-nota-texto', 'Relato da aula nova');
     pag.respostaDoDialogo = false;
     const d15 = pag.dialogos.length;
     await pag.evaluate(() => history.back());
-    await esperar('a pergunta do Voltar', () => Promise.resolve(pag.dialogos.length > d15), Boolean, 5000);
-    await pausa(300);
-    conf('o Voltar pergunta "Sair sem guardar o que você escreveu?"', pag.dialogos.slice(d15).join(' | '), 'Sair sem guardar o que você escreveu?');
+    const desfecho15 = await voltarProcessado(d15);
+    if (MODO === MODOS[7]) {
+      conf('VENENO visto: o Voltar na aula nova perguntou, e quebrou (' + desfecho15 + ')', desfecho15, 'fechou');
+      fimDoVeneno();
+    }
+    conf('o Voltar foi processado e perguntou (' + desfecho15 + ')', desfecho15, 'perguntou');
+    conf('a pergunta é "Sair sem guardar o que você escreveu?"', pag.dialogos.slice(d15).join(' | '), 'Sair sem guardar o que você escreveu?');
     conf('com o "não", a aula nova continua aberta', await aberta(pag), true);
     pag.respostaDoDialogo = true;
     const d15b = pag.dialogos.length;
     await pag.evaluate(() => history.back());
-    const fechou15 = await esperar('com o sim, fecha', async () => !(await aberta(pag)), Boolean, 5000);
-    conf('com o "sim", a aula nova fecha sem gravar nada', fechou15.ok && pag.dialogos.length > d15b &&
+    const desfecho15b = await voltarProcessado(d15b);
+    if (desfecho15b === 'perguntou') await esperar('com o sim, fecha', async () => !(await aberta(pag)), Boolean, 15000);
+    conf('com o "sim", a aula nova fecha sem gravar nada (' + desfecho15b + ')', desfecho15b === 'perguntou' && !(await aberta(pag)) &&
       !(await pag.evaluate(() => Store.carregar().then(d => d.aulas.some(a => a.hora === '07:30')))), true);
   }
 
