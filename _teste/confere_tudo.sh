@@ -1043,6 +1043,17 @@ roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip
 # versao anterior; as recusas (id trocado, livro que some, formato, assunto
 # fora do banco, caminho fora da lista); a classificacao do acervo; e as
 # regras do catalogo (a dona le e nao escreve). Portas 8986 a 8990.
+# Fase 1c (13/11/2026): o mapa novo chega ao tablet pelo catalogo, de ponta a
+# ponta no emulador: o publicador da 1b publica os metas vivos; o "Atualizar a
+# biblioteca" troca so o meta dos livros de mesmo arquivo; a defasagem da
+# romul-c0 vai a zero nos que ficam; Blob, posicao e correcoes byte a byte; o
+# SAI, o de outro arquivo e o de meta invalido intocados; nada na abertura.
+# Portas 8991 a 8996.
+roda "biblioteca na nuvem, metas"                   node "_teste/testa_biblioteca_nuvem_metas.js"
+roda "biblioteca na nuvem, metas --envenenado-troca-o-blob" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-troca-o-blob
+roda "biblioteca na nuvem, metas --envenenado-solta-a-posicao" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-solta-a-posicao
+roda "biblioteca na nuvem, metas --envenenado-aceita-meta-invalido" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-aceita-meta-invalido
+roda "biblioteca na nuvem, metas --envenenado-liga-na-abertura" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-liga-na-abertura
 roda "publicador do catalogo"                       node "_teste/testa_publicador_catalogo.js"
 roda "publicador do catalogo --envenenado-aceita-id-trocado" node "_teste/testa_publicador_catalogo.js" --envenenado-aceita-id-trocado
 roda "publicador do catalogo --envenenado-escreve-fora-da-lista" node "_teste/testa_publicador_catalogo.js" --envenenado-escreve-fora-da-lista

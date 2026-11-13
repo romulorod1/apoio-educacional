@@ -382,6 +382,35 @@
     return saida;
   }
 
+  /* O META DE UM LIVRO DO CATÁLOGO DA NUVEM (fase 1c), conferido antes de
+   * entrar no aparelho: o documento catalogo/{id} traz o meta como texto
+   * (metaJson) e o hash dele (metaHash). Vale só se o meta é o do livro do
+   * documento (id, "sha256:" + sha256 e o tamanho) e passa na MESMA
+   * conferência de forma do pacote zip (lerLivros: arquivo, título, sumário
+   * dentro do livro, numeração). `hashDoTexto` é o sha256 do metaJson, que a
+   * página calcula (WebCrypto). Devolve o meta, ou null com o motivo em
+   * `porque`. */
+  function conferirMetaDaNuvem(doc, hashDoTexto) {
+    var porque = function (m) { return { meta: null, porque: m }; };
+    if (!doc || typeof doc.metaJson !== 'string' || typeof doc.id !== 'string') return porque('documento sem meta');
+    if (hashDoTexto !== doc.metaHash) return porque('o meta não confere com o metaHash');
+    var meta;
+    try { meta = JSON.parse(doc.metaJson); } catch (e) { return porque('o meta não é JSON'); }
+    if (!meta || meta.id !== doc.id) return porque('o meta é de outro livro');
+    if (!/^[0-9a-f]{64}$/.test(String(doc.sha256 || '')) || meta.hash !== 'sha256:' + doc.sha256) return porque('o meta é de outro arquivo');
+    if (!inteiro(meta.bytes) || meta.bytes !== doc.tamanho) return porque('o tamanho não confere');
+    var noZip = {}, lista = {};
+    noZip[meta.arquivo] = true;
+    lista[meta.arquivo] = meta.hash;
+    try {
+      var lidos = lerLivros({ livros: [meta] }, noZip, lista);
+      if (!lidos.length) return porque((lidos.recusados && lidos.recusados[0] && lidos.recusados[0].motivo) || 'a forma do meta não confere');
+    } catch (e) {
+      return porque(e && e.message || 'a forma do meta não confere');
+    }
+    return { meta: meta, porque: null };
+  }
+
   /* As linhas que a tela mostra depois de importar livros. */
   function resumoDeLivros(contas) {
     var linhas = [];
@@ -1724,6 +1753,7 @@
     sha256: sha256, tipoDoAsset: tipoDoAsset,
     paginaImpressa: paginaImpressa, paginaDoArquivo: paginaDoArquivo, paginaDaPosicao: paginaDaPosicao,
     resolverPaginaDoLeitor: resolverPaginaDoLeitor, conferirNumeracao: conferirNumeracao, paraRomano: paraRomano, deRomano: deRomano,
+    conferirMetaDaNuvem: conferirMetaDaNuvem,
     mapaDoLivro: mapaDoLivro, resolverCorrecoes: resolverCorrecoes, correcoesOrfas: correcoesOrfas,
     chaveParaGravarCorrecao: chaveParaGravarCorrecao, tituloNormalizado: tituloNormalizado, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
     indiceDeCapitulos: indiceDeCapitulos, procurarNosCapitulos: procurarNosCapitulos,

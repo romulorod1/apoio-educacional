@@ -2799,6 +2799,47 @@
     });
   }
 
+  /* O META NOVO QUE VEM DO CATÁLOGO DA NUVEM (fase 1c), para o livro que já
+   * está no aparelho com o MESMO arquivo. Numa transação só sobre 'livros':
+   * para cada item { id, sha256, meta, metaHash, metaVersao }, troca SÓ o
+   * meta do registro e anota `nuvem: { metaHash, metaVersao }`; o Blob, os
+   * bytes, o pacote, a versão e a data de importação ficam como estavam. A
+   * posição de leitura (outro depósito) não é tocada: o arquivo é o mesmo, e
+   * a página do arquivo é a mesma página. As correções dela no mapa moram no
+   * db e não passam por aqui (a resolução é a da fase 1a, na leitura).
+   * Fica como está, e é contado:
+   *   ausente       o livro não está no aparelho (chega na fase 2);
+   *   outroArquivo  o arquivo do aparelho não é o do catálogo (o meta novo
+   *                 descreve outro arquivo: chega com a troca de arquivo, 2b);
+   *   iguais        o meta da nuvem já é o aplicado.
+   * Devolve as contas: { trocados: [ids], ausente, outroArquivo, iguais }. */
+  function trocarMetaDaNuvem(itens) {
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, ['livros'], 'readwrite');
+        var dep = t.objectStore('livros');
+        var contas = { trocados: [], ausente: 0, outroArquivo: 0, iguais: 0 };
+        (itens || []).forEach(function (it) {
+          var req = dep.get(it.id);
+          req.onsuccess = function () {
+            var atual = req.result;
+            if (!atual || !atual.meta) { contas.ausente++; return; }
+            if (atual.meta.hash !== 'sha256:' + it.sha256 || it.meta.hash !== atual.meta.hash) { contas.outroArquivo++; return; }
+            if (atual.nuvem && atual.nuvem.metaHash === it.metaHash) { contas.iguais++; return; }
+            var novo = {};
+            Object.keys(atual).forEach(function (k) { novo[k] = atual[k]; });
+            novo.meta = it.meta;
+            novo.nuvem = { metaHash: it.metaHash, metaVersao: it.metaVersao };
+            dep.put(novo);
+            contas.trocados.push(it.id);
+          };
+        });
+        t.oncomplete = function () { resolve(contas); };
+        t.onabort = function () { reject(t.error || new Error('A troca do meta foi interrompida.')); };
+      });
+    });
+  }
+
   /* Os livros guardados, em ordem de título. O registro traz o Blob, mas o
    * Blob do IndexedDB é só uma referência: listar não lê os livros. */
   function listarLivros() {
@@ -3567,6 +3608,7 @@
     listasDaBiblioteca: listasDaBiblioteca,
     gravarLivros: gravarLivros, listarLivros: listarLivros, lerLivro: lerLivro, removerLivro: removerLivro,
     lerPosicaoLivro: lerPosicaoLivro, gravarPosicaoLivro: gravarPosicaoLivro, posicaoNoArquivoNovo: posicaoNoArquivoNovo,
+    trocarMetaDaNuvem: trocarMetaDaNuvem,
     aoMudar: aoMudar, somenteLeitura: somenteLeitura, celularQueEdita: celularQueEdita,
     estaSoLendo: function () { return soLeitura; },
     celularEdita: function () { return soLeitura && celularEdita; },

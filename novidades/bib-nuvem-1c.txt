@@ -1,0 +1,1 @@
+# Fase 1c da biblioteca na nuvem: o mapa novo dos livros chega pelo "Atualizar a biblioteca" em Ajustes. Fica sem novidade na janela até a primeira publicação conferida.
