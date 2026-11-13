@@ -90,6 +90,10 @@ TOPO_MAX = 30     # quanto a linha do marcador sobe pelo texto que a atravessa (
 TOLERANCIA_MARGEM = 12.0
 RECUO_MAX = 40.0       # recuo de paragrafo que ainda aceita o marcador (recuado_na_linha)
 NOTA_SO_NO_PE = True   # nota de rodape so no pe da coluna (ver marcadores); False so no veneno
+# o bloco "Comentario para professores" sai do enunciado e vai, como ultimo pedaco,
+# para a solucao do mesmo item (ver titulo_de_comentario); False so no veneno
+COMENTARIO_AO_PROFESSOR = True
+COMENTARIO_SO_NO_ENUNCIADO = True  # o comentario dentro das solucoes nao corta nada (detectar); False so no veneno
 ESTENDE_BORDA = True   # recorte passa da borda direita quando a fonte passa (ver detectar); False so no veneno
 LEVA_NOTA = True       # nota de rodape vai com o item que a chama (notas_de_rodape); False so no veneno
 ALTURA_MIN_ENUNCIADO = 20.0
@@ -436,6 +440,12 @@ def marcadores(els, geo, em_solucoes, ja_teve_enunciado=False, secao_1_abre_solu
             continue
         if abs(e['bb'][0] - margem_da_coluna(e['col'], geo)) > TOLERANCIA_MARGEM and not recuado_na_linha(e, txt, geo):
             continue
+        # titulo do comentario ao professor na margem: fecha o enunciado aberto e
+        # abre o pedaco que vai para a solucao (detectar decide se esta antes das
+        # solucoes, pela ordem de leitura, e nao pela ordem dos spans)
+        if COMENTARIO_AO_PROFESSOR and titulo_de_comentario(e, txt):
+            out.append({'tipo': 'comentario', 'col': e['col'], 'el': e})
+            continue
         vizinhos = sorted([o for o in txt if o is not e and o['col'] == e['col']
                            and abs(centro_y(o['bb']) - centro_y(e['bb'])) < 3
                            and 0 <= o['bb'][0] - e['bb'][2] < 60], key=lambda o: o['bb'][0])
@@ -457,6 +467,63 @@ def marcadores(els, geo, em_solucoes, ja_teve_enunciado=False, secao_1_abre_solu
                 out.append({'tipo': 'solucao', 'col': e['col'], 'el': e, 'numero': int(m.group(1)),
                             'forma': 'junto' if m.group(2) else 'separado'})
     return out
+
+
+# Titulo do bloco que a fonte escreve para o professor, lido sem espaco, sem acento
+# e em minusculas: "Comentario para professores:" (o caso medido: 6 enunciados e 10
+# solucoes nas 7 series, em 12/11/2026), e as variantes da mesma frase ("Comentario
+# aos professores", "Observacao para o professor", "Nota ao professor", "Sugestao
+# aos professores", "Para o professor:"). "Comentario:" sozinho NAO entra: no
+# 8o ano ele e explicacao ao aluno (Condicao de alinhamento, exercicio 2), e a
+# decisao D2 do dono e sobre o comentario ao professor.
+TITULO_COMENTARIO = re.compile(
+    r'^(?:(?:comentarios?|observac(?:ao|oes)|obs\.?|notas?|sugest(?:ao|oes)|orientac(?:ao|oes)|dicas?)'
+    r'(?:para|ao|aos|a|as|do|dos|da|das)|para|ao|aos)(?:os|as|o|a)?(?:\((?:a|as|os)\))?professor')
+
+
+def titulo_de_comentario(e, txt):
+    """O span abre um titulo em negrito de comentario ao professor?
+
+    Pelo LAYOUT, e nao por busca no texto: o titulo e a sequencia de spans em
+    negrito que comeca neste span, na mesma linha visual (o Portal escreve
+    "Comentario para professores:" em CMSSBX10, o negrito do marcador
+    "Exercicio", e o texto do comentario segue em fonte normal). Frase em fonte
+    normal que fala do professor ("um presente para o professor", 7o ano) nao
+    e titulo.
+    """
+    cy = centro_y(e['bb'])
+    linha = sorted([o for o in txt if o['col'] == e['col'] and abs(centro_y(o['bb']) - cy) < 4
+                    and o['bb'][0] >= e['bb'][0] - 0.5], key=lambda o: o['bb'][0])
+    titulo = []
+    for o in linha:
+        if not negrito(o['fonte']):
+            break
+        titulo.append(o['texto'])
+    t = re.sub(r'\s+', '', portal.para_busca(' '.join(titulo)))
+    return TITULO_COMENTARIO.match(t) is not None
+
+
+COMENTARIO_SEM_REPETIR = True  # o comentario que a solucao da fonte ja traz nao se repete nela; False so no veneno
+
+
+def comentario_ja_na_solucao(txt_com, txt_sol):
+    """A solucao da fonte ja traz o mesmo comentario, palavra por palavra?
+
+    Medido em 12/11/2026: em 5 dos 6 enunciados com comentario ao professor, a
+    solucao do mesmo item repete o comentario inteiro (7o ano, Introducao a
+    Porcentagem 22; o do 3o medio, Pontos, Retas e Planos 14, nao). Ali o
+    comentario sai do enunciado e nao entra de novo no gabarito. Compara o corpo
+    do comentario, sem o titulo, so letras e algarismos, contra a solucao.
+    """
+    if not (COMENTARIO_SEM_REPETIR and txt_com and txt_sol):
+        return False
+    t = re.sub(r'\s+', '', portal.para_busca(txt_com))
+    m = TITULO_COMENTARIO.match(t)
+    # o titulo inteiro sai, ate os dois pontos ("es(as):."), para o corpo casar mesmo
+    # quando a solucao escreve o titulo de outro jeito ("Comentario para o professor:")
+    resto = re.sub(r'^[a-z()]*:\.?', '', t[m.end():]) if m else t
+    corpo = re.sub(r'[^a-z0-9]', '', resto)
+    return len(corpo) >= 20 and corpo in re.sub(r'[^a-z0-9]', '', portal.para_busca(txt_sol))
 
 
 def recuado_na_linha(e, txt, geo):
@@ -735,7 +802,11 @@ def detectar(doc, secao_1_abre_solucoes=True):
     if not geo_doc:
         return {'erro': 'sem divisa de colunas (nem fio, nem margem de texto)'}
     divisas = collections.Counter()
-    pedacos = {'enunciado': collections.defaultdict(list), 'solucao': collections.defaultdict(list)}
+    # 'comentario': o bloco ao professor que a fonte poe no enunciado, pela chave
+    # do enunciado; o gerador o empilha no fim da solucao do item
+    pedacos = {'enunciado': collections.defaultdict(list), 'solucao': collections.defaultdict(list),
+               'comentario': collections.defaultdict(list)}
+    comentarios = []  # onde cada comentario ao professor foi achado, e de quem ficou
     ordem = {'enunciado': [], 'solucao': []}
     rotulos = {}
     rotulos_inseguros = []
@@ -774,6 +845,12 @@ def detectar(doc, secao_1_abre_solucoes=True):
             if e['cruza']:
                 cruzados.append({'pagina': pno + 1, 'bb': [round(v, 1) for v in e['bb']]})
         marcs = marcadores(els, geo, em_solucoes, bool(ordem['enunciado']), secao_1_abre_solucoes)
+        # o comentario dentro das solucoes ja e do gabarito: nao corta a solucao.
+        # Pela ordem de leitura (coluna, altura), contra o titulo das solucoes
+        # desta pagina, e nao pela ordem em que os spans vem do PDF
+        tits = [(m['col'], m['el']['bb'][1]) for m in marcs if m['tipo'] == 'titulo_solucoes']
+        marcs = [m for m in marcs if m['tipo'] != 'comentario' or not COMENTARIO_SO_NO_ENUNCIADO
+                 or not (em_solucoes or any((m['col'], m['el']['bb'][1]) > t for t in tits))]
         for col in (0, 1):
             cx0, cx1 = faixa_da_coluna(col, geo, pg)
             ms = sorted([m for m in marcs if m['col'] == col], key=lambda m: m['el']['bb'][1])
@@ -823,25 +900,39 @@ def detectar(doc, secao_1_abre_solucoes=True):
                     if m['tipo'] in ('secao', 'creditos'):
                         aberto = None
                         continue
-                    tipo = m['tipo']
-                    if tipo == 'enunciado' and em_solucoes:
-                        continue
-                    formas[(tipo, m['forma'])] += 1
-                    texto_pos = m['el']['texto'].strip()
-                    continua = (tipo == 'solucao' and ordem['solucao'] and ordem['solucao'][-1][0] == m['numero']
-                                and continua_o_anterior(_depois_do_numero(m, els_col)))
-                    if continua:
-                        chave = ordem['solucao'][-1][1]
+                    if m['tipo'] == 'comentario':
+                        # o enunciado aberto acaba aqui; o que vem ate o proximo marcador
+                        # (nesta coluna, na seguinte ou na pagina seguinte) e o comentario
+                        # desse item. Sem enunciado aberto, o bloco nao e de item nenhum
+                        # e fica fora, registrado
+                        reg_c = {'pagina': pno + 1, 'coluna': col + 1,
+                                 'texto': portal.sem_tracos(_linha_a_partir(
+                                     m['el'], [x for x in els_col if x['tipo'] == 'txt']))[:120]}
+                        if aberto and aberto[0] in ('enunciado', 'comentario'):
+                            aberto = ('comentario', aberto[1], aberto[2])
+                            reg_c.update({'numero': aberto[1], 'chave': aberto[2]})
+                        else:
+                            aberto = None
+                            reg_c['motivo'] = 'comentario ao professor sem enunciado aberto antes dele'
+                        comentarios.append(reg_c)
                     else:
-                        chave_seq += 1
-                        chave = chave_seq
-                        ordem[tipo].append((m['numero'], chave))
-                        rotulos[chave] = caixa_do_rotulo(caracteres, m, tipo, m['numero'])
-                        if rotulos[chave] and borda_cruza_tinta(doc, pno, rotulos[chave], paginas_150):
-                            rotulos[chave] = None
-                            rotulos_inseguros.append({'tipo': tipo, 'numero': m['numero'], 'pagina': pno + 1})
-                    aberto = (tipo, m['numero'], chave)
-                    del texto_pos
+                        tipo = m['tipo']
+                        if tipo == 'enunciado' and em_solucoes:
+                            continue
+                        formas[(tipo, m['forma'])] += 1
+                        continua = (tipo == 'solucao' and ordem['solucao'] and ordem['solucao'][-1][0] == m['numero']
+                                    and continua_o_anterior(_depois_do_numero(m, els_col)))
+                        if continua:
+                            chave = ordem['solucao'][-1][1]
+                        else:
+                            chave_seq += 1
+                            chave = chave_seq
+                            ordem[tipo].append((m['numero'], chave))
+                            rotulos[chave] = caixa_do_rotulo(caracteres, m, tipo, m['numero'])
+                            if rotulos[chave] and borda_cruza_tinta(doc, pno, rotulos[chave], paginas_150):
+                                rotulos[chave] = None
+                                rotulos_inseguros.append({'tipo': tipo, 'numero': m['numero'], 'pagina': pno + 1})
+                        aberto = (tipo, m['numero'], chave)
                 if aberto is None:
                     continue
                 # linhas com tinta entre o comeco deste trecho e o proximo corte
@@ -931,7 +1022,7 @@ def detectar(doc, secao_1_abre_solucoes=True):
     geo_doc['divisas_por_pagina'] = {str(k): v for k, v in sorted(divisas.items())}
     notas = notas_de_rodape(doc, regioes_nota, pedacos) if LEVA_NOTA else []
     return {'geo': geo_doc, 'pagina_solucoes': pagina_solucoes, 'solucoes_sem_titulo': solucoes_sem_titulo,
-            'ordem': ordem, 'pedacos': pedacos, 'rotulos': rotulos, 'notas': notas,
+            'ordem': ordem, 'pedacos': pedacos, 'rotulos': rotulos, 'notas': notas, 'comentarios': comentarios,
             'rotulos_inseguros': rotulos_inseguros,
             'formas': {'%s_%s' % k: v for k, v in sorted(formas.items())}, 'cruzados': cruzados}
 
@@ -1017,7 +1108,8 @@ def notas_de_rodape(doc, regioes, pedacos):
                     chamadas.append(c)
             donos = []
             for c in chamadas:
-                for tipo in ('enunciado', 'solucao'):
+                # a chamada dentro do comentario ao professor: a nota vai com ele
+                for tipo in ('enunciado', 'solucao', 'comentario'):
                     for chave, ps in pedacos[tipo].items():
                         if any(p['pno'] == pno and pymupdf.Rect(p['rect']).contains(c) for p in ps):
                             donos.append((tipo, chave))
@@ -1782,11 +1874,25 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
             for nt in det.get('notas', []):
                 reg = {k: nt.get(k) for k in ('pagina', 'coluna', 'numero', 'texto')}
                 if 'chave' in nt:
-                    num = next(n for n, ch in det['ordem'][nt['tipo']] if ch == nt['chave'])
-                    reg.update({'id': '%s:%s:%s:ex:%d' % (serie, mod, a['aula'], num), 'em': nt['tipo']})
+                    # o comentario ao professor tem a chave do enunciado do item, e a
+                    # nota chamada nele acaba na solucao, com o comentario
+                    lado = 'enunciado' if nt['tipo'] == 'comentario' else nt['tipo']
+                    num = next(n for n, ch in det['ordem'][lado] if ch == nt['chave'])
+                    reg.update({'id': '%s:%s:%s:ex:%d' % (serie, mod, a['aula'], num),
+                                'em': 'solucao' if nt['tipo'] == 'comentario' else nt['tipo']})
                 else:
                     reg['motivo'] = nt['motivo']
                 rel['notas_de_rodape'].append(reg)
+            # comentarios ao professor achados nos enunciados: de que item, e onde.
+            # O id so entra se o item entrar no pacote (ver abaixo, 'na_solucao')
+            rel['comentarios_ao_professor'] = []
+            for c in det.get('comentarios', []):
+                reg = {k: c.get(k) for k in ('pagina', 'coluna', 'texto')}
+                if 'chave' in c:
+                    reg['id'] = '%s:%s:%s:ex:%d' % (serie, mod, a['aula'], c['numero'])
+                else:
+                    reg['motivo'] = c['motivo']
+                rel['comentarios_ao_professor'].append(reg)
             ne = [n for n, _ in det['ordem']['enunciado']]
             ns = [n for n, _ in det['ordem']['solucao']]
             total = len(ne)
@@ -1815,7 +1921,16 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                               'item, sai' % (numero, ', '.join(str(x) for x in range(1, total + 1) if cont_s[x] == 0) or 'outra'))
                 p_enun = det['pedacos']['enunciado'].get(ch, [])
                 p_sol = det['pedacos']['solucao'].get(chave_sol[numero][0], []) if cont_s[numero] == 1 else []
-                vaza = [p for p in p_enun + p_sol if p.get('transborda')]
+                # o comentario ao professor que a fonte pos no enunciado (decisao D2 do
+                # dono, 12/11/2026): sai do enunciado, que e a folha do aluno, e vai
+                # como ultimo pedaco da solucao, que so a professora ve
+                p_com = det['pedacos']['comentario'].get(ch, [])
+                # lista sem secao de solucoes: nao ha gabarito para levar o comentario,
+                # e ele nao volta para o enunciado (fica fora, com nota, mais abaixo)
+                com_fora = bool(p_com) and not p_sol
+                if com_fora:
+                    p_com = []
+                vaza = [p for p in p_enun + p_sol + p_com if p.get('transborda')]
                 if not motivo and vaza:
                     motivo = ('na pagina %d a fonte passa conteudo por cima do fio entre as colunas, na altura deste '
                               'item: o recorte da coluna cortaria esse trecho ou pegaria a outra coluna' % (vaza[0]['pno'] + 1))
@@ -1848,13 +1963,29 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                     continue
                 if nota:
                     rel['notas'].append({'id': iid, 'nota': nota})
+                if com_fora:
+                    rel['notas'].append({'id': iid, 'nota': 'comentario ao professor fora do pacote: o item nao '
+                                                            'tem solucao para levar o comentario'})
+                txt_com = '\n'.join(texto_do_retangulo(doc, p['pno'], p['rect']) for p in p_com)
+                repetido = bool(p_com) and comentario_ja_na_solucao(txt_com, txt_s)
+                regiao_fora = []
+                if repetido:
+                    # a solucao da fonte ja o traz: sai do enunciado e nao se repete. A
+                    # regiao fica no relatorio, porque passa a ficar fora de todo recorte
+                    regiao_fora = [{'pagina': p['pno'] + 1, 'coluna': p['col'] + 1, 'bbox': list(p['rect'])} for p in p_com]
+                    p_com, txt_com = [], ''
+                # a solucao com o comentario no fim; o primeiro pedaco continua sendo o
+                # da solucao (o rotulo e a regra "comeca pelo numero" sao dele)
+                ps_sol = p_sol + [dict(p, comentario=True) for p in p_com]
                 # alturas
                 col_alt = det['geo']['yrod'] or 750
                 ruim = None
-                for tipo, ps, minimo in (('enunciado', p_enun, ALTURA_MIN_ENUNCIADO), ('solucao', p_sol, ALTURA_MIN_SOLUCAO)):
+                for tipo, ps, minimo in (('enunciado', p_enun, ALTURA_MIN_ENUNCIADO), ('solucao', ps_sol, ALTURA_MIN_SOLUCAO)):
                     if not ps:
                         continue
-                    h_total = sum(p['rect'][3] - p['rect'][1] for p in ps)
+                    # a altura minima e da solucao propria: o comentario nao salva
+                    # uma solucao quase vazia
+                    h_total = sum(p['rect'][3] - p['rect'][1] for p in ps if not p.get('comentario'))
                     if h_total < minimo:
                         ruim = '%s com %.1f pt de altura, abaixo de %d' % (tipo, h_total, minimo)
                     for p in ps:
@@ -1867,7 +1998,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                 base = 'assets/%s/%s/%s/ex-%s' % (serie, mod, a['aula'], ('%02d' if total < 100 else '%03d') % numero)
                 assets, medidas, origem = {}, {}, {}
                 falhou = None
-                for tipo, ps, suf in (('enunciado', p_enun, '.svg'), ('solucao', p_sol, '-sol.svg')):
+                for tipo, ps, suf in (('enunciado', p_enun, '.svg'), ('solucao', ps_sol, '-sol.svg')):
                     if not ps:
                         continue
                     svgs, meds = [], []
@@ -1888,7 +2019,11 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                                      'rotulo': rotulo_relativo(det['rotulos'].get(chave), ps[0]['rect'])}
                     o = {'pagina': ps[0]['pno'] + 1, 'coluna': ps[0]['col'] + 1, 'bbox': list(ps[0]['rect'])}
                     if len(ps) > 1:
-                        o['pedacos'] = [{'pagina': p['pno'] + 1, 'coluna': p['col'] + 1, 'bbox': list(p['rect'])} for p in ps]
+                        # o pedaco do comentario ao professor leva "comentario": true, campo
+                        # aditivo (contrato, 8a: o app ignora o que nao conhece e empilha
+                        # pelos bbox, como sempre)
+                        o['pedacos'] = [dict({'pagina': p['pno'] + 1, 'coluna': p['col'] + 1, 'bbox': list(p['rect'])},
+                                             **({'comentario': True} if p.get('comentario') else {})) for p in ps]
                         if tipo == 'enunciado':
                             multi_e += 1
                         else:
@@ -1923,10 +2058,20 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                 item['medidas'] = medidas
                 item['origem'] = dict({'arquivo': 'PDF/matematica/obmep-portal/%s/%s' % (serie, a['arquivo'])}, **origem)
                 itens.append(item)
+                if p_com or repetido:
+                    for reg in rel['comentarios_ao_professor']:
+                        if reg.get('id') == iid:
+                            # na_solucao: levado ao fim da solucao; ja_na_solucao: a
+                            # solucao da fonte ja o trazia, e ele so saiu do enunciado
+                            reg['ja_na_solucao' if repetido else 'na_solucao'] = True
+                            if repetido:
+                                reg['regiao'] = regiao_fora
+                # o texto do comentario vai para a busca junto com a solucao, e nao com o enunciado
                 docs_busca.append({'id': iid, 'serie': SERIE_BUSCA.get(serie, serie), 'tipo': 'exercicio',
                                    'titulo': '', 'resumo': '%s %s' % (aula_tit, modulo['titulo']),
                                    'texto': portal.sem_tracos(portal.recompor(txt_e)),
-                                   'explicacao': portal.sem_tracos(portal.recompor(txt_s or ''))})
+                                   'explicacao': portal.sem_tracos(portal.recompor(
+                                       (txt_s or '') + ('\n' + txt_com if txt_com else '')))})
             rel['itens_no_pacote'] = sum(1 for i in itens if i['origem']['arquivo'].endswith(a['arquivo']))
             rel['enunciados_com_mais_de_um_pedaco'] = multi_e
             rel['solucoes_com_mais_de_um_pedaco'] = multi_s
@@ -2074,6 +2219,10 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
         'bytes_por_tipo': dict(sorted(tam.items())),
         'enunciados_com_mais_de_um_pedaco': sum(l.get('enunciados_com_mais_de_um_pedaco', 0) for l in relatorio['listas']),
         'solucoes_com_mais_de_um_pedaco': sum(l.get('solucoes_com_mais_de_um_pedaco', 0) for l in relatorio['listas']),
+        # todo comentario ao professor achado num enunciado: o item que o levou na
+        # solucao, ou o motivo de ter ficado fora
+        'comentarios_ao_professor': [dict(c, arquivo=l['arquivo']) for l in relatorio['listas']
+                                     for c in l.get('comentarios_ao_professor', [])],
         'segundos': round(time.time() - t_ini, 1),
         'como_o_marcador_foi_achado': (
             'enunciado: span negrito "Exercicio" na margem da coluna (ate 12 pt); forma "junto" quando o proprio span '
