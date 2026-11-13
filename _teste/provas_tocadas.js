@@ -2,7 +2,10 @@
  *
  * O nivel 1 da politica de testes por checkpoint (09/11/2026): dado o conjunto
  * de arquivos tocados por um PR, quais provas de NAVEGADOR rodam. O mapa e
- * _teste/mapa_provas.tsv (formato e ordem de decisao no cabecalho dele).
+ * _teste/mapa_provas.tsv (formato e ordem de decisao no cabecalho dele) somado
+ * aos arquivos de _teste/mapa_provas.d/, um por prova nova (leMapaPasta, regras
+ * no cabecalho do tsv). A pasta so ACRESCENTA provas a arquivos que o mapa geral
+ * ja decide: quem tira um arquivo da bateria inteira (item 3) e so o mapa geral.
  *
  *   node _teste/provas_tocadas.js --plano [arquivos...]
  *       so o plano: quantas fatias o nivel 1 abre (fatias=N e matriz=[1..N]
@@ -55,6 +58,7 @@ const { execFileSync } = require('child_process');
 
 const RAIZ = path.join(__dirname, '..');
 const MAPA = path.join(__dirname, 'mapa_provas.tsv');
+const PASTA = path.join(__dirname, 'mapa_provas.d');
 const PORTAO = path.join(__dirname, 'confere_tudo.sh');
 const ALVO_POR_FATIA = 5 * 60;   // segundos de prova por fatia do nivel 1 (5 min: relogio de uns 7 min com o preparo)
 const MAX_FATIAS = 8;
@@ -76,6 +80,68 @@ function leMapa(texto) {
     linhas.push({ padrao, re, provas });
   });
   return linhas;
+}
+
+/* Os arquivos de _teste/mapa_provas.d/ (13/11/2026): um por prova, para que o PR
+ * que cria uma prova nova so ACRESCENTE um arquivo e nao edite a linha do
+ * app.js, do index.html etc. no mapa geral, que todo PR aberto disputava.
+ * Cada arquivo <nome>.tsv tem o mesmo formato do mapa geral (padrao<TAB>prova),
+ * com estas regras a mais, e qualquer desvio grita (nunca pula calado):
+ *   - so arquivos .tsv na pasta (outro arquivo e erro, nao enfeite ignorado);
+ *   - ao menos uma linha, e UMA prova so por linha, a mesma em todas;
+ *   - o nome do arquivo e o da prova sem a extensao: _teste/testa_x.js fica em
+ *     testa_x.tsv (dois PRs com provas diferentes nunca tocam o mesmo arquivo);
+ *   - nada de "-" nem "*": esses sao decisoes gerais e moram no mapa geral;
+ *   - o padrao fixa uma pasta antes do primeiro "*" (biblioteca/* vale; *.js,
+ *     app* e * sozinho nao), para uma linha da pasta nao puxar a prova em todo PR.
+ * Que a prova e de navegador (esta no --listar) se confere contra o portao em
+ * confereMapa, a mesma regra que vale para o mapa geral.
+ * Pasta que nao existe: nenhuma linha (o mecanismo existe antes da 1a prova). */
+function leMapaPasta(pasta) {
+  const dir = pasta || PASTA;
+  if (!fs.existsSync(dir)) return [];
+  const linhas = [];
+  fs.readdirSync(dir).sort().forEach(nome => {
+    const onde = 'mapa_provas.d/' + nome;
+    const cheio = path.join(dir, nome);
+    if (!/\.tsv$/.test(nome) || !fs.statSync(cheio).isFile()) throw new Error(onde + ': so arquivos .tsv na pasta do mapa');
+    let deste;
+    try { deste = leMapa(fs.readFileSync(cheio, 'utf8')); } catch (e) { throw new Error(onde + ': ' + e.message); }
+    if (!deste.length) throw new Error(onde + ': nenhuma linha (arquivo vazio ou so comentario)');
+    const prova = deste[0].provas[0];
+    deste.forEach(l => {
+      if (l.provas.length !== 1) throw new Error(onde + ': uma prova so por linha ("' + l.padrao + '" tem ' + l.provas.length + ')');
+      if (l.provas[0] === '-' || l.provas[0] === '*') throw new Error(onde + ': "-" e "*" moram no mapa geral, nao na pasta ("' + l.padrao + '")');
+      if (l.provas[0] !== prova) throw new Error(onde + ': o arquivo e de uma prova so (' + prova + ' e ' + l.provas[0] + ')');
+      const ate = l.padrao.indexOf('*');
+      if (ate >= 0 && l.padrao.slice(0, ate).indexOf('/') < 0) throw new Error(onde + ': o padrao "' + l.padrao + '" tem de fixar uma pasta antes do primeiro "*"');
+      l.origem = 'pasta';
+      l.arquivo = onde;
+    });
+    const esperado = path.posix.basename(prova).replace(/\.[^.]+$/, '') + '.tsv';
+    if (nome !== esperado) throw new Error(onde + ': o nome do arquivo tem de ser o da prova (' + prova + ' fica em ' + esperado + ')');
+    deste.forEach(l => linhas.push(l));
+  });
+  return linhas;
+}
+
+/* O mapa que vale: o geral somado ao da pasta. Cada linha leva origem
+ * 'geral' ou 'pasta'. */
+function leMapaTodo(arquivo, pasta) {
+  const geral = leMapa(fs.readFileSync(arquivo || MAPA, 'utf8'));
+  geral.forEach(l => { l.origem = 'geral'; });
+  return geral.concat(leMapaPasta(pasta));
+}
+
+/* Toda prova que o mapa cita (geral e pasta) e de navegador: esta no --listar.
+ * Grita com a lista das que nao sao. Antes so gritava quando a linha casava um
+ * arquivo tocado; agora o CLI confere o mapa inteiro antes de decidir. */
+function confereMapa(mapa, navegador) {
+  const fora = [];
+  mapa.forEach(l => l.provas.forEach(p => {
+    if (p !== '-' && p !== '*' && navegador.arquivos.indexOf(p) < 0) fora.push((l.arquivo || 'mapa_provas.tsv') + ': ' + p);
+  }));
+  if (fora.length) throw new Error('o mapa cita prova que o portao nao tem (nao e prova de navegador): ' + fora.join('; '));
 }
 
 /* navegador: { arquivos: [caminho...], nomes: { caminho: [nome...] }, ordem: [nome...] } (do --listar). */
@@ -166,11 +232,16 @@ function provasTocadas(tocados, mapa, navegador, diffs) {
       return;
     }
     const casadas = mapa.filter(l => l.re.test(f));
-    if (!casadas.length) { inteira = true; motivos.push(f + ': nao esta no mapa, bateria inteira'); return; }
+    // item 3 pelo mapa GERAL: linha da pasta so acrescenta prova, nunca tira da bateria inteira
+    if (!casadas.some(l => l.origem !== 'pasta')) {
+      inteira = true;
+      motivos.push(f + ': nao esta no mapa' + (casadas.length ? ' geral (a pasta mapa_provas.d so acrescenta)' : '') + ', bateria inteira');
+      return;
+    }
     casadas.forEach(l => {
       if (l.provas[0] === '*') { inteira = true; motivos.push(f + ': ' + l.padrao + ' pede a bateria inteira'); }
       else if (l.provas[0] === '-') motivos.push(f + ': ' + l.padrao + ' sem prova de navegador (o portao-rapido cobre)');
-      else { l.provas.forEach(p => uniao.add(p)); motivos.push(f + ': ' + l.provas.length + ' provas pelo mapa (' + l.padrao + ')'); }
+      else { l.provas.forEach(p => uniao.add(p)); motivos.push(f + ': ' + l.provas.length + ' provas pelo mapa (' + l.padrao + (l.arquivo ? ', ' + l.arquivo : '') + ')'); }
     });
   });
   if (inteira) return { modo: 'inteira', provas: todas.slice(), diretas: [...diretas], motivos };
@@ -213,7 +284,7 @@ function daFatia(provas, navegador, k, n, nomesSel) {
   return nomesSel ? { arquivos, nomes: [...minhas] } : arquivos;
 }
 
-module.exports = { leMapa, listaDoPortao, provasTocadas, rodaDoDiff, nomesDaSelecao, fatiasDoPlano, daFatia, MAPA, ALVO_POR_FATIA, MAX_FATIAS };
+module.exports = { leMapa, leMapaPasta, leMapaTodo, confereMapa, PASTA, listaDoPortao, provasTocadas, rodaDoDiff, nomesDaSelecao, fatiasDoPlano, daFatia, MAPA, ALVO_POR_FATIA, MAX_FATIAS };
 
 if (require.main === module) {
   const a = process.argv.slice(2);
@@ -238,7 +309,11 @@ if (require.main === module) {
       diffs[PORTAO_REL] = execFileSync('git', ['diff', base + '...HEAD', '--', PORTAO_REL], { cwd: RAIZ, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (e) { console.log('  nao consegui ler o diff do ' + PORTAO_REL + ' contra ' + base + ': ' + String(e.message).split('\n')[0]); }
   }
-  const r = provasTocadas(tocados, leMapa(fs.readFileSync(MAPA, 'utf8')), nav, diffs);
+  // MAPA_PROVAS_PASTA_TESTE: so o testa_provas_tocadas a usa, para provar que o
+  // CLI le a pasta (o CI nao a define; sem ela vale _teste/mapa_provas.d)
+  const mapa = leMapaTodo(null, process.env.MAPA_PROVAS_PASTA_TESTE || null);
+  confereMapa(mapa, nav);
+  const r = provasTocadas(tocados, mapa, nav, diffs);
   r.motivos.forEach(m => console.log('  ' + m));
   const nomes = nomesDaSelecao(r, tocados, nav);
   const { leTempos, mediana } = require('./divide_portao.js');

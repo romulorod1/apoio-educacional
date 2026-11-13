@@ -325,6 +325,23 @@ roda "sugestoes matematica"  node _teste/testa_sugestoes_matematica.js
 roda "virada anual"          node _teste/testa_virada_anual.js
 # A regra do merge na main (_teste/merge_seguro.sh), que segura o processo
 # quando a protecao de branch do GitHub sumir com o repositorio privado.
+# F7 (#159): no "todas" e no "desta em diante", a aula com relato fica de fora
+# (core, alvosDoEscopo); o veneno tira a regra e so o lado da aula com relato cai.
+roda "escopo sem a aula com relato" node _teste/testa_escopo_relato.js
+roda "escopo sem a aula com relato --envenenado-sem-regra-do-relato" node _teste/testa_escopo_relato.js --envenenado-sem-regra-do-relato
+roda "escopo sem a aula com relato --envenenado-so-o-relato" node _teste/testa_escopo_relato.js --envenenado-so-o-relato
+# F7 (decisao do dono, 13/11): a aula passada de mes ja pago tambem fica fora do lote; os
+# venenos tiram a regra, protegem toda passada e protegem a futura.
+roda "escopo sem a aula paga" node _teste/testa_escopo_pago.js
+roda "escopo sem a aula paga --envenenado-sem-regra-da-paga" node _teste/testa_escopo_pago.js --envenenado-sem-regra-da-paga
+roda "escopo sem a aula paga --envenenado-protege-toda-passada" node _teste/testa_escopo_pago.js --envenenado-protege-toda-passada
+roda "escopo sem a aula paga --envenenado-protege-futura" node _teste/testa_escopo_pago.js --envenenado-protege-futura
+# F7 (rodada 5): o Encerrar da ficha e a mudanca de padrao passam pela mesma regra; os venenos
+# tiram a regra do Encerrar, fazem ele guardar tudo e deixam o "desta em diante" criar serie ao contrario.
+roda "encerrar repeticao" node _teste/testa_encerrar_repeticao.js
+roda "encerrar repeticao --envenenado-encerrar-sem-regra" node _teste/testa_encerrar_repeticao.js --envenenado-encerrar-sem-regra
+roda "encerrar repeticao --envenenado-encerrar-guarda-tudo" node _teste/testa_encerrar_repeticao.js --envenenado-encerrar-guarda-tudo
+roda "encerrar repeticao --envenenado-serie-ao-contrario" node _teste/testa_encerrar_repeticao.js --envenenado-serie-ao-contrario
 roda "merge seguro"          node _teste/testa_merge_seguro.js
 # O guarda de merge no CI (item 13c): o guarda_merge.js julga pelo merge_seguro
 # e publica o status portao-merge na cabeca que julgou. Com gh e git falsos:
@@ -579,6 +596,16 @@ roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/t
 # B1 (revisao cega do #192): a navegacao sai da pagina do assunto; o veneno a
 # deixa presa, e ela volta no Limpar e no Voltar do modulo.
 roda "biblioteca livros tela --envenenado-pagina-presa" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-pagina-presa
+# P2: a busca em tres blocos (Assuntos, Capitulos nos livros, Listas e
+# exercicios). Veneno dos dois lados no bloco Assuntos (o termo so de capitulo
+# entra nele; o termo do assunto some dele), e os dois casos reais de
+# 13/11/2026: com o ano escrito, o livro de outro ano que casa so no texto
+# volta ("volume 9o ano"), e os assuntos de outro ano ficam no mesmo nivel
+# ("volume 8o ano"). Cada veneno vai direto a secao 11 e tem de ser visto.
+roda "biblioteca livros tela --envenenado-capitulo-vira-assunto" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-capitulo-vira-assunto
+roda "biblioteca livros tela --envenenado-assunto-sumido" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-assunto-sumido
+roda "biblioteca livros tela --envenenado-ano-nao-filtra" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-ano-nao-filtra
+roda "biblioteca livros tela --envenenado-outros-anos-juntos" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-outros-anos-juntos
 # Fatia 2 do leitor: pinca e duplo toque no livro sintetico de 400 paginas,
 # com toques de verdade do Chrome. O ponto sob os dedos fica sob eles (24 px),
 # o duplo toque leva o ponto ao meio e volta, a caneta nao da zoom e um dedo
@@ -950,9 +977,9 @@ roda "livros indice --envenenado-pagina-ruim-derruba-livro" node "_teste/testa_l
 # mapa, inclusive no livro escaneado (sem texto). O veneno desliga a busca por
 # capitulo, e o livro escaneado some do resultado.
 roda "livros indice --envenenado-busca-sem-capitulos" node "_teste/testa_livros_indice.js" --envenenado-busca-sem-capitulos
-# A revisao do #181: com o resultado todo em "Outras paginas do livro", elas
-# disputam o topo; o veneno deixa os "Melhores resultados" vazios.
-roda "livros indice --envenenado-topo-vazio" node "_teste/testa_livros_indice.js" --envenenado-topo-vazio
+# P2: a pagina fora de todo capitulo nao e resultado (substitui o veneno do
+# topo vazio do #181); o veneno a devolve como linha.
+roda "livros indice --envenenado-pagina-solta-vira-resultado" node "_teste/testa_livros_indice.js" --envenenado-pagina-solta-vira-resultado
 # C15.2 e C15.3: "Este capitulo cobre" no leitor, Confirmar e Corrigir (so a
 # materia e o ano do livro), a correcao depois de recarregar e na copia de
 # seguranca (os livros nao), e o "Abrir no livro" da aula na pagina do PDF e no
@@ -1055,6 +1082,18 @@ roda "relato e Voltar"                            node "_teste/testa_relato_volt
 # como estava e o historico nunca mais fica sem janela
 roda "Voltar sem entrada velha"                  node "_teste/testa_voltar_entrada_velha.js"
 roda "Voltar sem entrada velha --envenenado-entrada-velha" node "_teste/testa_voltar_entrada_velha.js" --envenenado-entrada-velha
+# F7 (#159): na aula que ja existe, o relato salva sozinho e data, horario, duracao,
+# situacao e cobranca gravam so ao Fechar ou Concluir (com Desfazer); nunca por cima de
+# versao mais nova, mesmo campo ou outro; Descartar volta ao que havia; a repeticao pede
+# o escopo. Os venenos tiram a conferencia, o rascunho na saida e o retrato por chave (A1).
+roda "aula salva sozinha"                          node "_teste/testa_aula_salva_sozinha.js"
+roda "aula salva sozinha --envenenado-grava-por-cima" node "_teste/testa_aula_salva_sozinha.js" --envenenado-grava-por-cima
+roda "aula salva sozinha --envenenado-sem-rascunho-ao-sair" node "_teste/testa_aula_salva_sozinha.js" --envenenado-sem-rascunho-ao-sair
+roda "aula salva sozinha --envenenado-retrato-absorve-tudo" node "_teste/testa_aula_salva_sozinha.js" --envenenado-retrato-absorve-tudo
+roda "aula salva sozinha --envenenado-descartar-velho" node "_teste/testa_aula_salva_sozinha.js" --envenenado-descartar-velho
+roda "aula salva sozinha --envenenado-volta-atras" node "_teste/testa_aula_salva_sozinha.js" --envenenado-volta-atras
+roda "aula salva sozinha --envenenado-desfazer-tudo" node "_teste/testa_aula_salva_sozinha.js" --envenenado-desfazer-tudo
+roda "aula salva sozinha --envenenado-desfazer-so-no-lote" node "_teste/testa_aula_salva_sozinha.js" --envenenado-desfazer-so-no-lote
 roda "Voltar do aparelho nas telas"              node "_teste/testa_voltar_android.js"
 roda "Voltar do aparelho --envenenado-voltar-sem-tela" node "_teste/testa_voltar_android.js" --envenenado-voltar-sem-tela
 roda "Voltar do aparelho --envenenado-volta-dois-passos" node "_teste/testa_voltar_android.js" --envenenado-volta-dois-passos
