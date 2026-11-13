@@ -158,9 +158,31 @@
  * passar sem cache. O v148 traz o aviso de novidades do planejamento.
  * O v152 reorganiza a janela da aula em duas colunas no tablet.
  * O v156 traz os 6 assuntos novos de química da revisão dos mapas dos livros no banco/topicos/quimica.json.
- * O v166 traz o assistente só de leitura com IA: './assistente.js' entra na lista.
+ * O v158 traz a busca da Biblioteca nos capítulos e assuntos do mapa, com todas as palavras e os melhores resultados.
+ * O v166 traz as aulas tiradas e postas só na folha do planejamento.
+ * O v168 traz a correção dos módulos ligados a 14 assuntos no banco/topicos/matematica.json.
+ * O v169 traz o Voltar do aparelho dentro do aplicativo.
+ * O v171 traz a fase 1a da biblioteca na nuvem: a posição de leitura e a correção do
+ * mapa sobrevivem à troca de meta e de arquivo do livro.
+ * O v182 traz o Voltar sem entrada sobrando no histórico depois de recarregar com uma janela aberta.
+ * O v186 traz a pinça e o duplo toque no livro aberto.
+ * O v188 traz a ligação de assunto entre matérias nos mapas dos livros (biblioteca.js e app.js).
+ * O v187 traz o conteúdo escrito no pedido do planejamento valendo como o do aviso.
+ * O v192 traz a página do assunto na Biblioteca (B1).
+ * O v195 traz a ligação de assunto entre matérias com a versão 1.42.115.
+ * O v199 traz a janela PDF pronto e as próximas aulas no Gerar material da Biblioteca.
+ * O v201 é o último escrito à mão: o 13f passa a gerar VERSAO e CACHE na publicação,
+ * com 1.42.121 e v201 como valores fixos e piso.
+ *
+ * DESDE O 13f ESTE HISTÓRICO PAROU, e o CACHE abaixo fica fixo. O nome que o
+ * tablet vê é gerado na publicação (_teste/versao_publicada.js):
+ * apoio-educacional-v(1000 + N), em que N é o contador de publicações da main,
+ * que sobe em todo commit que muda o que o tablet baixa. O valor daqui é o valor
+ * de desenvolvimento e o piso da publicação. Não mude no PR (o merge_seguro
+ * recusa) e não acrescente linha neste comentário: era ele, junto com a VERSAO
+ * e as NOVIDADES, que fazia todo PR do app conflitar com o anterior.
  */
-var CACHE = 'apoio-educacional-v167';
+var CACHE = 'apoio-educacional-v201';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

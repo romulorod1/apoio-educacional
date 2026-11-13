@@ -298,21 +298,47 @@ roda "biblioteca (zip)" node _teste/testa_biblioteca_zip.js
 roda "fechamento em ordem"   node _teste/testa_fechamento_ordem_alfabetica.js
 roda "rotulos da aula"       node _teste/testa_rotulos_aula.js
 roda "vagos e repeticoes (F3)" node _teste/testa_vagos_repeticao.js
+# Remarcar aula de repeticao para um dia da PROPRIA serie, em mes nao lancado,
+# nao apaga a fixa daquele dia (12/11/2026: dezembro dava 1080 em vez de 1200).
+# So a ocorrencia original do dia ocupa a vaga; a aula vinda de outro dia, ao
+# sair de novo ou ser apagada, nao exclui o dia. E o lado da SOBRA: dado antigo
+# (id aleatorio) com o mes relancado (editarSerie, materializadoAte nulo ou
+# recuado) nao dobra. Tres venenos, um de cada lado: a regra antiga erra a
+# falta; "nunca e original" erra a sobra (o dia apagado volta); "lancado so
+# pelo campo" da gemea a aula antiga que so mudou de horario.
+roda "remarcar na repeticao" node _teste/testa_remarcar_repeticao.js
+roda "remarcar na repeticao --envenenado-regra-antiga" node _teste/testa_remarcar_repeticao.js --envenenado-regra-antiga
+roda "remarcar na repeticao --envenenado-nunca-original" node _teste/testa_remarcar_repeticao.js --envenenado-nunca-original
+roda "remarcar na repeticao --envenenado-lancado-so-pelo-campo" node _teste/testa_remarcar_repeticao.js --envenenado-lancado-so-pelo-campo
 roda "sugestoes matematica"  node _teste/testa_sugestoes_matematica.js
 roda "virada anual"          node _teste/testa_virada_anual.js
 # A regra do merge na main (_teste/merge_seguro.sh), que segura o processo
 # quando a protecao de branch do GitHub sumir com o repositorio privado.
 roda "merge seguro"          node _teste/testa_merge_seguro.js
-# CACHE do sw.js e VERSAO do app.js do PR MAIORES que os da main atual, e nao so
-# diferentes da base do merge (12/11/2026: um ramo em v130 integrado com a main
-# em v134 passava verde). A regra e a do merge_seguro; a prova a exercita dos dois
-# lados, como numero (1.42.9 contra 1.42.10), e num repositorio de mentira pelo
-# caminho real do --conferir, inclusive o ramo que trouxe a main e ficou igual a
-# ela. O veneno devolve a regra antiga, "mudou desde a base, passa", e os casos
-# de menor, de igual e o da revisao TEM de sair errados. A conferencia do repositorio
-# roda mais abaixo, na secao do cache.
-roda "ordem cache e versao"  node _teste/testa_ordem_versao.js
-roda "ordem cache e versao --envenenado-so-diferente" node _teste/testa_ordem_versao.js --envenenado-so-diferente
+# O guarda de merge no CI (item 13c): o guarda_merge.js julga pelo merge_seguro
+# e publica o status portao-merge na cabeca que julgou. Com gh e git falsos:
+# pending no comeco, success ou failure com o motivo, cabeca que andou nao
+# publica, fork e pulado, e o merge nunca e chamado; quando a main anda, todos os
+# PRs abertos sao rejulgados (o caso dos dois PRs com a mesma versao); o guarda
+# nao julga a si mesmo (com controle sem a regra); e o workflow so roda codigo da
+# main, sem checkout da cabeca do PR, com so a escrita de status e sem strict.
+roda "guarda de merge"       node _teste/testa_guarda_merge.js
+# 13f: VERSAO e CACHE sao gerados na publicacao (_teste/versao_publicada.js) e
+# ficam fixos no repositorio. A regra do merge: o PR nao os muda, e o PR que leva
+# arquivo do site traz novidades/<nome>.txt. A prova a exercita dos dois lados e
+# num repositorio de mentira pelo caminho real do --conferir, inclusive o ramo
+# atras de uma main que andou com outro PR do app (o conflito que o 13f tira).
+# Os venenos tiram uma exigencia de cada vez, e os casos dela TEM de sair
+# errados. A conferencia do repositorio roda mais abaixo, na secao do cache.
+roda "versao no deploy"      node _teste/testa_ordem_versao.js
+roda "versao no deploy --envenenado-sem-novidade" node _teste/testa_ordem_versao.js --envenenado-sem-novidade
+roda "versao no deploy --envenenado-versao-livre" node _teste/testa_ordem_versao.js --envenenado-versao-livre
+# O gerador da publicacao: o contador sobe exatamente quando o que o tablet
+# baixa muda, so cresce, cada novidade leva a versao do commit que a trouxe, e a
+# primeira publicacao sai MAIOR que o valor fixo do repositorio (1.42.121 e
+# v201), que e o piso. Com os venenos da regra de contagem (conta tudo, esquece
+# o banco) dentro da prova.
+roda "versao publicada"      node _teste/testa_versao_publicada.js
 # As fatias do portao inteiro no CI: toda prova de navegador em exatamente uma
 # fatia, para qualquer numero de fatias, com controle que reprova.
 roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
@@ -544,6 +570,26 @@ roda "biblioteca livros tela --envenenado-largura-vai-ao-alto" node "_teste/test
 roda "biblioteca livros tela --envenenado-vizinhas-sem-desenho" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-vizinhas-sem-desenho
 roda "biblioteca livros tela --envenenado-canvas-sem-soltar" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-canvas-sem-soltar
 roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-sumario-dos-marcadores
+# B1 (revisao cega do #192): a navegacao sai da pagina do assunto; o veneno a
+# deixa presa, e ela volta no Limpar e no Voltar do modulo.
+roda "biblioteca livros tela --envenenado-pagina-presa" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-pagina-presa
+# Fatia 2 do leitor: pinca e duplo toque no livro sintetico de 400 paginas,
+# com toques de verdade do Chrome. O ponto sob os dedos fica sob eles (24 px),
+# o duplo toque leva o ponto ao meio e volta, a caneta nao da zoom e um dedo
+# rola. O veneno ancora o gesto no meio da tela, e a prova tem de ver.
+roda "leitor pinca"                              node "_teste/testa_leitor_pinca.js"
+roda "leitor pinca --envenenado-gesto-sem-ponto" node "_teste/testa_leitor_pinca.js" --envenenado-gesto-sem-ponto
+roda "leitor pinca --envenenado-gesto-grava-pela-ancora" node "_teste/testa_leitor_pinca.js" --envenenado-gesto-grava-pela-ancora
+# Fatia 3 do leitor: nitido em qualquer zoom e mais rapido no escaneado, com
+# densidade de tela 2. No zoom maximo, em pe e deitado, a nitidez fica em 1,9
+# ou mais (o canvas de detalhe) e os pixels de canvas vivos em 16 milhoes ou
+# menos; parada a rolagem, a pagina seguinte NA DIRECAO dela ja tem canvas; o
+# escaneado sai primeiro a meia densidade. Um veneno para cada peca.
+roda "leitor nitidez"                               node "_teste/testa_leitor_nitidez.js"
+roda "leitor nitidez --envenenado-sem-detalhe"      node "_teste/testa_leitor_nitidez.js" --envenenado-sem-detalhe
+roda "leitor nitidez --envenenado-sem-teto"         node "_teste/testa_leitor_nitidez.js" --envenenado-sem-teto
+roda "leitor nitidez --envenenado-direcao-errada"   node "_teste/testa_leitor_nitidez.js" --envenenado-direcao-errada
+roda "leitor nitidez --envenenado-sem-meia-densidade" node "_teste/testa_leitor_nitidez.js" --envenenado-sem-meia-densidade
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
@@ -563,6 +609,12 @@ roda "biblioteca mirim --envenenado-equivalentes" node "_teste/testa_biblioteca_
 # e o "Diversos" das provas nao vira assunto da aula: o veneno trata todo modulo
 # de prova como assunto
 roda "biblioteca mirim --envenenado-diversos"   node "_teste/testa_biblioteca_mirim.js" --envenenado-diversos
+# C5: o pacote dos Cadernos de Apoio da SME-SP (campos novos tom, licenca,
+# atribuicao e dificuldade nula) importa sem mudar o app, os assuntos viram
+# modulos do 3o e do 7o ano e a atribuicao aparece em cada cartao. O veneno
+# serve o app.js sem a origem no cartao.
+roda "biblioteca cadernos sme"                 node "_teste/testa_biblioteca_cadernos_sme.js"
+roda "biblioteca cadernos sme --envenenado-sem-origem" node "_teste/testa_biblioteca_cadernos_sme.js" --envenenado-sem-origem
 # FRENTE B: selecionar e compor. Sem navegador, o compositor do pdf.js (lista
 # renumerada, gabarito separado, sem solucao escrito, quebra entre pedacos, marca
 # por cima so nesta folha e os outros documentos byte a byte iguais aos de main).
@@ -782,6 +834,17 @@ roda "minhas listas --envenenado-diario-antes"    node "_teste/testa_minhas_list
 roda "minhas listas --envenenado-memoria-velha"   node "_teste/testa_minhas_listas.js" --envenenado-memoria-velha
 roda "minhas listas --envenenado-uso-por-conteudo" node "_teste/testa_minhas_listas.js" --envenenado-uso-por-conteudo
 roda "minhas listas --envenenado-nomear-duplica"  node "_teste/testa_minhas_listas.js" --envenenado-nomear-duplica
+# L1 da nova montagem de listas (D1, D8 revista e D10, 12/11/2026): a janela
+# "PDF pronto" com compartilhar, baixar e ver (cancelar nao baixa nada), as
+# proximas aulas no "Gerar material" com a do aluno em contexto escolhida, e o
+# tutorial sem imprimir. Um veneno por regra.
+roda "pdf pronto"                                node "_teste/testa_biblioteca_pdf_pronto.js"
+roda "pdf pronto --envenenado-baixa-ao-cancelar" node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-baixa-ao-cancelar
+roda "pdf pronto --envenenado-so-hoje"           node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-so-hoje
+roda "pdf pronto --envenenado-sem-sugestao"      node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-sem-sugestao
+roda "pdf pronto --envenenado-sugere-depois"     node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-sugere-depois
+roda "pdf pronto --envenenado-filtro-fora"       node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-filtro-fora
+roda "pdf pronto --envenenado-voltar"            node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-voltar
 # C2a: o banco sobe de 2 para 3. A subida nao perde nada; codigo mais velho que
 # o banco diz o que fazer; a janela antiga larga o banco e avisa.
 roda "banco v3"                                   node "_teste/testa_banco_v3.js"
@@ -865,6 +928,13 @@ roda "livros indice --envenenado-erro-vira-pronto"    node "_teste/testa_livros_
 roda "livros indice --envenenado-apagar-espera-indice" node "_teste/testa_livros_indice.js" --envenenado-apagar-espera-indice
 # A pagina que sempre falha (de forma passageira) sai sozinha; o livro fica na busca.
 roda "livros indice --envenenado-pagina-ruim-derruba-livro" node "_teste/testa_livros_indice.js" --envenenado-pagina-ruim-derruba-livro
+# 12/11/2026: a busca tambem acha os capitulos pelo titulo e pelos assuntos do
+# mapa, inclusive no livro escaneado (sem texto). O veneno desliga a busca por
+# capitulo, e o livro escaneado some do resultado.
+roda "livros indice --envenenado-busca-sem-capitulos" node "_teste/testa_livros_indice.js" --envenenado-busca-sem-capitulos
+# A revisao do #181: com o resultado todo em "Outras paginas do livro", elas
+# disputam o topo; o veneno deixa os "Melhores resultados" vazios.
+roda "livros indice --envenenado-topo-vazio" node "_teste/testa_livros_indice.js" --envenenado-topo-vazio
 # C15.2 e C15.3: "Este capitulo cobre" no leitor, Confirmar e Corrigir (so a
 # materia e o ano do livro), a correcao depois de recarregar e na copia de
 # seguranca (os livros nao), e o "Abrir no livro" da aula na pagina do PDF e no
@@ -882,6 +952,39 @@ roda "livros mapa --envenenado-faixa-refeita"     node "_teste/testa_livros_mapa
 # o v1 depois do v2 nao rebaixa. O veneno deixa de trocar o meta. Porta 8887.
 roda "livros reimportar mapa"                     node "_teste/testa_livros_reimportar_mapa.js"
 roda "livros reimportar mapa --envenenado-meta-nao-troca" node "_teste/testa_livros_reimportar_mapa.js" --envenenado-meta-nao-troca
+# Fase 1a da biblioteca na nuvem (12/11/2026): a posicao de leitura fica quando
+# o meta ou o arquivo do livro muda (o sumario novo nao a solta mais); a pagina
+# que nao existe no arquivo novo vai para a ultima, com o aviso "voce estava na
+# p. X" na tela do livro e no leitor; o EPUB do FME remontado em PDF vai pela
+# ancora page_N para a pagina N; o livro que sai do pacote nao leva a posicao; o
+# ajuste fica ate ela mudar de pagina; a correcao orfa aparece na tela do livro,
+# com a sugestao de um toque, Ligar (que pergunta antes de trocar) e Descartar, e
+# o Desfazer devolve so o que a acao mexeu; o Confirmar num numero que guarda
+# outra correcao nao a apaga. Cada veneno tira uma regra. Porta 8972.
+roda "livros nuvem posicao"                       node "_teste/testa_livros_nuvem_posicao.js"
+roda "livros nuvem posicao --envenenado-solta-no-meta" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-solta-no-meta
+roda "livros nuvem posicao --envenenado-solta-no-sumario" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-solta-no-sumario
+roda "livros nuvem posicao --envenenado-solta-na-troca" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-solta-na-troca
+roda "livros nuvem posicao --envenenado-nao-ajusta" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-nao-ajusta
+roda "livros nuvem posicao --envenenado-sem-traducao" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-sem-traducao
+roda "livros nuvem posicao --envenenado-sem-aviso" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-sem-aviso
+roda "livros nuvem posicao --envenenado-orfa-some-da-tela" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-orfa-some-da-tela
+roda "livros nuvem posicao --envenenado-grava-por-cima-na-tela" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-grava-por-cima-na-tela
+roda "livros nuvem posicao --envenenado-solta-no-removido" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-solta-no-removido
+roda "livros nuvem posicao --envenenado-volta-sem-regra" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-volta-sem-regra
+roda "livros nuvem posicao --envenenado-ajuste-sai-na-abertura" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-ajuste-sai-na-abertura
+roda "livros nuvem posicao --envenenado-troca-sem-perguntar" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-troca-sem-perguntar
+roda "livros nuvem posicao --envenenado-desfazer-tudo" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-desfazer-tudo
+# 12/11/2026, item 12c: a ligacao de assunto entre materias. O capitulo de
+# quimica ligado ao assunto de fisica diz "Fisica: ..." na tela do livro, na
+# busca, na faixa e no Corrigir; a correcao dela com o id de fisica vale; o id
+# fora do indice nao ganha materia pelo prefixo; o da propria materia fica
+# igual; o lado a lado diz "livro de Quimica". Quatro venenos. Porta 8993.
+roda "livros entre materias"                      node "_teste/testa_livros_entre_materias.js"
+roda "livros entre materias --envenenado-sem-materia-no-nome" node "_teste/testa_livros_entre_materias.js" --envenenado-sem-materia-no-nome
+roda "livros entre materias --envenenado-materia-pelo-prefixo" node "_teste/testa_livros_entre_materias.js" --envenenado-materia-pelo-prefixo
+roda "livros entre materias --envenenado-propria-materia-marcada" node "_teste/testa_livros_entre_materias.js" --envenenado-propria-materia-marcada
+roda "livros entre materias --envenenado-corrigir-sem-a-de-fora" node "_teste/testa_livros_entre_materias.js" --envenenado-corrigir-sem-a-de-fora
 # C15.4 e C15.5: "Exportar em PDF" do capitulo 2 com o gabarito dele no mesmo
 # arquivo, anexado na aula: o texto do capitulo e DEPOIS o do gabarito do 2 (e
 # nao o do 1), o rodape de fonte, nenhum travessao; sem o gabarito; paginas
@@ -930,6 +1033,19 @@ roda "alerta da copia --envenenado-alerta-so-local" node "_teste/testa_alerta_co
 roda "alerta da copia --envenenado-idade-do-envio" node "_teste/testa_alerta_copia_nuvem.js" --envenenado-idade-do-envio
 roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_aluno_cascata.js"
 roda "relato e Voltar"                            node "_teste/testa_relato_voltar.js"
+# a entrada de janela que veio da recarga vira a da tela: o veneno a deixa
+# como estava e o historico nunca mais fica sem janela
+roda "Voltar sem entrada velha"                  node "_teste/testa_voltar_entrada_velha.js"
+roda "Voltar sem entrada velha --envenenado-entrada-velha" node "_teste/testa_voltar_entrada_velha.js" --envenenado-entrada-velha
+roda "Voltar do aparelho nas telas"              node "_teste/testa_voltar_android.js"
+roda "Voltar do aparelho --envenenado-voltar-sem-tela" node "_teste/testa_voltar_android.js" --envenenado-voltar-sem-tela
+roda "Voltar do aparelho --envenenado-volta-dois-passos" node "_teste/testa_voltar_android.js" --envenenado-volta-dois-passos
+roda "Voltar do aparelho --envenenado-seta-nao-tira" node "_teste/testa_voltar_android.js" --envenenado-seta-nao-tira
+roda "Voltar do aparelho --envenenado-pergunta-da-lista-some" node "_teste/testa_voltar_android.js" --envenenado-pergunta-da-lista-some
+roda "Voltar do aparelho --envenenado-folha-fora-do-historico" node "_teste/testa_voltar_android.js" --envenenado-folha-fora-do-historico
+roda "Voltar do aparelho --envenenado-pergunta-do-formulario-some" node "_teste/testa_voltar_android.js" --envenenado-pergunta-do-formulario-some
+roda "Voltar do aparelho --envenenado-guarda-depois-da-janela" node "_teste/testa_voltar_android.js" --envenenado-guarda-depois-da-janela
+roda "Voltar do aparelho --envenenado-sem-ramo-bib" node "_teste/testa_voltar_android.js" --envenenado-sem-ramo-bib
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
 # N0: a copia na nuvem contra o Firebase Emulator Suite: as regras nos tres
 # casos (dona, observador, estranho), a ida e volta entre dois aparelhos pela
@@ -1303,6 +1419,11 @@ roda "banco da biblioteca"                      python biblioteca/_prova_banco.p
 # C12: o tipo de fonte provas (OBMEP Mirim e ENEM), sobre provas sinteticas dos
 # dois formatos, com um veneno por regra do detector. A fidelidade e no Chrome.
 roda "provas da biblioteca"                     python biblioteca/_prova_provas.py
+# C5: o tipo de fonte cadernos-sme-sp (Cadernos de Apoio da SME-SP), sobre um
+# caderno sintetico: indice em duas colunas, atividade que atravessa a pagina,
+# foto com credito de terceiro (sai), duas colunas, revisao por questao. A
+# fidelidade e no Chrome.
+roda "cadernos sme da biblioteca"               python biblioteca/_prova_cadernos_sme.py
 # Daqui ate o fim da secao, nada abre Chrome (conferido com CHROME envenenado
 # em 26/10): o --rapido roda. O _prova_gerador e o _prova_banco acima ficam no
 # navegador porque a trava de fidelidade dos dois renderiza o SVG no Chrome
@@ -1332,6 +1453,22 @@ roda "livros (regras) --envenenado-teto-antigo" node "_teste/testa_livros_regras
 roda "livros (regras) --envenenado-sem-ano"     node "_teste/testa_livros_regras.js" --envenenado-sem-ano
 roda "livros (regras) --envenenado-correcao-ignorada" node "_teste/testa_livros_regras.js" --envenenado-correcao-ignorada
 roda "livros (regras) --envenenado-correcao-sem-titulo" node "_teste/testa_livros_regras.js" --envenenado-correcao-sem-titulo
+# Fase 1a da biblioteca na nuvem (12/11/2026): a correcao dela casa pela chave
+# estavel do capitulo, pelo numero e titulo, pelo titulo normalizado unico e
+# pela heranca de titulos (o caso da unidade 8 do ga7 e do ga9); o titulo unico
+# so sugere, nunca aplica calado; a mais recente vence no mesmo capitulo; o
+# Praticando 9 renumerado; a orfa listada e nunca no vizinho; a palavra nova nunca apaga a
+# de outro capitulo; o tablet na versao antiga lendo as correcoes novas. Um
+# veneno por regra. Sem Chrome.
+roda "livros mapa correcao"                       node "_teste/testa_livros_mapa_correcao.js"
+roda "livros mapa correcao --envenenado-so-numero-e-titulo" node "_teste/testa_livros_mapa_correcao.js" --envenenado-so-numero-e-titulo
+roda "livros mapa correcao --envenenado-chave-sem-titulo" node "_teste/testa_livros_mapa_correcao.js" --envenenado-chave-sem-titulo
+roda "livros mapa correcao --envenenado-chave-herda-sem-assunto" node "_teste/testa_livros_mapa_correcao.js" --envenenado-chave-herda-sem-assunto
+roda "livros mapa correcao --envenenado-titulo-aplica-calado" node "_teste/testa_livros_mapa_correcao.js" --envenenado-titulo-aplica-calado
+roda "livros mapa correcao --envenenado-mais-forte-vence" node "_teste/testa_livros_mapa_correcao.js" --envenenado-mais-forte-vence
+roda "livros mapa correcao --envenenado-heranca-pelo-inicio" node "_teste/testa_livros_mapa_correcao.js" --envenenado-heranca-pelo-inicio
+roda "livros mapa correcao --envenenado-orfa-some" node "_teste/testa_livros_mapa_correcao.js" --envenenado-orfa-some
+roda "livros mapa correcao --envenenado-grava-por-cima" node "_teste/testa_livros_mapa_correcao.js" --envenenado-grava-por-cima
 # C15.4 e C15.5: o que vai no PDF exportado (o capitulo sem as respostas do
 # livro, e o gabarito daquele capitulo depois, so quando pedido), as paginas
 # escolhidas e o rodape de fonte. O veneno deixa as respostas no capitulo.
@@ -1444,27 +1581,46 @@ sw_antes=""
 if [ -n "$base" ]; then
   sw_antes=$(git show "$base:sw.js" 2>/dev/null | tr -d '\r' || true)
 fi
+# 13f: o nome do cache que o tablet ve e o GERADO na publicacao, a partir do
+# contador de publicacoes (_teste/versao_publicada.js). O CACHE do sw.js do
+# repositorio fica fixo. Entao a pergunta das duas travas abaixo deixa de ser
+# "o PR subiu o nome?" e passa a ser "o merge deste PR na main sobe o
+# contador?" (--sobe): sobe se o diff base..HEAD muda algum arquivo que conta,
+# que e exatamente o que o commit de merge na main conta. E a mesma regra do
+# deploy (contaParaPublicacao): se alguem quebrar a regra do que conta (tirar
+# o banco, por exemplo), a trava reprova o PR que muda o banco.
+# (Na primeira rodada a trava comparava o contador do HEAD com o da base, e
+# dava FALSO VERMELHO local quando a main tinha andado mais que o ramo: a
+# historia de primeiro pai do ramo passa pelos commits dele, e nao pelos da
+# main. No CI nao acontecia, porque la o HEAD e o merge sobre a ponta da main.)
+sobe=""
+if [ -n "$base" ]; then
+  sobe=$(node _teste/versao_publicada.js --sobe "$base" HEAD 2>/dev/null || true)
+fi
 if [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
   printf '  INSTAVEL %-23s sem base de merge com sw.js para comparar\n' "nome do cache"
   pulada=1
 elif [ "$lista_agora" = "$(entradas_sw "$(lista_sw "$sw_antes")")" ]; then
   printf '  ok      %-24s a lista nao mudou desde a base do merge\n' "nome do cache"
-elif [ "$(nome_sw "$sw_agora")" != "$(nome_sw "$sw_antes")" ]; then
-  printf '  ok      %-24s lista nova desde a base, cache %s\n' "nome do cache" "$(nome_sw "$sw_agora")"
+elif [ "$sobe" != "sim" ] && [ "$sobe" != "nao" ]; then
+  printf '  FALHOU  %-24s a lista mudou e nao consegui perguntar se a publicacao sobe (--sobe:[%s])\n' \
+    "nome do cache" "$sobe"
+  falhou=1
+elif [ "$sobe" = "sim" ]; then
+  printf '  ok      %-24s lista nova desde a base; o merge sobe o contador e a publicacao troca o nome do cache\n' "nome do cache"
 else
-  printf '  FALHOU  %-24s a lista de ARQUIVOS mudou desde a base do merge e o cache continua %s\n' \
-    "nome do cache" "$(nome_sw "$sw_agora")"
+  printf '  FALHOU  %-24s a lista de ARQUIVOS mudou desde a base e o merge nao sobe o contador da publicacao\n' \
+    "nome do cache"
   falhou=1
 fi
 
-# A ORDEM: diferente da base nao basta. Se o HEAD leva para a origin/main (a do
-# CI e buscada no job) algum arquivo que muda o que o tablet baixa (app.js, sw.js
-# ou a lista ARQUIVOS), pela arvore do merge e nao pela base, CACHE e VERSAO tem
-# de ser MAIORES que os da origin/main, como numero. Igual reaproveita um nome ja
-# publicado e menor o rebaixa; nos dois o tablet ja instalado pode ficar sem o
-# codigo novo. PR que nao leva arquivo do app passa. A regra e a do merge_seguro,
-# que confere de novo contra a origin/main buscada na hora do merge. Le o HEAD
-# commitado, nao o disco. Saida: 0 passou, 1 reprovou, 2 sem main (INSTAVEL).
+# A VERSAO NO DEPLOY (13f): pela arvore do merge com a origin/main (a do CI e
+# buscada no job), e nao pela base, VERSAO e CACHE do PR tem de ser IGUAIS aos
+# da main (sao gerados na publicacao), e o PR que leva arquivo do site traz
+# novidades/<nome>.txt. PR que nao leva arquivo do site passa sem novidade. A
+# regra e a do merge_seguro, que confere de novo contra a origin/main buscada na
+# hora do merge. Le o HEAD commitado, nao o disco. Saida: 0 passou, 1 reprovou,
+# 2 sem main (INSTAVEL).
 saida=$(node _teste/testa_ordem_versao.js --conferir 2>&1) && codigo=0 || codigo=$?
 printf '%s\n' "$saida"
 if [ "$codigo" = "1" ]; then
@@ -1506,29 +1662,33 @@ veredito_cache() {
 # fechando sobre si mesma. Agora o mapeamento esta aqui dentro, e as quatro
 # asercoes abaixo o exercitam com argumento de verdade.
 #
-# $1 = lista de mudados (vazia = nada mudou); $2 = nome de agora; $3 = nome da base
+# $1 = lista de mudados (vazia = nada mudou); $2 = o merge sobe o contador da
+# publicacao (sim/nao, do --sobe; 13f: o nome publicado sai do contador)
 decide_cache() {
   if [ -n "$1" ]; then dc_mudou=sim; else dc_mudou=nao; fi
-  if [ "$2" != "$3" ]; then dc_novo=sim; else dc_novo=nao; fi
+  if [ "$2" = "sim" ]; then dc_novo=sim; else dc_novo=nao; fi
   veredito_cache "$dc_mudou" "$dc_novo"
 }
 p_cache=0; f_cache=0
+# $1 = mudados; $2 = o merge sobe (sim/nao); $3 = o veredito esperado
 afere_cache() {
-  obtido=$(decide_cache "$1" "$2" "$3")
-  if [ "$obtido" = "$4" ]; then
+  obtido=$(decide_cache "$1" "$2")
+  if [ "$obtido" = "$3" ]; then
     p_cache=$((p_cache + 1))
   else
     f_cache=$((f_cache + 1))
-    printf '    prova do cache: mudados=[%s] agora=%s antes=%s deu %s, esperado %s\n' \
-      "$1" "$2" "$3" "$obtido" "$4"
+    printf '    prova do cache: mudados=[%s] sobe=[%s] deu %s, esperado %s\n' \
+      "$1" "$2" "$obtido" "$3"
   fi
 }
-afere_cache "app.js" apoio-v22 apoio-v22 reprova
-afere_cache "app.js" apoio-v23 apoio-v22 passa
-afere_cache ""       apoio-v23 apoio-v22 passa
-afere_cache ""       apoio-v22 apoio-v22 passa
+afere_cache "app.js" nao reprova
+afere_cache "app.js" sim passa
+afere_cache ""       sim passa
+afere_cache ""       nao passa
+# so "sim" e sim: resposta vazia ou estranha nao vira subida
+afere_cache "app.js" "" reprova
 if [ "$f_cache" != "0" ]; then
-  printf '  FALHOU  %-24s a prova da trava nao passou: %s de 4\n' "conteudo no cache" "$p_cache"
+  printf '  FALHOU  %-24s a prova da trava nao passou: %s de 5\n' "conteudo no cache" "$p_cache"
   falhou=1
 elif [ -z "$base" ] || [ -z "$sw_antes" ] || [ -z "$sw_agora" ]; then
   # A MESMA guarda da trava vizinha, de proposito. Com base presente e sw.js
@@ -1607,14 +1767,12 @@ else
   done
   set +f
   IFS=$ifs_antes
-  nome_agora=$(nome_sw "$sw_agora")
-  nome_antes=$(nome_sw "$sw_antes")
-  if [ -z "$nome_agora" ] || [ -z "$nome_antes" ]; then
+  if [ "$sobe" != "sim" ] && [ "$sobe" != "nao" ]; then
     # Nome vazio passava como "promovido", porque vazio e diferente de v22. Uma
     # reformatacao do sw.js (aspas duplas, const, espaco a mais) faria nome_sw
     # devolver vazio, e a trava imprimiria ok com o nome em branco.
-    printf '  FALHOU  %-24s nao consegui ler o nome do cache no sw.js (agora:[%s] base:[%s])\n' \
-      "conteudo no cache" "$nome_agora" "$nome_antes"
+    printf '  FALHOU  %-24s nao consegui perguntar se a publicacao sobe (--sobe:[%s])\n' \
+      "conteudo no cache" "$sobe"
     falhou=1
   elif [ -n "$caixa_trocada" ] || [ -n "$sumidos" ] || [ -n "$fora_do_git" ]; then
     # UMA falha so, com os TRES motivos: separados em falhas diferentes, quem
@@ -1640,15 +1798,15 @@ else
     fi
     falhou=1
   else
-    if [ "$(decide_cache "$mudados" "$nome_agora" "$nome_antes")" = "reprova" ]; then
-      printf '  FALHOU  %-24s mudou de conteudo e o cache continua %s:%s\n' \
-        "conteudo no cache" "$nome_agora" "$mudados"
+    if [ "$(decide_cache "$mudados" "$sobe")" = "reprova" ]; then
+      printf '  FALHOU  %-24s mudou de conteudo e o merge nao sobe o contador da publicacao:%s\n' \
+        "conteudo no cache" "$mudados"
       falhou=1
     elif [ -z "$mudados" ]; then
       printf '  ok      %-24s nenhum arquivo do pacote mudou de conteudo desde a base\n' "conteudo no cache"
     else
-      printf '  ok      %-24s%s arquivo(s) do pacote mudaram e o cache subiu para %s\n' \
-        "conteudo no cache" "$(printf '%s' "$mudados" | wc -w | tr -d ' ')" "$nome_agora"
+      printf '  ok      %-24s%s arquivo(s) do pacote mudaram e o merge sobe o contador da publicacao\n' \
+        "conteudo no cache" "$(printf '%s' "$mudados" | wc -w | tr -d ' ')"
     fi
   fi
 fi

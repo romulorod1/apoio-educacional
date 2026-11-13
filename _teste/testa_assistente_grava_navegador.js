@@ -208,8 +208,8 @@ async function transbordo(pag, raizSel) {
     antesDepois: Array.from(c.querySelectorAll('.ass-antes-depois dd')).map(d => d.textContent), dinheiro: (c.querySelector('.ass-dinheiro') || {}).textContent,
     botoes: Array.from(c.querySelectorAll('button')).map(b => b.textContent) }; }, ultimoCartao);
   conf('o cartão: o que muda, o Entendi, o antes e o depois, o dinheiro e os dois botões', c1, {
-    titulo: 'Remarcar Zélia, qui 19/11: de 15h30 para 17h30', entendido: 'Entendi: quinta, 19/11, 15h30, Zélia.',
-    antesDepois: ['qui 19/11, 15h30 (1h), agendada', 'qui 19/11, 17h30 (1h)'], dinheiro: 'O valor do mês não muda.', botoes: ['Agora não', 'Confirmar'] });
+    titulo: 'Remarcar Zélia, qui 19/11: de 15:30 para 17:30', entendido: 'Entendi: quinta, 19/11, 15:30, Zélia.',
+    antesDepois: ['qui 19/11, 15:30 (1h), agendada', 'qui 19/11, 17:30 (1h)'], dinheiro: 'O valor do mês não muda.', botoes: ['Agora não', 'Confirmar'] });
   conf('com o cartão aberto, NADA gravou: o banco e a fila iguais', (await banco(pag)) === inicio, true);
   await clicar(pag, ultimoCartao + ' [id^="ass-agora-nao-"]');
   conf('"Agora não": o cartão diz que nada foi gravado, e o banco e a fila seguem iguais', [await pag.evaluate(s => document.querySelector(s).querySelector('.ass-estado').textContent, ultimoCartao), (await banco(pag)) === inicio], ['Nada foi gravado.', true]);
@@ -227,7 +227,7 @@ async function transbordo(pag, raizSel) {
     const topo = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     return [t.textContent, b.textContent, !!topo && (topo === b || b.contains(topo))];
   });
-  conf('o aviso diz o que foi feito e tem o Desfazer, POR CIMA da janela do assistente', aviso, ['Aula de Zélia remarcada para qui 19/11, 17h30 (1h).', 'Desfazer', true]);
+  conf('o aviso diz o que foi feito e tem o Desfazer, POR CIMA da janela do assistente', aviso, ['Aula de Zélia remarcada para qui 19/11, 17:30 (1h).', 'Desfazer', true]);
   await desfazerPeloAviso(pag);
   conf('o Desfazer volta o banco ao estado EXATO de antes', (await soBanco(pag)) === antesSo, true);
   await clicar(pag, '#abrir-assistente');
@@ -238,7 +238,7 @@ async function transbordo(pag, raizSel) {
   const criar = ferramentas([['propor_aulas', { itens: [item({ acao: 'criar_aula', alunoId: 'al2', nome_dito: 'Bruno', data: '2026-11-21', hora: '10:00' })] }]]);
   await perguntar(pag, 'marca uma aula com o Bruno sábado às 10h', [criar, texto('Confira e toque em Confirmar.')]);
   conf('o cartão da aula nova, com o dinheiro do core', await pag.evaluate(s => [document.querySelector(s + ' .ass-linha-titulo').textContent, document.querySelector(s + ' .ass-dinheiro').textContent], ultimoCartao),
-    ['Marcar aula de Bruno, sáb 21/11, 10h (1h)', 'O valor de novembro aumenta R$ 150,00.']);
+    ['Marcar aula de Bruno, sáb 21/11, 10:00 (1h)', 'O valor de novembro aumenta R$ 150,00.']);
   await pag.evaluate(s => { const b = document.querySelector(s + ' [id^="ass-confirmar-"]'); b.click(); b.click(); }, ultimoCartao);
   await pausa(1500);
   const novas = await pag.evaluate(() => Store.carregar().then(b => b.aulas.filter(a => a.alunoId === 'al2' && a.data === '2026-11-21').length));

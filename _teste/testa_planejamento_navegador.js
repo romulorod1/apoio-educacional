@@ -641,6 +641,54 @@ async function transbordo(pag) {
   await esperar('a ficha fechou', () => aberta(pag, 'modal-aluno'), v => v === false, 10000);
 
   // ================================================================
+  secao('2b. Tirar a aula com a Nath de um dia, num plano salvo ANTES de aulasRemovidas (só a folha muda, a agenda fica)');
+  const aulasNaFolhaCompartilhada = async () => {
+    await pag.evaluate(() => { window.__compartilhado = null; });
+    await clicar(pag, '#plan-compartilhar');
+    await esperar('o PDF foi compartilhado', () => pag.evaluate(() => window.__compartilhado && window.__compartilhado.nome), v => !!v, 10000);
+    return textoDoPdf((await pag.evaluate(() => window.__compartilhado)).base64).filter(x => x === 'Aula com a Nath').length;
+  };
+  conf('o plano semente está gravado no formato antigo, sem aulasRemovidas e aulasExtras', await pag.evaluate(() => Store.carregar().then(d => {
+    const pl = d.ajustes['planejamento:semente'].plano; return ['aulasRemovidas' in pl, 'aulasExtras' in pl];
+  })), [false, false]);
+  await H.irParaAba(pag, 'agenda');
+  await H.irParaAba(pag, 'alunos');
+  await clicar(pag, '#lista-alunos .item-lista[data-aluno="al2"]');
+  await esperar('a ficha do Bruno abriu', () => aberta(pag, 'modal-aluno'), v => v === true, 10000);
+  await clicar(pag, '#plan-item-semente');
+  await esperar('o plano antigo abre na prévia', () => temFolha(pag), v => v === true, 30000);
+  conf('plano antigo, controle: a folha tem a aula da agenda do Bruno (17/11)', await aulasNaFolhaCompartilhada(), 1);
+  const semAula17 = planoFalso('al2', 'Aluno', 'alta', { aulasRemovidas: ['2026-11-17'], aulasExtras: [] });
+  falso.status = 200; falso.atraso = 0; falso.fila = []; falso.corpo = respostaFalsa(semAula17);
+  const antesDeTirar = falso.pedidos.length;
+  await pag.evaluate(() => { document.querySelector('#plan-ajuste').value = ''; });
+  await pag.type('#plan-ajuste', 'dia 17 eu não vou conseguir dar aula, tira a aula com a Nath do dia 17');
+  await clicar(pag, '#plan-ajustar');
+  await esperar('o ajuste que tira a aula voltou', () => pag.evaluate(() => !!document.querySelector('#plan-mudou') && !document.querySelector('#plan-ajustando')).then(v => v && falso.pedidos.length === antesDeTirar + 1), v => v === true, 30000);
+  const tTirar = falso.pedidos[antesDeTirar].corpo.messages[0].content[0].text;
+  conf('o pedido leva a aula da agenda e o plano antigo com as listas vazias', [tTirar.indexOf('- 2026-11-17 (terça, 17/11) às 9h') >= 0, tTirar.indexOf('"aulasRemovidas":[]') >= 0,
+    tTirar.indexOf('Ajuste pedido pela professora: dia 17 eu não vou conseguir dar aula') >= 0], [true, true, true]);
+  conf('"Mudou:" diz a aula que saiu', await pag.evaluate(() => document.querySelector('#plan-mudou span').textContent), 'Mudou: saiu a aula com a Nath do dia 17/11.');
+  conf('a folha ficou sem a aula do dia 17', await aulasNaFolhaCompartilhada(), 0);
+  await esperar('o ajuste do salvo gravou sozinho', () => pag.evaluate(() => Store.carregar().then(d => JSON.stringify(d.ajustes['planejamento:semente'].plano.aulasRemovidas))), v => v === '["2026-11-17"]', 10000);
+  conf('a agenda não mudou: a aula do Bruno de 17/11 continua lá, realizada', await pag.evaluate(() => Store.carregar().then(d => {
+    const a = d.aulas.find(x => x.id === 'av2'); return [a && a.data, a && a.status];
+  })), ['2026-11-17', 'realizada']);
+  await clicar(pag, '#plan-desfazer-ajuste');
+  conf('Desfazer ajuste: a aula volta à folha', await aulasNaFolhaCompartilhada(), 1);
+  /* o Desfazer volta ao plano de ANTES, no formato antigo: sem as chaves (e
+   * não com a lista vazia, que é outro estado) */
+  await esperar('o desfazer gravou o plano de antes', () => pag.evaluate(() => Store.carregar().then(d => {
+    const pl = d.ajustes['planejamento:semente'].plano; return ['aulasRemovidas' in pl, 'aulasExtras' in pl].join(',');
+  })), v => v === 'false,false', 10000);
+  conf('Desfazer: o plano gravado voltou ao formato antigo (sem aulasRemovidas e aulasExtras), não a listas vazias', await pag.evaluate(() => Store.carregar().then(d => {
+    const pl = d.ajustes['planejamento:semente'].plano; return ['aulasRemovidas' in pl, 'aulasExtras' in pl];
+  })), [false, false]);
+  await fecharPlanejamento(pag);
+  await pag.evaluate(() => document.querySelector('#modal-aluno .fechar').click());
+  await esperar('a ficha fechou', () => aberta(pag, 'modal-aluno'), v => v === false, 10000);
+
+  // ================================================================
   secao('6. O observador (cópia de outra conta) não vê nada do planejamento');
   await pag.evaluate(() => {
     window.__estadoDeVerdade = Nuvem.estado;

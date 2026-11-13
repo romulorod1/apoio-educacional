@@ -130,7 +130,17 @@ secao('2. Alunos: primeiro nome, inicial no empate, só os ativos, com os horár
 const nomes = A.nomesParaIA(DB);
 conf('as duas Anas ganham a inicial; o inativo fica de fora', nomes, { al1: 'Ana S.', al2: 'Ana O.', al3: 'Bruno' });
 const bloco = A.blocoDeAlunos(DB, HOJE);
-conf('o bloco de alunos leva id, nome curto e horários fixos', bloco.split('\n')[1], '- id al1: Ana S. (aulas fixas: segunda e quarta às 15h30 (1h))');
+conf('o bloco de alunos leva id, nome curto e horários fixos', bloco.split('\n')[1], '- id al1: Ana S. (aulas fixas: segunda e quarta às 15:30 (1h))');
+{
+  const tres = { alunos: [
+    { id: 'h1', nome: 'Ana Sobrenomeum Silveira', ativo: true }, { id: 'h2', nome: 'Ana Sobrenomeum Santos', ativo: true },
+    { id: 'h3', nome: 'Ana Sobrenomeum Santos', ativo: true }, { id: 'h4', nome: 'Ana', ativo: true }, { id: 'h5', nome: 'Bia Unica', ativo: true }] };
+  const n3 = A.nomesParaIA(tres);
+  conf('três homônimos: mais iniciais e, no empate total, um número; o nome sem sobrenome fica como está', n3,
+    { h1: 'Ana S. S.', h2: 'Ana S. S. (2)', h3: 'Ana S. S. (3)', h4: 'Ana', h5: 'Bia' });
+  conf('VENENO: nenhum sobrenome inteiro em nome algum', Object.values(n3).some(x => /Sobrenomeum|Silveira|Santos|Unica/.test(x)), false);
+  conf('todos os nomes são diferentes', new Set(Object.values(n3)).size, 5);
+}
 conf('o bloco não leva sobrenome, telefone, endereço nem observação', [/Sintética|Outra|Teste|Parou/.test(bloco), bloco.indexOf(VENENO) >= 0, /98765/.test(bloco)], [false, false, false]);
 
 secao('3. listar_aulas: o dia, o período, o vazio, a virada de mês e a repetição prevista');
@@ -193,7 +203,7 @@ conf('dias que já passaram não têm horário livre', r.resultado.dias, 'o per�
 conf('recusa: duração quebrada (50 min)', ex('horarios_livres', { data_inicio: HOJE, data_fim: HOJE, duracao_min: 50, turno: null }).erro, true);
 conf('recusa: mais de 14 dias', ex('horarios_livres', { data_inicio: HOJE, data_fim: '2026-12-31', duracao_min: 60, turno: null }).erro, true);
 r = ex('tenho_algo', { data: '2026-11-19', hora: '15:00', duracao_min: null });
-conf('"já tenho algo quinta às 15h?": o Bruno, 15h, 1h30', [r.resultado.livre, r.resultado.aulas_no_horario.map(a => a.aluno + ' ' + a.hora + ' ' + a.duracao), r.entendido], [false, ['Bruno 15:00 1h30'], ['quinta, 19/11 às 15h (1h)']]);
+conf('"já tenho algo quinta às 15h?": o Bruno, 15h, 1h30', [r.resultado.livre, r.resultado.aulas_no_horario.map(a => a.aluno + ' ' + a.hora + ' ' + a.duracao), r.entendido], [false, ['Bruno 15:00 1h30'], ['quinta, 19/11 às 15:00 (1h)']]);
 r = ex('tenho_algo', { data: '2026-11-18', hora: '15:30', duracao_min: 60 });
 conf('a aula cancelada não ocupa o horário', r.resultado.livre, true);
 r = ex('tenho_algo', { data: '2026-12-09', hora: '16:00', duracao_min: 60 });
@@ -205,7 +215,7 @@ naoGravou('horarios_livres e tenho_algo');
 secao('5. proximas_aulas e historico_aluno');
 r = ex('proximas_aulas', { alunoId: 'al1', n: 3 });
 conf('próximas da Ana: hoje 15h30, a de 18/11 é cancelada e vai à parte, 23/11 e 25/11 (novembro está lançado)', r.resultado.proximas.map(a => a.data), ['2026-11-16', '2026-11-23', '2026-11-25']);
-conf('as canceladas à frente e os horários fixos', [r.resultado.canceladas_a_frente.map(a => a.data), r.resultado.horarios_fixos], [['2026-11-18'], ['segunda e quarta às 15h30 (1h)']]);
+conf('as canceladas à frente e os horários fixos', [r.resultado.canceladas_a_frente.map(a => a.data), r.resultado.horarios_fixos], [['2026-11-18'], ['segunda e quarta às 15:30 (1h)']]);
 r = ex('proximas_aulas', { alunoId: 'al1', n: 10 });
 conf('além de novembro, as repetições previstas entram (dezembro)', r.resultado.proximas.some(a => a.data >= '2026-12-01' && a.repeticao), true);
 conf('n acima de 10 fica em 10', ex('proximas_aulas', { alunoId: 'al1', n: 50 }).resultado.proximas.length, 10);
@@ -231,13 +241,13 @@ naoGravou('contagem');
 
 secao('7. Dinheiro: as funções do Fechamento, com a vigência');
 r = ex('resumo_financeiro', { mes: '2026-10', alunoId: 'al1' });
-conf('outubro da Ana a R$ 100/h: 1h + falta de 1h30 (cobrada) + 1h = R$ 350,00, nada pago', [r.resultado.valor_ja_dado, r.resultado.pagamento, r.resultado.falta], ['R$ 350,00', 'em aberto', 'R$ 350,00']);
+conf('outubro da Ana a R$ 100/h: 1h + falta de 1h30 (cobrada) + 1h = R$ 350,00, nada pago', [r.resultado.valor_ja_dado, r.resultado.pagamento, r.resultado.falta], ['R$ 350,00', 'sem pagamento marcado no app', 'R$ 350,00']);
 const fOut = Core.calcularFechamento(DB, 'al1', '2026-10', HOJE);
 conf('(o mesmo número do Fechamento)', Core.fmtMoeda(fOut.valorFeito), 'R$ 350,00');
 r = ex('resumo_financeiro', { mes: '2026-11', alunoId: 'al1' });
 conf('novembro da Ana a R$ 120/h (vigência nova): dado R$ 240,00 (11/11 e hoje, que o Fechamento já conta), ainda não dado R$ 360,00 (23, 25 e 30/11)', [r.resultado.valor_ja_dado, r.resultado.valor_ainda_nao_dado], ['R$ 240,00', 'R$ 360,00']);
 r = ex('resumo_financeiro', { mes: '2026-10', alunoId: null });
-conf('outubro de todos: Bruno 2h a 150 + cancelada e cobrada 1h = R$ 450, pagou 300; falta receber 350 + 150', [r.resultado.total_ja_dado, r.resultado.falta_receber_do_mes, r.resultado.por_aluno.map(p => p.aluno + ' ' + p.pagamento)], ['R$ 800,00', 'R$ 500,00', ['Ana S. em aberto', 'Bruno pago a menos']]);
+conf('outubro de todos: Bruno 2h a 150 + cancelada e cobrada 1h = R$ 450, pagou 300; falta receber 350 + 150', [r.resultado.total_ja_dado, r.resultado.falta_receber_do_mes, r.resultado.por_aluno.map(p => p.aluno + ' ' + p.pagamento)], ['R$ 800,00', 'R$ 500,00', ['Ana S. sem pagamento marcado no app', 'Bruno pagamento marcado a menos']]);
 r = ex('resumo_financeiro', { mes: '2026-11', alunoId: null });
 conf('novembro de todos: os meses anteriores em aberto (outubro) aparecem à parte', r.resultado.meses_anteriores_em_aberto, 'R$ 500,00');
 r = ex('resumo_financeiro', { mes: '2026-08', alunoId: 'al1' });
@@ -246,6 +256,8 @@ conf('recusa: mês "outubro"', ex('resumo_financeiro', { mes: 'outubro', alunoId
 conf('recusa: mês 13', ex('resumo_financeiro', { mes: '2026-13', alunoId: null }).erro, true);
 r = ex('pendencias_pagamento', { mes: null });
 conf('quem não pagou: Ana outubro (350) e Bruno outubro a menos (150); total 500', [r.resultado.meses.map(p => p.aluno + ' ' + p.falta), r.resultado.total_em_aberto], [['Ana S. R$ 350,00', 'Bruno R$ 150,00'], 'R$ 500,00']);
+conf('o resultado nunca diz "não pagou": diz "sem pagamento marcado no app" ou "marcado a menos", e lembra do Pix', [r.resultado.meses.map(p => p.situacao), /não pag/i.test(JSON.stringify(r.resultado)), /Pix/.test(r.resultado.lembrete)], [['sem pagamento marcado no app', 'pagamento marcado a menos'], false, true]);
+conf('o Entendi diz de onde vem o número', ex('pendencias_pagamento', { mes: '2026-10' }).entendido, ['pagamentos marcados no app, aulas de outubro de 2026']);
 r = ex('pendencias_pagamento', { mes: '2026-11' });
 conf('o mês corrente ainda não fecha', [r.resultado.meses.length, !!r.resultado.obs], [0, true]);
 r = ex('valor_hora', { alunoId: 'al1' });
@@ -272,6 +284,19 @@ conf('o WhatsApp abre com o texto escrito, sem travessão', [r.cartao.href, r.ca
 conf('recusa: sem celular (Ana O.)', [ex('preparar_whatsapp', { alunoId: 'al2', texto: 'Oi' }).erro, ex('preparar_whatsapp', { alunoId: 'al2', texto: 'Oi' }).resultado.erro.slice(0, 12)], [true, 'sem_whatsapp']);
 conf('recusa: fixo não abre WhatsApp, mas liga', [ex('preparar_whatsapp', { alunoId: 'al3', texto: 'Oi' }).erro, ex('preparar_ligacao', { alunoId: 'al3' }).cartao.href], [true, 'tel:+552133334444']);
 conf('recusa: texto vazio', ex('preparar_whatsapp', { alunoId: 'al1', texto: '  ' }).erro, true);
+for (const veneno of ['Olá! Ficou R$ 9.999,00 de outubro.', 'O valor é 9999,00.', 'São 300 reais.', 'Veja https://exemplo.com/pix', 'Paga em www.exemplo.com.br', 'Entra em pix.app']) {
+  const v = ex('preparar_whatsapp', { alunoId: 'al1', texto: veneno });
+  conf('VENENO recusado no WhatsApp: "' + veneno + '" (sem cartão; o erro manda usar a cobrança ou tirar o link)', [v.erro, v.cartao, /preparar_cobranca|link/.test(v.resultado.erro)], [true, null, true]);
+}
+for (const veneno of ['Olá! Ficou 350.', 'São 1.250 do mês.', 'Pix: 21987654321', 'O mês deu 1,250 no total.']) {
+  const v = ex('preparar_whatsapp', { alunoId: 'al1', texto: veneno });
+  conf('VENENO (rodada 2) recusado: "' + veneno + '", mandando usar a cobrança', [v.erro, /preparar_cobranca/.test(v.resultado.erro)], [true, true]);
+}
+for (const hora of ['Chego às 15.30', 'Chego às 15:30', 'Vou atrasar 15 min', 'Vou atrasar 10 minutos', 'Chego às 15h30', 'Chego 15.30h', 'Até 9:05!', 'Podemos remarcar a aula de 20/11/2026?']) {
+  conf('a hora passa no WhatsApp: "' + hora + '"', ex('preparar_whatsapp', { alunoId: 'al1', texto: hora }).erro, false);
+}
+conf('CONTROLE: a mensagem sem valor nem link passa, com minutos e horas', ex('preparar_whatsapp', { alunoId: 'al1', texto: 'Olá! Vou atrasar 10 minutos, chego às 15:40.' }).erro, false);
+conf('o cartão leva o responsável e o telefone só para a tela', (() => { const c = ex('preparar_whatsapp', { alunoId: 'al1', texto: 'Olá!' }).cartao; return [!!c.responsavel, !!c.telefone]; })(), [true, true]);
 r = ex('preparar_cobranca', { alunoId: 'al1', mes: null });
 conf('cobrança: a mensagem do app, com outubro e R$ 350,00', [r.cartao.cobranca, r.cartao.texto], [true, 'Olá! Passando para lembrar do pagamento: outubro de 2026, R$ 350,00. Obrigada!']);
 conf('recusa: cobrar um mês sem pendência', ex('preparar_cobranca', { alunoId: 'al1', mes: '2026-09' }).erro, true);
@@ -301,6 +326,12 @@ function respostaTool(chamadas, assinatura) {
 function respostaTexto(t) { return { ok: true, resposta: { stop_reason: 'end_turn', content: [{ type: 'thinking', thinking: '', signature: 'sig-fim' }, { type: 'text', text: t }], usage: { input_tokens: 5, output_tokens: 15, cache_read_input_tokens: 3000, cache_creation_input_tokens: 0 } } }; }
 
 (async () => {
+  secao('11b. A resposta na tela: sem travessão, sem markdown, valor à direita com 3 itens ou mais');
+  conf('negrito, título, marcador e travessão saem; valor à direita', A.linhasDaResposta('Em outubro:\n- **Ana O.**: R$ 110,00\n* Caio: R$ 600,00\n## Total \u2014 R$ 710,00'),
+    [{ texto: 'Em outubro:', valor: null }, { texto: 'Ana O.', valor: 'R$ 110,00' }, { texto: 'Caio', valor: 'R$ 600,00' }, { texto: 'Total', valor: 'R$ 710,00' }]);
+  conf('com menos de 3 linhas, o valor fica no texto', A.linhasDaResposta('O mês deu R$ 600,00.'), [{ texto: 'O mês deu R$ 600,00.', valor: null }]);
+  conf('o travessão vira vírgula', A.linhasDaResposta('Hoje \u2013 nada')[0].texto, 'Hoje, nada');
+
   secao('12. O laço: content intacto, resultados juntos, teto de 5 voltas, erro e recomeço');
   const sessao = A.novaSessao();
   const pedidos = [];
@@ -334,12 +365,12 @@ function respostaTexto(t) { return { ok: true, resposta: { stop_reason: 'end_tur
   let voltas = 0;
   const sempreFerramenta = () => { voltas++; return Promise.resolve(respostaTool([{ name: 'valor_hora', input: { alunoId: 'al1' } }], 'sig-' + voltas)); };
   res = await A.perguntar(sessao2, 'quanto eu cobro da Ana?', { chamar: sempreFerramenta, ctx, hora: '11:00' });
-  conf('o teto: no máximo 5 chamadas por pergunta, e a frase própria', [voltas, res.erro, A.fraseDoErro(res.erro)], [5, 'voltas', 'Não consegui responder em poucos passos. Tente perguntar de um jeito mais direto.']);
+  conf('o teto: no máximo 5 chamadas por pergunta, e a frase própria', [voltas, res.erro, A.fraseDoErro(res.erro)], [5, 'voltas', 'Não achei essa resposta. Tente perguntar de outro jeito.']);
   conf('a pergunta que não fechou sai da conversa (nada pendurado)', sessao2.mensagens.length, 0);
 
   // erro do endpoint: a pergunta sai da conversa e a frase é curta
   const sessao3 = A.novaSessao();
-  for (const [codigo, frase] of [['sem_internet', 'Precisa de internet para perguntar.'], ['limite_mensal', 'A IA está pausada até o dia 1.'], ['ocupado', 'A IA está ocupada agora. Tente de novo daqui a pouco.'], ['sem_permissao', 'A IA ainda não está liberada nesta conta.']]) {
+  for (const [codigo, frase] of [['sem_internet', 'Precisa de internet para perguntar.'], ['limite_mensal', 'A IA está pausada até o dia 1.'], ['ocupado', 'Não consegui agora. Toque em Tentar de novo.'], ['sem_permissao', 'A IA ainda não está liberada nesta conta.']]) {
     res = await A.perguntar(sessao3, 'oi', { chamar: () => Promise.resolve({ ok: false, codigo }), ctx, hora: '11:00' });
     conf('erro ' + codigo + ': frase curta e a conversa vazia', [A.fraseDoErro(res.erro), sessao3.mensagens.length], [frase, 0]);
   }
@@ -364,6 +395,69 @@ function respostaTexto(t) { return { ok: true, resposta: { stop_reason: 'end_tur
   let cancelado = false;
   res = await A.perguntar(sessao5, 'oi', { chamar: () => { cancelado = true; return Promise.resolve(respostaTexto('tarde')); }, ctx, hora: '11:00', cancelado: () => cancelado });
   conf('cancelar no meio: nada fica na conversa', [res.erro, sessao5.mensagens.length], ['cancelado', 0]);
+  // tetos (item 17): no máximo 8 ferramentas por volta, e o resultado grande demais vira erro
+  {
+    const sessao6 = A.novaSessao('u1');
+    const dez = Array.from({ length: 10 }, () => ['valor_hora', { alunoId: 'al1' }]).map(c => ({ name: c[0], input: c[1] }));
+    const pedidos6 = [];
+    let f6 = [respostaTool(dez), respostaTexto('ok')];
+    await A.perguntar(sessao6, 'dez', { chamar: c => { pedidos6.push(c); return Promise.resolve(f6.shift()); }, ctx, hora: '11:00' });
+    const res6 = pedidos6[1].messages[2].content;
+    conf('10 ferramentas numa volta: 8 rodam, 2 voltam como erro (todas respondidas)', [res6.length, res6.filter(b => !b.is_error).length, res6.filter(b => b.is_error).length, /no máximo 8/.test(res6[9].content)], [10, 8, 2, true]);
+    const pedidos7 = [];
+    f6 = [respostaTool([{ name: 'listar_aulas', input: { inicio: '2026-11-01', fim: '2027-01-01', alunoId: null } }]), respostaTexto('ok')];
+    const grande = Object.assign({}, ctx, { db: Object.assign({}, DB, { aulas: DB.aulas.concat(Array.from({ length: 900 }, (x, i) => ({ id: 'g' + i, alunoId: 'al3', data: '2026-12-' + String(1 + (i % 28)).padStart(2, '0'), hora: '07:00', duracaoMin: 30, status: 'realizada' }))) }) });
+    await A.perguntar(A.novaSessao('u1'), 'grande', { chamar: c => { pedidos7.push(c); return Promise.resolve(f6.shift()); }, ctx: grande, hora: '11:00' });
+    const r7 = pedidos7[1].messages[2].content[0];
+    conf('resultado acima de 30 mil caracteres vira erro "peça um período menor"', [r7.is_error, /período menor/.test(r7.content), r7.content.length < A.MAX_RESULTADO], [true, true, true]);
+  }
+  // sessão (item 16): o desfazer não corta a conversa que mudou no meio; a sessão sabe de quem é
+  {
+    const sessao8 = A.novaSessao('u1');
+    fila = [respostaTexto('primeira')];
+    await A.perguntar(sessao8, 'primeira', { chamar, ctx, hora: '11:00' });
+    const antesDaCorrida = sessao8.mensagens.length;
+    let soltar;
+    const pendente = A.perguntar(sessao8, 'lenta', { chamar: () => new Promise(r => { soltar = r; }), ctx, hora: '11:01' });
+    sessao8.mensagens = [];              // "Nova conversa" no meio
+    sessao8.mensagens.push({ role: 'user', content: [{ type: 'text', text: 'outra' }] });
+    soltar({ ok: false, codigo: 'ocupado' });
+    const r8 = await pendente;
+    conf('corrida: a pergunta que falha depois de uma "Nova conversa" não corta a conversa nova', [r8.erro, sessao8.mensagens.length, sessao8.mensagens[0].content[0].text], ['ocupado', 1, 'outra']);
+    conf('(arranjo) antes da corrida havia 2 mensagens', antesDaCorrida, 2);
+    /* Fechar, reabrir e perguntar (o caminho do app): ao fechar no meio, o app
+     * troca a lista da sessão pela de antes da pergunta (pararAssistente);
+     * a pergunta nova vai na lista nova, e a velha, quando enfim volta, não
+     * corta nada. */
+    const sessao11 = A.novaSessao('u1');
+    fila = [respostaTexto('antes')];
+    await A.perguntar(sessao11, 'antes', { chamar, ctx, hora: '11:00' });
+    const tamanho = sessao11.mensagens.length;
+    let soltar11;
+    const velha = A.perguntar(sessao11, 'velha', { chamar: () => new Promise(r => { soltar11 = r; }), ctx, hora: '11:01' });
+    sessao11.mensagens = sessao11.mensagens.slice(0, tamanho);       // fechar (pararAssistente)
+    fila = [respostaTexto('nova')];
+    const r11 = await A.perguntar(sessao11, 'nova', { chamar, ctx, hora: '11:02' });  // reabrir e perguntar
+    soltar11({ ok: false, codigo: 'cancelado' });
+    await velha;
+    conf('corrida fechar, reabrir e perguntar: a pergunta nova fica inteira, e a velha não aparece', [r11.texto, sessao11.mensagens.length, sessao11.mensagens.some(m => /velha/.test(JSON.stringify(m.content)))], ['nova', tamanho + 2, false]);
+    conf('a sessão sabe de quem é: outra conta não usa a conversa', [A.sessaoValida(sessao8, 'u1'), A.sessaoValida(sessao8, 'u2'), A.sessaoValida(null, 'u1')], [true, false, false]);
+  }
+  // recomeço (item 16): respeita as voltas que restam; e o teto de 36 mensagens recomeça avisando
+  {
+    const sessao9 = A.novaSessao('u1');
+    fila = [respostaTexto('um')];
+    await A.perguntar(sessao9, 'um', { chamar, ctx, hora: '11:00' });
+    let n9 = 0;
+    const sempreLonga = () => { n9++; return Promise.resolve(n9 <= 2 ? respostaTool([{ name: 'valor_hora', input: { alunoId: 'al1' } }]) : n9 === 3 ? { ok: false, codigo: 'conversa_longa' } : respostaTool([{ name: 'valor_hora', input: { alunoId: 'al1' } }])); };
+    const r9 = await A.perguntar(sessao9, 'dois', { chamar: sempreLonga, ctx, hora: '11:00' });
+    conf('o recomeço conta as voltas de antes: no máximo 5 chamadas no total', [n9, r9.erro, r9.voltas], [5, 'voltas', 5]);
+    const sessao10 = A.novaSessao('u1');
+    for (let i = 0; i < 40; i++) sessao10.mensagens.push({ role: i % 2 ? 'assistant' : 'user', content: [{ type: 'text', text: 'x' }] });
+    fila = [respostaTexto('nova')];
+    const r10 = await A.perguntar(sessao10, 'depois de muitas', { chamar, ctx, hora: '11:00' });
+    conf('passou de 36 mensagens: a conversa recomeça e a resposta avisa (recomecou)', [r10.recomecou, sessao10.mensagens.length, /Alunos ativos/.test(sessao10.mensagens[0].content[0].text)], [true, 2, true]);
+  }
   naoGravou('o laço inteiro');
 
   secao('13. Datas relativas: 20 frases, o calendário da pergunta e a conferência do app');
@@ -400,7 +494,7 @@ function respostaTexto(t) { return { ok: true, resposta: { stop_reason: 'end_tur
     else mostra = A.executar('listar_aulas', { inicio: alvo, fim: alvo, alunoId: null }, ctxDia).entendido[0];
     conf('"' + frase + '" em ' + hoje + ' ' + hora + ': o calendário traz "' + linha + '" e a tela mostra "' + tela + '"', [cal.indexOf(linha) >= 0, mostra], [true, tela]);
   }
-  conf('3 e meia da tarde é 15:30: o app aceita e a tela diz 15h30', A.executar('tenho_algo', { data: '2026-11-16', hora: '15:30', duracao_min: null }, ctx).entendido, ['segunda, 16/11 às 15h30 (1h)']);
+  conf('3 e meia da tarde é 15:30: o app aceita e a tela diz 15:30', A.executar('tenho_algo', { data: '2026-11-16', hora: '15:30', duracao_min: null }, ctx).entendido, ['segunda, 16/11 às 15:30 (1h)']);
   conf('a conferência recusa o que o modelo pedir errado: 2027-02-29, 2026-11-31, "amanhã", 2026-1-5',
     ['2027-02-29', '2026-11-31', 'amanhã', '2026-1-5'].map(d => A.executar('listar_aulas', { inicio: d, fim: d, alunoId: null }, ctx).erro), [true, true, true, true]);
   conf('o calendário não usa travessão', /[–—]/.test(A.contextoDoAgora(HOJE, '11:00')), false);

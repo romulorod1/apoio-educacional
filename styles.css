@@ -740,7 +740,13 @@ label.campo-checkbox {
    é pelo nome que ela reconhece o arquivo; os botões não encolhem. */
 #lista-anexos .item-lista .nome { overflow-wrap: break-word; word-break: normal; }
 #modal-bib-selecoes .item-lista.desligada { opacity: .55; cursor: default; }
-.bib-compartilhar-item { display: flex; flex-direction: column; gap: 4px; max-width: 100%; }
+/* A janela "PDF pronto" (D1): o nome do arquivo quebra onde for preciso e os
+   três botões de símbolo (compartilhar, baixar, ver) nunca encolhem; numa
+   tela estreita eles descem para a linha de baixo, inteiros. */
+.bib-pdf-item { flex-wrap: wrap; }
+.bib-pdf-item .cresce { min-width: 12em; }
+.bib-pdf-acoes { display: flex; gap: 8px; flex-shrink: 0; margin-left: auto; }
+.bib-pdf-acao { min-width: var(--alvo, 48px); padding: 0 12px; }
 .bib-compartilhar-nome { font-size: var(--letra-14); overflow-wrap: anywhere; }
 .bib-lp-ajuda-uso { margin: 0 0 10px; }
 .bib-lp-restam { font-weight: 600; color: var(--muted); }
@@ -2157,12 +2163,17 @@ button.alvo-rascunho:hover { background: var(--soft); }
   background: var(--branco); color: var(--navy); font: inherit; font-size: var(--letra-16); font-weight: 600; text-align: center; box-sizing: border-box; }
 .leitor-pdf-zoom { display: inline-flex; gap: 8px; margin-left: auto; }
 .leitor-pdf-quadrado { min-width: 44px; padding: 10px 0; font-size: var(--letra-20); line-height: 1; }
-.leitor-pdf-corpo { background: var(--fio-claro); overflow: auto; padding: 18px; }
+.leitor-pdf-corpo { background: var(--fio-claro); overflow: auto; padding: 18px;
+  /* o dedo rola nos dois sentidos; a pinça e o duplo toque são do leitor (app.js) */
+  touch-action: pan-x pan-y; }
 .leitor-pdf-navegacao { flex: 0 0 auto; padding: 0 18px; border-top: 1px solid var(--fio); background: var(--branco); }
 .leitor-pdf-navegacao[hidden] { display: none; }
 .leitor-pdf-navegacao input { display: block; width: 100%; min-height: var(--alvo); margin: 0; accent-color: var(--navy); }
 .leitor-pdf-pagina { position: relative; margin: 0 auto 18px; background: var(--branco); box-shadow: var(--sombra); }
 .leitor-pdf-pagina canvas { display: block; margin: 0; background: var(--branco); }
+/* O canvas de detalhe do zoom alto (fatia 3): só o pedaço à vista, na densidade
+   da tela, por cima da página inteira; o toque passa direto para a página. */
+.leitor-pdf-pagina canvas.leitor-pdf-detalhe { position: absolute; pointer-events: none; }
 .leitor-pdf-pagina-vazia { width: 100%; height: 100%; background: var(--branco); }
 /* A frase do C3 ("Escolha a página e toque em...") fica colada embaixo da
    barra, de ponta a ponta, sem rolar junto com a página. */
@@ -2325,6 +2336,13 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-gerar-rotulo { display: block; font-size: var(--letra-14); font-weight: 600; color: var(--navy); margin-bottom: 5px; }
 .bib-gerar-caixas { display: flex; flex-direction: column; gap: 0; }
 #bib-gerar-aulas .item-lista.escolhida { border-color: var(--acao); background: var(--acao-clara); }
+/* "Nova aula hoje" fica no fim e discreta (D8 revista): as aulas nascem na
+   agenda, e criar uma pela Biblioteca é a exceção. Continua um alvo inteiro. */
+#bib-gerar-aulas .item-lista.bib-aula-nova:not(.escolhida) { border-style: dashed; background: transparent; }
+#bib-gerar-aulas .item-lista.bib-aula-nova .nome { color: var(--muted); font-weight: 600; }
+.bib-gerar-mais { margin: 0 0 8px; }
+#bib-gerar-aulas .item-lista[hidden] { display: none; }
+#bib-gerar-passadas > summary { min-height: var(--alvo, 48px); box-sizing: border-box; padding: 12px 0; cursor: pointer; font-weight: 600; color: var(--navy); }
 
 /* ---------- Minhas listas (C2a) ---------- */
 .bib-abas { margin-bottom: 12px; }
@@ -3083,8 +3101,6 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-semana-bolinhas { display: flex; gap: 2px; min-height: 7px; }
 .cel-bolinha { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1px var(--branco); }
 .cel-abrir-vagos { margin: 0; min-height: var(--alvo-celular); }
-/* o relógio do Vagos só aparece quando o assistente divide a linha (abaixo) */
-.cel-abrir-vagos .ico { display: none; }
 .cel-semana-topo .cel-abrir-vagos { flex: 0 0 auto; min-width: var(--alvo-celular); padding: 4px; }
 .cel-vagos-topo { display: flex; align-items: center; gap: 4px; margin: 0 0 8px; padding: 4px 0; border-bottom: 1px solid var(--fio-claro); }
 .cel-vagos-topo .btn { flex: 0 0 auto; min-width: var(--alvo-celular); min-height: var(--alvo-celular); padding: 4px; }
@@ -3887,6 +3903,47 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bib-busca-livro-grupo { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; margin-top: 8px; border-top: 1px solid var(--fio); min-width: 0; }
 .bib-busca-livro-paginas { flex: 0 0 auto; min-width: 0; font-size: var(--letra-14); overflow-wrap: anywhere; }
 .bib-busca-livro-grupo .btn { min-height: var(--alvo); }
+/* por onde o capítulo foi achado (pelo capítulo, com o assunto, ou no texto) e o "Abrir no capítulo" */
+.bib-busca-como { margin: 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+.bib-busca-como-ponto { margin: 0 6px; }
+.bib-busca-acoes { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.bib-busca-acoes .btn { max-width: 100%; }
+.bib-busca-paginas[hidden] { display: none; }
+.bib-busca-obra { margin: 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+/* B1: os assuntos no alto da busca e a página do assunto */
+.bib-assuntos-da-busca { margin: 0 0 12px; }
+.bib-assuntos-da-busca[hidden] { display: none; }
+.bib-assuntos-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
+.bib-assunto { min-width: 0; }
+.bib-assunto-caminho { margin: 8px 0 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+.bib-assunto-passo + .bib-assunto-passo { margin-left: 6px; }
+.bib-assunto-titulo { margin: 4px 0 8px; font-size: 1.25rem; color: var(--navy); overflow-wrap: anywhere; }
+.bib-assunto-tambem { margin: 0 0 8px; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+.bib-assunto-tambem-rotulo { font-weight: var(--peso-forte); }
+.bib-assunto-secao { margin-top: 12px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
+.bib-assunto-secao-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
+.bib-assunto-livros { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 8px; min-width: 0; }
+.bib-assunto-livro { display: flex; flex-direction: column; gap: 4px; padding: 10px; border: 1px solid var(--fio); border-radius: 8px; min-width: 0; overflow-wrap: anywhere; }
+.bib-assunto-livro .btn, .bib-assunto-ver-outros { min-height: var(--alvo); }
+.bib-assunto-ver-outros { justify-self: start; }
+.bib-assunto-vizinhos { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.bib-assunto-vizinho { min-height: var(--alvo); max-width: 100%; white-space: normal; text-align: left; }
+.bib-assunto-vazio { margin: 0; }
+/* com a página do assunto aberta, o topo dos exercícios e a faixa do material saem: a página começa no alto */
+#tela-biblioteca.com-pagina-do-assunto #bib-exercicios-cabeca,
+#tela-biblioteca.com-pagina-do-assunto #bib-contexto,
+#tela-biblioteca.com-pagina-do-assunto #bib-carrinho { display: none; }
+.bib-assuntos-mais { min-height: var(--alvo); margin-top: 4px; }
+/* "Melhores resultados" no alto do grupo "Nos livros", e o resto recolhido em "Mais resultados (N)" */
+.bib-busca-melhores { margin-top: 8px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
+.bib-busca-melhores-titulo { margin: 0; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
+.bib-busca-mais { margin-top: 8px; }
+.bib-busca-mais > summary { list-style: none; cursor: pointer; min-height: var(--alvo); display: flex; align-items: center; gap: 4px;
+  font-weight: var(--peso-forte); color: var(--navy); }
+.bib-busca-mais > summary::-webkit-details-marker { display: none; }
+.bib-busca-mais[open] > summary .bib-grupo-seta { transform: rotate(90deg); }
+/* a faixa do material marcado vazia não gruda no alto durante a busca: rola junto */
+.bib-carrinho.vazia.na-busca { position: static; }
 .bib-busca-livros-aviso { margin-top: 8px; }
 .bibl-exercicios-cabeca .cresce { flex: 1; }
 .bibl-exercicios-titulo { font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); margin: 0; }
@@ -3997,6 +4054,25 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bibl-sumario-cabeca { display: flex; align-items: baseline; gap: 12px; padding: 4px 12px 8px; }
 .bibl-sumario-cabeca .bibl-apoio { margin-left: auto; }
 .bibl-sem-sumario { padding: 0 12px; }
+/* fase 1a da nuvem: onde ela estava antes da atualização, e as correções órfãs (uma linha discreta, recolhida) */
+#bib-livro-onde-estava { margin: 0 0 8px; padding: 0 12px; }
+.bibl-orfas { padding: 0 12px 8px; min-width: 0; }
+.bibl-orfas-linha {
+  display: block; width: 100%; min-height: var(--alvo); padding: 8px 0; border: 0; background: transparent;
+  font: inherit; font-size: var(--letra-14); color: var(--muted); text-align: left; text-decoration: underline;
+  text-underline-offset: 3px; overflow-wrap: anywhere; cursor: pointer;
+}
+.bibl-orfa { padding: 8px 0; border-top: 1px solid var(--fio-claro); min-width: 0; }
+.bibl-orfa-texto { margin: 0 0 8px; font-size: var(--letra-14); color: var(--texto); overflow-wrap: anywhere; }
+.bibl-orfa-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.bibl-orfa-acoes .btn { max-width: 100%; white-space: normal; }
+.bibl-orfa-pergunta { margin-top: 8px; padding: 8px 12px; border-radius: var(--raio); background: var(--soft); }
+.bibl-orfa-capitulos { display: flex; flex-direction: column; margin-top: 8px; }
+.bibl-orfa-capitulo {
+  min-height: var(--alvo); padding: 8px 12px; border: 0; border-top: 1px solid var(--fio-claro); background: transparent;
+  font: inherit; font-size: var(--letra-14); color: var(--texto); text-align: left; overflow-wrap: anywhere; cursor: pointer;
+}
+.bibl-orfa-capitulo:hover { background: var(--soft); }
 .bibl-cap, .bibl-sec {
   display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) auto; gap: 2px 12px; align-items: baseline;
   width: 100%; min-height: var(--alvo); padding: 10px 12px; border: 0; border-top: 1px solid var(--fio-claro);
@@ -4242,31 +4318,46 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 /* ==================== planejamento (fim) ==================== */
 
 /* ==================== assistente (IA, fase 3: só leitura) ==================== */
-/* O ícone no alto do tablet, ao lado do olho, com o alvo de 48 px. */
-.olho.assistente-topo { width: 48px; height: 48px; color: var(--navy); }
-.olho.assistente-topo[hidden] { display: none; }
+/* A porta do tablet: a pílula com o balão e a palavra "Perguntar", vizinha
+   do olho (a margem automática junta as duas à direita do cabeçalho), com a
+   mesma borda e o mesmo branco do olho. */
+.pilula-perguntar {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 48px; padding: 0 16px 0 12px;
+  border: 1px solid var(--fio); border-radius: 999px;
+  background: var(--branco); color: var(--navy);
+  font: inherit; font-size: var(--letra-14); font-weight: 600;
+  cursor: pointer; flex-shrink: 0;
+}
+.pilula-perguntar[hidden] { display: none; }
+.pilula-perguntar .ico { width: 20px; height: 20px; }
+.pilula-perguntar:hover { background: var(--soft); }
 @media (max-width: 720px) {
-  .olho.assistente-topo { position: absolute; top: 8px; right: 64px; }
+  .pilula-perguntar { position: absolute; top: 8px; right: 64px; }
 }
-/* No celular, o ícone na linha do dia. Com o assistente na linha, num
-   celular (até 430 px), as setas ficam só com a seta (o "1 dia" continua no
-   nome que o leitor de tela lê) e o dia da semana do título sai da vista (a
-   faixa dos dias logo abaixo já o diz; o leitor de tela continua lendo), para
-   a data não quebrar em três linhas com a letra a 130%. */
-.cel-semana-topo .cel-abrir-assistente { flex: 0 0 auto; min-width: var(--alvo-celular); min-height: var(--alvo-celular); padding: 0; color: var(--navy); }
-@media (max-width: 430px) {
-  .cel-semana-topo.com-assistente .cel-semana-passo { font-size: 0; min-width: var(--alvo-celular); padding: 0; }
-  .cel-semana-topo.com-assistente .cel-semana-passo .ico { width: 20px; height: 20px; }
-  .cel-semana-topo.com-assistente .cel-abrir-vagos { font-size: 0; padding: 0; }
-  .cel-semana-topo.com-assistente .cel-abrir-vagos .ico { display: inline-block; width: 22px; height: 22px; }
-  .cel-semana-topo.com-assistente .cel-titulo-semana { font-size: 0; }
+/* A porta do celular: a mesma pílula, presa no pé de Hoje, acima das abas,
+   à direita (perto do polegar). O alto (a linha do dia) fica como era. */
+.cel-assistente-pe { position: sticky; bottom: 12px; display: flex; justify-content: flex-end; margin-top: 8px; pointer-events: none; z-index: 3; }
+.cel-assistente-pe .cel-perguntar {
+  pointer-events: auto; box-shadow: var(--sombra-forte); background: var(--branco); border: 1px solid var(--fio);
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: var(--alvo-celular); padding: 0 16px 0 12px;
+  border-radius: 999px; color: var(--navy); font-weight: 600;
 }
-/* No celular mais estreito, com o selinho dos avisos também na linha, o "Hoje," sai da vista (o dia de hoje está marcado na faixa logo abaixo, e o botão "Hoje" aparece em qualquer outro dia). */
-@media (max-width: 380px) {
-  .cel-semana-topo.com-assistente .cel-titulo-hoje { font-size: 0; }
-}
+.cel-assistente-pe .cel-perguntar .ico { width: 20px; height: 20px; }
+/* No fim da rolagem de Hoje, a pílula fica no próprio lugar, depois de uma
+   folga do tamanho dela: a última aula rola até ficar livre. */
+#cel-hoje .cel-assistente-pe { padding-top: 12px; }
 
 .ass-modal { max-width: 640px; height: 88vh; }
+/* No celular, a janela desce até o fim da tela e cobre a barra de abas (os
+   rótulos não aparecem borrados por baixo). */
+body.modo-celular #modal-assistente { padding: 8px 0 0; align-items: stretch; }
+body.modo-celular #modal-assistente .ass-modal { height: 100%; max-height: 100%; max-width: 100%; border-radius: 16px 16px 0 0; }
+.modal-cabecalho .btn#ass-nova { min-height: 48px; margin-left: auto; white-space: nowrap; }
+/* o título recebe o foco ao abrir (o teclado não sobe); não é um controle, sem moldura */
+#titulo-modal-assistente:focus { outline: none; }
 .ass-conversa { display: flex; flex-direction: column; gap: 14px; }
 .ass-vez { display: flex; flex-direction: column; gap: 6px; scroll-margin-top: 8px; }
 .ass-pergunta {
@@ -4276,29 +4367,48 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 }
 .ass-resposta { font-size: var(--letra-16); line-height: 1.45; color: var(--texto); overflow-wrap: anywhere; }
 .ass-resposta p { margin: 0 0 4px; }
-.ass-resposta.ass-erro { color: var(--vermelho); margin: 0; }
+.ass-linha-valor { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--fio-claro); padding-bottom: 2px; }
+.ass-valor { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ass-pensando { color: var(--muted); font-style: italic; margin: 0; }
-.ass-entendido { margin: 0; font-size: var(--letra-14); color: var(--muted); }
+.ass-conversa .ass-entendido, .ass-entendido { margin: 0; font-size: var(--letra-14); line-height: 1.35; color: var(--muted); }
 .ass-cartao {
-  border: 1px solid var(--fio); border-radius: 12px; padding: 12px; background: var(--branco);
-  display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+  border: 1px solid var(--fio); border-radius: 12px; padding: 10px 12px; background: var(--branco);
+  display: flex; flex-direction: column; gap: 8px;
 }
-.ass-cartao-titulo { font-weight: 600; color: var(--navy); font-size: var(--letra-14); }
-.ass-cartao-linha { font-size: var(--letra-16); overflow-wrap: anywhere; }
-.ass-cartao .ass-telefone { font-weight: 600; }
-.ass-mensagem { margin: 0; padding: 8px 12px; border-left: 3px solid var(--fio); background: var(--soft); border-radius: 4px; font-size: var(--letra-16); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; box-sizing: border-box; }
+.ass-cartao-linha { display: flex; align-items: flex-start; gap: 8px; font-size: var(--letra-16); overflow-wrap: anywhere; min-width: 0; }
+.ass-cartao-linha .ass-cartao-ico { width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; color: var(--navy); }
+.ass-cartao-quem { min-width: 0; font-weight: 600; color: var(--texto); }
+.ass-cinza { font-weight: 400; color: var(--muted); }
+.ass-numero { white-space: nowrap; }
+.ass-mensagem { width: 100%; box-sizing: border-box; min-height: 72px; resize: none; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 8px; background: var(--soft); }
+.ass-mensagem:focus { outline: 1px solid var(--navy); outline-offset: 0; }
 .ass-cartao-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
-.ass-link { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
+.ass-link { min-height: 48px; min-width: 48px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
 .ass-exemplos { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .ass-exemplo { min-height: 48px; text-align: left; white-space: normal; max-width: 100%; }
-.ass-falha { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ass-ideias > summary { min-height: 48px; display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--navy); font-weight: 600; list-style: none; }
+.ass-ideias > summary::-webkit-details-marker { display: none; }
+.ass-ideias .ass-ideias-seta { width: 20px; height: 20px; transform: rotate(-90deg); transition: transform .15s ease; }
+.ass-ideias[open] .ass-ideias-seta { transform: none; }
+.ass-ideias .ass-exemplos { padding-top: 4px; }
+/* Com o erro aberto, uma linha só: o ícone, o texto e o "Tentar de novo". */
+.ass-falha { margin: 0; display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; padding-top: 6px; padding-bottom: 6px; }
+.ass-falha .ass-falha-ico { width: 20px; height: 20px; flex-shrink: 0; }
+.ass-falha span { flex: 1 1 auto; min-width: 0; font-size: var(--letra-14); line-height: 1.3; }
+.ass-falha .btn { flex: 0 0 auto; white-space: nowrap; }
+.ass-texto.ass-texto-curto { min-height: 48px; height: 48px; }
+.ass-campo-junto { gap: 8px; align-items: center; }
+.ass-campo-junto .btn { min-height: 48px; flex: 0 0 auto; }
 .ass-falha .btn { min-height: 48px; }
 .modal-rodape.ass-rodape { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
 .ass-campo { display: flex; }
 .ass-texto { flex: 1; min-width: 0; min-height: 48px; resize: none; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 10px; box-sizing: border-box; }
+.ass-texto:focus { outline: 1px solid var(--navy); outline-offset: 0; }
 .ass-botoes { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
 .ass-botoes .btn { min-height: 48px; }
-.ass-botoes .esquerda, .ass-botoes .plan-ditar { margin-right: auto; }
+.ass-botoes .esquerda { margin-right: auto; }
+/* desligado, o Perguntar continua legível: texto escuro sobre cinza claro */
+.ass-botoes .btn.principal:disabled { background: var(--fio-claro); border-color: var(--fio); color: var(--texto); opacity: 1; }
 /* O cartão de confirmação (fase 4a): o que muda, o antes e o depois, o
  * dinheiro e o Confirmar à mão, no pé do cartão. */
 .ass-proposta { align-items: stretch; border-color: var(--navy); }
@@ -4315,7 +4425,7 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 }
 .ass-marca-caixa {
   width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--navy); background: var(--navy); box-sizing: border-box;
-  color: var(--branco); font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center; line-height: 1;
+  color: var(--branco); font-size: var(--letra-14); font-weight: 700; display: flex; align-items: center; justify-content: center; line-height: 1;
 }
 .ass-marca[aria-checked="false"] .ass-marca-caixa { background: var(--branco); }
 .ass-marca:focus-visible { outline: 2px solid var(--navy); outline-offset: -3px; }
@@ -4323,7 +4433,7 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .ass-antes-depois dt { color: var(--muted); }
 .ass-antes-depois dd { margin: 0; overflow-wrap: anywhere; }
 .ass-dinheiro { margin: 0; font-weight: 600; font-size: var(--letra-14); color: var(--navy); }
-.ass-aviso { margin: 0; font-size: var(--letra-14); color: var(--aviso-texto); background: var(--aviso-fundo); border-radius: 6px; padding: 4px 8px; overflow-wrap: anywhere; }
+.ass-aviso { margin: 0; display: flex; align-items: flex-start; gap: 6px; font-size: var(--letra-14); color: var(--aviso-texto); background: var(--aviso-fundo); border-radius: 6px; padding: 4px 8px; overflow-wrap: anywhere; }
 .ass-pergunta-conjunto { margin: 0; font-weight: 600; font-size: var(--letra-14); }
 .ass-opcoes { display: flex; flex-direction: column; gap: 6px; }
 .ass-opcao {
@@ -4354,5 +4464,9 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .ass-campo-rascunho span.ass-texto-novo-rotulo { color: var(--navy); font-weight: 600; }
 .ass-campo-rascunho.com-antigo .ass-rascunho { border: 2px solid var(--navy); }
 .ass-confirmar .btn { min-height: 48px; }
-.ass-estado { margin: 0; font-size: var(--letra-14); color: var(--muted); }
+.ass-estado { margin: 0; display: flex; align-items: flex-start; gap: 6px; font-size: var(--letra-14); color: var(--muted); }
+.ass-estado.ass-estado-erro { color: var(--vermelho); }
+.ass-linha-cabeca .ass-cartao-ico, .ass-aviso .ass-cartao-ico, .ass-estado .ass-cartao-ico { width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; color: var(--navy); }
+.ass-aviso .ass-cartao-ico { color: var(--aviso-texto); }
+.ass-estado-erro .ass-cartao-ico { color: var(--vermelho); }
 /* ==================== assistente (fim) ==================== */

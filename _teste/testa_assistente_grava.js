@@ -130,22 +130,22 @@ conf('nem o buscar_assunto existe para quem só lê', A.executar('buscar_assunto
 secao('2. Remarcar (G03, G04): a aula certa, a inexistente, o homônimo, o choque, além de materializadoAte');
 let r = propor('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19', hora: '15:30', nova_data: '2026-11-19', nova_hora: '17:30' })] });
 let l = r.linhas && r.linhas[0];
-conf('o cartão diz em linguagem dela: "Remarcar Marina, qui 19/11: de 15h30 para 17h30"', l && l.titulo, 'Remarcar Marina, qui 19/11: de 15h30 para 17h30');
-conf('o Entendi, o antes, o depois e o dinheiro (do core)', l && [l.entendido, l.antes, l.depois, l.dinheiro], ['quinta, 19/11, 15h30', 'qui 19/11, 15h30 (1h), agendada', 'qui 19/11, 17h30 (1h)', 'O valor do mês não muda.']);
+conf('o cartão diz em linguagem dela: "Remarcar Marina, qui 19/11: de 15:30 para 17:30"', l && l.titulo, 'Remarcar Marina, qui 19/11: de 15:30 para 17:30');
+conf('o Entendi, o antes, o depois e o dinheiro (do core)', l && [l.entendido, l.antes, l.depois, l.dinheiro], ['quinta, 19/11, 15:30', 'qui 19/11, 15:30 (1h), agendada', 'qui 19/11, 17:30 (1h)', 'O valor do mês não muda.']);
 conf('na aula de repetição, o cartão diz que muda só esta', l && l.avisos.some(a => /muda só esta aula/.test(a)), true);
 conf('o resultado ao modelo diz que NADA foi gravado', /NADA foi gravado/.test(JSON.stringify(r.resultado)), true);
 conf('confirmado = o Remarcar do celular (Core.aplicarEdicaoAula só nesta, { data, hora, duracaoMin }), byte a byte',
   JSON.stringify(confirmado(r.linhas)), JSON.stringify(pelaTela(db => Core.aplicarEdicaoAula(db, 's1@2026-11-19', { data: '2026-11-19', hora: '17:30', duracaoMin: 60 }, 'esta'))));
 naoGravou('remarcar');
 r = propor('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19', hora: null, nova_data: '2026-11-20', nova_hora: null })] });
-conf('sem a hora: acha a única aula do dia; "remarca para sexta" mantém a hora (K1)', r.linhas && [r.linhas[0].titulo, r.linhas[0].op.mudancas], ['Remarcar Marina, qui 19/11: de qui 19/11, 15h30 para sex 20/11, 15h30', { data: '2026-11-20', hora: '15:30', duracaoMin: 60 }]);
+conf('sem a hora: acha a única aula do dia; "remarca para sexta" mantém a hora (K1)', r.linhas && [r.linhas[0].titulo, r.linhas[0].op.mudancas], ['Remarcar Marina, qui 19/11: de qui 19/11, 15:30 para sex 20/11, 15:30', { data: '2026-11-20', hora: '15:30', duracaoMin: 60 }]);
 const k1 = confirmado(r.linhas);
 conf('K1 confirmado: a aula muda de data com o mesmo id (ligada à original), e a data antiga vira exclusão da série',
   [k1.aulas.filter(a => a.id === 's1@2026-11-19').map(a => a.data + ' ' + a.destacada)[0], k1.series[0].exclusoes], ['2026-11-20 true', ['2026-11-19']]);
 r = propor('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-18', hora: '15:30', nova_data: '2026-11-20', nova_hora: '15:30' })] });
 conf('recusa: a aula que não existe (quarta 18/11) volta como nao_achei, sem cartão', [r.erro, /^nao_achei/.test(r.resultado.erro), r.linhas], [true, true, null]);
 r = propor('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19', hora: '10:00', nova_data: '2026-11-20', nova_hora: '15:30' })] });
-conf('recusa: a data certa e a hora errada, com a hora que existe no dia', [r.erro, /15h30/.test(r.resultado.erro)], [true, true]);
+conf('recusa: a data certa e a hora errada, com a hora que existe no dia', [r.erro, /15:30/.test(r.resultado.erro)], [true, true]);
 r = propor('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'anas', nome_dito: 'Ana', data: '2026-11-17', hora: null, nova_data: '2026-11-18', nova_hora: null })] });
 conf('recusa: "Ana" com duas Anas ativas é ambíguo, e o erro manda perguntar com os dois nomes', [r.erro, /^ambiguo/.test(r.resultado.erro), /Ana S\. e Ana O\./.test(r.resultado.erro)], [true, true, true]);
 r = propor('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'anas', nome_dito: 'Ana S.', data: '2026-11-17', hora: null, nova_data: '2026-11-18', nova_hora: null })] });
@@ -155,7 +155,7 @@ conf('"Ana O." e "a Ana Outra" (artigo e inicial) também são inequívocos; "a 
 r = propor('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'anao', nome_dito: 'Ana Sintética', data: '2026-11-17', hora: null, nova_data: '2026-11-18', nova_hora: null })] });
 conf('recusa: o nome dito é de outra aluna que não a do id', [r.erro, /Confira o id/.test(r.resultado.erro)], [true, true]);
 r = propor('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19', hora: '15:30', nova_data: '2026-11-20', nova_hora: '17:30' })] });
-conf('choque de horário (Bruno sexta 17h30): o cartão avisa, pela conta do Vagos', r.linhas && r.linhas[0].avisos.filter(a => /Já há aula/.test(a)), ['Já há aula neste horário: Bruno às 17h30. As duas ficam no mesmo horário.']);
+conf('choque de horário (Bruno sexta 17h30): o cartão avisa, pela conta do Vagos', r.linhas && r.linhas[0].avisos.filter(a => /Já há aula/.test(a)), ['Já há aula neste horário: Bruno às 17:30. As duas ficam no mesmo horário.']);
 r = propor('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19', hora: '15:30', nova_data: '2026-11-20', nova_hora: '10:00' })] });
 conf('(controle) horário livre: sem aviso de choque', r.linhas[0].avisos.filter(a => /Já há aula/.test(a)).length, 0);
 r = propor('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'mar', nome_dito: 'Marina', data: '2026-12-03', hora: '15:30', nova_data: '2026-12-04', nova_hora: null })] });
@@ -169,7 +169,7 @@ conf('remarcar de novembro para dezembro: o valor sai de um mês e entra no outr
 
 secao('3. Duração (G05): o valor que muda');
 r = propor('propor_aulas', { itens: [item({ acao: 'mudar_duracao', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19', hora: null, duracao_min: 90 })] });
-conf('1h para 1h30: "O valor de novembro aumenta R$ 60,00."', r.linhas && [r.linhas[0].titulo, r.linhas[0].dinheiro], ['Duração da aula de Marina, qui 19/11, 15h30: de 1h para 1h30', 'O valor de novembro aumenta R$ 60,00.']);
+conf('1h para 1h30: "O valor de novembro aumenta R$ 60,00."', r.linhas && [r.linhas[0].titulo, r.linhas[0].dinheiro], ['Duração da aula de Marina, qui 19/11, 15:30: de 1h para 1h30', 'O valor de novembro aumenta R$ 60,00.']);
 conf('confirmado = o "Ajustar duração" do celular ({ duracaoMin })', JSON.stringify(confirmado(r.linhas)), JSON.stringify(pelaTela(db => Core.aplicarEdicaoAula(db, 's1@2026-11-19', { duracaoMin: 90 }, 'esta'))));
 conf('recusa: a mesma duração, e 50 minutos (fora da grade de 15)', [propor('propor_aulas', { itens: [item({ acao: 'mudar_duracao', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19', duracao_min: 60 })] }).erro,
   propor('propor_aulas', { itens: [item({ acao: 'mudar_duracao', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19', duracao_min: 50 })] }).erro], [true, true]);
@@ -203,10 +203,10 @@ conf('G11 "não cobra esta aula": diminui R$ 150 e = o "Não cobrar" do Fechamen
 secao('5. Voltar (G07, G13), criar (G01) e reposição (G12)');
 r = propor('propor_aulas', { itens: [item({ acao: 'voltar_a_dada', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-05' })] });
 conf('G07 "a falta foi engano": volta a dada, = o "Realizada" do celular', [r.linhas[0].titulo, JSON.stringify(confirmado(r.linhas)) === JSON.stringify(pelaTela(db => Core.aplicarEdicaoAula(db, 's1@2026-11-05', { status: 'realizada', cobravel: true }, 'esta')))],
-  ['A aula de Marina, qui 05/11, 15h30 volta a contar como dada', true]);
+  ['A aula de Marina, qui 05/11, 15:30 volta a contar como dada', true]);
 conf('recusa: voltar uma aula que não é falta nem cancelada', propor('propor_aulas', { itens: [item({ acao: 'voltar_a_dada', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19' })] }).erro, true);
 r = propor('propor_aulas', { itens: [item({ acao: 'criar_aula', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-11-21', hora: '10:00', duracao_min: null })] });
-conf('G01 "marca uma aula com o Bruno sábado às 10h": 1h, cobrada, aumenta R$ 150', [r.linhas[0].titulo, r.linhas[0].dinheiro], ['Marcar aula de Bruno, sáb 21/11, 10h (1h)', 'O valor de novembro aumenta R$ 150,00.']);
+conf('G01 "marca uma aula com o Bruno sábado às 10h": 1h, cobrada, aumenta R$ 150', [r.linhas[0].titulo, r.linhas[0].dinheiro], ['Marcar aula de Bruno, sáb 21/11, 10:00 (1h)', 'O valor de novembro aumenta R$ 150,00.']);
 const novaTela = c => ({ id: Core.uid(), alunoId: c.alunoId, serieId: null, destacada: false, data: c.data, hora: c.hora, duracaoMin: c.duracaoMin, status: c.status, cobravel: c.cobravel,
   notaTexto: '', notaPrivada: '', temNota: false, anexos: [] }); // a novaAulaAvulsa do app.js, copiada
 const fonteApp = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
@@ -216,7 +216,7 @@ conf('confirmado = o "Marcar aula" do celular (a mesma aula avulsa, fora o id no
 conf('recusa: aula nova sem hora, e aula repetida no mesmo horário', [propor('propor_aulas', { itens: [item({ acao: 'criar_aula', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-11-21', hora: null })] }).erro,
   /já existe/.test(propor('propor_aulas', { itens: [item({ acao: 'criar_aula', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-11-20', hora: '17:30' })] }).resultado.erro)], [true, true]);
 r = propor('propor_aulas', { itens: [item({ acao: 'criar_aula', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-20', hora: '17:00', duracao_min: 60 })] });
-conf('aula nova em cima de outra: o aviso de choque', r.linhas[0].avisos.some(a => /Bruno às 17h30/.test(a)), true);
+conf('aula nova em cima de outra: o aviso de choque', r.linhas[0].avisos.some(a => /Bruno às 17:30/.test(a)), true);
 r = propor('propor_aulas', { itens: [item({ acao: 'criar_reposicao', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-21', hora: '10:00' })] });
 conf('G12 reposição: situação reposição, cobrada, e o cartão diz que não fica ligada à aula que repõe', [r.linhas[0].op.campos.status, r.linhas[0].op.campos.cobravel, r.linhas[0].avisos.some(a => /não fica ligada/.test(a))], ['reposicao', true, true]);
 
@@ -297,11 +297,17 @@ const ctxA = (db, fala) => ctxDe(db, { catalogo: null, fala: fala === undefined 
   conf('A1: remarcada para 03/12, a aula fixa daquele dia continua (15:30 e 17:00)', dia, ['15:30', '17:00']);
   conf('A1: dezembro fecha R$ 1.200 (9 fixas e a remarcada), e não R$ 1.080', Core.calcularFechamento(db, 'mar', '2026-12', HOJE).totalValor, 1200);
   conf('A1: o cartão já dizia o dinheiro certo dos dois meses', rA1.linhas[0].dinheiro, 'O valor de novembro diminui R$ 120,00. O valor de dezembro aumenta R$ 120,00.');
-  /* VENENO A1: o mesmo plano sem lançar o mês de destino (o de antes). */
-  const dbV = bancoDoAtaque();
-  const opsV = A.opsConfirmadas(A.executar('propor_aulas', { itens: [itA({ data: '2026-11-26', hora: '15:30', nova_data: '2026-12-03', nova_hora: '17:00' })] }, ctxA(dbV)).linhas, {}).ops;
-  Core.aplicarEdicaoAula(dbV, opsV[0].aulaId, opsV[0].mudancas, 'esta'); Core.garantirSeriesAte(dbV, '2026-12');
-  conf('VENENO A1: sem lançar o destino antes, a fixa de 03/12 some (a prova vê)', dbV.aulas.filter(a => a.alunoId === 'mar' && a.data === '2026-12-03').length, 1);
+  /* A1 também na ordem: o Confirmar lança dezembro ANTES de mover (como o
+   * tablet ao navegar). Desde a main a39e13f o core também protege a fixa
+   * quando o mês é lançado depois; a proposta não depende disso. Veneno:
+   * a mesma edição direto, sem lançar o destino, deixa dezembro sem lançar. */
+  const db1 = bancoDoAtaque();
+  const ops1 = A.opsConfirmadas(A.executar('propor_aulas', { itens: [itA({ data: '2026-11-26', hora: '15:30', nova_data: '2026-12-03', nova_hora: '17:00' })] }, ctxA(db1)).linhas, {}).ops;
+  const dbV = JSON.parse(JSON.stringify(db1));
+  A.aplicarPlano(db1, ops1, Core);
+  conf('A1: o Confirmar lança o mês de destino antes de mover (materializadoAte chega a dezembro)', db1.series.find(x => x.id === 's1').materializadoAte, '2026-12');
+  Core.aplicarEdicaoAula(dbV, ops1[0].aulaId, ops1[0].mudancas, 'esta');
+  conf('VENENO A1: a mesma edição sem lançar o destino deixa dezembro sem lançar (a prova vê a diferença)', dbV.series.find(x => x.id === 's1').materializadoAte, '2026-11');
 }
 {
   const db = bancoDoAtaque();
@@ -348,9 +354,9 @@ const ctxA = (db, fala) => ctxDe(db, { catalogo: null, fala: fala === undefined 
   /* A5: homônimos, inclusive de nome completo idêntico. */
   const db = bancoDoAtaque(true);
   const nomes = A.nomesParaIA(db);
-  conf('A5: dois "Marina Sintética" ganham rótulos distintos', [nomes.mar, nomes.m2], ['Marina Sintética (1)', 'Marina Sintética (2)']);
+  conf('A5: dois "Marina Sintética" ganham rótulos distintos (a regra do #191)', [nomes.mar, nomes.m2], ['Marina S.', 'Marina S. (2)']);
   const can = nd => A.executar('propor_aulas', { itens: [itA({ acao: 'cancelar', alunoId: 'm2', nome_dito: nd, data: '2026-11-17', hora: '10:00', cobranca: 'sem' })] }, ctxA(db)).erro;
-  conf('A5: "Marina", "Marina Sintética", "ela" e o vazio são ambíguos; o rótulo exato "(2)" não', ['Marina', 'Marina Sintética', 'ela', '', 'Marina Sintética (2)'].map(can), [true, true, true, true, false]);
+  conf('A5: "Marina", "Marina Sintética", "ela" e o vazio são ambíguos; o rótulo exato "Marina S. (2)" não', ['Marina', 'Marina Sintética', 'ela', '', 'Marina S. (2)'].map(can), [true, true, true, true, false]);
   conf('A5 (controle): sem homônimo, o nome vazio vale pelo id', A.executar('propor_aulas', { itens: [itA({ acao: 'cancelar', alunoId: 'bru', nome_dito: '', data: '2026-11-17', hora: '09:00', cobranca: 'sem' })] }, ctxA(bancoDoAtaque(true))).erro, false);
 }
 {
