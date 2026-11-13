@@ -4320,6 +4320,88 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 #modal-leitor-pdf.leitor-compacto #leitor-compartilhar { flex: 1; }
 /* ==================== planejamento (fim) ==================== */
 
+/* ==================== T2: o bloco "Teoria e exercícios" da página do assunto ==================== */
+/* Os tons da dificuldade (D3): três degraus do mesmo marinho, do claro ao
+   escuro, nos pontos (sinal gráfico, 3:1 sobre o branco), e o selo inteiro
+   acompanha: fundo e borda mais fortes a cada degrau. A letra do selo fica
+   sempre no marinho da casa, que passa dos 4,5:1. */
+:root {
+  --bte-dif-1: #5B86B3;
+  --bte-dif-2: #2F5A8A;
+}
+/* Uma coluna só, no tablet e no celular (D5 e a parte A do 12b). O teto é de
+   leitura: a página do assunto decide onde o bloco fica. */
+.bte { min-width: 0; max-width: 46rem; margin: 0 0 24px; }
+h3.subtitulo.bte-titulo { margin: 6px 0 0; padding-bottom: 0; border-bottom: 0; font-size: var(--letra-20); }
+.bte-vazio { margin: 10px 0 0; }
+.bte-secao { min-width: 0; }
+.bte-secao .bloco-exercicios { margin-top: 18px; }
+.bte-secao-titulo { display: flex; align-items: baseline; gap: 8px; }
+.bte-secao-quantos { color: var(--muted); font-weight: var(--peso-normal); }
+/* a teoria: uma linha por aula, com a capa pequena; tocar na linha abre, e a
+   caixa fica na mesma linha */
+.bte-teorias { min-width: 0; }
+.bte-teoria { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; padding: 4px 0;
+  border-bottom: 1px solid var(--fio-claro); }
+.bte-teoria.bte-marcado { background: var(--acao-clara); }
+.bte-teoria-abrir { flex: 1 1 12rem; min-width: 0; display: flex; align-items: center; gap: 12px;
+  min-height: var(--alvo); padding: 6px 0; border: 1px solid transparent; border-radius: 10px;
+  background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.bte-teoria-abrir:hover .nome { text-decoration: underline; }
+.bte-teoria-abrir > .ico { color: var(--muted); }
+.bte-teoria-capa.bib-mini { width: 56px; flex: none; }
+.bte-teoria-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bte-teoria-texto .nome { font-weight: var(--peso-forte); color: var(--navy); overflow-wrap: anywhere; }
+.bte-teoria-texto .detalhe { font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+/* a lista de base: um cartão, com Ver e Usar à mão */
+.bte-lista { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 12px 14px;
+  border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); }
+.bte-lista-texto { flex: 1 1 10rem; min-width: 0; }
+.bte-lista-texto .nome { font-weight: var(--peso-forte); color: var(--navy); }
+.bte-lista-texto .detalhe { font-size: var(--letra-14); color: var(--muted); }
+.bte-lista-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.bte-lista-acoes .btn { min-height: var(--alvo); }
+/* os exercícios: grandes, um embaixo do outro; a caixa na linha do nome, e
+   o recorte num cartão da largura da coluna */
+.bte-exercicios { display: flex; flex-direction: column; gap: 24px; margin-top: 10px; min-width: 0; }
+.bte-ex { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bte-ex-de { margin-top: 4px; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--muted); overflow-wrap: anywhere; }
+.bte-ex-cabeca { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; }
+.bte-ex-cabeca .cresce { flex: 1 1 0; min-width: 0; }
+/* a caixa fica sempre na ponta direita, mesmo quando a linha quebra no celular */
+.bte-ex-cabeca .bte-marcar { margin-left: auto; }
+.bte-ex-nome { font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); overflow-wrap: anywhere; }
+.bte-ex-abrir { display: block; width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--fio);
+  border-radius: 10px; background: var(--branco); cursor: pointer; text-align: left; }
+.bte-ex-abrir:hover { border-color: var(--acao); }
+.bte-ex-abrir .bib-mini { border: 0; border-radius: 0; }
+.bte-ex.bte-marcado .bte-ex-abrir { border-color: var(--acao); box-shadow: inset 0 0 0 1px var(--acao); }
+.bte-marcar { min-height: var(--alvo); }
+.bte-marcar input:indeterminate { accent-color: var(--acao); }
+.bte-mais { align-self: flex-start; margin-top: 14px; min-height: var(--alvo); }
+/* o selo da dificuldade (D3): pontos e nome, e cada degrau mais forte que o
+   de baixo; o "para mim" dela tem a borda grossa da cor de ação */
+.bte-dificuldade { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bte-selo { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 2px 10px;
+  border: 1px solid var(--fio); border-radius: 999px; background: var(--branco);
+  font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--navy); white-space: nowrap; }
+.bte-pontos { display: inline-flex; gap: 3px; }
+.bte-ponto { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; box-sizing: border-box; }
+.bte-ponto.cheio { background: currentColor; }
+.bte-dif-1 .bte-pontos { color: var(--bte-dif-1); }
+.bte-dif-2 { background: var(--acao-clara); border-color: var(--bte-dif-2); }
+.bte-dif-2 .bte-pontos { color: var(--bte-dif-2); }
+.bte-dif-3 { background: var(--soft-2); border: 2px solid var(--navy-escuro); }
+.bte-dif-3 .bte-pontos { color: var(--navy-escuro); }
+/* o "para mim" é o chip de dentro: a moldura do selo continua a do degrau,
+   para um Fácil dela não parecer Difícil */
+.bte-selo-para-mim { padding: 1px 8px; border: 1px solid var(--acao); border-radius: 999px;
+  background: var(--acao-clara); font-size: var(--letra-14); font-weight: var(--peso-forte); }
+/* o desafio é um sinal forte e próprio (D3), e não uma terceira etiqueta apagada */
+.tag.bte-desafio { padding: 3px 10px; border: 1px solid var(--aviso-borda); background: var(--aviso-fundo);
+  color: var(--aviso-texto); font-size: var(--letra-14); font-weight: var(--peso-forte); text-transform: none; letter-spacing: 0; }
+/* ==================== T2 (fim) ==================== */
+
 /* ==================== assistente (IA, fase 3: só leitura) ==================== */
 /* A porta do tablet: a pílula com o balão e a palavra "Perguntar", vizinha
    do olho (a margem automática junta as duas à direita do cabeçalho), com a
