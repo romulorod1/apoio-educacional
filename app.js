@@ -23563,6 +23563,7 @@
    * a caixa nunca passa da coluna: no celular de 412 px ela encolhe até caber. */
   var PX_POR_PT_DO_RECORTE = 1.9;
   // a divulgação progressiva (padrão 1): os primeiros à vista, o resto no "Ver mais"
+  var TEORIA_A_VISTA = 2;
   var EXERCICIOS_A_VISTA = 5;
   var OBMEP_A_VISTA = 4;
 
@@ -23696,6 +23697,9 @@
       var v = (c._noMaterial || fonteNoMaterial)(c._fonte);
       c.checked = v === true;
       c.indeterminate = v === 'parte';
+      // o cartão marcado se vê na rolagem, e não só a caixa
+      var cartao = c.closest('.bte-ex, .bte-teoria');
+      if (cartao) cartao.classList.toggle('bte-marcado', v === true);
     });
   }
 
@@ -23731,19 +23735,12 @@
     elemento.appendChild(bloco);
     bloco.appendChild(el('h3', { class: 'subtitulo bte-titulo', texto: 'Teoria e exercícios' }));
 
-    var resumo = [
-      teoria.length ? plural(teoria.length, 'aula de teoria', 'aulas de teoria') : '',
-      base ? 'lista de base' : '',
-      exercicios.length ? plural(exercicios.length, 'exercício', 'exercícios') : '',
-      obmep.length ? obmep.length + (nomeDaOlimpiada === 'ENEM' ? ' do ' : ' da ') + nomeDaOlimpiada : ''
-    ].filter(Boolean);
-    if (!resumo.length) {
+    if (!teoria.length && !base && !exercicios.length && !obmep.length) {
       // o vazio numa linha, e com o porquê
       bloco.appendChild(el('p', { class: 'ajuda bte-vazio', texto: (f.vazio && f.vazio.texto) ||
         'Ainda não há teoria nem exercícios ligados a este assunto.' }));
       return bloco;
     }
-    bloco.appendChild(el('p', { class: 'ajuda bte-resumo', texto: resumo.join(' · ') }));
 
     function caixaNoMaterial(fonte, nome) {
       var chk = el('input', { type: 'checkbox', class: 'bte-marca', 'aria-label': 'No material: ' + nome });
@@ -23800,46 +23797,63 @@
       return caixa;
     }
 
-    function cartaoDeExercicio(e) {
+    /* O CARTÃO DO EXERCÍCIO: a linha de cima tem o nome, o selo e a caixa "No
+     * material", para ela marcar sem rolar a imagem inteira; embaixo, o
+     * recorte grande num cartão da largura da coluna (o recorte guarda a
+     * escala da letra, e o cartão alinha a coluna). De onde ele vem aparece
+     * só quando muda em relação ao de cima, e não repetido em todos. */
+    function cartaoDeExercicio(e, deAnterior) {
       var medidas = e.imagem && e.imagem.medidas;
       var largura = Math.round(((medidas && medidas.largura_pt) || 262) * PX_POR_PT_DO_RECORTE);
       var img = miniatura(e.imagem, Math.min(1200, largura * 2));
       if (img) img.style.maxWidth = largura + 'px';
-      var de = e.fonte === 'obmep-banco' ? [e.modulo.titulo, e.lista.titulo].filter(Boolean).join(', ') : e.lista.titulo;
+      var de = deDoExercicio(e);
       return el('article', { class: 'bte-ex', 'data-id': e.id, 'data-tipo': e.tipo }, [
+        de && de !== deAnterior ? el('div', { class: 'bte-ex-de', texto: de }) : null,
         el('div', { class: 'bte-ex-cabeca' }, [
           el('span', { class: 'bte-ex-nome', texto: e.titulo }),
           seloDeDificuldade(e),
-          e.objetiva ? el('span', { class: 'tag', texto: 'Objetiva' }) : null
+          e.objetiva ? el('span', { class: 'tag', texto: 'Objetiva' }) : null,
+          el('span', { class: 'cresce' }),
+          caixaNoMaterial(e, e.titulo)
         ]),
-        de ? el('div', { class: 'bte-ex-de', texto: de }) : null,
         el('button', {
           type: 'button', class: 'bte-ex-abrir', 'aria-label': 'Abrir ' + e.titulo + ' em tela cheia',
           aoClick: function () { abrir(e); }
-        }, [img || el('span', { class: 'btn bte-ex-sem-imagem', icone: 'olho', texto: 'Abrir ' + e.titulo })]),
-        el('div', { class: 'bte-ex-acoes' }, [caixaNoMaterial(e, e.titulo)])
+        }, [img || el('span', { class: 'btn bte-ex-sem-imagem', icone: 'olho', texto: 'Abrir ' + e.titulo })])
       ]);
     }
+    function deDoExercicio(e) {
+      return e.fonte === 'obmep-banco' ? [e.modulo.titulo, e.lista.titulo].filter(Boolean).join(', ') : e.lista.titulo;
+    }
 
-    function secao(chave, titulo) {
-      var s = el('div', { class: 'bte-secao', 'data-secao': chave }, [el('h4', { class: 'bloco-exercicios', texto: titulo })]);
+    function secao(chave, titulo, quantos) {
+      var s = el('div', { class: 'bte-secao', 'data-secao': chave }, [
+        el('h4', { class: 'bloco-exercicios bte-secao-titulo' }, [
+          el('span', { class: 'bte-secao-nome', texto: titulo }),
+          quantos ? el('span', { class: 'bte-secao-quantos', texto: String(quantos) }) : null
+        ])
+      ]);
       bloco.appendChild(s);
       return s;
     }
 
-    function listaDeCartoes(s, lista, aVista, um, varios) {
-      var coluna = el('div', { class: 'bte-exercicios' });
+    /* Os primeiros à vista e o resto atrás do "Ver mais" (padrão 1): vale para
+     * a teoria, os exercícios e a OBMEP. */
+    function listaComMais(s, classe, lista, aVista, um, varios, desenhar) {
+      var coluna = el('div', { class: classe });
       s.appendChild(coluna);
       var postos = 0;
       function mostrarAte(n) {
         var novos = [];
         while (postos < Math.min(n, lista.length)) {
-          var c = cartaoDeExercicio(lista[postos]);
+          var c = desenhar(lista[postos], postos ? lista[postos - 1] : null);
           coluna.appendChild(c);
           novos.push(c);
           postos++;
         }
         observarMiniaturasDoBloco(coluna);
+        if (novos.length && coluna.isConnected) atualizarBlocosTeoriaExercicios();
         return novos;
       }
       mostrarAte(aVista);
@@ -23852,46 +23866,48 @@
             mais.remove();
             var novos = mostrarAte(lista.length);
             // o foco vai para o primeiro que apareceu, e não se perde com o botão que saiu
-            var alvo = novos[0] && novos[0].querySelector('.bte-ex-abrir');
+            var alvo = novos[0] && novos[0].querySelector('button');
             if (alvo) alvo.focus();
           }
         });
         s.appendChild(mais);
       }
     }
+    function cartaoDaLista(e, anterior) { return cartaoDeExercicio(e, anterior ? deDoExercicio(anterior) : null); }
 
     if (teoria.length) {
-      var sTeoria = secao('teoria', 'Teoria');
-      teoria.forEach(function (t) {
-        var capa = miniatura(t.imagem, 160);
-        if (capa) capa.classList.add('bte-teoria-capa');
-        sTeoria.appendChild(el('div', { class: 'bte-teoria', 'data-id': t.id }, [
-          el('button', {
-            type: 'button', class: 'bte-teoria-abrir', 'aria-label': 'Abrir a teoria ' + t.titulo,
-            aoClick: function () { abrir(t); }
-          }, [
-            capa,
-            el('span', { class: 'bte-teoria-texto' }, [
-              el('span', { class: 'nome', texto: t.titulo }),
-              el('span', { class: 'detalhe', texto: plural(t.quantidade, 'página', 'páginas') +
-                (t.modulo && t.modulo.titulo ? ' · ' + t.modulo.titulo : '') })
+      // o módulo só se diz quando a teoria vem de mais de um
+      var variosModulos = teoria.some(function (t) { return t.modulo.chave !== teoria[0].modulo.chave; });
+      listaComMais(secao('teoria', 'Teoria', teoria.length), 'bte-teorias', teoria, TEORIA_A_VISTA,
+        'aula de teoria', 'aulas de teoria', function (t) {
+          var capa = miniatura(t.imagem, 160);
+          if (capa) capa.classList.add('bte-teoria-capa');
+          return el('div', { class: 'bte-teoria', 'data-id': t.id }, [
+            el('button', {
+              type: 'button', class: 'bte-teoria-abrir', 'aria-label': 'Abrir a teoria ' + t.titulo,
+              aoClick: function () { abrir(t); }
+            }, [
+              capa,
+              el('span', { class: 'bte-teoria-texto' }, [
+                el('span', { class: 'nome', texto: t.titulo }),
+                el('span', { class: 'detalhe', texto: plural(t.quantidade, 'página', 'páginas') +
+                  (variosModulos && t.modulo.titulo ? ' · ' + t.modulo.titulo : '') })
+              ]),
+              icone('chr')
             ]),
-            icone('olho')
-          ]),
-          caixaNoMaterial(t, 'a teoria ' + t.titulo)
-        ]));
-      });
+            caixaNoMaterial(t, 'a teoria ' + t.titulo)
+          ]);
+        });
     }
 
     if (base) {
       var sBase = secao('lista-base', 'Lista de base');
       sBase.appendChild(el('div', { class: 'bte-lista', 'data-id': base.id }, [
         el('div', { class: 'bte-lista-texto' }, [
-          el('div', { class: 'nome', texto: base.titulo }),
-          el('div', { class: 'detalhe', texto: plural(base.quantidade, 'exercício', 'exercícios') +
-            (base.minutos !== null && base.minutos !== undefined ? ' · ' + minutosEstimados(base.minutos, true) : '') })
+          el('div', { class: 'nome', texto: plural(base.quantidade, 'exercício', 'exercícios') }),
+          base.minutos !== null && base.minutos !== undefined
+            ? el('div', { class: 'detalhe', texto: minutosEstimados(base.minutos, true, true) }) : null
         ]),
-        el('span', { class: 'bib-minha-nivel bib-lp-nivel', texto: 'Nível Base' }),
         el('div', { class: 'bte-lista-acoes' }, [
           el('button', { type: 'button', class: 'btn bte-lista-ver', icone: 'olho', texto: 'Ver',
             'aria-label': 'Ver a lista de base em tela cheia', aoClick: function () { abrir(base); } }),
@@ -23901,8 +23917,14 @@
       ]));
     }
 
-    if (exercicios.length) listaDeCartoes(secao('exercicios', 'Exercícios'), exercicios, EXERCICIOS_A_VISTA, 'exercício', 'exercícios');
-    if (obmep.length) listaDeCartoes(secao('obmep', nomeDaOlimpiada), obmep, OBMEP_A_VISTA, 'questão', 'questões');
+    if (exercicios.length) {
+      listaComMais(secao('exercicios', 'Exercícios', exercicios.length), 'bte-exercicios', exercicios, EXERCICIOS_A_VISTA,
+        'exercício', 'exercícios', cartaoDaLista);
+    }
+    if (obmep.length) {
+      listaComMais(secao('obmep', nomeDaOlimpiada, obmep.length), 'bte-exercicios', obmep, OBMEP_A_VISTA,
+        'questão', 'questões', cartaoDaLista);
+    }
 
     // o que falta, numa linha só no fim, e nunca uma seção vazia
     var faltam = [
@@ -23916,6 +23938,8 @@
       bloco.appendChild(el('p', { class: 'ajuda bte-vazio bte-faltam', texto: frase }));
     }
 
+    // os cartões que já estão no material nascem com a marca deles
+    atualizarBlocosTeoriaExercicios();
     observarMiniaturasDoBloco(bloco);
 
     // a etiqueta dela chega depois do primeiro desenho: os selos se refazem

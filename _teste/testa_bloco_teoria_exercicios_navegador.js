@@ -15,7 +15,7 @@
  * Chrome novo e apagado no fim.
  *
  * O que prova, a 1280x800, 800x1280 e 412x915:
- *   1. as quatro seções (Teoria, Lista de base, Exercícios, OBMEP) e o resumo;
+ *   1. as quatro seções (Teoria, Lista de base, Exercícios, OBMEP), com a contagem;
  *   2. o exercício grande, numa coluna só, com a letra estimada entre 18 e 22
  *      px no tablet (D5), legível sem a tela cheia;
  *   3. tudo desmarcado ao abrir (D4): o bloco não põe nada no material;
@@ -105,13 +105,14 @@ const ler = pag => pag.evaluate(() => {
   if (!b) return null;
   const txt = s => { const e = b.querySelector(s); return e ? e.textContent.trim() : null; };
   return {
-    titulo: txt('.bte-titulo'), resumo: txt('.bte-resumo'), faltam: txt('.bte-faltam'),
+    titulo: txt('.bte-titulo'), faltam: txt('.bte-faltam'),
     vazios: Array.from(b.querySelectorAll('.bte-vazio')).map(p => p.textContent.trim()),
-    secoes: Array.from(b.querySelectorAll('.bte-secao')).map(s => s.dataset.secao + ':' + s.querySelector('h4').textContent.trim()),
+    secoes: Array.from(b.querySelectorAll('.bte-secao')).map(s => s.dataset.secao + ':' + s.querySelector('.bte-secao-nome').textContent.trim() +
+      (s.querySelector('.bte-secao-quantos') ? ' ' + s.querySelector('.bte-secao-quantos').textContent.trim() : '')),
     cartoes: b.querySelectorAll('.bte-ex').length,
     marcadas: Array.from(b.querySelectorAll('input.bte-marca')).filter(c => c.checked).length,
     caixas: b.querySelectorAll('input.bte-marca').length,
-    mais: txt('.bte-mais'),
+    mais: Array.from(b.querySelectorAll('.bte-mais')).map(m => m.textContent.trim()).join(' | ') || null,
     texto: b.innerText
   };
 });
@@ -238,11 +239,11 @@ const fecharModal = async pag => {
   await esperarMiniatura(pag);
   let b = await ler(pag);
   conf('o título do bloco', b.titulo, 'Teoria e exercícios');
-  conf('o resumo conta as quatro fontes', b.resumo, '4 aulas de teoria · lista de base · 48 exercícios · 1 da OBMEP');
-  conf('as quatro seções, nesta ordem', b.secoes.join(' | '), 'teoria:Teoria | lista-base:Lista de base | exercicios:Exercícios | obmep:OBMEP');
+  conf('as quatro seções, nesta ordem, cada uma com a contagem', b.secoes.join(' | '), 'teoria:Teoria 4 | lista-base:Lista de base | exercicios:Exercícios 48 | obmep:OBMEP 1');
+  conf('a teoria mostra 2 das 4 aulas', await pag.evaluate(() => document.querySelectorAll('#prova-t2 .bte-teoria').length), 2);
   conf('sem linha de falta (nada falta)', b.faltam, null);
   conf('os exercícios: os 5 primeiros à vista e 1 da OBMEP', b.cartoes, 6);
-  conf('e o resto atrás do "Ver mais"', b.mais, 'Ver mais 43 exercícios');
+  conf('e o resto atrás do "Ver mais"', b.mais, 'Ver mais 2 aulas de teoria | Ver mais 43 exercícios');
 
   secao('3. Tudo desmarcado ao abrir (D4)');
   conf('nenhuma caixa marcada', b.marcadas + ' de ' + b.caixas, '0 de ' + b.caixas);
@@ -272,10 +273,10 @@ const fecharModal = async pag => {
   conf('o selo vale o dela: difícil, três pontos, "para mim"', dela.d + ' ' + dela.cheios + ' ' + /para mim/.test(dela.texto), '3 3 true');
   conf('o desafio continua o do pacote, como nas listas prontas (o pacote diz fácil: sem desafio)', dela.desafio, false);
   conf('e o rótulo para quem ouve diz de quem é', /sua etiqueta/.test(dela.rotulo), true);
-  await pag.evaluate(() => document.querySelector('#prova-t2 .bte-mais').click());
+  await pag.evaluate(() => document.querySelector('#prova-t2 [data-secao="exercicios"] .bte-mais').click());
   await pausa(300);
   b = await ler(pag);
-  conf('o "Ver mais" mostra os 48 e a questão da OBMEP', b.cartoes + ' ' + b.mais, '49 null');
+  conf('o "Ver mais" mostra os 48 e a questão da OBMEP', b.cartoes + ' ' + b.mais, '49 Ver mais 2 aulas de teoria');
   const graus = await pag.evaluate(() => {
     const porNivel = {};
     document.querySelectorAll('#prova-t2 .bte-selo[data-de="pacote"]').forEach(s => {
@@ -366,7 +367,7 @@ const fecharModal = async pag => {
   secao('8. O vazio numa linha');
   await desenhar(pag, 'MAT04-09');
   b = await ler(pag);
-  conf('MAT04-09 (4º ano, sem livro): só a OBMEP', b.secoes.join(' | '), 'obmep:OBMEP');
+  conf('MAT04-09 (4º ano, sem livro): só a OBMEP', b.secoes.join(' | '), 'obmep:OBMEP 2');
   conf('e o que falta numa linha só', b.faltam, 'Ainda sem teoria, lista de base e exercícios avulsos para este assunto.');
   await desenhar(pag, 'MAT07-01');
   b = await ler(pag);
@@ -374,13 +375,12 @@ const fecharModal = async pag => {
   conf('e uma linha só, com o porquê', b.vazios.join(' | '), 'O pacote com a teoria e os exercícios deste assunto ainda não está neste aparelho.');
   await desenhar(pag, 'MATEM3-11');
   b = await ler(pag);
-  conf('MATEM3-11 (só ENEM): a seção leva o nome do ENEM', b.secoes.join(' | '), 'obmep:ENEM');
-  conf('e o resumo também', b.resumo, '3 do ENEM');
+  conf('MATEM3-11 (só ENEM): a seção leva o nome do ENEM', b.secoes.join(' | '), 'obmep:ENEM 3');
   conf('o ENEM, de dificuldade neutra, fica sem selo', await pag.evaluate(() =>
     document.querySelectorAll('#prova-t2 .bte-selo').length), 0);
   await desenhar(pag, 'MATEM3-11', [{ assunto: 'MATEM3-11', item: 'banco:2019:n2:1' }]);
   b = await ler(pag);
-  conf('com uma questão do Banco ligada, "OBMEP e ENEM"', b.secoes.join(' | ') + ' / ' + b.resumo, 'obmep:OBMEP e ENEM / 4 da OBMEP e ENEM');
+  conf('com uma questão do Banco ligada, "OBMEP e ENEM"', b.secoes.join(' | '), 'obmep:OBMEP e ENEM 4');
 
   // ================================================================
   secao('8b. As miniaturas do bloco não dependem da fila da Biblioteca');
@@ -394,7 +394,7 @@ const fecharModal = async pag => {
   conf('a Biblioteca está na tela do módulo', await pag.evaluate(() => !!document.querySelector('#bib-marcar-modulo')), true);
   await desenhar(pag, 'MAT09-04', VINCULOS, true);
   await esperarMiniatura(pag);
-  await pag.evaluate(() => document.querySelector('#prova-t2 .bte-mais').click());
+  await pag.evaluate(() => document.querySelectorAll('#prova-t2 .bte-mais').forEach(m => m.click()));
   await pag.evaluate(id => document.querySelector('#prova-t2 .bte-ex[data-id="' + id + '"] .bte-ex-abrir').click(), EX(1));
   await abrirModal(pag);
   await fecharModal(pag);
@@ -419,8 +419,10 @@ const fecharModal = async pag => {
   b = await ler(pag);
   conf('as quatro seções', b.secoes.length, 4);
   // os exercícios da lista de base são os três primeiros da Soma e Produto, abaixo do "Ver mais"
-  await pag.evaluate(() => document.querySelector('#prova-t2 .bte-mais').click());
+  await pag.evaluate(() => document.querySelector('#prova-t2 [data-secao="exercicios"] .bte-mais').click());
   await pausa(200);
+  conf('os cartões marcados ganham a marca deles (os mesmos três)', await pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#prova-t2 .bte-ex.bte-marcado')).map(c => c.dataset.id).join(',')), BASE_IDS.join(','));
   conf('as caixas seguem o material de agora: os três da lista de base, e só eles', await pag.evaluate(() =>
     Array.from(document.querySelectorAll('#prova-t2 .bte-ex')).filter(c => c.querySelector('input.bte-marca').checked)
       .map(c => c.dataset.id).join(',')), BASE_IDS.join(','));
@@ -439,9 +441,9 @@ const fecharModal = async pag => {
   await printar(pag, 't2-800x1280.png');
   // o degrau da dificuldade, para o painel ver os três tons lado a lado
   if (PRINTS) {
-    await pag.evaluate(() => document.querySelector('#prova-t2 .bte-mais').click());
+    await pag.evaluate(() => document.querySelector('#prova-t2 [data-secao="exercicios"] .bte-mais').click());
     await pausa(300);
-    await printar(pag, 't2-800x1280-degraus.png', '#prova-t2 .bte-ex[data-id$=":ex:13"]');
+    await printar(pag, 't2-800x1280-degraus.png', '#prova-t2 .bte-ex[data-id$=":ex:26"]');
   }
 
   // ================================================================
@@ -453,7 +455,7 @@ const fecharModal = async pag => {
   await desenhar(cel, 'MAT09-04', VINCULOS, true);
   await esperarMiniatura(cel);
   b = await ler(cel);
-  conf('as quatro seções', b.secoes.join(' | '), 'teoria:Teoria | lista-base:Lista de base | exercicios:Exercícios | obmep:OBMEP');
+  conf('as quatro seções', b.secoes.join(' | '), 'teoria:Teoria 4 | lista-base:Lista de base | exercicios:Exercícios 48 | obmep:OBMEP 1');
   m = await medirExercicio(cel);
   console.log('   ' + JSON.stringify(m));
   conf('o exercício cabe na coluna', m.largura > 300 && m.largura <= m.caixa, true);
