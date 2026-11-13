@@ -956,6 +956,10 @@ roda "alerta da copia --envenenado-alerta-so-local" node "_teste/testa_alerta_co
 roda "alerta da copia --envenenado-idade-do-envio" node "_teste/testa_alerta_copia_nuvem.js" --envenenado-idade-do-envio
 roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_aluno_cascata.js"
 roda "relato e Voltar"                            node "_teste/testa_relato_voltar.js"
+# a entrada de janela que veio da recarga vira a da tela: o veneno a deixa
+# como estava e o historico nunca mais fica sem janela
+roda "Voltar sem entrada velha"                  node "_teste/testa_voltar_entrada_velha.js"
+roda "Voltar sem entrada velha --envenenado-entrada-velha" node "_teste/testa_voltar_entrada_velha.js" --envenenado-entrada-velha
 roda "Voltar do aparelho nas telas"              node "_teste/testa_voltar_android.js"
 roda "Voltar do aparelho --envenenado-voltar-sem-tela" node "_teste/testa_voltar_android.js" --envenenado-voltar-sem-tela
 roda "Voltar do aparelho --envenenado-volta-dois-passos" node "_teste/testa_voltar_android.js" --envenenado-volta-dois-passos
