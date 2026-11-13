@@ -1072,9 +1072,9 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   /* Um livro SINTÉTICO a mais, gravado direto no tablet: 4 páginas, e o mapa
    * liga o capítulo "Pitágoras e aplicações" (p. 2 a 3) ao MAT09-07, "Teorema
    * de Pitágoras", e o livro INTEIRO ao MAT08-15 (obra inteira). No pacote
-   * sintético do 9º ano, dois problemas do Banco passam a ser do MAT09-07 e
-   * um exercício de outro módulo vira questão do ENEM do MAT09-07 (só no
-   * banco desta prova), para os blocos OBMEP e ENEM aparecerem. */
+   * sintético do 9º ano, dois exercícios de outro módulo viram questões de
+   * prova da OBMEP do MAT09-07, e um terceiro, do ENEM (só no banco desta
+   * prova), para os blocos OBMEP e ENEM aparecerem. */
   const pdfB1 = path.join(TMP, 'b1-livro.pdf');
   const rB1 = spawnSync(PYTHON, ['-X', 'utf8', '-c', 'import sys, pymupdf\nd = pymupdf.open()\n' +
     'for t in ["Capa.", "Pitagoras: o quadrado da hipotenusa.", "Aplicacoes do teorema.", "Fim."]:\n' +
@@ -1091,18 +1091,19 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     q.onerror = () => rej(q.error);
     q.onsuccess = () => {
       const b = q.result, t = b.transaction('biblioteca_itens', 'readwrite'), s = t.objectStore('biblioteca_itens');
-      const feito = { banco: 0, enem: 0 };
+      const feito = { obmep: 0, enem: 0 };
       s.getAll().onsuccess = e => {
         const itens = e.target.result;
-        itens.filter(it => String(it.id).indexOf('banco:') === 0).slice(0, 2).forEach(it => { it.tema_app = 'MAT09-07'; s.put(it); feito.banco++; });
-        const outro = itens.find(it => String(it.id).indexOf('banco:') !== 0 && it.modulo && !/pitagoras/.test(it.modulo.slug));
-        if (outro) { outro.fonte = 'enem'; outro.tema_app = 'MAT09-07'; s.put(outro); feito.enem++; }
+        // de fora do módulo de Pitágoras: duas questões da OBMEP (prova) e uma do ENEM
+        const fora = itens.filter(it => String(it.id).indexOf('banco:') !== 0 && it.modulo && !/pitagoras/.test(it.modulo.slug));
+        fora.slice(0, 2).forEach(it => { it.fonte = 'obmep-mirim'; it.tema_app = 'MAT09-07'; s.put(it); feito.obmep++; });
+        fora.slice(2, 3).forEach(it => { it.fonte = 'enem'; it.tema_app = 'MAT09-07'; s.put(it); feito.enem++; });
       };
       t.oncomplete = () => { b.close(); res(feito); };
       t.onerror = () => rej(t.error);
     };
   }));
-  conf('a prova ligou 2 problemas do Banco e 1 questão do ENEM ao MAT09-07', JSON.stringify(ligados), JSON.stringify({ banco: 2, enem: 1 }));
+  conf('a prova ligou 2 questões da OBMEP e 1 do ENEM ao MAT09-07', JSON.stringify(ligados), JSON.stringify({ obmep: 2, enem: 1 }));
   await pag.setViewport({ width: 1280, height: 800, hasTouch: true, deviceScaleFactor: 1 });
   await H.abrirApp(pag, amb.ORIGEM);
   await abrirBiblioteca(pag);
@@ -1170,7 +1171,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
       vizinhos: [...p.querySelectorAll('[data-secao="vizinhos"] [data-assunto]')].map(b => b.dataset.assunto),
       campo: document.querySelector('#busca-biblioteca').value,
       livrosDaEstante: vis('#bib-livros'), topo: vis('#bib-exercicios-cabeca') || vis('#bib-carrinho'),
-      alto: Math.round(p.getBoundingClientRect().top - document.querySelector('.conteudo').getBoundingClientRect().top) };
+      alto: Math.round(p.getBoundingClientRect().top - document.querySelector('.bibl-topo').getBoundingClientRect().bottom) };
   });
   const pg = await esperar('a página do assunto', lerPagina, v => !!v && v.id === 'MAT09-07', 10000);
   const P = pg.valor || {};
@@ -1179,12 +1180,12 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('"Também aparece como" traz o nome do capítulo no mapa', /Pitágoras e aplicações/.test(P.tambem), true);
   conf('"Nos livros" traz o capítulo ligado, com a faixa de páginas (1 vínculo, como na busca)', (P.livros || []).join(','), 'b1-livro:Pitágoras e aplicações:p. 2 a 3:Abrir');
   conf('"Teoria e exercícios" traz as fontes do módulo do assunto', (P.fontes || []).length > 0, true);
-  conf('o bloco OBMEP aparece com os problemas do Banco ligados, e diz quantos são de quantos', !!P.obmep && P.obmep.length > 0 &&
+  conf('o bloco OBMEP aparece com as questões ligadas, e diz quantas são de quantas', !!P.obmep && P.obmep.length > 0 &&
     P.obmep.every(d => /^(\d+ questões?|\d+ questões? ligadas?, numa lista de \d+) · /.test(d)), true);
   conf('a questão do ENEM fica no bloco ENEM, e não no da OBMEP', !!P.enem && P.enem.length === 1 && /^1 questão ligada, numa lista de \d+ · /.test(P.enem[0]), true);
   conf('os vizinhos são do mesmo tema e ano, e não o próprio assunto', (P.vizinhos || []).length > 0 && (P.vizinhos || []).every(v => /^MAT09-/.test(v) && v !== 'MAT09-07'), true);
   conf('a busca deu lugar à página; a estante, o topo dos exercícios e a faixa saem, e a página começa no alto',
-    P.campo + '|' + P.livrosDaEstante + '|' + P.topo + '|' + (P.alto <= 40), '|false|false|true');
+    P.campo + '|' + P.livrosDaEstante + '|' + P.topo + '|' + (P.alto <= 24), '|false|false|true');
   // a trava de transbordo da página: tablet de pé e deitado, celular, e a letra a 130% a 360 px
   for (const [w, h, css] of [[1280, 800, ''], [800, 1280, ''], [412, 915, ''], [360, 800, LETRA_130]]) {
     await pag.setViewport({ width: w, height: h, hasTouch: true, deviceScaleFactor: 1 });
@@ -1232,7 +1233,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await clicar(pag, '#limpar-busca-biblioteca');
   await pausa(900);
   presa.limpar = await naPagina();
-  conf('o Limpar de uma busca feita sobre a página não ressuscita a página', presa.limpar, false);
+  if (!VENENO_PAGINA_PRESA) conf('o Limpar de uma busca feita sobre a página não ressuscita a página', presa.limpar, false);
   await digitarB1('pitagoras');
   await esperar('o bloco Assuntos de "pitagoras"', lerAssuntos, v => !!v && v.some(x => /^MAT09-07=/.test(x)), 10000);
   await pag.evaluate(() => document.querySelector('#bib-assuntos-da-busca [data-assunto="MAT09-07"]').click());
@@ -1249,7 +1250,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await clicar(pag, '#bib-corpo .bib-voltar');
   await pausa(700);
   presa.voltarDoModulo = await naPagina();
-  conf('o Voltar do módulo vai à lista da série, e não à página do assunto de antes', presa.voltarDoModulo, false);
+  if (!VENENO_PAGINA_PRESA) conf('o Voltar do módulo vai à lista da série, e não à página do assunto de antes', presa.voltarDoModulo, false);
   if (VENENO_PAGINA_PRESA) {
     secao('VENENO: a página do assunto presa');
     conf('envenenado-pagina-presa: a página voltou no Limpar ou no Voltar do módulo (defeito detectado)', presa.limpar || presa.voltarDoModulo, true);

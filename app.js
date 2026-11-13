@@ -22775,8 +22775,9 @@
     var deOutroAno = function (m) { return !!serieDoAssuntoNosExercicios && !m.series[serieDoAssuntoNosExercicios]; };
     var vistos = Object.create(null);
     function poe(lista, item) {
-      if (vistos[item.tipo + '|' + item.id]) return;
-      vistos[item.tipo + '|' + item.id] = true;
+      var chave = item.tipo + '|' + (item.bloco || '') + '|' + item.id;
+      if (vistos[chave]) return;
+      vistos[chave] = true;
       lista.push(item);
     }
     function listasDoModulo(m, destino) {
@@ -22812,10 +22813,11 @@
       if (mod && chave === mod.chave) return;
       var bloco = blocoDaFonte(it.fonte, eDoBanco(it));
       if (!bloco) return;
-      var k = chave + '#' + it.aula.slug;
+      // a lista em cada bloco: as da OBMEP e as do ENEM de uma mesma lista contam cada uma no seu
+      var k = bloco + '|' + chave + '#' + it.aula.slug;
       if (!porLista[k]) {
         var m = bib.modulos[chave], lista = m && m.listas[it.aula.slug];
-        porLista[k] = { tipo: 'lista', id: k, titulo: it.aula.titulo, serie: it.serie, quantidade: 0, total: lista ? lista.itens.length : 0,
+        porLista[k] = { tipo: 'lista', id: chave + '#' + it.aula.slug, titulo: it.aula.titulo, serie: it.serie, quantidade: 0, total: lista ? lista.itens.length : 0,
           modulo: it.modulo.titulo, bloco: bloco, outroAno: m ? deOutroAno(m) : false,
           abrir: { modulo: chave, aula: { tipo: 'exercicios', slug: it.aula.slug } } };
         ordem.push(k);
