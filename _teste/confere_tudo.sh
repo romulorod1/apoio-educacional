@@ -584,6 +584,16 @@ roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/t
 # B1 (revisao cega do #192): a navegacao sai da pagina do assunto; o veneno a
 # deixa presa, e ela volta no Limpar e no Voltar do modulo.
 roda "biblioteca livros tela --envenenado-pagina-presa" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-pagina-presa
+# P2: a busca em tres blocos (Assuntos, Capitulos nos livros, Listas e
+# exercicios). Veneno dos dois lados no bloco Assuntos (o termo so de capitulo
+# entra nele; o termo do assunto some dele), e os dois casos reais de
+# 13/11/2026: com o ano escrito, o livro de outro ano que casa so no texto
+# volta ("volume 9o ano"), e os assuntos de outro ano ficam no mesmo nivel
+# ("volume 8o ano"). Cada veneno vai direto a secao 11 e tem de ser visto.
+roda "biblioteca livros tela --envenenado-capitulo-vira-assunto" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-capitulo-vira-assunto
+roda "biblioteca livros tela --envenenado-assunto-sumido" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-assunto-sumido
+roda "biblioteca livros tela --envenenado-ano-nao-filtra" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-ano-nao-filtra
+roda "biblioteca livros tela --envenenado-outros-anos-juntos" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-outros-anos-juntos
 # Fatia 2 do leitor: pinca e duplo toque no livro sintetico de 400 paginas,
 # com toques de verdade do Chrome. O ponto sob os dedos fica sob eles (24 px),
 # o duplo toque leva o ponto ao meio e volta, a caneta nao da zoom e um dedo
@@ -950,9 +960,9 @@ roda "livros indice --envenenado-pagina-ruim-derruba-livro" node "_teste/testa_l
 # mapa, inclusive no livro escaneado (sem texto). O veneno desliga a busca por
 # capitulo, e o livro escaneado some do resultado.
 roda "livros indice --envenenado-busca-sem-capitulos" node "_teste/testa_livros_indice.js" --envenenado-busca-sem-capitulos
-# A revisao do #181: com o resultado todo em "Outras paginas do livro", elas
-# disputam o topo; o veneno deixa os "Melhores resultados" vazios.
-roda "livros indice --envenenado-topo-vazio" node "_teste/testa_livros_indice.js" --envenenado-topo-vazio
+# P2: a pagina fora de todo capitulo nao e resultado (substitui o veneno do
+# topo vazio do #181); o veneno a devolve como linha.
+roda "livros indice --envenenado-pagina-solta-vira-resultado" node "_teste/testa_livros_indice.js" --envenenado-pagina-solta-vira-resultado
 # C15.2 e C15.3: "Este capitulo cobre" no leitor, Confirmar e Corrigir (so a
 # materia e o ano do livro), a correcao depois de recarregar e na copia de
 # seguranca (os livros nao), e o "Abrir no livro" da aula na pagina do PDF e no
