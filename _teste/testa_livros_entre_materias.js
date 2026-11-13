@@ -100,7 +100,7 @@ function pdfDePaginas(n) {
 function livro(id, titulo, materia, caps, paginas) {
   return {
     id, titulo, formato: 'pdf', paginas, materia, series: ['em1'], series_origem: 'mapa', mapa_disciplina: materia, hash: 'sintetico-' + id,
-    sumario: caps.map(c => ({ nivel: 1, titulo: c[0], pagina: c[1], pagina_fim: c[2] })), sumario_origem: 'marcadores',
+    sumario: caps.map((c, i) => ({ n: i + 1, nivel: 1, titulo: c[0], pagina: c[1], pagina_fim: c[2] })), sumario_origem: 'marcadores',
     mapa: caps.map((c, i) => ({ n: i + 1, titulo: c[0], pagina: c[1], pagina_fim: c[2], assuntos: c[3].map(x => ({ id: x, confianca: 'alta' })), origem: 'mapa' })),
     mapa_origem: 'mapa'
   };
@@ -224,7 +224,7 @@ const cobre = pag => pag.evaluate(() => {
     Array.from(document.querySelectorAll('#leitor-cobre .cobre-escolha [data-assunto]')).map(b => b.getAttribute('data-assunto') + '=' +
       b.textContent.trim() + (b.getAttribute('aria-current') === 'true' ? '*' : ''))), v => !!v && v.length > 2, 10000)).valor || [];
   console.log('   Corrigir: ' + lista.slice(0, 4).join(' | ') + ' ... (' + lista.length + ')');
-  if (MODO === '--envenenado-corrigir-sem-a-de-fora') return venenoVisto('o assunto de física sumiu do Corrigir', !lista.some(x => x.indexOf('FISEM1-T01=') === 0), lista.slice(0, 3).join(' | '));
+  if (MODO === '--envenenado-corrigir-sem-a-de-fora') return venenoVisto('o assunto de física sumiu do Corrigir', lista.length > 2 && !lista.some(x => x.indexOf('FISEM1-T01=') === 0), lista.slice(0, 3).join(' | '));
   conf('o primeiro do Corrigir é o de física, com a matéria, marcado como atual', lista[0], 'FISEM1-T01=' + FIS + '*');
   const resto = lista.slice(1, -1);
   conf('depois, só assuntos de química da 1ª série', resto.length > 0 && resto.every(x => /^QUIEM1-/.test(x)), true);
