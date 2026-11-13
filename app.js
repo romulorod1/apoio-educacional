@@ -1553,6 +1553,18 @@
       solicitarFecharModal('modal-planejamento');
       return;
     }
+    if (JANELAS_COM_CAMPOS[topo.id] && !(topo.id === 'modal-aula' && relatoEmEdicaoAlterado()) && janelaMudou(topo.id)) {
+      // a ficha do aluno ou a aula com campo mudado desde que abriu: a entrada volta, e ela decide
+      history.pushState({ apoioModal: topo.token }, '');
+      if (!confirmar('Sair sem guardar o que você escreveu?')) return;
+      pilhaModalHistorico.pop();
+      retornoProgramado = true;
+      history.back();
+      fechandoPorVoltar = true;
+      fecharModal(topo.id);
+      fechandoPorVoltar = false;
+      return;
+    }
     if (topo.id === 'modal-aula' && relatoEmEdicaoAlterado()) {
       // A confirmação precisa de seu próprio Voltar. Repor a entrada da aula
       // evita que Continuar escrevendo deixe a janela sem proteção do Android.
@@ -1656,18 +1668,45 @@
 
   /* O trabalho não salvo da tela à vista: a pergunta que a seta da tela faz,
    * ou null. Só lê. */
+  /* Os campos de uma caixa, como texto: o valor de cada campo, a marca de
+   * cada caixinha e a opção de cada lista. A foto é tirada quando a tela (ou a
+   * janela) abre, e a pergunta só aparece se algo MUDOU desde então: um campo
+   * que já vem preenchido, ou uma lista com a escolha do dia, não pergunta. */
+  function fotoDosCampos(caixa) {
+    if (!caixa) return '';
+    return Array.prototype.map.call(caixa.querySelectorAll('input, textarea, select'), function (c) {
+      if (c.type === 'checkbox' || c.type === 'radio') return c.checked ? '1' : '0';
+      return String(c.value);
+    }).join('\u0001');
+  }
+  var fotoDaTela = null;              // { chave, caixa, valores } da tela aberta pelo último passo
+  var fotoDasJanelas = {};            // id da janela -> valores dos campos quando ela abriu
+  function chaveDaFoto() { var r = retratoDaTela(); return JSON.stringify([r.aba, r.alunoCelular, r.fichaEditando, r.form]); }
+  function tirarFotoDaTela() {
+    var caixa = modoCelular ? '#cel-conteudo' : '#bib-corpo';
+    fotoDaTela = { chave: chaveDaFoto(), caixa: caixa, valores: fotoDosCampos($(caixa)) };
+  }
+  function camposMudaram() {
+    if (!fotoDaTela || fotoDaTela.chave !== chaveDaFoto()) return false;
+    return fotoDosCampos($(fotoDaTela.caixa)) !== fotoDaTela.valores;
+  }
+  function tirarFotoDaJanela(id) {
+    setTimeout(function () {
+      var j = $('#' + id);
+      if (j && j.classList.contains('aberto')) fotoDasJanelas[id] = fotoDosCampos(j);
+    }, 0);
+  }
+  function janelaMudou(id) {
+    var j = $('#' + id);
+    return !!j && fotoDasJanelas[id] !== undefined && fotoDosCampos(j) !== fotoDasJanelas[id];
+  }
+
   function perguntaDeTrabalhoNaoSalvo() {
     if (!modoCelular && bibNav.minhas && bibNav.minhas.editar && typeof editorDeListaMudou === 'function' && editorDeListaMudou()) {
       return 'Sair sem guardar as mudanças desta lista?';
     }
-    if (modoCelular && (formCelular || (alunoCelular && editandoFichaAlunoCelular))) {
-      var caixa = $('#cel-conteudo');
-      var mexeu = caixa && Array.prototype.some.call(caixa.querySelectorAll('input, textarea, select'), function (c) {
-        if (c.type === 'checkbox' || c.type === 'radio') return c.checked !== c.defaultChecked;
-        if (c.tagName === 'SELECT') return Array.prototype.some.call(c.options, function (o) { return o.selected !== o.defaultSelected; });
-        return c.value !== c.defaultValue;
-      });
-      if (mexeu) return 'Sair sem guardar o que você escreveu?';
+    if (modoCelular && (formCelular || (alunoCelular && editandoFichaAlunoCelular)) && camposMudaram()) {
+      return 'Sair sem guardar o que você escreveu?';
     }
     return null;
   }
@@ -1696,6 +1735,7 @@
     estado = history.state || {};
     history.replaceState(Object.assign({}, estado, { retrato: antes }), '');
     history.pushState({ apoioTela: ++proximoPassoTela, retrato: agora, anterior: antes }, '');
+    tirarFotoDaTela();
   }
 
   function restaurarTela(r) {
@@ -1760,10 +1800,7 @@
       // num passo de formulário da folha (cancelar, remarcar, duração), o Voltar volta às ações da folha
       if (folhaCelular && folhaCelular.passo !== 'acoes' && folhaCelular.passo !== 'ficha') {
         folhaEntrouNoHistorico();
-        var naFolha = $('#cel-folha');
-        var mexeuNaFolha = naFolha && Array.prototype.some.call(naFolha.querySelectorAll('input, textarea'), function (c) {
-          return (c.type === 'checkbox' || c.type === 'radio') ? c.checked !== c.defaultChecked : c.value !== c.defaultValue;
-        });
+        var mexeuNaFolha = folhaCelular.foto !== undefined && fotoDosCampos($('#cel-folha')) !== folhaCelular.foto;
         if (mexeuNaFolha && !confirmar('Sair sem guardar o que você escreveu?')) return;
         irAoPassoDaFolha('acoes');
         return;
@@ -1788,7 +1825,13 @@
       return;
     }
     if (estado.retrato && !mesmaTela(estado.retrato, atual)) { restaurarTela(estado.retrato); return; }
-    if (estado.retrato) { restaurarTela(estado.retrato); }
+    if (!estado.apoioRaiz && history.length > 1) {
+      /* A entrada de baixo mostra a mesma tela (uma guarda, ou uma entrada que
+       * ficou de antes de uma recarga): o toque não fica morto, o Voltar anda
+       * mais uma, até uma tela diferente ou até a raiz, que avisa. */
+      history.back();
+      return;
+    }
     if (estado.apoioRaiz) {
       avisar('Toque em Voltar de novo para sair.');
       clearTimeout(guardaDaSaida);
@@ -1803,6 +1846,7 @@
   function folhaEntrouNoHistorico() {
     if (folhaNoHistorico || retornoProgramado) return;
     folhaNoHistorico = true;
+    guardaNaRaiz();
     history.pushState({ apoioFolha: true, retrato: retratoDaTela() }, '');
   }
   // a folha fechou por um toque (fora dela, ou uma ação que acabou): a entrada dela sai
@@ -1820,6 +1864,11 @@
     if (!(e && (e.apoioRaiz || e.apoioGuarda || e.apoioTela || e.apoioModal || e.apoioFolha))) {
       history.replaceState({ apoioRaiz: true, retrato: retratoDaTela() }, '');
       history.pushState({ apoioGuarda: true, retrato: retratoDaTela() }, '');
+    } else if (e.retrato && !mesmaTela(e.retrato, retratoDaTela())) {
+      /* Recarregou (o Android descartou a aba) numa entrada de outra tela: o app
+       * abriu na tela padrão. A entrada passa a dizer a tela à vista, e o
+       * primeiro Voltar vai para a de baixo de verdade, sem toque morto. */
+      history.replaceState(Object.assign({}, e, { retrato: retratoDaTela() }), '');
     }
     document.addEventListener('click', function () {
       if (restaurandoTela) return;
@@ -1835,6 +1884,7 @@
     }, true);
   }
 
+  var JANELAS_COM_CAMPOS = { 'modal-aluno': true, 'modal-aula': true };
   var MODAIS_HISTORICO = {
     'modal-aula': true,
     'modal-sair-relato': true,
@@ -1860,9 +1910,12 @@
       degrauModal += 2;
       e.style.zIndex = String(degrauModal);
       if (MODAIS_HISTORICO[id]) {
+        // a janela aberta sobre a raiz repõe a guarda antes: o Voltar que a fecha não cai na raiz sem aviso
+        if (typeof guardaNaRaiz === 'function') guardaNaRaiz();
         var token = ++proximoModalHistorico;
         history.pushState({ apoioModal: token }, '');
         pilhaModalHistorico.push({ id: id, token: token });
+        if (JANELAS_COM_CAMPOS[id]) tirarFotoDaJanela(id);
       }
     }
     e.classList.add('aberto');
@@ -24939,8 +24992,7 @@
     telaCelular = tela;
     celularPedeEntrada = false;
     formCelular = null;
-    if (folhaCelular) folhaSaiuDoHistorico();
-    folhaCelular = null;
+    soltarFolhaCelular();
     fecharMensagemCelular(); // o que ela escreveu já está no rascunho
     alunoCelular = null; // a aba Alunos volta à lista
     diaRoladoCelular = null; // voltando a Hoje, a linha do tempo rola até agora
@@ -25328,7 +25380,7 @@
 
   function irParaDiaCelular(dia) {
     diaCelular = dia;
-    folhaCelular = null;
+    soltarFolhaCelular();
     desenharHojeCelular();
   }
 
@@ -26206,6 +26258,13 @@
     if (!folhaCelular) return;
     folhaCelular.passo = passo;
     desenharFolhaCelular();
+    // a foto dos campos do passo, para o Voltar perguntar só se algo mudou
+    folhaCelular.foto = fotoDosCampos($('#cel-folha'));
+  }
+  // a folha sai por outro caminho (outro dia, um formulário): a entrada dela sai do histórico
+  function soltarFolhaCelular() {
+    if (folhaCelular) folhaSaiuDoHistorico();
+    folhaCelular = null;
   }
 
   /* O que ela quer ver da aula antes de entrar na casa: o lembrete, a última
@@ -26254,7 +26313,7 @@
     if (velho) velho.parentNode.removeChild(velho);
     if (!folhaCelular || !$('#cel-hoje')) return;
     var a = aulaPorIdCelular(folhaCelular.aulaId);
-    if (!a) { folhaCelular = null; return; }
+    if (!a) { soltarFolhaCelular(); return; }
     var aluno = alunoPorId(a.alunoId);
     var edita = celularEdita() && !!aluno;
     // quem só lê vê a aula e a ficha mínima, e só
@@ -26657,7 +26716,7 @@
 
   function abrirFormularioCelular(form) {
     esconderAviso(); // o aviso da ação anterior não fica em cima do formulário
-    folhaCelular = null;
+    soltarFolhaCelular();
     formCelular = form;
     desenharHojeCelular();
     var conteudo = $('#cel-conteudo');

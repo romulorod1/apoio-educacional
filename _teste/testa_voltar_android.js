@@ -55,9 +55,22 @@ const VENENOS_DA_PROVA = {
   'volta-dois-passos': ['if (estado.retrato && !mesmaTela(estado.retrato, atual)) { restaurarTela(estado.retrato); return; }',
     'if (estado.retrato && !mesmaTela(estado.retrato, atual)) { restaurarTela(estado.retrato); history.back(); return; }'],
   'seta-nao-tira': ["      // a seta de voltar da tela levou de volta ao lugar de antes: a entrada sai\n      retornoProgramado = true;\n      history.back();\n      return;",
-    '      // veneno: a entrada fica']
+    '      // veneno: a entrada fica'],
+  // a pergunta do editor de Minhas listas some
+  'pergunta-da-lista-some': ["    if (!modoCelular && bibNav.minhas && bibNav.minhas.editar && typeof editorDeListaMudou === 'function' && editorDeListaMudou()) {",
+    '    if (false) {'],
+  // a folha da aula no celular fica fora do histórico
+  'folha-fora-do-historico': ['    folhaNoHistorico = true;\n    guardaNaRaiz();', '    return;'],
+  // a pergunta do formulário do celular some
+  'pergunta-do-formulario-some': ['    if (modoCelular && (formCelular || (alunoCelular && editandoFichaAlunoCelular)) && camposMudaram()) {', '    if (false) {'],
+  // a janela aberta sobre a raiz não repõe a guarda
+  'guarda-depois-da-janela': ["        if (typeof guardaNaRaiz === 'function') guardaNaRaiz();", '        void 0;'],
+  // a volta para a Biblioteca logo depois de recarregar desenha sem a Biblioteca carregada
+  'sem-ramo-bib': ['            if (!bib) {\n              // a Biblioteca ainda está carregando', '            if (false) {\n              // a Biblioteca ainda está carregando']
 };
-const VENENOS = ['--envenenado-voltar-sem-tela', '--envenenado-volta-dois-passos', '--envenenado-seta-nao-tira'];
+const VENENOS = ['--envenenado-voltar-sem-tela', '--envenenado-volta-dois-passos', '--envenenado-seta-nao-tira',
+  '--envenenado-pergunta-da-lista-some', '--envenenado-folha-fora-do-historico', '--envenenado-pergunta-do-formulario-some',
+  '--envenenado-guarda-depois-da-janela', '--envenenado-sem-ramo-bib'];
 const VENENO = Object.keys(VENENOS_DA_PROVA).find(k => process.argv.indexOf('--envenenado-' + k) !== -1) || null;
 const PYTHON = process.env.PYTHON || 'python';
 const trocas = {};
@@ -223,6 +236,20 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
   await voltar(pag);
   const aviso2 = await esperar('o aviso de novo', () => avisos(pag), v => /Toque em Voltar de novo para sair\./.test(v || ''), 3000);
   checa('o Voltar seguinte avisa de novo, sem sair', aviso2.ok && (await lugar(pag)).aba === 'agenda', true, ['volta-dois-passos']);
+  // M2: logo depois do aviso, ela abre uma aula (janela sobre a raiz); o Voltar fecha a aula, e o seguinte ainda avisa
+  const abriuNaRaiz = await pag.evaluate(h => {
+    const p = Array.from(document.querySelectorAll('[data-dia="' + h + '"] .pilula')).find(x => x.textContent.indexOf('10:00') === 0);
+    if (!p) return false; p.click(); return true;
+  }, hoje);
+  conf('a aula abriu logo depois do aviso', abriuNaRaiz && (await esperar('a janela da aula sobre a raiz', () => lugar(pag), v => !!v && v.aula, 4000)).ok, true);
+  await voltar(pag);
+  const fechouNaRaiz = await esperar('o Voltar fecha a aula', () => lugar(pag), v => !!v && !v.aula, 4000);
+  conf('o Voltar fecha a aula aberta sobre a raiz', fechouNaRaiz.ok, true);
+  await pag.evaluate(() => { window.__avisos = []; });
+  const urlNaRaiz = pag.url();
+  await pag.evaluate(() => { setTimeout(() => history.back(), 50); });
+  const aviso3 = await esperar('o aviso depois da janela', () => avisos(pag).catch(() => ''), v => /Toque em Voltar de novo para sair\./.test(v || ''), 3000);
+  checa('depois da janela fechada, o Voltar ainda avisa, e não fecha o app', aviso3.ok && pag.url() === urlNaRaiz, true, ['guarda-depois-da-janela']);
   const urlAntes = pag.url();
   await pag.evaluate(() => { setTimeout(() => history.back(), 50); });
   const saiu = await esperar('o segundo Voltar sai do app', () => Promise.resolve(pag.url()), u => u !== urlAntes, 5000);
@@ -310,8 +337,8 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
   await voltar(pag);
   await pausa(600);
   const e1 = await lugar(pag);
-  checa('o Voltar pergunta o mesmo que a seta', dialogos.slice(antesDoDialogo).join('|'), 'Sair sem guardar as mudanças desta lista?', []);
-  checa('"Cancelar": o editor fica, com o texto digitado', e1.nome, 'Lista de prova mudada', []);
+  checa('o Voltar pergunta o mesmo que a seta', dialogos.slice(antesDoDialogo).join('|'), 'Sair sem guardar as mudanças desta lista?', ['pergunta-da-lista-some']);
+  checa('"Cancelar": o editor fica, com o texto digitado', e1.nome, 'Lista de prova mudada', ['pergunta-da-lista-some']);
   pag.__respostaDoDialogo = 'aceita';
   await voltar(pag);
   const e2 = await esperar('o Voltar com "OK"', () => lugar(pag), v => !!v && v.nome === undefined, 4000);
@@ -333,6 +360,8 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
   await voltar(pag);
   const r1 = await esperar('1º Voltar depois da recarga', () => lugar(pag), v => !!v && v.aba === 'biblioteca' && v.titulo === '', 4000);
   checa('1º Voltar depois de recarregar: a Biblioteca, sem o módulo', r1.ok, true, TODOS);
+  await pausa(400);
+  checa('a volta logo depois de recarregar passa pela Biblioteca ainda carregando sem erro de página', erros.filter(e => /listaSeries|modulos/.test(e)).join(' | '), '', ['sem-ramo-bib']);
   await pausa(300);
   await voltar(pag);
   const r2 = await esperar('2º Voltar depois da recarga', () => lugar(pag), v => !!v && v.aba === 'agenda', 4000);
@@ -341,6 +370,49 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
   await voltar(pag);
   const r3 = await esperar('3º Voltar depois da recarga', () => avisos(pag), v => /Toque em Voltar de novo para sair\./.test(v || ''), 3000);
   checa('3º Voltar: o aviso de sair (nenhum toque morto)', r3.ok, true, ['volta-dois-passos']);
+  await pag.close();
+
+  secao('8b. Recarga na tela padrão: o primeiro Voltar não é morto');
+  pag = await abaNova();
+  await clicar(pag, '#abas .aba[data-tela="biblioteca"]');
+  await esperarBib(pag);
+  await H.abrirApp(pag, ORIGEM);  // o Android recarrega a aba, que abre na Agenda, e a entrada atual era a da Biblioteca
+  await ouvirAvisos(pag);
+  conf('depois de recarregar, a tela à vista é a Agenda', (await lugar(pag)).aba, 'agenda');
+  await voltar(pag);
+  const m1 = await esperar('o 1º Voltar depois de recarregar na Agenda', () => avisos(pag), v => /Toque em Voltar de novo para sair\./.test(v || ''), 3000);
+  checa('o 1º Voltar já avisa (a entrada de baixo também é a Agenda, e o toque não fica morto)', m1.ok, true, ['volta-dois-passos']);
+  await pag.close();
+
+  secao('8c. A ficha do aluno no tablet: o Voltar pergunta se algo mudou');
+  pag = await abaNova();
+  await clicar(pag, '#abas .aba[data-tela="alunos"]');
+  await pausa(300);
+  await clicar(pag, '#novo-aluno');
+  const fichaAberta = await esperar('a ficha nova', () => pag.evaluate(() => !!document.querySelector('#modal-aluno.aberto')), v => v, 4000);
+  conf('a ficha de aluno novo abriu', fichaAberta.ok, true);
+  await pausa(200);
+  pag.__respostaDoDialogo = 'cancela';
+  let antesA = dialogos.length;
+  // sem mexer: o Voltar fecha sem perguntar (nenhuma pergunta falsa)
+  await voltar(pag);
+  const semMexer = await esperar('o Voltar da ficha sem mudança', () => pag.evaluate(() => !document.querySelector('#modal-aluno.aberto')), v => v, 4000);
+  conf('sem nada digitado, o Voltar fecha a ficha sem perguntar', semMexer.ok && dialogos.length === antesA, true);
+  await clicar(pag, '#novo-aluno');
+  await esperar('a ficha nova de novo', () => pag.evaluate(() => !!document.querySelector('#modal-aluno.aberto')), v => v, 4000);
+  await pausa(200);
+  await pag.evaluate(() => { const c = document.querySelector('#modal-aluno input[type="text"], #modal-aluno input:not([type])'); c.value = 'Aluno Beta Teste'; c.dispatchEvent(new Event('input', { bubbles: true })); });
+  antesA = dialogos.length;
+  await voltar(pag);
+  await pausa(600);
+  conf('com o nome digitado, o Voltar pergunta', dialogos.slice(antesA).join('|'), 'Sair sem guardar o que você escreveu?');
+  conf('"Cancelar": a ficha fica aberta, com o nome', await pag.evaluate(() => !!document.querySelector('#modal-aluno.aberto') &&
+    Array.from(document.querySelectorAll('#modal-aluno input')).some(c => c.value === 'Aluno Beta Teste')), true);
+  pag.__respostaDoDialogo = 'aceita';
+  await voltar(pag);
+  const fechouAluno = await esperar('o Voltar com "OK"', () => pag.evaluate(() => !document.querySelector('#modal-aluno.aberto')), v => v, 4000);
+  conf('"OK": a ficha fecha', fechouAluno.ok, true);
+  conf('e nada foi gravado: nenhum aluno novo', await pag.evaluate(() => Store.carregar().then(d => d.alunos.length)), 1);
   await pag.close();
 
   secao('9. No celular: a folha, a ficha e o formulário');
@@ -363,8 +435,8 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
   conf('a folha da aula abriu em Hoje', abriuFolha && (await telaCel()).folha, true);
   await cel.evaluate(() => history.back());
   const f1 = await esperar('o Voltar da folha', telaCel, v => !!v && !v.folha, 4000);
-  checa('o Voltar fecha a folha e fica em Hoje', f1.ok && f1.valor.ativa === 'hoje', true, []);
-  checa('sem o aviso de sair por cima da folha', /Toque em Voltar de novo para sair/.test(await avisos(cel)), false, []);
+  checa('o Voltar fecha a folha e fica em Hoje', f1.ok && f1.valor.ativa === 'hoje', true, ['folha-fora-do-historico']);
+  checa('sem o aviso de sair por cima da folha', /Toque em Voltar de novo para sair/.test(await avisos(cel).catch(() => '')), false, ['folha-fora-do-historico']);
   // a ficha de um aluno
   await cel.evaluate(() => document.querySelector('#cel-abas .cel-aba[data-cel="alunos"]').click());
   await esperar('a lista de alunos', telaCel, v => !!v && v.ativa === 'alunos' && v.lista, 5000);
@@ -391,7 +463,16 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
       b.click(); return !!document.querySelector('[data-form-celular]');
     } catch (e) { return 'erro: ' + e.message; }
   });
+  conf('a nuvem dublada abriu o formulário do celular', dublou, true);
   if (dublou === true) {
+    await pausa(300);
+    // sem mexer em nada: o Voltar sai do formulário sem perguntar (nenhuma pergunta falsa)
+    const antesSem = dialogos.length;
+    await cel.evaluate(() => history.back());
+    const semTexto = await esperar('o Voltar do formulário sem mudança', telaCel, v => !!v && !v.form, 4000);
+    checa('sem nada digitado, o Voltar sai do formulário sem perguntar', semTexto.ok && dialogos.length === antesSem, true, []);
+    await cel.evaluate(() => { const b = document.querySelector('#cel-marcar-aula'); if (b) b.click(); });
+    await esperar('o formulário de novo', telaCel, v => !!v && v.form, 4000);
     await pausa(300);
     await cel.evaluate(() => {
       const c = document.querySelector('[data-form-celular] input:not([type=hidden]), [data-form-celular] textarea');
@@ -401,14 +482,12 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
     const antes = dialogos.length;
     await cel.evaluate(() => history.back());
     await pausa(600);
-    checa('o formulário com texto: o Voltar pergunta antes de sair', dialogos.slice(antes).join('|'), 'Sair sem guardar o que você escreveu?', []);
-    checa('"Cancelar": o formulário fica', (await telaCel()).form, true, []);
+    checa('o formulário com texto: o Voltar pergunta antes de sair', dialogos.slice(antes).join('|'), 'Sair sem guardar o que você escreveu?', ['pergunta-do-formulario-some']);
+    checa('"Cancelar": o formulário fica', (await telaCel()).form, true, ['pergunta-do-formulario-some']);
     cel.__respostaDoDialogo = 'aceita';
     await cel.evaluate(() => history.back());
     const fm = await esperar('o Voltar do formulário com "OK"', telaCel, v => !!v && !v.form, 4000);
     checa('"OK": o formulário sai', fm.ok, true, []);
-  } else {
-    console.log('   NÃO CONFERIDO: o formulário do celular não abriu com a nuvem dublada (' + dublou + ')');
   }
 
   } catch (e) {
