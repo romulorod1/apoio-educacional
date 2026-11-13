@@ -3298,6 +3298,7 @@
     $('#corpo-modal-leitor-pdf').addEventListener('scroll', rolarLeitorContinuo, { passive: true });
     ligarGestosDoLeitor($('#corpo-modal-leitor-pdf'));
     ligarCanetaSemSelecao($('#corpo-modal-leitor-pdf'));
+    ligarFimDoConteudo();
     $('#leitor-slider-pagina').addEventListener('input', function () {
       // rolagem DIRETA: a suave atravessava as páginas do caminho, desenhava cada uma
       // e deixava o temporizador gravar posições intermediárias depois de soltar
@@ -25364,6 +25365,7 @@
         Array.prototype.forEach.call(camada.div.querySelectorAll('span'), function (s) {
           s.style.fontSize = 'calc(var(--text-scale-factor) * var(--font-height))';
         });
+        camada.div.appendChild(el('div', { class: 'endOfContent' }));
         registro.caixa.dataset.texto = '1';
       });
     }).catch(function () { /* sem a camada a página continua lá; só não seleciona */ });
@@ -25385,6 +25387,64 @@
   function ligarCanetaSemSelecao(corpo) {
     corpo.addEventListener('pointerdown', function (ev) { canetaNoLeitor = ev.pointerType === 'pen'; }, true);
     corpo.addEventListener('selectstart', function (ev) { if (canetaNoLeitor) ev.preventDefault(); });
+  }
+
+  /* O FIM DO CONTEÚDO: o mecanismo do TextLayerBuilder do visualizador do
+   * pdf.js (web/text_layer_builder.js), que o TextLayer do núcleo não traz.
+   * Sem ele, o arrasto que termina depois do fim da linha (o dedo quase sempre
+   * passa) cai no vazio da camada e o Chrome põe a ponta da seleção longe: a
+   * seleção some ou pula para a linha de cima. Cada camada tem no fim um
+   * div.endOfContent; enquanto há seleção nela (classe selecting) ele cobre a
+   * camada inteira por baixo dos pedaços de texto (styles.css), e a cada
+   * mudança da seleção ele é posto logo depois do pedaço em que a ponta está:
+   * o arrasto no vazio pega até o fim daquele pedaço, e não mais. Uma escuta
+   * só, no documento, para todas as páginas. */
+  function ligarFimDoConteudo() {
+    var apertado = false, anterior = null;
+    var camadas = function () { return document.querySelectorAll('#corpo-modal-leitor-pdf .leitor-pdf-texto'); };
+    var devolver = function (camada) {
+      var fim = camada.querySelector('.endOfContent');
+      if (fim) { fim.style.width = ''; fim.style.height = ''; if (fim.parentNode !== camada || fim.nextSibling) camada.appendChild(fim); }
+      camada.classList.remove('selecting');
+    };
+    var devolverTodas = function () { Array.prototype.forEach.call(camadas(), devolver); };
+    document.addEventListener('pointerdown', function (ev) {
+      apertado = true;
+      var camada = ev.pointerType !== 'pen' && ev.target.closest && ev.target.closest('.leitor-pdf-texto');
+      if (camada) camada.classList.add('selecting');
+    });
+    document.addEventListener('pointerup', function () { apertado = false; devolverTodas(); });
+    window.addEventListener('blur', function () { apertado = false; devolverTodas(); });
+    document.addEventListener('keyup', function () { if (!apertado) devolverTodas(); });
+    document.addEventListener('selectionchange', function () {
+      var sel = document.getSelection();
+      if (!sel.rangeCount) { devolverTodas(); return; }
+      var r = sel.getRangeAt(0), ativa = false;
+      Array.prototype.forEach.call(camadas(), function (c) {
+        if (r.intersectsNode(c)) { c.classList.add('selecting'); ativa = true; } else devolver(c);
+      });
+      if (!ativa) { anterior = null; return; }
+      // a ponta que o arrasto está mexendo: a do começo, se a do fim ficou parada
+      var mexeInicio = !!anterior && (r.compareBoundaryPoints(Range.END_TO_END, anterior) === 0 ||
+        r.compareBoundaryPoints(Range.START_TO_END, anterior) === 0);
+      var ponta = mexeInicio ? r.startContainer : r.endContainer;
+      if (ponta.nodeType === Node.TEXT_NODE) ponta = ponta.parentNode;
+      if (!mexeInicio && r.endOffset === 0) {
+        // a ponta no começo de um pedaço: o fim vai depois do pedaço com texto anterior
+        do {
+          while (ponta && !ponta.previousSibling) ponta = ponta.parentNode;
+          ponta = ponta && ponta.previousSibling;
+        } while (ponta && !ponta.childNodes.length);
+      }
+      var camada = ponta && ponta.parentElement && ponta.parentElement.closest('.leitor-pdf-texto');
+      var fim = camada && camada.querySelector('.endOfContent');
+      if (fim && ponta !== fim) {
+        fim.style.width = camada.clientWidth + 'px';
+        fim.style.height = camada.clientHeight + 'px';
+        ponta.parentElement.insertBefore(fim, mexeInicio ? ponta : ponta.nextSibling);
+      }
+      anterior = r.cloneRange();
+    });
   }
 
   function liberarPaginaContinua(registro) {

@@ -25,6 +25,10 @@
  *   5. no escaneado, 0 elementos de texto (nenhuma camada) depois de todas as
  *      páginas lidas, e a frase "Este livro é imagem: o texto não pode ser
  *      selecionado nem buscado." aparece UMA vez; no livro de texto, nenhuma;
+ *   2b. o arrasto que termina DEPOIS do fim da linha (2 e 20 pt além da
+ *      tinta) copia a linha inteira, "Exercício 206. Calcule a soma dos
+ *      números de 1 a 206."; e o que sai do começo do título e termina 2 pt
+ *      além da tinta do exercício copia as duas linhas;
  *   6. nenhum erro de página.
  *   1b. (a B12 honesta, logo depois do 1) todo pedaço da camada do leitor tem
  *      a cor computada transparente (alfa 0), e o tamanho de letra inline
@@ -51,6 +55,9 @@
  *                                      transparentes (1b, critério a)
  *   --envenenado-letra-fora-da-camada  a caixa da página, fora da camada,
  *                                      ganha font-size inline (1b, critério b)
+ *   --envenenado-sem-fim-do-conteudo   a camada sem o div.endOfContent: o
+ *                                      arrasto que passa do fim da linha não
+ *                                      copia a linha inteira (2b)
  *
  *   --app-de <pasta>   serve o app.js e o styles.css dessa pasta (o controle
  *                      no commit pai): as verificações rodam e TÊM de falhar.
@@ -75,10 +82,11 @@ const VENENOS = {
   'escaneado-com-camada': ['app.js', "      if (!temTexto) { registro.caixa.dataset.texto = '0'; return null; }\n", ''],
   'aviso-repetido': ['app.js', 'if (estado.escaneado && !estado.avisouImagem)', 'if (estado.escaneado)'],
   'camada-visivel': ['styles.css', '.textLayer br { color: transparent;', '.textLayer br { color: #000;'],
-  'letra-fora-da-camada': ['app.js', "registro.caixa.dataset.texto = '1';", "registro.caixa.style.fontSize = '20px'; registro.caixa.dataset.texto = \"1\";"]
+  'letra-fora-da-camada': ['app.js', "registro.caixa.dataset.texto = '1';", "registro.caixa.style.fontSize = '20px'; registro.caixa.dataset.texto = \"1\";"],
+  'sem-fim-do-conteudo': ['app.js', "        camada.div.appendChild(el('div', { class: 'endOfContent' }));\n", '']
 };
 // a seção depois da qual o veneno já foi medido (a prova para ali)
-const SECAO_DO_VENENO = { 'sem-camada': 1, 'camada-visivel': '1b', 'letra-fora-da-camada': '1b', 'sem-selecao': 2,
+const SECAO_DO_VENENO = { 'sem-camada': 1, 'camada-visivel': '1b', 'letra-fora-da-camada': '1b', 'sem-selecao': 2, 'sem-fim-do-conteudo': 2,
   'caneta-seleciona': 3, 'texto-sem-soltar': 4, 'escaneado-com-camada': 5, 'aviso-repetido': 5 };
 const VENENO = Object.keys(VENENOS).find(k => process.argv.indexOf('--envenenado-' + k) !== -1) || null;
 const iPrints = process.argv.indexOf('--prints');
@@ -364,6 +372,57 @@ const checa = (rotulo, obtido, esperado, doVeneno) => {
   await print('depois', 'p206_depois_da_selecao');
   // o arrasto sai de dentro do primeiro E: a cópia COMEÇA no exercício (a camada está no lugar da letra desenhada)
   checa('arrastar o mouse pela linha e copiar põe na área de transferência o texto que começa em "Exercício 206"', /^Exercício 206/.test(copiado), true, 'sem-selecao');
+
+  /* 2b. O arrasto que passa do fim da linha (o dedo no tablet quase sempre
+   * passa). O fim da linha é o da TINTA no canvas, e não o da camada: o último
+   * pixel escuro na faixa da linha do exercício (126 a 142 pt). Sem o fim do
+   * conteúdo (div.endOfContent com a classe selecting, como no visualizador do
+   * pdf.js), o arrasto 2 pt depois da tinta copiava "\r\n", e o que saía do
+   * título até ali copiava só o título. A cópia tem de ser a linha inteira, e
+   * nada a mais (só o fim de linha final é tolerado). */
+  const tinta = await pag.evaluate(() => {
+    const k = document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="206"] canvas');
+    const g = k.getContext('2d', { willReadFrequently: true });
+    const y0 = Math.round(k.height * 126 / 842), y1 = Math.round(k.height * 142 / 842);
+    const d = g.getImageData(0, y0, k.width, y1 - y0).data;
+    let maxX = -1;
+    for (let y = 0; y < y1 - y0; y++) for (let x = 0; x < k.width; x++) {
+      const i = (y * k.width + x) * 4;
+      if (d[i + 3] > 0 && 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2] < 128 && x > maxX) maxX = x;
+    }
+    return maxX < 0 ? null : (maxX + 1) * 595 / k.width;
+  });
+  console.log('   fim da tinta da linha do exercício: ' + (tinta === null ? 'nenhum' : tinta.toFixed(1) + ' pt'));
+  conf('a prova achou a tinta da linha do exercício no canvas', tinta !== null && tinta > 300 && tinta < 560, true);
+  const LINHA = 'Exercício 206. Calcule a soma dos números de 1 a 206.';
+  const TITULO = 'Página 206 do livro do leitor.';
+  const arrastaECopia = async (dePt, atePt) => {
+    await limparSelecao();
+    await pag.evaluate(() => { window.__copias = []; });
+    const p0 = await pontoDaPagina(206, dePt[0], dePt[1]), p1 = await pontoDaPagina(206, atePt[0], atePt[1]);
+    await pag.mouse.move(p0.x, p0.y);
+    await pag.mouse.down();
+    await esperar('o cursor da seleção onde o mouse desceu', ancoraSel, v => !!v, 3000);
+    await pag.mouse.move(p1.x, p1.y, { steps: 12 });
+    await pag.mouse.up();
+    await pag.keyboard.down('Control');
+    await pag.keyboard.press('KeyC');
+    await pag.keyboard.up('Control');
+    await esperar('o Ctrl+C chegou ao documento', () => pag.evaluate(() => window.__copias.length), v => v > 0, 3000);
+    const c = await pag.evaluate(() => navigator.clipboard.readText().catch(e => 'ERRO: ' + e.message));
+    // o fim de linha do sistema (\r\n no Windows) vira \n; só o fim de linha final é tirado
+    return c.replace(/\r\n/g, '\n').replace(/\n$/, '');
+  };
+  const fimX = (tinta || 0);
+  for (const passa of [2, 20]) {
+    const c = await arrastaECopia([74, 135], [fimX + passa, 135]);
+    console.log('   da linha do exercício até ' + passa + ' pt depois da tinta: copiado ' + JSON.stringify(c));
+    checa('arrastar do começo de "Exercício" até ' + passa + ' pt depois do fim da linha copia a linha inteira', c, LINHA, 'sem-fim-do-conteudo');
+  }
+  const c2 = await arrastaECopia([74, 83], [fimX + 2, 135]);
+  console.log('   do título até 2 pt depois da tinta do exercício: copiado ' + JSON.stringify(c2));
+  checa('arrastar do começo do título até 2 pt depois do fim da linha do exercício copia as duas linhas', c2, TITULO + '\n' + LINHA, 'sem-fim-do-conteudo');
+  await limparSelecao();
   if (await pararNoVeneno(2)) return;
 
   // ================================================================

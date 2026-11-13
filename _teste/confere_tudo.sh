@@ -596,6 +596,7 @@ roda "leitor texto --envenenado-caneta-seleciona"   node "_teste/testa_leitor_te
 roda "leitor texto --envenenado-texto-sem-soltar"   node "_teste/testa_leitor_texto.js" --envenenado-texto-sem-soltar
 roda "leitor texto --envenenado-escaneado-com-camada" node "_teste/testa_leitor_texto.js" --envenenado-escaneado-com-camada
 roda "leitor texto --envenenado-aviso-repetido"     node "_teste/testa_leitor_texto.js" --envenenado-aviso-repetido
+roda "leitor texto --envenenado-sem-fim-do-conteudo" node "_teste/testa_leitor_texto.js" --envenenado-sem-fim-do-conteudo
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
