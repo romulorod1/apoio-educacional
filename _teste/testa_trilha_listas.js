@@ -44,6 +44,20 @@ conf('razão e regra de três apontam para razões e proporções',
 conf('porcentagem aponta para porcentagem e juros', moduloDe('MAT07-07'), '7ano:porcentagem-e-juros');
 conf('equações apontam para equações', moduloDe('MAT07-10'), '7ano:equacoes-e-inequacoes-do-primeiro-grau');
 conf('sequências sem lista segura ficam sem vínculo', moduloDe('MAT07-08'), null);
+// C1 (12/11/2026): vínculos conferidos lendo os enunciados dos pacotes
+conf('funções trigonométricas abrem Trigonometria III (funções), não a II',
+  moduloDe('MATEM2-02'), '2em:trigonometria-iii');
+conf('adição de arcos abre Trigonometria II (seno e cosseno da soma)',
+  moduloDe('MATEM2-15'), '2em:trigonometria-ii');
+conf('nenhum assunto aponta para "Estatística Básica I" do 1º EM (é desigualdade entre médias)',
+  temas.filter(t => t.modulo === '1em:estatistica-basica-i').map(t => t.id).join(','), '');
+conf('estatística descritiva, dados e gráficos, média e moda abrem a estatística do 7º ano',
+  ['MAT07-14', 'MAT08-19', 'MAT09-13', 'MATEM1-13', 'MATEM3-14'].map(moduloDe).join(','),
+  Array(5).fill('7ano:nocoes-basicas-de-estatistica').join(','));
+conf('radiciação abre o módulo de dízimas e reais, que tem radicais',
+  moduloDe('MAT08-03'), '8ano:dizimas-periodicas-e-numeros-reais');
+conf('círculo, notação científica, determinantes e dispersão ficam sem vínculo (nenhum módulo trata deles)',
+  ['MAT08-13', 'MAT08-02', 'MATEM2-05', 'MATEM2-14'].map(moduloDe).join(','), ',,,');
 
 // ============================================================================
 secao('2. Lógica visual da trilha: Abrir lista e selo sem lista pronta (C7.3)');
