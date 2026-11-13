@@ -1026,6 +1026,18 @@ roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip
 # 21 em JAVA_HOME; sem eles, a prova diz onde procurou e REPROVA, nunca passa
 # calada. Os venenos: a regra que deixa qualquer conta ler tem de ser vista pela
 # parte das regras; a que deixa quem le escrever registro, idem.
+# Fase 1b da biblioteca na nuvem (13/11/2026): o publicador do catalogo
+# (biblioteca/publicar_catalogo.py) contra o emulador do Firestore e do Auth,
+# com manifests sinteticos: sem --publicar nada e gravado; publicar grava num
+# commit so; republicar igual nao escreve; a falha no meio do lote deixa a
+# versao anterior; as recusas (id trocado, livro que some, formato, assunto
+# fora do banco, caminho fora da lista); a classificacao do acervo; e as
+# regras do catalogo (a dona le e nao escreve). Portas 8986 a 8990.
+roda "publicador do catalogo"                       node "_teste/testa_publicador_catalogo.js"
+roda "publicador do catalogo --envenenado-aceita-id-trocado" node "_teste/testa_publicador_catalogo.js" --envenenado-aceita-id-trocado
+roda "publicador do catalogo --envenenado-escreve-fora-da-lista" node "_teste/testa_publicador_catalogo.js" --envenenado-escreve-fora-da-lista
+roda "publicador do catalogo --envenenado-dois-lotes" node "_teste/testa_publicador_catalogo.js" --envenenado-dois-lotes
+roda "publicador do catalogo --envenenado-regra-herda-escrita" node "_teste/testa_publicador_catalogo.js" --envenenado-regra-herda-escrita
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
@@ -1413,6 +1425,12 @@ roda "corrigir pacote Mirim C7"                 python biblioteca/_prova_corrigi
 # livro), a origem do sumario (marcadores, mapa, nenhum, nav do EPUB) e o
 # determinismo. Sem Chrome.
 roda "livros (gerador)"                         python biblioteca/_prova_livros.py
+# Fase 1b: a chave estavel do capitulo (biblioteca/chaves.py), pelos mesmos
+# criterios que o aplicativo confere (titulo igual, par da heranca; o mesmo
+# comeco so com titulo parecido ou com o par). Sem Chrome e sem rede.
+roda "chaves dos capitulos"                     python -X utf8 biblioteca/_prova_chaves.py
+roda "chaves dos capitulos --envenenado-chave-pela-pagina" python -X utf8 biblioteca/_prova_chaves.py --envenenado-chave-pela-pagina
+roda "chaves dos capitulos --envenenado-sem-heranca" python -X utf8 biblioteca/_prova_chaves.py --envenenado-sem-heranca
 # A revisao do C15.1: o pacote cortado recusado ja na espiada, sem ler o
 # arquivo inteiro, e o teto de 160 MB do aplicativo. Sem Chrome.
 roda "livros (regras)"                          node "_teste/testa_livros_regras.js"

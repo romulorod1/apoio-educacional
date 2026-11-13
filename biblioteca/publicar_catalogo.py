@@ -227,6 +227,65 @@ def assuntos_dos_mapas(pasta):
     return citados
 
 
+ENTRAM = ('FICA', 'SO_TEORIA')
+
+
+def ler_classificacao(caminho):
+    """{id do livro: {'resultado', 'motivo'}} de CLASSIFICACAO_ACERVO.csv
+    (decisão do dono de 13/11: a biblioteca é só teoria, exercícios e
+    gabarito). Resultados: FICA, SO_TEORIA (o livro do professor: entra com
+    `so_teoria`), SAI e DÚVIDA (que a orquestradora decidiu tratar como SAI).
+    O separador é o da primeira linha (`;` ou `,`). O livro se acha pela coluna
+    `id` (ou `livro_id`), ou pelo nome do arquivo (`arquivo`), que dá o id
+    pelo mesmo slug do gerador (livros.slug)."""
+    import csv
+    import unicodedata
+    saida = {}
+    with open(caminho, encoding='utf-8-sig', newline='') as f:
+        texto = f.read()
+    primeira = texto.split('\n', 1)[0]
+    sep = ';' if primeira.count(';') > primeira.count(',') else ','
+    for l in csv.DictReader(texto.splitlines(), delimiter=sep):
+        r = chaves.titulo_normalizado(l.get('resultado') or '').upper().replace(' ', '_')
+        lid = (l.get('id') or l.get('livro_id') or '').strip()
+        if not lid and (l.get('arquivo') or '').strip():
+            nome = os.path.splitext(os.path.basename(l['arquivo'].strip().replace('\\', '/')))[0]
+            t = unicodedata.normalize('NFKD', nome)
+            t = ''.join(c for c in t if not unicodedata.combining(c)).lower()
+            lid = re.sub(r'[^a-z0-9]+', '-', t).strip('-')[:80].strip('-') or 'livro'
+        if lid:
+            saida[lid] = {'resultado': 'DUVIDA' if r.startswith('DUVIDA') else r, 'motivo': (l.get('motivo') or '').strip()}
+    return saida
+
+
+def filtrar_pela_classificacao(livros_novos, classificacao):
+    """Só FICA e SO_TEORIA vão para a nuvem; o SO_TEORIA leva `so_teoria: true`
+    no meta, para a tela não oferecer os exercícios dele como lista ao aluno.
+    SAI, DÚVIDA e o livro que a lista não cita ficam de fora. Devolve
+    (ficam, linhas do relatório, agrupadas pelo motivo)."""
+    if classificacao is None:
+        return list(livros_novos), []
+    ficam, fora = [], {}
+    for meta in livros_novos:
+        c = classificacao.get(meta.get('id')) or {}
+        r = c.get('resultado')
+        if r in ENTRAM:
+            m = dict(meta)
+            if r == 'SO_TEORIA':
+                m['so_teoria'] = True
+            else:
+                m.pop('so_teoria', None)
+            ficam.append(m)
+            continue
+        grupo = {'SAI': 'SAI', 'DUVIDA': 'DÚVIDA (tratada como SAI)'}.get(r, 'ausente da classificação')
+        fora.setdefault(grupo, []).append('%s (%s)' % (meta.get('id'), c.get('motivo') or 'sem motivo na lista'))
+    linhas = []
+    for grupo in sorted(fora):
+        linhas.append('- fora da nuvem, %s: %d livro(s)' % (grupo, len(fora[grupo])))
+        linhas += ['    - ' + x for x in sorted(fora[grupo])]
+    return ficam, linhas
+
+
 def planejar(livros_novos, indice, registro_ids, trocas=None, retirar=None, banco=None, citados=None,
              registros_chaves=None, heranca=None, agora=None, gerador=None):
     """A decisão inteira, sem rede: o que escrever e por quê. Devolve
@@ -397,6 +456,7 @@ def principal(argv=None):
     p.add_argument('--chaves', help='a pasta dos registros de chave por livro (Livros/mapa/_chaves)')
     p.add_argument('--registro-ids', help='o registro sha256 para id (Livros/catalogo/_ids.json), que só cresce')
     p.add_argument('--heranca', action='append', default=[], help='tabela de herança de títulos (HERANCA_L1.json)')
+    p.add_argument('--classificacao', help='CLASSIFICACAO_ACERVO.csv: só os FICA vão para a nuvem')
     p.add_argument('--trocas', help='trocas_de_arquivo.json: [{id, arquivo_antigo, arquivo_novo, motivo}]')
     p.add_argument('--retirar', action='append', default=[])
     p.add_argument('--relatorio')
@@ -439,12 +499,14 @@ def principal(argv=None):
             for nome in os.listdir(a.chaves):
                 if nome.endswith('.json'):
                     registros_chaves[nome[:-5]] = ler_json(os.path.join(a.chaves, nome), None)
+        novos, fora_da_nuvem = filtrar_pela_classificacao(novos, ler_classificacao(a.classificacao) if a.classificacao else None)
         citados = assuntos_dos_mapas(a.mapas)
         banco = ids_do_banco(a.topicos) if citados else None
         indice = fs.ler('usuarios/%s/config/catalogo' % uid)
         import gerar_pacote
         plano = planejar(novos, indice, ler_json(a.registro_ids, {}), ler_json(a.trocas, []), a.retirar, banco, citados,
                          registros_chaves, heranca, a.agora, gerar_pacote.commit_do_gerador())
+        plano['linhas'] = fora_da_nuvem + plano['linhas']
         publicado = False
         if not plano['recusas'] and plano['indice'] and a.publicar:
             escritas = montar_escritas(plano, uid)
