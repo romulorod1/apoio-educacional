@@ -3903,9 +3903,10 @@
       var aplicar = function (escopo) {
         var mexeu = null;
         var rotulo = function () {
-          var base = frasDoQueMudouNaAula(mudancas);
-          if (escopo === 'seguintes') base = base.replace('Aula atualizada', 'Aulas atualizadas desta data em diante');
-          if (escopo === 'todas') base = base.replace('Aula atualizada', 'Todas as aulas da repetição atualizadas');
+          // nos escopos de várias aulas, a frase de sempre; numa aula só, o que mudou nela
+          var base = escopo === 'seguintes' ? 'Aulas alteradas desta data em diante.'
+            : escopo === 'todas' ? 'Todas as aulas da repetição foram alteradas.'
+              : frasDoQueMudouNaAula(mudancas);
           return base + textoDeTrilha(mexeu);
         };
         comDesfazer(rotulo, function () {

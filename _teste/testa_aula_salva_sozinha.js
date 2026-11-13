@@ -97,6 +97,7 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca) => {
   const pag = await amb.pagina();
   pag.dialogos = [];
   pag.respostaDoDialogo = true;
+  pag.removeAllListeners('dialog'); // o ajudante aceita toda pergunta; aqui quem responde é a prova
   pag.on('dialog', async d => {
     pag.dialogos.push(d.message());
     try { if (pag.respostaDoDialogo) await d.accept(); else await d.dismiss(); } catch (e) { /* ok */ }
@@ -132,7 +133,10 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca) => {
     conf('o aviso diz o que mudou e oferece Desfazer (' + aviso.texto + ')', /^Aula atualizada: cancelada/.test(aviso.texto) && /Desfazer/.test(aviso.acao), true);
     await pag.click('#aviso-acao');
     const desfeito = await esperar('o Desfazer volta', () => lerAula(pag, AVULSA), a => a && a.status === antes.status, 5000);
-    conf('o Desfazer volta exatamente o que havia', desfeito.ok && JSON.stringify(desfeito.valor) === JSON.stringify(antes), true);
+    const CAMPOS = ['data', 'hora', 'duracaoMin', 'status', 'cobravel', 'notaTexto', 'notaPrivada', 'destacada', 'serieId'];
+    const diferentes = desfeito.ok ? CAMPOS.filter(k => JSON.stringify(desfeito.valor[k]) !== JSON.stringify(antes[k])) : ['(não voltou)'];
+    if (diferentes.length) console.log('   antes: ' + JSON.stringify(antes) + '\n   depois: ' + JSON.stringify(desfeito.valor));
+    conf('o Desfazer volta exatamente o que havia (' + diferentes.join(',') + ')', diferentes.length, 0);
 
     secao('2. Conflito no mesmo campo: nada grava por cima');
     conf('(arranjo) a aula abriu de novo', (await abrir(pag, AVULSA)).ok, true);
@@ -176,7 +180,10 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca) => {
     await escolher(pag, '#campo-status', 'realizada');
     await pag.click('#descartar-aula');
     const voltou = await esperar('Descartar volta a aula', () => lerAula(pag, AVULSA), a => a && a.notaTexto === abertura.notaTexto, 5000);
-    conf('Descartar volta a aula exatamente ao que era ao abrir', voltou.ok && JSON.stringify(voltou.valor) === JSON.stringify(abertura) && !(await aberta(pag)), true);
+    const CAMPOS_D = ['data', 'hora', 'duracaoMin', 'status', 'cobravel', 'notaTexto', 'notaPrivada', 'destacada'];
+    const difD = voltou.ok ? CAMPOS_D.filter(k => JSON.stringify(voltou.valor[k]) !== JSON.stringify(abertura[k])) : ['(não voltou)'];
+    if (difD.length) console.log('   abertura: ' + JSON.stringify(abertura) + '\n   depois: ' + JSON.stringify(voltou.valor));
+    conf('Descartar volta a aula exatamente ao que era ao abrir (' + difD.join(',') + ')', difD.length === 0 && !(await aberta(pag)), true);
   }
 
   if (MODO === MODOS[2] || !MODO) {

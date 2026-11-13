@@ -30,6 +30,7 @@ async function rodar() {
   await amb.subir();
   const pag = await amb.pagina();
   const dialogos = [];
+  pag.removeAllListeners('dialog'); // o ajudante aceita toda pergunta; aqui o "não" é da prova
   pag.on('dialog', async d => { dialogos.push(d.message()); try { await d.dismiss(); } catch (e) { /* ok */ } });
   if (GRADE_ANTIGA) {
     await pag.evaluateOnNewDocument(() => {
