@@ -23645,7 +23645,21 @@
     if (!x || !bib) return false;
     if (x.tipo === 'lista-pronta') {
       var lp = listaProntaPorId(x.id);
-      return lp ? pedirParaUsarLista(lp) : false;
+      if (!lp) return false;
+      /* A tela da lista pronta mora dentro do módulo dela: sem o módulo na
+       * navegação, o usarListaPronta cairia na lista de séries. É o que a
+       * trilha faz antes de usar a lista. Se ela desistir na pergunta, a
+       * navegação volta a ser a de antes. */
+      var antes = { modulo: bibNav.modulo, serie: bibNav.serie };
+      if (temChave(bib.modulos, lp.modulo)) {
+        var mod = bib.modulos[lp.modulo];
+        bibNav.modulo = lp.modulo;
+        bibNav.serie = (bib.listaSeries || []).filter(function (s) { return mod.series[s]; })[0] || mod.serie;
+      }
+      if (pedirParaUsarLista(lp)) return true;
+      bibNav.modulo = antes.modulo;
+      bibNav.serie = antes.serie;
+      return false;
     }
     if (x.tipo !== 'itens' && x.tipo !== 'paginas') return false;
     var ids = (x.ids || []).filter(function (id) { return noCarrinho(x.tipo, id) !== !!marcado; });
@@ -23902,6 +23916,8 @@
       bloco.appendChild(el('p', { class: 'ajuda bte-vazio bte-faltam', texto: frase }));
     }
 
+    observarMiniaturasDoBloco(bloco);
+
     // a etiqueta dela chega depois do primeiro desenho: os selos se refazem
     if (typeof cx.etiqueta !== 'function') {
       carregarEtiquetas().then(function () {
@@ -23927,14 +23943,33 @@
     var imgs = Array.prototype.slice.call(caixa.querySelectorAll('img.bib-mini'))
       .filter(function (i) { return !i._bteObservada; });
     if (typeof IntersectionObserver !== 'function') { imgs.forEach(pedirMiniaturaDoBloco); return; }
-    var obs = caixa._bteObservador || (caixa._bteObservador = new IntersectionObserver(function (entradas, o) {
-      entradas.forEach(function (e) {
-        if (!e.isIntersecting) return;
-        o.unobserve(e.target);
-        pedirMiniaturaDoBloco(e.target);
-      });
-    }, { rootMargin: '300px 0px' }));
-    imgs.forEach(function (i) { i._bteObservada = true; obs.observe(i); });
+    imgs.forEach(function (i) {
+      i._bteObservada = true;
+      /* Um observador por área que rola: a folga de 300 px vale para a área
+       * de rolagem, e com a janela como raiz a área cortaria o que está logo
+       * abaixo da dobra até ela rolar. */
+      var area = areaQueRola(i);
+      var chave = '_bteObservador';
+      var dono = area || document;
+      var obs = dono[chave] || (dono[chave] = new IntersectionObserver(function (entradas, o) {
+        entradas.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          o.unobserve(e.target);
+          pedirMiniaturaDoBloco(e.target);
+        });
+      }, { root: area, rootMargin: '300px 0px' }));
+      obs.observe(i);
+    });
+  }
+  /* A área que rola em volta da imagem (a .conteudo no tablet, a caixa da
+   * página no celular), ou nada, e aí vale a janela. Fora do documento não há
+   * área, e a janela também serve: a imagem é pedida quando aparecer. */
+  function areaQueRola(e) {
+    for (var p = e.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+      var o = getComputedStyle(p).overflowY;
+      if (o === 'auto' || o === 'scroll') return p;
+    }
+    return null;
   }
   function pedirMiniaturaDoBloco(img) {
     if (img._btePedida) return;

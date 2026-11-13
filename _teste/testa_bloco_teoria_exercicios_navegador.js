@@ -159,15 +159,31 @@ const varrer = pag => pag.evaluate(() => {
 
 async function printar(pag, nome, seletor) {
   if (!PRINTS) return;
-  await pag.evaluate(s => { const e = document.querySelector(s); if (e) e.scrollIntoView({ block: 'start' }); }, seletor || '#prova-t2');
+  // a faixa do material fica presa no alto da Biblioteca: o print desce menos, para ela não tapar o título
+  await pag.evaluate(s => {
+    const e = document.querySelector(s);
+    if (!e) return;
+    e.scrollIntoView({ block: 'start' });
+    const faixa = document.querySelector('#bib-carrinho');
+    const area = document.querySelector('.conteudo');
+    if (faixa && !faixa.hidden && faixa.offsetParent && area) area.scrollTop -= faixa.getBoundingClientRect().height + 16;
+  }, seletor || '#prova-t2');
   await pausa(600);
   await pag.screenshot({ path: path.join(PRINTS, nome) });
   console.log('   print: ' + nome);
 }
 
 async function esperarMiniatura(pag) {
-  return esperar('a primeira miniatura do bloco', () => pag.evaluate(() =>
+  const r = await esperar('a primeira miniatura do bloco', () => pag.evaluate(() =>
     !!document.querySelector('#prova-t2 .bte-ex img.bib-mini.pronta')), v => v, 20000);
+  if (!r.ok) {
+    console.log('   miniaturas: ' + JSON.stringify(await pag.evaluate(() =>
+      Array.from(document.querySelectorAll('#prova-t2 img.bib-mini')).slice(0, 6).map(i => ({
+        obs: !!i._bteObservada, pedida: !!i._btePedida, classe: i.className, src: (i.getAttribute('src') || '').slice(0, 20),
+        topo: Math.round(i.getBoundingClientRect().top), alto: Math.round(i.getBoundingClientRect().height) })))));
+  }
+  conf('a primeira miniatura do bloco chegou', r.ok, true);
+  return r;
 }
 
 const abrirModal = pag => esperar('a tela cheia abriu', () => pag.evaluate(() => {
@@ -194,7 +210,6 @@ const fecharModal = async pag => {
 
   await amb.subir();
   const pag = await amb.pagina();
-  pag.on('dialog', d => d.accept());
   await pag.setViewport({ width: 1280, height: 800 });
   await H.abrirApp(pag, amb.ORIGEM);
 
@@ -369,13 +384,12 @@ const fecharModal = async pag => {
 
   // ================================================================
   secao('8b. As miniaturas do bloco não dependem da fila da Biblioteca');
-  // a Biblioteca por baixo, na tela de um módulo (a que se redesenha ao fechar a tela cheia)
+  // a Biblioteca por baixo, na tela de um módulo (a que se redesenha ao fechar a tela cheia):
+  // sair e voltar à aba redesenha a Biblioteca na lista pronta, e o Voltar dela leva ao módulo
+  await H.irParaAba(pag, 'ajustes');
   await H.irParaAba(pag, 'biblioteca');
-  await pag.evaluate(() => {
-    const l = Array.from(document.querySelectorAll('#bib-corpo .item-lista'))
-      .find(x => (x.querySelector('.nome') || {}).textContent === 'Equações do Segundo Grau');
-    if (l) l.click();
-  });
+  await pausa(600);
+  await pag.evaluate(() => { const v = document.querySelector('#bib-corpo .bib-voltar'); if (v) v.click(); });
   await pausa(400);
   conf('a Biblioteca está na tela do módulo', await pag.evaluate(() => !!document.querySelector('#bib-marcar-modulo')), true);
   await desenhar(pag, 'MAT09-04', VINCULOS, true);
@@ -404,7 +418,14 @@ const fecharModal = async pag => {
   await esperarMiniatura(pag);
   b = await ler(pag);
   conf('as quatro seções', b.secoes.length, 4);
-  conf('as caixas seguem o material de agora (a lista de base)', b.marcadas, 3);
+  // os exercícios da lista de base são os três primeiros da Soma e Produto, abaixo do "Ver mais"
+  await pag.evaluate(() => document.querySelector('#prova-t2 .bte-mais').click());
+  await pausa(200);
+  conf('as caixas seguem o material de agora: os três da lista de base, e só eles', await pag.evaluate(() =>
+    Array.from(document.querySelectorAll('#prova-t2 .bte-ex')).filter(c => c.querySelector('input.bte-marca').checked)
+      .map(c => c.dataset.id).join(',')), BASE_IDS.join(','));
+  await desenhar(pag, 'MAT09-04', VINCULOS);
+  await esperarMiniatura(pag);
   m = await medirExercicio(pag);
   console.log('   ' + JSON.stringify(m));
   conf('o exercício continua com cerca de 498 px e a letra entre 18 e 22', Math.abs(m.largura - 498) <= 2 && m.letra >= 18 && m.letra <= 22, true);
@@ -426,7 +447,6 @@ const fecharModal = async pag => {
   // ================================================================
   secao('10. 412x915 (celular): o mesmo bloco, em uma coluna');
   const cel = await amb.pagina();
-  cel.on('dialog', d => d.accept());
   await cel.setViewport({ width: 412, height: 915, isMobile: true, hasTouch: true });
   await H.abrirApp(cel, amb.ORIGEM);
   conf('o aplicativo abriu no modo celular', await cel.evaluate(() => document.body.classList.contains('modo-celular')), true);
