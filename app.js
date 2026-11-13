@@ -18606,7 +18606,7 @@
         nomesDosCapitulos = v;
         indiceDosCapitulos = null;
         var b = buscaLivrosAtual;
-        if (b && b.caixa.grupo.isConnected && String(bibTermo).trim() === b.termo) buscarTextoNosLivros(b.termo, b.caixa);
+        if (b && b.caixa.grupo.isConnected && termoDosGrupos(String(bibTermo).trim()) === b.termo) buscarTextoNosLivros(b.termo, b.caixa);
       }, function () { /* sem o índice de assuntos, o capítulo conta pelo título e pelo id do assunto */ });
     }
     return indice;
@@ -19007,7 +19007,7 @@
       clearTimeout(espera);
       espera = setTimeout(function () {
         var b = buscaLivrosAtual;
-        if (!b || !b.caixa.grupo.isConnected || String(bibTermo).trim() !== b.termo) return;
+        if (!b || !b.caixa.grupo.isConnected || termoDosGrupos(String(bibTermo).trim()) !== b.termo) return;
         buscarTextoNosLivros(b.termo, b.caixa);
       }, 400);
     });
@@ -23179,13 +23179,25 @@
       serie = 'em' + (ORDINAIS[m[1]] || m[1]);
       tira(m[0]);
     } else {
-      m = /\s(?:d[oa]\s)?([2-9]|segundo|terceiro|quarto|quinto|sexto|setimo|oitavo|nono)\s?(?:o)?(?:\sano)?\s/.exec(t);
+      // com "ano" escrito ("8 ano", "do 8º ano", "oitavo ano"), ou no fim da busca ("volume 8", "volume oitavo");
+      // no meio, sem "ano", o número é do assunto: "equação do 2º grau" não é o 2º ano
+      m = /\s(?:d[oa]\s)?([2-9]|segundo|terceiro|quarto|quinto|sexto|setimo|oitavo|nono)\s?(?:o)?\sano\s/.exec(t) ||
+        /\s(?:d[oa]\s)?([2-9]|segundo|terceiro|quarto|quinto|sexto|setimo|oitavo|nono)\s?(?:o)?\s$/.exec(t);
       if (m) {
         serie = '0' + (ORDINAIS[m[1]] || m[1]);
         tira(m[0]);
       }
     }
     return { serie: serie, resto: t.replace(/\s+/g, ' ').trim() };
+  }
+
+  /* O termo que os grupos de exercícios e de livros procuram: a busca sem o
+   * ano ("volume 8" procura "volume"), porque o ano escolhe o assunto, e não
+   * é palavra do exercício nem do livro. A busca só de ano fica como veio. */
+  function termoDosGrupos(termo) {
+    var norm = normalizadorDaBusca() || function (x) { return Busca.semAcento(String(x || '')); };
+    var ano = anoDaBusca(norm(termo));
+    return ano.serie && ano.resto ? ano.resto : String(termo || '').trim();
   }
 
   // a mesma regra da busca no texto (todas as palavras significativas), no título ou nas palavras-chave do assunto
@@ -23224,6 +23236,16 @@
       .sort(function (x, y) { return (x.outroAno ? 1 : 0) - (y.outroAno ? 1 : 0); });
   }
 
+  // "1 capítulo nos livros", "1 livro inteiro", "2 capítulos e 1 livro inteiro"
+  function nosLivrosEmPalavras(vinculos) {
+    var inteiros = vinculos.filter(function (c) { return c.entrada.obraInteira; }).length;
+    var capitulos = vinculos.length - inteiros;
+    var partes = [capitulos ? plural(capitulos, 'capítulo', 'capítulos') : '', inteiros ? plural(inteiros, 'livro inteiro', 'livros inteiros') : '']
+      .filter(Boolean);
+    if (!partes.length) return '';
+    return partes.join(' e ') + (inteiros ? '' : ' nos livros');
+  }
+
   // "o 8º ano", "a 1ª série"
   function comArtigo(serie) {
     return (/ª/.test(serie) || /^(s[ée]rie|etapa)/i.test(serie) ? 'a ' : 'o ') + serie;
@@ -23238,7 +23260,14 @@
     var tentativas = 0;
     function preencher() {
       Promise.all([carregarAssuntosDosLivros(), Store.listarLivros().catch(function () { return []; })]).then(function (r) {
-        if (!caixa.isConnected || String(bibTermo).trim() !== termo) return;
+        if (String(bibTermo).trim() !== termo) return;
+        /* a caixa saiu da tela (o miolo foi refeito, ou trocado pelo vazio) com a
+         * mesma busca à vista: ela volta ao alto do miolo, em vez de calar */
+        if (!caixa.isConnected) {
+          var miolo = $('#bib-corpo');
+          if (!miolo || bibNav.assunto || miolo.querySelector('#bib-assuntos-da-busca')) return;
+          miolo.insertBefore(caixa, miolo.firstChild);
+        }
         var nomes = r[0], livros = r[1] || [];
         caixa.innerHTML = '';
         caixa.hidden = true;
@@ -23248,9 +23277,8 @@
         if (!achados.length) return;
         caixa.appendChild(el('h3', { class: 'bib-assuntos-titulo', texto: 'Assuntos' }));
         var linha = function (a) {
-          var n = vinculosDoAssunto(livros, a).length;
-          var detalhe = [nomeDaDisciplina(a.disciplina, a), serieDoAssunto(a),
-            n ? plural(n, 'vínculo nos livros', 'vínculos nos livros') : ''].filter(Boolean).join(' · ');
+          var detalhe = [nomeDaDisciplina(a.disciplina, a), serieDoAssunto(a), nosLivrosEmPalavras(vinculosDoAssunto(livros, a))]
+            .filter(Boolean).join(' · ');
           var l = linhaBib(a.titulo, detalhe, function () { abrirPaginaDoAssunto(a.id); });
           l.setAttribute('data-assunto', a.id);
           return l;
@@ -23536,7 +23564,7 @@
     corpo.innerHTML = '';
     livrosNaBusca(true);
     corpo.appendChild(grupoDeAssuntosDaBusca(bibTermo.trim()));
-    corpo.appendChild(grupoNosLivros(bibTermo.trim()));
+    corpo.appendChild(grupoNosLivros(termoDosGrupos(bibTermo.trim())));
   }
 
   function normalizarBusca(t) {
@@ -23661,6 +23689,8 @@
   function desenharBuscaBiblioteca(corpoDaAba, termo) {
     // B1: os assuntos que casam a busca vêm primeiro, e levam à página do assunto
     corpoDaAba.appendChild(grupoDeAssuntosDaBusca(termo));
+    // os grupos de exercícios e de livros procuram sem o ano escrito ("volume 8" procura "volume")
+    termo = termoDosGrupos(termo);
     var g = procurarNaBiblioteca(termo);
     var total = g.modulo.length + g.teoria.length + g.exercicio.length + g.banco.length;
     var corpo = corpoDaAba;

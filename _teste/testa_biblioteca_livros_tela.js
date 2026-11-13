@@ -1127,8 +1127,8 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await digitarB1('pitagoras');
   const assuntos = await esperar('o bloco Assuntos da busca', lerAssuntos, v => !!v && v.length > 0, 10000);
   console.log('   "pitagoras": ' + JSON.stringify(assuntos.valor));
-  conf('a busca "pitagoras" mostra o assunto Teorema de Pitágoras no alto, com a matéria, o ano e os vínculos nos livros',
-    (assuntos.valor || []).filter(x => /^MAT09-07=/.test(x)).join(''), 'MAT09-07=Teorema de Pitágoras|Matemática · 9º ano · 1 vínculo nos livros');
+  conf('a busca "pitagoras" mostra o assunto Teorema de Pitágoras no alto, com a matéria, o ano e os capítulos nos livros',
+    (assuntos.valor || []).filter(x => /^MAT09-07=/.test(x)).join(''), 'MAT09-07=Teorema de Pitágoras|Matemática · 9º ano · 1 capítulo nos livros');
   conf('o bloco Assuntos vem antes dos grupos de exercícios e de livros', await pag.evaluate(() => {
     const filhos = [...document.querySelector('#bib-corpo').children];
     return filhos.indexOf(document.querySelector('#bib-assuntos-da-busca')) < filhos.indexOf(document.querySelector('#bib-corpo [data-grupo="exercicios"]'));
@@ -1139,8 +1139,23 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     const v = await esperar('os assuntos de "' + termo + '"', lerAssuntos, x => !!x && x.length > 0 && !/^MAT09-07/.test(x[0]), 10000);
     console.log('   "' + termo + '": ' + JSON.stringify(v.valor));
     conf('"' + termo + '" põe o MAT08-15 (Volume e capacidade, 8º ano) em primeiro, com o livro inteiro ligado contado',
-      (v.valor || [])[0], 'MAT08-15=Volume e capacidade: bloco retangular e cilindro|Matemática · 8º ano · 1 vínculo nos livros');
+      (v.valor || [])[0], 'MAT08-15=Volume e capacidade: bloco retangular e cilindro|Matemática · 8º ano · 1 livro inteiro');
+    // os grupos de baixo procuram sem o ano: nada diz "Nenhum exercício com "volume 8""
+    const grupos = await esperar('os grupos de "' + termo + '"', () => pag.evaluate(() => {
+      const g = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status');
+      return g && !/Buscando/.test(g.textContent) ? document.querySelector('#bib-corpo').innerText : null;
+    }), x => !!x, 10000);
+    conf('com "' + termo + '", os grupos de exercícios e de livros não falam do termo com o ano', /volume 8|8º ano|oitavo/.test(grupos.valor || ''), false);
   }
+  // "equação do 2º grau" não é o 2º ano: os exercícios do módulo aparecem, e o assunto do 9º ano vem primeiro
+  await digitarB1('equação do 2º grau');
+  const grau = await esperar('a busca "equação do 2º grau"', () => pag.evaluate(() => {
+    const c = document.querySelector('#bib-assuntos-da-busca');
+    const ex = document.querySelector('#bib-corpo [data-grupo="exercicios"] .bib-grupo-contagem');
+    return c && !c.hidden && ex ? { primeiro: c.querySelector('[data-assunto]').dataset.assunto, exercicios: ex.textContent } : null;
+  }), x => !!x, 10000);
+  conf('"equação do 2º grau" não vira o 2º ano: o assunto do 9º ano vem primeiro, e os exercícios aparecem',
+    !!grau.valor && /^MAT09-0[45]$/.test(grau.valor.primeiro) && grau.valor.exercicios !== '0', true);
   /* "volume" casa 8 assuntos (4 pelo título em Matemática, 1 em Química e 3 pelas palavras-chave): com
    * mais de 5, três no alto, os do título primeiro, e "Ver os outros N" mostra o resto; "volume 8" escolhe o ano */
   await digitarB1('volume');
