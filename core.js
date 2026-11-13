@@ -515,34 +515,43 @@
 
   /* Alvos de uma edição em massa, respeitando o escopo escolhido.
    * escopo: 'esta' | 'seguintes' | 'todas' */
-  // o relato ou a nota só dela: o texto que o escopo de várias aulas não regrava nem apaga
-  function temTextoDaAula(a) {
-    return !!(String(a.notaTexto || '').trim() || String(a.notaPrivada || '').trim());
+  /* AS AULAS QUE NENHUMA AÇÃO EM LOTE DA REPETIÇÃO ALCANÇA, por regra
+   * declarada (F7; decisões do dono e da orquestradora, 13/11/2026). Vale para
+   * todo caminho de lote: o "todas" e o "desta em diante" da edição e do
+   * excluir (escopoDaRepeticao), o Encerrar da ficha do aluno (encerrarSerie) e
+   * a mudança de padrão (editarSerie).
+   * - 'registrada': a aula com QUALQUER conteúdo registrado (temConteudo:
+   *   relato, nota só dela, folha, anexo, assunto ou área). Dado registrado
+   *   não some nem muda num lote. Antes isso vinha de carona no "destacada",
+   *   que todo Salvar marcava; desde o F7 o relato e o Concluir gravam direto,
+   *   sem destacar.
+   * - 'paga': a aula PASSADA de um mês COM PAGAMENTO REGISTRADO, mesmo vazia:
+   *   mudar ou apagar uma aula dessas muda o que a família pagou, ou o que falta
+   *   receber de um mês que ela já está cobrando. Qualquer pagamento do mês
+   *   (pagamentoDe), inteiro ou a menos: na dúvida com dinheiro, protege.
+   *   "Passada" é a regra do Fechamento (a aula de hoje conta como dada).
+   * Devolve null quando a aula pode entrar no lote. `cache` guarda, por aluno e
+   * mês, se o mês tem pagamento. Uma aula registrada e paga conta como
+   * registrada (um motivo só por aula). */
+  function motivoParaPoupar(db, a, hoje, cache) {
+    if (temConteudo(a)) return 'registrada';
+    if (!a.data || a.data > hoje) return null;
+    var chave = a.alunoId + '|' + mesDe(a.data);
+    if (!(chave in cache)) {
+      cache[chave] = !!pagamentoDe(db, a.alunoId, mesDe(a.data));
+    }
+    return cache[chave] ? 'paga' : null;
   }
 
-  /* As aulas da repetição que uma ação em lote ("todas", "desta em diante",
-   * "excluir todas" e "excluir desta em diante") NÃO alcança, por regra
-   * declarada:
-   * - a aula com relato ou com a nota só dela (notaTexto ou notaPrivada não
-   *   vazios): é aula dada e registrada, e mudar o padrão da série não reescreve
-   *   o passado dela, nem o excluir a apaga com o texto junto. Antes isso vinha
-   *   de carona no "destacada", que o Salvar marcava; desde o F7 o relato e a
-   *   nota gravam direto, sem destacar. Só os dois textos, e não o conteúdo
-   *   inteiro da aula: a aula só com assunto o pai não protegia;
-   * - a aula PASSADA de um mês COM PAGAMENTO REGISTRADO, mesmo sem texto
-   *   (decisão do dono, 13/11/2026): mudar ou apagar uma aula dessas muda o que
-   *   a família pagou, ou o que falta receber de um mês que ela já está
-   *   cobrando. Vale para qualquer pagamento do mês (pagamentoDe), inteiro ou
-   *   a menos: na dúvida com dinheiro, protege. "Passada" é a mesma regra do
-   *   Fechamento (a aula de hoje conta como dada: só o que está depois de hoje
-   *   é previsto).
-   * A aula destacada continua fora, como sempre. A própria aula editada sempre
-   * entra. `hojeRef` existe para a prova fixar o dia.
-   * Devolve { alvos, comTexto, pagas }: as duas listas são as irmãs do mesmo
-   * trecho que ficaram de fora por cada motivo, para a tela dizer quantas e
-   * por quê (uma aula com texto e paga conta como com texto). */
+  /* As aulas da repetição que o "todas", o "desta em diante", o "excluir
+   * todas" e o "excluir desta em diante" alcançam, e as que ficam de fora por
+   * cada motivo (motivoParaPoupar). A aula destacada continua fora, como
+   * sempre. A própria aula editada sempre entra. `hojeRef` existe para a prova
+   * fixar o dia.
+   * Devolve { alvos, registradas, pagas }: as duas listas são as irmãs do mesmo
+   * trecho que ficaram de fora, para a tela dizer quantas e por quê. */
   function escopoDaRepeticao(db, aula, escopo, hojeRef) {
-    if (escopo === 'esta' || !aula.serieId) return { alvos: [aula], comTexto: [], pagas: [] };
+    if (escopo === 'esta' || !aula.serieId) return { alvos: [aula], registradas: [], pagas: [] };
     var hoje = hojeRef || hojeIso();
     var s = (db.series || []).filter(function (x) { return x.id === aula.serieId; })[0];
     var raizId = s ? (s.serieOrigemId || s.id) : aula.serieId;
@@ -551,23 +560,16 @@
       if (x.id === raizId || x.serieOrigemId === raizId) seriesIds[x.id] = true;
     });
     seriesIds[aula.serieId] = true;
-    var mesPago = {};
-    function passadaEPaga(a) {
-      if (!a.data || a.data > hoje) return false;
-      var chave = a.alunoId + '|' + mesDe(a.data);
-      if (!(chave in mesPago)) {
-        mesPago[chave] = !!pagamentoDe(db, a.alunoId, mesDe(a.data));
-      }
-      return mesPago[chave];
-    }
-    var saida = { alvos: [], comTexto: [], pagas: [] };
+    var cache = {};
+    var saida = { alvos: [], registradas: [], pagas: [] };
     (db.aulas || []).forEach(function (a) {
       if (!seriesIds[a.serieId]) return;
       if (escopo === 'seguintes' && a.data < aula.data && a.id !== aula.id) return;
       if (a.id === aula.id) { saida.alvos.push(a); return; }
       if (a.destacada) return;
-      if (temTextoDaAula(a)) { saida.comTexto.push(a); return; }
-      if (passadaEPaga(a)) { saida.pagas.push(a); return; }
+      var motivo = motivoParaPoupar(db, a, hoje, cache);
+      if (motivo === 'registrada') { saida.registradas.push(a); return; }
+      if (motivo === 'paga') { saida.pagas.push(a); return; }
       saida.alvos.push(a);
     });
     return saida;
@@ -575,6 +577,31 @@
 
   function alvosDoEscopo(db, aula, escopo, hojeRef) {
     return escopoDaRepeticao(db, aula, escopo, hojeRef).alvos;
+  }
+
+  /* O "Encerrar" da repetição (ficha do aluno): a série para na véspera de
+   * `quando`, e as aulas dela dali em diante saem, MENOS as que a regra poupa
+   * (motivoParaPoupar) e as destacadas, como antes. As poupadas ficam com o
+   * serieId da série (que pode ter sido apagada, se o fim ficou antes do
+   * início) e depois do fim dela. Devolve { removidas, registradas, pagas }. */
+  function encerrarSerie(db, serieId, quando, hojeRef) {
+    var se = (db.series || []).filter(function (x) { return x.id === serieId; })[0];
+    var saida = { removidas: 0, registradas: 0, pagas: 0 };
+    if (!se || !quando) return saida;
+    var hoje = hojeRef || hojeIso();
+    var cache = {};
+    db.aulas = (db.aulas || []).filter(function (a) {
+      if (a.serieId !== se.id || a.data < quando || a.destacada) return true;
+      var motivo = motivoParaPoupar(db, a, hoje, cache);
+      if (motivo === 'registrada') { saida.registradas++; return true; }
+      if (motivo === 'paga') { saida.pagas++; return true; }
+      saida.removidas++;
+      return false;
+    });
+    var dt = dataLocal(quando); dt.setDate(dt.getDate() - 1);
+    se.fim = isoDe(dt);
+    if (se.fim < se.inicio) db.series = db.series.filter(function (x) { return x.id !== se.id; });
+    return saida;
   }
 
   /* Aplica mudanças de horário, duração, situação ou cobrança.
@@ -656,7 +683,11 @@
             }
           });
           var fimAntigo = temSemFim ? null : maiorFim;
-          if (aula.data <= s.inicio) {
+          if (fimAntigo && fimAntigo < aula.data) {
+            /* A aula está depois do fim da repetição (uma poupada pelo
+             * Encerrar): não há padrão a mudar dali em diante, e uma série nova
+             * nasceria com o fim antes do início. Só as aulas mudam. */
+          } else if (aula.data <= s.inicio) {
             if (mudancas.hora !== undefined) s.hora = mudancas.hora;
             if (mudancas.duracaoMin !== undefined) s.duracaoMin = mudancas.duracaoMin;
             if (mudancas.status !== undefined) s.status = mudancas.status;
@@ -820,10 +851,18 @@
     }
 
     var preservadas = 0;
+    /* A regra do lote (motivoParaPoupar): a aula registrada ou passada de mês
+     * com pagamento fica como está, nem sai nem muda de horário. */
+    var cachePoupa = {}, poupadas = {};
+    var hojePoupa = hojeIso();
+    (db.aulas || []).forEach(function (a) {
+      if (a.serieId === serieId && a.data >= corte && !a.destacada && motivoParaPoupar(db, a, hojePoupa, cachePoupa)) poupadas[a.id] = true;
+    });
     db.aulas = (db.aulas || []).filter(function (a) {
       if (a.serieId !== serieId || a.data < corte || a.destacada) return true;
       if (datasNovas[a.data]) return true;          // a data continua no padrão
       if (temConteudo(a)) { a.destacada = true; preservadas++; return true; }
+      if (poupadas[a.id]) return true;               // passada de mês com pagamento: fica
       return false;                                  // vazia e fora do padrão: sai
     });
     db._preservadasNaEdicao = preservadas;
@@ -853,7 +892,7 @@
     // As aulas que sobreviveram ao corte passam a seguir o horário e a duração
     // novos, sem trocar de registro: assim a folha de aula continua com a aula.
     (db.aulas || []).forEach(function (a) {
-      if (a.serieId !== serieId || a.data < corte || a.destacada) return;
+      if (a.serieId !== serieId || a.data < corte || a.destacada || poupadas[a.id]) return;
       if (novoPadrao.hora !== undefined) a.hora = s.hora;
       if (novoPadrao.duracaoMin !== undefined) a.duracaoMin = s.duracaoMin;
     });
@@ -5820,7 +5859,7 @@
     feriadoEm: feriadoEm, feriadosDoMes: feriadosDoMes, deBR: deBR,
     criarSerie: criarSerie, editarSerie: editarSerie, serieDe: serieDe, descreveSerie: descreveSerie,
     datasDaSerieNoMes: datasDaSerieNoMes, materializarSerieNoMes: materializarSerieNoMes,
-    garantirSeriesAte: garantirSeriesAte, aulasDaSerie: aulasDaSerie, alvosDoEscopo: alvosDoEscopo, escopoDaRepeticao: escopoDaRepeticao,
+    garantirSeriesAte: garantirSeriesAte, aulasDaSerie: aulasDaSerie, alvosDoEscopo: alvosDoEscopo, escopoDaRepeticao: escopoDaRepeticao, encerrarSerie: encerrarSerie,
     aplicarEdicaoAula: aplicarEdicaoAula, excluirAulas: excluirAulas, achaAula: achaAula,
     repetirParaTras: repetirParaTras, preverRetroativo: preverRetroativo, temConteudo: temConteudo,
     calcularFechamento: calcularFechamento, calcularMesInteiro: calcularMesInteiro,

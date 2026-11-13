@@ -24,9 +24,9 @@ const os = require('os');
 const path = require('path');
 
 const VENENOS = {
-  '--envenenado-sem-regra-da-paga': ['      if (passadaEPaga(a)) { saida.pagas.push(a); return; }', ''],
-  '--envenenado-protege-toda-passada': ['        mesPago[chave] = !!pagamentoDe(db, a.alunoId, mesDe(a.data));', '        mesPago[chave] = true;'],
-  '--envenenado-protege-futura': ['      if (!a.data || a.data > hoje) return false;', '      if (!a.data) return false;']
+  '--envenenado-sem-regra-da-paga': ["      if (motivo === 'paga') { saida.pagas.push(a); return; }", ''],
+  '--envenenado-protege-toda-passada': ['      cache[chave] = !!pagamentoDe(db, a.alunoId, mesDe(a.data));', '      cache[chave] = true;'],
+  '--envenenado-protege-futura': ['    if (!a.data || a.data > hoje) return null;', '    if (!a.data) return null;']
 };
 const pedidos = process.argv.slice(2);
 const desconhecidos = pedidos.filter(a => !VENENOS[a]);
@@ -87,7 +87,7 @@ for (const escopo of ['todas', 'seguintes']) {
   const origem = escopo === 'todas' ? m.dia('2026-12-03') : m.dia('2026-08-06');
   const fora = Core.escopoDaRepeticao(m.db, origem, escopo, HOJE);
   conf(escopo + ': ficam de fora por pagamento as 11 passadas de setembro, outubro e novembro', fora.pagas.length, 11);
-  conf(escopo + ': nenhuma de fora por texto', fora.comTexto.length, 0);
+  conf(escopo + ': nenhuma de fora por registro', fora.registradas.length, 0);
   Core.aplicarEdicaoAula(m.db, origem.id, { duracaoMin: 90 }, escopo, HOJE);
   conf(escopo + ': a passada e paga de outubro (08/10) fica com 60', m.dia('2026-10-08').duracaoMin, 60);
   conf(escopo + ': a passada e paga de novembro (12/11) fica com 60', m.dia('2026-11-12').duracaoMin, 60);
@@ -135,7 +135,7 @@ for (const escopo of ['todas', 'seguintes']) {
   const m = montar();
   m.dia('2026-10-22').notaTexto = 'Revisão para a prova.';
   const fora = Core.escopoDaRepeticao(m.db, m.dia('2026-12-03'), 'todas', HOJE);
-  conf('a aula paga com relato conta uma vez, como com texto', [fora.comTexto.length, fora.pagas.length].join(','), '1,10');
+  conf('a aula paga com relato conta uma vez, como registrada', [fora.registradas.length, fora.pagas.length].join(','), '1,10');
 }
 
 if (VENENO) {

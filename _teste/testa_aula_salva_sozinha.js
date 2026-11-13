@@ -37,6 +37,14 @@
  * 14. A aula passada de mês com pagamento fica fora do "todas" e do "excluir todas",
  *     e o aviso diz quantas ficaram de fora e por quê (regra no core,
  *     testa_escopo_pago.js).
+ * 15. O Voltar do aparelho na aula NOVA preenchida pergunta "Sair sem guardar o
+ *     que você escreveu?", como no pai; o "não" deixa a janela aberta.
+ * 16. Uma gravação depois de um lote encerra o Desfazer do lote (o relato salvo
+ *     depois não some).
+ * 17. A pergunta de escopo aberta enquanto chega uma mudança: nada grava por cima.
+ * 18. O fecharTudo do Desfazer não grava: o relato pendente fica no rascunho.
+ * 19. O Encerrar da ficha do aluno também poupa a aula já registrada, e o aviso
+ *     diz quantas continuam (regra no core, testa_encerrar_repeticao.js).
  *
  * Venenos, cada um tem de cair:
  *   --envenenado-grava-por-cima        sem a conferência antes de gravar e sem o rebase;
@@ -151,7 +159,11 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
   pag.removeAllListeners('dialog'); // o ajudante aceita toda pergunta; aqui quem responde é a prova
   pag.on('dialog', async d => {
     pag.dialogos.push(d.message());
-    try { if (pag.respostaDoDialogo) await d.accept(); else await d.dismiss(); } catch (e) { /* ok */ }
+    try {
+      if (!pag.respostaDoDialogo) await d.dismiss();
+      else if (d.type() === 'prompt') await d.accept(pag.textoDoPrompt || d.defaultValue());
+      else await d.accept();
+    } catch (e) { /* ok */ }
   });
   await RELOGIO.naPagina(pag);
   await H.abrirApp(pag, amb.ORIGEM);
@@ -476,7 +488,7 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
     await pag.click('#salvar-aula');
     await esperar('pergunta de escopo', () => pag.evaluate(() => document.querySelector('#modal-escopo').classList.contains('aberto')), Boolean, 4000);
     conf('a pergunta do "todas" avisa que as de mês com pagamento ficam de fora', await pag.evaluate(() =>
-      /menos as com relato ou nota e as de mês com pagamento/.test(document.querySelector('#modal-escopo').textContent)), true);
+      /menos as aulas já registradas e as de mês com pagamento/.test(document.querySelector('#modal-escopo').textContent)), true);
     await pag.evaluate(() => Array.from(document.querySelectorAll('.opcao-escopo')).find(o => /Todas as aulas/.test(o.textContent)).click());
     const mudou = await esperar('o todas gravou', () => lerAula(pag, beta.outra), a => a && a.duracaoMin === 90, 5000); // a de 26/11, outra irmã
     conf('(arranjo) o "todas" gravou nas aulas que podia', mudou.ok, true);
@@ -496,6 +508,117 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
     const av14b = (await avisoAgora(pag)).texto;
     conf('o aviso do excluir diz quantas continuam e por quê (' + av14b + ')',
       /^Aulas da repetição excluídas\. 5 aulas de mês com pagamento continuam na agenda\./.test(av14b), true);
+  }
+
+  if (!MODO) {
+    secao('15. O Voltar na aula NOVA preenchida pergunta antes de sair');
+    await H.irParaAba(pag, 'agenda');
+    await pag.click('#nova-aula');
+    await esperar('a aula nova abriu', () => aberta(pag), Boolean, 5000);
+    await escolher(pag, '#campo-hora', '07:30');
+    const temRelatoNaNova = await pag.evaluate(() => !!document.querySelector('#campo-nota-texto'));
+    if (temRelatoNaNova) await escrever(pag, '#campo-nota-texto', 'Relato da aula nova');
+    pag.respostaDoDialogo = false;
+    const d15 = pag.dialogos.length;
+    await pag.evaluate(() => history.back());
+    await esperar('a pergunta do Voltar', () => Promise.resolve(pag.dialogos.length > d15), Boolean, 5000);
+    await pausa(300);
+    conf('o Voltar pergunta "Sair sem guardar o que você escreveu?"', pag.dialogos.slice(d15).join(' | '), 'Sair sem guardar o que você escreveu?');
+    conf('com o "não", a aula nova continua aberta', await aberta(pag), true);
+    pag.respostaDoDialogo = true;
+    const d15b = pag.dialogos.length;
+    await pag.evaluate(() => history.back());
+    const fechou15 = await esperar('com o sim, fecha', async () => !(await aberta(pag)), Boolean, 5000);
+    conf('com o "sim", a aula nova fecha sem gravar nada', fechou15.ok && pag.dialogos.length > d15b &&
+      !(await pag.evaluate(() => Store.carregar().then(d => d.aulas.some(a => a.hora === '07:30')))), true);
+  }
+
+  if (!MODO) {
+    secao('16. Uma gravação depois de um lote encerra o Desfazer do lote');
+    pag.respostaDoDialogo = true;
+    conf('(arranjo) a aula da repetição abriu', (await abrir(pag, serie.aula)).ok, true);
+    await escolher(pag, '#campo-hora', '14:00');
+    await pag.click('#salvar-aula');
+    await esperar('pergunta de escopo', () => pag.evaluate(() => document.querySelector('#modal-escopo').classList.contains('aberto')), Boolean, 4000);
+    await pag.evaluate(() => Array.from(document.querySelectorAll('.opcao-escopo')).find(o => /Todas as aulas/.test(o.textContent)).click());
+    await esperar('o lote gravou', () => lerAula(pag, serie.aula), a => a && a.hora === '14:00', 5000);
+    const lote16 = await avisoAgora(pag);
+    conf('(arranjo) o lote oferece Desfazer (' + lote16.texto + ')', /Desfazer/.test(lote16.acao), true);
+    conf('(arranjo) a outra aula abriu', (await abrir(pag, OUTRA)).ok, true);
+    await escrever(pag, '#campo-nota-texto', 'Relato gravado depois do lote');
+    conf('(arranjo) o relato da outra aula salvou', (await esperar('relato depois do lote', () => lerAula(pag, OUTRA), a => a && a.notaTexto === 'Relato gravado depois do lote', 5000)).ok, true);
+    const botao16 = await pag.evaluate(() => { const b = document.querySelector('#aviso-acao'); return { visivel: getComputedStyle(b).display !== 'none', texto: b.textContent }; });
+    conf('depois do "Salvo", o Desfazer do lote some (' + JSON.stringify(botao16) + ')', botao16.visivel && /Desfazer/.test(botao16.texto), false);
+    await pag.click('#cancelar-aula');
+    await pausa(400);
+    conf('o relato gravado depois do lote continua', (await lerAula(pag, OUTRA)).notaTexto, 'Relato gravado depois do lote');
+    conf('e o lote continua aplicado', (await lerAula(pag, serie.aula)).hora, '14:00');
+
+    secao('17. A pergunta de escopo aberta enquanto chega uma mudança: nada grava por cima');
+    conf('(arranjo) a aula da repetição abriu', (await abrir(pag, serie.aula)).ok, true);
+    await escolher(pag, '#campo-hora', '15:30');
+    await pag.click('#salvar-aula');
+    await esperar('pergunta de escopo', () => pag.evaluate(() => document.querySelector('#modal-escopo').classList.contains('aberto')), Boolean, 4000);
+    conf('(arranjo) chegou da nuvem outro horário com a pergunta aberta', await chegaDaNuvem(pag, serie.aula, { hora: '19:00' }), 1);
+    await pausa(900);
+    await pag.evaluate(() => Array.from(document.querySelectorAll('.opcao-escopo')).find(o => /Todas as aulas/.test(o.textContent)).click());
+    await pausa(800);
+    conf('o horário que chegou não foi coberto', (await lerAula(pag, serie.aula)).hora, '19:00');
+    const av17 = (await avisoAgora(pag)).texto;
+    conf('o aviso diz que nada foi gravado por cima (' + av17 + ')', /mudou em outro aparelho enquanto você escolhia/.test(av17), true);
+    conf('o rodapé mostra o conflito', /mudou em outro aparelho/.test(await rodape(pag)), true);
+    pag.respostaDoDialogo = true;
+    await pag.click('#cancelar-aula');
+    await pausa(400);
+
+    secao('18. O fecharTudo do Desfazer não grava: o relato pendente fica no rascunho');
+    conf('(arranjo) a aula a excluir abriu', (await abrir(pag, EXCLUI)).ok, true);
+    await pag.click('#excluir-aula');
+    await esperar('a aula saiu', () => lerAula(pag, EXCLUI), a => a === null, 5000);
+    conf('(arranjo) a outra aula abriu', (await abrir(pag, OUTRA)).ok, true);
+    const antes18 = (await lerAula(pag, OUTRA)).notaTexto;
+    await escrever(pag, '#campo-nota-texto', 'Relato que o Desfazer não pode gravar');
+    // antes da pausa do salvar sozinho: o Desfazer da exclusão, que fecha tudo
+    await pag.evaluate(() => document.querySelector('#aviso-acao').click());
+    await esperar('a exclusão desfeita', () => lerAula(pag, EXCLUI), a => !!a, 5000);
+    await pausa(1200);
+    conf('a janela fechou', await aberta(pag), false);
+    conf('o relato pendente NÃO foi gravado pelo fecharTudo', (await lerAula(pag, OUTRA)).notaTexto, antes18);
+    conf('ele ficou no rascunho do aparelho', await pag.evaluate(id => {
+      const r = JSON.parse(localStorage.getItem('rascunho-relato-aula:' + id) || 'null');
+      return !!r && r.notaTexto === 'Relato que o Desfazer não pode gravar';
+    }, OUTRA), true);
+  }
+
+  if (!MODO) {
+    secao('19. O Encerrar da ficha do aluno também poupa a aula já registrada');
+    pag.respostaDoDialogo = true;
+    const antes19 = await pag.evaluate(sid => Store.carregar().then(d => {
+      const hoje = Core.hojeIso();
+      const da = d.aulas.filter(a => a.serieId === sid && a.data >= hoje && !a.destacada);
+      return { registradas: da.filter(a => Core.temConteudo(a)).map(a => a.id), vazias: da.filter(a => !Core.temConteudo(a)).map(a => a.id) };
+    }), serie.id);
+    conf('(arranjo) há aula registrada e aula vazia da repetição de hoje em diante', antes19.registradas.length > 0 && antes19.vazias.length > 0, true);
+    await H.irParaAba(pag, 'alunos');
+    await pag.evaluate(() => document.querySelector('#lista-alunos .item-lista[data-aluno="f7_alfa"]').click());
+    await esperar('a ficha abriu', () => pag.evaluate(() => document.querySelector('#modal-aluno').classList.contains('aberto')), Boolean, 5000);
+    pag.textoDoPrompt = await pag.evaluate(() => Core.ddmmaaaa(Core.hojeIso()));
+    const d19 = pag.dialogos.length;
+    const tocou = await pag.evaluate(() => {
+      const b = Array.from(document.querySelectorAll('#modal-aluno button')).find(x => x.textContent.trim() === 'Encerrar');
+      if (b) b.click();
+      return !!b;
+    });
+    conf('(arranjo) o Encerrar existe na ficha', tocou, true);
+    const depois19 = await esperar('o Encerrar gravou', () => pag.evaluate(ids => Store.carregar().then(d => ids.filter(id => d.aulas.some(a => a.id === id)).length), antes19.vazias), n => n === 0, 5000);
+    pag.textoDoPrompt = null;
+    conf('(arranjo) o Encerrar perguntou a data', pag.dialogos.length > d19, true);
+    conf('as vazias de hoje em diante saíram', depois19.ok, true);
+    const ficaram19 = await pag.evaluate(ids => Store.carregar().then(d => ids.filter(id => d.aulas.some(a => a.id === id)).length), antes19.registradas);
+    conf('as já registradas ficaram (' + ficaram19 + ' de ' + antes19.registradas.length + ')', ficaram19, antes19.registradas.length);
+    const av19 = (await avisoAgora(pag)).texto;
+    const n19 = antes19.registradas.length;
+    conf('o aviso diz quantas continuam e por quê (' + av19 + ')', av19.indexOf('Repetição encerrada. ' + (n19 === 1 ? '1 aula já registrada continua na agenda.' : n19 + ' aulas já registradas continuam na agenda.')) === 0, true);
   }
 
   conf('não houve erro de página', (pag.errosDePagina || []).join(' | '), '');

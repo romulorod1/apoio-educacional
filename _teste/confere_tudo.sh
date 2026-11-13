@@ -325,6 +325,12 @@ roda "escopo sem a aula paga" node _teste/testa_escopo_pago.js
 roda "escopo sem a aula paga --envenenado-sem-regra-da-paga" node _teste/testa_escopo_pago.js --envenenado-sem-regra-da-paga
 roda "escopo sem a aula paga --envenenado-protege-toda-passada" node _teste/testa_escopo_pago.js --envenenado-protege-toda-passada
 roda "escopo sem a aula paga --envenenado-protege-futura" node _teste/testa_escopo_pago.js --envenenado-protege-futura
+# F7 (rodada 5): o Encerrar da ficha e a mudanca de padrao passam pela mesma regra; os venenos
+# tiram a regra do Encerrar, fazem ele guardar tudo e deixam o "desta em diante" criar serie ao contrario.
+roda "encerrar repeticao" node _teste/testa_encerrar_repeticao.js
+roda "encerrar repeticao --envenenado-encerrar-sem-regra" node _teste/testa_encerrar_repeticao.js --envenenado-encerrar-sem-regra
+roda "encerrar repeticao --envenenado-encerrar-guarda-tudo" node _teste/testa_encerrar_repeticao.js --envenenado-encerrar-guarda-tudo
+roda "encerrar repeticao --envenenado-serie-ao-contrario" node _teste/testa_encerrar_repeticao.js --envenenado-serie-ao-contrario
 roda "merge seguro"          node _teste/testa_merge_seguro.js
 # O guarda de merge no CI (item 13c): o guarda_merge.js julga pelo merge_seguro
 # e publica o status portao-merge na cabeca que julgou. Com gh e git falsos:

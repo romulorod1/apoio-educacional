@@ -12,7 +12,9 @@
  *
  * Venenos, cada um tem de cair só do lado da aula com texto:
  *   --envenenado-sem-regra-do-relato   o filtro volta a olhar só o destacada;
- *   --envenenado-so-o-relato           a regra olha só o notaTexto (a nota só dela fica desprotegida).
+ *   --envenenado-so-o-relato           a regra olha só o texto (relato e nota só dela): a folha,
+ *                                      o anexo e o assunto ficam desprotegidos.
+ * Rodada 5: a regra é "aula com qualquer conteúdo registrado" (Core.temConteudo).
  * Dados fictícios.
  */
 'use strict';
@@ -21,9 +23,9 @@ const os = require('os');
 const path = require('path');
 
 const VENENOS = {
-  '--envenenado-sem-regra-do-relato': ['      if (temTextoDaAula(a)) { saida.comTexto.push(a); return; }', ''],
-  '--envenenado-so-o-relato': ["    return !!(String(a.notaTexto || '').trim() || String(a.notaPrivada || '').trim());",
-    "    return !!String(a.notaTexto || '').trim();"]
+  '--envenenado-sem-regra-do-relato': ["      if (motivo === 'registrada') { saida.registradas.push(a); return; }", ''],
+  '--envenenado-so-o-relato': ["    if (temConteudo(a)) return 'registrada';",
+    "    if (String(a.notaTexto || '').trim() || String(a.notaPrivada || '').trim()) return 'registrada';"]
 };
 const pedidos = process.argv.slice(2);
 const desconhecidos = pedidos.filter(a => !VENENOS[a]);
@@ -62,9 +64,13 @@ function montar() {
   const s = db.series[0];
   Core.materializarSerieNoMes(db, s, '2026-10');
   Core.materializarSerieNoMes(db, s, '2026-11');
+  Core.materializarSerieNoMes(db, s, '2026-12');
   const dia = iso => db.aulas.filter(a => a.serieId && a.data === iso)[0];
   dia('2026-10-08').notaTexto = 'Equações do 1º grau, lista 3 feita.'; // o relato grava direto (F7, B4)
   dia('2026-10-29').notaPrivada = 'Chegou cansada; conversar com a mãe.'; // só a nota só dela
+  dia('2026-11-19').temNota = true;                                  // só a folha escrita
+  dia('2026-11-26').anexos = [{ id: 'anx1', nome: 'lista.pdf' }];    // só um anexo
+  dia('2026-12-03').temas = [{ id: 'mat-fracoes', titulo: 'Frações' }]; // só o assunto
   return { db, dia };
 }
 
@@ -79,6 +85,10 @@ for (const escopo of ['todas', 'seguintes']) {
   conf(escopo + ': a aula com relato mantém o relato', comRelato.notaTexto, 'Equações do 1º grau, lista 3 feita.');
   conf(escopo + ': a aula só com a nota só dela (29/10) fica com 60 minutos', soNota.duracaoMin, 60);
   conf(escopo + ': a aula sem relato (15/10) passa a 90 minutos', semRelato.duracaoMin, 90);
+  conf(escopo + ': a aula só com a folha (19/11) fica com 60 minutos', m.dia('2026-11-19').duracaoMin, 60);
+  conf(escopo + ': a aula só com anexo (26/11) fica com 60 minutos', m.dia('2026-11-26').duracaoMin, 60);
+  conf(escopo + ': a aula só com assunto (03/12) fica com 60 minutos', m.dia('2026-12-03').duracaoMin, 60);
+  conf(escopo + ': a aula vazia de dezembro (10/12) passa a 90 minutos', m.dia('2026-12-10').duracaoMin, 90);
   conf(escopo + ': a aula sem relato de novembro (12/11) passa a 90 minutos', depois.duracaoMin, 90);
   conf(escopo + ': a aula editada passa a 90 minutos', origem.duracaoMin, 90);
 }
@@ -101,6 +111,10 @@ for (const escopo of ['todas', 'seguintes']) {
   conf('excluir ' + escopo + ': a aula só com a nota só dela (29/10) fica, com a nota',
     !!ficou('2026-10-29') && ficou('2026-10-29').notaPrivada, 'Chegou cansada; conversar com a mãe.');
   conf('excluir ' + escopo + ': a aula sem texto (15/10) sai', !ficou('2026-10-15'), true);
+  conf('excluir ' + escopo + ': a aula só com a folha (19/11) fica', !!ficou('2026-11-19'), true);
+  conf('excluir ' + escopo + ': a aula só com anexo (26/11) fica', !!ficou('2026-11-26'), true);
+  conf('excluir ' + escopo + ': a aula só com assunto (03/12) fica', !!ficou('2026-12-03'), true);
+  conf('excluir ' + escopo + ': a aula vazia de dezembro (10/12) sai', !ficou('2026-12-10'), true);
   conf('excluir ' + escopo + ': a aula de onde saiu o excluir sai', !m.db.aulas.some(a => a.id === origem.id), true);
 }
 // relato só de espaços não conta como relato
@@ -123,10 +137,11 @@ if (VENENO) {
         'excluir todas: a aula sem texto (15/10) sai', 'todas: a aula com relato mantém o relato', 'relato só com espaços não protege a aula']
     },
     '--envenenado-so-o-relato': {
-      erra: ['todas: a aula só com a nota só dela (29/10) fica com 60 minutos', 'seguintes: a aula só com a nota só dela (29/10) fica com 60 minutos',
-        'excluir todas: a aula só com a nota só dela (29/10) fica, com a nota', 'excluir seguintes: a aula só com a nota só dela (29/10) fica, com a nota'],
-      acerta: ['todas: a aula com relato (08/10) fica com 60 minutos', 'excluir todas: a aula com relato (08/10) fica, com o relato',
-        'todas: a aula sem relato (15/10) passa a 90 minutos', 'excluir todas: a aula sem texto (15/10) sai']
+      erra: ['todas: a aula só com a folha (19/11) fica com 60 minutos', 'todas: a aula só com anexo (26/11) fica com 60 minutos',
+        'todas: a aula só com assunto (03/12) fica com 60 minutos', 'excluir todas: a aula só com assunto (03/12) fica',
+        'excluir seguintes: a aula só com a folha (19/11) fica'],
+      acerta: ['todas: a aula com relato (08/10) fica com 60 minutos', 'todas: a aula só com a nota só dela (29/10) fica com 60 minutos',
+        'todas: a aula sem relato (15/10) passa a 90 minutos', 'excluir todas: a aula vazia de dezembro (10/12) sai']
     }
   }[VENENO];
   const vf = (r, ok) => { if (ok) passes++; else falhas++; console.log((ok ? '  OK   ' : '  FALHA') + ' ' + r); };

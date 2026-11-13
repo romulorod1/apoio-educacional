@@ -1628,8 +1628,13 @@
       solicitarFecharModal('modal-planejamento');
       return;
     }
-    if (JANELAS_COM_CAMPOS[topo.id] && topo.id !== 'modal-aula' && janelaMudou(topo.id)) {
-      // a ficha do aluno com campo mudado desde que abriu: a entrada volta, e ela decide
+    /* F7: o Voltar na aula que JÁ EXISTE, com relato, nota, data, horário,
+     * duração, situação ou cobrança mudados, é o Fechar dela (abaixo). A aula
+     * NOVA preenchida, e a aula que existe com outro campo da janela mudado,
+     * perguntam como no pai ("Sair sem guardar o que você escreveu?"). */
+    var aulaPeloFechar = topo.id === 'modal-aula' && janelaDaAulaAberta() && aulaTemMudancasParaAutosave();
+    if (JANELAS_COM_CAMPOS[topo.id] && !aulaPeloFechar && janelaMudou(topo.id)) {
+      // a ficha do aluno ou a aula com campo mudado desde que abriu: a entrada volta, e ela decide
       history.pushState({ apoioModal: topo.token }, '');
       if (!confirmar('Sair sem guardar o que você escreveu?')) return;
       pilhaModalHistorico.pop();
@@ -1640,7 +1645,7 @@
       fechandoPorVoltar = false;
       return;
     }
-    if (topo.id === 'modal-aula' && aulaTemMudancasParaAutosave()) {
+    if (aulaPeloFechar) {
       /* F7: na aula, o Voltar é o Fechar dela (as mesmas regras: o relato
        * grava, data, hora, duração, situação e cobrança gravam com o aviso de
        * Desfazer, e o conflito ou a data pela metade perguntam). A entrada
@@ -2063,7 +2068,7 @@
      * material da aula) com mudança pendente. O relato grava pelo salvar
      * sozinho; data, horário, duração, situação e cobrança só gravam pelo
      * Fechar ou pelo Concluir, e o aviso diz que não gravaram. */
-    if (id === 'modal-aula' && !fechandoAulaPelasRegras && typeof janelaDaAulaAberta === 'function' &&
+    if (id === 'modal-aula' && !fechandoAulaPelasRegras && !fechandoSemGravar && typeof janelaDaAulaAberta === 'function' &&
         janelaDaAulaAberta() && !conflitoAutosaveAula &&
         valoresDaAulaNoBanco(aulaEmEdicao.id)) { // B3: a aula excluída não tem o que gravar nem avisar
       if (relatoEmEdicaoAlterado()) gravarRelatoDaAula();
@@ -2146,6 +2151,7 @@
     $('#aviso-texto').textContent = texto;
     $('#aviso-texto').removeAttribute('data-versao'); // só o aviso de versão nova o põe
     var botao = $('#aviso-acao');
+    botao._doLote = false; // só o comDesfazer de um lote marca, depois de mostrar o dele
     if (aoAgir) {
       botao.style.display = '';
       botao.textContent = rotuloAcao || 'Desfazer';
@@ -2214,12 +2220,26 @@
 
   /* Fecha os painéis e solta o que estava sendo editado. Usado quando o estado
    * inteiro é trocado, para nada continuar apontando para registro que sumiu. */
+  /* F7 (rodada 5): o fecharTudo vem da releitura do disco e do Desfazer, que
+   * trocam o banco da memória. Ele NÃO grava: o relato pendente da aula aberta
+   * fica no rascunho do aparelho (com a base do disco), como no pai, e a
+   * gravação sozinha que estava esperando a pausa não dispara depois. */
+  var fechandoSemGravar = false;
   function fecharTudo() {
     if (editorAtual) { editorAtual.destruir(); editorAtual = null; }
+    if (typeof janelaDaAulaAberta === 'function' && janelaDaAulaAberta() && relatoEmEdicaoAlterado()) {
+      guardarRascunhoRelato(aulaEmEdicao, $('#campo-nota-texto'), $('#campo-nota-privada'), baseDiscoRelatoAula);
+    }
+    if (temporizadorAutosaveAula) { clearTimeout(temporizadorAutosaveAula); temporizadorAutosaveAula = null; }
     var quantosEstados = pilhaModalHistorico.length;
     fechandoPorVoltar = true;
-    $$('.fundo-modal').forEach(function (m) { fecharModal(m.id); });
-    fechandoPorVoltar = false;
+    fechandoSemGravar = true;
+    try {
+      $$('.fundo-modal').forEach(function (m) { fecharModal(m.id); });
+    } finally {
+      fechandoPorVoltar = false;
+      fechandoSemGravar = false;
+    }
     pilhaModalHistorico = [];
     if (quantosEstados && history.state && history.state.apoioModal) {
       retornoProgramado = true;
@@ -2322,9 +2342,25 @@
       avisar(recusa.message);
       return Promise.reject(recusa);
     }
+    gravacoesPedidas++;
+    /* F7 (rodada 5): uma gravação qualquer depois de um lote da repetição
+     * encerra o Desfazer daquele lote. O Desfazer volta o banco inteiro de
+     * antes, e apagaria o que foi gravado depois (o relato salvo sozinho em
+     * outra aula, por exemplo). O botão some; o texto do aviso fica. */
+    if (desfazerDeLoteAberto && desfazerDeLoteAberto.marca !== gravacoesPedidas) encerrarDesfazerDeLote();
     var p = Store.salvar(semCorteDoCelular(dbParaGravar()));
     p.then(gravacaoConfirmada, falhaDeGravacao);
     return p;
+  }
+
+  var gravacoesPedidas = 0;
+  var desfazerDeLoteAberto = null;   // { marca }: a gravação do lote; outra depois encerra o Desfazer
+  function encerrarDesfazerDeLote() {
+    if (!desfazerDeLoteAberto) return;
+    desfazerDeLoteAberto.encerrado = true;
+    var botao = $('#aviso-acao');
+    if (botao && botao._doLote) { botao.style.display = 'none'; botao.onclick = null; botao._doLote = false; }
+    desfazerDeLoteAberto = null;
   }
 
   /* O QUE É SÓ TELA ACONTECE MESMO QUANDO A GRAVAÇÃO FALHA. A memória já é a
@@ -2595,7 +2631,7 @@
    * aviso sai sem o Desfazer, porque não há para onde voltar. Antes, essa
    * falha pulava a gravação da mudança e caía no ouvinte global, com a memória
    * já alterada e nenhuma faixa. */
-  function comDesfazer(rotulo, acao) {
+  function comDesfazer(rotulo, acao, deLote) {
     var antes = JSON.parse(JSON.stringify(dbParaGravar()));
     /* A ação do celular da dona (D6b) grava depois, fora do toque: a permissão
      * é guardada aqui e vale para a gravação e para o Desfazer dela. */
@@ -2605,9 +2641,22 @@
     var texto = (typeof rotulo === 'function') ? rotulo() : rotulo;
     return Store.registrarHistorico(texto, antes).then(function () { return true; }, function () { return false; })
       .then(function (comPonto) {
-        return gravar(salvar).then(function () {
+        var registroDoLote = null;
+        var gravou = gravar(function () {
+          var p = salvar();
+          // a gravação do próprio lote: só uma DEPOIS dela encerra o Desfazer
+          if (deLote) { encerrarDesfazerDeLote(); registroDoLote = desfazerDeLoteAberto = { marca: gravacoesPedidas }; }
+          return p;
+        });
+        return gravou.then(function () {
           if (!comPonto) { avisar(texto); return resultado; }
+          if (registroDoLote && registroDoLote.encerrado) { avisar(texto); return resultado; }
           avisar(texto, 'Desfazer', function () {
+            if (registroDoLote && (registroDoLote.encerrado || registroDoLote.marca !== gravacoesPedidas)) {
+              avisar('Outra mudança foi gravada depois, então esta alteração em várias aulas não se desfaz mais.');
+              return;
+            }
+            if (registroDoLote) desfazerDeLoteAberto = null;
             db = antes;
             // Um painel aberto ainda aponta para o registro antigo, que sai do ar
             // ao voltar o estado. Fecha tudo e limpa as referências.
@@ -2623,6 +2672,7 @@
               });
             });
           });
+          if (registroDoLote) $('#aviso-acao')._doLote = true;
           return resultado;
         }, function () {
           // o que aconteceu (e quantos passos da trilha voltaram) é dito do mesmo jeito; a faixa diz que falta guardar
@@ -4049,12 +4099,25 @@
       var alunoId = aula.alunoId;
       var naSerie = Core.serieDe(db, aula) && pendentes.some(function (k) { return CAMPOS_PADRAO_SERIE.indexOf(k) >= 0; });
       var aplicar = function (escopo) {
+        /* F7 (rodada 5): a pergunta de escopo pode ficar aberta enquanto chega
+         * uma mudança desta aula da nuvem. Confere de novo antes de gravar: com
+         * conflito, nada grava por cima; o rodapé avisa e a janela fica com o
+         * que chegou (o rebase já pôs nela o que ela não tinha mexido). */
+        if (conflitoAutosaveAula || !janelaDaAulaAberta() || aulaEmEdicao.id !== aula.id ||
+            mudaramForaDaJanela(pendentes).length) {
+          if (janelaDaAulaAberta()) {
+            conflitoAutosaveAula = true;
+            rotuloEstadoAutosaveAula(FRASE_CONFLITO_AULA);
+          }
+          avisar('Esta aula mudou em outro aparelho enquanto você escolhia. Nada foi gravado por cima: confira a aula e feche de novo.');
+          return;
+        }
         var mexeu = null;
-        // antes de mexer: as irmãs que o lote não alcança (com texto, ou passadas e pagas)
+        // antes de mexer: as irmãs que o lote não alcança (registradas, ou passadas de mês com pagamento)
         var fora = Core.escopoDaRepeticao(db, aula, escopo);
         var rotulo = function () {
           // nos escopos de várias aulas, a frase de sempre; numa aula só, o que mudou nela
-          var poupou = fora.comTexto.length + fora.pagas.length;
+          var poupou = fora.registradas.length + fora.pagas.length;
           var base = escopo === 'seguintes' ? 'Aulas alteradas desta data em diante.'
             : escopo === 'todas' ? (poupou ? 'Aulas da repetição alteradas.' : 'Todas as aulas da repetição foram alteradas.')
               : frasDoQueMudouNaAula(mudancas);
@@ -4065,7 +4128,7 @@
           mexeu = revisarTrilhasDoAluno(alunoId);
         };
         // numa aula só, o Desfazer volta só ela (e a série dela); nos escopos de várias, o banco de antes
-        (escopo === 'esta' ? comDesfazerDaAula(rotulo, aula.id, acaoDaAula) : comDesfazer(rotulo, acaoDaAula)).then(function () {
+        (escopo === 'esta' ? comDesfazerDaAula(rotulo, aula.id, acaoDaAula) : comDesfazer(rotulo, acaoDaAula, true)).then(function () {
           if (aulaEmEdicao && aulaEmEdicao.id === aula.id) absorverGravadoNaJanela(pendentes, valores);
           fecharAulaPelasRegras(depois || null);
           desenharTudo();
@@ -5938,11 +6001,11 @@
       var mexeu = null;
       // antes de apagar: as irmãs que o lote não alcança (com texto, ou passadas e pagas)
       var fora = Core.escopoDaRepeticao(db, aulaEmEdicao, escopo);
-      if (escopo === 'todas' && fora.comTexto.length + fora.pagas.length) rotulos.todas = 'Aulas da repetição excluídas.';
+      if (escopo === 'todas' && fora.registradas.length + fora.pagas.length) rotulos.todas = 'Aulas da repetição excluídas.';
       comDesfazer(function () { return rotulos[escopo] + fraseDoQueFicouDeFora(fora, true) + textoDeTrilha(mexeu); }, function () {
         Core.excluirAulas(db, alvo, escopo);
         mexeu = revisarTrilhasDoAluno(quem);
-      }).then(function () {
+      }, escopo !== 'esta').then(function () {
         fecharModal('modal-aula');
         desenharTudo();
       });
@@ -6039,22 +6102,25 @@
   }
 
   /* A escolha de escopo do Google Agenda: só esta, esta e as seguintes, ou todas. */
-  /* F7 (decisão do dono, 13/11/2026): as ações em lote da repetição não
-   * mexem na aula com relato ou nota, nem na passada de mês com pagamento
-   * (Core.escopoDaRepeticao). O aviso diz quantas ficaram de fora e por quê.
-   * `exclusao`: no excluir, elas continuam na agenda; na edição, ficaram
-   * como estavam. Sem nenhuma de fora, a frase é vazia. */
+  /* F7 (decisões do dono e da orquestradora, 13/11/2026): as ações em lote da
+   * repetição não mexem na aula já registrada (qualquer conteúdo: relato,
+   * nota, folha, anexo, assunto) nem na passada de mês com pagamento
+   * (Core.escopoDaRepeticao, Core.encerrarSerie). O aviso diz quantas ficaram
+   * de fora e por quê. `fora` traz `registradas` e `pagas`, listas ou números.
+   * `exclusao`: no excluir e no Encerrar, elas continuam na agenda; na edição,
+   * ficaram como estavam. Sem nenhuma de fora, a frase é vazia. */
   function fraseDoQueFicouDeFora(fora, exclusao) {
-    var c = fora ? fora.comTexto.length : 0, p = fora ? fora.pagas.length : 0, n = c + p;
+    var conta = function (x) { return Array.isArray(x) ? x.length : (Number(x) || 0); };
+    var r = fora ? conta(fora.registradas) : 0, p = fora ? conta(fora.pagas) : 0, n = r + p;
     if (!n) return '';
     var verbo = exclusao ? (n === 1 ? 'continua na agenda' : 'continuam na agenda')
       : (n === 1 ? 'ficou como estava' : 'ficaram como estavam');
-    var comTexto = 'com relato ou nota';
+    var registrada = n === 1 ? 'já registrada' : 'já registradas';
     var paga = 'de mês com pagamento';
-    if (c && p) {
-      return ' ' + n + ' aulas ' + verbo + ': ' + c + ' ' + comTexto + ' e ' + p + ' ' + paga + '.';
+    if (r && p) {
+      return ' ' + n + ' aulas ' + verbo + ': ' + r + ' ' + (r === 1 ? 'já registrada' : 'já registradas') + ' e ' + p + ' ' + paga + '.';
     }
-    return ' ' + (n === 1 ? '1 aula' : n + ' aulas') + ' ' + (c ? comTexto : paga) + ' ' + verbo + '.';
+    return ' ' + (n === 1 ? '1 aula' : n + ' aulas') + ' ' + (r ? registrada : paga) + ' ' + verbo + '.';
   }
 
   function perguntarEscopo(verbo, aoEscolher, ehExclusao) {
@@ -6068,8 +6134,8 @@
 
     var opcoes = [
       ['esta', 'Somente esta aula', 'As outras aulas da repetição continuam como estão.'],
-      ['seguintes', 'Esta e as seguintes', 'Vale desta data em diante. As anteriores não mudam.'],
-      ['todas', 'Todas as aulas da repetição', 'Inclui as que já passaram, menos as com relato ou nota e as de mês com pagamento. Dá para desfazer logo depois.']
+      ['seguintes', 'Esta e as seguintes', 'Vale desta aula em diante, ela inclusive, menos as aulas já registradas e as de mês com pagamento. As anteriores não mudam.'],
+      ['todas', 'Todas as aulas da repetição', 'Inclui as que já passaram, menos as aulas já registradas e as de mês com pagamento. Esta aula entra. Dá para desfazer logo depois.']
     ];
     opcoes.forEach(function (o) {
       var b = el('button', {
@@ -6825,14 +6891,13 @@
                 if (!digitado) return;
                 var quando = Core.deBR(digitado);
                 if (!quando) { avisar('Data inválida. Use o formato dia/mês/ano, por exemplo 05/04/2026.'); return; }
-                comDesfazer('Repetição encerrada.', function () {
-                  db.aulas = db.aulas.filter(function (a) {
-                    return !(a.serieId === se.id && a.data >= quando && !a.destacada);
-                  });
-                  var dt = Core.dataLocal(quando); dt.setDate(dt.getDate() - 1);
-                  se.fim = Core.isoDe(dt);
-                  if (se.fim < se.inicio) db.series = db.series.filter(function (x) { return x.id !== se.id; });
-                }).then(function () {
+                /* F7: o Encerrar é um lote como os outros: a aula já registrada e
+                 * a passada de mês com pagamento ficam (Core.encerrarSerie), e o
+                 * aviso diz quantas. */
+                var encerrou = null;
+                comDesfazer(function () { return 'Repetição encerrada.' + fraseDoQueFicouDeFora(encerrou, true); }, function () {
+                  encerrou = Core.encerrarSerie(db, se.id, quando);
+                }, true).then(function () {
                   fecharModal('modal-aluno');
                   desenharTudo();
                 });
