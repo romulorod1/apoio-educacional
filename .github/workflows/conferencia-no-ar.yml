@@ -12,23 +12,23 @@
 # novo, e comparar o site com um commit que ja foi ultrapassado reprovaria
 # sem defeito nenhum.
 #
-# DOIS ENDERECOS DESDE O B4, enquanto o antigo existir:
+# DOIS ENDERECOS DESDE O B4, enquanto o antigo existir, e desde o 13f os dois
+# saem da MESMA montagem (.github/monta_site.sh, com VERSAO e CACHE gerados),
+# publicada pelo publica-cloudflare.yml depois do portao inteiro verde:
+#   novo    https://apoio-educacional.pages.dev, o Cloudflare Pages;
 #   antigo  https://romulorod1.github.io/apoio-educacional, o GitHub Pages, que
-#           publica sozinho a cada push na main; conferido no push, como sempre.
-#   novo    https://apoio-educacional.pages.dev, o Cloudflare Pages, que so
-#           recebe o commit depois do portao inteiro verde; conferido quando o
-#           publica-cloudflare.yml termina de enviar (ele chama este arquivo
-#           com workflow_call, dizendo o site e o commit). No push o novo ainda
-#           nao tem o commit, e conferir ali reprovaria sem defeito.
+#           ate o 13f publicava o repositorio cru a cada push na main.
+# O publica-cloudflare.yml chama este arquivo (workflow_call) depois de cada
+# envio, dizendo o site e o commit. O gatilho de push saiu no 13f: no push,
+# nenhum dos dois enderecos ainda tem o commit, e conferir ali reprovaria sem
+# defeito. Os dois sao conferidos contra o site MONTADO deste checkout.
 # Na mao (workflow_dispatch), escolhe-se qual dos dois.
 #
-# Quando o GitHub Pages for desligado (virada do B4), sai o push e a linha
-# SITE_ANTIGO; o resto fica.
+# Quando o GitHub Pages for desligado (virada do B4), saem o job
+# publica-github-pages e a linha SITE_ANTIGO; o resto fica.
 name: conferencia-no-ar
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       site:
@@ -60,13 +60,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # fetch-depth 0: no endereco novo o esperado e o site MONTADO, e a VERSAO e
+      # o CACHE saem do contador da publicacao, que le a historia inteira (13f).
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.1'
       - name: O site publicado bate com o commit
         env:
           SITE_PEDIDO: ${{ inputs.site }}
         run: |
           SITE="${SITE_PEDIDO:-$SITE_ANTIGO}"
           echo "conferindo $SITE"
-          sh _teste/confere_no_ar.sh "$SITE" 900
+          # Os dois enderecos servem o site montado pelo publica-cloudflare, com
+          # VERSAO e CACHE gerados (13f). Os tres arquivos comparados (sw.js,
+          # app.js, index.html) sao iguais nas duas montagens; so o icone muda.
+          sh _teste/confere_no_ar.sh --montado "$SITE" 900
