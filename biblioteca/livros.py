@@ -31,7 +31,23 @@ O SUMARIO, por ordem de preferencia:
     muda nada e a nota diz que foi ignorado. Só no PDF.
   - EPUB: o sumario de navegacao do EPUB 3 (nav) ou, na falta dele, o NCX do
     EPUB 2. No EPUB nao ha pagina: cada entrada aponta o capitulo, que e a
-    posicao do arquivo na espinha (spine), e a ancora dentro dele.
+    posicao do arquivo na espinha (spine), e a ancora dentro dele. Sem sumario
+    (ou com o "Start" de uma entrada so), o mapa de capitulos de EPUB da
+    orquestradora, por parte e ancora (item 12a, parte 0); com
+    `"sumario": "mapa"` no livro do mapa, o mapa vence o sumario do EPUB.
+
+O MAPA DE CAPITULOS DE EPUB (item 12a, parte 0): no livro do mapa de um
+EPUB, cada capitulo diz `capitulo` (a posicao da parte na espinha, de 1 em
+diante, a mesma "parte N" do leitor), `capitulo_fim` (a ultima parte dele) e,
+opcional, `ancora` (o id, dentro da parte `capitulo`, onde ele comeca), no
+lugar de `pag_arquivo_inicio` e `pag_arquivo_fim`. A ancora tem de existir na
+parte (o gerador le os ids de cada parte): ancora que nao esta la, parte fora
+da espinha e entrada so com paginas de PDF saem, contadas na nota. O campo
+`formato` do livro no mapa, se vier e nao for o do arquivo, tira o mapa
+inteiro desse livro (mapa_do_formato). O meta sai na forma de sempre do mapa
+de EPUB: {n, titulo, capitulo, capitulo_fim, ancora?, capitulo_do_livro,
+assuntos, origem}, em ordem de parte e, na mesma parte, de ancora no texto.
+O formato esta descrito tambem no LEIA-ME.md de Livros/mapa.
 
 O PACOTE segue o contrato dos pacotes (CONTRATO_pacote_biblioteca.md, secao
 8j): um zip com manifest.json e livros/<id>.<pdf|epub>, nomes ASCII, o
@@ -358,6 +374,20 @@ def ler_mapas(pasta):
             if isinstance(livro, dict) and livro.get('arquivo') and isinstance(livro.get('capitulos'), list):
                 por_arquivo.setdefault(chave_de_arquivo(livro['arquivo']), (nome, livro))
     return por_arquivo
+
+
+def mapa_do_formato(achado, formato):
+    """O mapa achado pelo nome, se ele servir a este formato; senao (None, aviso).
+    O campo `formato` do livro no mapa e opcional; se vier e nao for o do
+    arquivo, o mapa inteiro fica de fora: as paginas de um PDF lidas como
+    partes de um EPUB (ou o contrario) levariam cada toque a outro lugar."""
+    if not achado:
+        return None, ''
+    dito = achado[1].get('formato')
+    if dito is None or str(dito).strip().lower() == formato:
+        return achado, ''
+    return None, ('O mapa da orquestradora (%s, livro %s) diz formato "%s", e o arquivo é %s: o mapa ficou de fora.'
+                  % (achado[0], achado[1].get('livro'), limpar_texto(dito)[:20], formato.upper()))
 
 
 # ------------------------------------------------------------------ a numeracao impressa (item 12a)
@@ -755,6 +785,30 @@ def montar_mapa(livro, info, achado, catalogo):
         nota = 'Do mapa de capítulos da orquestradora (%s, livro %s).' % (nome_mapa, do_mapa.get('livro'))
         if fora_pag:
             nota += ' %d capítulo(s) fora das páginas do arquivo ficaram de fora.' % fora_pag
+        if fora_id:
+            nota += ' %d assunto(s) fora do índice ficaram de fora.' % fora_id
+        nota += nota_de_outra_materia(entradas, disciplina_id, ids_validos)
+        saida.update(mapa=[dict(n=i + 1, **e) for i, e in enumerate(entradas)], mapa_origem='mapa', mapa_nota=nota)
+        return saida
+
+    # 2b. o mapa de capitulos da orquestradora num EPUB (item 12a, parte 0):
+    # a parte da espinha e a ancora dentro dela, no lugar das paginas
+    if do_mapa is not None and formato == 'epub':
+        ancoras = info.get('_ancoras')
+        validas, contas = entradas_epub_do_mapa(do_mapa, espinha, ancoras)
+        entradas, fora_id = [], 0
+        for e in validas:
+            assuntos, fora = assuntos_do_mapa(e['cap'].get('assuntos'), ids_validos)
+            fora_id += fora
+            m = {'titulo': e['titulo'], 'capitulo': e['capitulo'], 'capitulo_fim': e['capitulo_fim']}
+            if e.get('ancora'):
+                m['ancora'] = e['ancora']
+            m.update(capitulo_do_livro=e['capitulo_do_livro'], assuntos=assuntos, origem='mapa')
+            entradas.append(m)
+        nota = 'Do mapa de capítulos da orquestradora (%s, livro %s), por parte do EPUB e âncora.' % (nome_mapa, do_mapa.get('livro'))
+        fora_txt = nota_das_contas(contas)
+        if fora_txt:
+            nota += ' ' + fora_txt
         if fora_id:
             nota += ' %d assunto(s) fora do índice ficaram de fora.' % fora_id
         nota += nota_de_outra_materia(entradas, disciplina_id, ids_validos)
@@ -1367,7 +1421,101 @@ def entradas_do_ncx(raiz, base):
     return saida
 
 
-def ler_epub(caminho):
+# O id de um elemento no HTML de uma parte do EPUB, na ordem do texto: as
+# ancoras que o mapa de EPUB pode citar.
+ID_NO_HTML = re.compile(r'''\sid\s*=\s*["']([^"']+)["']''')
+
+
+def ancoras_das_partes(z, espinha):
+    """[[ids da parte 1, na ordem do texto], [ids da parte 2], ...]."""
+    saida = []
+    for c in espinha:
+        try:
+            h = z.read(c).decode('utf-8', 'replace')
+        except KeyError:
+            saida.append([])
+            continue
+        saida.append(ID_NO_HTML.findall(h))
+    return saida
+
+
+def entradas_epub_do_mapa(livro_do_mapa, partes, ancoras):
+    """As entradas do mapa de capitulos de um livro EPUB (item 12a, parte 0),
+    validadas contra a espinha: [{titulo, capitulo, capitulo_fim, ancora?,
+    capitulo_do_livro, cap}], em ordem de parte e, dentro da parte, de ancora
+    no texto. `cap` e a entrada crua do mapa (os assuntos).
+
+    Cada entrada precisa de `capitulo` (a posicao na espinha, de 1 a `partes`)
+    e `capitulo_fim` (>= capitulo; acima do total fica no total, como a pagina
+    no PDF). A `ancora` e opcional, mas, se vier, tem de ser um id da parte
+    `capitulo`: ancora que nao esta la denuncia parte trocada, e a entrada sai.
+    A entrada que so tem `pag_arquivo_*` e entrada de PDF: sai, contada a parte.
+    Devolve (entradas, contas) com contas {'fora': n, 'ancora': n, 'de_pdf': n}."""
+    contas = {'fora': 0, 'ancora': 0, 'de_pdf': 0}
+    entradas = []
+    for cap in livro_do_mapa.get('capitulos') or []:
+        if not isinstance(cap, dict):
+            contas['fora'] += 1
+            continue
+        ini, fim = cap.get('capitulo'), cap.get('capitulo_fim')
+        if ini is None and fim is None and ('pag_arquivo_inicio' in cap or 'pag_arquivo_fim' in cap):
+            contas['de_pdf'] += 1
+            continue
+        t = limpar_texto(cap.get('titulo'))
+        if not t or not inteiro(ini) or not inteiro(fim) or not (1 <= ini <= partes) or fim < ini:
+            contas['fora'] += 1
+            continue
+        e = {'titulo': t, 'capitulo': ini, 'capitulo_fim': min(partes, fim), 'capitulo_do_livro': cap.get('n'), 'cap': cap}
+        ancora = cap.get('ancora')
+        if ancora is not None:
+            ids = ancoras[ini - 1] if ancoras and ini - 1 < len(ancoras) else []
+            if not isinstance(ancora, str) or ancora not in ids:
+                contas['ancora'] += 1
+                continue
+            e['ancora'] = ancora
+            e['_ordem'] = ids.index(ancora)
+        else:
+            e['_ordem'] = -1
+        entradas.append(e)
+    entradas.sort(key=lambda e: (e['capitulo'], e['_ordem']))
+    for e in entradas:
+        del e['_ordem']
+    return entradas, contas
+
+
+def nota_das_contas(contas):
+    """O que ficou de fora do mapa de EPUB, numa frase para a nota."""
+    partes = []
+    if contas.get('fora'):
+        partes.append('%d capítulo(s) do mapa fora da espinha do EPUB (ou sem capitulo e capitulo_fim) ficaram de fora.' % contas['fora'])
+    if contas.get('ancora'):
+        partes.append('%d capítulo(s) do mapa com âncora que não está na parte indicada ficaram de fora.' % contas['ancora'])
+    if contas.get('de_pdf'):
+        partes.append('%d capítulo(s) do mapa com páginas de PDF (pag_arquivo_*) num EPUB ficaram de fora.' % contas['de_pdf'])
+    return ' '.join(partes)
+
+
+def sumario_epub_do_mapa(entradas):
+    saida = []
+    for i, e in enumerate(entradas):
+        s = {'n': i + 1, 'nivel': 1, 'titulo': e['titulo'], 'capitulo': e['capitulo']}
+        if e.get('ancora'):
+            s['ancora'] = e['ancora']
+        if e.get('capitulo_do_livro') is not None:
+            s['capitulo_do_livro'] = e['capitulo_do_livro']
+        saida.append(s)
+    return saida
+
+
+def ler_epub(caminho, mapas=None):
+    """O sumario, a espinha e, quando ha mapa de capitulos deste EPUB, as
+    ancoras de cada parte (em `_ancoras`, que nao vai para o manifest).
+
+    O SUMARIO DO MAPA (item 12a, parte 0): sem sumario de navegacao (ou com o
+    de uma entrada so), o sumario sai do mapa de capitulos da orquestradora,
+    por parte e ancora; com `"sumario": "mapa"` no livro do mapa, o mapa vence
+    o sumario do proprio EPUB. Mapa que nao da entrada nenhuma dentro da
+    espinha nao muda nada, e a nota diz."""
     try:
         z = zipfile.ZipFile(caminho)
     except (zipfile.BadZipFile, OSError) as e:
@@ -1425,6 +1573,40 @@ def ler_epub(caminho):
                     origem = 'ncx'
                 except ET.ParseError:
                     entradas = []
+        achado = (mapas or {}).get(chave_de_arquivo(caminho))
+        do_mapa = achado[1] if achado and isinstance(achado[1].get('capitulos'), list) else None
+        ancoras = ancoras_das_partes(z, espinha) if do_mapa is not None else None
+    info = sumario_do_epub(entradas, origem, espinha)
+    if ancoras is not None:
+        info['_ancoras'] = ancoras
+    if do_mapa is None:
+        return info
+    nome_mapa = achado[0]
+    do, contas = entradas_epub_do_mapa(do_mapa, len(espinha), ancoras)
+    pedido = do_mapa.get('sumario')
+    de_onde = '(%s, livro %s)' % (nome_mapa, do_mapa.get('livro'))
+    fora = nota_das_contas(contas)
+    if pedido is not None and pedido != SUMARIO_DO_MAPA:
+        aviso = ' O campo "sumario" do mapa tem um valor que o gerador não conhece (%s) e foi ignorado.' % limpar_texto(pedido)[:40]
+        info['sumario_nota'] = (info.get('sumario_nota', '') + aviso).strip()
+        pedido = None
+    if pedido == SUMARIO_DO_MAPA or not info['sumario']:
+        if do:
+            antes = len(info['sumario'])
+            nota = ('O sumário veio do mapa da orquestradora %s, por parte e âncora, e não das %d entradas do '
+                    'sumário do EPUB: o mapa pede "sumario": "mapa".' % (de_onde, antes) if antes else
+                    'O EPUB não tem sumário que leve aos capítulos: o sumário veio do mapa da orquestradora %s, '
+                    'por parte e âncora.' % de_onde)
+            info.update(sumario=sumario_epub_do_mapa(do), sumario_origem='mapa',
+                        sumario_nota=(nota + (' ' + fora if fora else '')).strip())
+        elif pedido == SUMARIO_DO_MAPA:
+            info['sumario_nota'] = (info.get('sumario_nota', '') + ' O mapa pede "sumario": "mapa", mas não tem '
+                                    'capítulo dentro da espinha do EPUB: valeu o sumário do EPUB.').strip()
+    return info
+
+
+def sumario_do_epub(entradas, origem, espinha):
+    """O sumario do proprio EPUB (nav ou NCX), contra a espinha."""
     sumario, fora = [], 0
     for e in entradas:
         if e['caminho'] not in espinha:
@@ -1526,11 +1708,14 @@ def relatorio_md(manifest, rel):
 
 
 def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapas=None, trabalho=None,
-          gerado_em=None, commit=None, gravar=True, topicos=None, conferencia=None):
+          gerado_em=None, commit=None, gravar=True, topicos=None, conferencia=None, origem=None):
     """Gera o pacote livros-<rotulo>. Devolve (manifest, relatorio, pasta de trabalho).
 
     `conferencia`: a pasta das planilhas de conferencia do gabarito (C15.5),
-    uma por livro; sem ela, <trabalho>/gabaritos."""
+    uma por livro; sem ela, <trabalho>/gabaritos.
+
+    `origem`: um dicionário que, se vier, recebe {id: caminho do arquivo na
+    planilha} (o publicador do catálogo o usa; não entra no manifest)."""
     t0 = time.time()
     if not re.fullmatch(r'[a-z0-9][a-z0-9-]*', rotulo or ''):
         raise SystemExit('erro: --rotulo tem de ser minusculo, sem acento nem espaco (por exemplo matematica-6ano)')
@@ -1563,8 +1748,12 @@ def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapa
         if m:
             recusados.append(dict(rec, motivo=m, teto=True))
             continue
+        # item 12a, parte 0: o mapa que diz outro formato (um mapa de PDF com o
+        # nome de um EPUB, ou o contrario) nao vale para este arquivo
+        achado, aviso_formato = mapa_do_formato(por_mapa.get(chave_de_arquivo(caminho)), formato)
+        mapas_do_livro = {chave_de_arquivo(caminho): achado} if achado else {}
         try:
-            info = ler_pdf(caminho, por_mapa) if formato == 'pdf' else ler_epub(caminho)
+            info = ler_pdf(caminho, mapas_do_livro) if formato == 'pdf' else ler_epub(caminho, mapas_do_livro)
         except Recusa as e:
             recusados.append(dict(rec, motivo=str(e)))
             continue
@@ -1574,6 +1763,8 @@ def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapa
             lid = '%s-%d' % (slug(os.path.splitext(os.path.basename(arq))[0])[:76], k)
             k += 1
         ids.add(lid)
+        if origem is not None:
+            origem[lid] = arq   # o publicador do catálogo casa a classificação pelo caminho, fora do manifest
         no_zip = 'livros/%s.%s' % (lid, formato)
         h = sha_do_arquivo(caminho)
         livro = {
@@ -1591,10 +1782,12 @@ def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapa
         if formato == 'epub':
             livro['capitulos'] = info['capitulos']
             livro['epub'] = info['epub']
-        livro.update(montar_mapa(livro, info, por_mapa.get(chave_de_arquivo(caminho)), catalogo))
+        livro.update(montar_mapa(livro, info, achado, catalogo))
+        if aviso_formato:
+            livro['mapa_nota'] = (aviso_formato + ' ' + livro.get('mapa_nota', '')).strip()
         if formato == 'pdf':
             # item 12a: a numeracao impressa (rotulos do PDF, ou o mapa)
-            livro.update(ler_numeracao(caminho, por_mapa.get(chave_de_arquivo(caminho))))
+            livro.update(ler_numeracao(caminho, achado))
         # C15.5: o gabarito de cada capitulo, e a planilha de conferencia do livro
         try:
             linhas_conf = localizar_gabarito(caminho, livro)

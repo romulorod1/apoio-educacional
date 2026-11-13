@@ -994,6 +994,15 @@ roda "livros mapa --envenenado-sem-ano-na-tela"   node "_teste/testa_livros_mapa
 # faixa e apagava a lista do Corrigir aberta; a prova esperava pela pagina que
 # ja estava a vista e falhava uma vez em dez. O veneno volta a refazer a faixa.
 roda "livros mapa --envenenado-faixa-refeita"     node "_teste/testa_livros_mapa.js" --envenenado-faixa-refeita
+# 12a, parte 0 (13/11/2026): o mapa de capitulos de EPUB, por parte e ancora,
+# sobre o EPUB sintetico do gerador (dois capitulos na mesma parte). O meta
+# novo nao mexe na posicao antiga, a tela e o leitor mostram o sumario do mapa
+# e o "Abrir no livro" leva a parte e a ancora, com a faixa do capitulo certo.
+# Porta 8983.
+roda "livros mapa epub"                           node "_teste/testa_livros_mapa_epub.js"
+roda "livros mapa epub --envenenado-sem-ancora"   node "_teste/testa_livros_mapa_epub.js" --envenenado-sem-ancora
+roda "livros mapa epub --envenenado-cobre-sem-ancora" node "_teste/testa_livros_mapa_epub.js" --envenenado-cobre-sem-ancora
+roda "livros mapa epub --envenenado-posicao-solta" node "_teste/testa_livros_mapa_epub.js" --envenenado-posicao-solta
 # 12/11/2026: a versao nova de um pacote de livros que so muda o mapa (o MAT08-15
 # de volume): mesmo arquivo, versao maior, so o meta trocado; a posicao de
 # leitura e a correcao dela intactas, inclusive no livro cujo sumario era vazio;
@@ -1115,6 +1124,25 @@ roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip
 # 21 em JAVA_HOME; sem eles, a prova diz onde procurou e REPROVA, nunca passa
 # calada. Os venenos: a regra que deixa qualquer conta ler tem de ser vista pela
 # parte das regras; a que deixa quem le escrever registro, idem.
+# Fase 1b da biblioteca na nuvem (13/11/2026): o publicador do catalogo
+# (biblioteca/publicar_catalogo.py) contra o emulador do Firestore e do Auth,
+# com manifests sinteticos: sem --publicar nada e gravado; publicar grava num
+# commit so; republicar igual nao escreve; a falha no meio do lote deixa a
+# versao anterior; as recusas (id trocado, livro que some, formato, assunto
+# fora do banco, caminho fora da lista); a classificacao do acervo; e as
+# regras do catalogo (a dona le e nao escreve); os registros que somem sao recusa
+# e o que ficou para tras e refeito pelo indice da nuvem. Portas 9031 a 9035.
+roda "publicador do catalogo"                       node "_teste/testa_publicador_catalogo.js"
+roda "publicador do catalogo --envenenado-aceita-id-trocado" node "_teste/testa_publicador_catalogo.js" --envenenado-aceita-id-trocado
+roda "publicador do catalogo --envenenado-escreve-fora-da-lista" node "_teste/testa_publicador_catalogo.js" --envenenado-escreve-fora-da-lista
+roda "publicador do catalogo --envenenado-dois-lotes" node "_teste/testa_publicador_catalogo.js" --envenenado-dois-lotes
+roda "publicador do catalogo --envenenado-regra-herda-escrita" node "_teste/testa_publicador_catalogo.js" --envenenado-regra-herda-escrita
+roda "publicador do catalogo --envenenado-repetido-ultima-vence" node "_teste/testa_publicador_catalogo.js" --envenenado-repetido-ultima-vence
+roda "publicador do catalogo --envenenado-nome-cortado" node "_teste/testa_publicador_catalogo.js" --envenenado-nome-cortado
+roda "publicador do catalogo --envenenado-registro-vazio-passa" node "_teste/testa_publicador_catalogo.js" --envenenado-registro-vazio-passa
+roda "publicador do catalogo --envenenado-relatorio-grava" node "_teste/testa_publicador_catalogo.js" --envenenado-relatorio-grava
+roda "publicador do catalogo --envenenado-so-pelo-id" node "_teste/testa_publicador_catalogo.js" --envenenado-so-pelo-id
+roda "publicador do catalogo --envenenado-homonimo-na-lista" node "_teste/testa_publicador_catalogo.js" --envenenado-homonimo-na-lista
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
@@ -1502,6 +1530,24 @@ roda "corrigir pacote Mirim C7"                 python biblioteca/_prova_corrigi
 # livro), a origem do sumario (marcadores, mapa, nenhum, nav do EPUB) e o
 # determinismo. Sem Chrome.
 roda "livros (gerador)"                         python biblioteca/_prova_livros.py
+# 12a, parte 0: o mapa de capitulos de EPUB no gerador (parte, fim e ancora,
+# a ancora conferida na parte), o sumario do mapa sem sumario no EPUB e com
+# "sumario": "mapa", e o mapa de PDF fora do EPUB. Os venenos rodam dentro da
+# prova. Sem Chrome.
+roda "mapa de EPUB (gerador)"                   python biblioteca/_prova_mapa_epub.py
+# O lado do aplicativo, no biblioteca.js: o sumario do EPUB sem sumario sai do
+# mapa, e a ancora escolhe o capitulo na parte de varios. Sem Chrome.
+roda "mapa de EPUB (regras)"                    node "_teste/testa_livros_mapa_epub_regras.js"
+roda "mapa de EPUB (regras) --envenenado-sumario-so-do-pacote" node "_teste/testa_livros_mapa_epub_regras.js" --envenenado-sumario-so-do-pacote
+roda "mapa de EPUB (regras) --envenenado-cobre-sem-ancora" node "_teste/testa_livros_mapa_epub_regras.js" --envenenado-cobre-sem-ancora
+# Fase 1b: a chave estavel do capitulo (biblioteca/chaves.py), pelos mesmos
+# criterios que o aplicativo confere (titulo igual, par da heranca; o mesmo
+# comeco so com titulo parecido ou com o par). Sem Chrome e sem rede.
+roda "chaves dos capitulos"                     python _teste/testa_chaves_capitulos.py
+roda "chaves dos capitulos --envenenado-chave-pela-pagina" python _teste/testa_chaves_capitulos.py --envenenado-chave-pela-pagina
+roda "chaves dos capitulos --envenenado-sem-heranca" python _teste/testa_chaves_capitulos.py --envenenado-sem-heranca
+roda "chaves dos capitulos --envenenado-titulo-sem-unicidade" python _teste/testa_chaves_capitulos.py --envenenado-titulo-sem-unicidade
+roda "chaves dos capitulos --envenenado-repetido-sem-ordem" python _teste/testa_chaves_capitulos.py --envenenado-repetido-sem-ordem
 # A revisao do C15.1: o pacote cortado recusado ja na espiada, sem ler o
 # arquivo inteiro, e o teto de 160 MB do aplicativo. Sem Chrome.
 roda "livros (regras)"                          node "_teste/testa_livros_regras.js"
