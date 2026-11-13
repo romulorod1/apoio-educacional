@@ -1206,7 +1206,7 @@
     "r": "comprimento converter grandeza massa medida medir padronizada temperatura tempo unidade",
     "d": "celsius centimetro dia duracao grama grau hora intervalo metro minuto quilograma quilometro segundo superficie tonelada transformar"
    },
-   "modulo": null
+   "modulo": "6ano:sistemas-de-medidas-e-medidas-de-tempo"
   },
   {
    "id": "MAT06-18",
@@ -1504,7 +1504,7 @@
     "r": "a cada calcular certa chance com conjunto dado de evento medida para resumir simple situacao um",
     "d": "aluno azul bola calcule caso cinco comum dele determine dois exemplo favoravel grupo maior mais melhor nota numa numero pessoa possivel precisa qual quantidade quatro real resultado sair soma tirar todo tres turma valor"
    },
-   "modulo": null
+   "modulo": "7ano:nocoes-basicas-de-estatistica"
   },
   {
    "id": "MAT07-15",
@@ -1578,7 +1578,7 @@
     "r": "com compacta comparar de e ele escrever forma grande grandeza muito na numero operar ordem ou pequeno",
     "d": "algarismo calcule casa como escreva exemplo expoente igual maior metro quanta resultado sinal valor virgula"
    },
-   "modulo": "8ano:potenciacao"
+   "modulo": null
   },
   {
    "id": "MAT08-03",
@@ -1596,7 +1596,7 @@
     "r": "a calculadora com como desfaz ele entender operacao operar potencia que radical recorrer sem simplificar",
     "d": "calcule cubica denominador duas entre esta exemplo indice inteiro mais mesmo multiplicar numero perfeito produto quadrada quadrado qual quando radicando resultado simplifique soma vale"
    },
-   "modulo": "8ano:potenciacao"
+   "modulo": "8ano:dizimas-periodicas-e-numeros-reais"
   },
   {
    "id": "MAT08-04",
@@ -1781,7 +1781,7 @@
     "r": "calcular circunferencia coroa de do entender numero o onde para pi raio resultado setor vem voltar",
     "d": "angulo aproximado arco calcule centimetro central centro circular como contorno determine diametro duas entao entre exemplo fatia figura formula funcao grau hachurada legenda maior menor metro pede quadrado quando regiao resposta roda tres usando valor volta"
    },
-   "modulo": "8ano:elementos-basicos-de-geometria-plana-parte-3"
+   "modulo": null
   },
   {
    "id": "MAT08-14",
@@ -1893,7 +1893,7 @@
     "r": "amostra amostragem censitaria grafico pesquisa populacao variavel",
     "d": "adequado casual classe coleta colunas dados estratificada frequencia histograma intervalo linha planejar relatorio setor sistematica tabela"
    },
-   "modulo": null
+   "modulo": "7ano:nocoes-basicas-de-estatistica"
   },
   {
    "id": "MAT09-01",
@@ -2141,7 +2141,7 @@
     "r": "afastam amplitude centro conjunto dado desvio do media mediana medio medir moda o os pela pelo quanto resumir se um valor",
     "d": "aluno apareceu cada calcular calcule central determine distancia dois duas exemplo isso maior mais menor mesma mesmo nota numero onde quantidade soma todo turma"
    },
-   "modulo": null
+   "modulo": "7ano:nocoes-basicas-de-estatistica"
   },
   {
    "id": "MAT09-14",
@@ -2215,7 +2215,7 @@
     "r": "acrescimo composto desconto juro montante percentual porcentagem sucessivo taxa",
     "d": "aplicacao capital emprestimo exemplo financeira mes potencia rendimento simples tempo valor"
    },
-   "modulo": null
+   "modulo": "1em:matematica-financeira"
   },
   {
    "id": "MATEM1-01",
@@ -2452,7 +2452,7 @@
     "r": "amplitude com dado desvio e espalhamento media mediana medir moda numa o organizar padrao resumir tabela",
     "d": "aluno cada calcular calcule categoria central centro cinco conjunto dois entao erro essa exemplo frequencia grafico grupo irmao maior mais medida menor muito nota numero onde pela peso ponderada populacao quadrado qual quando quantidade quantitativa quanto quatro real responderam resultado salario soma somam todo total tres turma unidade valor variancia"
    },
-   "modulo": "1em:estatistica-basica-i"
+   "modulo": "7ano:nocoes-basicas-de-estatistica"
   },
   {
    "id": "MATEM1-14",
@@ -2562,7 +2562,7 @@
     "r": "cosseno das descrever deslocamento e fenomeno imagem las para periodo que reconhecer repetem se seno tangente usa",
     "d": "achar altura arco cada ciclo completa determine equacao exemplo maximo mesmo minimo muda numero onda parametro ponto positivo repete temperatura todo valor vertical volta"
    },
-   "modulo": "2em:trigonometria-ii"
+   "modulo": "2em:trigonometria-iii"
   },
   {
    "id": "MATEM2-03",
@@ -2616,7 +2616,7 @@
     "r": "calcular de decidir e equacao existe inversa matriz o para propriedade quadrada resolver se sua usar",
     "d": "achar calcule coluna cuja determine diagonal duas elemento exemplo linha numero pela produto quando transposta tres valor zero"
    },
-   "modulo": "3em:matrizes-e-sistemas-lineares"
+   "modulo": null
   },
   {
    "id": "MATEM2-06",
@@ -2783,7 +2783,7 @@
     "r": "amplitude com conjunto dado de desvio espalham media mediana medir moda o os padrao por quanto resumir se um valor variancia",
     "d": "apareceu cada calcular calcule central determine dois entao exemplo formado frequencia isso mais medida mesma muito nota numero onde pela quadrado quantidade soma somar todo"
    },
-   "modulo": "2em:introducao-a-inferencia-estatistica"
+   "modulo": null
   },
   {
    "id": "MATEM2-15",
@@ -2801,7 +2801,7 @@
     "r": "calcular cosseno da diferenca do dois equacao essa exato formula metade obter para resolver seno soma tangente usar valor",
     "d": "calcule duas escrevendo esta exemplo fator forma frac isso mostre quadrante quando sabendo sinal zero"
    },
-   "modulo": "2em:trigonometria-iii"
+   "modulo": "2em:trigonometria-ii"
   },
   {
    "id": "MATEM2-16",
@@ -3125,7 +3125,7 @@
     "r": "adequada com conclusao conjunto julgar medida qual realmente resumir sustenta um",
     "d": "alta aluno amplitude barra cada calcule crescimento desvio diferente dois duas eixo escolheram esta exemplo fevereiro final foram grupo janeiro leram livro mais marco media mediana mensal moda mostra nota onde opcao padrao percentual peso pessoa ponto quantidade real soma todo tres usam valor venda vertical"
    },
-   "modulo": "1em:estatistica-basica-i"
+   "modulo": "7ano:nocoes-basicas-de-estatistica"
   },
   {
    "id": "MATEM3-15",
