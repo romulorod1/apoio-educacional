@@ -162,6 +162,8 @@
  * O v166 traz as aulas tiradas e postas só na folha do planejamento.
  * O v168 traz a correção dos módulos ligados a 14 assuntos no banco/topicos/matematica.json.
  * O v169 traz o Voltar do aparelho dentro do aplicativo.
+ * O v171 traz a fase 1a da biblioteca na nuvem: a posição de leitura e a correção do
+ * mapa sobrevivem à troca de meta e de arquivo do livro.
  * O v175 traz a página do assunto na Biblioteca (B1).
  */
 var CACHE = 'apoio-educacional-v175';
