@@ -161,7 +161,8 @@
  * O v158 traz a busca da Biblioteca nos capítulos e assuntos do mapa, com todas as palavras e os melhores resultados.
  * O v166 traz as aulas tiradas e postas só na folha do planejamento.
  * O v168 traz a correção dos módulos ligados a 14 assuntos no banco/topicos/matematica.json.
- * O v174 traz a aula que salva sozinha, sem gravar por cima de versão mais nova.
+ * O v169 traz o Voltar do aparelho dentro do aplicativo.
+ * O v174 traz a aula que salva sozinha o relato, sem gravar por cima de versão mais nova.
  */
 var CACHE = 'apoio-educacional-v174';
 var BAIXADOS = 'apoio-educacional-baixados';
