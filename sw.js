@@ -165,11 +165,13 @@
  * O v171 traz a fase 1a da biblioteca na nuvem: a posição de leitura e a correção do
  * mapa sobrevivem à troca de meta e de arquivo do livro.
  * O v182 traz o Voltar sem entrada sobrando no histórico depois de recarregar com uma janela aberta.
- * O v191 traz o bloco "Teoria e exercícios" da página do assunto (app.js,
- * biblioteca.js e styles.css), com a lista igual. Versão silenciosa: o bloco
- * só aparece quando a página do assunto entrar.
+ * O v186 traz a pinça e o duplo toque no livro aberto.
+ * O v187 traz o conteúdo escrito no pedido do planejamento valendo como o do aviso.
+ * O v192 traz a página do assunto na Biblioteca (B1).
+ * O bloco "Teoria e exercícios" da página do assunto (T2: app.js, biblioteca.js
+ * e styles.css) entra com o próximo cache, com a lista igual.
  */
-var CACHE = 'apoio-educacional-v191';
+var CACHE = 'apoio-educacional-v192';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

@@ -23,6 +23,12 @@ O SUMARIO, por ordem de preferencia:
     do arquivo), com as paginas do arquivo de cada capitulo; sem os dois, o
     sumario sai vazio, e o manifest diz isso em `sumario_origem` e
     `sumario_nota`, em vez de inventar um.
+    CAMPO `sumario` DO LIVRO NO MAPA (item 12a): `"sumario": "mapa"` faz o
+    sumário sair do mapa MESMO quando o PDF tem marcadores. É para o PDF cujos
+    marcadores são lixo (o fme05: "x, 1, 2, 3, gaba, 4, gabb, x"). A nota diz
+    que o mapa venceu os marcadores. Se o mapa não der entrada nenhuma dentro
+    das páginas, valem os marcadores, e a nota diz. Outro valor no campo não
+    muda nada e a nota diz que foi ignorado. Só no PDF.
   - EPUB: o sumario de navegacao do EPUB 3 (nav) ou, na falta dele, o NCX do
     EPUB 2. No EPUB nao ha pagina: cada entrada aponta o capitulo, que e a
     posicao do arquivo na espinha (spine), e a ancora dentro dele.
@@ -265,6 +271,10 @@ def sumario_do_mapa(livro_do_mapa, total):
     return [dict(n=i + 1, **e) for i, e in enumerate(entradas)], fora
 
 
+# O valor do campo `sumario` do livro no mapa que faz o mapa vencer os marcadores.
+SUMARIO_DO_MAPA = 'mapa'
+
+
 def ler_pdf(caminho, mapas):
     try:
         doc = pymupdf.open(caminho)
@@ -278,12 +288,30 @@ def ler_pdf(caminho, mapas):
         total = doc.page_count
         sumario, fora = sumario_dos_marcadores(doc)
         info = {'paginas': total}
+        achado = mapas.get(chave_de_arquivo(caminho))
+        pedido = achado[1].get('sumario') if achado else None
+        aviso = ''
+        if pedido == SUMARIO_DO_MAPA and sumario:
+            # o campo `sumario: "mapa"` do livro: o mapa vence os marcadores
+            nome_mapa, livro = achado
+            do_mapa, fora_mapa = sumario_do_mapa(livro, total)
+            if do_mapa:
+                info.update(sumario=do_mapa, sumario_origem='mapa',
+                            sumario_nota='O sumário veio do mapa da orquestradora (%s, livro %s), com as páginas do '
+                                         'arquivo, e não dos %d marcadores do PDF: o mapa pede "sumario": "mapa".'
+                                         % (nome_mapa, livro.get('livro'), len(sumario)))
+                if fora_mapa:
+                    info['sumario_nota'] += ' %d capítulo(s) do mapa fora das páginas do arquivo ficaram de fora.' % fora_mapa
+                return info
+            aviso = ' O mapa pede "sumario": "mapa", mas não tem capítulo dentro das páginas do arquivo: valeram os marcadores.'
+        elif pedido is not None and pedido != SUMARIO_DO_MAPA:
+            aviso = ' O campo "sumario" do mapa tem um valor que o gerador não conhece (%s) e foi ignorado.' % limpar_texto(pedido)[:40]
         if sumario:
             info.update(sumario=sumario, sumario_origem='marcadores')
-            if fora:
-                info['sumario_nota'] = '%d marcador(es) sem página de destino ficaram fora do sumário.' % fora
+            nota = ('%d marcador(es) sem página de destino ficaram fora do sumário.' % fora if fora else '') + aviso
+            if nota.strip():
+                info['sumario_nota'] = nota.strip()
             return info
-        achado = mapas.get(chave_de_arquivo(caminho))
         if achado:
             nome_mapa, livro = achado
             sumario, fora = sumario_do_mapa(livro, total)
@@ -293,6 +321,7 @@ def ler_pdf(caminho, mapas):
                                          'livro %s), com as páginas do arquivo.' % (nome_mapa, livro.get('livro')))
                 if fora:
                     info['sumario_nota'] += ' %d capítulo(s) do mapa fora das páginas do arquivo ficaram de fora.' % fora
+                info['sumario_nota'] += aviso
                 return info
         info.update(sumario=[], sumario_origem='nenhum',
                     sumario_nota='O PDF não tem marcadores e não há mapa deste livro: o sumário está vazio.')
@@ -767,6 +796,35 @@ PARECE_RESPOSTA = re.compile(r'^([0-9]{1,3}[.)]|[a-h]\))')
 # "RESPOSTAS" do manual do professor, ao lado da pagina do aluno, fica perto de
 # um decimo.
 DENSIDADE_MINIMA = 0.2
+# O TITULO NO FIM DO TEXTO (item 12a): em alguns PDFs o cabeçalho corrido sai
+# no fim do texto extraído da página. No Praticando 8 e 9 o título "Respostas
+# dos exercícios" é a ÚLTIMA linha da primeira página da seção. Por isso o
+# título também vale nas LINHAS_DO_FIM últimas linhas da página do PDF. O
+# título achado SÓ ali vale apenas com número de capítulo ou de unidade nas
+# respostas (o caso 3a): sem número, o "Respostas" na última linha de um
+# sumário (o ca2, página 6, no ensaio) viraria gabarito do fim da entrada.
+LINHAS_DO_FIM = 2
+# A CONTINUAÇÃO da seção (item 12a): nesses livros o título está só na
+# primeira página, e as seguintes são só respostas, sem título. A seção segue
+# pelas páginas seguintes enquanto as condições valem: a página tem texto; ela
+# fica na mesma entrada do mapa da página do título (ou fora do mapa, como
+# ela); e ou essa entrada do mapa tem título de respostas ("Respostas dos
+# exercícios": o mapa diz que a faixa inteira é a seção), ou a página é feita
+# de respostas (DENSIDADE_DA_CONTINUACAO; nas seções reais do Praticando, a
+# maioria das páginas fica entre 60% e 80%, mas há páginas de 20% e de 38%,
+# com figura ou fração, e por isso a densidade sozinha não basta quando o mapa
+# diz). No fim, a seção estendida tem de trazer respostas de DOIS capítulos ou
+# unidades, ou mais, senão fica como estava. Sem essa última condição, um
+# quadro de margem seguido de páginas de exercício chegaria ao fim do
+# capítulo e viraria "fim do capítulo". Só no PDF: no EPUB a parte inteira já
+# é lida.
+DENSIDADE_DA_CONTINUACAO = 0.5
+# O FIM DO CAPITULO SEM NUMERO (o 3b) exige mais (item 12a): ali nada além do
+# título e do lugar diz que é gabarito. O quadro "RESPOSTAS" da margem do
+# professor, na última página do capítulo do aluno, tem perto de um quarto das
+# linhas com cara de resposta (o ga7, página 401: 24%). As páginas de
+# respostas de verdade passam de metade.
+DENSIDADE_DO_FIM_DO_CAPITULO = 0.5
 
 
 def marca_no_alto(ls, k):
@@ -889,22 +947,53 @@ def propor_gabaritos(textos, capitulos, formato='pdf'):
     # a conversao junta paginas numa parte so
     titulo_em = {}
     for i, ls in enumerate(linhas):
-        alvo = ls[:LINHAS_DO_ALTO] if formato == 'pdf' else ls
-        for k, l in enumerate(alvo):
-            if TITULO_DE_RESPOSTAS.match(l):
-                titulo_em[i + 1] = (k / max(1, len(ls)), l)
+        if formato == 'pdf':
+            # no alto da pagina, ou nas ultimas linhas (o cabecalho que sai no fim do texto)
+            onde = sorted(set(range(min(LINHAS_DO_ALTO, len(ls)))) | set(range(max(0, len(ls) - LINHAS_DO_FIM), len(ls))))
+        else:
+            onde = range(len(ls))
+        for k in onde:
+            if TITULO_DE_RESPOSTAS.match(ls[k]):
+                # o terceiro campo diz se o titulo so foi achado nas ultimas linhas
+                # (LINHAS_DO_FIM); o quarto e a linha do titulo (para o SO_IMPARES)
+                titulo_em[i + 1] = (k / max(1, len(ls)), ls[k], formato == 'pdf' and k >= LINHAS_DO_ALTO, k)
                 break
     manual = [i + 1 for i, t in enumerate(textos) if NO_MANUAL.search(' '.join(linhas[i]))]
-
-    # 2. as secoes: unidades seguidas com o titulo
-    secoes = faixas(titulo_em)
-    usadas = set()
 
     def capitulo_de(u):
         for c in capitulos:
             if c['ini'] <= u <= c['fim']:
                 return c
         return None
+
+    def densidade_de(u):
+        ls = linhas[u - 1]
+        return sum(1 for l in ls if PARECE_RESPOSTA.match(l)) / max(1, len(ls))
+
+    def entrada_de_respostas(c):
+        # a entrada do mapa cujo titulo E o de uma secao de respostas ("Respostas dos exercicios")
+        return bool(c) and TITULO_DE_RESPOSTAS.match(linha_normal(c.get('titulo') or '')) is not None
+
+    def numeros_em(a, b):
+        return {numero_de(m.group(2)) for u in range(a, b + 1) for l in linhas[u - 1]
+                for m in [MARCA_DE_CAPITULO.match(l) or MARCA_DE_UNIDADE.match(l)] if m and numero_de(m.group(2))}
+
+    # 2. as secoes: unidades seguidas com o titulo, e no PDF a continuacao sem
+    # titulo (LINHAS_DO_FIM e DENSIDADE_DA_CONTINUACAO, acima)
+    secoes = faixas(titulo_em)
+    if formato == 'pdf':
+        com_continuacao = set(titulo_em)
+        for a, b in secoes:
+            cap, fim = capitulo_de(a), b
+            de_respostas = entrada_de_respostas(cap)
+            while (fim + 1 <= total and fim + 1 not in titulo_em and fim + 1 not in sem_texto
+                   and capitulo_de(fim + 1) is cap
+                   and (de_respostas or densidade_de(fim + 1) >= DENSIDADE_DA_CONTINUACAO)):
+                fim += 1
+            if fim > b and len(numeros_em(a, fim)) >= 2:
+                com_continuacao.update(range(b + 1, fim + 1))
+        secoes = faixas(com_continuacao)
+    usadas = set()
 
     for a, b in secoes:
         # as marcas de capitulo dentro da secao, na ordem: (unidade, numero, no alto)
@@ -926,7 +1015,14 @@ def propor_gabaritos(textos, capitulos, formato='pdf'):
             if limpas and limpas[-1][1] == x[1]:
                 continue
             limpas.append(x)
-        impares = any(SO_IMPARES.search(l) for u in range(a, b + 1) for l in linhas[u - 1][:LINHAS_DO_ALTO + 2])
+        # "Só as ímpares" vale só no TÍTULO da seção, na página em que ela abre:
+        # a linha do título e a seguinte ("Respostas" / "dos exercícios ímpares"),
+        # esta só se não for resposta. Nas linhas do alto de todas as páginas, uma
+        # resposta casava: "e expoente impar tem o mesmo sinal" (mp1, p. 193)
+        # marcava os caps. 1 a 5 inteiros, e a p. 182 tem pares e ímpares.
+        ls_a, k_titulo = linhas[a - 1], titulo_em[a][3]
+        perto_do_titulo = [ls_a[k_titulo]] + [l for l in ls_a[k_titulo + 1:k_titulo + 2] if not PARECE_RESPOSTA.match(l)]
+        impares = any(SO_IMPARES.search(l) for l in perto_do_titulo)
         evidencia = '"%s" (%s %d)' % (titulo_em[a][1], nome, a)
         numeros = [x[1] for x in limpas]
         # sem texto perto da secao (dentro dela ou colada nela), pode faltar resposta: a certeza baixa
@@ -998,6 +1094,22 @@ def propor_gabaritos(textos, capitulos, formato='pdf'):
             continue
         # 3b. sem numero de capitulo: so vale no FIM de um capitulo, dentro dele
         cap = capitulo_de(a)
+        if titulo_em[a][2]:
+            # o titulo so nas ultimas linhas, sem numero de capitulo: no fim de
+            # um sumario ("... Respostas"), por exemplo. Ele so vale com marcas (3a)
+            saida['linhas'].append({'tipo': 'descartado', 'gabarito': [[a, b]], 'certeza': 'baixa', 'achado': evidencia,
+                                    'observacao': 'título de respostas só no fim do texto da página, sem número de capítulo '
+                                                  'nas respostas: não se sabe de que capítulo são; ignorado'})
+            continue
+        if cap and capitulo_de(b) is cap and b >= cap['fim'] - 1 and a > cap['ini'] and cap['n'] not in usadas \
+                and densidade < DENSIDADE_DO_FIM_DO_CAPITULO:
+            saida['linhas'].append({'tipo': 'descartado', 'gabarito': [[a, b]], 'certeza': 'baixa', 'achado': evidencia,
+                                    'observacao': 'título de respostas no fim do capítulo %d (%s), sem número, mas só %d%% '
+                                                  'das linhas parecem resposta (no fim do capítulo o mínimo é %d%%): quadro '
+                                                  'de respostas da margem, na página do capítulo; ignorado'
+                                                  % (cap['n'], cap['titulo'], round(densidade * 100),
+                                                     round(DENSIDADE_DO_FIM_DO_CAPITULO * 100))})
+            continue
         if cap and capitulo_de(b) is cap and b >= cap['fim'] - 1 and a > cap['ini'] and cap['n'] not in usadas:
             certeza = menos('média')
             saida['por_capitulo'][cap['n']] = {'faixas': [[a, b]], 'certeza': certeza, 'como': 'fim_do_capitulo',
