@@ -3148,6 +3148,37 @@
     return reais.concat(conflitosDe({ aulas: previstas }, aula));
   }
 
+  /* Os horários vagos do celular (aba Vagos), numa conta só, para a tela e
+   * para o assistente (IA, fase 3) nunca discordarem.
+   *
+   * horariosLivresDoDia: os inícios livres de um dia para uma aula de
+   * `duracaoMin`, de meia em meia hora, das 07:00 até a aula terminar às
+   * 21:00, pela mesma conta de choque do tablet mais as repetições ainda não
+   * materializadas (conflitosComRepeticoes). Era o horariosLivresCelular do
+   * app.js, que agora só chama esta.
+   *
+   * vagasDoDia: o que a aba Vagos mostra desse dia: só o que termina até as
+   * 20:00, nada num dia que já passou e, hoje, nada antes de agora
+   * (`agoraMin`, os minutos do relógio da tela). Só LÊ o db. */
+  var VAGOS_INICIO_MIN = 7 * 60, VAGOS_FIM_MIN = 21 * 60, VAGOS_FIM_DA_TELA_MIN = 20 * 60, VAGOS_PASSO_MIN = 30;
+  function horariosLivresDoDia(db, dataIso, duracaoMin, ignorarId) {
+    var livres = [];
+    var dur = Number(duracaoMin) || 60;
+    for (var m = VAGOS_INICIO_MIN; m + dur <= VAGOS_FIM_MIN; m += VAGOS_PASSO_MIN) {
+      var hora = pad2(Math.floor(m / 60)) + ':' + pad2(m % 60);
+      if (!conflitosComRepeticoes(db, { id: ignorarId || null, data: dataIso, hora: hora, duracaoMin: dur, status: 'realizada' }).length) livres.push(hora);
+    }
+    return livres;
+  }
+  function vagasDoDia(db, dataIso, duracaoMin, hojeRef, agoraMin) {
+    var dur = Number(duracaoMin) || 60;
+    var hoje = hojeRef || hojeIso();
+    return horariosLivresDoDia(db, dataIso, dur).filter(function (hora) {
+      var inicio = minutosDaHora(hora);
+      return dataIso >= hoje && inicio + dur <= VAGOS_FIM_DA_TELA_MIN && (dataIso !== hoje || inicio >= agoraMin);
+    });
+  }
+
   /* Divide uma aula em duas metades no mesmo dia.
    *
    * Serve para quando o encontro tratou de dois assuntos diferentes e ela quer
@@ -5836,7 +5867,8 @@
     aplicarViradaAnual: aplicarViradaAnual,
     serieParaTemas: serieParaTemas,
     conflitosDe: conflitosDe, minutosDaHora: minutosDaHora, ocorrenciasPrevistasDoDia: ocorrenciasPrevistasDoDia,
-    conflitosComRepeticoes: conflitosComRepeticoes, faixasDeHorariosLivres: faixasDeHorariosLivres, mensagemDeHorariosVagos: mensagemDeHorariosVagos,
+    conflitosComRepeticoes: conflitosComRepeticoes, horariosLivresDoDia: horariosLivresDoDia, vagasDoDia: vagasDoDia,
+    faixasDeHorariosLivres: faixasDeHorariosLivres, mensagemDeHorariosVagos: mensagemDeHorariosVagos,
     dividirAula: dividirAula, desfazerDivisao: desfazerDivisao,
     podeDividir: podeDividir, metadesDe: metadesDe, somarMinutosNaHora: somarMinutosNaHora,
     uid: uid, nomeArquivo: nomeArquivo,
