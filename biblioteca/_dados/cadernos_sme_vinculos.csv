@@ -1,0 +1,1435 @@
+# Vinculos das atividades dos Cadernos de Apoio e Aprendizagem (SME-SP) aos assuntos do aplicativo, item C5.
+# Leitura do texto de cada unidade por subagente (Sonnet), 13/11/2026; exclusao preenchida pela curadoria (imagem de terceiro sem credito).
+id;tema;exclusao;quem;justificativa;confianca
+sme:2ano:p016;MAT02-12;imagem de terceiro sem crédito (dúvida: miniaturas de sabonete parecem fotografia);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);problema de banhos por semana com contexto familiar;média
+sme:2ano:p017;MAT02-11;;leitura C5 (Sonnet);leitura de tabela de contagem de tampinhas e ditado;média
+sme:2ano:p018;MAT02-09;;leitura C5 (Sonnet);preencher e ler o calendário do mês;alta
+sme:2ano:p019;MAT02-09;;leitura C5 (Sonnet);datas e números dos meses do ano;alta
+sme:2ano:p020;MAT02-11;;leitura C5 (Sonnet);preencher e ler tabela de aniversariantes;média
+sme:2ano:p021;MAT02-12;imagem de terceiro sem crédito (reprodução de cédulas e moedas reais);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);contar produtos e somar com contexto de compra;média
+sme:2ano:p023;MAT02-09;;leitura C5 (Sonnet);calendário com intervalos de dias e contagem de dez em dez;média
+sme:2ano:p024;MAT02-05;;leitura C5 (Sonnet);contagem de cinco em cinco e padrão no calendário;média
+sme:2ano:p025;MAT02-01;;leitura C5 (Sonnet);formar e comparar números de dois algarismos;alta
+sme:2ano:p026:q1;MAT02-01;;leitura C5 (Sonnet);comparar dois números e pintar o maior;alta
+sme:2ano:p026:q2;MAT02-05;;leitura C5 (Sonnet);completar sequências numéricas;alta
+sme:2ano:p026:q3;MAT02-01;;leitura C5 (Sonnet);escrever números ditados;média
+sme:2ano:p026:q4;;;leitura C5 (Sonnet);preencher ficha pessoal sem tarefa matemática clara;baixa
+sme:2ano:p026:q5;MAT02-09;;leitura C5 (Sonnet);completar os dias da semana;alta
+sme:2ano:p026:q6;MAT02-09;;leitura C5 (Sonnet);ler calendário e dias da semana e do mês;alta
+sme:2ano:p026:q7;MAT02-03;;leitura C5 (Sonnet);comparar quantidades dizendo quantas a mais;baixa
+sme:2ano:p030;;;leitura C5 (Sonnet);posição na fila com ordinais e pistas;média
+sme:2ano:p031;MAT02-01;;leitura C5 (Sonnet);leitura de números de linhas de ônibus;baixa
+sme:2ano:p032;MAT02-01;;leitura C5 (Sonnet);formar e ler números em placas;baixa
+sme:2ano:p033;MAT02-09;;leitura C5 (Sonnet);relacionar placa a dia da semana;baixa
+sme:2ano:p034;MAT02-09;;leitura C5 (Sonnet);completar calendário e contar dias do mês;média
+sme:2ano:p035;;;leitura C5 (Sonnet);ordem de chegada em fila com ordinais;média
+sme:2ano:p036;;;leitura C5 (Sonnet);mapa de estações do metrô e posição;média
+sme:2ano:p037;;;leitura C5 (Sonnet);jogo de tabuleiro sem pergunta de matemática;alta
+sme:2ano:p038;MAT02-01;;leitura C5 (Sonnet);quadro numérico até 100 e contagem;média
+sme:2ano:p039:q1;MAT02-01;;leitura C5 (Sonnet);escrever números ditados;média
+sme:2ano:p039:q2;MAT02-09;;leitura C5 (Sonnet);formar placas e achar dia do rodízio;baixa
+sme:2ano:p039:q3;;;leitura C5 (Sonnet);posição em fila com ordinais;média
+sme:2ano:p039:q4;MAT02-01;;leitura C5 (Sonnet);antecessor e sucessor de números;alta
+sme:2ano:p039:q5;MAT02-01;;leitura C5 (Sonnet);identificar números ditados no quadro;média
+sme:2ano:p039:q6;;;leitura C5 (Sonnet);posição de estação entre outras no mapa;média
+sme:2ano:p039:q7;MAT02-01;;leitura C5 (Sonnet);completar quadro numérico até 100;média
+sme:2ano:p042;MAT02-05;;leitura C5 (Sonnet);contar objetos agrupando em pares;baixa
+sme:2ano:p043;MAT02-03;;leitura C5 (Sonnet);comparar coleções contando de cinco em cinco e diferença;baixa
+sme:2ano:p044;MAT02-05;;leitura C5 (Sonnet);agrupar de cinco em cinco e contar o total;baixa
+sme:2ano:p046;MAT02-05;;leitura C5 (Sonnet);contar de dez em dez agrupando em envelopes;média
+sme:2ano:p047;MAT02-02;;leitura C5 (Sonnet);problemas de juntar e completar com figurinhas;média
+sme:2ano:p049;;;leitura C5 (Sonnet);mapa com trajeto sem conta;alta
+sme:2ano:p050;MAT02-02;;leitura C5 (Sonnet);somar pontos de jogo e trocar dezenas por fichas;baixa
+sme:2ano:p052;MAT02-02;;leitura C5 (Sonnet);somar pontos de jogadas e trocar por fichas;baixa
+sme:2ano:p054:q1;MAT02-01;;leitura C5 (Sonnet);escrever números ditados;média
+sme:2ano:p054:q2;MAT02-05;;leitura C5 (Sonnet);contar caixas de dez em dez;média
+sme:2ano:p054:q3;MAT02-05;;leitura C5 (Sonnet);contar potes de dez em dez;média
+sme:2ano:p054:q4;MAT02-02;;leitura C5 (Sonnet);problema de adição de duas parcelas;alta
+sme:2ano:p054:q5;MAT02-05;;leitura C5 (Sonnet);contar de dois em dois;média
+sme:2ano:p054:q6;MAT02-03;;leitura C5 (Sonnet);problema de subtração com parte desconhecida;alta
+sme:2ano:p054:q7;MAT02-01;;leitura C5 (Sonnet);comparar números e pintar o maior;alta
+sme:2ano:p058;MAT02-01;;leitura C5 (Sonnet);comparar quantidades e agrupar de dez em dez;baixa
+sme:2ano:p060;MAT02-10;;leitura C5 (Sonnet);tabela de gastos em reais e notas;média
+sme:2ano:p062;MAT02-10;imagem de terceiro sem crédito (reprodução de cédulas reais de 10 e 20 reais);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);compras, troco e notas e moedas;alta
+sme:2ano:p064;MAT02-01;;leitura C5 (Sonnet);completar quadro numérico até 128;média
+sme:2ano:p066;MAT02-10;;leitura C5 (Sonnet);escolher compras dentro de 80 reais;média
+sme:2ano:p067;MAT02-10;;leitura C5 (Sonnet);preços do lanche e total gasto;média
+sme:2ano:p068;MAT02-02;;leitura C5 (Sonnet);compor somas iguais a 10 em quadro;média
+sme:2ano:p069;MAT02-01;;leitura C5 (Sonnet);adivinhas com números até 200 e somas de dezenas;média
+sme:2ano:p070;MAT02-11;;leitura C5 (Sonnet);ler tabela de gastos e cupons;baixa
+sme:2ano:p072:q1;MAT02-01;;leitura C5 (Sonnet);escrever números ditados;média
+sme:2ano:p072:q2;MAT02-01;;leitura C5 (Sonnet);completar quadro numérico até 149;média
+sme:2ano:p072:q3;MAT02-01;;leitura C5 (Sonnet);achar números intrusos no quadro;média
+sme:2ano:p072:q4;MAT02-01;;leitura C5 (Sonnet);descobrir número por pistas de ordem;média
+sme:2ano:p072:q5;MAT02-11;;leitura C5 (Sonnet);ler tabela de vendas e comparar;média
+sme:2ano:p072:q6;MAT02-02;;leitura C5 (Sonnet);problema de juntar duas quantidades;alta
+sme:2ano:p072:q7;MAT02-04;;leitura C5 (Sonnet);dois pacotes iguais, dobro de vinte;média
+sme:2ano:p076;MAT02-02;;leitura C5 (Sonnet);problemas de juntar e completar quantidades;alta
+sme:2ano:p077;MAT02-03;;leitura C5 (Sonnet);relação entre adição e subtração;baixa
+sme:2ano:p078;MAT02-07;;leitura C5 (Sonnet);formas de aquários e objetos parecidos;média
+sme:2ano:p079;;;leitura C5 (Sonnet);capacidade com copos sem assunto da lista;média
+sme:2ano:p080;MAT02-09;;leitura C5 (Sonnet);calendário e data do passeio;alta
+sme:2ano:p081;MAT02-01;;leitura C5 (Sonnet);completar quadro numérico e usar calculadora;média
+sme:2ano:p082;MAT02-03;;leitura C5 (Sonnet);problemas de retirar e quantidade inicial;alta
+sme:2ano:p083;MAT02-03;;leitura C5 (Sonnet);diferença entre dois números;média
+sme:2ano:p084;MAT02-03;;leitura C5 (Sonnet);calculadora e cálculo mental de adição e subtração;baixa
+sme:2ano:p086;MAT02-01;;leitura C5 (Sonnet);formar, ordenar e comparar números com cartões;média
+sme:2ano:p088;MAT02-02;;leitura C5 (Sonnet);problemas de juntar e completar com tubarões;média
+sme:2ano:p089:q1;MAT02-01;;leitura C5 (Sonnet);escrever números ditados;média
+sme:2ano:p089:q2;MAT02-03;;leitura C5 (Sonnet);transformar números na calculadora por operações;baixa
+sme:2ano:p089:q3;MAT02-03;;leitura C5 (Sonnet);problema de subtração de filhotes;alta
+sme:2ano:p089:q4;MAT02-02;;leitura C5 (Sonnet);problema de parte desconhecida no total de páginas;alta
+sme:2ano:p089:q5;MAT02-07;;leitura C5 (Sonnet);objetos com forma parecida com sólidos;média
+sme:2ano:p092;MAT02-01;;leitura C5 (Sonnet);sequência de números das casas e pistas;média
+sme:2ano:p093;MAT02-11;;leitura C5 (Sonnet);completar tabela e ler gráfico de votos;alta
+sme:2ano:p094;MAT02-08;;leitura C5 (Sonnet);medir cordas com palmos;alta
+sme:2ano:p095;MAT02-11;;leitura C5 (Sonnet);ler gráfico de barras de times;alta
+sme:2ano:p096;MAT02-08;;leitura C5 (Sonnet);medidas não padronizadas de distância;alta
+sme:2ano:p098;MAT02-07;;leitura C5 (Sonnet);sólidos geométricos faces e vértices;alta
+sme:2ano:p100;MAT02-02;;leitura C5 (Sonnet);adição com decomposição em dezenas e unidades;alta
+sme:2ano:p101;MAT02-02;;leitura C5 (Sonnet);adições por decomposição e cálculo mental;alta
+sme:2ano:p102;MAT02-02;;leitura C5 (Sonnet);procedimentos de adição e problema de juntar;alta
+sme:2ano:p104;MAT02-02;;leitura C5 (Sonnet);problemas de adição com cards;alta
+sme:2ano:p105:q1;MAT02-05;;leitura C5 (Sonnet);completar sequência numérica;alta
+sme:2ano:p105:q2;MAT02-02;;leitura C5 (Sonnet);problema de adição de duas parcelas;alta
+sme:2ano:p105:q3;MAT02-02;;leitura C5 (Sonnet);adições por decomposição;alta
+sme:2ano:p105:q4;MAT02-07;;leitura C5 (Sonnet);contar vértices de objetos;média
+sme:2ano:p105:q5;MAT02-11;;leitura C5 (Sonnet);ler gráfico de barras de preferência;alta
+sme:2ano:p105:q6;MAT02-02;;leitura C5 (Sonnet);adições por cálculo mental;alta
+sme:2ano:p108;;;leitura C5 (Sonnet);mapa de roteiro sem conta;alta
+sme:2ano:p110;MAT02-03;;leitura C5 (Sonnet);subtração por decomposição em dezenas e unidades;alta
+sme:2ano:p112;MAT02-03;;leitura C5 (Sonnet);comparar quantidades dizendo a mais ou a menos;média
+sme:2ano:p113;MAT02-12;;leitura C5 (Sonnet);problemas com a mais e a menos misturando operações;média
+sme:2ano:p114;MAT02-07;;leitura C5 (Sonnet);formas de esculturas e superfícies planas;média
+sme:2ano:p116;MAT02-12;;leitura C5 (Sonnet);problemas com a mais e a menos misturando operações;média
+sme:2ano:p117;MAT02-07;;leitura C5 (Sonnet);faces de uma pirâmide;média
+sme:2ano:p118;;;leitura C5 (Sonnet);comparação de peso sem assunto da lista;média
+sme:2ano:p119:q1;MAT02-01;;leitura C5 (Sonnet);escrever números ditados;média
+sme:2ano:p119:q2;MAT02-02;;leitura C5 (Sonnet);problema de adição com a mais;alta
+sme:2ano:p119:q3;MAT02-03;;leitura C5 (Sonnet);subtrações por decomposição;alta
+sme:2ano:p119:q4;MAT02-07;;leitura C5 (Sonnet);sólidos com superfície arredondada;alta
+sme:2ano:p119:q5;MAT02-12;;leitura C5 (Sonnet);problemas de cálculo mental com mais e menos;média
+sme:2ano:p119:q6;MAT02-06;;leitura C5 (Sonnet);reconhecer o retângulo entre figuras;alta
+sme:2ano:p122;MAT02-07;;leitura C5 (Sonnet);reconhecer formas geométricas em desenho de casinha;média
+sme:2ano:p123;;;leitura C5 (Sonnet);temperatura sem assunto da lista;alta
+sme:2ano:p124;MAT02-05;;leitura C5 (Sonnet);sequência de múltiplos de sete por semanas;média
+sme:2ano:p125;MAT02-04;;leitura C5 (Sonnet);dobro e quádruplo em quadros de relação;baixa
+sme:2ano:p126;MAT02-04;;leitura C5 (Sonnet);fileiras iguais de ovos ideia de dobro;baixa
+sme:2ano:p127;MAT03-05;;leitura C5 (Sonnet);repartir igualmente e formar grupos de cinco;média
+sme:2ano:p128;;;leitura C5 (Sonnet);combinações possíveis sem assunto da lista;média
+sme:2ano:p129;;;leitura C5 (Sonnet);massa e proporção de gotas sem assunto da lista;média
+sme:2ano:p130;;;leitura C5 (Sonnet);relação entre xícaras e quilos sem assunto da lista;média
+sme:2ano:p131;MAT02-01;;leitura C5 (Sonnet);completar quadro numérico até 450;média
+sme:2ano:p132;MAT02-11;;leitura C5 (Sonnet);ler quadro e construir gráfico de votos;alta
+sme:2ano:p133:q1;MAT03-04;;leitura C5 (Sonnet);pilhas iguais de caixas multiplicação;média
+sme:2ano:p133:q2;MAT02-04;;leitura C5 (Sonnet);distribuir doze ovos igualmente em duas caixas;média
+sme:2ano:p133:q3;;;leitura C5 (Sonnet);escolher instrumento de medir massa;média
+sme:2ano:p133:q4;MAT02-07;;leitura C5 (Sonnet);planificação de caixa em forma de sólido;média
+sme:2ano:p133:q5;MAT02-04;;leitura C5 (Sonnet);quadros de relação dobro e múltiplos;baixa
+sme:2ano:p133:q6;MAT02-10;;leitura C5 (Sonnet);custo de três pacotes em reais;média
+sme:3ano:p016;MAT03-01;;leitura C5 (Sonnet);ler contagens, comparar quantidades e somar ovelhas;baixa
+sme:3ano:p017;MAT03-01;;leitura C5 (Sonnet);agrupar de dez em dez e escrever números ditados;média
+sme:3ano:p018;MAT03-01;;leitura C5 (Sonnet);explorar quadro numérico e posições dos algarismos;média
+sme:3ano:p020;MAT02-12;;leitura C5 (Sonnet);problemas de juntar e completar numa festa;média
+sme:3ano:p021;MAT02-12;;leitura C5 (Sonnet);problemas de adição e subtração com coleções;média
+sme:3ano:p022;MAT03-01;;leitura C5 (Sonnet);formar, ordenar e comparar números com fichas;média
+sme:3ano:p023;MAT03-01;;leitura C5 (Sonnet);formar números e decompor em dezenas e unidades;alta
+sme:3ano:p024;MAT03-11;;leitura C5 (Sonnet);calendário com meses, bimestre e semestre;alta
+sme:3ano:p025;MAT03-12;;leitura C5 (Sonnet);construir gráfico de aniversariantes por mês;alta
+sme:3ano:p026;;;leitura C5 (Sonnet);localização de sala sem conta de matemática;alta
+sme:3ano:p027;;;leitura C5 (Sonnet);localização de sala sem conta de matemática;alta
+sme:3ano:p028;MAT02-12;;leitura C5 (Sonnet);revisão variada com contagem, somas, calendário e mapa;baixa
+sme:3ano:p032;;;leitura C5 (Sonnet);percurso em planta da escola sem conta;alta
+sme:3ano:p033;MAT03-11;;leitura C5 (Sonnet);semestres do ano e meses;alta
+sme:3ano:p034;MAT03-11;;leitura C5 (Sonnet);trimestres do ano e meses;alta
+sme:3ano:p035;MAT02-12;;leitura C5 (Sonnet);problemas de juntar e de parte desconhecida;média
+sme:3ano:p036;MAT02-12;;leitura C5 (Sonnet);problemas de somar e de retirar com selos;média
+sme:3ano:p037;MAT03-01;;leitura C5 (Sonnet);par e ímpar e adivinhas com números;baixa
+sme:3ano:p038;MAT03-02;;leitura C5 (Sonnet);achar número desconhecido somando ou tirando;baixa
+sme:3ano:p039;MAT03-01;;leitura C5 (Sonnet);números entre outros e a mais ou a menos;baixa
+sme:3ano:p040;MAT02-12;;leitura C5 (Sonnet);problemas de juntar e completar no passeio;média
+sme:3ano:p041;;;leitura C5 (Sonnet);trajeto com setas sem conta;alta
+sme:3ano:p042;MAT03-01;;leitura C5 (Sonnet);andar no quadro numérico e completar sequências;média
+sme:3ano:p044:q1;MAT03-11;;leitura C5 (Sonnet);identificar semestre de datas;alta
+sme:3ano:p044:q2;MAT03-11;;leitura C5 (Sonnet);meses de um trimestre;média
+sme:3ano:p044:q3;MAT03-11;;leitura C5 (Sonnet);último mês de um trimestre;média
+sme:3ano:p044:q4;MAT03-02;;leitura C5 (Sonnet);problema de adição de duas parcelas;média
+sme:3ano:p044:q5;MAT03-03;;leitura C5 (Sonnet);problema de subtração com parte conhecida;média
+sme:3ano:p044:q6;MAT03-03;;leitura C5 (Sonnet);problema de subtração com parte desconhecida;média
+sme:3ano:p044:q7;MAT03-01;;leitura C5 (Sonnet);completar sequências numéricas;baixa
+sme:3ano:p044:q8;MAT03-02;;leitura C5 (Sonnet);número desconhecido por soma ou subtração;baixa
+sme:3ano:p044:q9;;;leitura C5 (Sonnet);trajeto com setas sem conta;alta
+sme:3ano:p048;MAT03-08;;leitura C5 (Sonnet);comparar extensões em metros e sequência de quatro em quatro;baixa
+sme:3ano:p050;MAT03-11;;leitura C5 (Sonnet);calendário e dias da semana;alta
+sme:3ano:p051;MAT03-01;;leitura C5 (Sonnet);completar quadro numérico até 200 e sequências;média
+sme:3ano:p055;MAT03-02;;leitura C5 (Sonnet);adição com reagrupamento em problema de sessão;média
+sme:3ano:p056;MAT02-12;;leitura C5 (Sonnet);problemas de ganhar e perder pontos;média
+sme:3ano:p058;MAT03-02;;leitura C5 (Sonnet);inventar problemas de adição 76 mais 23;média
+sme:3ano:p059;;;leitura C5 (Sonnet);desenhar objetos com forma de sólidos;média
+sme:3ano:p060;;;leitura C5 (Sonnet);reconhecer forma de sólido em foto;média
+sme:3ano:p061;;;leitura C5 (Sonnet);descrever forma de sólido em foto;média
+sme:3ano:p062;MAT03-02;;leitura C5 (Sonnet);adição por decomposição e cálculo mental;alta
+sme:3ano:p064:q1;MAT03-01;;leitura C5 (Sonnet);contar de dez em dez num labirinto;baixa
+sme:3ano:p064:q2;MAT03-03;;leitura C5 (Sonnet);problema de parte desconhecida em livros;média
+sme:3ano:p064:q3;MAT03-02;;leitura C5 (Sonnet);problema de adição de cards;alta
+sme:3ano:p064:q4;;;leitura C5 (Sonnet);nomear objetos parecidos com sólidos;média
+sme:3ano:p064:q5;MAT03-02;;leitura C5 (Sonnet);adições com estratégias estudadas;alta
+sme:3ano:p064:q6;MAT03-01;;leitura C5 (Sonnet);completar sequências por um segredo;baixa
+sme:3ano:p068;MAT03-11;;leitura C5 (Sonnet);calendário, dias da semana e intervalos de dias;alta
+sme:3ano:p070;MAT03-11;;leitura C5 (Sonnet);marcar horários em relógios;alta
+sme:3ano:p071;;;leitura C5 (Sonnet);formas de malas e faces de sólidos;média
+sme:3ano:p072;;;leitura C5 (Sonnet);faces e semelhanças entre sólidos;média
+sme:3ano:p074;MAT03-01;imagem de terceiro sem crédito (dúvida: logotipo de companhia aérea na tabela);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);ler e escrever números por extenso;alta
+sme:3ano:p076;MAT03-01;;leitura C5 (Sonnet);comparar, ordenar e decompor números;alta
+sme:3ano:p078;MAT03-01;;leitura C5 (Sonnet);formar números com unidades dezenas e centenas;alta
+sme:3ano:p080;MAT03-02;;leitura C5 (Sonnet);operações por decomposição como o personagem;média
+sme:3ano:p082;MAT03-02;;leitura C5 (Sonnet);adição por decomposição e estimativa;alta
+sme:3ano:p084;MAT03-03;;leitura C5 (Sonnet);problemas de diferença e subtração com voos;alta
+sme:3ano:p086;MAT02-12;;leitura C5 (Sonnet);problemas de somar e comparar passageiros;média
+sme:3ano:p088:q1;MAT03-11;;leitura C5 (Sonnet);marcar horas em relógios;alta
+sme:3ano:p088:q2;MAT03-01;;leitura C5 (Sonnet);escrever números por extenso;alta
+sme:3ano:p088:q3;MAT03-01;;leitura C5 (Sonnet);ordenar números do menor para o maior;alta
+sme:3ano:p088:q4;MAT03-01;;leitura C5 (Sonnet);somar centenas dezenas e unidades;média
+sme:3ano:p088:q5;;;leitura C5 (Sonnet);face de cada sólido geométrico;média
+sme:3ano:p088:q6;MAT03-03;;leitura C5 (Sonnet);problema de subtração com a menos;alta
+sme:3ano:p088:q7;MAT03-03;;leitura C5 (Sonnet);problema de subtração com a menos;alta
+sme:3ano:p088:q8;MAT03-02;;leitura C5 (Sonnet);adição com e sem decomposição;alta
+sme:3ano:p092;MAT02-12;;leitura C5 (Sonnet);problemas de somar e de parte desconhecida;média
+sme:3ano:p094;MAT03-04;;leitura C5 (Sonnet);grupos iguais de mudas e sementes;alta
+sme:3ano:p095;MAT03-05;;leitura C5 (Sonnet);repartir mudas igualmente entre três amigos;alta
+sme:3ano:p096;MAT03-01;;leitura C5 (Sonnet);contar de dez em dez, ordenar e escrever por extenso;alta
+sme:3ano:p097;MAT03-02;;leitura C5 (Sonnet);estimar e resolver adições de três algarismos;alta
+sme:3ano:p098;MAT03-03;;leitura C5 (Sonnet);estimar e resolver subtrações de três algarismos;alta
+sme:3ano:p100;MAT03-03;;leitura C5 (Sonnet);subtração por decomposição com estimativa;alta
+sme:3ano:p101;MAT02-08;;leitura C5 (Sonnet);medir altura com palmo e comparar;média
+sme:3ano:p102;MAT03-03;;leitura C5 (Sonnet);subtração por decomposição e outros métodos;alta
+sme:3ano:p104;;;leitura C5 (Sonnet);descrever sólidos e pirâmides;média
+sme:3ano:p106;;;leitura C5 (Sonnet);pirâmides e faces;média
+sme:3ano:p108;MAT03-08;;leitura C5 (Sonnet);estimar e medir em metro e centímetro;alta
+sme:3ano:p109:q1;MAT03-02;;leitura C5 (Sonnet);adições e subtrações de três algarismos;média
+sme:3ano:p109:q2;MAT03-02;;leitura C5 (Sonnet);conferir cálculos na calculadora;baixa
+sme:3ano:p109:q3;MAT03-01;;leitura C5 (Sonnet);ordenar números do menor para o maior;alta
+sme:3ano:p109:q4;;;leitura C5 (Sonnet);desenhar pirâmide com faces dadas;média
+sme:3ano:p109:q5;MAT03-03;;leitura C5 (Sonnet);problema de parte desconhecida em figurinhas;alta
+sme:3ano:p109:q6;MAT03-04;;leitura C5 (Sonnet);grupos iguais de saquinhos;alta
+sme:3ano:p109:q7;MAT03-05;;leitura C5 (Sonnet);repartir figurinhas igualmente entre três amigos;alta
+sme:3ano:p112;MAT02-12;;leitura C5 (Sonnet);problemas de efetivo misturando soma e subtração;média
+sme:3ano:p113;MAT02-12;;leitura C5 (Sonnet);problemas de frota com subtração e soma;média
+sme:3ano:p114;MAT03-04;;leitura C5 (Sonnet);multiplicar rodas e caminhões;alta
+sme:3ano:p115;MAT03-04;;leitura C5 (Sonnet);dobro e triplo por multiplicação;alta
+sme:3ano:p116;MAT03-04;;leitura C5 (Sonnet);fileiras iguais de carrinhos;alta
+sme:3ano:p117;MAT03-04;;leitura C5 (Sonnet);tabelas de tabuada de rodas e bombeiros;alta
+sme:3ano:p119;MAT02-11;;leitura C5 (Sonnet);ler quadro de pesquisa e comparar quantidades;média
+sme:3ano:p120;;;leitura C5 (Sonnet);comparar pirâmide cubo e paralelepípedo;média
+sme:3ano:p121;;;leitura C5 (Sonnet);faces e vértices de sólidos;média
+sme:3ano:p123;MAT03-09;;leitura C5 (Sonnet);peso do cachorro e diferença de massas;alta
+sme:3ano:p124;MAT03-09;;leitura C5 (Sonnet);balança de dois pratos e pesos;alta
+sme:3ano:p125;MAT03-09;;leitura C5 (Sonnet);balança eletrônica e diferenças de quilos;média
+sme:3ano:p126:q1;MAT03-09;;leitura C5 (Sonnet);estimar qual animal pesa mais;média
+sme:3ano:p126:q2;MAT02-11;;leitura C5 (Sonnet);ler tabela de lápis e comparar;média
+sme:3ano:p126:q3;MAT03-04;;leitura C5 (Sonnet);tabela de dedos por mãos tabuada do cinco;média
+sme:3ano:p126:q4;MAT03-04;;leitura C5 (Sonnet);fileiras iguais de carteiras;alta
+sme:3ano:p126:q5;MAT03-04;;leitura C5 (Sonnet);dobro de bonecas;média
+sme:3ano:p126:q6;;;leitura C5 (Sonnet);nomear sólidos por características;média
+sme:3ano:p126:q7;;;leitura C5 (Sonnet);desenhar faces de cubo e pirâmide;média
+sme:3ano:p130;MAT03-02;;leitura C5 (Sonnet);problemas de somar cartas em vários dias;média
+sme:3ano:p132;MAT03-10;imagem de terceiro sem crédito (reprodução de cédulas e moedas reais);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);contar moedas e trocar por cédulas;alta
+sme:3ano:p133;MAT03-10;;leitura C5 (Sonnet);preços e composição de valor com cédulas e moedas;alta
+sme:3ano:p135;MAT03-10;imagem de terceiro sem crédito (reprodução de cédulas e moedas reais);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);trocas entre cédulas e moedas;alta
+sme:3ano:p136;MAT02-11;;leitura C5 (Sonnet);ler tabela e comparar quantidades;média
+sme:3ano:p137;MAT02-11;;leitura C5 (Sonnet);tabela de aparelhos total e comparações;média
+sme:3ano:p138;MAT03-12;;leitura C5 (Sonnet);ler eixos de gráficos de barras;alta
+sme:3ano:p139;MAT03-09;;leitura C5 (Sonnet);litro e mililitro em embalagens;alta
+sme:3ano:p140;MAT03-09;;leitura C5 (Sonnet);estimar capacidade em litros;alta
+sme:3ano:p141;MAT03-09;;leitura C5 (Sonnet);problemas de capacidade com copos e jarras;alta
+sme:3ano:p142;MAT03-05;;leitura C5 (Sonnet);dividir cadeiras em fileiras iguais;média
+sme:3ano:p143;;;leitura C5 (Sonnet);diferença entre circular e esférico;baixa
+sme:3ano:p144:q1;MAT03-02;;leitura C5 (Sonnet);problema de adição de três parcelas;alta
+sme:3ano:p144:q2;MAT02-12;;leitura C5 (Sonnet);problema de ganhar e perder pontos;média
+sme:3ano:p144:q3;MAT03-10;imagem de terceiro sem crédito (reprodução de moedas reais);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);trocar moedas por cédulas;alta
+sme:3ano:p144:q4;MAT03-10;imagem de terceiro sem crédito (reprodução de cédula e moedas reais);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);escolher troca correta de dinheiro;alta
+sme:3ano:p144:q5;MAT02-11;;leitura C5 (Sonnet);ler tabela do tempo e comparar;média
+sme:3ano:p144:q6;MAT03-12;;leitura C5 (Sonnet);ler gráfico de aniversariantes por mês;alta
+sme:3ano:p144:q7;;;leitura C5 (Sonnet);esfera ou círculo em figuras;média
+sme:3ano:p148;MAT03-10;;leitura C5 (Sonnet);problemas com mesada em reais;média
+sme:3ano:p149;MAT03-10;;leitura C5 (Sonnet);problemas de compras com reais;média
+sme:3ano:p150;;;leitura C5 (Sonnet);jogo de trilha sobre corpos redondos;alta
+sme:3ano:p152;MAT03-05;;leitura C5 (Sonnet);repartir garrafas e enfeites igualmente;alta
+sme:3ano:p153;MAT03-05;;leitura C5 (Sonnet);formar equipes iguais dividindo;alta
+sme:3ano:p154;MAT03-04;;leitura C5 (Sonnet);escolher a operação em problemas multiplicativos;média
+sme:3ano:p155;MAT03-04;;leitura C5 (Sonnet);combinações e pares como multiplicação;média
+sme:3ano:p156;MAT03-04;;leitura C5 (Sonnet);combinar sabores e coberturas;média
+sme:3ano:p157;MAT03-10;imagem de terceiro sem crédito (reprodução de cédulas e moedas reais);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);valor em reais e preços de produtos;alta
+sme:3ano:p158;MAT03-12;;leitura C5 (Sonnet);comparar gráfico de colunas e tabela;alta
+sme:3ano:p160;MAT03-12;;leitura C5 (Sonnet);ler gráfico de barras de brincadeiras;alta
+sme:3ano:p161;MAT03-10;imagem de terceiro sem crédito (reprodução de cédulas e moedas reais);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);valores em reais e cheques;alta
+sme:3ano:p164:q1;MAT03-03;;leitura C5 (Sonnet);problema de perdas por subtração;alta
+sme:3ano:p164:q2;;;leitura C5 (Sonnet);verdadeiro ou falso sobre corpos redondos;média
+sme:3ano:p164:q3;MAT03-05;;leitura C5 (Sonnet);repartir docinhos entre cinco crianças;alta
+sme:3ano:p164:q4;MAT03-05;;leitura C5 (Sonnet);formar grupos de seis dividindo;alta
+sme:3ano:p164:q5;MAT03-10;imagem de terceiro sem crédito (reprodução de cédulas reais de 50 e 10 reais);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);escrever quantia por extenso em cheque;média
+sme:3ano:p164:q6;MAT03-10;;leitura C5 (Sonnet);cheque e cédulas para um valor;média
+sme:4ano:p016;MAT04-01;;leitura C5 (Sonnet);ler tabela, ordenar números e escrever números ditados;média
+sme:4ano:p017;MAT04-02;;leitura C5 (Sonnet);completar tabela com somas e subtrações de anos;média
+sme:4ano:p018;MAT04-01;;leitura C5 (Sonnet);comparar e escrever números por extenso a partir de tabela;média
+sme:4ano:p019;MAT04-02;;leitura C5 (Sonnet);problemas de adição e subtração com centenas;alta
+sme:4ano:p020;MAT04-02;;leitura C5 (Sonnet);problemas de adição e subtração com centenas;alta
+sme:4ano:p021;MAT04-02;;leitura C5 (Sonnet);problemas de comparação e soma de pesos grandes;alta
+sme:4ano:p022;MAT05-11;;leitura C5 (Sonnet);localizar elementos em mapa com letras e números;média
+sme:4ano:p024;MAT04-01;;leitura C5 (Sonnet);formar números com algarismos e valor posicional;alta
+sme:4ano:p025;MAT04-01;;leitura C5 (Sonnet);compor números e valor posicional na calculadora;média
+sme:4ano:p026;MAT04-01;;leitura C5 (Sonnet);jogo de formar números de três algarismos e intervalos;média
+sme:4ano:p028;MAT04-01;;leitura C5 (Sonnet);formar números, escrever por extenso, sucessor e antecessor;alta
+sme:4ano:p029;MAT04-01;;leitura C5 (Sonnet);completar quadros numéricos e regularidades;média
+sme:4ano:p030:q1;MAT04-01;;leitura C5 (Sonnet);formar o maior número com algarismos dados;alta
+sme:4ano:p030:q2;MAT04-02;;leitura C5 (Sonnet);comparar pesos e calcular diferença;alta
+sme:4ano:p030:q3;MAT04-02;;leitura C5 (Sonnet);problemas de soma e subtração;alta
+sme:4ano:p030:q4;MAT05-11;;leitura C5 (Sonnet);localizar na malha por letra e número;alta
+sme:4ano:p030:q5;MAT05-11;depende do mapa de outra questão, que não vem no recorte;leitura C5 (Sonnet) + lente C5 (Opus);identificar o que está na coordenada;alta
+sme:4ano:p030:q6;MAT04-01;;leitura C5 (Sonnet);sucessor e antecessor;alta
+sme:4ano:p030:q7;MAT04-01;;leitura C5 (Sonnet);maior número de três algarismos;alta
+sme:4ano:p030:q8;MAT04-01;;leitura C5 (Sonnet);menor número de três algarismos;alta
+sme:4ano:p030:q9;MAT04-01;;leitura C5 (Sonnet);escrever números ditados;média
+sme:4ano:p034;MAT03-11;;leitura C5 (Sonnet);calendário, dias da semana e horas;média
+sme:4ano:p036;MAT04-02;;leitura C5 (Sonnet);problemas de adição e subtração;alta
+sme:4ano:p038;MAT04-02;;leitura C5 (Sonnet);problemas de adição e subtração;alta
+sme:4ano:p040;MAT04-02;;leitura C5 (Sonnet);adição com reagrupamento e valor dos algarismos;alta
+sme:4ano:p041;MAT04-02;;leitura C5 (Sonnet);formular problemas de adição e subtração;média
+sme:4ano:p042;MAT04-02;;leitura C5 (Sonnet);estimativa de somas e subtrações;média
+sme:4ano:p043;MAT04-02;;leitura C5 (Sonnet);arredondar para estimar somas e subtrações;média
+sme:4ano:p044;MAT04-02;;leitura C5 (Sonnet);cálculo por arredondamento e compensação;alta
+sme:4ano:p045;MAT04-01;;leitura C5 (Sonnet);antecessor, sucessor e ordenar números;alta
+sme:4ano:p046;MAT04-01;;leitura C5 (Sonnet);ordem crescente, decrescente e sequências;alta
+sme:4ano:p047;MAT05-11;;leitura C5 (Sonnet);descrever percurso em malha com giros;média
+sme:4ano:p048;MAT05-11;;leitura C5 (Sonnet);percursos e orientação na malha quadriculada;média
+sme:4ano:p049;MAT05-11;;leitura C5 (Sonnet);criar comandos de caminho na malha;média
+sme:4ano:p050:q1;MAT04-01;;leitura C5 (Sonnet);completar sequências numéricas;alta
+sme:4ano:p050:q2;MAT04-01;;leitura C5 (Sonnet);ordenar números em ordem crescente;alta
+sme:4ano:p050:q3;MAT04-01;;leitura C5 (Sonnet);sucessor e antecessor;alta
+sme:4ano:p050:q4;MAT04-02;;leitura C5 (Sonnet);estimar subtração e soma;alta
+sme:4ano:p050:q5;MAT04-02;;leitura C5 (Sonnet);problemas de subtração;alta
+sme:4ano:p050:q6;MAT05-11;;leitura C5 (Sonnet);escolher descrição de percurso na malha;média
+sme:4ano:p054;MAT03-04;;leitura C5 (Sonnet);relações multiplicativas entre tempos de decomposição;média
+sme:4ano:p056;MAT03-04;;leitura C5 (Sonnet);tabelas de proporcionalidade com multiplicação;baixa
+sme:4ano:p058;MAT03-04;;leitura C5 (Sonnet);completar tabelas de tabuada;alta
+sme:4ano:p060;MAT03-04;;leitura C5 (Sonnet);estratégias para tabuada;alta
+sme:4ano:p062;MAT03-04;;leitura C5 (Sonnet);tabelas de multiplicação por quantidade fixa;alta
+sme:4ano:p063;MAT04-03;;leitura C5 (Sonnet);multiplicar por 10, 100 e 1.000;média
+sme:4ano:p064;MAT04-03;;leitura C5 (Sonnet);problemas de multiplicação e divisão exata;baixa
+sme:4ano:p065;MAT03-04;;leitura C5 (Sonnet);contar arranjos retangulares por multiplicação;média
+sme:4ano:p066;MAT04-03;;leitura C5 (Sonnet);problemas de multiplicação com números maiores;média
+sme:4ano:p067;MAT04-02;;leitura C5 (Sonnet);pistas de comparação com adição e subtração;média
+sme:4ano:p068;MAT04-02;;leitura C5 (Sonnet);estratégias de subtração e operação inversa;alta
+sme:4ano:p070;MAT04-02;;leitura C5 (Sonnet);subtração com estimativa e calculadora;alta
+sme:4ano:p071;MAT05-08;;leitura C5 (Sonnet);observar embalagens e formas geométricas espaciais;média
+sme:4ano:p072;MAT05-08;;leitura C5 (Sonnet);classificar embalagens e partes de sólidos;média
+sme:4ano:p073:q1;MAT03-04;;leitura C5 (Sonnet);multiplicar quantidades em tabela;média
+sme:4ano:p073:q2;MAT04-03;;leitura C5 (Sonnet);multiplicar 22 por 7;média
+sme:4ano:p073:q3;MAT03-04;;leitura C5 (Sonnet);multiplicação por 2 em tabela;média
+sme:4ano:p073:q4;MAT03-04;;leitura C5 (Sonnet);resultados de tabuada;alta
+sme:4ano:p073:q5;MAT04-03;;leitura C5 (Sonnet);multiplicar por 10, 100 e 1.000;média
+sme:4ano:p073:q6;MAT05-08;;leitura C5 (Sonnet);identificar forma geométrica fora do grupo;baixa
+sme:4ano:p076;MAT04-03;;leitura C5 (Sonnet);multiplicação por decomposição em problemas;alta
+sme:4ano:p077;MAT04-03;;leitura C5 (Sonnet);registros de multiplicação por um algarismo;alta
+sme:4ano:p078;MAT03-04;;leitura C5 (Sonnet);contar assentos em fileiras e colunas;média
+sme:4ano:p079;MAT03-04;;leitura C5 (Sonnet);fileiras e colunas, multiplicar e dividir;média
+sme:4ano:p080;MAT03-04;;leitura C5 (Sonnet);dobro, triplo e metade;baixa
+sme:4ano:p081;MAT03-04;;leitura C5 (Sonnet);princípio multiplicativo de combinações;média
+sme:4ano:p082;MAT04-04;;leitura C5 (Sonnet);divisão com resto em situações de distribuição;média
+sme:4ano:p083;MAT03-05;;leitura C5 (Sonnet);divisões exatas em tabelas de caixas;média
+sme:4ano:p084;MAT04-04;;leitura C5 (Sonnet);esquema de divisão e divisão por 10, 100, 1.000;média
+sme:4ano:p086;MAT04-02;;leitura C5 (Sonnet);subtração com números maiores;alta
+sme:4ano:p087;MAT05-08;;leitura C5 (Sonnet);planificação do cubo;alta
+sme:4ano:p088;MAT05-08;depende da forma do cilindro de outra atividade, que não vem no recorte (lente C5);leitura C5 (Sonnet) + lente C5 (Opus);planificações do cilindro e do cubo;alta
+sme:4ano:p089:q1;MAT04-03;;leitura C5 (Sonnet);problemas de multiplicação e divisão;média
+sme:4ano:p089:q2;MAT04-03;;leitura C5 (Sonnet);multiplicar por decomposição;alta
+sme:4ano:p089:q3;MAT04-02;;leitura C5 (Sonnet);subtrações com números grandes;alta
+sme:4ano:p089:q4;MAT05-08;;leitura C5 (Sonnet);escolher planificação de cubo;alta
+sme:4ano:p089:q5;MAT03-04;;leitura C5 (Sonnet);dobro, triplo e metade;baixa
+sme:4ano:p089:q6;MAT04-04;depende do modelo de esquema de outra atividade, que não vem no recorte (lente C5);leitura C5 (Sonnet) + lente C5 (Opus);divisão pelo esquema;alta
+sme:4ano:p092;MAT04-03;;leitura C5 (Sonnet);multiplicar voltas por 400 metros;média
+sme:4ano:p093;MAT04-10;;leitura C5 (Sonnet);metros e quilômetros em provas;média
+sme:4ano:p094;MAT03-04;;leitura C5 (Sonnet);combinações e contagem de partidas;média
+sme:4ano:p095;MAT03-04;;leitura C5 (Sonnet);jogo de tabuada;alta
+sme:4ano:p096;MAT03-04;;leitura C5 (Sonnet);dicas para memorizar tabuada;alta
+sme:4ano:p098;MAT04-10;;leitura C5 (Sonnet);temperatura e variação em graus;média
+sme:4ano:p100;MAT05-11;;leitura C5 (Sonnet);jogo de coordenadas letra e número;alta
+sme:4ano:p101;MAT04-03;;leitura C5 (Sonnet);multiplicar por múltiplos de 10 e 100;alta
+sme:4ano:p103;MAT04-03;;leitura C5 (Sonnet);cálculo mental de multiplicação;alta
+sme:4ano:p104;MAT04-03;;leitura C5 (Sonnet);estimar algarismos do produto;média
+sme:4ano:p105;MAT05-08;;leitura C5 (Sonnet);características de sólidos geométricos;alta
+sme:4ano:p107;MAT04-10;;leitura C5 (Sonnet);instrumentos e unidades de medida;alta
+sme:4ano:p109:q1;MAT04-03;;leitura C5 (Sonnet);multiplicar metros por chegadas;média
+sme:4ano:p109:q2;MAT04-03;;leitura C5 (Sonnet);multiplicar com dobro do comprimento;média
+sme:4ano:p109:q3;MAT03-04;;leitura C5 (Sonnet);princípio multiplicativo de combinações;média
+sme:4ano:p109:q4;MAT04-10;;leitura C5 (Sonnet);variação de temperatura em graus;baixa
+sme:4ano:p109:q5;MAT03-04;;leitura C5 (Sonnet);dicas de tabuada;média
+sme:4ano:p109:q6;MAT05-08;;leitura C5 (Sonnet);características de sólidos;média
+sme:4ano:p112;MAT04-10;;leitura C5 (Sonnet);converter horas, dias e meses;alta
+sme:4ano:p113;MAT03-05;;leitura C5 (Sonnet);divisão e proporcionalidade em receitas;baixa
+sme:4ano:p114;MAT04-04;;leitura C5 (Sonnet);dividir por 10, 100 e 1.000 mentalmente;média
+sme:4ano:p115;MAT04-05;;leitura C5 (Sonnet);frações e números racionais no cotidiano;média
+sme:4ano:p116;MAT04-04;;leitura C5 (Sonnet);divisão com resto e partes de inteiro;média
+sme:4ano:p118;MAT04-05;;leitura C5 (Sonnet);jogo de frações de quantidade;média
+sme:4ano:p119;MAT04-06;;leitura C5 (Sonnet);frações do real e moedas;média
+sme:4ano:p121;MAT04-05;;leitura C5 (Sonnet);frações de quilo e de quantidade;média
+sme:4ano:p122;MAT04-08;;leitura C5 (Sonnet);compor quadrados e triângulos com tangram;média
+sme:4ano:p123;MAT04-10;;leitura C5 (Sonnet);variação de temperatura;baixa
+sme:4ano:p124;MAT04-03;;leitura C5 (Sonnet);multiplicação por dois algarismos;alta
+sme:4ano:p125;MAT04-03;;leitura C5 (Sonnet);algoritmo da multiplicação por dois algarismos;alta
+sme:4ano:p127:q1;MAT03-11;;leitura C5 (Sonnet);calcular meses entre datas no calendário;média
+sme:4ano:p127:q2;MAT03-05;;leitura C5 (Sonnet);divisão inversa da multiplicação;média
+sme:4ano:p127:q3;MAT03-05;;leitura C5 (Sonnet);divisão inversa da multiplicação;média
+sme:4ano:p127:q4;MAT04-03;;leitura C5 (Sonnet);multiplicar e dividir por potências de 10;média
+sme:4ano:p127:q5;MAT04-03;;leitura C5 (Sonnet);multiplicar dois números de dois algarismos;alta
+sme:4ano:p127:q6;MAT04-08;;leitura C5 (Sonnet);relações entre figuras do tangram;média
+sme:4ano:p127:q7;MAT04-05;;leitura C5 (Sonnet);identificar fração de um inteiro;alta
+sme:4ano:p127:q8;MAT04-06;;leitura C5 (Sonnet);moedas e valores em reais;alta
+sme:4ano:p130;MAT04-10;;leitura C5 (Sonnet);unidades de área km2 e m2;média
+sme:4ano:p131;MAT04-02;;leitura C5 (Sonnet);somar e comparar áreas grandes;baixa
+sme:4ano:p132;MAT05-11;imagem de terceiro sem crédito (mapa de ruas real e mapa do metrô);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);localizar no mapa com letras e números;média
+sme:4ano:p134;MAT04-04;;leitura C5 (Sonnet);problemas de divisão e resto;média
+sme:4ano:p135;MAT04-04;;leitura C5 (Sonnet);divisão com resto em problemas;alta
+sme:4ano:p136;MAT04-04;;leitura C5 (Sonnet);procedimentos de divisão;média
+sme:4ano:p137;MAT04-04;;leitura C5 (Sonnet);estratégias de divisão e por 10, 100, 1.000;média
+sme:4ano:p139;MAT04-06;;leitura C5 (Sonnet);dinheiro, troco e divisão de real;média
+sme:4ano:p140;MAT04-06;;leitura C5 (Sonnet);forma decimal e fracionária de divisões;alta
+sme:4ano:p141;MAT04-06;;leitura C5 (Sonnet);dividir reais por 10 e decimais;alta
+sme:4ano:p142;MAT04-09;;leitura C5 (Sonnet);perímetro e área em malha;alta
+sme:4ano:p143;MAT04-12;;leitura C5 (Sonnet);organizar dados em tabela;alta
+sme:4ano:p144;MAT04-12;;leitura C5 (Sonnet);interpretar gráfico de linhas;alta
+sme:4ano:p145:q1;MAT05-11;;leitura C5 (Sonnet);localizar por coordenadas;alta
+sme:4ano:p145:q2;MAT04-10;;leitura C5 (Sonnet);escolher unidade de medida de distância;alta
+sme:4ano:p145:q3;MAT04-09;;leitura C5 (Sonnet);perímetro de planta;alta
+sme:4ano:p145:q4;MAT04-04;;leitura C5 (Sonnet);divisão exata em problema;média
+sme:4ano:p145:q5;MAT04-04;;leitura C5 (Sonnet);dividir por 10;média
+sme:4ano:p145:q6;MAT04-06;;leitura C5 (Sonnet);ordenar números decimais;alta
+sme:4ano:p145:q7;MAT04-04;;leitura C5 (Sonnet);divisões indicando o resto;alta
+sme:4ano:p145:q8;MAT04-04;;leitura C5 (Sonnet);divisões exatas por um algarismo;média
+sme:4ano:p148;MAT04-01;;leitura C5 (Sonnet);ler e escrever números grandes;alta
+sme:4ano:p149;MAT04-10;;leitura C5 (Sonnet);transformar unidades dividindo por potências de 10;média
+sme:4ano:p151;MAT04-10;;leitura C5 (Sonnet);transformar unidades de tempo;média
+sme:4ano:p152;MAT04-12;;leitura C5 (Sonnet);interpretar tabela de horários;média
+sme:4ano:p153;MAT04-10;;leitura C5 (Sonnet);litros e mililitros;alta
+sme:4ano:p154;MAT04-10;;leitura C5 (Sonnet);gramas, mililitros e quantidades de ingredientes;alta
+sme:4ano:p156;MAT04-06;;leitura C5 (Sonnet);preços, dinheiro e divisão de despesa;média
+sme:4ano:p157;MAT05-08;;leitura C5 (Sonnet);faces de prisma e planificação;alta
+sme:4ano:p159;MAT04-09;;leitura C5 (Sonnet);perímetro de percursos;alta
+sme:4ano:p160;MAT04-06;;leitura C5 (Sonnet);comparar números decimais;alta
+sme:4ano:p161;MAT04-06;;leitura C5 (Sonnet);relacionar fração e decimal;média
+sme:4ano:p163;MAT04-12;;leitura C5 (Sonnet);interpretar gráfico de chuva;alta
+sme:4ano:p165:q1;MAT04-12;;leitura C5 (Sonnet);ler gráfico de barras;alta
+sme:4ano:p165:q2;MAT04-04;;leitura C5 (Sonnet);dividir 369 por 3;média
+sme:4ano:p165:q3;MAT04-04;;leitura C5 (Sonnet);divisão exata em problema;média
+sme:4ano:p165:q4;MAT04-10;;leitura C5 (Sonnet);converter litro em mililitros;média
+sme:4ano:p165:q5;MAT04-09;;leitura C5 (Sonnet);perímetro de terrenos;alta
+sme:4ano:p165:q6;MAT04-04;;leitura C5 (Sonnet);dividir conta igualmente;média
+sme:4ano:p165:q7;MAT04-03;;leitura C5 (Sonnet);multiplicar velocidade por tempo;baixa
+sme:4ano:p165:q8;MAT04-06;;leitura C5 (Sonnet);frações em forma decimal;alta
+sme:5ano:p016;MAT05-01;imagem de terceiro sem crédito (mapa oficial da subprefeitura da Mooca);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);comparar e ler números de cinco algarismos;alta
+sme:5ano:p017;MAT05-01;;leitura C5 (Sonnet);quadro de ordens e classes;alta
+sme:5ano:p018;MAT05-01;;leitura C5 (Sonnet);comparar números e escrever com algarismos;alta
+sme:5ano:p019;MAT05-01;;leitura C5 (Sonnet);comparar e ordenar com símbolos maior e menor;alta
+sme:5ano:p020;MAT05-01;;leitura C5 (Sonnet);composição de números na calculadora;média
+sme:5ano:p021;MAT05-01;;leitura C5 (Sonnet);quadros numéricos, ordem e aproximação;média
+sme:5ano:p022;MAT05-02;;leitura C5 (Sonnet);problemas de adição e subtração;alta
+sme:5ano:p023;MAT05-02;;leitura C5 (Sonnet);problemas de adição e subtração;alta
+sme:5ano:p024;MAT05-02;;leitura C5 (Sonnet);problemas de adição e subtração;alta
+sme:5ano:p025;MAT05-02;;leitura C5 (Sonnet);cálculo mental de adição e estimativa;alta
+sme:5ano:p026;MAT05-02;;leitura C5 (Sonnet);algoritmo da adição com reagrupamento;alta
+sme:5ano:p027;MAT05-02;;leitura C5 (Sonnet);procedimentos de subtração com desagrupamento;alta
+sme:5ano:p028;MAT05-02;;leitura C5 (Sonnet);adições e subtrações com lápis e papel;alta
+sme:5ano:p030;MAT05-11;;leitura C5 (Sonnet);descrever o entorno da escola com referências;baixa
+sme:5ano:p031;MAT05-11;;leitura C5 (Sonnet);explicar caminho com pontos de referência;baixa
+sme:5ano:p032:q1;MAT05-02;;leitura C5 (Sonnet);subtração mental;alta
+sme:5ano:p032:q2;MAT05-02;;leitura C5 (Sonnet);subtração com três algarismos;alta
+sme:5ano:p032:q3;MAT05-02;;leitura C5 (Sonnet);problema de subtração;alta
+sme:5ano:p032:q4;MAT05-01;;leitura C5 (Sonnet);decompor número;alta
+sme:5ano:p032:q5;MAT05-01;;leitura C5 (Sonnet);ordem crescente;alta
+sme:5ano:p032:q6;MAT05-01;;leitura C5 (Sonnet);escrever número com algarismos;alta
+sme:5ano:p032:q7;MAT05-02;;leitura C5 (Sonnet);subtração com quatro algarismos;alta
+sme:5ano:p032:q8;MAT05-01;;leitura C5 (Sonnet);compor número por soma de ordens;alta
+sme:5ano:p032:q9;MAT05-02;;leitura C5 (Sonnet);subtrações de 100;alta
+sme:5ano:p032:q10;MAT05-02;;leitura C5 (Sonnet);completar adições com termo faltante;alta
+sme:5ano:p036;MAT05-08;;leitura C5 (Sonnet);prismas e faces das caixas;alta
+sme:5ano:p038;MAT05-08;;leitura C5 (Sonnet);nomear e desenhar prismas;alta
+sme:5ano:p039;MAT05-08;;leitura C5 (Sonnet);contar faces de prismas;alta
+sme:5ano:p040;MAT05-08;;leitura C5 (Sonnet);contar vértices e arestas de prismas;alta
+sme:5ano:p041;MAT05-02;;leitura C5 (Sonnet);problemas de multiplicação e divisão;alta
+sme:5ano:p042;MAT05-02;;leitura C5 (Sonnet);problemas com dobro, triplo e metade;alta
+sme:5ano:p043;MAT05-02;;leitura C5 (Sonnet);multiplicar por 10, 100 e 1.000;média
+sme:5ano:p044;MAT05-02;;leitura C5 (Sonnet);regularidades na tabela de multiplicação;média
+sme:5ano:p046;MAT05-02;;leitura C5 (Sonnet);multiplicar linhas por colunas;média
+sme:5ano:p047;MAT05-02;;leitura C5 (Sonnet);multiplicar por repartição;alta
+sme:5ano:p048;MAT05-02;;leitura C5 (Sonnet);procedimentos de multiplicação;alta
+sme:5ano:p049;MAT05-02;;leitura C5 (Sonnet);multiplicação com produtos parciais;alta
+sme:5ano:p050;MAT05-10;;leitura C5 (Sonnet);medidas de tempo e conversões;média
+sme:5ano:p052;MAT05-10;;leitura C5 (Sonnet);leitura de temperatura e diferença;baixa
+sme:5ano:p053;MAT05-12;imagem de terceiro sem crédito (previsão do tempo com logotipo Climatempo);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);ler tabela de temperaturas e comparar;média
+sme:5ano:p054:q1;MAT05-10;;leitura C5 (Sonnet);marcar temperaturas em termômetro;baixa
+sme:5ano:p054:q2;MAT05-02;;leitura C5 (Sonnet);problema de multiplicação;alta
+sme:5ano:p054:q3;MAT05-02;;leitura C5 (Sonnet);problema com dobro;alta
+sme:5ano:p054:q4;MAT05-08;;leitura C5 (Sonnet);vértices, arestas e faces;alta
+sme:5ano:p054:q5;MAT05-02;;leitura C5 (Sonnet);multiplicação por dois algarismos;alta
+sme:5ano:p054:q6;MAT05-02;;leitura C5 (Sonnet);divisão em pacotes;média
+sme:5ano:p054:q7;MAT05-10;;leitura C5 (Sonnet);calcular tempo entre datas;baixa
+sme:5ano:p058;MAT05-08;;leitura C5 (Sonnet);comparar prisma e pirâmide em edifícios;alta
+sme:5ano:p060;MAT05-08;;leitura C5 (Sonnet);diferenças entre prisma e pirâmide;alta
+sme:5ano:p062;MAT05-08;;leitura C5 (Sonnet);faces e bases das pirâmides;alta
+sme:5ano:p064;MAT05-08;;leitura C5 (Sonnet);faces, vértices e arestas de pirâmides;alta
+sme:5ano:p065;MAT05-12;;leitura C5 (Sonnet);ler tabela com título e fonte;média
+sme:5ano:p066;MAT05-02;;leitura C5 (Sonnet);multiplicar fileiras e colunas;média
+sme:5ano:p068;MAT05-02;;leitura C5 (Sonnet);princípio multiplicativo de combinações;média
+sme:5ano:p069;MAT05-02;;leitura C5 (Sonnet);multiplicação e divisão em arranjo retangular;alta
+sme:5ano:p070;MAT05-02;;leitura C5 (Sonnet);combinações e divisão;média
+sme:5ano:p071;MAT05-02;;leitura C5 (Sonnet);metade e divisão por 10, 100, 1.000;média
+sme:5ano:p072;MAT05-02;;leitura C5 (Sonnet);divisão por esquemas;alta
+sme:5ano:p073;MAT05-02;;leitura C5 (Sonnet);divisão com resto por esquema;alta
+sme:5ano:p074;MAT05-02;;leitura C5 (Sonnet);estimar e efetuar divisões;alta
+sme:5ano:p075;MAT05-12;;leitura C5 (Sonnet);ler e somar dados de tabela dupla;média
+sme:5ano:p076;MAT05-02;;leitura C5 (Sonnet);relação entre dividendo, divisor, quociente e resto;alta
+sme:5ano:p078;MAT05-02;;leitura C5 (Sonnet);termos da divisão e verificação;alta
+sme:5ano:p079;MAT05-12;;leitura C5 (Sonnet);tabela de dupla entrada e totais;alta
+sme:5ano:p080:q1;MAT05-02;;leitura C5 (Sonnet);contar carteiras por multiplicação;média
+sme:5ano:p080:q2;MAT05-02;;leitura C5 (Sonnet);estimar e resolver divisões;alta
+sme:5ano:p080:q3;MAT05-02;;leitura C5 (Sonnet);combinações de lanche e suco;média
+sme:5ano:p080:q4;MAT05-02;;leitura C5 (Sonnet);combinações de recheio e pão;média
+sme:5ano:p080:q5;MAT05-02;;leitura C5 (Sonnet);multiplicação em problema de cadeiras;alta
+sme:5ano:p080:q6;MAT05-12;;leitura C5 (Sonnet);ler e somar dados de tabela;alta
+sme:5ano:p080:q7;MAT05-08;;leitura C5 (Sonnet);vértices, faces e arestas de pirâmides;alta
+sme:5ano:p084;MAT05-01;;leitura C5 (Sonnet);comparar números grandes e escrever com algarismos;média
+sme:5ano:p085;MAT05-01;;leitura C5 (Sonnet);ler, escrever e aproximar milhões;alta
+sme:5ano:p086;MAT05-01;imagem de terceiro sem crédito (logotipos reais de clubes de futebol);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);ler números e quadro de ordens até milhões;alta
+sme:5ano:p088;MAT05-02;;leitura C5 (Sonnet);divisão em partes iguais;alta
+sme:5ano:p089;MAT05-02;;leitura C5 (Sonnet);problemas de divisão;alta
+sme:5ano:p090;MAT05-02;;leitura C5 (Sonnet);jogo de resto da divisão;média
+sme:5ano:p092;MAT05-02;;leitura C5 (Sonnet);completar algarismos em multiplicações e divisões;alta
+sme:5ano:p093;MAT05-12;;leitura C5 (Sonnet);ler gráfico de colunas;alta
+sme:5ano:p094;MAT05-12;;leitura C5 (Sonnet);ler gráfico de barras;alta
+sme:5ano:p096;MAT05-08;;leitura C5 (Sonnet);planificações de prismas;alta
+sme:5ano:p098;MAT05-08;;leitura C5 (Sonnet);planificações de pirâmides;alta
+sme:5ano:p100;MAT05-08;;leitura C5 (Sonnet);cilindro e cone e suas planificações;alta
+sme:5ano:p102;MAT05-12;;leitura C5 (Sonnet);ler gráfico de barras e tabela;média
+sme:5ano:p104:q1;MAT05-01;;leitura C5 (Sonnet);ler números grandes por extenso;alta
+sme:5ano:p104:q2;MAT05-08;;leitura C5 (Sonnet);planificação de forma geométrica;alta
+sme:5ano:p104:q3;MAT05-08;;leitura C5 (Sonnet);formas a partir de planificações;alta
+sme:5ano:p104:q4;MAT05-02;;leitura C5 (Sonnet);problema de divisão;alta
+sme:5ano:p104:q5;MAT05-02;;leitura C5 (Sonnet);divisão por um algarismo;alta
+sme:5ano:p104:q6;MAT05-02;;leitura C5 (Sonnet);divisão por um algarismo;alta
+sme:5ano:p104:q7;MAT05-12;;leitura C5 (Sonnet);ler gráfico e subtrair;média
+sme:5ano:p108;MAT05-04;;leitura C5 (Sonnet);leitura de números decimais em contexto;média
+sme:5ano:p110;MAT05-04;;leitura C5 (Sonnet);ler e escrever preços em decimal;média
+sme:5ano:p111;MAT05-04;;leitura C5 (Sonnet);quadro de ordens decimais;alta
+sme:5ano:p112;MAT05-04;;leitura C5 (Sonnet);comparar e ordenar decimais;alta
+sme:5ano:p113;MAT05-04;;leitura C5 (Sonnet);frações e decimais equivalentes;alta
+sme:5ano:p114;MAT05-04;;leitura C5 (Sonnet);escrever quantidades em forma fracionária;média
+sme:5ano:p115;MAT05-03;;leitura C5 (Sonnet);fração de pizza como parte do inteiro;média
+sme:5ano:p116;MAT05-03;;leitura C5 (Sonnet);representar e comparar frações de pizza;média
+sme:5ano:p118;MAT05-03;;leitura C5 (Sonnet);representar relações como fração;média
+sme:5ano:p119;MAT05-03;;leitura C5 (Sonnet);frações de pastilhas em relação ao total;média
+sme:5ano:p120;MAT05-06;;leitura C5 (Sonnet);frações de denominador 100 em pesquisa;média
+sme:5ano:p121;MAT05-05;;leitura C5 (Sonnet);multiplicar preços decimais por fração de quilo;média
+sme:5ano:p122;MAT05-05;;leitura C5 (Sonnet);comparar preços e dividir quantidades em kg;média
+sme:5ano:p124;MAT05-10;;leitura C5 (Sonnet);medidas de comprimento e altura em metros;média
+sme:5ano:p125;MAT05-10;;leitura C5 (Sonnet);unidades de medida e valores em cm;alta
+sme:5ano:p126;MAT05-10;;leitura C5 (Sonnet);massa em quilogramas e comparação;média
+sme:5ano:p127;MAT05-10;;leitura C5 (Sonnet);litros e mililitros;alta
+sme:5ano:p128;MAT05-10;;leitura C5 (Sonnet);medidas caseiras e padronizadas;alta
+sme:5ano:p129:q1;MAT05-03;;leitura C5 (Sonnet);fração do total de pedaços;alta
+sme:5ano:p129:q2;MAT05-04;;leitura C5 (Sonnet);meio quilo em fração ou decimal;média
+sme:5ano:p129:q3;MAT05-05;;leitura C5 (Sonnet);multiplicar preço em reais;média
+sme:5ano:p129:q4;MAT05-05;;leitura C5 (Sonnet);multiplicar preço decimal;média
+sme:5ano:p129:q5;MAT05-03;;leitura C5 (Sonnet);fração de uma quantidade;média
+sme:5ano:p129:q6;MAT05-04;;leitura C5 (Sonnet);leitura de decimal;alta
+sme:5ano:p129:q7;MAT05-03;;leitura C5 (Sonnet);leitura de fração;média
+sme:5ano:p132;MAT05-04;;leitura C5 (Sonnet);decimais na reta numérica;média
+sme:5ano:p133;MAT05-04;;leitura C5 (Sonnet);decimais e fração na reta numérica;média
+sme:5ano:p134;MAT05-04;;leitura C5 (Sonnet);comparar e ordenar fichas de racionais;média
+sme:5ano:p135;MAT05-03;;leitura C5 (Sonnet);repartir folha em partes iguais com fração;média
+sme:5ano:p136;MAT05-03;;leitura C5 (Sonnet);fração como divisão de folhas;média
+sme:5ano:p137;MAT05-04;;leitura C5 (Sonnet);converter fração em decimal e inverso;alta
+sme:5ano:p138;MAT05-05;;leitura C5 (Sonnet);adição e subtração de decimais;alta
+sme:5ano:p140;MAT05-05;;leitura C5 (Sonnet);operações e estimativas com decimais;alta
+sme:5ano:p141;MAT05-05;;leitura C5 (Sonnet);problemas com dinheiro e troco;alta
+sme:5ano:p142;;;leitura C5 (Sonnet);comparar formas planas em obras de arte;baixa
+sme:5ano:p143;;;leitura C5 (Sonnet);polígonos planos, lados e ângulos;média
+sme:5ano:p144;;;leitura C5 (Sonnet);polígonos planos por descrição;média
+sme:5ano:p145;;;leitura C5 (Sonnet);decompor polígonos em triângulos;média
+sme:5ano:p146;;;leitura C5 (Sonnet);decompor quadriláteros em triângulos;média
+sme:5ano:p147;MAT05-12;;leitura C5 (Sonnet);ler gráfico de linhas;alta
+sme:5ano:p148;MAT05-12;;leitura C5 (Sonnet);ler gráfico de colunas;alta
+sme:5ano:p149;MAT05-12;;leitura C5 (Sonnet);gráficos com médias e interpretação;média
+sme:5ano:p154;MAT05-03;;leitura C5 (Sonnet);metade e fração em consumo de água;baixa
+sme:5ano:p155;MAT05-03;;leitura C5 (Sonnet);frações em tiras e equivalência;baixa
+sme:5ano:p156;MAT05-03;;leitura C5 (Sonnet);frações equivalentes;baixa
+sme:5ano:p158;MAT05-06;;leitura C5 (Sonnet);significado do símbolo de porcentagem;alta
+sme:5ano:p159;MAT05-06;;leitura C5 (Sonnet);porcentagem em fração e decimal;alta
+sme:5ano:p160;MAT05-06;;leitura C5 (Sonnet);calcular porcentagens de valores;alta
+sme:5ano:p161;;;leitura C5 (Sonnet);reduzir figura em malha;média
+sme:5ano:p162;;;leitura C5 (Sonnet);ampliar figura em malha;média
+sme:5ano:p164;MAT05-09;;leitura C5 (Sonnet);perímetro em malha;alta
+sme:5ano:p166;MAT05-09;;leitura C5 (Sonnet);área em malha quadriculada;alta
+sme:5ano:p167;MAT05-09;;leitura C5 (Sonnet);área de terreno retangular;alta
+sme:5ano:p168;MAT05-12;;leitura C5 (Sonnet);tabela, gráfico de setores e porcentagens;média
+sme:5ano:p171;MAT05-06;;leitura C5 (Sonnet);fração e porcentagem em gráfico de setores;média
+sme:5ano:p172:q1;MAT05-09;;leitura C5 (Sonnet);área contando unidades;alta
+sme:5ano:p172:q2;MAT05-09;;leitura C5 (Sonnet);perímetro em malha;alta
+sme:5ano:p172:q3;MAT05-09;;leitura C5 (Sonnet);relações entre áreas de quadrados;alta
+sme:5ano:p172:q4;MAT05-03;;leitura C5 (Sonnet);escrever frações equivalentes;baixa
+sme:5ano:p172:q5;MAT05-06;;leitura C5 (Sonnet);calcular porcentagens;alta
+sme:5ano:p172:q6;MAT05-06;;leitura C5 (Sonnet);porcentagem de valor em reais;alta
+sme:5ano:p172:q7;MAT05-06;;leitura C5 (Sonnet);porcentagens em pesquisa de 100 pessoas;média
+sme:5ano:p176;MAT05-02;;leitura C5 (Sonnet);princípio multiplicativo de combinações;média
+sme:5ano:p177;MAT05-02;;leitura C5 (Sonnet);princípio multiplicativo de combinações;média
+sme:5ano:p178;MAT05-02;;leitura C5 (Sonnet);combinações de livros e gibis;média
+sme:5ano:p180;MAT05-02;;leitura C5 (Sonnet);combinações de suco e lanche;média
+sme:5ano:p182;;;leitura C5 (Sonnet);chance de sair face de dado;média
+sme:5ano:p184;;;leitura C5 (Sonnet);jogo de dados e registro de resultados;baixa
+sme:5ano:p185;;;leitura C5 (Sonnet);probabilidade como fração;média
+sme:5ano:p186;MAT05-09;;leitura C5 (Sonnet);área do piso em malha;alta
+sme:5ano:p187;MAT05-02;;leitura C5 (Sonnet);contagem de combinações de países;média
+sme:5ano:p188;MAT05-09;;leitura C5 (Sonnet);área de quadrados e retângulos em malha;alta
+sme:5ano:p189;MAT05-09;;leitura C5 (Sonnet);área de quadrado e retângulo por multiplicação;alta
+sme:5ano:p190;MAT05-09;;leitura C5 (Sonnet);área de campo de futebol;alta
+sme:5ano:p191;MAT05-10;;leitura C5 (Sonnet);unidades de medida de superfície;média
+sme:5ano:p192;MAT05-10;;leitura C5 (Sonnet);associar e converter unidades de área;alta
+sme:5ano:p193;MAT05-12;;leitura C5 (Sonnet);tabela e gráfico de colunas;alta
+sme:5ano:p195;MAT05-12;;leitura C5 (Sonnet);construir gráfico de linha;alta
+sme:5ano:p196:q1;MAT05-02;;leitura C5 (Sonnet);combinações de cores;média
+sme:5ano:p196:q2;MAT05-02;;leitura C5 (Sonnet);combinações de roupas;alta
+sme:5ano:p196:q3;;;leitura C5 (Sonnet);probabilidade com bolinhas;média
+sme:5ano:p196:q4;MAT05-10;;leitura C5 (Sonnet);escolher unidade de área;média
+sme:5ano:p196:q5;MAT05-09;;leitura C5 (Sonnet);calcular área de quadrado e retângulo;alta
+sme:5ano:p196:q6;MAT05-12;;leitura C5 (Sonnet);organizar dados em tabela;alta
+sme:5ano:p196:q7;MAT05-12;;leitura C5 (Sonnet);construir gráfico de barras;alta
+sme:6ano:p016;MAT06-01;;leitura C5 (Sonnet);Usos sociais dos números naturais e sequência infinita;média
+sme:6ano:p017;MAT06-01;;leitura C5 (Sonnet);Ordens, classes e leitura de números grandes;alta
+sme:6ano:p018;MAT06-01;;leitura C5 (Sonnet);Arredondar e escrever números por extenso e com algarismos;alta
+sme:6ano:p019;MAT06-01;;leitura C5 (Sonnet);Escrita por extenso e maior e menor número de três ordens;alta
+sme:6ano:p020;MAT06-01;;leitura C5 (Sonnet);Decomposição, ordens e comparação de naturais grandes;alta
+sme:6ano:p021;MAT06-01;;leitura C5 (Sonnet);Números como códigos (CEP e DDD), sem cálculo;baixa
+sme:6ano:p022;MAT06-01;;leitura C5 (Sonnet);Aproximar e abreviar escritas numéricas;média
+sme:6ano:p023;MAT06-01;;leitura C5 (Sonnet);Abreviar números grandes com mil, milhão e bilhão;alta
+sme:6ano:p024;MAT06-13;;leitura C5 (Sonnet);Orientação em mapa com ruas, noção de localização;baixa
+sme:6ano:p025;MAT06-13;;leitura C5 (Sonnet);Localizar lugares no mapa por linha e coluna;média
+sme:6ano:p026;MAT06-13;;leitura C5 (Sonnet);Pares ordenados e eixos cartesianos;alta
+sme:6ano:p028;;;leitura C5 (Sonnet);Roteiro de metrô, sem conteúdo matemático da lista;baixa
+sme:6ano:p030;;;leitura C5 (Sonnet);Lateralidade em quadros, sem pergunta de matemática do assunto;média
+sme:6ano:p031;MAT06-02;;leitura C5 (Sonnet);Somas e diferenças com dados populacionais em tabela;média
+sme:6ano:p032;MAT06-02;;leitura C5 (Sonnet);Subtrações e comparações com populações;média
+sme:6ano:p033:q1;MAT06-01;;leitura C5 (Sonnet);Escrever números abreviados só com algarismos;média
+sme:6ano:p033:q2;MAT06-03;;leitura C5 (Sonnet);Posição na tabela depende do resto na divisão por 5;média
+sme:6ano:p033:q3;MAT06-01;;leitura C5 (Sonnet);Ordens e valor posicional do número 65.349;alta
+sme:6ano:p033:q4;MAT06-01;;leitura C5 (Sonnet);Ordens e algarismos de número palíndromo;alta
+sme:6ano:p033:q5;MAT06-02;;leitura C5 (Sonnet);Problema de subtração com naturais;alta
+sme:6ano:p033:q6;MAT06-02;;leitura C5 (Sonnet);Problema de operação inversa com adição;alta
+sme:6ano:p033:q7;MAT06-02;;leitura C5 (Sonnet);Comparação aditiva por subtração;alta
+sme:6ano:p036;MAT06-03;;leitura C5 (Sonnet);Introdução ao ano bissexto, ciclo de quatro anos;baixa
+sme:6ano:p037;MAT06-03;;leitura C5 (Sonnet);Eventos periódicos tratados como múltiplos;média
+sme:6ano:p038;MAT06-03;;leitura C5 (Sonnet);Relações de múltiplo e divisor;alta
+sme:6ano:p039;MAT06-03;;leitura C5 (Sonnet);Múltiplos de 2, 3, 4, 6 e 5 em quadro;alta
+sme:6ano:p040;MAT06-04;;leitura C5 (Sonnet);Decomposição em fatores primos do 36;alta
+sme:6ano:p041;MAT06-04;erro da fonte: pede escrever 13, 17 e 37 como produto de dois ou mais primos (lente C5);leitura C5 (Sonnet) + lente C5 (Opus);Fatorar números e reconhecer primos;alta
+sme:6ano:p042;MAT06-04;;leitura C5 (Sonnet);Crivo de Eratóstenes para primos até 100;alta
+sme:6ano:p043;MAT06-03;;leitura C5 (Sonnet);Anos bissextos como múltiplos de 4;média
+sme:6ano:p044;MAT06-03;;leitura C5 (Sonnet);Divisores comuns e maior divisor comum;alta
+sme:6ano:p045;MAT06-16;;leitura C5 (Sonnet);Identificar sólidos e poliedros;alta
+sme:6ano:p046;MAT06-16;;leitura C5 (Sonnet);Características de prismas e pirâmides;alta
+sme:6ano:p048;MAT06-16;;leitura C5 (Sonnet);Corpos redondos e comparação com poliedros;alta
+sme:6ano:p049;MAT06-17;;leitura C5 (Sonnet);Ideia de medir e unidades de medida;alta
+sme:6ano:p050;MAT06-17;;leitura C5 (Sonnet);Unidades adequadas de comprimento e estimativas;alta
+sme:6ano:p051;MAT06-17;;leitura C5 (Sonnet);Unidades de massa e conversões;alta
+sme:6ano:p052;MAT06-17;;leitura C5 (Sonnet);Capacidade em litros e mililitros;média
+sme:6ano:p053:q1;MAT06-03;;leitura C5 (Sonnet);Critérios de múltiplos de 2, 3 e 6;alta
+sme:6ano:p053:q2;MAT06-03;;leitura C5 (Sonnet);Verificar se é múltiplo por divisão exata;alta
+sme:6ano:p053:q3;MAT06-03;;leitura C5 (Sonnet);Problema de menor múltiplo comum;alta
+sme:6ano:p053:q4;MAT06-03;;leitura C5 (Sonnet);Divisores de 20 e 32 e divisores comuns;alta
+sme:6ano:p053:q5;MAT06-03;;leitura C5 (Sonnet);Comparar quantidade de divisores;alta
+sme:6ano:p053:q6;MAT06-04;;leitura C5 (Sonnet);Soma de dois números primos;alta
+sme:6ano:p053:q7;MAT06-17;;leitura C5 (Sonnet);Converter quilômetros e metros;alta
+sme:6ano:p053:q8;MAT06-03;;leitura C5 (Sonnet);Afirmações sobre múltiplos, primos e divisores;média
+sme:6ano:p053:q9;MAT06-02;;leitura C5 (Sonnet);Proporção resolvida com multiplicação de naturais;baixa
+sme:6ano:p056;MAT06-01;;leitura C5 (Sonnet);Leitura de texto e escrita de número por extenso;baixa
+sme:6ano:p057;MAT06-02;;leitura C5 (Sonnet);Divisão e multiplicação em receita para muitas pessoas;alta
+sme:6ano:p058;MAT06-02;;leitura C5 (Sonnet);Cálculo de gasto com ingressos usando multiplicação e soma;média
+sme:6ano:p059;MAT06-02;;leitura C5 (Sonnet);Somar populações grandes por continente;média
+sme:6ano:p060;MAT06-02;;leitura C5 (Sonnet);Soma e subtração com dados de tabela;alta
+sme:6ano:p061;MAT06-02;;leitura C5 (Sonnet);Estimativa e cálculo de adição e subtração;alta
+sme:6ano:p062;MAT06-02;;leitura C5 (Sonnet);Estratégias de multiplicação com decomposição;alta
+sme:6ano:p063;MAT06-02;;leitura C5 (Sonnet);Estimar e efetuar multiplicações;alta
+sme:6ano:p064;MAT06-02;;leitura C5 (Sonnet);Estimar e entender divisões e seus termos;alta
+sme:6ano:p065;MAT06-02;;leitura C5 (Sonnet);Algoritmo da divisão por esquema de decomposição;alta
+sme:6ano:p066;MAT06-02;;leitura C5 (Sonnet);Divisão com divisor de dois algarismos;alta
+sme:6ano:p067;MAT06-02;;leitura C5 (Sonnet);Multiplicações e divisões para resolver;alta
+sme:6ano:p068;MAT06-16;;leitura C5 (Sonnet);Elementos de prismas e pirâmides;alta
+sme:6ano:p070;MAT06-16;;leitura C5 (Sonnet);Faces, vértices e arestas de paralelepípedos e cubos;alta
+sme:6ano:p072;MAT06-12;;leitura C5 (Sonnet);Contar cubos em camadas, ideia de volume;média
+sme:6ano:p073;MAT06-02;;leitura C5 (Sonnet);Problemas de multiplicação, divisão e soma;alta
+sme:6ano:p075:q1;MAT06-02;;leitura C5 (Sonnet);Problema de soma e multiplicação;alta
+sme:6ano:p075:q2;MAT06-02;;leitura C5 (Sonnet);Divisão de naturais em problema;alta
+sme:6ano:p075:q3;MAT06-02;;leitura C5 (Sonnet);Proporção simples resolvida por multiplicação;média
+sme:6ano:p075:q4;MAT06-02;;leitura C5 (Sonnet);Operação inversa em problema de adição;alta
+sme:6ano:p075:q5;MAT06-02;;leitura C5 (Sonnet);Adição de naturais e alternativa;alta
+sme:6ano:p075:q6;MAT06-02;;leitura C5 (Sonnet);Subtração em problema;alta
+sme:6ano:p075:q7;MAT06-14;;leitura C5 (Sonnet);Ler tabela e somar dois valores;média
+sme:6ano:p078;MAT06-02;;leitura C5 (Sonnet);Introdução à potência como multiplicação repetida;média
+sme:6ano:p079;MAT06-02;;leitura C5 (Sonnet);Potência com cubos, base e expoente;média
+sme:6ano:p080;MAT06-02;;leitura C5 (Sonnet);Quadrado, cubo, dobro e triplo em tabelas;média
+sme:6ano:p081;MAT06-02;;leitura C5 (Sonnet);Calcular e comparar potências;média
+sme:6ano:p082;;;leitura C5 (Sonnet);Contagem de pares possíveis, assunto fora da lista;baixa
+sme:6ano:p083;;;leitura C5 (Sonnet);Árvore de possibilidades, assunto fora da lista;baixa
+sme:6ano:p084;MAT06-02;;leitura C5 (Sonnet);Contagem de números e escrita como potência;baixa
+sme:6ano:p085;MAT06-02;;leitura C5 (Sonnet);Princípio multiplicativo de contagem;baixa
+sme:6ano:p086;MAT06-14;;leitura C5 (Sonnet);Tabela de alturas e construção de gráfico;média
+sme:6ano:p088;MAT06-17;;leitura C5 (Sonnet);Comparar embalagens com litros, mililitros e quilos;média
+sme:6ano:p089;MAT06-17;;leitura C5 (Sonnet);Problemas com metros, centímetros, litros e quilos;média
+sme:6ano:p090;MAT06-17;;leitura C5 (Sonnet);Conversões de unidades de tempo;alta
+sme:6ano:p091;MAT06-07;;leitura C5 (Sonnet);Divisões sucessivas por 10 e décimos, centésimos;alta
+sme:6ano:p092;MAT06-07;;leitura C5 (Sonnet);Divisões por 10 e equivalências decimais;alta
+sme:6ano:p093;MAT06-07;;leitura C5 (Sonnet);Décimos e centésimos no inteiro;alta
+sme:6ano:p094;MAT06-07;;leitura C5 (Sonnet);Leitura e escrita de decimais no quadro de valores;alta
+sme:6ano:p095;MAT06-07;;leitura C5 (Sonnet);Comparar e ordenar decimais em medidas;alta
+sme:6ano:p097;MAT06-07;;leitura C5 (Sonnet);Escrita e ordem de números decimais;alta
+sme:6ano:p098;MAT06-05;;leitura C5 (Sonnet);Frações como parte do todo;alta
+sme:6ano:p099;MAT06-05;;leitura C5 (Sonnet);Frações como divisão e chance;alta
+sme:6ano:p100;MAT06-05;;leitura C5 (Sonnet);Representar parte do todo em fração e decimal;média
+sme:6ano:p101;MAT06-05;;leitura C5 (Sonnet);Frações equivalentes;alta
+sme:6ano:p102;MAT06-07;;leitura C5 (Sonnet);Fração para decimal com calculadora e dízimas;média
+sme:6ano:p103;MAT06-07;;leitura C5 (Sonnet);Comparar e operar decimais em saltos;alta
+sme:6ano:p104;MAT06-05;;leitura C5 (Sonnet);Representar frações e decimais em figuras;média
+sme:6ano:p105:q1;MAT06-02;;leitura C5 (Sonnet);Contagem pela multiplicação de naturais;baixa
+sme:6ano:p105:q2;MAT06-05;;leitura C5 (Sonnet);Escrever frações a partir de frases;alta
+sme:6ano:p105:q3;MAT06-05;;leitura C5 (Sonnet);Pintar figuras conforme a fração;alta
+sme:6ano:p105:q4;MAT06-17;;leitura C5 (Sonnet);Distância entre metros e quilômetros;média
+sme:6ano:p105:q5;MAT06-17;;leitura C5 (Sonnet);Duração de evento em horas;alta
+sme:6ano:p105:q6;MAT06-17;;leitura C5 (Sonnet);Converter horas e minutos;alta
+sme:6ano:p105:q7;MAT06-17;;leitura C5 (Sonnet);Calcular horário final com minutos;alta
+sme:6ano:p105:q8;MAT06-02;;leitura C5 (Sonnet);Raciocínio com consumo diário e divisão;média
+sme:6ano:p108;MAT06-14;;leitura C5 (Sonnet);Ler gráfico de barras de distâncias;alta
+sme:6ano:p110;MAT06-17;;leitura C5 (Sonnet);Estimar alturas e distâncias;alta
+sme:6ano:p111;MAT06-07;;leitura C5 (Sonnet);Localizar decimais na reta numérica;média
+sme:6ano:p112;MAT06-07;;leitura C5 (Sonnet);Números decimais entre outros dois;alta
+sme:6ano:p113;MAT06-07;;leitura C5 (Sonnet);Comparar números decimais;alta
+sme:6ano:p114;MAT06-17;;leitura C5 (Sonnet);Grandezas e instrumentos de medida;alta
+sme:6ano:p115;MAT06-10;;leitura C5 (Sonnet);Polígonos, lados, vértices e ângulos;alta
+sme:6ano:p116;MAT06-09;;leitura C5 (Sonnet);Ângulos retos, agudos e obtusos;alta
+sme:6ano:p118;MAT06-09;;leitura C5 (Sonnet);Medir ângulos com o transferidor;alta
+sme:6ano:p120;MAT06-10;;leitura C5 (Sonnet);Classificar polígonos e regulares;alta
+sme:6ano:p121;MAT06-10;;leitura C5 (Sonnet);Classificar polígonos por lados e regularidade;alta
+sme:6ano:p122;MAT06-17;;leitura C5 (Sonnet);Estimar e medir comprimentos com régua;alta
+sme:6ano:p123;MAT06-05;;leitura C5 (Sonnet);Frações e decimais em figuras divididas;média
+sme:6ano:p124;MAT06-07;;leitura C5 (Sonnet);Preços e marcas em decimais, comparar;média
+sme:6ano:p126;MAT06-10;;leitura C5 (Sonnet);Triângulos, decomposição de polígonos e classificação;alta
+sme:6ano:p128;MAT06-05;;leitura C5 (Sonnet);Fração e decimal de total de animais;média
+sme:6ano:p129:q1;MAT06-17;;leitura C5 (Sonnet);Comparar massas em quilo e grama;média
+sme:6ano:p129:q2;MAT06-10;;leitura C5 (Sonnet);Formas poligonais do Tangram;alta
+sme:6ano:p129:q3;MAT06-10;;leitura C5 (Sonnet);Quadrilátero de lados iguais;alta
+sme:6ano:p129:q4;MAT06-07;;leitura C5 (Sonnet);Posição de decimal na reta;alta
+sme:6ano:p129:q5;MAT06-07;;leitura C5 (Sonnet);Decimal entre outros dois;alta
+sme:6ano:p129:q6;MAT06-10;;leitura C5 (Sonnet);Identificar polígonos em painel;média
+sme:6ano:p129:q7;MAT06-17;;leitura C5 (Sonnet);Escolher medida plausível de altura;alta
+sme:6ano:p132;MAT06-05;;leitura C5 (Sonnet);Divisão de inteiros em frações e preço;média
+sme:6ano:p133;MAT06-07;;leitura C5 (Sonnet);Adição e subtração de decimais em problemas;alta
+sme:6ano:p134;MAT06-05;;leitura C5 (Sonnet);Comparar frações e números mistos;alta
+sme:6ano:p135;MAT06-05;;leitura C5 (Sonnet);Localizar frações e mistos na reta;média
+sme:6ano:p136;MAT06-10;;leitura C5 (Sonnet);Lados opostos e paralelos em quadriláteros;média
+sme:6ano:p138;MAT06-10;;leitura C5 (Sonnet);Paralelogramos, retângulos, losangos e quadrados;alta
+sme:6ano:p140;MAT06-05;;leitura C5 (Sonnet);Fração de uma quantidade e partes iguais;média
+sme:6ano:p141;MAT06-10;;leitura C5 (Sonnet);Diagonais e propriedades do retângulo;alta
+sme:6ano:p142;MAT06-10;;leitura C5 (Sonnet);Relações entre quadriláteros;alta
+sme:6ano:p143;MAT06-17;;leitura C5 (Sonnet);Problemas com litros e mililitros;média
+sme:6ano:p144;MAT06-17;;leitura C5 (Sonnet);Conversão de comprimentos, escala e perímetro;média
+sme:6ano:p145;MAT06-07;;leitura C5 (Sonnet);Decimais na reta numérica e distâncias;média
+sme:6ano:p146;MAT06-06;;leitura C5 (Sonnet);Soma e subtração de frações de mesmo denominador;alta
+sme:6ano:p147;MAT06-07;;leitura C5 (Sonnet);Compras com preços decimais e troco;alta
+sme:6ano:p148;MAT06-05;;leitura C5 (Sonnet);Obter e comparar frações equivalentes;alta
+sme:6ano:p149;MAT06-17;;leitura C5 (Sonnet);Unidades de massa e leitura de gráfico;média
+sme:6ano:p150;MAT06-06;;leitura C5 (Sonnet);Soma e subtração de frações com denominadores diferentes;alta
+sme:6ano:p151;MAT06-07;;leitura C5 (Sonnet);Problema de custo e troco com decimais;média
+sme:6ano:p152;MAT06-05;;leitura C5 (Sonnet);Fração de quantidade e divisão de torta;média
+sme:6ano:p153:q1;MAT06-07;;leitura C5 (Sonnet);Troco de compra com decimais;alta
+sme:6ano:p153:q2;MAT06-07;;leitura C5 (Sonnet);Subtração de decimais com temperatura;média
+sme:6ano:p153:q3;MAT06-05;;leitura C5 (Sonnet);Fração do que restou da torta;média
+sme:6ano:p153:q4;MAT06-05;;leitura C5 (Sonnet);Converter fração em decimal;alta
+sme:6ano:p153:q5;MAT06-10;;leitura C5 (Sonnet);Reconhecer quadrilátero;alta
+sme:6ano:p153:q6;MAT06-07;;leitura C5 (Sonnet);Divisão por 10 com decimal em consumo;média
+sme:6ano:p153:q7;MAT06-17;;leitura C5 (Sonnet);Converter centímetros em metros;média
+sme:6ano:p153:q8;MAT06-07;;leitura C5 (Sonnet);Decimal indicado na reta numérica;alta
+sme:6ano:p156;MAT06-11;;leitura C5 (Sonnet);Perímetro e área de formas em malha;alta
+sme:6ano:p158;MAT06-02;;leitura C5 (Sonnet);Raiz quadrada ligada à área do quadrado;baixa
+sme:6ano:p159;MAT06-02;;leitura C5 (Sonnet);Calcular raízes quadradas e quadrados;baixa
+sme:6ano:p160;MAT06-16;;leitura C5 (Sonnet);Planificações de cubo e sólidos;alta
+sme:6ano:p161;MAT06-07;;leitura C5 (Sonnet);Problemas de compra com decimais;alta
+sme:6ano:p162;MAT06-16;;leitura C5 (Sonnet);Planificações de cubos e caixas;alta
+sme:6ano:p163;MAT06-16;;leitura C5 (Sonnet);Arestas e moldes de paralelepípedo;alta
+sme:6ano:p164;MAT06-07;;leitura C5 (Sonnet);Adição e subtração de decimais;alta
+sme:6ano:p165;MAT06-05;;leitura C5 (Sonnet);Frações de litro e perímetro em milímetros;média
+sme:6ano:p166;MAT06-07;;leitura C5 (Sonnet);Problemas com altura, dinheiro e decimais;alta
+sme:6ano:p167;MAT06-07;;leitura C5 (Sonnet);Cálculos exatos de decimais e expressões;alta
+sme:6ano:p168;MAT06-11;;leitura C5 (Sonnet);Áreas de retângulos, quadrados e triângulos;alta
+sme:6ano:p169;MAT06-17;;leitura C5 (Sonnet);Problemas variados com medidas e frações;baixa
+sme:6ano:p170;MAT06-05;;leitura C5 (Sonnet);Fração de quantidade e perímetro;baixa
+sme:6ano:p171;MAT06-11;;leitura C5 (Sonnet);Áreas com peças do Tangram;média
+sme:6ano:p172;MAT06-07;;leitura C5 (Sonnet);Massa em gramas, preços e fração do salário;média
+sme:6ano:p173;MAT06-07;;leitura C5 (Sonnet);Multiplicar e dividir decimais por potências de 10;alta
+sme:6ano:p174;MAT06-07;;leitura C5 (Sonnet);Cálculos mentais com decimais e preços;alta
+sme:6ano:p175;MAT06-07;;leitura C5 (Sonnet);Estimar e operar com decimais;média
+sme:6ano:p176;MAT06-07;;leitura C5 (Sonnet);Somas e subtrações com decimais em problemas;alta
+sme:6ano:p177:q1;MAT06-11;;leitura C5 (Sonnet);Perímetro de retângulo e custo;alta
+sme:6ano:p177:q2;MAT06-05;;leitura C5 (Sonnet);Fração da fração de uma barra;média
+sme:6ano:p177:q3;MAT06-17;;leitura C5 (Sonnet);Litros e mililitros em divisão de copos;média
+sme:6ano:p177:q4;MAT06-16;;leitura C5 (Sonnet);Faces de caixa em forma de prisma;média
+sme:6ano:p177:q5;MAT06-11;;leitura C5 (Sonnet);Perímetro e área em malha;alta
+sme:6ano:p180;MAT06-08;;leitura C5 (Sonnet);Ideia de porcentagem e cálculo de 10%, 25%, 50%;alta
+sme:6ano:p182;MAT06-08;;leitura C5 (Sonnet);Porcentagem em figuras;alta
+sme:6ano:p183;MAT06-11;;leitura C5 (Sonnet);Áreas por composição e decomposição de figuras;alta
+sme:6ano:p185;MAT06-14;;leitura C5 (Sonnet);Ler tabela e gráfico com porcentagens;alta
+sme:6ano:p186;MAT06-07;;leitura C5 (Sonnet);Multiplicação de decimais;alta
+sme:6ano:p188;MAT06-07;;leitura C5 (Sonnet);Multiplicação de decimais em tabelas e problemas;alta
+sme:6ano:p189;MAT06-07;;leitura C5 (Sonnet);Divisão com quociente decimal;alta
+sme:6ano:p190;MAT06-06;;leitura C5 (Sonnet);Multiplicação de frações;alta
+sme:6ano:p192;MAT06-06;;leitura C5 (Sonnet);Divisão de frações;alta
+sme:6ano:p194;MAT06-08;;leitura C5 (Sonnet);Porcentagem de quantidades;alta
+sme:6ano:p195;MAT06-07;;leitura C5 (Sonnet);Compras e promoções com preços decimais;média
+sme:6ano:p196;MAT06-02;;leitura C5 (Sonnet);Expressões numéricas com naturais;média
+sme:6ano:p197:q1;MAT06-07;;leitura C5 (Sonnet);Multiplicar peso decimal por preço;alta
+sme:6ano:p197:q2;MAT06-08;;leitura C5 (Sonnet);Percentual de uma mistura;média
+sme:6ano:p197:q3;MAT06-08;;leitura C5 (Sonnet);Dividir região em partes de 50%;média
+sme:6ano:p197:q4;MAT06-06;;leitura C5 (Sonnet);Fração de uma fração da área;média
+sme:6ano:p197:q5;MAT06-08;;leitura C5 (Sonnet);Porcentagem de alunos;alta
+sme:6ano:p197:q6;MAT06-08;;leitura C5 (Sonnet);Porcentagem de milhões de visitantes;alta
+sme:6ano:p197:q7;MAT06-08;;leitura C5 (Sonnet);Relacionar 70% a gráfico;média
+sme:7ano:p016;;;leitura C5 (Sonnet);Subtrações e somas com naturais em tabela, assunto fora da lista;média
+sme:7ano:p017;;;leitura C5 (Sonnet);Arredondar e somar naturais, assunto fora da lista;média
+sme:7ano:p018;MAT07-04;;leitura C5 (Sonnet);Divisão de valores em reais com decimais;média
+sme:7ano:p020;MAT07-10;;leitura C5 (Sonnet);Descobrir valor desconhecido em igualdades com naturais;baixa
+sme:7ano:p022;MAT07-06;;leitura C5 (Sonnet);Problemas de proporção com cálculo mental;baixa
+sme:7ano:p023;;;leitura C5 (Sonnet);Contagem de possibilidades e frações simples, fora da lista;média
+sme:7ano:p024;MAT07-10;;leitura C5 (Sonnet);Valor desconhecido em igualdades, operações inversas;baixa
+sme:7ano:p026;;;leitura C5 (Sonnet);Cálculo mental de naturais, fora da lista;média
+sme:7ano:p027;;;leitura C5 (Sonnet);Propriedades da adição de naturais, fora da lista;média
+sme:7ano:p028;;;leitura C5 (Sonnet);Estimativa de multiplicações e divisões de naturais;média
+sme:7ano:p029;MAT07-05;;leitura C5 (Sonnet);Índice calculado como razão entre massa e altura;média
+sme:7ano:p030;MAT07-03;;leitura C5 (Sonnet);Comparar números decimais em tabela de classificação;baixa
+sme:7ano:p032;MAT07-07;;leitura C5 (Sonnet);Porcentagem a partir de contagens e cálculo de 30%;alta
+sme:7ano:p033;MAT07-07;;leitura C5 (Sonnet);Cálculo de porcentagens a partir de 10%;alta
+sme:7ano:p034;MAT07-14;;leitura C5 (Sonnet);Probabilidade em fração, decimal e percentual;alta
+sme:7ano:p035;MAT07-14;;leitura C5 (Sonnet);Gráfico de pesquisa, porcentagem e chance;média
+sme:7ano:p036;MAT07-07;;leitura C5 (Sonnet);Porcentagens e probabilidade com tabela de medalhas;média
+sme:7ano:p037;MAT07-03;;leitura C5 (Sonnet);Racionais em fração, decimal e porcentagem;alta
+sme:7ano:p038;MAT07-03;;leitura C5 (Sonnet);Localizar racionais em intervalos e na reta;alta
+sme:7ano:p039;MAT07-03;;leitura C5 (Sonnet);Comparar e ordenar racionais;alta
+sme:7ano:p040;MAT07-03;;leitura C5 (Sonnet);Equivalência entre fração e porcentagem;média
+sme:7ano:p041:q1;MAT07-14;;leitura C5 (Sonnet);Probabilidade do evento complementar;média
+sme:7ano:p041:q2;MAT07-14;;leitura C5 (Sonnet);Probabilidade em sorteio;alta
+sme:7ano:p041:q3;MAT07-10;;leitura C5 (Sonnet);Valor desconhecido em igualdades com naturais;baixa
+sme:7ano:p041:q4;MAT07-06;;leitura C5 (Sonnet);Preço do cento a partir de total;média
+sme:7ano:p041:q5;MAT07-03;;leitura C5 (Sonnet);Comparar números racionais;média
+sme:7ano:p041:q6;MAT07-03;;leitura C5 (Sonnet);Completar fração, decimal e porcentagem;alta
+sme:7ano:p041:q7;MAT07-03;;leitura C5 (Sonnet);Marcar decimais na reta numérica;alta
+sme:7ano:p044;MAT07-14;;leitura C5 (Sonnet);Ler gráfico de barras e porcentagens;média
+sme:7ano:p045;MAT07-14;;leitura C5 (Sonnet);Ler gráfico de distância e tempo;baixa
+sme:7ano:p046;MAT07-14;;leitura C5 (Sonnet);Ler gráfico de linhas de corrida;baixa
+sme:7ano:p047;MAT07-14;;leitura C5 (Sonnet);Construir gráfico de temperatura a partir de tabela;baixa
+sme:7ano:p048;MAT07-14;;leitura C5 (Sonnet);Comparar texto com gráfico de barras;média
+sme:7ano:p049;MAT07-14;;leitura C5 (Sonnet);Interpretar gráfico de taxas por região;média
+sme:7ano:p050;MAT07-14;;leitura C5 (Sonnet);Elementos do gráfico e construção de colunas;média
+sme:7ano:p051;MAT07-14;;leitura C5 (Sonnet);Construir gráfico e tabela com porcentagens;média
+sme:7ano:p052;MAT07-14;;leitura C5 (Sonnet);Tabela de dupla entrada;média
+sme:7ano:p053;MAT07-14;;leitura C5 (Sonnet);Gráfico para tabela e leitura de dados;média
+sme:7ano:p054;MAT07-14;;leitura C5 (Sonnet);Organizar porcentagens em tabela e gráfico;média
+sme:7ano:p055;MAT07-14;;leitura C5 (Sonnet);Organizar dados de gráfico em tabelas;média
+sme:7ano:p056;MAT07-12;;leitura C5 (Sonnet);Decompor polígonos em triângulos;média
+sme:7ano:p057;;;leitura C5 (Sonnet);Poliedros e planificações, assunto fora da lista do ano;média
+sme:7ano:p058;;;leitura C5 (Sonnet);Relações em elementos de pirâmides, fora da lista;média
+sme:7ano:p059;;;leitura C5 (Sonnet);Relações em elementos de prismas, fora da lista;média
+sme:7ano:p060;;;leitura C5 (Sonnet);Faces, arestas e vértices de sólidos, fora da lista;média
+sme:7ano:p062;;;leitura C5 (Sonnet);Fórmulas para elementos de sólidos, fora da lista;média
+sme:7ano:p063:q1;MAT07-14;;leitura C5 (Sonnet);Ler gráfico de analfabetismo e diferença;média
+sme:7ano:p063:q2;;;leitura C5 (Sonnet);Elementos de prisma, fora da lista;média
+sme:7ano:p063:q3;;;leitura C5 (Sonnet);Nome de prisma por vértices, fora da lista;média
+sme:7ano:p063:q4;MAT07-14;;leitura C5 (Sonnet);Ler gráfico de variação de preços;média
+sme:7ano:p063:q5;;;leitura C5 (Sonnet);Arestas e vértices de pirâmide, fora da lista;média
+sme:7ano:p063:q6;;;leitura C5 (Sonnet);Afirmações sobre sólidos, fora da lista;média
+sme:7ano:p066;MAT07-01;;leitura C5 (Sonnet);Significados de positivos e negativos;alta
+sme:7ano:p068;MAT07-02;;leitura C5 (Sonnet);Diferenças de temperaturas com negativos;média
+sme:7ano:p070;MAT07-02;;leitura C5 (Sonnet);Saldos e variações com inteiros negativos;alta
+sme:7ano:p072;MAT07-01;;leitura C5 (Sonnet);Reta numérica com inteiros e distâncias;alta
+sme:7ano:p074;MAT06-13;;leitura C5 (Sonnet);Coordenadas de latitude e longitude no planisfério;média
+sme:7ano:p076;MAT06-13;;leitura C5 (Sonnet);Pesquisar coordenadas de países;baixa
+sme:7ano:p077;MAT06-13;;leitura C5 (Sonnet);Pares ordenados no plano cartesiano;alta
+sme:7ano:p078;MAT06-13;imagem de terceiro sem crédito (dúvida: ilustração de cena parece de outra fonte);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);Localizar pontos por pares ordenados;alta
+sme:7ano:p080;MAT07-14;;leitura C5 (Sonnet);Ler tabela de porcentagens;média
+sme:7ano:p081;MAT07-14;;leitura C5 (Sonnet);Selecionar dados de tabela grande;média
+sme:7ano:p082;MAT07-14;;leitura C5 (Sonnet);Ler e comparar dados de tabela;média
+sme:7ano:p084;MAT07-14;;leitura C5 (Sonnet);Ler tabela de evolução de telefones;média
+sme:7ano:p086;MAT07-02;;leitura C5 (Sonnet);Créditos e débitos em extrato com saldo negativo;média
+sme:7ano:p087;MAT07-01;;leitura C5 (Sonnet);Comparar inteiros positivos e negativos;alta
+sme:7ano:p088;MAT07-14;;leitura C5 (Sonnet);Construir tabela a partir de gráfico;média
+sme:7ano:p089;MAT07-14;;leitura C5 (Sonnet);Tabela de índices de leitura e diferença;média
+sme:7ano:p090;MAT07-14;;leitura C5 (Sonnet);Organizar gráfico em tabela;média
+sme:7ano:p091;;;leitura C5 (Sonnet);Cubo na arte e planificação, fora da lista;média
+sme:7ano:p092;;;leitura C5 (Sonnet);Hexaedros e planificações, fora da lista;média
+sme:7ano:p093;;;leitura C5 (Sonnet);Planificações do dado, fora da lista;média
+sme:7ano:p094;;;leitura C5 (Sonnet);Planificações do cubo, fora da lista;média
+sme:7ano:p096:q1;MAT07-14;;leitura C5 (Sonnet);Gráfico para tabela e leitura de dados;média
+sme:7ano:p096:q2;MAT06-13;;leitura C5 (Sonnet);Coordenadas de vértices no plano;alta
+sme:7ano:p096:q3;MAT07-02;;leitura C5 (Sonnet);Saldo negativo menos débito;alta
+sme:7ano:p096:q4;MAT07-01;;leitura C5 (Sonnet);Identificar inteiro por dicas e intervalo;média
+sme:7ano:p096:q5;MAT07-02;;leitura C5 (Sonnet);Saldo negativo e depósito;alta
+sme:7ano:p100;MAT07-02;;leitura C5 (Sonnet);Variação positiva e negativa de índice;média
+sme:7ano:p102;MAT07-02;;leitura C5 (Sonnet);Deslocamento como subtração de inteiros;alta
+sme:7ano:p104;MAT07-02;;leitura C5 (Sonnet);Adição e subtração com saldo negativo;alta
+sme:7ano:p106;MAT07-02;;leitura C5 (Sonnet);Expressões de adições e subtrações de inteiros;alta
+sme:7ano:p108;MAT07-02;;leitura C5 (Sonnet);Expressões com ganhos e perdas de consumo;média
+sme:7ano:p110;MAT07-02;;leitura C5 (Sonnet);Associar parcelas em adição de inteiros;alta
+sme:7ano:p112;MAT07-02;;leitura C5 (Sonnet);Subtração de inteiros por adição na calculadora;média
+sme:7ano:p113;MAT07-02;;leitura C5 (Sonnet);Sinal do resultado e cálculo com inteiros;alta
+sme:7ano:p114;MAT07-02;;leitura C5 (Sonnet);Adição de positivos e negativos em jogo;alta
+sme:7ano:p115;MAT07-02;;leitura C5 (Sonnet);Adição e subtração de inteiros;alta
+sme:7ano:p116;MAT07-11;;leitura C5 (Sonnet);Medir e construir ângulos com transferidor;alta
+sme:7ano:p117;MAT07-11;;leitura C5 (Sonnet);Medir lados e ângulos de polígonos regulares;baixa
+sme:7ano:p118;MAT07-15;;leitura C5 (Sonnet);Ladrilhar o plano com polígonos;baixa
+sme:7ano:p119;MAT07-13;;leitura C5 (Sonnet);Área do Tangram com unidades diferentes;média
+sme:7ano:p120;MAT07-13;;leitura C5 (Sonnet);Compor desenho e medir sua área;média
+sme:7ano:p122;MAT07-13;;leitura C5 (Sonnet);Área por aproximação em malha;alta
+sme:7ano:p123;MAT07-13;;leitura C5 (Sonnet);Área de polígonos em malha;alta
+sme:7ano:p124;MAT07-13;;leitura C5 (Sonnet);Área e perímetro em malha;alta
+sme:7ano:p126;MAT07-13;;leitura C5 (Sonnet);Área do paralelogramo por decomposição;alta
+sme:7ano:p128;MAT07-11;;leitura C5 (Sonnet);Giros medidos em graus;média
+sme:7ano:p130;MAT07-11;;leitura C5 (Sonnet);Percurso com giros em graus e distâncias;média
+sme:7ano:p132;MAT07-11;;leitura C5 (Sonnet);Estimar, medir e classificar ângulos;alta
+sme:7ano:p134;MAT07-11;;leitura C5 (Sonnet);Orientação por giros em mapa;baixa
+sme:7ano:p135;MAT07-02;;leitura C5 (Sonnet);Expressões com adição e subtração de inteiros;alta
+sme:7ano:p136;MAT07-02;;leitura C5 (Sonnet);Adições e subtrações de inteiros;alta
+sme:7ano:p137;MAT07-02;;leitura C5 (Sonnet);Revisão mista, maioria com operações de inteiros;média
+sme:7ano:p140;MAT07-02;;leitura C5 (Sonnet);Temperaturas negativas e multiplicação por inteiros;média
+sme:7ano:p143;MAT07-02;;leitura C5 (Sonnet);Regra de sinais da multiplicação;alta
+sme:7ano:p145;MAT07-02;;leitura C5 (Sonnet);Multiplicar inteiros de modos diferentes;alta
+sme:7ano:p146;MAT07-02;;leitura C5 (Sonnet);Divisão de inteiros como operação inversa;alta
+sme:7ano:p147;MAT07-02;;leitura C5 (Sonnet);Multiplicação e divisão de inteiros;alta
+sme:7ano:p149;MAT07-03;;leitura C5 (Sonnet);Quocientes de inteiros como racionais;alta
+sme:7ano:p150;MAT07-03;;leitura C5 (Sonnet);Racionais negativos na reta e opostos;alta
+sme:7ano:p152;MAT07-03;;leitura C5 (Sonnet);Comparar racionais positivos e negativos;alta
+sme:7ano:p153;MAT07-03;;leitura C5 (Sonnet);Racionais positivos e negativos em tabela econômica;baixa
+sme:7ano:p155;MAT07-04;;leitura C5 (Sonnet);Adição e subtração de racionais com sinais;alta
+sme:7ano:p157;MAT07-04;;leitura C5 (Sonnet);Multiplicação e inverso de racionais;alta
+sme:7ano:p159;MAT07-04;;leitura C5 (Sonnet);Multiplicar racionais decimais com sinais;alta
+sme:7ano:p160;MAT07-04;;leitura C5 (Sonnet);Divisão de racionais pelo inverso;alta
+sme:7ano:p162;MAT07-05;;leitura C5 (Sonnet);Razão entre grandezas;alta
+sme:7ano:p163;MAT07-05;;leitura C5 (Sonnet);Razões e proporção entre grandezas;alta
+sme:7ano:p164;MAT07-05;;leitura C5 (Sonnet);Razão constante e propriedade das proporções;média
+sme:7ano:p165;MAT07-05;;leitura C5 (Sonnet);Razões como velocidade e densidade;alta
+sme:7ano:p167;MAT07-05;;leitura C5 (Sonnet);Razão e porcentagem entre gasto e renda;alta
+sme:7ano:p169:q1;MAT07-04;;leitura C5 (Sonnet);Completar quadro com operações entre racionais;alta
+sme:7ano:p169:q2;MAT07-06;;leitura C5 (Sonnet);Proporção direta de porções;alta
+sme:7ano:p169:q3;MAT07-04;;leitura C5 (Sonnet);Valor de expressão com frações;média
+sme:7ano:p169:q4;MAT07-03;;leitura C5 (Sonnet);Fração correspondente a ponto na reta;média
+sme:7ano:p169:q5;MAT07-06;;leitura C5 (Sonnet);Quantidade de semente por área;média
+sme:7ano:p169:q6;MAT07-07;;leitura C5 (Sonnet);Porcentagem de cadernos por criança;média
+sme:7ano:p172;MAT07-08;;leitura C5 (Sonnet);Padrão em painel e termos de sequência;alta
+sme:7ano:p174;MAT07-08;;leitura C5 (Sonnet);Padrão de quadradinhos por posição;alta
+sme:7ano:p176;MAT07-08;;leitura C5 (Sonnet);Sequência de caixas com bombons e caramelos;alta
+sme:7ano:p177;MAT07-08;;leitura C5 (Sonnet);Padrão de palitos em portas;média
+sme:7ano:p178;MAT07-09;;leitura C5 (Sonnet);Generalizar padrões com letras;alta
+sme:7ano:p180;MAT07-09;;leitura C5 (Sonnet);Propriedades aritméticas escritas com letras;alta
+sme:7ano:p181;MAT07-09;;leitura C5 (Sonnet);Convenções da escrita algébrica;alta
+sme:7ano:p182;MAT07-09;;leitura C5 (Sonnet);Linguagem comum para algébrica;alta
+sme:7ano:p184;MAT07-09;;leitura C5 (Sonnet);Relacionar linguagem algébrica e comum;alta
+sme:7ano:p185;MAT07-09;;leitura C5 (Sonnet);Regra entre x e y em expressão algébrica;média
+sme:7ano:p186;MAT07-10;;leitura C5 (Sonnet);Incógnita e equações simples;alta
+sme:7ano:p188;MAT07-09;;leitura C5 (Sonnet);Adivinhações traduzidas em expressões com letras;média
+sme:7ano:p189;MAT07-09;;leitura C5 (Sonnet);Testar regra e expressão com letra;média
+sme:7ano:p190;MAT07-10;;leitura C5 (Sonnet);Problemas resolvidos por equações;alta
+sme:7ano:p191;MAT07-10;;leitura C5 (Sonnet);Transformar equações equivalentes;alta
+sme:7ano:p192;MAT07-10;;leitura C5 (Sonnet);Resolver equações do primeiro grau;alta
+sme:7ano:p193;MAT07-10;;leitura C5 (Sonnet);Criar e resolver problemas com equação;alta
+sme:7ano:p194;MAT07-13;;leitura C5 (Sonnet);Fórmulas de área de quadrado, retângulo e losango;alta
+sme:7ano:p196;MAT07-13;;leitura C5 (Sonnet);Áreas de papel, losango e margens;alta
+sme:7ano:p197;MAT07-13;;leitura C5 (Sonnet);Unidades de área e cálculo de quintal;média
+sme:7ano:p198;MAT07-13;;leitura C5 (Sonnet);Áreas de portas e janelas em m2 e cm2;média
+sme:7ano:p199:q1;MAT07-09;;leitura C5 (Sonnet);Expressão algébrica para número mais quádruplo;alta
+sme:7ano:p199:q2;MAT07-09;;leitura C5 (Sonnet);Propriedade distributiva em letras;alta
+sme:7ano:p199:q3;MAT07-09;;leitura C5 (Sonnet);Fórmula da área do retângulo com letras;média
+sme:7ano:p199:q4;MAT07-09;;leitura C5 (Sonnet);Comandos que originam expressões algébricas;alta
+sme:7ano:p199:q5;MAT07-13;;leitura C5 (Sonnet);Área do quadrado de lado decimal;alta
+sme:7ano:p199:q6;MAT07-13;;leitura C5 (Sonnet);Área do retângulo;alta
+sme:7ano:p199:q7;MAT07-13;;leitura C5 (Sonnet);Área do paralelogramo;alta
+sme:7ano:p199:q8;MAT07-13;;leitura C5 (Sonnet);Área de terreno retangular em km2 e m2;alta
+sme:7ano:p202;MAT07-15;;leitura C5 (Sonnet);Pesquisa sobre simetria, sem cálculo;baixa
+sme:7ano:p203;MAT07-15;;leitura C5 (Sonnet);Eixos de simetria em tapetes;alta
+sme:7ano:p204;MAT07-15;;leitura C5 (Sonnet);Completar figuras pelo eixo de simetria;alta
+sme:7ano:p205;MAT07-15;;leitura C5 (Sonnet);Eixos de simetria de polígonos;alta
+sme:7ano:p206;MAT07-15;;leitura C5 (Sonnet);Reflexão em reta;alta
+sme:7ano:p207;MAT07-15;;leitura C5 (Sonnet);Reflexões sucessivas de polígonos;alta
+sme:7ano:p208;MAT07-15;;leitura C5 (Sonnet);Reflexões e invariância de área e perímetro;alta
+sme:7ano:p209;MAT07-15;;leitura C5 (Sonnet);Completar máscaras por reflexão;alta
+sme:7ano:p210;MAT07-15;;leitura C5 (Sonnet);Mandalas, giros e ângulo de rotação;média
+sme:7ano:p211;MAT07-15;;leitura C5 (Sonnet);Rotação de triângulo em torno de ponto;alta
+sme:7ano:p212;MAT07-15;;leitura C5 (Sonnet);Rotações de 90 graus em mandalas;alta
+sme:7ano:p213;MAT07-15;;leitura C5 (Sonnet);Rotação de quadriláteros;alta
+sme:7ano:p214;MAT07-15;;leitura C5 (Sonnet);Rotações sucessivas de figura;alta
+sme:7ano:p215;MAT07-12;;leitura C5 (Sonnet);Soma dos ângulos internos do triângulo, por medição;média
+sme:7ano:p216;MAT07-12;;leitura C5 (Sonnet);Soma dos ângulos do triângulo por dobradura;média
+sme:7ano:p217;MAT07-11;;leitura C5 (Sonnet);Calcular ângulo que falta em triângulos;média
+sme:7ano:p218;MAT07-12;;leitura C5 (Sonnet);Soma dos ângulos internos de polígonos por triângulos;média
+sme:7ano:p220;;;leitura C5 (Sonnet);Propriedades da potenciação, fora da lista;média
+sme:7ano:p221;;;leitura C5 (Sonnet);Potência de expoente zero, fora da lista;média
+sme:7ano:p222;;;leitura C5 (Sonnet);Potência de expoente um, fora da lista;média
+sme:7ano:p223;;;leitura C5 (Sonnet);Potências com bases diferentes, fora da lista;média
+sme:7ano:p224;;;leitura C5 (Sonnet);Expoentes negativos, fora da lista;média
+sme:7ano:p225;MAT07-08;;leitura C5 (Sonnet);Próximos termos de sequências de números figurados;alta
+sme:7ano:p226;MAT07-08;;leitura C5 (Sonnet);Padrão de quadrados e termo geral;média
+sme:7ano:p227;;;leitura C5 (Sonnet) + lente C5 (Opus);volume com cubinhos, nenhum assunto da lista (era MAT07-08);baixa
+sme:7ano:p228;MAT07-08;;leitura C5 (Sonnet);Padrão de cubos e termo geral;média
+sme:7ano:p229;MAT07-15;;leitura C5 (Sonnet) + revisão C5;revisão inteira (enunciado comum): reflexão e potências, o principal é reflexão;média
+sme:7ano:p232;MAT07-14;;leitura C5 (Sonnet);Leitura de texto e gráficos sobre a Terra;baixa
+sme:7ano:p233;;;leitura C5 (Sonnet);Texto sobre água com percentuais, sem tarefa clara;média
+sme:7ano:p235;MAT07-14;;leitura C5 (Sonnet);Escolher gráfico de barras para setores;média
+sme:7ano:p236;;;leitura C5 (Sonnet);Raiz quadrada, fora da lista;média
+sme:7ano:p238;;;leitura C5 (Sonnet);Raiz quadrada na calculadora, fora da lista;média
+sme:7ano:p239;;;leitura C5 (Sonnet);Raiz quadrada aproximada, fora da lista;média
+sme:7ano:p240;MAT07-06;;leitura C5 (Sonnet);Converter vazão por segundo em total diário;média
+sme:7ano:p241;;;leitura C5 (Sonnet);Volume e empilhamento de cubos, fora da lista;média
+sme:7ano:p242;;;leitura C5 (Sonnet);Unidades de volume e capacidade, fora da lista;média
+sme:7ano:p243;;;leitura C5 (Sonnet);Relação entre litro e metro cúbico, fora da lista;média
+sme:7ano:p244;;;leitura C5 (Sonnet);Volume de paralelepípedo, fora da lista;média
+sme:7ano:p246;;;leitura C5 (Sonnet);Texto sobre água de reuso e conversão de volume;baixa
+sme:7ano:p247;;;leitura C5 (Sonnet);Raiz quadrada aproximada, fora da lista;média
+sme:7ano:p248;;;leitura C5 (Sonnet);Fórmula do volume do bloco retangular, fora da lista;média
+sme:7ano:p250;;;leitura C5 (Sonnet);Estimar medidas de grandezas, fora da lista;média
+sme:7ano:p252;;;leitura C5 (Sonnet);Estimar medidas plausíveis, fora da lista;média
+sme:7ano:p254;;;leitura C5 (Sonnet);Raiz cúbica, fora da lista;média
+sme:7ano:p255;;;leitura C5 (Sonnet);Raiz cúbica exata, fora da lista;média
+sme:7ano:p256;;;leitura C5 (Sonnet);Raiz cúbica em problemas, fora da lista;média
+sme:7ano:p257;;;leitura C5 (Sonnet);Raiz cúbica aproximada, fora da lista;média
+sme:7ano:p258;;;leitura C5 (Sonnet);Unidades de medida não convencionais, fora da lista;baixa
+sme:7ano:p260;MAT07-14;;leitura C5 (Sonnet);Ler tabela e achar erro em gráfico;média
+sme:7ano:p261:q1;;;leitura C5 (Sonnet);Completar cubo com cubinhos, fora da lista;média
+sme:7ano:p261:q2;MAT07-06;;leitura C5 (Sonnet);Comparar consumo de água proporcional à massa;média
+sme:7ano:p261:q3;MAT07-04;;leitura C5 (Sonnet);Taxa de subida com decimais e degraus;média
+sme:7ano:p261:q4;MAT07-14;;leitura C5 (Sonnet);Ler gráfico de preferência de candidatos;média
+sme:7ano:p261:q5;;;leitura C5 (Sonnet);Volume de caixa-d'água, fora da lista;média
+sme:8ano:p016;;;leitura C5 (Sonnet);Área de retângulo e divisores comuns, assunto fora da lista;média
+sme:8ano:p017;;;leitura C5 (Sonnet);Cálculo de IMC e divisão de medidas, fora da lista;média
+sme:8ano:p019;MAT08-18;;leitura C5 (Sonnet);Combinações entre grupos de alimentos pelo princípio multiplicativo;alta
+sme:8ano:p020;;;leitura C5 (Sonnet);Problemas de proporção e porcentagem com leite;alta
+sme:8ano:p021;;;leitura C5 (Sonnet);Conjunto dos números naturais;alta
+sme:8ano:p022;;;leitura C5 (Sonnet);Operações com números inteiros em temperaturas;alta
+sme:8ano:p023;;;leitura C5 (Sonnet);Operações com números inteiros em saldos e pontos;alta
+sme:8ano:p024;;;leitura C5 (Sonnet);Tabelas de operações com inteiros;alta
+sme:8ano:p025;;;leitura C5 (Sonnet);Conjunto dos números inteiros e reta numérica;alta
+sme:8ano:p026;;;leitura C5 (Sonnet);Frações de uma área em problemas;alta
+sme:8ano:p027;;;leitura C5 (Sonnet);Números racionais decimais e conversão de meses em dias;alta
+sme:8ano:p028;;;leitura C5 (Sonnet);Conversão de dias em meses com decimais;alta
+sme:8ano:p029;;;leitura C5 (Sonnet);Porcentagem a partir de tabela, sem foco em tipos de gráfico;média
+sme:8ano:p030;;;leitura C5 (Sonnet);Porcentagem e calculadora com tabela de dados;média
+sme:8ano:p031;MAT08-19;;leitura C5 (Sonnet);Planejar coleta e divulgação de pesquisa sobre lanche;média
+sme:8ano:p032;MAT08-19;;leitura C5 (Sonnet);Interpretar gráficos de setores de pesquisas com percentuais;média
+sme:8ano:p034;;;leitura C5 (Sonnet);Conjunto dos números racionais;alta
+sme:8ano:p035;;;leitura C5 (Sonnet);Operações com racionais em fração e decimal;alta
+sme:8ano:p036;;;leitura C5 (Sonnet);Racionais na reta numérica e porcentagem;alta
+sme:8ano:p037;;;leitura C5 (Sonnet);Multiplicação de decimais e regularidades;alta
+sme:8ano:p038;;;leitura C5 (Sonnet);Pertinência e inclusão entre conjuntos numéricos;alta
+sme:8ano:p040:q1;;;leitura C5 (Sonnet);Operações com decimais e racionais;alta
+sme:8ano:p040:q2;;;leitura C5 (Sonnet);Localizar racionais na reta numérica;alta
+sme:8ano:p040:q3;;;leitura C5 (Sonnet);Verdadeiro ou falso sobre conjuntos numéricos;alta
+sme:8ano:p040:q4;;;leitura C5 (Sonnet);Quadrado mágico com decimais;alta
+sme:8ano:p040:q5;;;leitura C5 (Sonnet);Multiplicação de decimais por cálculo mental;alta
+sme:8ano:p040:q6;;;leitura C5 (Sonnet);Porcentagem de uma população e aumento;alta
+sme:8ano:p040:q7;;;leitura C5 (Sonnet);Saldo com créditos e débitos, inteiros;alta
+sme:8ano:p040:q8;;;leitura C5 (Sonnet);Decimal na reta numérica;alta
+sme:8ano:p044;MAT08-19;;leitura C5 (Sonnet);Construção de gráfico de setores em planilha;alta
+sme:8ano:p046;MAT08-19;;leitura C5 (Sonnet);Dar título e contexto a um gráfico de setores;média
+sme:8ano:p047;MAT08-19;;leitura C5 (Sonnet);Gráfico de setores com dados do IBGE;média
+sme:8ano:p048;MAT08-19;;leitura C5 (Sonnet);Construir gráfico de setores e formular questões;alta
+sme:8ano:p049;MAT08-02;;leitura C5 (Sonnet);Escrever números grandes com potências de 10 e notação científica;média
+sme:8ano:p050;MAT08-01;;leitura C5 (Sonnet);Potências de base 10 com expoentes positivos e negativos;média
+sme:8ano:p052;MAT08-02;;leitura C5 (Sonnet);Escrever números em notação científica;alta
+sme:8ano:p053;MAT08-02;;leitura C5 (Sonnet);Notação científica e correção de erros;alta
+sme:8ano:p054;;;leitura C5 (Sonnet);Cortes em pirâmides, geometria espacial fora da lista;alta
+sme:8ano:p055;;;leitura C5 (Sonnet);Seções de prismas e pirâmides;alta
+sme:8ano:p057;;;leitura C5 (Sonnet);Polígonos obtidos em cortes de sólidos;alta
+sme:8ano:p059;;;leitura C5 (Sonnet);Vértices, arestas e faces de pirâmides e troncos;alta
+sme:8ano:p060;;;leitura C5 (Sonnet);Vistas de pilhas de cubos;alta
+sme:8ano:p062;;;leitura C5 (Sonnet);Proporcionalidade direta entre distância e tempo;alta
+sme:8ano:p064;;;leitura C5 (Sonnet);Proporcionalidade direta entre distância e consumo;alta
+sme:8ano:p066;;;leitura C5 (Sonnet);Problemas de proporção com embalagens e receita;alta
+sme:8ano:p067;;;leitura C5 (Sonnet);Grandezas diretamente proporcionais;alta
+sme:8ano:p068;MAT08-15;;leitura C5 (Sonnet);Relação volume e altura em cilindro, foco em proporção;baixa
+sme:8ano:p069;;;leitura C5 (Sonnet);Porcentagem e proporcionalidade;alta
+sme:8ano:p070;;;leitura C5 (Sonnet);Proporcionalidade em preços de ofertas;alta
+sme:8ano:p071:q1;MAT08-02;;leitura C5 (Sonnet);Escrever dados em notação científica;alta
+sme:8ano:p071:q2;;;leitura C5 (Sonnet);Comparar crescimento percentual;alta
+sme:8ano:p071:q3;;;leitura C5 (Sonnet);Vistas de pilha de cubos;alta
+sme:8ano:p071:q4;MAT08-19;;leitura C5 (Sonnet);Ler gráfico de setores e calcular percentual;baixa
+sme:8ano:p071:q5;;;leitura C5 (Sonnet);Regra de três com áreas;alta
+sme:8ano:p071:q6;;;leitura C5 (Sonnet);Vista frontal de pilha de cubos;alta
+sme:8ano:p074;MAT07-08;;leitura C5 (Sonnet);Padrões em sequências de figuras e termo geral;alta
+sme:8ano:p075;MAT07-08;;leitura C5 (Sonnet);Regularidade em sequência de quadradinhos e fórmula;alta
+sme:8ano:p076;MAT07-08;;leitura C5 (Sonnet);Regularidades em sequência com duas cores;alta
+sme:8ano:p078;MAT08-05;;leitura C5 (Sonnet);Relações entre números escritas como expressões algébricas;média
+sme:8ano:p080;MAT08-05;;leitura C5 (Sonnet);Traduzir frases em expressões algébricas;alta
+sme:8ano:p081;MAT08-05;;leitura C5 (Sonnet);Associar frases a expressões algébricas;alta
+sme:8ano:p082;MAT08-05;;leitura C5 (Sonnet);Charadas representadas por expressões algébricas;média
+sme:8ano:p084;MAT08-05;;leitura C5 (Sonnet);Representação algébrica de sequências de operações;média
+sme:8ano:p085;;;leitura C5 (Sonnet);Resolver adivinhação por operações inversas, equação de 1º grau;média
+sme:8ano:p086;;;leitura C5 (Sonnet);Operações inversas para achar o número pensado;média
+sme:8ano:p087;;;leitura C5 (Sonnet);Esquemas de operações inversas;média
+sme:8ano:p088;;;leitura C5 (Sonnet);Equações do 1º grau com uma incógnita;média
+sme:8ano:p090;;;leitura C5 (Sonnet);Equilíbrio de balança e equação de uma incógnita;média
+sme:8ano:p091;;;leitura C5 (Sonnet);Balanças em equilíbrio com uma incógnita;média
+sme:8ano:p092;;;leitura C5 (Sonnet);Equação como balança, uma incógnita;média
+sme:8ano:p094;;;leitura C5 (Sonnet);Resolução de equação de 1º grau passo a passo;média
+sme:8ano:p095;MAT08-05;;leitura C5 (Sonnet);Expressões algébricas de pares, ímpares e distributiva;alta
+sme:8ano:p096;;;leitura C5 (Sonnet);Posição relativa de arestas em sólidos;alta
+sme:8ano:p098;;;leitura C5 (Sonnet);Comparar arestas de cubo e pirâmide;alta
+sme:8ano:p099:q1;MAT08-05;;leitura C5 (Sonnet);Representar algebricamente sequência de comandos;média
+sme:8ano:p099:q2;MAT08-05;;leitura C5 (Sonnet);Descobrir comandos e expressão algébrica;média
+sme:8ano:p099:q3;;;leitura C5 (Sonnet);Massa desconhecida em balança, equação simples;média
+sme:8ano:p099:q4;MAT07-08;;leitura C5 (Sonnet);Sequência de figuras e sentença para a posição;média
+sme:8ano:p102;;;leitura C5 (Sonnet);Resolução de equações do 1º grau;média
+sme:8ano:p104;;;leitura C5 (Sonnet);Equações do 1º grau com incógnita nos dois lados;média
+sme:8ano:p106;;;leitura C5 (Sonnet);Problemas resolvidos por equação de 1º grau;média
+sme:8ano:p108;;;leitura C5 (Sonnet);Problemas resolvidos por equação de 1º grau;média
+sme:8ano:p109;;;leitura C5 (Sonnet);Vocabulário e resolução de equações de 1º grau;média
+sme:8ano:p111;;;leitura C5 (Sonnet);Fórmula de conversão de temperatura, substituição numérica;média
+sme:8ano:p112;;;leitura C5 (Sonnet);Fórmula de consumo de energia e custo;média
+sme:8ano:p114;;;leitura C5 (Sonnet);Custo de aluguel por fórmula de duas variáveis;média
+sme:8ano:p116;;;leitura C5 (Sonnet);Grandezas inversamente proporcionais;alta
+sme:8ano:p118;;;leitura C5 (Sonnet);Verificar proporcionalidade direta ou inversa;alta
+sme:8ano:p119;;;leitura C5 (Sonnet);Classificar tabelas de grandezas proporcionais;alta
+sme:8ano:p120;;;leitura C5 (Sonnet);Regra de três simples;alta
+sme:8ano:p121;;;leitura C5 (Sonnet);Proporção e igualdade de razões;alta
+sme:8ano:p122;;;leitura C5 (Sonnet);Regra de três inversa;alta
+sme:8ano:p124;;;leitura C5 (Sonnet);Descontos, acréscimos e juros simples;alta
+sme:8ano:p126;;;leitura C5 (Sonnet);Juros simples e aumentos percentuais;alta
+sme:8ano:p128;;;leitura C5 (Sonnet);Porcentagem de lucro em vendas;alta
+sme:8ano:p130;;;leitura C5 (Sonnet);Juros compostos em empréstimo;alta
+sme:8ano:p131;MAT08-17;;leitura C5 (Sonnet);Mediana do triângulo e ponto médio;alta
+sme:8ano:p132;MAT08-17;;leitura C5 (Sonnet);Construir medianas e baricentro;alta
+sme:8ano:p133;MAT08-17;;leitura C5 (Sonnet);Propriedade do baricentro na razão dois para um;alta
+sme:8ano:p135;;;leitura C5 (Sonnet) + revisão C5;revisão inteira (enunciado comum): porcentagem, regra de três e equações, nenhum assunto da lista;alta
+sme:8ano:p140;;;leitura C5 (Sonnet);Diagonais de polígonos;alta
+sme:8ano:p141;;;leitura C5 (Sonnet);Número de diagonais de polígonos e fórmula;média
+sme:8ano:p142;;;leitura C5 (Sonnet);Classificação de quadriláteros;alta
+sme:8ano:p144;;;leitura C5 (Sonnet);Propriedades das diagonais de quadriláteros;alta
+sme:8ano:p145;;;leitura C5 (Sonnet);Desenhar quadriláteros pelas diagonais;alta
+sme:8ano:p146;;;leitura C5 (Sonnet);Pipas e simetria do quadrilátero;alta
+sme:8ano:p148;MAT08-05;;leitura C5 (Sonnet);Área de retângulo com medida literal e distributiva;média
+sme:8ano:p149;MAT08-05;;leitura C5 (Sonnet);Áreas com monômios e potências de variável;média
+sme:8ano:p150;MAT08-05;;leitura C5 (Sonnet);Perímetro escrito com expressões algébricas;média
+sme:8ano:p151;MAT08-05;;leitura C5 (Sonnet);Área e perímetro em expressões algébricas;alta
+sme:8ano:p153;MAT08-05;;leitura C5 (Sonnet);Operações com monômios;alta
+sme:8ano:p156;MAT08-05;;leitura C5 (Sonnet);Adição de polinômios;alta
+sme:8ano:p157;MAT08-05;;leitura C5 (Sonnet);Subtração de polinômios;alta
+sme:8ano:p158;MAT08-05;;leitura C5 (Sonnet);Multiplicação de polinômios pela distributiva;alta
+sme:8ano:p159;MAT08-05;;leitura C5 (Sonnet);Produto de binômios com áreas;média
+sme:8ano:p160;MAT08-05;;leitura C5 (Sonnet);Multiplicação de binômios;média
+sme:8ano:p161;MAT08-05;;leitura C5 (Sonnet);Multiplicações de polinômios pela distributiva;média
+sme:8ano:p162;MAT08-06;;leitura C5 (Sonnet);Quadrado da soma por áreas;alta
+sme:8ano:p163;MAT08-06;;leitura C5 (Sonnet);Quadrado da soma de dois termos;alta
+sme:8ano:p164;MAT08-06;;leitura C5 (Sonnet);Quadrado da diferença e produto da soma pela diferença;alta
+sme:8ano:p166;MAT08-06;;leitura C5 (Sonnet);Produtos notáveis e aplicações;alta
+sme:8ano:p167:q1;MAT08-05;;leitura C5 (Sonnet);Operações com monômios e polinômios;alta
+sme:8ano:p167:q2;MAT08-06;;leitura C5 (Sonnet);Área do quadrado da soma;alta
+sme:8ano:p167:q3;MAT08-06;;leitura C5 (Sonnet);Representar o quadrado da soma em figura;alta
+sme:8ano:p167:q4;;;leitura C5 (Sonnet);Afirmações sobre diagonais de quadriláteros;alta
+sme:8ano:p170;;;leitura C5 (Sonnet);Simetria axial e eixos de simetria;alta
+sme:8ano:p171;;;leitura C5 (Sonnet);Completar figuras simétricas;alta
+sme:8ano:p172;;;leitura C5 (Sonnet);Propriedades de pontos simétricos;alta
+sme:8ano:p173;;;leitura C5 (Sonnet);Reflexão e translação de figuras;alta
+sme:8ano:p174;;;leitura C5 (Sonnet);Rotação e simetria central;alta
+sme:8ano:p176;;;leitura C5 (Sonnet);Construir figuras simétricas;alta
+sme:8ano:p177;;;leitura C5 (Sonnet);Figuras simétricas congruentes por reflexão;alta
+sme:8ano:p178;;;leitura C5 (Sonnet);Identificar reflexão translação ou rotação;alta
+sme:8ano:p179;MAT08-10;;leitura C5 (Sonnet);Problemas de soma e diferença por vários métodos;média
+sme:8ano:p181;MAT08-09;;leitura C5 (Sonnet);Equação com duas incógnitas e infinitas soluções;alta
+sme:8ano:p183;MAT08-10;;leitura C5 (Sonnet);Duas balanças levam a sistema de equações;alta
+sme:8ano:p184;MAT08-10;;leitura C5 (Sonnet);Método da substituição com balanças;alta
+sme:8ano:p185;MAT08-10;;leitura C5 (Sonnet);Resolver sistemas por substituição;alta
+sme:8ano:p186;MAT08-10;;leitura C5 (Sonnet);Sistema resolvido por subtração de equações;alta
+sme:8ano:p187;MAT08-10;;leitura C5 (Sonnet);Método da adição em sistemas;alta
+sme:8ano:p189;MAT08-10;;leitura C5 (Sonnet);Sistemas com multiplicação prévia de equação;alta
+sme:8ano:p190;MAT08-10;;leitura C5 (Sonnet);Problemas resolvidos por sistemas;alta
+sme:8ano:p191;MAT08-10;;leitura C5 (Sonnet);Resolver sistemas e criar problemas;alta
+sme:8ano:p192;;;leitura C5 (Sonnet);Cálculo de áreas em malhas;alta
+sme:8ano:p193;MAT08-17;;leitura C5 (Sonnet);Alturas de triângulo e ortocentro;alta
+sme:8ano:p194;;;leitura C5 (Sonnet);Áreas de paralelogramo e triângulo;alta
+sme:8ano:p196;;;leitura C5 (Sonnet);Área do trapézio;alta
+sme:8ano:p197;;;leitura C5 (Sonnet);Área do losango;alta
+sme:8ano:p198;;;leitura C5 (Sonnet);Problemas de área de figuras planas;alta
+sme:8ano:p199:q1;MAT08-10;;leitura C5 (Sonnet);Montar sistema de equações do problema;alta
+sme:8ano:p199:q2;MAT08-10;;leitura C5 (Sonnet);Problema de idades por sistema;média
+sme:8ano:p199:q3;;;leitura C5 (Sonnet);Altura de triângulo pela área;alta
+sme:8ano:p199:q4;;;leitura C5 (Sonnet);Simetria central de triângulo;alta
+sme:8ano:p202;MAT08-11;imagem de terceiro sem crédito (mapa de ruas do Google Maps);leitura C5 (Sonnet) + curadoria visual C5 (Sonnet);Retas paralelas e transversais em mapa;alta
+sme:8ano:p203;MAT08-11;;leitura C5 (Sonnet);Ângulos opostos pelo vértice e suplementares entre retas;média
+sme:8ano:p204;MAT08-11;;leitura C5 (Sonnet);Medidas de ângulos entre retas paralelas;média
+sme:8ano:p205;MAT08-11;;leitura C5 (Sonnet);Ângulos correspondentes em paralelas;alta
+sme:8ano:p206;MAT08-11;;leitura C5 (Sonnet);Alternos e colaterais em paralelas;alta
+sme:8ano:p207;MAT08-11;;leitura C5 (Sonnet);Valor de ângulos em paralelas cortadas por transversal;alta
+sme:8ano:p208;;;leitura C5 (Sonnet);Soma dos ângulos internos de polígonos;média
+sme:8ano:p210;;;leitura C5 (Sonnet);Fórmula da soma dos ângulos internos;alta
+sme:8ano:p212;;;leitura C5 (Sonnet);Ângulos internos e externos de polígonos;alta
+sme:8ano:p213;MAT08-19;;leitura C5 (Sonnet);Tabela de estabelecimentos com percentuais de pesquisa;média
+sme:8ano:p214;MAT08-19;;leitura C5 (Sonnet);Frequência absoluta e relativa em tabelas;média
+sme:8ano:p216;MAT08-19;;leitura C5 (Sonnet);População e amostra em pesquisa;alta
+sme:8ano:p217;;;leitura C5 (Sonnet);Escalas de mapas;alta
+sme:8ano:p219;;;leitura C5 (Sonnet);Distâncias reais com escala;alta
+sme:8ano:p220;;;leitura C5 (Sonnet);Problemas com escala;alta
+sme:8ano:p221;;;leitura C5 (Sonnet);Grandezas derivadas por razão;alta
+sme:8ano:p223;MAT08-18;;leitura C5 (Sonnet);Possibilidades de lanche e senhas por multiplicação;alta
+sme:8ano:p224;MAT08-14;;leitura C5 (Sonnet);Probabilidade no lançamento de dois dados;alta
+sme:8ano:p226;MAT08-14;;leitura C5 (Sonnet);Probabilidade no par ou ímpar;alta
+sme:8ano:p228;MAT08-18;;leitura C5 (Sonnet);Árvore de possibilidades com lançamento de moedas;média
+sme:8ano:p229;MAT08-18;;leitura C5 (Sonnet);Contagem de números e árvore de nascimentos;média
+sme:8ano:p230;MAT08-14;;leitura C5 (Sonnet);Probabilidade ao retirar bombons e cartas;alta
+sme:8ano:p231:q1;MAT08-14;;leitura C5 (Sonnet);Chance de sorteio de rifa;alta
+sme:8ano:p231:q2;MAT08-14;;leitura C5 (Sonnet);Probabilidade no lançamento de um dado;alta
+sme:8ano:p231:q3;MAT08-11;;leitura C5 (Sonnet);Ângulos com paralelas e transversal;alta
+sme:8ano:p231:q4;;;leitura C5 (Sonnet);Soma dos ângulos internos de polígonos;alta
+sme:8ano:p231:q5;;;leitura C5 (Sonnet);Ângulos interno e externo do triângulo equilátero;alta
+sme:8ano:p231:q6;;;leitura C5 (Sonnet);Massa pela densidade;alta
+sme:8ano:p234;MAT08-07;;leitura C5 (Sonnet);Fatoração de expressões algébricas;alta
+sme:8ano:p235;MAT08-07;;leitura C5 (Sonnet);Fator comum em evidência;alta
+sme:8ano:p236;MAT08-07;;leitura C5 (Sonnet);Fatoração por agrupamento;alta
+sme:8ano:p238;MAT08-07;;leitura C5 (Sonnet);Fatoração da diferença de quadrados;alta
+sme:8ano:p240;MAT08-06;;leitura C5 (Sonnet);Produtos notáveis no cálculo mental de quadrados;média
+sme:8ano:p242;;;leitura C5 (Sonnet);Desigualdades em balanças, inequações;média
+sme:8ano:p244;;;leitura C5 (Sonnet);Problemas resolvidos por inequações;média
+sme:8ano:p245;;;leitura C5 (Sonnet);Propriedades aditivas de desigualdades;média
+sme:8ano:p246;;;leitura C5 (Sonnet);Multiplicação de desigualdades por números negativos;média
+sme:8ano:p247;;;leitura C5 (Sonnet);Propriedades das desigualdades;média
+sme:8ano:p248;;;leitura C5 (Sonnet);Jogo com inequações;média
+sme:8ano:p249;;;leitura C5 (Sonnet);Resolução de inequações;média
+sme:8ano:p250;;;leitura C5 (Sonnet);Procedimentos para resolver inequações;média
+sme:8ano:p251;;;leitura C5 (Sonnet);Problemas resolvidos por inequações;média
+sme:8ano:p252;;;leitura C5 (Sonnet);Medição de ângulos por dobradura;alta
+sme:8ano:p253;MAT08-12;;leitura C5 (Sonnet);Construir triângulos e comparar se coincidem;média
+sme:8ano:p254;MAT08-12;;leitura C5 (Sonnet);Congruência de polígonos;média
+sme:8ano:p255;MAT08-12;;leitura C5 (Sonnet);Casos LLL LAL ALA LAAO de congruência;alta
+sme:8ano:p257;MAT08-12;;leitura C5 (Sonnet);Aplicar casos de congruência de triângulos;alta
+sme:8ano:p258;;;leitura C5 (Sonnet);Triângulo mágico com soma constante;alta
+sme:8ano:p260;;;leitura C5 (Sonnet);Investigação de triângulos mágicos;alta
+sme:8ano:p261:q1;;;leitura C5 (Sonnet);Resolver inequações;média
+sme:8ano:p261:q2;;;leitura C5 (Sonnet);Idade traduzida em inequação;média
+sme:8ano:p261:q3;MAT08-12;;leitura C5 (Sonnet);Congruência de triângulos retângulos;alta
+sme:8ano:p261:q4;MAT08-07;;leitura C5 (Sonnet);Fatorar expressões algébricas;alta
+sme:8ano:p261:q5;MAT08-06;;leitura C5 (Sonnet);Quadrados por produtos notáveis;alta
+sme:9ano:p016;;;leitura C5 (Sonnet);Cálculo de porcentagem simples com calculadora;alta
+sme:9ano:p018;;;leitura C5 (Sonnet);Representações fracionária decimal e percentual de racionais;alta
+sme:9ano:p019;;;leitura C5 (Sonnet);Índice percentual de espécies endêmicas;alta
+sme:9ano:p020;;;leitura C5 (Sonnet);Porcentagens em fração decimal e índices percentuais;alta
+sme:9ano:p021;MAT08-04;;leitura C5 (Sonnet);Decimais exatos e dízimas periódicas;média
+sme:9ano:p022;MAT08-04;;leitura C5 (Sonnet);Dízimas periódicas e seu período;alta
+sme:9ano:p023;MAT08-04;;leitura C5 (Sonnet);Fração geratriz de dízima periódica;alta
+sme:9ano:p024;MAT08-04;;leitura C5 (Sonnet);Obter geratriz por equação;alta
+sme:9ano:p025;MAT09-07;;leitura C5 (Sonnet);Descobrir a relação pitagórica entre números;alta
+sme:9ano:p026;MAT09-07;;leitura C5 (Sonnet);Áreas de quadrados sobre lados do triângulo retângulo;alta
+sme:9ano:p027;MAT09-07;;leitura C5 (Sonnet);Escadas e árvores levam à relação pitagórica;alta
+sme:9ano:p028;MAT09-07;;leitura C5 (Sonnet);Generalizar e enunciar o teorema de Pitágoras;alta
+sme:9ano:p029;MAT09-07;;leitura C5 (Sonnet);Calcular hipotenusa de triângulos retângulos;alta
+sme:9ano:p030;;;leitura C5 (Sonnet);Contagem de tipos com tabela e árvore, fora da lista;alta
+sme:9ano:p032;;;leitura C5 (Sonnet);Contagem de trajetos com árvore de possibilidades;alta
+sme:9ano:p034;;;leitura C5 (Sonnet);Contagem de viagens com restrição;alta
+sme:9ano:p036;;;leitura C5 (Sonnet);Anagramas e contagem;alta
+sme:9ano:p037;;;leitura C5 (Sonnet);Contagem de anagramas pelo princípio multiplicativo;alta
+sme:9ano:p038;;;leitura C5 (Sonnet);Contagem de caminhos em diagrama;alta
+sme:9ano:p039;;;leitura C5 (Sonnet);Problemas de contagem;alta
+sme:9ano:p040:q1;MAT08-04;;leitura C5 (Sonnet);Classificar decimais exatos e dízimas;alta
+sme:9ano:p040:q2;MAT08-04;;leitura C5 (Sonnet);Fração geratriz de dízimas;alta
+sme:9ano:p040:q3;MAT09-07;;leitura C5 (Sonnet);Terceiro lado de triângulo retângulo;alta
+sme:9ano:p040:q4;;;leitura C5 (Sonnet);Contagem de combinações de roupas;alta
+sme:9ano:p040:q5;;;leitura C5 (Sonnet);Racional entre dois racionais dados;média
+sme:9ano:p040:q6;MAT08-04;;leitura C5 (Sonnet);Dízima 0,999 na reta numérica;baixa
+sme:9ano:p040:q7;MAT09-07;;leitura C5 (Sonnet);Lado do triângulo retângulo;alta
+sme:9ano:p040:q8;;;leitura C5 (Sonnet);Anagramas de uma palavra;alta
+sme:9ano:p040:q9;;;leitura C5 (Sonnet);Permutações de pessoas em fila;alta
+sme:9ano:p044;MAT09-07;;leitura C5 (Sonnet);Quebra cabeça que verifica o teorema de Pitágoras;alta
+sme:9ano:p045;MAT09-07;;leitura C5 (Sonnet);Pitágoras com raiz quadrada exata e aplicação;alta
+sme:9ano:p047;MAT09-01;;leitura C5 (Sonnet);Raiz quadrada e números opostos;baixa
+sme:9ano:p048;MAT09-01;;leitura C5 (Sonnet);Raiz quadrada aproximada de não quadrado perfeito;média
+sme:9ano:p050;MAT09-07;;leitura C5 (Sonnet);Diagonal de retângulo por Pitágoras e raiz;alta
+sme:9ano:p051;MAT09-07;;leitura C5 (Sonnet);Diagonal do quadrado unitário por Pitágoras;média
+sme:9ano:p052;MAT09-01;;leitura C5 (Sonnet);Raiz de dois como número irracional;alta
+sme:9ano:p053;MAT09-07;;leitura C5 (Sonnet);Espiral de triângulos retângulos e hipotenusas;média
+sme:9ano:p054;MAT09-01;;leitura C5 (Sonnet);Racionais irracionais e conjunto dos reais;alta
+sme:9ano:p055;MAT09-01;;leitura C5 (Sonnet);Medidas irracionais de lados e diagonais;média
+sme:9ano:p056;MAT08-13;;leitura C5 (Sonnet);Elementos da circunferência, base do estudo do círculo;média
+sme:9ano:p057;MAT08-13;;leitura C5 (Sonnet);Experimento que leva ao número pi;alta
+sme:9ano:p058;MAT08-13;;leitura C5 (Sonnet);Fórmula do comprimento da circunferência;alta
+sme:9ano:p059;MAT08-13;;leitura C5 (Sonnet);Comprimento e raio de círculos;alta
+sme:9ano:p060;MAT08-13;;leitura C5 (Sonnet);Problemas de comprimento de circunferência;alta
+sme:9ano:p062;MAT08-13;;leitura C5 (Sonnet);Problemas de comprimento de circunferência;alta
+sme:9ano:p064;MAT09-11;;leitura C5 (Sonnet);Arcos de circunferência e seus comprimentos;baixa
+sme:9ano:p066;MAT09-11;;leitura C5 (Sonnet);Comprimento de arcos em figuras;baixa
+sme:9ano:p067;;;leitura C5 (Sonnet);Contagem de placas alfanuméricas;alta
+sme:9ano:p068;;;leitura C5 (Sonnet);Princípio multiplicativo com placas;alta
+sme:9ano:p070;;;leitura C5 (Sonnet);Princípio multiplicativo da contagem;alta
+sme:9ano:p072;;;leitura C5 (Sonnet);Contagem de números com algarismos;alta
+sme:9ano:p073:q1;MAT09-01;;leitura C5 (Sonnet);Quadrado perfeito e raiz quadrada;baixa
+sme:9ano:p073:q2;MAT09-07;;leitura C5 (Sonnet);Mureta de canteiro quadrado, provável diagonal;baixa
+sme:9ano:p073:q3;MAT09-11;;leitura C5 (Sonnet);Medida de arco em quatro partes iguais;baixa
+sme:9ano:p073:q4;MAT09-01;;leitura C5 (Sonnet);Classificar número como irracional;alta
+sme:9ano:p073:q5;MAT08-13;;leitura C5 (Sonnet);Pi como razão entre comprimento e diâmetro;alta
+sme:9ano:p073:q6;MAT09-01;;leitura C5 (Sonnet);Lado de quadrado com raiz não exata;média
+sme:9ano:p073:q7;MAT09-01;;leitura C5 (Sonnet);Hipotenusa como raiz de três;média
+sme:9ano:p073:q8;;;leitura C5 (Sonnet);Contagem de números sem repetição;alta
+sme:9ano:p076;MAT09-01;;leitura C5 (Sonnet);Representação decimal infinita não periódica e irracionais;alta
+sme:9ano:p078;MAT09-01;;leitura C5 (Sonnet);Arredondar decimais de números irracionais;média
+sme:9ano:p080;MAT09-01;;leitura C5 (Sonnet);Segmentos comensuráveis e razão racional;média
+sme:9ano:p082;MAT09-01;;leitura C5 (Sonnet);Segmentos incomensuráveis e razão irracional;média
+sme:9ano:p083;MAT09-08;;leitura C5 (Sonnet);Razão entre medidas de segmentos;média
+sme:9ano:p085;MAT09-08;;leitura C5 (Sonnet);Segmentos proporcionais;alta
+sme:9ano:p086;MAT09-08;;leitura C5 (Sonnet);Feixe de paralelas e transversais proporcionais;alta
+sme:9ano:p088;MAT09-08;;leitura C5 (Sonnet);Segmentos em feixe de paralelas;alta
+sme:9ano:p090;MAT09-08;;leitura C5 (Sonnet);Verificação experimental do teorema de Tales;alta
+sme:9ano:p091;MAT09-08;;leitura C5 (Sonnet);Enunciado e proporções do teorema de Tales;alta
+sme:9ano:p092;MAT09-08;;leitura C5 (Sonnet);Cálculo de medidas com o teorema de Tales;alta
+sme:9ano:p094;MAT09-08;;leitura C5 (Sonnet);Aplicações de Tales em triângulos e trapézios;alta
+sme:9ano:p096;MAT09-08;;leitura C5 (Sonnet);Proporções em triângulos com paralela a um lado;alta
+sme:9ano:p097;MAT08-13;;leitura C5 (Sonnet);Circunferência e círculo, abertura do estudo de área;média
+sme:9ano:p098;MAT08-13;;leitura C5 (Sonnet);Estimar área do círculo com malha;alta
+sme:9ano:p100;MAT08-13;;leitura C5 (Sonnet);Conjecturas para a área do círculo;alta
+sme:9ano:p101;MAT08-13;;leitura C5 (Sonnet);Fórmula da área do círculo;alta
+sme:9ano:p102;MAT08-13;;leitura C5 (Sonnet);Áreas de círculos e coroa circular;alta
+sme:9ano:p104;MAT08-13;;leitura C5 (Sonnet);Áreas de círculo e quadrado inscrito;média
+sme:9ano:p105:q1;MAT09-08;;leitura C5 (Sonnet);Tales em feixe de paralelas com incógnita;alta
+sme:9ano:p105:q2;MAT09-08;;leitura C5 (Sonnet);Tales em triângulo com paralela;alta
+sme:9ano:p105:q3;MAT08-13;;leitura C5 (Sonnet);Área de fatia de pizza circular;alta
+sme:9ano:p105:q4;MAT09-01;;leitura C5 (Sonnet);Identificar números irracionais;alta
+sme:9ano:p105:q5;MAT09-08;;leitura C5 (Sonnet);Tales em trapézio com lados prolongados;alta
+sme:9ano:p105:q6;MAT08-13;;leitura C5 (Sonnet);Razão entre áreas de círculos;alta
+sme:9ano:p108;MAT09-03;;leitura C5 (Sonnet);Adição e subtração de radicais;alta
+sme:9ano:p109;MAT09-03;;leitura C5 (Sonnet);Soma de radicais semelhantes com fator comum;alta
+sme:9ano:p111;MAT09-03;;leitura C5 (Sonnet);Soma de radicais não é radical da soma;alta
+sme:9ano:p112;MAT09-03;;leitura C5 (Sonnet);Operações com radicais em trilhas e distâncias;média
+sme:9ano:p114;MAT09-03;;leitura C5 (Sonnet);Produto de radicais em área;alta
+sme:9ano:p115;MAT09-03;;leitura C5 (Sonnet);Propriedade do produto de raízes;alta
+sme:9ano:p117;MAT09-03;;leitura C5 (Sonnet);Fatorar radical na diagonal do quadrado;média
+sme:9ano:p119;MAT09-03;;leitura C5 (Sonnet);Divisão de radicais em problema de cateto;alta
+sme:9ano:p120;MAT09-03;;leitura C5 (Sonnet);Propriedade do quociente de raízes;alta
+sme:9ano:p121;MAT09-03;;leitura C5 (Sonnet);Operações com radicais na forma exata;alta
+sme:9ano:p122;MAT09-07;;leitura C5 (Sonnet);Recíproca do teorema de Pitágoras;alta
+sme:9ano:p124;MAT09-03;;leitura C5 (Sonnet);Tangram com perímetros e áreas em radicais;média
+sme:9ano:p125;MAT09-08;;leitura C5 (Sonnet);Dividir segmento em partes proporcionais com paralelas;alta
+sme:9ano:p126;MAT09-08;;leitura C5 (Sonnet);Dividir segmentos por construção de Tales;alta
+sme:9ano:p127;MAT09-04;;leitura C5 (Sonnet);Propriedades prévias ao estudo da equação do 2º grau;baixa
+sme:9ano:p128;MAT09-04;;leitura C5 (Sonnet);Equação x ao quadrado igual a número;média
+sme:9ano:p130;MAT09-04;;leitura C5 (Sonnet);Coeficientes e raízes de equação do 2º grau;alta
+sme:9ano:p131;MAT09-04;;leitura C5 (Sonnet);Resolver equação ax² menos c igual a zero;alta
+sme:9ano:p132;MAT09-05;;leitura C5 (Sonnet);Problema de placas que leva a equação do 2º grau;alta
+sme:9ano:p133;MAT09-05;;leitura C5 (Sonnet);Equacionar problema das placas;média
+sme:9ano:p134;MAT09-05;;leitura C5 (Sonnet);Resolver equação do problema e interpretar soluções;média
+sme:9ano:p135;MAT09-04;;leitura C5 (Sonnet);Resolver equação ax² mais bx igual a zero;alta
+sme:9ano:p136;MAT09-05;;leitura C5 (Sonnet);Problemas que resultam em equação incompleta do 2º grau;média
+sme:9ano:p137:q1;MAT09-03;;leitura C5 (Sonnet);Área de losango com radicais;média
+sme:9ano:p137:q2;MAT09-03;;leitura C5 (Sonnet);Procedimento correto com radicais;alta
+sme:9ano:p137:q3;MAT09-03;;leitura C5 (Sonnet);Valor aproximado de expressão com radicais;alta
+sme:9ano:p137:q4;MAT09-03;;leitura C5 (Sonnet);Medidas exatas com radicais em retângulo;média
+sme:9ano:p140;;;leitura C5 (Sonnet);Padrão de translação em tira;alta
+sme:9ano:p141;;;leitura C5 (Sonnet);Translação de figura;alta
+sme:9ano:p142;;;leitura C5 (Sonnet);Translação de um balão em malha;alta
+sme:9ano:p143;;;leitura C5 (Sonnet);Simetria axial de motivo geométrico;alta
+sme:9ano:p144;;;leitura C5 (Sonnet);Reflexão em relação a uma reta;alta
+sme:9ano:p146;;;leitura C5 (Sonnet);Rotação de motivo geométrico;alta
+sme:9ano:p147;;;leitura C5 (Sonnet);Rotação de triângulo em torno de ponto;alta
+sme:9ano:p149;;;leitura C5 (Sonnet);Translações no computador;alta
+sme:9ano:p150;;;leitura C5 (Sonnet);Simetrias e rotações no computador;alta
+sme:9ano:p151;MAT09-04;;leitura C5 (Sonnet);Equação do 2º grau obtida de um quadrado de soma;média
+sme:9ano:p154;MAT09-04;;leitura C5 (Sonnet);Resolver equação do tipo m x mais n ao quadrado igual a c;alta
+sme:9ano:p155;MAT09-05;;leitura C5 (Sonnet);Problema da quadra que leva a equação do 2º grau;alta
+sme:9ano:p156;MAT09-05;;leitura C5 (Sonnet);Organizar dados e resolver problema com equação do 2º grau;alta
+sme:9ano:p158;MAT09-05;;leitura C5 (Sonnet);Terreno retangular modelado por equação do 2º grau;alta
+sme:9ano:p160;MAT09-04;;leitura C5 (Sonnet);Fórmula de Bhaskara e discriminante;alta
+sme:9ano:p162;MAT09-04;;leitura C5 (Sonnet);Aplicar Bhaskara a uma equação;alta
+sme:9ano:p163;MAT09-05;;leitura C5 (Sonnet);Problema geométrico resolvido por equação do 2º grau;alta
+sme:9ano:p164;;;leitura C5 (Sonnet);População e amostra em pesquisa;alta
+sme:9ano:p166;;;leitura C5 (Sonnet);Questionário tabulação e frequência relativa;alta
+sme:9ano:p168;;;leitura C5 (Sonnet);Análise de frequências relativas;alta
+sme:9ano:p169:q1;;;leitura C5 (Sonnet);Rotações de figura;alta
+sme:9ano:p169:q2;MAT09-05;;leitura C5 (Sonnet);Moldura que leva a equação do 2º grau;alta
+sme:9ano:p169:q3;MAT09-05;;leitura C5 (Sonnet);Número definido por equação do 2º grau;média
+sme:9ano:p169:q4;MAT09-04;;leitura C5 (Sonnet);Raízes de equação ax² menos c igual a zero;alta
+sme:9ano:p169:q5;MAT09-05;;leitura C5 (Sonnet);Problema de número resolvido por equação do 2º grau;média
+sme:9ano:p169:q6;;;leitura C5 (Sonnet);Rotação de 90 graus em malha;alta
+sme:9ano:p172;;;leitura C5 (Sonnet);Áreas de superfícies e pintura, fora da lista;média
+sme:9ano:p173;;;leitura C5 (Sonnet);Área de paredes de bloco retangular;média
+sme:9ano:p175;;;leitura C5 (Sonnet);Problema de pintura com áreas;média
+sme:9ano:p176;;;leitura C5 (Sonnet);Área total do bloco retangular;alta
+sme:9ano:p177;;;leitura C5 (Sonnet);Custo de pintura com áreas;média
+sme:9ano:p178;;;leitura C5 (Sonnet);Elementos e faces de pirâmide retangular;alta
+sme:9ano:p179;;;leitura C5 (Sonnet);Área lateral e total de pirâmide;alta
+sme:9ano:p180;MAT09-13;;leitura C5 (Sonnet);Média aritmética e dispersão de salários;alta
+sme:9ano:p182;MAT09-13;;leitura C5 (Sonnet);Média aritmética ponderada;média
+sme:9ano:p183;MAT09-13;;leitura C5 (Sonnet);Moda e média de conjuntos de dados;alta
+sme:9ano:p186;;;leitura C5 (Sonnet);Figuras congruentes;alta
+sme:9ano:p188;;;leitura C5 (Sonnet);Congruência de triângulos;alta
+sme:9ano:p189;;;leitura C5 (Sonnet);Caso LLL de congruência;alta
+sme:9ano:p190;;;leitura C5 (Sonnet);Casos LAL e ALA de congruência;alta
+sme:9ano:p191;;;leitura C5 (Sonnet);Caso LAAO e ângulos insuficientes;alta
+sme:9ano:p192;;;leitura C5 (Sonnet);Justificar congruência em figuras;alta
+sme:9ano:p193;MAT09-01;;leitura C5 (Sonnet);Localizar irracional na reta numérica;alta
+sme:9ano:p194;;;leitura C5 (Sonnet);Razões com expressões algébricas, fora da lista;alta
+sme:9ano:p195;;;leitura C5 (Sonnet);Expressões algébricas fracionárias equivalentes;alta
+sme:9ano:p196;;;leitura C5 (Sonnet);Adição de expressões algébricas fracionárias;alta
+sme:9ano:p198;;;leitura C5 (Sonnet);Multiplicação e divisão de expressões fracionárias;alta
+sme:9ano:p199:q1;MAT09-07;;leitura C5 (Sonnet);Altura de face triangular da pirâmide, provável uso de Pitágoras;baixa
+sme:9ano:p199:q2;MAT09-13;;leitura C5 (Sonnet);Comparar médias aritméticas de notas;média
+sme:9ano:p199:q3;MAT09-01;;leitura C5 (Sonnet);Situar raiz na reta numérica;alta
+sme:9ano:p199:q4;;;leitura C5 (Sonnet);Soma de frações com denominadores diferentes;alta
+sme:9ano:p199:q5;MAT09-07;;leitura C5 (Sonnet);Hipotenusa do triângulo retângulo 6 e 8;baixa
+sme:9ano:p202;MAT09-12;;leitura C5 (Sonnet);Volume do cubo e conversão de unidades;alta
+sme:9ano:p203;MAT09-12;;leitura C5 (Sonnet);Volume e capacidade de caixa cúbica;alta
+sme:9ano:p204;MAT09-12;;leitura C5 (Sonnet);Volume do bloco retangular;alta
+sme:9ano:p205;MAT09-12;;leitura C5 (Sonnet);Volume de cubo e bloco retangular;alta
+sme:9ano:p206;MAT09-08;;leitura C5 (Sonnet);Ampliações e reduções proporcionais de figuras;média
+sme:9ano:p207;MAT09-08;;leitura C5 (Sonnet);Razões de ampliação e redução em malha;alta
+sme:9ano:p208;MAT09-08;;leitura C5 (Sonnet);Figuras semelhantes;alta
+sme:9ano:p209;MAT09-08;;leitura C5 (Sonnet);Semelhança de polígonos e razão de semelhança;alta
+sme:9ano:p210;MAT09-08;;leitura C5 (Sonnet);Ampliação por homotetia e semelhança;alta
+sme:9ano:p212;MAT09-08;;leitura C5 (Sonnet);Perímetros e áreas de figuras semelhantes;alta
+sme:9ano:p213;MAT09-08;;leitura C5 (Sonnet);Semelhança de triângulos com paralela a um lado;alta
+sme:9ano:p215;MAT09-08;;leitura C5 (Sonnet);Casos de semelhança de triângulos;alta
+sme:9ano:p216;MAT09-08;;leitura C5 (Sonnet);Medições indiretas por semelhança;alta
+sme:9ano:p218;MAT09-06;;leitura C5 (Sonnet);Altura relativa à hipotenusa e triângulos semelhantes;alta
+sme:9ano:p220;MAT09-06;;leitura C5 (Sonnet);Projeções em triângulo retângulo e altura relativa;alta
+sme:9ano:p221;MAT09-07;;leitura C5 (Sonnet);Demonstração e aplicação do teorema de Pitágoras;alta
+sme:9ano:p223;MAT09-08;;leitura C5 (Sonnet);Pipas semelhantes e diagonais perpendiculares;média
+sme:9ano:p224;MAT09-05;;leitura C5 (Sonnet);Sistema com equação do 2º grau por substituição;média
+sme:9ano:p226;MAT09-05;;leitura C5 (Sonnet);Medidas da quadra por sistema com equação do 2º grau;média
+sme:9ano:p227;MAT09-01;;leitura C5 (Sonnet);Classificar números naturais a reais;média
+sme:9ano:p228;MAT09-01;;leitura C5 (Sonnet);Relação entre conjuntos numéricos e reais;alta
+sme:9ano:p229:q1;;;leitura C5 (Sonnet);Área da superfície de cubo de volume dado;média
+sme:9ano:p229:q2;MAT09-07;;leitura C5 (Sonnet);Distância entre cidades com catetos perpendiculares;alta
+sme:9ano:p229:q3;MAT09-01;;leitura C5 (Sonnet);Classificar decimal infinito não periódico;alta
+sme:9ano:p229:q4;MAT09-08;;leitura C5 (Sonnet);Elementos conservados em ampliação;alta
+sme:9ano:p229:q5;MAT09-08;;leitura C5 (Sonnet);Lados de triângulos semelhantes;alta
+sme:9ano:p232;MAT09-10;;leitura C5 (Sonnet);Dependência entre grandezas e equação;alta
+sme:9ano:p233;MAT09-10;;leitura C5 (Sonnet);Procura em função do preço;alta
+sme:9ano:p234;MAT09-17;;leitura C5 (Sonnet);Desvalorização anual de 90 por cento sucessiva;média
+sme:9ano:p236;MAT09-10;;leitura C5 (Sonnet);Função de produção com tabela;alta
+sme:9ano:p238;MAT09-10;;leitura C5 (Sonnet);Gráfico cartesiano de função;alta
+sme:9ano:p239;MAT09-10;;leitura C5 (Sonnet);Gráfico de função em planilha;média
+sme:9ano:p240;MAT09-10;;leitura C5 (Sonnet);Função de desconto e seu gráfico;média
+sme:9ano:p241;MAT09-10;;leitura C5 (Sonnet);Gráfico de função em planilha;média
+sme:9ano:p242;MAT09-10;;leitura C5 (Sonnet);Duas funções de custo e gráficos;alta
+sme:9ano:p244;MAT09-10;;leitura C5 (Sonnet);Perímetro do quadrado em função do lado;alta
+sme:9ano:p245;MAT09-10;;leitura C5 (Sonnet);Área do quadrado em função do lado;alta
+sme:9ano:p246;MAT08-14;;leitura C5 (Sonnet);Experimento aleatório e espaço amostral;alta
+sme:9ano:p247;MAT08-14;;leitura C5 (Sonnet);Espaço amostral de dado e retirada sem reposição;média
+sme:9ano:p248;MAT08-14;;leitura C5 (Sonnet);Estimar probabilidade por frequência relativa;alta
+sme:9ano:p249;MAT08-14;;leitura C5 (Sonnet);Eventos equiprováveis e probabilidade;alta
+sme:9ano:p250;MAT09-17;;leitura C5 (Sonnet);Conceitos financeiros de capital montante e juro;baixa
+sme:9ano:p251;MAT09-17;;leitura C5 (Sonnet);Juro simples mês a mês;média
+sme:9ano:p254;MAT09-17;;leitura C5 (Sonnet);Generalizar saldo com juro simples;média
+sme:9ano:p255;MAT09-17;;leitura C5 (Sonnet);Juros compostos em parcelas sem juros;alta
+sme:9ano:p256;MAT09-17;;leitura C5 (Sonnet);Taxa de juros de parcelamento;média
+sme:9ano:p259;MAT09-17;;leitura C5 (Sonnet);Poupança com rendimentos sucessivos;alta
+sme:9ano:p261:q1;MAT09-10;;leitura C5 (Sonnet);Salário como função da venda;média
+sme:9ano:p261:q2;MAT09-17;;leitura C5 (Sonnet);Juro simples de empréstimo;baixa
+sme:9ano:p261:q3;MAT08-14;;leitura C5 (Sonnet);Probabilidade simples em caixa de bolas;alta
+sme:9ano:p261:q4;MAT09-10;;leitura C5 (Sonnet);Expressão de função com tabela;alta
+sme:9ano:p261:q5;MAT09-10;;leitura C5 (Sonnet);Gráfico da área do quadrado em função do lado;alta
+sme:9ano:p261:q6;MAT08-14;;leitura C5 (Sonnet);Maior chance de sabor de bombom;alta

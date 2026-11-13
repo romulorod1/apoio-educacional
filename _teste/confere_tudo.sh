@@ -298,6 +298,18 @@ roda "biblioteca (zip)" node _teste/testa_biblioteca_zip.js
 roda "fechamento em ordem"   node _teste/testa_fechamento_ordem_alfabetica.js
 roda "rotulos da aula"       node _teste/testa_rotulos_aula.js
 roda "vagos e repeticoes (F3)" node _teste/testa_vagos_repeticao.js
+# Remarcar aula de repeticao para um dia da PROPRIA serie, em mes nao lancado,
+# nao apaga a fixa daquele dia (12/11/2026: dezembro dava 1080 em vez de 1200).
+# So a ocorrencia original do dia ocupa a vaga; a aula vinda de outro dia, ao
+# sair de novo ou ser apagada, nao exclui o dia. E o lado da SOBRA: dado antigo
+# (id aleatorio) com o mes relancado (editarSerie, materializadoAte nulo ou
+# recuado) nao dobra. Tres venenos, um de cada lado: a regra antiga erra a
+# falta; "nunca e original" erra a sobra (o dia apagado volta); "lancado so
+# pelo campo" da gemea a aula antiga que so mudou de horario.
+roda "remarcar na repeticao" node _teste/testa_remarcar_repeticao.js
+roda "remarcar na repeticao --envenenado-regra-antiga" node _teste/testa_remarcar_repeticao.js --envenenado-regra-antiga
+roda "remarcar na repeticao --envenenado-nunca-original" node _teste/testa_remarcar_repeticao.js --envenenado-nunca-original
+roda "remarcar na repeticao --envenenado-lancado-so-pelo-campo" node _teste/testa_remarcar_repeticao.js --envenenado-lancado-so-pelo-campo
 roda "sugestoes matematica"  node _teste/testa_sugestoes_matematica.js
 roda "virada anual"          node _teste/testa_virada_anual.js
 # A regra do merge na main (_teste/merge_seguro.sh), que segura o processo
@@ -547,6 +559,16 @@ roda "biblioteca livros tela --envenenado-largura-vai-ao-alto" node "_teste/test
 roda "biblioteca livros tela --envenenado-vizinhas-sem-desenho" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-vizinhas-sem-desenho
 roda "biblioteca livros tela --envenenado-canvas-sem-soltar" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-canvas-sem-soltar
 roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-sumario-dos-marcadores
+# B1 (revisao cega do #192): a navegacao sai da pagina do assunto; o veneno a
+# deixa presa, e ela volta no Limpar e no Voltar do modulo.
+roda "biblioteca livros tela --envenenado-pagina-presa" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-pagina-presa
+# Fatia 2 do leitor: pinca e duplo toque no livro sintetico de 400 paginas,
+# com toques de verdade do Chrome. O ponto sob os dedos fica sob eles (24 px),
+# o duplo toque leva o ponto ao meio e volta, a caneta nao da zoom e um dedo
+# rola. O veneno ancora o gesto no meio da tela, e a prova tem de ver.
+roda "leitor pinca"                              node "_teste/testa_leitor_pinca.js"
+roda "leitor pinca --envenenado-gesto-sem-ponto" node "_teste/testa_leitor_pinca.js" --envenenado-gesto-sem-ponto
+roda "leitor pinca --envenenado-gesto-grava-pela-ancora" node "_teste/testa_leitor_pinca.js" --envenenado-gesto-grava-pela-ancora
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
@@ -566,6 +588,12 @@ roda "biblioteca mirim --envenenado-equivalentes" node "_teste/testa_biblioteca_
 # e o "Diversos" das provas nao vira assunto da aula: o veneno trata todo modulo
 # de prova como assunto
 roda "biblioteca mirim --envenenado-diversos"   node "_teste/testa_biblioteca_mirim.js" --envenenado-diversos
+# C5: o pacote dos Cadernos de Apoio da SME-SP (campos novos tom, licenca,
+# atribuicao e dificuldade nula) importa sem mudar o app, os assuntos viram
+# modulos do 3o e do 7o ano e a atribuicao aparece em cada cartao. O veneno
+# serve o app.js sem a origem no cartao.
+roda "biblioteca cadernos sme"                 node "_teste/testa_biblioteca_cadernos_sme.js"
+roda "biblioteca cadernos sme --envenenado-sem-origem" node "_teste/testa_biblioteca_cadernos_sme.js" --envenenado-sem-origem
 # FRENTE B: selecionar e compor. Sem navegador, o compositor do pdf.js (lista
 # renumerada, gabarito separado, sem solucao escrito, quebra entre pedacos, marca
 # por cima so nesta folha e os outros documentos byte a byte iguais aos de main).
@@ -886,6 +914,29 @@ roda "livros mapa --envenenado-faixa-refeita"     node "_teste/testa_livros_mapa
 # o v1 depois do v2 nao rebaixa. O veneno deixa de trocar o meta. Porta 8887.
 roda "livros reimportar mapa"                     node "_teste/testa_livros_reimportar_mapa.js"
 roda "livros reimportar mapa --envenenado-meta-nao-troca" node "_teste/testa_livros_reimportar_mapa.js" --envenenado-meta-nao-troca
+# Fase 1a da biblioteca na nuvem (12/11/2026): a posicao de leitura fica quando
+# o meta ou o arquivo do livro muda (o sumario novo nao a solta mais); a pagina
+# que nao existe no arquivo novo vai para a ultima, com o aviso "voce estava na
+# p. X" na tela do livro e no leitor; o EPUB do FME remontado em PDF vai pela
+# ancora page_N para a pagina N; o livro que sai do pacote nao leva a posicao; o
+# ajuste fica ate ela mudar de pagina; a correcao orfa aparece na tela do livro,
+# com a sugestao de um toque, Ligar (que pergunta antes de trocar) e Descartar, e
+# o Desfazer devolve so o que a acao mexeu; o Confirmar num numero que guarda
+# outra correcao nao a apaga. Cada veneno tira uma regra. Porta 8972.
+roda "livros nuvem posicao"                       node "_teste/testa_livros_nuvem_posicao.js"
+roda "livros nuvem posicao --envenenado-solta-no-meta" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-solta-no-meta
+roda "livros nuvem posicao --envenenado-solta-no-sumario" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-solta-no-sumario
+roda "livros nuvem posicao --envenenado-solta-na-troca" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-solta-na-troca
+roda "livros nuvem posicao --envenenado-nao-ajusta" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-nao-ajusta
+roda "livros nuvem posicao --envenenado-sem-traducao" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-sem-traducao
+roda "livros nuvem posicao --envenenado-sem-aviso" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-sem-aviso
+roda "livros nuvem posicao --envenenado-orfa-some-da-tela" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-orfa-some-da-tela
+roda "livros nuvem posicao --envenenado-grava-por-cima-na-tela" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-grava-por-cima-na-tela
+roda "livros nuvem posicao --envenenado-solta-no-removido" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-solta-no-removido
+roda "livros nuvem posicao --envenenado-volta-sem-regra" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-volta-sem-regra
+roda "livros nuvem posicao --envenenado-ajuste-sai-na-abertura" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-ajuste-sai-na-abertura
+roda "livros nuvem posicao --envenenado-troca-sem-perguntar" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-troca-sem-perguntar
+roda "livros nuvem posicao --envenenado-desfazer-tudo" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-desfazer-tudo
 # C15.4 e C15.5: "Exportar em PDF" do capitulo 2 com o gabarito dele no mesmo
 # arquivo, anexado na aula: o texto do capitulo e DEPOIS o do gabarito do 2 (e
 # nao o do 1), o rodape de fonte, nenhum travessao; sem o gabarito; paginas
@@ -934,6 +985,19 @@ roda "alerta da copia --envenenado-alerta-so-local" node "_teste/testa_alerta_co
 roda "alerta da copia --envenenado-idade-do-envio" node "_teste/testa_alerta_copia_nuvem.js" --envenenado-idade-do-envio
 roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_aluno_cascata.js"
 roda "relato e Voltar"                            node "_teste/testa_relato_voltar.js"
+# a entrada de janela que veio da recarga vira a da tela: o veneno a deixa
+# como estava e o historico nunca mais fica sem janela
+roda "Voltar sem entrada velha"                  node "_teste/testa_voltar_entrada_velha.js"
+roda "Voltar sem entrada velha --envenenado-entrada-velha" node "_teste/testa_voltar_entrada_velha.js" --envenenado-entrada-velha
+roda "Voltar do aparelho nas telas"              node "_teste/testa_voltar_android.js"
+roda "Voltar do aparelho --envenenado-voltar-sem-tela" node "_teste/testa_voltar_android.js" --envenenado-voltar-sem-tela
+roda "Voltar do aparelho --envenenado-volta-dois-passos" node "_teste/testa_voltar_android.js" --envenenado-volta-dois-passos
+roda "Voltar do aparelho --envenenado-seta-nao-tira" node "_teste/testa_voltar_android.js" --envenenado-seta-nao-tira
+roda "Voltar do aparelho --envenenado-pergunta-da-lista-some" node "_teste/testa_voltar_android.js" --envenenado-pergunta-da-lista-some
+roda "Voltar do aparelho --envenenado-folha-fora-do-historico" node "_teste/testa_voltar_android.js" --envenenado-folha-fora-do-historico
+roda "Voltar do aparelho --envenenado-pergunta-do-formulario-some" node "_teste/testa_voltar_android.js" --envenenado-pergunta-do-formulario-some
+roda "Voltar do aparelho --envenenado-guarda-depois-da-janela" node "_teste/testa_voltar_android.js" --envenenado-guarda-depois-da-janela
+roda "Voltar do aparelho --envenenado-sem-ramo-bib" node "_teste/testa_voltar_android.js" --envenenado-sem-ramo-bib
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
 # N0: a copia na nuvem contra o Firebase Emulator Suite: as regras nos tres
 # casos (dona, observador, estranho), a ida e volta entre dois aparelhos pela
@@ -1307,6 +1371,11 @@ roda "banco da biblioteca"                      python biblioteca/_prova_banco.p
 # C12: o tipo de fonte provas (OBMEP Mirim e ENEM), sobre provas sinteticas dos
 # dois formatos, com um veneno por regra do detector. A fidelidade e no Chrome.
 roda "provas da biblioteca"                     python biblioteca/_prova_provas.py
+# C5: o tipo de fonte cadernos-sme-sp (Cadernos de Apoio da SME-SP), sobre um
+# caderno sintetico: indice em duas colunas, atividade que atravessa a pagina,
+# foto com credito de terceiro (sai), duas colunas, revisao por questao. A
+# fidelidade e no Chrome.
+roda "cadernos sme da biblioteca"               python biblioteca/_prova_cadernos_sme.py
 # Daqui ate o fim da secao, nada abre Chrome (conferido com CHROME envenenado
 # em 26/10): o --rapido roda. O _prova_gerador e o _prova_banco acima ficam no
 # navegador porque a trava de fidelidade dos dois renderiza o SVG no Chrome
@@ -1336,6 +1405,22 @@ roda "livros (regras) --envenenado-teto-antigo" node "_teste/testa_livros_regras
 roda "livros (regras) --envenenado-sem-ano"     node "_teste/testa_livros_regras.js" --envenenado-sem-ano
 roda "livros (regras) --envenenado-correcao-ignorada" node "_teste/testa_livros_regras.js" --envenenado-correcao-ignorada
 roda "livros (regras) --envenenado-correcao-sem-titulo" node "_teste/testa_livros_regras.js" --envenenado-correcao-sem-titulo
+# Fase 1a da biblioteca na nuvem (12/11/2026): a correcao dela casa pela chave
+# estavel do capitulo, pelo numero e titulo, pelo titulo normalizado unico e
+# pela heranca de titulos (o caso da unidade 8 do ga7 e do ga9); o titulo unico
+# so sugere, nunca aplica calado; a mais recente vence no mesmo capitulo; o
+# Praticando 9 renumerado; a orfa listada e nunca no vizinho; a palavra nova nunca apaga a
+# de outro capitulo; o tablet na versao antiga lendo as correcoes novas. Um
+# veneno por regra. Sem Chrome.
+roda "livros mapa correcao"                       node "_teste/testa_livros_mapa_correcao.js"
+roda "livros mapa correcao --envenenado-so-numero-e-titulo" node "_teste/testa_livros_mapa_correcao.js" --envenenado-so-numero-e-titulo
+roda "livros mapa correcao --envenenado-chave-sem-titulo" node "_teste/testa_livros_mapa_correcao.js" --envenenado-chave-sem-titulo
+roda "livros mapa correcao --envenenado-chave-herda-sem-assunto" node "_teste/testa_livros_mapa_correcao.js" --envenenado-chave-herda-sem-assunto
+roda "livros mapa correcao --envenenado-titulo-aplica-calado" node "_teste/testa_livros_mapa_correcao.js" --envenenado-titulo-aplica-calado
+roda "livros mapa correcao --envenenado-mais-forte-vence" node "_teste/testa_livros_mapa_correcao.js" --envenenado-mais-forte-vence
+roda "livros mapa correcao --envenenado-heranca-pelo-inicio" node "_teste/testa_livros_mapa_correcao.js" --envenenado-heranca-pelo-inicio
+roda "livros mapa correcao --envenenado-orfa-some" node "_teste/testa_livros_mapa_correcao.js" --envenenado-orfa-some
+roda "livros mapa correcao --envenenado-grava-por-cima" node "_teste/testa_livros_mapa_correcao.js" --envenenado-grava-por-cima
 # C15.4 e C15.5: o que vai no PDF exportado (o capitulo sem as respostas do
 # livro, e o gabarito daquele capitulo depois, so quando pedido), as paginas
 # escolhidas e o rodape de fonte. O veneno deixa as respostas no capitulo.
