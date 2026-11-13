@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.86';
+  var VERSAO = '1.42.96';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -28518,7 +28518,8 @@
      * aparece com o aluno escolhido. Cada item é tocável e ACRESCENTA o dia ao
      * que já está no campo do ajuste. */
     var campoAjuste = null;
-    var conferir = escolhido ? Planejamento.itensIncertos(pl, { semAjuste: !chamaIA }) : [];
+    // o texto do pedido (só existe no plano montado nesta janela; o salvo abre sem ele) deixa o app conferir o conteúdo que ela escreveu
+    var conferir = escolhido ? Planejamento.itensIncertos(pl, { semAjuste: !chamaIA, texto: p.texto || '' }) : [];
     var linhaAcoes = el('div', { class: 'plan-linha plan-acoes', id: 'plan-acoes' });
     if (conferir.length) {
       linhaAcoes.appendChild(el('button', { type: 'button', class: 'plan-selo', id: 'plan-conferir', 'aria-expanded': p.conferirAberto ? 'true' : 'false',

@@ -518,5 +518,52 @@ secao('11. A conversa contínua: o modelo só repete a resposta crua (dois ajust
   conf('tirou a da agenda e pôs uma sem hora no mesmo dia: as duas ficam, e a folha mostra a aula sem hora', [P.normalizarAulas(trocaSemHora, null, AG).aulasExtras.length, P.aulasNaFolha(trocaSemHora, AG).aulas['2026-11-12']], [1, '']);
 })();
 
+// ================================================================
+secao('12. O conteúdo escrito no pedido: o system, o esquema e a conferência do app (dos dois lados)');
+(function () {
+  const S = P.SISTEMA;
+  conf('o system diz que o pedido vale tanto quanto o aviso, e que cada prova é avaliada separadamente', [
+    S.indexOf('O que a professora escreveu ou ditou no pedido') >= 0 && S.indexOf('vale tanto quanto o aviso') >= 0,
+    S.indexOf('Avalie cada prova separadamente') >= 0, S.indexOf('não aparece em lugar nenhum (nem nos prints, nem no pedido)') >= 0,
+    S.indexOf('não apaga o conteúdo das outras') >= 0], [true, true, true, true]);
+  conf('a regra velha (prova só no pedido entra com conteudo null) saiu', [/sem aviso da escola, entra em "provas" com conteudo null/.test(S), /Se o aviso não diz o conteúdo/.test(S)], [false, false]);
+  conf('o rascunho continua sem virar conteúdo', S.indexOf('As matérias que o rascunho põe para estudar em cada dia não são o conteúdo da prova.') >= 0, true);
+  conf('as regras seguem numeradas de 1 a 9, sem buraco', (S.match(/^\d+\. /gm) || []).map(x => parseInt(x, 10)), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  conf('a referência à regra das aulas aponta para a 6', [/regra 6\)/.test(S), /^6\. Nunca ponha aula/m.test(S)], [true, true]);
+  const pr = P.ESQUEMA.properties.provas.items.properties;
+  conf('o esquema: conteudo e material vêm do aviso OU do pedido, null só se não aparece em nenhum', [/aviso ou no pedido/.test(pr.conteudo.description), /aviso ou no pedido/.test(pr.material.description), /null só se/.test(pr.conteudo.description)], [true, true, true]);
+  const fixo = P.montarPedido({ texto: 'x', imagens: [], alunos: ALUNOS, alunoFixoId: 'al-sint-1', hoje: '2026-11-12' });
+  conf('o system continua o mesmo objeto em todo pedido (o cache pega)', fixo.system === P.SISTEMA, true);
+  conf('o system sem travessão', TRAVESSAO.test(S), false);
+
+  // a conferência determinística
+  const LIA = 'Provas da Zélia: dia 24/11 Matemática, frações e decimais, livro cap. 5. Dia 26/11 Ciências, sistema solar. Dia 27/11 História, conteúdo ainda não informado. Uma matéria por dia, 1h, revisão na manhã da prova.';
+  const prova = (data, disciplina, conteudo) => ({ data, disciplina, conteudo, material: null, incerto: false });
+  const g = (data, estudo) => ({ data, prova: null, estudo, deManha: false });
+  const vazio = { grade: [g('2026-11-23', ['Matemática (1h)']), g('2026-11-25', ['Ciências (1h)']), g('2026-11-26', ['História (1h)'])],
+    provas: [prova('2026-11-24', 'Matemática', null), prova('2026-11-26', 'Ciências', null), prova('2026-11-27', 'História', null)] };
+  const textos = l => l.map(i => i.texto);
+  conf('o modelo deixou vazio o que ela escreveu: "Confira o conteúdo de X" em Matemática e Ciências; História (não informado) fica com o aviso de sempre',
+    textos(P.itensIncertos(vazio, { texto: LIA })), ['Confira o conteúdo de Matemática: você escreveu algo no pedido.', 'Confira o conteúdo de Ciências: você escreveu algo no pedido.',
+      'O conteúdo da prova de 27/11 (História) não veio no aviso. Se tiver, diga no Ajustar.']);
+  const cheio = JSON.parse(JSON.stringify(vazio)); cheio.provas[0].conteudo = 'Frações e decimais'; cheio.provas[1].conteudo = 'Sistema solar';
+  conf('controle: com o conteúdo preenchido, nenhum "Confira o conteúdo"', textos(P.itensIncertos(cheio, { texto: LIA })).filter(t => /Confira o conteúdo/.test(t)), []);
+  conf('sem o texto do pedido (plano salvo), a frase de sempre', textos(P.itensIncertos(vazio, {})).filter(t => /Confira o conteúdo/.test(t)), []);
+  conf('a conferência nunca preenche o conteúdo', [vazio.provas[0].conteudo, vazio.provas[1].conteudo], [null, null]);
+  const semEstudo = { grade: [], provas: [prova('2026-11-24', 'Matemática', null)] };
+  conf('o "Confira o conteúdo" vence o "Nenhum dia de estudo" na mesma prova (é dado que se perderia)', textos(P.itensIncertos(semEstudo, { texto: LIA })), ['Confira o conteúdo de Matemática: você escreveu algo no pedido.']);
+  const e = (texto, disciplina, provas) => P.escreveuConteudo(texto, disciplina, provas || [prova('2026-11-24', disciplina, null)]);
+  conf('acusa: "prova de matemática sobre frações" (ditado, sem acento e minúsculo)', e('dia 24 tem prova de matematica sobre fracoes', 'Matemática'), true);
+  conf('acusa: o nome da escola em outra língua (Math no plano, Matemática no pedido)', e('Matemática: frações e decimais.', 'Math'), true);
+  conf('acusa: "Geografia: relevo e clima, apostila p. 30 a 45"', e('Geografia: relevo e clima, apostila p. 30 a 45', 'Geografia'), true);
+  conf('não acusa: só a data e a matéria ("dia 24 tem prova de matemática e dia 26 de ciências")', e('dia 24 tem prova de matemática e dia 26 de ciências', 'Matemática'), false);
+  conf('não acusa: a lista de matérias ("provas de Matemática, Ciências e História")', e('provas de Matemática, Ciências e História', 'Matemática',
+    [prova('2026-11-24', 'Matemática', null), prova('2026-11-26', 'Ciências', null), prova('2026-11-27', 'História', null)]), false);
+  conf('não acusa: "conteúdo ainda não informado", "sem conteúdo", "a escola não mandou o conteúdo"', [e('História, conteúdo ainda não informado.', 'História'),
+    e('Geografia sem conteúdo por enquanto', 'Geografia'), e('Inglês, a escola não mandou o conteúdo', 'Inglês')], [false, false, false]);
+  conf('não acusa: só a duração ("Matemática 1h30, Português 30min")', e('Matemática 1h30, Português 30min', 'Matemática'), false);
+  conf('não acusa: a matéria que nem está no pedido', e(LIA, 'Geografia'), false);
+})();
+
 console.log('\n' + passes + ' verificacoes passaram, ' + falhas + ' falharam');
 process.exit(falhas ? 1 : 0);
