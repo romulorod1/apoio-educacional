@@ -85,6 +85,20 @@ function extrairDoApp(nome) {
 }
 const FONTE_DA_TELA = ['funcoesDaTela', 'mudarSoEstaAula', 'revisarTrilhasDoAluno', 'incluirAssuntoNaAula', 'novaAulaAvulsa', 'alunoPorId'].map(extrairDoApp).join('\n') +
   '\n' + /\n  var MAX_TITULO_ASSUNTO = \d+;/.exec(APP_FONTE)[0];
+/* O assistente.js de produção com trocas (os venenos): cada trecho tem de
+ * existir uma vez só, senão a prova grita. */
+function assistenteEnvenenado(trocas) {
+  let fonte = fs.readFileSync(path.join(__dirname, '..', 'assistente.js'), 'utf8').replace(/\r\n/g, '\n');
+  trocas.forEach(([de, para]) => {
+    if (fonte.split(de).length !== 2) throw new Error('veneno sem âncora única: ' + de.slice(0, 60));
+    fonte = fonte.split(de).join(para);
+  });
+  const Module = require('module');
+  const m = new Module(path.join(__dirname, '..', 'assistente_envenenado.js'));
+  m.paths = module.paths;
+  m._compile(fonte, path.join(__dirname, '..', 'assistente_envenenado.js'));
+  return m.exports;
+}
 function telaDe(db) { return new Function('Core', 'db', FONTE_DA_TELA + '\nreturn funcoesDaTela();')(Core, db); }
 
 const CATALOGO = [{ ref: 'b:MAT-FRA', item: { id: 'MAT-FRA', titulo: 'Frações equivalentes', fonte: 'banco', disciplina: 'matematica' } }];
@@ -383,7 +397,7 @@ const ctxA = (db, fala) => ctxDe(db, { catalogo: null, fala: fala === undefined 
   const nomes = A.nomesParaIA(db);
   conf('A5: dois "Marina Sintética" ganham rótulos distintos (a regra do #191)', [nomes.mar, nomes.m2], ['Marina S.', 'Marina S. (2)']);
   const can = nd => exec('propor_aulas', { itens: [itA({ acao: 'cancelar', alunoId: 'm2', nome_dito: nd, data: '2026-11-17', hora: '10:00', cobranca: 'sem' })] }, ctxA(db)).erro;
-  conf('A5: "Marina", "Marina Sintética", "ela" e o vazio são ambíguos; e nomes completos idênticos também, até o rótulo "Marina S. (2)": a fala dela não tem como diferenciar, então ela escolhe na tela', ['Marina', 'Marina Sintética', 'ela', '', 'Marina S. (2)'].map(can), [true, true, true, true, true]);
+  conf('A5: "Marina", "Marina Sintética" e o rótulo "Marina S. (2)" são ambíguos (a fala cita o nome e não tem como diferenciar nomes idênticos); "ela" e o vazio, sem nome na fala, vêm da agenda (N5)', ['Marina', 'Marina Sintética', 'ela', '', 'Marina S. (2)'].map(can), [true, true, false, false, true]);
   conf('A5 (controle): sem homônimo, o nome vazio vale pelo id', exec('propor_aulas', { itens: [itA({ acao: 'cancelar', alunoId: 'bru', nome_dito: '', data: '2026-11-17', hora: '09:00', cobranca: 'sem' })] }, ctxA(bancoDoAtaque(true))).erro, false);
 }
 {
@@ -395,7 +409,7 @@ const ctxA = (db, fala) => ctxDe(db, { catalogo: null, fala: fala === undefined 
       (() => { const r = exec('propor_aulas', { itens: [itA({ acao: 'cancelar', data: '2026-11-19', hora: '15:30', cobranca: 'com' })] }, ctxDe(db, { fala: undefined })); return r.linhas[0].opcoes ? 'pergunta' : 'decidiu'; })()],
     ['pergunta', 'pergunta', 'pergunta', 'pergunta']);
   conf('4: com a palavra dela, vale o que ela disse',
-    [['cancela sem cobrar', 'sem'], ['cancela, mas cobra', 'com'], ['foi cortesia, cancela', 'sem'], ['cancela, fica de graça', 'sem'], ['cancela, que é pago', 'com']].map(p => cancelar(p[0], p[1])), [false, true, false, false, true]);
+    [['cancela sem cobrar', 'sem'], ['cancela, mas cobra', 'com'], ['foi cortesia, cancela', 'sem'], ['cancela, fica de graça', 'sem'], ['cancela, que é pago', 'com']].map(p => cancelar(p[0], p[1])), [false, true, false, false, 'pergunta']);
   conf('4: texto injetado pelo modelo (no nome dito) não conta como fala dela',
     (() => { const r = exec('propor_aulas', { itens: [itA({ acao: 'cancelar', nome_dito: 'Marina sem cobrar', data: '2026-11-19', hora: '15:30', cobranca: 'sem' })] }, ctxA(db, 'cancela a da Marina')); return r.erro ? 'erro' : (r.linhas[0].opcoes ? 'pergunta' : 'decidiu'); })(), 'pergunta');
   const falta = (fala, cob) => exec('propor_aulas', { itens: [itA({ acao: 'falta', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-11-10', hora: '09:00', cobranca: cob })] }, ctxA(db, fala)).linhas[0].op.mudancas.cobravel;
@@ -420,9 +434,20 @@ secao('7c. A lente adversarial do #213 (scratchpad\\cen.js): ano, homônimo pela
   conf('1: criar_aula no ano passado e a mais de 12 meses: recusados, com a mesma frase do remarcar', ['2025-11-21', '2031-11-21'].map(d => {
     const r = exec('propor_aulas', { itens: [item({ acao: 'criar_aula', alunoId: 'bru', nome_dito: 'Bruno', data: d, hora: '10:00' })] }, ctxDe(db, { fala: 'marca aula com o Bruno' }));
     return r.erro && (/já passou/.test(r.resultado.erro) || /12 meses/.test(r.resultado.erro)); }), [true, true]);
-  /* VENENO 1: o mesmo cartão com o quandoCurto de antes (sem o ano). */
-  const semAno = l1b && l1b.titulo.replace(/\/2027/g, '');
-  conf('VENENO 1: sem o ano, o título de janeiro seria igual ao de um janeiro deste ano (a prova vê a diferença)', !!semAno && semAno !== l1b.titulo, true);
+  /* VENENO 1 (B7): o assistente.js de PRODUÇÃO, carregado com o ano tirado
+   * do quandoCurto e do dinheiro. A mesma prova do ano tem de reprovar. */
+  const comVeneno = assistenteEnvenenado([
+    ["    var ano = hoje && String(hoje).slice(0, 4) !== String(data).slice(0, 4) ? '/' + String(data).slice(0, 4) : '';", "    var ano = '';"],
+    ["      var ano = String(ctx.hoje).slice(0, 4) !== e.mes.slice(0, 4) ? ' de ' + e.mes.slice(0, 4) : '';", "      var ano = '';"]]);
+  const lV = comVeneno.executar('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-11-20', hora: '17:30', nova_data: '2027-01-08', nova_hora: '17:30' })] },
+    ctxDe(db, { fala: 'passa a aula do Bruno para 8 de janeiro' })).linhas[0];
+  conf('VENENO 1: sem o ano no código, o cartão de janeiro sai sem "/2027" e sem "de 2027" (a prova do ano reprova)', [/\/2027/.test(lV.titulo), /2027/.test(lV.dinheiro)], [false, false]);
+}
+{
+  /* B8: o Confirmar do app passa as funções da tela ao aplicarPlano. */
+  const fonte = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8').replace(/\r\n/g, '\n');
+  const corpo = (fonte.split('\n  function confirmarProposta(')[1] || '').split('\n  }\n')[0];
+  conf('B8: o confirmarProposta grava pelo Assistente.aplicarPlano(db, r.ops, Core, funcoesDaTela())', /trilhas = Assistente\.aplicarPlano\(db, r\.ops, Core, funcoesDaTela\(\)\);/.test(corpo), true);
 }
 {
   /* 2. homônimo pela FALA: o nome_dito copiado da lista não basta. */
@@ -444,13 +469,13 @@ secao('7c. A lente adversarial do #213 (scratchpad\\cen.js): ano, homônimo pela
   conf('3: a polaridade da fala', ['o Bruno faltou, pode cobrar', 'cancela sem cobrar', 'não cobra a do Bruno', 'foi cortesia', 'não precisa cobrar', 'cancela a do Bruno', 'cobra e não cobra'].map(f => pol(f)),
     ['com', 'sem', 'sem', 'sem', 'sem', null, 'ambigua']);
   const falta = exec('propor_aulas', { itens: [item({ acao: 'falta', alunoId: 'bru', nome_dito: 'Bruno', data: HOJE, cobranca: 'sem' })] }, ctxDe(db, { fala: 'o Bruno faltou hoje, pode cobrar' }));
-  conf('3: "faltou, pode cobrar" com o modelo mandando "sem": a falta fica cobrada', falta.linhas[0].op.mudancas, { status: 'falta', cobravel: true });
+  conf('3: "faltou, pode cobrar" com o modelo mandando "sem": a fala contradiz o modelo, e o cartão pergunta (com ou sem cobrança)', falta.linhas[0].opcoes && falta.linhas[0].opcoes.map(o => o.id + ':' + o.op.mudancas.cobravel), ['com:true', 'sem:false']);
   const outra = exec('propor_aulas', { itens: [item({ acao: 'cancelar', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-11-20', cobranca: 'sem' })] }, ctxDe(db, { fala: 'cancela a aula do Bruno de sexta. depois me lembra de cobrar a Marina' }));
   conf('3: "cancela a de sexta. depois me lembra de cobrar a Marina": a cobrança da Marina não vale, o cartão pergunta', !!outra.linhas[0].opcoes, true);
   const outraCom = exec('propor_aulas', { itens: [item({ acao: 'cancelar', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-11-20', cobranca: 'com' })] }, ctxDe(db, { fala: 'cancela a aula do Bruno de sexta. depois me lembra de cobrar a Marina' }));
   conf('3: e o "com" do modelo também não vale ali', !!outraCom.linhas[0].opcoes, true);
   const nc = exec('propor_aulas', { itens: [item({ acao: 'nao_cobrar', alunoId: 'bru', nome_dito: 'Bruno', data: HOJE, hora: '08:00' })] }, ctxDe(db, { fala: 'o Bruno veio hoje' }));
-  conf('3: nao_cobrar com "o Bruno veio hoje" é recusado', [nc.erro, /não diz para não cobrar/.test(nc.resultado.erro)], [true, true]);
+  conf('3: nao_cobrar com "o Bruno veio hoje" é recusado', [nc.erro, /para não cobrar/.test(nc.resultado.erro)], [true, true]);
   conf('3 (controle): nao_cobrar com "foi cortesia" passa', exec('propor_aulas', { itens: [item({ acao: 'nao_cobrar', alunoId: 'bru', nome_dito: 'Bruno', data: HOJE, hora: '08:00' })] }, ctxDe(db, { fala: 'a do Bruno de hoje foi cortesia' })).erro, false);
 }
 {
@@ -474,6 +499,98 @@ secao('7c. A lente adversarial do #213 (scratchpad\\cen.js): ano, homônimo pela
     'feedbacks_recentes' in exec('historico_aluno', { alunoId: 'mar', n: 3 }, ctxDe(DB)).resultado], [false, true]);
 }
 
+secao('7d. Segunda rodada adversarial do #213 (scratchpad\\sonda.js): na dúvida, o cartão pergunta');
+{
+  /* N1 a N3: a tabela da polaridade. Cada frase dá exatamente um de COM, SEM
+   * ou PERGUNTA, numa FALTA de hoje em que o modelo manda "sem" (o pior caso:
+   * o modelo erra para o lado de tirar dinheiro). Nenhuma decide errado. */
+  const dbP = JSON.parse(FOTO);
+  dbP.alunos.push({ id: 'gra', nome: 'Graça Pinto', ativo: true, precos: [{ id: 'pg', inicio: '2026-01-01', fim: null, valorHora: 100 }] });
+  dbP.aulas.push(aula('g1', 'gra', HOJE, '07:00'));
+  const decisao = (fala, alunoId, cobModelo) => {
+    const r = exec('propor_aulas', { itens: [item({ acao: 'falta', alunoId: alunoId || 'bru', nome_dito: '', data: HOJE, cobranca: cobModelo || 'sem' })] }, ctxDe(dbP, { fala }));
+    if (r.erro) return 'RECUSA';
+    const l = r.linhas[0];
+    return l.opcoes ? 'PERGUNTA' : l.op.mudancas.cobravel ? 'COM' : 'SEM';
+  };
+  const TABELA = [
+    // as frases da lente: todas perguntam
+    ['o Bruno faltou, não é pra cobrar', 'PERGUNTA'], ['o Bruno faltou, não quero que cobre', 'PERGUNTA'], ['o Bruno faltou, não vai cobrar', 'PERGUNTA'],
+    ['o Bruno faltou, cobra não', 'PERGUNTA'], ['o Bruno faltou, nem cobra', 'PERGUNTA'], ['o Bruno faltou e não é cortesia', 'PERGUNTA'],
+    ['o Bruno faltou, e não é de graça', 'PERGUNTA'], ['o Bruno faltou, sem custo adicional', 'PERGUNTA'], ['o Bruno faltou, não foi pago', 'PERGUNTA'],
+    ['o Bruno faltou, o mês já está pago', 'PERGUNTA'], ['o Bruno faltou, a mãe paga depois', 'PERGUNTA'], ['o Bruno faltou, cobra só metade', 'PERGUNTA'],
+    ['o Bruno e a Marina faltaram, a do Bruno sem cobrar', 'PERGUNTA'], ['o Bruno faltou sem cobrar e a Marina cobrando', 'PERGUNTA'], ['a Marina faltou sem cobrar, o Bruno também', 'PERGUNTA'],
+    ['o Bruno faltou, não cobrar 50', 'PERGUNTA'], ['o Bruno faltou e depois não cobra', 'PERGUNTA'], ['o Bruno faltou, NÃO COBRAR', 'PERGUNTA'],
+    ['a aluna de Graça faltou hoje', 'PERGUNTA', 'gra'],
+    // os controles inequívocos
+    ['o Bruno faltou, pode cobrar', 'COM', null, 'com'], ['o Bruno faltou, cobra', 'COM', null, 'com'], ['o Bruno faltou, vai ser cobrada', 'COM', null, 'com'],
+    ['o Bruno faltou, sem cobrar', 'SEM'], ['o Bruno faltou, sem cobrança', 'SEM'], ['o Bruno faltou, não cobra', 'SEM'],
+    ['o Bruno faltou, não precisa cobrar', 'SEM'], ['o Bruno faltou, foi cortesia', 'SEM'], ['o Bruno faltou, fica de graça', 'PERGUNTA'], // com uma aluna Graça, "de graça" fica em dúvida (sem ela, SEM: seção 7b)
+    // a fala que diz um e o modelo que diz outro: pergunta
+    ['o Bruno faltou, pode cobrar', 'PERGUNTA', null, 'sem'], ['o Bruno faltou, não cobra', 'PERGUNTA', null, 'com'],
+    // sem palavra de cobrança: a falta fica no padrão (cobrada)
+    ['o Bruno faltou hoje', 'COM'], ['a aula da Graça foi hoje e ela faltou', 'COM', 'gra']
+  ];
+  const vistas = TABELA.map(([f, esp, id, cob]) => [f, cob || 'sem', decisao(f, id, cob), esp]);
+  vistas.forEach(([f, cob, obt, esp]) => console.log('        ' + (obt === esp ? 'ok   ' : 'ERRO ') + obt.padEnd(9) + '(modelo ' + cob + ')  ' + f));
+  conf('N1 a N3: a tabela da polaridade (' + vistas.length + ' frases): cada uma dá exatamente o esperado de COM, SEM ou PERGUNTA', vistas.filter(v => v[2] !== v[3]).map(v => v[0] + ' => ' + v[2]), []);
+  conf('N1: nenhuma frase da tabela decide para o lado contrário do que ela disse (nunca SEM onde pede COM, nem o contrário)',
+    vistas.filter(v => (v[3] === 'COM' && v[2] === 'SEM') || (v[3] === 'SEM' && v[2] === 'COM')).length, 0);
+  const nc = f => exec('propor_aulas', { itens: [item({ acao: 'nao_cobrar', alunoId: 'bru', nome_dito: 'Bruno', data: HOJE, hora: '08:00' })] }, ctxDe(dbP, { fala: f })).erro;
+  conf('N3: o nao_cobrar exige a forma SEM inequívoca ("não é cortesia" e "sem custo" são recusados; "foi cortesia" passa)',
+    ['a aula do Bruno de hoje não é cortesia', 'a do Bruno de hoje foi sem custo', 'a do Bruno de hoje foi cortesia'].map(nc), [true, true, false]);
+  const can = (f, cob) => { const r = exec('propor_aulas', { itens: [item({ acao: 'cancelar', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-11-20', cobranca: cob })] }, ctxDe(dbP, { fala: f })); return r.linhas[0].opcoes ? 'PERGUNTA' : r.linhas[0].op.mudancas.cobravel ? 'COM' : 'SEM'; };
+  conf('N1: a aula nova e o cancelamento também perguntam na dúvida', [can('cancela a do Bruno, a mãe paga depois', 'com'),
+    (() => { const r = exec('propor_aulas', { itens: [item({ acao: 'criar_aula', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-11-21', hora: '10:00', cobranca: 'sem' })] }, ctxDe(dbP, { fala: 'marca aula do Bruno sábado, não é de graça' })); return r.linhas[0].opcoes ? 'PERGUNTA' : 'decidiu'; })()],
+    ['PERGUNTA', 'PERGUNTA']);
+}
+{
+  /* B6: a fala da conversa desde o último cartão. */
+  const fila = [];
+  const pedidos = [];
+  const o6 = { ctx: ctxDe(DB, { fala: undefined }), hora: '11:00', chamar: c => { pedidos.push(c); return Promise.resolve(fila.shift()); } };
+  fila.push({ ok: true, resposta: { stop_reason: 'tool_use', usage: {}, content: [{ type: 'tool_use', id: 't6', name: 'propor_aulas', input: { itens: [item({ acao: 'falta', alunoId: 'bru', nome_dito: '', data: HOJE, hora: '08:00', cobranca: 'sem' })] } }] } },
+    { ok: true, resposta: { stop_reason: 'end_turn', usage: {}, content: [{ type: 'text', text: 'Confira.' }] } });
+  global.__b6 = A.perguntar(A.novaSessao(), 'a das 8', Object.assign({}, o6, { falasAnteriores: ['o Bruno faltou, não cobra', 'qual aula?'] }));
+}
+{
+  /* N4: o diferenciador é a inicial COM ponto ou a palavra inteira. */
+  const dbH = JSON.parse(FOTO);
+  const anas = [['an1', 'Ana Souza'], ['an2', 'Ana Oliveira'], ['an3', 'Ana Assis'], ['an4', 'Ana Nascimento'], ['an5', 'Ana Mendes'], ['an6', 'Ana Esteves']];
+  dbH.alunos = dbH.alunos.filter(a => a.id !== 'anas' && a.id !== 'anao');
+  anas.forEach(([id, nome]) => { dbH.alunos.push({ id, nome, ativo: true, precos: [{ id: 'p' + id, inicio: '2026-01-01', fim: null, valorHora: 100 }] }); dbH.aulas.push(aula('x' + id, id, '2026-11-17', '10:00')); });
+  const rotulos = A.nomesParaIA(dbH);
+  // o nome_dito é o rótulo da lista (o que o modelo copia): quem decide é a fala dela
+  const cancela = (id, fala) => { const r = exec('propor_aulas', { itens: [item({ acao: 'cancelar', alunoId: id, nome_dito: rotulos[id], data: '2026-11-17', cobranca: 'perguntar' })] }, ctxDe(dbH, { fala })); return r.erro ? (/^ambiguo/.test(r.resultado.erro) ? 'ambiguo' : r.resultado.erro) : 'passa'; };
+  conf('N4: "só", "o", "às", "na", "me" e "e" depois de "Ana" não são sobrenome (Souza, Oliveira, Assis, Nascimento, Mendes, Esteves)',
+    [['an1', 'cancela a da Ana só amanhã'], ['an2', 'cancela a da Ana o dia todo'], ['an3', 'cancela a da Ana às 10'], ['an4', 'cancela a da Ana na terça'], ['an5', 'cancela a da Ana me avisou'], ['an6', 'cancela a da Ana e pronto']].map(p => cancela(p[0], p[1])),
+    ['ambiguo', 'ambiguo', 'ambiguo', 'ambiguo', 'ambiguo', 'ambiguo']);
+  conf('N4: a inicial com ponto e a palavra inteira passam; a inicial sem ponto e o prefixo, não',
+    [cancela('an1', 'cancela a da Ana S. amanhã'), cancela('an4', 'cancela a da Ana Nascimento'), cancela('an1', 'cancela a da Ana S amanhã'), cancela('an4', 'cancela a da Ana Nasc')], ['passa', 'passa', 'ambiguo', 'ambiguo']);
+  /* N5: sem nome na fala, vale (com o aviso); com apelido, não. */
+  const dbN = JSON.parse(FOTO);
+  const r5 = exec('propor_aulas', { itens: [item({ acao: 'cancelar', alunoId: 'anas', nome_dito: '', data: '2026-11-17', cobranca: 'perguntar' })] }, ctxDe(dbN, { fala: 'cancela a de amanhã às 10:00' }));
+  conf('N5: o modelo obediente (nome_dito vazio, fala sem nome) passa, com o aviso da outra Ana no dia', [r5.erro, r5.linhas && r5.linhas[0].avisos.some(a => /Há outra Ana com aula neste dia/.test(a))], [false, true]);
+  conf('N5: "Aninha", "Anna" e "Anas" com "Ana S." copiado da lista são recusados', ['cancela a da Aninha amanhã', 'cancela a da Anna amanhã', 'cancela as das Anas amanhã'].map(f =>
+    exec('propor_aulas', { itens: [item({ acao: 'cancelar', alunoId: 'anas', nome_dito: 'Ana S.', data: '2026-11-17', cobranca: 'perguntar' })] }, ctxDe(dbN, { fala: f })).erro), [true, true, true]);
+}
+{
+  /* N7, B1 e o N6 do prompt e do app. */
+  const db7 = JSON.parse(FOTO);
+  db7.aulas.push(aula('velha', 'bru', '2026-09-10', '10:00'), aula('muitovelha', 'bru', '2025-10-01', '10:00'));
+  const r7 = exec('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-09-10', hora: '10:00', nova_data: '2026-11-25', nova_hora: '10:00' })] }, ctxDe(db7, { fala: 'remarca a do Bruno' }));
+  conf('N7: a aula de origem num mês já fechado leva o aviso', r7.linhas[0].avisos.filter(a => /mês já fechado/.test(a)), ['Esta aula é de setembro de 2026, mês já fechado.']);
+  const r7b = exec('propor_aulas', { itens: [item({ acao: 'falta', alunoId: 'bru', nome_dito: 'Bruno', data: '2025-10-01', hora: '10:00' })] }, ctxDe(db7, { fala: 'o Bruno faltou' }));
+  conf('N7: a origem com mais de 12 meses é recusada', [r7b.erro, /mais de 12 meses atrás/.test(r7b.resultado.erro)], [true, true]);
+  conf('N7 (controle): a aula deste mês não leva o aviso', exec('propor_aulas', { itens: [item({ acao: 'falta', alunoId: 'bru', nome_dito: 'Bruno', data: HOJE, hora: '08:00' })] }, ctxDe(db7, { fala: 'o Bruno faltou' })).linhas[0].avisos.filter(a => /fechado/.test(a)).length, 0);
+  const r1 = exec('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-11-20', hora: '17:30', nova_data: HOJE, nova_hora: '09:00' })] }, ctxDe(db7, { fala: 'passa a do Bruno para hoje às 9' }));
+  conf('B1: destino hoje num horário que já passou: o aviso', r1.linhas[0].avisos.indexOf('Esse horário de hoje já passou: a aula entra como dada.') >= 0, true);
+  conf('N6: o sistema pede para repetir as linhas no cartão novo', /Um cartão novo troca os cartões ainda abertos: repita nele as linhas que ela ainda quer\./.test(A.SISTEMA_GRAVA), true);
+  const fonteApp = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+  conf('N6: o cartão trocado não promete o de baixo, e o texto editado dele vai ao modelo', [/substituido: 'Trocado por um cartão novo\. Nada foi gravado por este\.'/.test(fonteApp), /o texto que ela deixou no cartão/.test(fonteApp)], [true, true]);
+  conf('B6: o app manda as falas desde o último cartão confirmado ou trocado', /falasAnteriores: falasDesdeOUltimoCartao\(\)/.test(fonteApp), true);
+}
+
 secao('8. "Nada grava sem Confirmar", K6 e K7 num cartão só, e o Confirmar que confere de novo');
 const filaDoModelo = [];
 function respostaFerramentas(chamadas) { return { ok: true, resposta: { stop_reason: 'tool_use', usage: {}, content: [{ type: 'thinking', thinking: '', signature: 's' }].concat(chamadas.map((c, i) => ({ type: 'tool_use', id: 't' + i, name: c[0], input: c[1] }))) } }; }
@@ -481,6 +598,9 @@ function respostaTexto(t) { return { ok: true, resposta: { stop_reason: 'end_tur
 const pedidos = [];
 const o = { ctx, hora: '11:00', chamar: c => { pedidos.push(c); return Promise.resolve(filaDoModelo.shift()); } };
 (async () => {
+  const r6 = await global.__b6;
+  conf('B6: "o Bruno faltou, não cobra", "qual aula?", "a das 8": a falta sai SEM cobrança, e a fala guardada é a da conversa',
+    [r6.proposta && r6.proposta.linhas[0].op && r6.proposta.linhas[0].op.mudancas, r6.proposta && r6.proposta.fala], [{ status: 'falta', cobravel: false }, 'o Bruno faltou, não cobra\nqual aula?\na das 8']);
   const sessao = A.novaSessao();
   filaDoModelo.push(respostaFerramentas([
     ['propor_aulas', { itens: [item({ acao: 'falta', alunoId: 'bru', nome_dito: 'Bruno', data: HOJE, cobranca: 'com' }), item({ acao: 'criar_reposicao', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-11-21', hora: '10:00' })] }],

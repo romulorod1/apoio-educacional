@@ -2318,6 +2318,8 @@
     mudancaNaoGuardada = false;
     clearTimeout(tempoNovaTentativa);
     esconderFaixaGravacao();
+    // o cartão do assistente que dizia "ainda não guardado" passa a dizer que guardou
+    if (typeof cartoesDoAssistenteGuardados === 'function') cartoesDoAssistenteGuardados();
   }
 
   function falhaDeGravacao(erro) {
@@ -31250,7 +31252,8 @@
     feito: 'Gravado. O aviso de baixo traz o Desfazer por alguns segundos.',
     semPonto: 'Gravado, mas sem o Desfazer: não deu para guardar o ponto de volta.',
     pendente: 'Mudou neste aparelho, mas ainda não foi guardado. A faixa de cima avisa e tenta de novo.',
-    substituido: 'Trocado pelo cartão de baixo. Nada foi gravado por este.',
+    substituido: 'Trocado por um cartão novo. Nada foi gravado por este.',
+    guardado: 'Gravado e guardado.',
     desfeito: 'Desfeito: ficou como estava antes.',
     recusado: 'Nada foi gravado.',
     mudou: 'A agenda mudou desde a proposta, e nada foi gravado. Pergunte de novo.',
@@ -31268,10 +31271,11 @@
       if (!botaoConfirmar) return;
       var r = Assistente.opsConfirmadas(linhas, c);
       var marcadas = linhas.filter(function (l, i) { return !c.semLinha[i]; }).length;
-      botaoConfirmar.disabled = !r.ops || c.estado !== 'aberto';
+      var esperando = !!(fluxoAssistente && fluxoAssistente.pedindo);
+      botaoConfirmar.disabled = !r.ops || c.estado !== 'aberto' || esperando;
       botaoConfirmar.textContent = !varias ? 'Confirmar' : marcadas === linhas.length ? 'Confirmar tudo' : 'Confirmar ' + marcadas + ' de ' + linhas.length;
       var dica = caixa.querySelector('.ass-falta-escolher');
-      var porque = { cobranca: 'Escolha a cobrança para confirmar.', nada: 'Marque ao menos uma aula para confirmar.', texto: 'Escreva o texto para confirmar.' }[r.falta];
+      var porque = esperando ? 'Espere a resposta.' : { cobranca: 'Escolha a cobrança para confirmar.', nada: 'Marque ao menos uma aula para confirmar.', texto: 'Escreva o texto para confirmar.' }[r.falta];
       if (dica) { dica.hidden = !porque; dica.textContent = porque || ''; }
       if (porque) botaoConfirmar.setAttribute('aria-describedby', 'ass-dica-' + n); else botaoConfirmar.removeAttribute('aria-describedby');
     }
@@ -31523,22 +31527,47 @@
     p.then(desenharTudo, desenharTudo);
   }
 
+  function cartoesDoAssistenteGuardados() {
+    var mudou = false;
+    historicoAssistente.forEach(function (x) { if (x.proposta && x.proposta.estado === 'pendente') { x.proposta.estado = 'guardado'; mudou = true; } });
+    if (mudou && fluxoAssistente && $('#modal-assistente.aberto')) desenharAssistente();
+  }
+
   /* A volta a um ponto antigo pelo Ajustes desfaz também os cartões gravados
    * a partir dali: o cartão e o que vai ao modelo dizem isso. */
   function cartoesDoAssistenteVoltaram(quando) {
     historicoAssistente.forEach(function (x) {
       var c = x.proposta;
-      if (c && (c.estado === 'feito' || c.estado === 'semPonto' || c.estado === 'pendente') && c.pontoEm >= quando) c.estado = 'desfeito';
+      if (c && (c.estado === 'feito' || c.estado === 'semPonto' || c.estado === 'pendente' || c.estado === 'guardado') && c.pontoEm >= quando) c.estado = 'desfeito';
     });
+  }
+
+  /* A fala que decide a cobrança e o homônimo é a da conversa: as perguntas
+   * dela desde o último cartão confirmado ou trocado (lente do #213, B6).
+   * "A Marina faltou, não cobra", "qual aula?", "a das 8" decide SEM. */
+  var ESTADOS_QUE_FECHAM = ['feito', 'semPonto', 'pendente', 'guardado', 'desfeito', 'substituido'];
+  function falasDesdeOUltimoCartao() {
+    var falas = [];
+    for (var i = historicoAssistente.length - 1; i >= 0; i--) {
+      var x = historicoAssistente[i];
+      if (x.proposta && ESTADOS_QUE_FECHAM.indexOf(x.proposta.estado) >= 0) break;
+      if (x.pergunta) falas.unshift(x.pergunta);
+    }
+    return falas;
   }
 
   /* Para a próxima pergunta: o que aconteceu com os cartões desta sessão. */
   function cartoesAnterioresDoAssistente() {
     var estado = { aberto: 'ainda aberto, não confirmado', gravando: 'gravando', feito: 'confirmado e gravado', desfeito: 'gravado e desfeito por ela',
-      semPonto: 'confirmado e gravado, sem Desfazer', pendente: 'confirmado, ainda não guardado', substituido: 'trocado por um cartão novo; nada gravado',
+      semPonto: 'confirmado e gravado, sem Desfazer', pendente: 'confirmado, ainda não guardado', guardado: 'confirmado e gravado', substituido: 'trocado por um cartão novo; nada gravado',
       recusado: 'ela tocou em Agora não; nada gravado', mudou: 'não gravado (a agenda mudou)', erro: 'não gravado' };
     return historicoAssistente.filter(function (x) { return x.proposta; }).slice(-3).map(function (x) {
-      return x.proposta.linhas.map(function (l) { return l.titulo; }).join('; ') + ': ' + (estado[x.proposta.estado] || x.proposta.estado);
+      var p = x.proposta;
+      var editado = p.estado !== 'substituido' ? '' : Object.keys(p.edicao || {}).map(function (i) {
+        var e = p.edicao[i] || {}, txt = [e.relato, e.nota, e.feedback].filter(function (t) { return typeof t === 'string' && t.trim(); });
+        return txt.length ? ' (o texto que ela deixou no cartão: "' + txt.join(' / ').slice(0, 800) + '")' : '';
+      }).join('');
+      return p.linhas.map(function (l) { return l.titulo; }).join('; ') + ': ' + (estado[p.estado] || p.estado) + editado;
     }).join(' | ');
   }
 
@@ -31710,6 +31739,7 @@
       hora: horaDeMinutosCelular(agoraMin),
       hojeBrasilia: typeof Planejamento !== 'undefined' ? Planejamento.hojeEmSaoPaulo() : null,
       cartoesAnteriores: cartoesAnterioresDoAssistente(),
+      falasAnteriores: falasDesdeOUltimoCartao(),
       cancelado: cancelou,
       chamar: function (corpoDoPedido) {
         return chamarIA(corpoDoPedido, controle ? controle.signal : undefined);

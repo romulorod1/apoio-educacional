@@ -199,7 +199,8 @@
     '- Feedback do mês para a família: propor_feedback, no tom dela. Leia antes historico_aluno (traz os feedbacks recentes dela e o que foi dado) e escreva parecido, em primeira pessoa, curto. Use só o que ela disse e o que as ferramentas trouxeram.',
     '- Depois de propor, diga em uma frase curta o que está no cartão e que é só conferir e tocar em Confirmar. Nunca diga que gravou, remarcou, cancelou ou marcou.',
     '- Se a proposta voltar com erro "ambiguo" ou "nao_achei", pergunte a ela com as opções que vieram, sem chutar.',
-    '- O começo da pergunta diz o que aconteceu com os cartões anteriores. Se ela corrigir um cartão que não confirmou, proponha de novo.'
+    '- O começo da pergunta diz o que aconteceu com os cartões anteriores. Se ela corrigir um cartão que não confirmou, proponha de novo.',
+    '- Um cartão novo troca os cartões ainda abertos: repita nele as linhas que ela ainda quer.'
   ].join('\n');
 
   var DATA = { type: 'string', format: 'date', description: 'AAAA-MM-DD' };
@@ -768,17 +769,24 @@
    * palavra que começa uma parte do nome DESTE aluno e de nenhum outro dos
    * homônimos ("Ana S.", "Ana Silveira", "Ana da Silva")? */
   function falaDistingue(ctx, aluno, homonimos) {
-    var p = semAcento(soTexto(ctx && ctx.fala)).replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean);
+    /* Só vale a INICIAL COM PONTO no texto dela ("Ana S.") ou uma palavra
+     * INTEIRA igual a uma parte do nome ("Souza"). Prefixo não vale: "só",
+     * "o", "às", "na", "me" e "e" começam sobrenomes (lente do #213, N4). */
+    var p = semAcento(soTexto(ctx && ctx.fala)).replace(/[^a-z0-9. ]+/g, ' ').split(/\s+/).filter(Boolean);
     var primeiro = semAcento(primeiroNome(aluno.nome));
     var partes = function (a) { return semAcento(a.nome).split(/\s+/).slice(1).filter(function (x) { return ['da', 'de', 'do', 'dos', 'das', 'e'].indexOf(x) < 0; }); };
-    var comeca = function (a, t) { return partes(a).some(function (q) { return q.indexOf(t) === 0; }); };
+    var serve = function (a, t) {
+      if (/^[a-z]\.$/.test(t)) return partes(a).some(function (q) { return q.charAt(0) === t.charAt(0); });
+      var w = t.replace(/\.+$/, '');
+      return w.length > 1 && partes(a).indexOf(w) >= 0;
+    };
     for (var i = 0; i < p.length; i++) {
-      if (p[i] !== primeiro) continue;
+      if (p[i].replace(/\.+$/, '') !== primeiro) continue;
       var j = i + 1;
       while (j < p.length && ['da', 'de', 'do', 'dos', 'das'].indexOf(p[j]) >= 0) j++;
       var t = p[j];
-      if (!t || !comeca(aluno, t)) continue;
-      if (!homonimos.some(function (a) { return a.id !== aluno.id && comeca(a, t); })) return true;
+      if (!t || !serve(aluno, t)) continue;
+      if (!homonimos.some(function (a) { return a.id !== aluno.id && serve(a, t); })) return true;
     }
     return false;
   }
@@ -793,9 +801,15 @@
     /* Quando ela não disse nome nenhum ("cancela todas as aulas da semana que
      * vem"), quem identifica a aula é a agenda (a data e a hora), e o cartão
      * mostra o nome: aí não há o que desempatar pela fala. */
-    var citaONome = new RegExp('\\b' + semAcento(primeiroNome(aluno.nome)).replace(/[^a-z0-9]/g, '') + '\\b').test(semAcento(soTexto(ctx && ctx.fala)));
-    if (homonimos.length > 1 && citaONome && !falaDistingue(ctx, aluno, homonimos)) {
-      falha('ambiguo: a fala dela diz "' + primeiroNome(aluno.nome) + '", que serve para ' + homonimos.map(function (a) { return nomes[a.id]; }).join(' e ') + '. Pergunte a ela qual, sem propor.');
+    /* Conta como citar o nome qualquer palavra que começa com as 3 primeiras
+     * letras dele ("Aninha", "Anna", "Anas"; lente do #213, N5). */
+    var nomeLimpo = semAcento(primeiroNome(aluno.nome)).replace(/[^a-z0-9]/g, '');
+    // nome curto ("Ana"): as 2 primeiras letras, para pegar "Aninha" e "Anna"; os outros, as 3
+    var raiz = nomeLimpo.slice(0, nomeLimpo.length <= 3 ? 2 : 3);
+    var citaONome = !!raiz && semAcento(soTexto(ctx && ctx.fala)).replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).some(function (w) { return w.indexOf(raiz) === 0; });
+    if (homonimos.length > 1) {
+      if (!citaONome) return aluno; // a aula vem da agenda; o cartão avisa do outro homônimo no dia
+      if (!falaDistingue(ctx, aluno, homonimos)) falha('ambiguo: a fala dela diz "' + primeiroNome(aluno.nome) + '", que serve para ' + homonimos.map(function (a) { return nomes[a.id]; }).join(' e ') + '. Pergunte a ela qual, sem propor.');
     }
     /* Só o artigo do começo sai ("a Marina", "o Tomás"); a inicial do meio
      * fica ("Ana O." é Ana Oliveira). Cada palavra depois do primeiro nome
@@ -858,6 +872,8 @@
     if (cand.length > 1) falha('ambiguo: ' + nomes[aluno.id] + ' tem ' + cand.length + ' aulas em ' + rotuloDoDia(data, ctx.hoje) + ': ' + lista(cand) + '. Pergunte qual.');
     /* A repetição prevista longe demais lançaria meses de aulas de todos os
      * alunos no Confirmar (lente de dados, A4): até 12 meses de hoje. */
+    /* A aula de origem com mais de 12 meses é recusada (lente do #213, N7). */
+    if (data < somaDias(ctx.hoje, -366)) falha('a aula de ' + rotuloDoDia(data, ctx.hoje) + ' é de mais de 12 meses atrás: confira o ano com ela; mudanças tão antigas se fazem na tela do aplicativo.');
     if (cand[0].prevista && data > somaDias(ctx.hoje, 366)) falha('a aula de ' + rotuloDoDia(data, ctx.hoje) + ' está a mais de 12 meses de hoje: mude essa aula na tela do aplicativo.');
     return cand[0];
   }
@@ -1021,39 +1037,96 @@
   }
   /* As saídas de um cancelamento: as três com dinheiro diferente, cada uma
    * com o nome que sai no PDF e o efeito no mês. */
-  /* A COBRANÇA NÃO DEPENDE DO PROMPT (lente de dados, 4): "com" e "sem" só
-   * valem se a fala DELA (ctx.fala, o texto da pergunta, nunca o que o modelo
-   * escreve) tem palavra de cobrança. Sem ela, o cancelamento pergunta no
-   * cartão, e a falta e a aula nova ficam com a cobrança padrão. */
-  /* A POLARIDADE vem da fala (lente do #213, 3): "sem cobrar", "não cobra",
-   * "cortesia" são SEM; "cobra", "pode cobrar", "pago" são COM. Só contam
-   * as frases da fala que são deste aluno: as que dizem o nome dele, ou as
-   * que não dizem o nome de aluno nenhum ("cancela a de sexta. depois me
-   * lembra de cobrar a Marina" não diz nada da cobrança da de sexta). O
-   * valor do modelo só vale se a fala diz o MESMO; se contradiz, se diz os
-   * dois, ou se não diz, o cancelamento pergunta e a falta e a aula nova
-   * ficam no padrão. */
-  var COBRANCA_SEM = /\b(sem cobr\w*|nao (precisa |vou |pode |quero )?cobr\w*|nao e para cobr\w*|cortesia|sem custo|de graca|gratis|gratuit\w*)/g;
-  var COBRANCA_COM = /\b(cobr\w*|pag[oa]|com cobranca)\b/;
-  function frasesDoAluno(ctx, aluno) {
-    var outros = ativos(ctx.db).filter(function (a) { return !aluno || semAcento(primeiroNome(a.nome)) !== semAcento(primeiroNome(aluno.nome)); })
-      .map(function (a) { return semAcento(primeiroNome(a.nome)); }).filter(Boolean);
-    var meu = aluno ? semAcento(primeiroNome(aluno.nome)) : null;
-    var temPalavra = function (f, p) { return new RegExp('\\b' + p.replace(/[^a-z0-9]/g, '') + '\\b').test(f); };
-    return semAcento(soTexto(ctx && ctx.fala)).split(/[.;!?\n]+|\bdepois\b|\btambem\b/).filter(function (f) {
-      if (meu && temPalavra(f, meu)) return true;
-      return !outros.some(function (o) { return temPalavra(f, o); });
-    });
+  /* A COBRANÇA: NA DÚVIDA, O CARTÃO PERGUNTA (lente do #213, N1 a N3).
+   * Regex de português nunca cobre tudo, então só um conjunto pequeno de
+   * formas inequívocas decide sozinho; qualquer outra palavra de cobrança
+   * deixa a cobrança AMBÍGUA, e o cartão pergunta (no cancelar, na falta e na
+   * aula nova). Um toque dela custa menos que uma cobrança errada.
+   *   SEM: "sem cobrar", "sem cobrança", "não cobra", "não precisa cobrar",
+   *        "cortesia", "de graça", sem negação nas 3 palavras antes;
+   *   COM: "cobra", "pode cobrar", "cobrada", sem negação nas 3 palavras
+   *        antes nem "não" logo depois (a vírgula corta a frase);
+   *   AMBÍGUA: qualquer outra palavra da família (cobrar, cobre, cobrança,
+   *        pago, paga, pagou, custo, isenta, metade, conta, grátis...), a
+   *        negação perto, "nem cobra", número junto, a frase que cita outro
+   *        aluno, e a frase com "também" ou "depois".
+   * Graça e Grátis como nome de aluno não contam. Lê a fala da conversa desde
+   * o último cartão confirmado ou trocado (ctx.fala). */
+  var FORMAS_SEM = [['sem', 'cobrar'], ['sem', 'cobranca'], ['nao', 'cobra'], ['nao', 'precisa', 'cobrar'], ['cortesia'], ['de', 'graca']];
+  var FORMAS_COM = [['pode', 'cobrar'], ['cobra'], ['cobrada']];
+  var NEGACAO = ['nao', 'nem', 'sem', 'nunca'];
+  function daFamilia(t) {
+    return /^cobr/.test(t) || /^pag(o|a|ou|ar|amento|ando|ue|uei|aram|os|as)?$/.test(t) || /^gratu/.test(t) || /^isent/.test(t) ||
+      ['cortesia', 'graca', 'gratis', 'custo', 'metade', 'conta'].indexOf(t) >= 0;
+  }
+  function raizDoNome(a) { var n = semAcento(primeiroNome(a.nome)).replace(/[^a-z0-9]/g, ''); return n.slice(0, Math.max(3, n.length - 2)); }
+  function cobrancaDaFrase(T, nomesAluno) {
+    var familia = T.filter(daFamilia);
+    if (!familia.length) return null;
+    if (T.indexOf('tambem') >= 0 || T.indexOf('depois') >= 0) return 'ambigua';
+    var usado = T.map(function () { return false; });
+    var casa = function (forma, i) { return forma.every(function (w, k) { return T[i + k] === w && !usado[i + k]; }); };
+    var negadoAntes = function (i) { for (var k = i - 1; k >= 0 && k >= i - 3; k--) { if (T[k] === ',') return false; if (NEGACAO.indexOf(T[k]) >= 0 && !usado[k]) return true; } return false; };
+    var sem = false, com = false, ruim = false;
+    T.forEach(function (t, i) { if (daFamilia(t) && T.slice(Math.max(0, i - 3), i + 4).some(function (x) { return /\d/.test(x); })) ruim = true; });
+    for (var i = 0; i < T.length; i++) {
+      FORMAS_SEM.forEach(function (f) {
+        if (!casa(f, i)) return;
+        if (negadoAntes(i)) ruim = true;
+        for (var k = 0; k < f.length; k++) usado[i + k] = true;
+        sem = true;
+      });
+    }
+    for (var j = 0; j < T.length; j++) {
+      FORMAS_COM.forEach(function (f) {
+        if (!casa(f, j)) return;
+        if (negadoAntes(j) || NEGACAO.indexOf(T[j + f.length]) >= 0) ruim = true;
+        for (var k = 0; k < f.length; k++) usado[j + k] = true;
+        com = true;
+      });
+    }
+    if (T.some(function (t, k) { return daFamilia(t) && !usado[k]; })) ruim = true;
+    if (ruim || (sem && com)) return 'ambigua';
+    return sem ? 'sem' : com ? 'com' : null;
   }
   function polaridadeDaFala(ctx, aluno) {
-    var sem = false, com = false;
-    frasesDoAluno(ctx, aluno).forEach(function (f) {
-      if (f.match(COBRANCA_SEM)) sem = true;
-      if (COBRANCA_COM.test(f.replace(COBRANCA_SEM, ' '))) com = true;
+    var todos = ativos(ctx.db);
+    var meuPrimeiro = aluno ? semAcento(primeiroNome(aluno.nome)) : null;
+    var outros = todos.filter(function (a) { return semAcento(primeiroNome(a.nome)) !== meuPrimeiro; });
+    /* Graça e Grátis, quando são nome de aluno, não são palavra de cobrança. */
+    var nomesQueSaoPalavra = todos.map(function (a) { return semAcento(primeiroNome(a.nome)); }).filter(function (n) { return n === 'graca' || n === 'gratis'; });
+    var texto = semAcento(soTexto(ctx && ctx.fala)).replace(/\b([a-z])\.(?=\s|$)/g, '$1').replace(/\s+/g, ' ');
+    var resultado = null;
+    texto.split(/[.;!?\n]+/).forEach(function (frase) {
+      var cru = frase.replace(/,/g, ' , ').replace(/[^a-z0-9, ]+/g, ' ').split(/\s+/).filter(Boolean);
+      var T = cru.filter(function (t) { return nomesQueSaoPalavra.indexOf(t) < 0; });
+      /* "de Graça" com uma aluna Graça: pode ser a aula dela ou "de graça".
+       * Não decide nada; deixa a cobrança em dúvida. */
+      var deNome = cru.some(function (t, i) { return nomesQueSaoPalavra.indexOf(t) >= 0 && cru[i - 1] === 'de'; });
+      var r = deNome ? 'ambigua' : cobrancaDaFrase(T);
+      if (!r) return;
+      var citaOutro = outros.some(function (a) { var rz = raizDoNome(a); return T.some(function (t) { return t.indexOf(rz) === 0; }); });
+      if (citaOutro) r = 'ambigua';
+      resultado = !resultado || resultado === r ? r : 'ambigua';
     });
-    return sem && com ? 'ambigua' : sem ? 'sem' : com ? 'com' : null;
+    return resultado;
   }
-  function cobrancaDita(v, ctx, aluno) { return (v === 'com' || v === 'sem') && polaridadeDaFala(ctx, aluno) === v ? v : null; }
+  /* A decisão: 'com', 'sem', 'perguntar' ou null (a cobrança padrão).
+   * perguntarSemFala: o cancelamento pergunta quando a fala não diz nada; a
+   * falta e a aula nova ficam no padrão (cobradas). */
+  function decidirCobranca(v, ctx, aluno, perguntarSemFala) {
+    var pol = polaridadeDaFala(ctx, aluno);
+    if (pol === 'ambigua') return 'perguntar';
+    if (!pol) return perguntarSemFala ? 'perguntar' : null;
+    if ((v === 'com' || v === 'sem') && v !== pol) return 'perguntar';
+    return pol;
+  }
+  /* Uma saída com o dinheiro do core, para a pergunta da cobrança. */
+  function opcaoComDinheiro(ctx, id, rotulo, op) {
+    var ef = simular(ctx, [op]);
+    var centavos = ef.reduce(function (t, e) { return t + e.depois - e.antes; }, 0);
+    return { id: id, rotulo: rotulo, dinheiro: fraseDoDinheiro(ctx, ef), centavos: centavos, avisos: avisosDoDinheiro(ctx, ef), op: op };
+  }
 
   function opcaoDeCancelamento(ctx, a, id) {
     var m = id === 'falta' ? { status: 'falta', cobravel: true }
@@ -1082,7 +1155,8 @@
         tipo: 'remarcar', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
         titulo: 'Remarcar ' + nome + ', ' + quandoCurto(a.data, '', ctx.hoje) + ': de ' + (mesmoDia ? horaCurta(a.hora) + ' para ' + horaCurta(nh) : quandoCurto(a.data, a.hora, ctx.hoje) + ' para ' + quandoCurto(nd, nh, ctx.hoje)),
         antes: descricao(a, ctx), depois: quandoCurto(nd, nh, ctx.hoje) + ' (' + duracaoCurta(dur) + ')',
-        avisos: [avisoDeChoque(choques(ctx, a, nd, nh, dur)), a.serieId ? 'É da repetição: muda só esta aula, e as outras continuam como estão.' : null],
+        avisos: [avisoDeChoque(choques(ctx, a, nd, nh, dur)), a.serieId ? 'É da repetição: muda só esta aula, e as outras continuam como estão.' : null,
+          nd === ctx.hoje && minutos(nh) !== null && minutos(nh) < ctx.agoraMin ? 'Esse horário de hoje já passou: a aula entra como dada.' : null],
         op: opDeEdicao(a, { data: nd, hora: nh, duracaoMin: dur })
       };
     },
@@ -1102,7 +1176,7 @@
     },
     cancelar: function (it, ctx, aluno, nome) {
       var a = resolverAula(ctx, aluno, it.data, it.hora);
-      var cob = cobrancaDita(it.cobranca, ctx, aluno) || 'perguntar';
+      var cob = decidirCobranca(it.cobranca, ctx, aluno, true);
       var c = cobravel(a, ctx.Core);
       if (a.status === 'cancelada' && (cob === 'perguntar' || (cob === 'com') === c)) falha('a aula de ' + quando(a, ctx) + ' já está como ' + situacao(a, ctx).toLowerCase() + '.');
       var jaConta = a.status !== 'cancelada' && c && (a.status === 'falta' || jaAcabou(a, ctx) || a.data <= ctx.hoje);
@@ -1130,7 +1204,15 @@
     falta: function (it, ctx, aluno, nome) {
       var a = resolverAula(ctx, aluno, it.data, it.hora);
       if (a.data > ctx.hoje) falha('a aula de ' + quando(a, ctx) + ' ainda não aconteceu: para aula futura, use cancelar (com cobranca "perguntar") ou remarcar.');
-      var cobrar = cobrancaDita(it.cobranca, ctx, aluno) !== 'sem';
+      var dec = decidirCobranca(it.cobranca, ctx, aluno, false);
+      if (dec === 'perguntar') {
+        return linha(ctx, { tipo: 'falta', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
+          titulo: 'Falta de ' + nome + ', ' + quandoCurto(a.data, a.hora, ctx.hoje) + ': com ou sem cobrança?',
+          antes: descricao(a, ctx), depois: null, pergunta: 'cobranca',
+          opcoes: [opcaoComDinheiro(ctx, 'com', 'Falta sem aviso (cobrada)', opDeEdicao(a, { status: 'falta', cobravel: true })),
+            opcaoComDinheiro(ctx, 'sem', 'Falta sem aviso, sem cobrança', opDeEdicao(a, { status: 'falta', cobravel: false }))] });
+      }
+      var cobrar = dec !== 'sem';
       if (a.status === 'falta' && cobravel(a, ctx.Core) === cobrar) falha('a aula de ' + quando(a, ctx) + ' já está como falta.');
       return {
         tipo: 'falta', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
@@ -1144,7 +1226,7 @@
       if (!cobravel(a, ctx.Core)) falha('a aula de ' + quando(a, ctx) + ' já está sem cobrança.');
       /* Tirar a cobrança é dinheiro: só com a palavra DELA (cortesia, não
        * cobra, de graça) numa frase deste aluno. */
-      if (polaridadeDaFala(ctx, aluno) !== 'sem') falha('a fala dela não diz para não cobrar esta aula: pergunte a ela antes de propor.');
+      if (polaridadeDaFala(ctx, aluno) !== 'sem') falha('a fala dela não diz, com todas as letras, para não cobrar esta aula: pergunte a ela antes de propor.');
       return {
         tipo: 'nao_cobrar', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
         titulo: 'Não cobrar a aula de ' + nome + ', ' + quandoCurto(a.data, a.hora, ctx.hoje),
@@ -1171,14 +1253,23 @@
     if (typeof dur !== 'number' || Math.floor(dur) !== dur || dur < 15 || dur > 240 || dur % 15) falha('duracao_min precisa ser um múltiplo de 15 entre 15 e 240 minutos.');
     var mesma = aulasDoPeriodo(ctx, it.data, it.data, aluno.id).filter(function (a) { return (a.hora || '') === it.hora && a.status !== 'cancelada'; })[0];
     if (mesma) falha('já existe aula de ' + nome + ' em ' + quando(mesma, ctx) + '.');
-    var cobrar = cobrancaDita(it.cobranca, ctx, aluno) !== 'sem';
+    var dec = decidirCobranca(it.cobranca, ctx, aluno, false);
+    var cobrar = dec !== 'sem';
     var status = reposicao ? 'reposicao' : 'realizada';
-    var op = { k: 'criar', alunoId: aluno.id, data: it.data, campos: { alunoId: aluno.id, data: it.data, hora: it.hora, duracaoMin: dur, status: status, cobravel: cobrar } };
+    var opDe = function (cob) { return { k: 'criar', alunoId: aluno.id, data: it.data, campos: { alunoId: aluno.id, data: it.data, hora: it.hora, duracaoMin: dur, status: status, cobravel: cob } }; };
+    var op = opDe(cobrar);
+    var agoraPassou = it.data === ctx.hoje && minutos(it.hora) !== null && minutos(it.hora) < ctx.agoraMin ? 'Esse horário de hoje já passou: a aula entra como dada.' : null;
+    if (dec === 'perguntar') {
+      return linha(ctx, { tipo: reposicao ? 'criar_reposicao' : 'criar_aula', alunoId: aluno.id, nome: nome, entendido: rotuloDoDia(it.data, ctx.hoje) + ', ' + horaCurta(it.hora),
+        titulo: (reposicao ? 'Marcar a reposição de ' : 'Marcar aula de ') + nome + ', ' + quandoCurto(it.data, it.hora, ctx.hoje) + ' (' + duracaoCurta(dur) + '): com ou sem cobrança?',
+        antes: null, depois: null, pergunta: 'cobranca', avisos: [avisoDeChoque(choques(ctx, null, it.data, it.hora, dur)), agoraPassou],
+        opcoes: [opcaoComDinheiro(ctx, 'com', (reposicao ? 'Reposição' : 'Aula') + ' cobrada', opDe(true)), opcaoComDinheiro(ctx, 'sem', (reposicao ? 'Reposição' : 'Aula') + ' sem cobrança', opDe(false))] });
+    }
     return {
       tipo: reposicao ? 'criar_reposicao' : 'criar_aula', alunoId: aluno.id, nome: nome, entendido: rotuloDoDia(it.data, ctx.hoje) + ', ' + horaCurta(it.hora),
       titulo: (reposicao ? 'Marcar a reposição de ' : 'Marcar aula de ') + nome + ', ' + quandoCurto(it.data, it.hora, ctx.hoje) + ' (' + duracaoCurta(dur) + ')',
       antes: null, depois: (reposicao ? 'Reposição' : 'Aula') + (cobrar ? ' cobrada' : ' sem cobrança') + ', ' + quandoCurto(it.data, it.hora, ctx.hoje) + ' (' + duracaoCurta(dur) + ')',
-      avisos: [avisoDeChoque(choques(ctx, null, it.data, it.hora, dur)),
+      avisos: [avisoDeChoque(choques(ctx, null, it.data, it.hora, dur)), agoraPassou,
         reposicao ? 'A reposição não fica ligada à aula que ela repõe: o aplicativo ainda não guarda esse vínculo.' : null],
       op: op
     };
@@ -1282,6 +1373,22 @@
       if (k) chaves.push(k);
     });
   }
+  /* O que toda linha de aula leva: "Há outra Ana com aula neste dia" (o
+   * homônimo, quando a aula veio da agenda; N5) e a origem num mês já
+   * fechado ou com mais de 60 dias (N7). */
+  function avisosDaLinha(ctx, aluno, l) {
+    var op = l.op || (l.opcoes && l.opcoes[0] && l.opcoes[0].op) || {};
+    var data = op.k === 'criar' ? op.campos.data : op.data;
+    if (!data) return l;
+    var mais = [];
+    var homonimos = ativos(ctx.db).filter(function (a) { return a.id !== aluno.id && semAcento(primeiroNome(a.nome)) === semAcento(primeiroNome(aluno.nome)); });
+    if (homonimos.some(function (a) { return aulasDoPeriodo(ctx, data, data, a.id).length; })) mais.push('Há outra ' + primeiroNome(aluno.nome) + ' com aula neste dia: confira o nome.');
+    if (op.k !== 'criar' && (data.slice(0, 7) < String(ctx.hoje).slice(0, 7) || data < somaDias(ctx.hoje, -60))) {
+      mais.push('Esta aula é de ' + rotuloDoMes(data.slice(0, 7)) + ', mês já fechado.');
+    }
+    l.avisos = (l.avisos || []).concat(mais).filter(Boolean);
+    return l;
+  }
   var PROPOSTAS = {
     propor_aulas: function (e, ctx, jaNoCartao) {
       if (!Array.isArray(e.itens) || !e.itens.length) falha('itens vazio: mande um item por aula.');
@@ -1293,8 +1400,8 @@
           if (!it || ACOES.indexOf(it.acao) < 0) falha('acao desconhecida: ' + (it && it.acao));
           var aluno = alunoInequivoco(ctx, it.alunoId, it.nome_dito);
           var nome = nomesParaIA(ctx.db)[aluno.id];
-          if (it.acao === 'criar_aula' || it.acao === 'criar_reposicao') return linha(ctx, proporCriacao(it, ctx, aluno, nome, it.acao === 'criar_reposicao'));
-          return linha(ctx, PROPOR_AULA[it.acao](it, ctx, aluno, nome));
+          if (it.acao === 'criar_aula' || it.acao === 'criar_reposicao') return avisosDaLinha(ctx, aluno, linha(ctx, proporCriacao(it, ctx, aluno, nome, it.acao === 'criar_reposicao')));
+          return avisosDaLinha(ctx, aluno, linha(ctx, PROPOR_AULA[it.acao](it, ctx, aluno, nome)));
         } catch (x) {
           if (x instanceof Erro && e.itens.length > 1) throw new Erro('item ' + (i + 1) + ': ' + x.msg);
           throw x;
@@ -1310,7 +1417,7 @@
           if (!cru || typeof cru !== 'object') falha('item inválido.');
           var it = Object.assign({}, cru, { hora: semNulo(typeof cru.hora === 'string' ? cru.hora : ''), assuntos: (Array.isArray(cru.assuntos) ? cru.assuntos : []).map(function (s) { return s && typeof s === 'object' ? Object.assign({}, s, { ref: semNulo(s.ref) }) : null; }) });
           var aluno = alunoInequivoco(ctx, it.alunoId, it.nome_dito);
-          return proporRelato(it, ctx, aluno, nomesParaIA(ctx.db)[aluno.id]);
+          return avisosDaLinha(ctx, aluno, proporRelato(it, ctx, aluno, nomesParaIA(ctx.db)[aluno.id]));
         } catch (x) {
           if (x instanceof Erro && e.itens.length > 1) throw new Erro('item ' + (i + 1) + ': ' + x.msg);
           throw x;
@@ -1517,8 +1624,9 @@
     lista.push(minha);
     var usos = [], cartoes = [], entendido = [], voltas = 0;
     var linhas = [], chamadas = [];
-    var ctxDaFala = Object.assign({}, ctx, { fala: pergunta });
-    function proposta() { return linhas.length ? { linhas: linhas, chamadas: chamadas, fala: pergunta, assinatura: assinatura(linhas) } : null; }
+    var falaDaConversa = (o.falasAnteriores || []).filter(function (x) { return typeof x === 'string' && x.trim(); }).concat([pergunta]).join('\n');
+    var ctxDaFala = Object.assign({}, ctx, { fala: falaDaConversa });
+    function proposta() { return linhas.length ? { linhas: linhas, chamadas: chamadas, fala: falaDaConversa, assinatura: assinatura(linhas) } : null; }
 
     /* Tira desta conversa só o que é desta pergunta, e só se a conversa
      * ainda é a mesma (outra pergunta ou uma "Nova conversa" no meio não
