@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.98';
+  var VERSAO = '1.42.108';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,7 +85,7 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.98',
+      versao: '1.42.108',
       itens: [
         'Na Biblioteca, o capítulo de um livro pode ficar ligado a um assunto de outra matéria, e a tela diz qual: no livro de Química, por exemplo, "Física: Unidades do SI e conversões". A busca da Biblioteca acha o capítulo por esse assunto, e o Corrigir mostra o assunto de outra matéria que o capítulo já tem.'
       ]
@@ -1889,6 +1889,16 @@
     if (!(e && (e.apoioRaiz || e.apoioGuarda || e.apoioTela || e.apoioModal || e.apoioFolha))) {
       history.replaceState({ apoioRaiz: true, retrato: retratoDaTela() }, '');
       history.pushState({ apoioGuarda: true, retrato: retratoDaTela() }, '');
+    } else if ((e.apoioModal || e.apoioFolha) && !pilhaModalHistorico.length && !folhaNoHistorico) {
+      /* Recarregou numa entrada de janela (ou da folha): a janela era do
+       * documento de antes e não existe neste. Acontece quando o Android
+       * descarta a aba com uma janela aberta, e quando a recarga chega antes de
+       * o history.back() do fechamento terminar, que é assíncrono. Deixada
+       * como estava, a entrada dizia que havia janela aberta, e toda janela
+       * aberta e fechada depois voltava para ela: o histórico nunca voltava
+       * ao estado sem janela, e sobrava uma entrada. Ela passa a ser a
+       * entrada da tela à vista. */
+      history.replaceState({ apoioTela: ++proximoPassoTela, retrato: retratoDaTela() }, '');
     } else if (e.retrato && !mesmaTela(e.retrato, retratoDaTela())) {
       /* Recarregou (o Android descartou a aba) numa entrada de outra tela: o app
        * abriu na tela padrão. A entrada passa a dizer a tela à vista, e o
