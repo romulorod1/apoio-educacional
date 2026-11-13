@@ -17484,6 +17484,169 @@
   }
 
   /* A lista de Ajustes: cada livro com o tamanho e o Remover, e o total. */
+  /* ---- a biblioteca na nuvem, fase 1c: o mapa novo chega pelo catálogo ----
+   *
+   * O "Atualizar a biblioteca" (Ajustes, Livros) lê o índice do catálogo
+   * (Nuvem.lerCatalogo) e, para cada livro do aparelho com o MESMO arquivo do
+   * catálogo e um meta que ainda não foi aplicado, baixa o documento do livro,
+   * confere o meta (Biblioteca.conferirMetaDaNuvem) e troca SÓ o meta
+   * (Store.trocarMetaDaNuvem). Nada de PDF baixado nem regravado; a posição e
+   * as correções dela ficam como estão. O livro de outro arquivo, ou que ainda
+   * não está no aparelho, só entra na conta "chegam com a próxima versão"
+   * (fase 2). Só no tablet, com a conta dela: o celular e o observador ficam
+   * para a 2c.
+   *
+   * A conferência sozinha na abertura fica DESLIGADA até a orquestradora
+   * conferir o relatório da primeira publicação real (decisão de 13/11): até
+   * lá, só o botão. Ligar é trocar esta constante, com prova. */
+  var ATUALIZAR_BIBLIOTECA_NA_ABERTURA = false;
+  var UMA_HORA_MS = 60 * 60 * 1000;
+  var atualizandoBiblioteca = null;
+  var CHAVE_ESTADO_DA_BIBLIOTECA = 'apoio-educacional:biblioteca-nuvem';
+  // a entrada dela venceu ou não existe: a linha pede para entrar de novo, e não "tente de novo"
+  var PEDE_ENTRAR_DE_NOVO = { SEM_SESSAO: true, TOKEN_EXPIRED: true, INVALID_REFRESH_TOKEN: true, USER_NOT_FOUND: true, UNAUTHENTICATED: true };
+  function estadoDaBibliotecaNuvem() {
+    try { return JSON.parse(localStorage.getItem(CHAVE_ESTADO_DA_BIBLIOTECA) || 'null'); } catch (e) { return null; }
+  }
+  function guardarEstadoDaBibliotecaNuvem(est) {
+    try { localStorage.setItem(CHAVE_ESTADO_DA_BIBLIOTECA, JSON.stringify(est)); } catch (e) { /* só a linha de Ajustes depende disto */ }
+  }
+
+  function atualizarBibliotecaDaNuvem() {
+    if (atualizandoBiblioteca) return atualizandoBiblioteca;
+    if (modoCelular || aparelhoSoLe() || typeof Nuvem !== 'object' || !Nuvem || typeof Nuvem.lerCatalogo !== 'function') {
+      return Promise.resolve(null);
+    }
+    var antes = estadoDaBibliotecaNuvem() || {};
+    // a marca do livro cujo meta da nuvem veio IGUAL ao do aparelho (não regravado): o metaHash do
+    // catálogo e o hash do meta do aparelho; se um dos dois mudar, o livro volta a ser conferido
+    var marcas = antes.conferidos && typeof antes.conferidos === 'object' ? antes.conferidos : {};
+    var estado = { quando: new Date().toISOString(), trocados: 0, chegam: 0, invalidos: 0, faltaram: 0, semEspaco: false, orfas: 0,
+      semCatalogo: false, conferidos: {} };
+    var hashDoMeta = function (m) { return Store.sha256Hex(Store.canonicoDoMeta(m)); };
+    var doAparelho = {};
+    var itens = [];
+    atualizandoBiblioteca = Promise.all([Nuvem.lerCatalogo(), Store.listarLivros()]).then(function (r) {
+      var indice = r[0], lista = r[1] || [];
+      if (!indice || !indice.livros || typeof indice.livros !== 'object') { estado.semCatalogo = true; return null; }
+      var candidatos = [];
+      lista.forEach(function (l) {
+        doAparelho[l.id] = l;
+        var e = indice.livros[l.id];
+        if (!e || e.retiradoEm) return;
+        if (!l.meta || l.meta.hash !== 'sha256:' + e.sha256) { estado.chegam++; return; }
+        if (l.nuvem && l.nuvem.metaHash === e.metaHash) return;
+        candidatos.push({ id: l.id, entrada: e });
+      });
+      Object.keys(indice.livros).forEach(function (id) {
+        if (!doAparelho[id] && !indice.livros[id].retiradoEm) estado.chegam++;
+      });
+      return Promise.all(candidatos.map(function (ped) {
+        var m = marcas[ped.id];
+        if (!m || m.metaHash !== ped.entrada.metaHash) return ped;
+        return hashDoMeta(doAparelho[ped.id].meta).then(function (h) {
+          if (h !== m.local) return ped;
+          estado.conferidos[ped.id] = m;
+          return null;
+        });
+      })).then(function (l) {
+        var pedidos = l.filter(Boolean);
+        // um livro por vez: são poucos KB cada, e a rede do tablet é a da aula
+        return pedidos.reduce(function (p, ped) {
+          return p.then(function () {
+            return Nuvem.lerLivroDoCatalogo(ped.id).then(function (doc) {
+              if (!doc || doc.id !== ped.id || doc.metaHash !== ped.entrada.metaHash || doc.sha256 !== ped.entrada.sha256) { estado.invalidos++; return; }
+              return Store.sha256Hex(doc.metaJson).then(function (h) {
+                var c = Biblioteca.conferirMetaDaNuvem(doc, h);
+                if (!c.meta) { estado.invalidos++; return; }
+                itens.push({ id: ped.id, sha256: doc.sha256, meta: c.meta, metaHash: doc.metaHash, metaVersao: doc.metaVersao });
+              });
+            });
+          });
+        }, Promise.resolve());
+      }).then(function () {
+        return itens.length ? Store.trocarMetaDaNuvem(itens) : null;
+      });
+    }).then(function (contas) {
+      if (!contas) return null;
+      estado.trocados = contas.trocados.length;
+      estado.invalidos += contas.invalidos;
+      estado.faltaram = contas.faltaram;
+      estado.semEspaco = !!(contas.falha && contas.falha.name === 'QuotaExceededError');
+      // as correções dela que o mapa novo deixou sem capítulo (as que já estavam órfãs não contam)
+      var correcoes = correcoesDosLivros();
+      itens.forEach(function (it) {
+        var c = correcoes[it.id];
+        if (!c || contas.trocados.indexOf(it.id) === -1) return;
+        try {
+          var velhas = {};
+          Biblioteca.correcoesOrfas(doAparelho[it.id].meta, c).forEach(function (o) { velhas[o.chave] = true; });
+          estado.orfas += Biblioteca.correcoesOrfas(it.meta, c).filter(function (o) { return !velhas[o.chave]; }).length;
+        } catch (e) { /* a conta é só da linha; a tela do livro mostra as órfãs de qualquer jeito */ }
+      });
+      return Promise.all(contas.iguais.map(function (id) {
+        var it = itens.filter(function (x) { return x.id === id; })[0];
+        return hashDoMeta(doAparelho[id].meta).then(function (h) { estado.conferidos[id] = { metaHash: it.metaHash, local: h }; });
+      }));
+    }).then(function () {
+      guardarEstadoDaBibliotecaNuvem(estado);
+      if (estado.trocados) {
+        indiceDosCapitulos = null;   // a busca pelos capítulos (#181) refaz com os mapas novos
+        return desenharLivrosAjustes().then(function () { return estado; });
+      }
+      desenharEstadoDaBibliotecaNuvem();
+      return estado;
+    }).then(function (est) { atualizandoBiblioteca = null; return est; }, function (e) {
+      atualizandoBiblioteca = null;
+      throw e;
+    });
+    return atualizandoBiblioteca;
+  }
+
+  // na abertura, no máximo uma vez por hora, e só com a constante ligada
+  function atualizarBibliotecaNaAbertura() {
+    if (!ATUALIZAR_BIBLIOTECA_NA_ABERTURA) return Promise.resolve(null);
+    var est = estadoDaBibliotecaNuvem();
+    if (est && est.quando && Date.now() - Date.parse(est.quando) < UMA_HORA_MS) return Promise.resolve(null);
+    return atualizarBibliotecaDaNuvem().catch(function () { return null; });
+  }
+
+  function textoDoEstadoDaBibliotecaNuvem(est) {
+    if (!est || !est.quando) return 'A biblioteca ainda não foi conferida com a nuvem.';
+    if (est.semCatalogo) return 'A biblioteca da nuvem ainda não tem livros.';
+    var d = new Date(est.quando);
+    var hoje = new Date();
+    var dia = d.toDateString() === hoje.toDateString() ? 'hoje' : 'em ' + ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
+    var partes = ['Biblioteca conferida ' + dia + ' às ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2)];
+    partes.push(est.trocados ? est.trocados + ' ' + palavraPlural(est.trocados, 'livro com mapa novo', 'livros com mapa novo') : 'nenhum livro com mapa novo');
+    if (est.chegam) partes.push(est.chegam + ' ' + palavraPlural(est.chegam, 'livro chega', 'livros chegam') + ' com a próxima versão');
+    if (est.invalidos) partes.push(est.invalidos + ' ' + palavraPlural(est.invalidos, 'livro não pôde ser conferido', 'livros não puderam ser conferidos'));
+    if (est.faltaram) {
+      partes.push(est.faltaram + ' ' + palavraPlural(est.faltaram, 'livro ficou', 'livros ficaram') + ' para o próximo toque' +
+        (est.semEspaco ? ', por falta de espaço no tablet' : ''));
+    }
+    if (est.orfas) partes.push(est.orfas + ' ' + palavraPlural(est.orfas, 'correção sua ficou', 'correções suas ficaram') + ' sem capítulo; veja no livro');
+    return partes.join(' · ');
+  }
+
+  function desenharEstadoDaBibliotecaNuvem() {
+    var linha = $('#livros-nuvem-estado');
+    if (linha) linha.textContent = textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem());
+  }
+
+  function tocarAtualizarBiblioteca(botao) {
+    if (botao) botao.disabled = true;
+    return atualizarBibliotecaDaNuvem().then(function (est) {
+      if (botao) botao.disabled = false;
+      if (est === null && (modoCelular || aparelhoSoLe())) avisar('A biblioteca se atualiza no tablet.');
+    }, function (e) {
+      if (botao) botao.disabled = false;
+      var codigo = e && e.codigo;
+      avisar(codigo === 'SEM_SESSAO' ? 'Entre na nuvem para atualizar a biblioteca.'
+        : PEDE_ENTRAR_DE_NOVO[codigo] ? 'A entrada na nuvem venceu. Entre de novo para atualizar a biblioteca.' : 'Não consegui conferir a biblioteca agora. Tente de novo daqui a pouco.');
+    });
+  }
+
   function desenharLivrosAjustes() {
     var caixa = $('#lista-livros-biblioteca');
     return Store.listarLivros().then(function (lista) {
@@ -17523,7 +17686,13 @@
         el('div', { class: 'livros-total', id: 'livros-total', 'data-bytes': String(total),
           texto: lista.length + (lista.length === 1 ? ' livro, ' : ' livros, ') + Biblioteca.mb(total) + ' no total' }),
         el('div', { class: 'ajuda u-margem-0-0-6', texto: 'Os livros ficam só neste tablet: a cópia de segurança não os leva. Para usar num tablet novo, ' +
-            'importe o pacote de livros de novo do Drive.' })
+            'importe o pacote de livros de novo do Drive.' }),
+        // fase 1c: o mapa novo dos livros chega pelo catálogo da nuvem, sem baixar livro nenhum
+        el('div', { class: 'livros-nuvem', id: 'livros-nuvem' }, [
+          el('div', { class: 'ajuda cresce', id: 'livros-nuvem-estado', texto: textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem()) }),
+          el('button', { type: 'button', class: 'btn pequeno', id: 'livros-nuvem-atualizar', texto: 'Atualizar a biblioteca',
+            aoClick: function () { tocarAtualizarBiblioteca($('#livros-nuvem-atualizar')); } })
+        ])
       ].concat(linhas)));
     }).catch(function () { quantosLivros = 0; livrosDoTablet = []; livrosDoTabletMudaram(); if (caixa) caixa.innerHTML = ''; });
   }
@@ -23653,7 +23822,8 @@
       });
     return Promise.all([enun, sol]).then(function (r) {
       return { id: it.id, origem: origemCurta(it), credito: creditoDaLicenca(it), enunciado: r[0], solucao: r[1],
-        semSolucao: !!(it.sem_solucao || !it.assets.solucao), resposta: respostaSemSolucao(it) };
+        semSolucao: !!(it.sem_solucao || !it.assets.solucao), resposta: respostaSemSolucao(it),
+        gabaritoAgente: respostasDoAgente(it) };
     });
   }
 
@@ -23662,6 +23832,54 @@
    * solução mostra a solução, e a letra fica dentro dela. */
   function respostaSemSolucao(it) {
     return it && !it.assets.solucao && it.formato === 'objetiva' && /^[A-E]$/.test(it.resposta || '') ? it.resposta : null;
+  }
+
+  /* O GABARITO RESOLVIDO POR AGENTE E CONFERIDO (aditivo no pacote). Fonte
+   * sem solução (os Cadernos da SME-SP: o caderno do aluno não traz respostas)
+   * pode trazer no item `gabarito: { origem: 'agente-conferido', respostas:
+   * [{ subitem, resposta }] }`, a resposta de duas IAs que resolveram separadas
+   * e chegaram ao mesmo resultado (o gerador grava pelo --gabarito-externo).
+   * Onde a resposta aparece (a tela cheia e o gabarito do PDF), a marca vai
+   * SEMPRE junto, e nenhuma caixa a desliga: quem lê precisa saber que aquela
+   * resposta não veio do livro. Item sem o campo, ou de outra origem, devolve
+   * null e fica exatamente como era. As linhas saem prontas para mostrar,
+   * como { texto, semResposta }: "1) 38" por subitem, ou "Resposta: 38"
+   * quando o item não tem subitens. A resposta PARCIAL é de propósito (o
+   * subitem em que as duas IAs não concordaram fica sem entrada): item com
+   * subitens lista TODOS, e o que não tem resposta sai "sem resposta
+   * conferida". */
+  var MARCA_GABARITO_AGENTE = 'Resposta conferida por duas IAs';
+  var EXPLICA_GABARITO_AGENTE = 'Este livro não traz gabarito. Duas IAs resolveram separadas e chegaram à mesma resposta.';
+  var SEM_RESPOSTA_CONFERIDA = 'sem resposta conferida';
+  function respostasDoAgente(it) {
+    var g = it && it.gabarito;
+    if (!g || g.origem !== 'agente-conferido' || !Array.isArray(g.respostas)) return null;
+    var limpo = function (v) { return typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : ''; };
+    var rs = g.respostas.filter(function (r) { return r && limpo(r.resposta); });
+    if (!rs.length) return null;
+    var subs = (Array.isArray(it.subitens) ? it.subitens : []).map(limpo).filter(Boolean);
+    if (subs.length) {
+      var de = {};
+      rs.forEach(function (r) { if (limpo(r.subitem)) de[limpo(r.subitem)] = limpo(r.resposta); });
+      return subs.map(function (s) {
+        return de[s] ? { texto: s + ') ' + de[s], semResposta: false }
+          : { texto: s + ') ' + SEM_RESPOSTA_CONFERIDA, semResposta: true };
+      });
+    }
+    if (rs.length === 1 && !limpo(rs[0].subitem)) return [{ texto: 'Resposta: ' + limpo(rs[0].resposta), semResposta: false }];
+    return rs.map(function (r) {
+      return { texto: (limpo(r.subitem) ? limpo(r.subitem) + ') ' : '') + limpo(r.resposta), semResposta: false };
+    });
+  }
+
+  /* A marca, que se toca para ler o porquê. Um <details>: sem script, e o
+   * leitor de tela anuncia que abre. */
+  function marcaDoAgente() {
+    return el('details', { id: 'bib-marca-ia', class: 'bib-marca-ia u-texto-centro' }, [
+      el('summary', {}, [el('span', { class: 'bib-grupo-seta', 'aria-hidden': 'true' }, [icone('chr')]),
+        el('span', { texto: MARCA_GABARITO_AGENTE })]),
+      el('p', { id: 'bib-marca-ia-explica', class: 'bib-marca-ia-explica', texto: EXPLICA_GABARITO_AGENTE })
+    ]);
   }
 
   /* Módulo de prova que não é assunto do aplicativo ("Diversos", C12) não vira
@@ -25662,6 +25880,14 @@
       corpo.appendChild(el('div', { id: 'bib-resposta', class: 'bib-resposta u-texto-centro u-letra-6 u-peso-negrito u-cor-navy u-margem-topo-10',
         texto: 'Resposta: ' + resposta }));
     }
+    /* A resposta de duas IAs conferida (item sem solução na fonte): pelo mesmo
+     * "Ver resposta", e a marca embaixo SEMPRE, aberta ou não a resposta. */
+    var doAgente = bibVendo.tipo === 'exercicio' ? respostasDoAgente(peca.item) : null;
+    if (doAgente && bibVendo.solucao) {
+      corpo.appendChild(el('div', { id: 'bib-resposta-agente', class: 'bib-resposta u-texto-centro u-margem-topo-10' },
+        doAgente.map(function (l) { return el('div', { class: l.semResposta ? 'bib-sem-resposta' : 'u-peso-negrito u-cor-navy', texto: l.texto }); })));
+    }
+    if (doAgente) corpo.appendChild(marcaDoAgente());
     var vez = ++bibVezDoVisor;
     Store.lerAssetBiblioteca(peca.pacote, peca.caminho).then(function (blob) {
       // ela pode ter andado para outra página enquanto esta era lida
@@ -25675,7 +25901,7 @@
     if (bibVendo.tipo === 'exercicio' && peca.item.assets.solucao) {
       sol.style.display = '';
       sol.textContent = bibVendo.solucao ? 'Ver enunciado' : 'Ver solução';
-    } else if (resposta) {
+    } else if (resposta || doAgente) {
       sol.style.display = '';
       sol.textContent = bibVendo.solucao ? 'Esconder a resposta' : 'Ver resposta';
     } else {
@@ -27175,6 +27401,8 @@
     if (typeof Store.aoReceber === 'function') Store.aoReceber(registrosChegaram);
     var lembretePronto = function () { lembreteNuvemPronta = true; relerFilaDoLembrete(); };
     Nuvem.pronto().then(lembretePronto, lembretePronto);
+    // fase 1c: a conferência do catálogo na abertura (desligada até a primeira publicação conferida)
+    Nuvem.pronto().then(atualizarBibliotecaNaAbertura, function () { /* sem nuvem, sem catálogo */ });
     Nuvem.pronto().then(function () {
       desenharNuvem();
       // o celular busca a cópia mais nova; quem sobe a dele é só o tablet

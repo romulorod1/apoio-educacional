@@ -2119,6 +2119,13 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-origem { font-size: var(--letra-12); color: var(--muted); }
 /* o crédito que a licença da fonte pede (L6): sempre visível, nunca escondido */
 .bib-credito { font-size: var(--letra-12); color: var(--muted); overflow-wrap: anywhere; }
+/* a marca da resposta de duas IAs conferida: sempre à vista; tocar abre o porquê */
+.bib-marca-ia { font-size: var(--letra-12); color: var(--muted); margin-top: 6px; }
+.bib-marca-ia > summary { display: inline-flex; align-items: center; gap: 4px; min-height: var(--alvo); cursor: pointer; color: var(--navy); font-weight: 600; list-style: none; }
+.bib-marca-ia > summary::-webkit-details-marker { display: none; }
+.bib-marca-ia[open] > summary .bib-grupo-seta { transform: rotate(90deg); }
+.bib-marca-ia-explica { margin: 0 0 6px; }
+.bib-sem-resposta { font-style: italic; color: var(--muted); }
 .bib-visor { background: var(--fio-claro); }
 .bib-cheia { width: 100%; height: auto; display: block; margin: 0 auto; background: var(--branco); box-shadow: var(--sombra); }
 /* o selo "Marcado" sobre a imagem da tela cheia: ela anda pelo Anterior e
@@ -2232,6 +2239,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-cobre .cobre-rolagem { flex: 1 1 100%; margin: 0; }
 .livro-linha .detalhe { margin-top: 2px; }
 #lista-livros-biblioteca .livros-total { font-weight: 600; margin: 4px 0 8px; }
+/* fase 1c: a linha da biblioteca na nuvem, com o botão ao lado (quebra quando falta largura) */
+#lista-livros-biblioteca .livros-nuvem { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 10px; }
+#lista-livros-biblioteca .livros-nuvem .ajuda { margin: 0; min-width: 12rem; overflow-wrap: anywhere; }
 #lista-instalados-biblioteca > summary {
   cursor: pointer;
   color: inherit;

@@ -1,0 +1,2 @@
+Na Biblioteca, exercício sem gabarito no livro pode trazer a resposta conferida por duas IAs.
+# Campo gabarito (origem agente-conferido) no pacote, gravado pelo --gabarito-externo do gerador; a marca aparece sempre na tela cheia e no gabarito do PDF. Prova: _teste/testa_gabarito_agente.js.

@@ -54,7 +54,10 @@ aplicativo ignora o que nao conhece):
 - dificuldade: o caderno nao da referencia de dificuldade; sai null, com
   dificuldade_origem null (o app ja trata dificuldade ausente).
 - sem solucao: o caderno do aluno nao traz respostas; assets.solucao null,
-  sem_solucao true, resposta null.
+  sem_solucao true, resposta null. Com --gabarito-externo, o item que tem
+  entrada ganha `gabarito` {origem: 'agente-conferido', respostas: [{subitem,
+  resposta}]}, a resposta de duas IAs que resolveram separadas e concordaram
+  (gerar_pacote.aplicar_gabarito_externo); o resto do item nao muda.
 - origem_detalhe (aditivo): caderno, ano, volume, edicao, pagina(s), unidade,
   atividade e, na revisao, a questao.
 """
@@ -935,7 +938,7 @@ def referencia_de_fora(texto, tipo):
 
 
 def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=None, commit=None, gravar_zip=True,
-          series=None):
+          series=None, gabarito_externo=None):
     t_ini = time.time()
     # com --serie, o pacote parcial leva as series no nome: com o nome do completo,
     # importado no app ele substituiria o completo (achado da revisao do C5)
@@ -1093,6 +1096,10 @@ def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=Non
             i['numero'] = k
     itens.sort(key=lambda i: (i['serie'], i['modulo']['slug'], i['aula']['n'], i['numero']))
     docs_busca.sort(key=lambda d: d['id'])
+    # o gabarito de fora (aditivo, gerar_pacote.aplicar_gabarito_externo): o
+    # caderno do aluno nao traz respostas, e as de duas IAs conferidas entram aqui
+    n_gabarito = (gerar_pacote.aplicar_gabarito_externo(itens, gabarito_externo)
+                  if gabarito_externo is not None else None)
     conteudo['itens.json'] = gerar_pacote.json_bytes(itens)
     conteudo['teoria.json'] = gerar_pacote.json_bytes([])
     conteudo['busca.json'] = gerar_pacote.json_bytes(gerar_pacote.montar_busca(docs_busca))
@@ -1101,6 +1108,8 @@ def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=Non
     contagens = {'modulos': len(set((i['serie'], i['modulo']['slug']) for i in itens)), 'aulas_teoria': 0,
                  'paginas_teoria': 0, 'aulas_exercicios': len(aulas), 'itens': len(itens),
                  'itens_com_solucao': 0, 'itens_excluidos': len(relatorio['excluidos'])}
+    if n_gabarito is not None:
+        contagens['itens_com_gabarito_agente'], contagens['itens_com_gabarito_agente_parcial'] = n_gabarito
     manifest = {
         'esquema': 1, 'pacote': nome, 'versao': versao,
         'gerado_em': gerado_em or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).replace(microsecond=0).isoformat(),
