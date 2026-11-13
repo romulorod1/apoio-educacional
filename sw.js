@@ -164,9 +164,10 @@
  * O v169 traz o Voltar do aparelho dentro do aplicativo.
  * O v171 traz a fase 1a da biblioteca na nuvem: a posição de leitura e a correção do
  * mapa sobrevivem à troca de meta e de arquivo do livro.
- * O v176 traz o conteúdo escrito no pedido do planejamento valendo como o do aviso.
+ * O v182 traz o Voltar sem entrada sobrando no histórico depois de recarregar com uma janela aberta.
+ * O v187 traz o conteúdo escrito no pedido do planejamento valendo como o do aviso.
  */
-var CACHE = 'apoio-educacional-v176';
+var CACHE = 'apoio-educacional-v187';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
