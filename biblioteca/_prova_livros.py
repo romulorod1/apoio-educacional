@@ -381,6 +381,229 @@ def trava_tracos(manifest):
     return erros
 
 
+# ------------------------------------------------------------------ numeracao impressa (item 12a)
+
+# O que o aplicativo mostra, pelo proprio biblioteca.js (o mesmo carregamento
+# de _teste/testa_livros_impressa.js): para cada pagina do arquivo, a
+# paginaImpressa, e a conferirNumeracao do livro. O "Abrir na p." e o contador
+# do leitor mostram paginaImpressa(meta, pagina) (as funcoes de tela sobre ela
+# estao provadas em testa_livros_impressa.js).
+LEITOR_JS = r"""
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const [raiz, arq] = process.argv.slice(2);
+const ctx = { Math, JSON, Object, Array, String, Number, Error, RegExp, parseInt, isFinite, Promise, setTimeout, clearTimeout,
+              TextDecoder, Uint8Array, ArrayBuffer };
+ctx.self = ctx;
+vm.runInNewContext(fs.readFileSync(path.join(raiz, 'biblioteca.js'), 'utf8'), ctx, { filename: 'biblioteca.js' });
+const B = ctx.Biblioteca;
+const metas = JSON.parse(fs.readFileSync(arq, 'utf8'));
+const saida = metas.map(m => {
+  const pags = [];
+  for (let p = 1; p <= m.paginas; p++) pags.push(B.paginaImpressa(m, p));
+  return { erro: B.conferirNumeracao(m), paginas: pags };
+});
+process.stdout.write(JSON.stringify(saida));
+"""
+
+
+def no_aplicativo(temp, metas):
+    """[(erro da conferirNumeracao, [paginaImpressa de 1..paginas])] de cada meta, pelo biblioteca.js."""
+    import subprocess
+    js = os.path.join(temp, 'leitor_numeracao.js')
+    dados = os.path.join(temp, 'metas_numeracao.json')
+    with open(js, 'w', encoding='utf-8') as f:
+        f.write(LEITOR_JS)
+    with open(dados, 'w', encoding='utf-8') as f:
+        json.dump(metas, f, ensure_ascii=False)
+    r = subprocess.run(['node', js, os.path.dirname(AQUI), dados], capture_output=True, text=True, encoding='utf-8')
+    if r.returncode != 0:
+        raise RuntimeError('node falhou: %s' % r.stderr[-400:])
+    return [(x['erro'], x['paginas']) for x in json.loads(r.stdout)]
+
+
+# O livro sintetico de 120 paginas, sem rotulo, e a VERDADE de cada pagina,
+# escrita a mao (nao pelo gerador): o que o livro impresso diz.
+TOTAL_NUM = 120
+
+
+def verdade_da_numeracao():
+    v = {}
+    for p in range(1, TOTAL_NUM + 1):
+        if p <= 3:
+            v[p] = None              # paginas iniciais, sem numero
+        elif p == 4:
+            v[p] = 3                 # a pagina "PARTE", sem numero visivel: a 3
+        elif p == 5:
+            v[p] = 4                 # a pagina DUPLA: impressas 4 e 5, mostra a da esquerda
+        elif p <= 20:
+            v[p] = p
+        elif p in (30, 31):
+            v[p] = p + 3             # FORA DE ORDEM: 33 e 34 antes de 29 a 32 (o mp1, 299 e 300)
+        elif 32 <= p <= 35:
+            v[p] = p - 3
+        elif p <= 40:
+            v[p] = p - 1
+        elif p <= 60:
+            v[p] = p - 40            # o adicional: 1 a 20
+        elif p <= 70:
+            v[p] = p - 60            # RECOMECO dentro do adicional: 1 a 10
+        elif p <= 85:
+            v[p] = p - 66            # o caderno: 5 a 19
+        elif p <= 100:
+            v[p] = p - 65            # PULA a impressa 20: a 86 e a 21 (o caderno do tel7 sem a 44)
+        elif p <= 110:
+            v[p] = p - 11            # a Resolucao continua: 90 a 99
+        else:
+            v[p] = p - 26            # e RECOMECA em 85 (a Resolucao do ca1)
+    return v
+
+
+CASOS_DA_NUMERACAO = {
+    'página dupla e página da Parte': [4, 5],
+    'páginas fora de ordem': list(range(30, 36)),
+    'recomeço no adicional': list(range(61, 71)),
+    'página impressa que não existe': list(range(86, 101)),
+    'recomeço na Resolução': list(range(111, 121)),
+}
+
+
+def mapa_da_numeracao(explicitos=True):
+    caps_ = [
+        {'n': None, 'titulo': 'Páginas iniciais', 'pag_impressa': None, 'pag_arquivo_inicio': 1, 'pag_arquivo_fim': 3},
+        {'n': 1, 'titulo': 'Capítulo um', 'pag_impressa': 4, 'deslocamento': 0, 'pag_arquivo_inicio': 4, 'pag_arquivo_fim': 20},
+        {'n': 2, 'titulo': 'Capítulo dois', 'pag_impressa': 20, 'deslocamento': 1, 'pag_arquivo_inicio': 21, 'pag_arquivo_fim': 40},
+        {'n': None, 'titulo': 'Capítulo adicional', 'pag_impressa': 1, 'deslocamento': 40, 'pag_arquivo_inicio': 41, 'pag_arquivo_fim': 70},
+        {'n': None, 'titulo': 'Caderno de atividades', 'pag_impressa': 5, 'deslocamento': 66, 'pag_arquivo_inicio': 71, 'pag_arquivo_fim': 100},
+        {'n': None, 'titulo': 'Resolução', 'pag_impressa': None, 'pag_arquivo_inicio': 101, 'pag_arquivo_fim': 120},
+    ]
+    livro = {'livro': 'num-prova', 'arquivo': 'livro-numeracao.pdf', 'serie': 'em1', 'deslocamento': None, 'capitulos': caps_}
+    if explicitos:
+        livro['numeracao_trechos'] = [
+            {'de': 4, 'ate': 4, 'inicio': 3}, {'de': 5, 'ate': 5, 'inicio': 4},
+            {'de': 30, 'ate': 31, 'inicio': 33}, {'de': 32, 'ate': 35, 'inicio': 29},
+            {'de': 61, 'ate': 70, 'inicio': 1},
+            {'de': 86, 'ate': 100, 'inicio': 21},
+            {'de': 101, 'ate': 110, 'inicio': 90, 'estilo': 'arabico'}, {'de': 111, 'ate': 120, 'inicio': 85},
+        ]
+    return livro
+
+
+def numeracao_impressa(temp, placar):
+    pasta = os.path.join(temp, 'numeracao')
+    os.makedirs(os.path.join(pasta, 'mapa'))
+    pdf = os.path.join(pasta, 'livro-numeracao.pdf')
+    doc = pymupdf.open()
+    for i in range(TOTAL_NUM):
+        doc.new_page().insert_text((72, 72), 'Página sintética %d' % (i + 1))
+    doc.save(pdf)
+    doc.close()
+    # o mesmo livro COM rotulos de pagina proprios: i a iii, e 1 em diante
+    pdf_rot = os.path.join(pasta, 'livro-numeracao-rotulos.pdf')
+    doc = pymupdf.open(pdf)
+    doc.set_page_labels([{'startpage': 0, 'prefix': '', 'style': 'r', 'firstpagenum': 1},
+                         {'startpage': 3, 'prefix': '', 'style': 'D', 'firstpagenum': 1}])
+    doc.save(pdf_rot)
+    doc.close()
+
+    def ler(livro, caminho=pdf):
+        with open(os.path.join(pasta, 'mapa', 'mapa_capitulos_prova.json'), 'w', encoding='utf-8') as f:
+            json.dump([dict(livro, arquivo=os.path.basename(caminho))] if livro else [], f, ensure_ascii=False)
+        achado = livros.ler_mapas(os.path.join(pasta, 'mapa')).get(livros.chave_de_arquivo(caminho))
+        return livros.ler_numeracao(caminho, achado)
+
+    verdade = verdade_da_numeracao()
+
+    def contra_a_verdade(r, paginas=None):
+        """Os erros de uma numeracao contra a verdade, medidos no biblioteca.js."""
+        if not r.get('numeracao'):
+            return ['sem numeração: %r' % r.get('numeracao_nota')]
+        erro, mostradas = no_aplicativo(temp, [{'id': 'num-prova', 'paginas': TOTAL_NUM, 'numeracao': r['numeracao']}])[0]
+        if erro:
+            return ['o aplicativo recusaria: %s' % erro]
+        return ['p. %d do arquivo mostra %r, o livro diz %r' % (p, mostradas[p - 1], verdade[p])
+                for p in (paginas or range(1, TOTAL_NUM + 1)) if mostradas[p - 1] != verdade[p]]
+
+    r = ler(mapa_da_numeracao())
+    placar.conferir('numeração: do mapa, com os trechos explícitos, o aplicativo mostra a página IMPRESSA em todas as '
+                    '120 páginas (dupla, fora de ordem, recomeços, impressa que não existe)',
+                    contra_a_verdade(r) + ([] if r.get('numeracao_origem') == 'mapa' and 'explícito' in r.get('numeracao_nota', '')
+                                           else ['origem ou nota %r %r' % (r.get('numeracao_origem'), r.get('numeracao_nota'))]))
+    # o instrumento ve cada caso: sem os trechos explicitos, so a derivada, CADA caso erra (e o corpo acerta)
+    derivada = ler(mapa_da_numeracao(explicitos=False))
+    erros = []
+    for rot, paginas in CASOS_DA_NUMERACAO.items():
+        if not contra_a_verdade(derivada, paginas):
+            erros.append('sem os trechos explícitos, o caso "%s" não erra: a prova não o vê' % rot)
+    corpo = [p for p in range(6, 30)] + [p for p in range(36, 61)] + [p for p in range(71, 86)]
+    erros += contra_a_verdade(derivada, corpo)
+    placar.conferir('numeração: só a derivada do mapa acerta o corpo e erra cada um dos cinco casos dos trechos explícitos', erros)
+    placar.conferir('numeração: os trechos explícitos ignorados', contra_a_verdade(derivada), deve_reprovar=True)
+    regra = livros.tirar_paginas
+    livros.tirar_paginas = lambda trechos, cobertos: trechos
+    try:
+        rv = ler(mapa_da_numeracao())
+    finally:
+        livros.tirar_paginas = regra
+    placar.conferir('numeração: a derivada sem dar lugar aos trechos explícitos', contra_a_verdade(rv), deve_reprovar=True)
+
+    # o outro lado: o livro com rotulo de pagina proprio continua com o rotulo,
+    # com ou sem o mapa
+    sem_mapa = ler(None, pdf_rot)
+    com_mapa = ler(mapa_da_numeracao(), pdf_rot)
+    erros = []
+    if sem_mapa.get('numeracao') != [{'de': 1, 'ate': 3, 'inicio': 1, 'estilo': 'romano'},
+                                     {'de': 4, 'ate': TOTAL_NUM, 'inicio': 1, 'estilo': 'arabico'}]:
+        erros.append('os rótulos do PDF: %r' % sem_mapa)
+    if com_mapa.get('numeracao') != sem_mapa.get('numeracao') or com_mapa.get('numeracao_origem') != 'rotulos':
+        erros.append('o mapa mudou o livro com rótulos: %r' % com_mapa)
+    elif 'rótulos do PDF vencem' not in com_mapa.get('numeracao_nota', ''):
+        erros.append('a nota não diz que o mapa foi deixado de lado: %r' % com_mapa.get('numeracao_nota'))
+    if not erros:
+        _, mostradas = no_aplicativo(temp, [{'id': 'rot', 'paginas': TOTAL_NUM, 'numeracao': com_mapa['numeracao']}])[0]
+        if mostradas[:5] != ['i', 'ii', 'iii', 1, 2]:
+            erros.append('o aplicativo mostra %r nas cinco primeiras' % mostradas[:5])
+    placar.conferir('numeração: o livro com rótulos de página próprios fica com os rótulos, com ou sem o mapa', erros)
+    regra = livros.numeracao_dos_rotulos
+    livros.numeracao_dos_rotulos = lambda doc: (False, [])
+    try:
+        rv = ler(mapa_da_numeracao(), pdf_rot)
+    finally:
+        livros.numeracao_dos_rotulos = regra
+    placar.conferir('numeração: o mapa por cima dos rótulos do PDF',
+                    [] if rv.get('numeracao') == sem_mapa.get('numeracao') else ['o mapa venceu'], deve_reprovar=True)
+
+    # mal formado: o trecho explicito errado derruba a numeracao inteira, e a nota diz qual
+    erros = []
+    for rot, troca in (('sobreposto', {'de': 30, 'ate': 33, 'inicio': 33}), ('além da última página', {'de': 111, 'ate': 999, 'inicio': 85}),
+                       ('com início zero', {'de': 61, 'ate': 70, 'inicio': 0}), ('com estilo desconhecido', {'de': 61, 'ate': 70, 'inicio': 1, 'estilo': 'grego'})):
+        livro = mapa_da_numeracao()
+        alvo = next(i for i, t in enumerate(livro['numeracao_trechos']) if t['de'] == troca['de'])
+        livro['numeracao_trechos'][alvo] = troca
+        r = ler(livro)
+        if r.get('numeracao') or 'trecho' not in r.get('numeracao_nota', ''):
+            erros.append('trecho %s: %r' % (rot, r))
+    r = ler(dict(mapa_da_numeracao(), numeracao_trechos='4 a 5'))
+    if r.get('numeracao') or 'não é uma lista' not in r.get('numeracao_nota', ''):
+        erros.append('numeracao_trechos que não é lista: %r' % r)
+    placar.conferir('numeração: trecho explícito sobreposto, fora do livro, com início zero ou estilo desconhecido derruba a '
+                    'numeração e a nota diz', erros)
+    # a entrada cuja pagina impressa nao fecha com o deslocamento fica sem numero, e a nota diz
+    livro = mapa_da_numeracao()
+    livro['capitulos'][2]['pag_impressa'] = 25
+    r = ler(livro)
+    fora = [p for p in range(21, 41) if p not in range(30, 36)]
+    mostradas = no_aplicativo(temp, [{'id': 'x', 'paginas': TOTAL_NUM, 'numeracao': r.get('numeracao') or []}])[0][1]
+    placar.conferir('numeração: a entrada que não fecha com o deslocamento fica sem número, e a nota diz',
+                    ([] if all(mostradas[p - 1] is None for p in fora) else ['%r' % [mostradas[p - 1] for p in fora]]) +
+                    ([] if 'não fecha com o deslocamento' in r.get('numeracao_nota', '') else ['nota %r' % r.get('numeracao_nota')]))
+    # sem pagina impressa nem trecho, nada muda: o livro fica sem numeracao
+    livro = mapa_da_numeracao(explicitos=False)
+    for c in livro['capitulos']:
+        c['pag_impressa'] = None
+    placar.conferir('numeração: mapa sem página impressa nem trecho deixa o livro sem numeração, como antes',
+                    [] if ler(livro) == {} and ler(None) == {} else ['%r %r' % (ler(livro), ler(None))])
+
+
 # ------------------------------------------------------------------ rodada
 
 def gerar_amostra(pasta, nome):
@@ -626,6 +849,9 @@ def amostra_rodada(temp, placar):
         calar.close()
         gerar_pacote.confere_versao_do_pymupdf = guarda_versao
     placar.conferir('livros: linha de comando (--fonte livros, e as recusas)', erros_cli)
+
+    # item 12a: a numeracao impressa
+    numeracao_impressa(temp, placar)
 
 
 def sumario_explicito(temp, placar):

@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.61';
+  var VERSAO = '1.42.91';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -84,6 +84,43 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.89',
+      itens: [
+        'O botão Voltar do tablet e do celular volta para a tela anterior dentro do aplicativo, e não fecha mais o app. Na tela inicial, toque em Voltar duas vezes para sair.'
+      ]
+    },
+    {
+      versao: '1.42.88',
+      itens: [
+        'Em Matemática, 10 assuntos passaram a abrir a lista e o Material do módulo certo, entre eles funções trigonométricas e adição de arcos (que estavam trocados entre si), média, estatística, leitura de gráficos, radiciação e juros compostos. Círculo (comprimento e área), notação científica, determinantes e distribuições e dispersão ficam sem lista pronta e sem Material, porque nenhum módulo trata deles.'
+      ]
+    },
+    {
+      versao: '1.42.78',
+      itens: [
+        'Na Biblioteca, a busca também acha os capítulos pelo nome e pelos assuntos ligados, inclusive nos livros escaneados, e o botão Abrir no capítulo leva ao começo dele.',
+        'A busca nos livros pede todas as palavras digitadas e mostra primeiro os melhores resultados; o resto fica em Mais resultados, com cada capítulo numa linha só.'
+      ]
+    },
+    {
+      versao: '1.42.76',
+      itens: [
+        'Química do ensino médio ganhou 6 assuntos, para escolher na aula e procurar na Biblioteca: a Química como ciência, laboratório e segurança, pilhas e baterias comerciais e três de funções orgânicas.'
+      ]
+    },
+    {
+      versao: '1.42.72',
+      itens: [
+        'No tablet, a janela da aula organiza os campos em duas colunas; os mesmos campos e ações continuam disponíveis.'
+      ]
+    },
+    {
+      versao: '1.42.68',
+      itens: [
+        'Na ficha de cada aluno, em Planejamentos, toque em Novo planejamento, cole ou dite o aviso de provas da escola e anexe os prints. O aplicativo monta um PDF com os dias de estudo, as provas e as suas aulas; você confere, ajusta se quiser e compartilha com a família. Precisa de internet. Também dá para começar pelo link na janela de marcar aula.'
+      ]
+    },
     {
       versao: '1.42.61',
       itens: [
@@ -1455,7 +1492,10 @@
     alerta: '<path d="M12 4.5l8.5 15h-17z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none"/>',
     // o olho de esconder os valores: aberto (à mostra) e riscado (escondidos)
     olho: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
-    olho_fechado: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>'
+    olho_fechado: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/>',
+    // o planejamento de estudos com IA: ditar e anexar prints
+    mic: '<rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v2.5"/>',
+    imagem: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4.5 3.5 3 3-2.5 4.5 4"/>'
   };
   function icone(nome, rotulo, classe) {
     var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -1497,15 +1537,20 @@
   var fechandoPorVoltar = false;
   var retornoProgramado = null;
 
-  window.addEventListener('popstate', function () {
+  window.addEventListener('popstate', function (ev) {
     if (retornoProgramado) {
       var depois = retornoProgramado;
       retornoProgramado = null;
       if (depois !== true) depois();
+      // o passo de tela que veio enquanto a janela fechava entra agora, na ordem
+      var passos = passosDepoisDoRetorno;
+      passosDepoisDoRetorno = [];
+      passos.forEach(function (antes) { registrarPassoDeTela(antes); });
       return;
     }
     var topo = pilhaModalHistorico[pilhaModalHistorico.length - 1];
-    if (!topo) return;
+    // sem janela aberta, o Voltar é das telas (FILA 2b)
+    if (!topo) { voltarDeTela(ev.state); return; }
     /* B6: a tabela lado a lado por cima de uma janela (a aula) não entra no
      * histórico: o Voltar fecha a TABELA, e a entrada da janela de baixo volta
      * para a pilha continuar casando com o que está aberto. */
@@ -1513,6 +1558,30 @@
     if (ladoAberto && !ladoAberto.hidden) {
       history.pushState({ apoioModal: topo.token }, '');
       fecharLadoALado();
+      return;
+    }
+    if (topo.id === 'modal-planejamento' && $('#modal-leitor-pdf').classList.contains('aberto')) {
+      // o leitor ampliado por cima do planejamento: o Voltar fecha o leitor
+      history.pushState({ apoioModal: topo.token }, '');
+      fecharModal('modal-leitor-pdf');
+      return;
+    }
+    if (topo.id === 'modal-planejamento' && planejamentoTemTrabalho()) {
+      // a pergunta antes de perder o pedido ou o plano não salvo; a entrada volta
+      history.pushState({ apoioModal: topo.token }, '');
+      solicitarFecharModal('modal-planejamento');
+      return;
+    }
+    if (JANELAS_COM_CAMPOS[topo.id] && !(topo.id === 'modal-aula' && relatoEmEdicaoAlterado()) && janelaMudou(topo.id)) {
+      // a ficha do aluno ou a aula com campo mudado desde que abriu: a entrada volta, e ela decide
+      history.pushState({ apoioModal: topo.token }, '');
+      if (!confirmar('Sair sem guardar o que você escreveu?')) return;
+      pilhaModalHistorico.pop();
+      retornoProgramado = true;
+      history.back();
+      fechandoPorVoltar = true;
+      fecharModal(topo.id);
+      fechandoPorVoltar = false;
       return;
     }
     if (topo.id === 'modal-aula' && relatoEmEdicaoAlterado()) {
@@ -1548,6 +1617,293 @@
     fechandoPorVoltar = false;
   });
 
+  /* O VOLTAR DO APARELHO NAS TELAS (FILA 2b).
+   *
+   * Relato do dono em 12/11: na Biblioteca, o Voltar do tablet FECHAVA o
+   * aplicativo. O histórico só conhecia as janelas (MODAIS_HISTORICO); trocar
+   * de aba, entrar numa série, num módulo, numa lista ou na tela de um livro
+   * não deixava entrada nenhuma, e o Voltar saía do app.
+   *
+   * Cada entrada de tela do histórico GUARDA O RETRATO DA PRÓPRIA TELA no
+   * history.state ({ apoioTela, retrato, anterior }): aba, lugar na
+   * Biblioteca, termo da busca, livro aberto, aba, ficha e formulário do
+   * celular, e rolagem. O Voltar cai na entrada de baixo, e o retrato dela é
+   * a tela a devolver. Como o retrato mora no histórico do navegador, e não
+   * na memória, ele sobrevive à recarga (o Android descarta a aba do PWA e a
+   * recarrega): depois de recarregar, o Voltar continua voltando.
+   *
+   * Quem descobre o passo é o toque: o retrato é tirado na captura do clique
+   * e comparado logo depois dos ouvintes, e de novo 400 ms depois (navegação
+   * que espera uma gravação). Se a tela mudou, é um passo: a entrada de agora
+   * recebe o retrato de antes, e uma entrada nova entra com o de depois.
+   * Quando a mudança só devolve a tela ao retrato da entrada de baixo (a seta
+   * de voltar da própria tela), a entrada sai do histórico em vez de entrar
+   * outra.
+   *
+   * TRABALHO NÃO SALVO: antes de devolver a tela, o Voltar pergunta o mesmo
+   * que a seta da tela (o editor de Minhas listas, o formulário e a ficha em
+   * edição do celular). Se ela fica, a entrada volta e nada se perde. Nada
+   * é gravado aqui: no celular, gravar continua sendo só pelo comoAcaoDoCelular.
+   *
+   * Na tela inicial, o primeiro Voltar avisa "Toque em Voltar de novo para
+   * sair." e só o segundo sai: uma entrada de guarda fica sobre a raiz. A
+   * guarda volta 3,6 s depois do aviso (o tempo do aviso na tela), e também
+   * antes de qualquer passo novo dado a partir da raiz.
+   *
+   * As janelas continuam como eram: o passo não é registrado com janela do
+   * histórico aberta, e o Voltar com janela aberta é dela (a proteção do relato,
+   * da folha, da exclusão e da trilha segue igual, no ouvinte acima). A folha da
+   * aula no celular (Hoje) também é do histórico: o Voltar fecha a folha. */
+  var proximoPassoTela = 0;
+  var passosDepoisDoRetorno = [];
+  var restaurandoTela = false;
+  var guardaDaSaida = null;
+  var GUARDA_DA_SAIDA_MS = 3600;
+  var folhaNoHistorico = false;
+  var fechandoFolhaPorVoltar = false;
+
+  function retratoDaTela() {
+    var aba = modoCelular ? 'cel:' + telaCelular : (($('#abas .aba.ativa') || { dataset: {} }).dataset.tela || '');
+    var conteudo = $(modoCelular ? '#cel-conteudo' : '.conteudo');
+    var naBib = aba === 'biblioteca';
+    return {
+      aba: aba,
+      alunoCelular: modoCelular && alunoCelular ? String(alunoCelular) : null,
+      fichaEditando: modoCelular && !!alunoCelular && !!editandoFichaAlunoCelular,
+      form: modoCelular && formCelular ? formCelular.tipo + ':' + (formCelular.aulaId || '') : null,
+      bib: naBib ? JSON.stringify({ s: bibNav.serie, m: bibNav.modulo, a: bibNav.aula, l: bibNav.minhas }) : null,
+      bibNav: naBib ? JSON.parse(JSON.stringify(bibNav)) : null,
+      termo: naBib ? String(bibTermo || '') : '',
+      livro: naBib ? (bibLivroAberto || null) : null,
+      rolagem: conteudo ? conteudo.scrollTop : 0
+    };
+  }
+
+  // o que conta como "outra tela": a aba, o lugar e o livro (a rolagem e o termo digitado não)
+  function mesmaTela(a, b) {
+    return !!a && !!b && a.aba === b.aba && a.alunoCelular === b.alunoCelular && a.fichaEditando === b.fichaEditando &&
+      a.form === b.form && a.bib === b.bib && a.livro === b.livro;
+  }
+
+  /* O trabalho não salvo da tela à vista: a pergunta que a seta da tela faz,
+   * ou null. Só lê. */
+  /* Os campos de uma caixa, como texto: o valor de cada campo, a marca de
+   * cada caixinha e a opção de cada lista. A foto é tirada quando a tela (ou a
+   * janela) abre, e a pergunta só aparece se algo MUDOU desde então: um campo
+   * que já vem preenchido, ou uma lista com a escolha do dia, não pergunta. */
+  function fotoDosCampos(caixa) {
+    if (!caixa) return '';
+    return Array.prototype.map.call(caixa.querySelectorAll('input, textarea, select'), function (c) {
+      if (c.type === 'checkbox' || c.type === 'radio') return c.checked ? '1' : '0';
+      return String(c.value);
+    }).join('\u0001');
+  }
+  var fotoDaTela = null;              // { chave, caixa, valores } da tela aberta pelo último passo
+  var fotoDasJanelas = {};            // id da janela -> valores dos campos quando ela abriu
+  function chaveDaFoto() { var r = retratoDaTela(); return JSON.stringify([r.aba, r.alunoCelular, r.fichaEditando, r.form]); }
+  function tirarFotoDaTela() {
+    var caixa = modoCelular ? '#cel-conteudo' : '#bib-corpo';
+    fotoDaTela = { chave: chaveDaFoto(), caixa: caixa, valores: fotoDosCampos($(caixa)) };
+  }
+  function camposMudaram() {
+    if (!fotoDaTela || fotoDaTela.chave !== chaveDaFoto()) return false;
+    return fotoDosCampos($(fotoDaTela.caixa)) !== fotoDaTela.valores;
+  }
+  function tirarFotoDaJanela(id) {
+    setTimeout(function () {
+      var j = $('#' + id);
+      if (j && j.classList.contains('aberto')) fotoDasJanelas[id] = fotoDosCampos(j);
+    }, 0);
+  }
+  function janelaMudou(id) {
+    var j = $('#' + id);
+    return !!j && fotoDasJanelas[id] !== undefined && fotoDosCampos(j) !== fotoDasJanelas[id];
+  }
+
+  function perguntaDeTrabalhoNaoSalvo() {
+    if (!modoCelular && bibNav.minhas && bibNav.minhas.editar && typeof editorDeListaMudou === 'function' && editorDeListaMudou()) {
+      return 'Sair sem guardar as mudanças desta lista?';
+    }
+    if (modoCelular && (formCelular || (alunoCelular && editandoFichaAlunoCelular)) && camposMudaram()) {
+      return 'Sair sem guardar o que você escreveu?';
+    }
+    return null;
+  }
+
+  function guardaNaRaiz() {
+    if (history.state && history.state.apoioRaiz) {
+      clearTimeout(guardaDaSaida);
+      guardaDaSaida = null;
+      history.pushState({ apoioGuarda: true, retrato: retratoDaTela() }, '');
+    }
+  }
+
+  function registrarPassoDeTela(antes) {
+    if (retornoProgramado) { passosDepoisDoRetorno.push(antes); return; }
+    var agora = retratoDaTela();
+    if (mesmaTela(antes, agora)) return;
+    var estado = history.state || {};
+    if (estado.apoioTela && estado.anterior && mesmaTela(estado.anterior, agora)) {
+      // a seta de voltar da tela levou de volta ao lugar de antes: a entrada sai
+      retornoProgramado = true;
+      history.back();
+      return;
+    }
+    // um passo dado a partir da raiz repõe a guarda antes (o aviso de sair volta a valer)
+    guardaNaRaiz();
+    estado = history.state || {};
+    history.replaceState(Object.assign({}, estado, { retrato: antes }), '');
+    history.pushState({ apoioTela: ++proximoPassoTela, retrato: agora, anterior: antes }, '');
+    tirarFotoDaTela();
+  }
+
+  function restaurarTela(r) {
+    restaurandoTela = true;
+    try {
+      if (modoCelular) {
+        var tela = r.aba.indexOf('cel:') === 0 ? r.aba.slice(4) : 'hoje';
+        if (tela !== telaCelular || String(alunoCelular || '') !== String(r.alunoCelular || '') || formCelular || editandoFichaAlunoCelular) {
+          irParaTelaCelular(tela);
+        }
+        // a ficha de um aluno na aba Alunos: o mesmo caminho do toque na lista
+        if (r.alunoCelular && db && db.alunos.some(function (a) { return String(a.id) === r.alunoCelular; })) {
+          alunoCelular = r.alunoCelular;
+          editandoFichaAlunoCelular = false;
+          desenharAlunosCelular();
+        }
+      } else {
+        var atual = ($('#abas .aba.ativa') || { dataset: {} }).dataset.tela;
+        if (r.aba && r.aba !== atual) {
+          var b = $('#abas .aba[data-tela="' + r.aba + '"]');
+          if (b) b.click();
+        }
+        if (r.aba === 'biblioteca' && r.bibNav) {
+          var mudouBib = JSON.stringify({ s: bibNav.serie, m: bibNav.modulo, a: bibNav.aula, l: bibNav.minhas }) !== r.bib;
+          var termo = String(r.termo || '');
+          var mudouTermo = termo !== String(bibTermo || '');
+          if (mudouBib || mudouTermo) {
+            minhaEmEdicao = null;
+            // o termo da busca volta com a tela: o resultado aberto pela busca volta à lista de resultados
+            bibTermo = termo;
+            var campo = $('#busca-biblioteca'), limpar = $('#limpar-busca-biblioteca');
+            if (campo) campo.value = termo;
+            if (limpar) limpar.style.display = termo ? '' : 'none';
+            if (!bib) {
+              // a Biblioteca ainda está carregando (logo depois de recarregar): o lugar fica, e o desenho dela o usa
+              bibNav.serie = r.bibNav.serie; bibNav.modulo = r.bibNav.modulo; bibNav.aula = r.bibNav.aula; bibNav.minhas = r.bibNav.minhas;
+            } else if (mudouBib) irNaBiblioteca({ serie: r.bibNav.serie, modulo: r.bibNav.modulo, aula: r.bibNav.aula, minhas: r.bibNav.minhas });
+            else desenharCorpoBiblioteca();
+          }
+          if (r.livro && r.livro !== bibLivroAberto) abrirTelaDoLivro(r.livro);
+          else if (!r.livro && bibLivroAberto) fecharTelaDoLivro();
+        }
+      }
+    } finally {
+      restaurandoTela = false;
+    }
+    // a rolagem volta depois do desenho (a tela do livro desenha depois de ler a posição)
+    var conteudo = $(modoCelular ? '#cel-conteudo' : '.conteudo');
+    var rolar = function () { if (conteudo) conteudo.scrollTop = r.rolagem; };
+    rolar();
+    setTimeout(rolar, 0);
+    setTimeout(rolar, 250);
+  }
+
+  /* O Voltar chegou sem janela aberta. `estado` é a entrada em que o Voltar
+   * caiu (a de baixo), e o retrato dela é a tela a devolver. */
+  function voltarDeTela(estado) {
+    estado = estado || {};
+    // a folha da aula (celular) é do histórico: o Voltar fecha a folha
+    if (folhaNoHistorico) {
+      folhaNoHistorico = false;
+      // num passo de formulário da folha (cancelar, remarcar, duração), o Voltar volta às ações da folha
+      if (folhaCelular && folhaCelular.passo !== 'acoes' && folhaCelular.passo !== 'ficha') {
+        folhaEntrouNoHistorico();
+        var mexeuNaFolha = folhaCelular.foto !== undefined && fotoDosCampos($('#cel-folha')) !== folhaCelular.foto;
+        if (mexeuNaFolha && !confirmar('Sair sem guardar o que você escreveu?')) return;
+        irAoPassoDaFolha('acoes');
+        return;
+      }
+      if (folhaCelular) {
+        fechandoFolhaPorVoltar = true;
+        try { fecharFolhaCelular(); } finally { fechandoFolhaPorVoltar = false; }
+        return;
+      }
+    }
+    var atual = retratoDaTela();
+    var pergunta = perguntaDeTrabalhoNaoSalvo();
+    if (pergunta && estado.retrato && !mesmaTela(estado.retrato, atual)) {
+      // a entrada da tela à vista volta antes da pergunta: se ela ficar, o próximo Voltar ainda é desta tela
+      history.pushState({ apoioTela: ++proximoPassoTela, retrato: atual, anterior: estado.retrato }, '');
+      if (!confirmar(pergunta)) return;
+      // ela aceitou perder: a tela de baixo volta, e a entrada reposta sai sem mexer em nada
+      minhaEmEdicao = null;
+      retornoProgramado = true;
+      history.back();
+      restaurarTela(estado.retrato);
+      return;
+    }
+    if (estado.retrato && !mesmaTela(estado.retrato, atual)) { restaurarTela(estado.retrato); return; }
+    if (!estado.apoioRaiz && history.length > 1) {
+      /* A entrada de baixo mostra a mesma tela (uma guarda, ou uma entrada que
+       * ficou de antes de uma recarga): o toque não fica morto, o Voltar anda
+       * mais uma, até uma tela diferente ou até a raiz, que avisa. */
+      history.back();
+      return;
+    }
+    if (estado.apoioRaiz) {
+      avisar('Toque em Voltar de novo para sair.');
+      clearTimeout(guardaDaSaida);
+      guardaDaSaida = setTimeout(function () {
+        guardaDaSaida = null;
+        if (history.state && history.state.apoioRaiz) history.pushState({ apoioGuarda: true, retrato: retratoDaTela() }, '');
+      }, GUARDA_DA_SAIDA_MS);
+    }
+  }
+
+  // a folha da aula no celular abriu: entra no histórico como uma janela
+  function folhaEntrouNoHistorico() {
+    if (folhaNoHistorico || retornoProgramado) return;
+    folhaNoHistorico = true;
+    guardaNaRaiz();
+    history.pushState({ apoioFolha: true, retrato: retratoDaTela() }, '');
+  }
+  // a folha fechou por um toque (fora dela, ou uma ação que acabou): a entrada dela sai
+  function folhaSaiuDoHistorico() {
+    if (!folhaNoHistorico || fechandoFolhaPorVoltar) return;
+    folhaNoHistorico = false;
+    if (history.state && history.state.apoioFolha) { retornoProgramado = true; history.back(); }
+  }
+
+  function ligarVoltarDasTelas() {
+    if (ligarVoltarDasTelas.feito) return;
+    ligarVoltarDasTelas.feito = true;
+    // a raiz e a guarda: o primeiro Voltar na tela inicial cai na raiz e avisa
+    var e = history.state;
+    if (!(e && (e.apoioRaiz || e.apoioGuarda || e.apoioTela || e.apoioModal || e.apoioFolha))) {
+      history.replaceState({ apoioRaiz: true, retrato: retratoDaTela() }, '');
+      history.pushState({ apoioGuarda: true, retrato: retratoDaTela() }, '');
+    } else if (e.retrato && !mesmaTela(e.retrato, retratoDaTela())) {
+      /* Recarregou (o Android descartou a aba) numa entrada de outra tela: o app
+       * abriu na tela padrão. A entrada passa a dizer a tela à vista, e o
+       * primeiro Voltar vai para a de baixo de verdade, sem toque morto. */
+      history.replaceState(Object.assign({}, e, { retrato: retratoDaTela() }), '');
+    }
+    document.addEventListener('click', function () {
+      if (restaurandoTela) return;
+      var antes = retratoDaTela();
+      var conferir = function () {
+        // com janela do histórico aberta, o toque é dela, e não um passo de tela
+        if (pilhaModalHistorico.length && !retornoProgramado) return true;
+        if (!mesmaTela(antes, retratoDaTela())) { registrarPassoDeTela(antes); return true; }
+        return false;
+      };
+      // logo depois dos ouvintes; e de novo 400 ms depois, para a navegação que espera uma gravação
+      setTimeout(function () { if (!conferir()) setTimeout(conferir, 400); }, 0);
+    }, true);
+  }
+
+  var JANELAS_COM_CAMPOS = { 'modal-aluno': true, 'modal-aula': true };
   var MODAIS_HISTORICO = {
     'modal-aula': true,
     'modal-sair-relato': true,
@@ -1558,7 +1914,13 @@
     'modal-trilha': true,
     'modal-virada-anual': true,
     'modal-nuvem-restaurar': true,
-    'modal-nuvem-senha': true
+    'modal-nuvem-senha': true,
+    'modal-planejamento': true,
+    'modal-sair-planejamento': true,
+    'modal-plan-print': true,
+    // FILA 2b: o leitor de livro é uma tela para ela; o Voltar fecha o leitor e volta ao livro
+    'modal-leitor-pdf': true,
+    'modal-leitor-epub': true
   };
 
   function abrirModal(id) {
@@ -1567,9 +1929,12 @@
       degrauModal += 2;
       e.style.zIndex = String(degrauModal);
       if (MODAIS_HISTORICO[id]) {
+        // a janela aberta sobre a raiz repõe a guarda antes: o Voltar que a fecha não cai na raiz sem aviso
+        if (typeof guardaNaRaiz === 'function') guardaNaRaiz();
         var token = ++proximoModalHistorico;
         history.pushState({ apoioModal: token }, '');
         pilhaModalHistorico.push({ id: id, token: token });
+        if (JANELAS_COM_CAMPOS[id]) tirarFotoDaJanela(id);
       }
     }
     e.classList.add('aberto');
@@ -1600,6 +1965,12 @@
       if (r.height <= 0) return;
       if (limite === null || r.top < limite) limite = r.top;
     });
+    // a folha da aula no celular (Hoje) mora embaixo: o aviso para acima dela
+    var folhaCel = $('#cel-folha');
+    if (folhaCel) {
+      var rf = folhaCel.getBoundingClientRect();
+      if (rf.height > 0 && (limite === null || rf.top < limite)) limite = rf.top;
+    }
     if (limite === null) { caixa.style.removeProperty('--sobe'); return; }
     /* O aviso mora a 24 pixels do fim da tela: subir o bastante para a base
      * dele parar 12 pixels acima do rodapé. Teto de 55 por cento da tela, para
@@ -1615,6 +1986,9 @@
 
   function fecharModal(id, depoisDoHistorico) {
     if (id === 'modal-excluir-aluno' && exclusaoAlunoPendente) return;
+    // o planejamento fechado no meio do "montando" cancela o pedido à IA
+    if (id === 'modal-planejamento') pararPlanejamento();
+    if (id === 'modal-sair-planejamento') devolverFocoDaPergunta();
     var e = $('#' + id);
     var estavaAberto = e.classList.contains('aberto');
     if (estavaAberto && !fechandoPorVoltar && MODAIS_HISTORICO[id]) {
@@ -2593,6 +2967,7 @@
 
   function ligarEventos() {
     ligarBuscaAoIndice();
+    ligarVoltarDasTelas();
     $$('#abas .aba').forEach(function (b) {
       b.addEventListener('click', function () {
         $$('#abas .aba').forEach(function (x) { x.classList.remove('ativa'); x.removeAttribute('aria-current'); });
@@ -3222,7 +3597,9 @@
       (privado && privado.value !== (aulaEmEdicao.notaPrivada || '')));
   }
 
+  var aulaNovaMexida = false; // a aula nova já preenchida (o link do planejamento pergunta antes)
   function solicitarFecharModal(id) {
+    if (id === 'modal-planejamento' && planejamentoTemTrabalho()) { perguntarSairDoPlanejamento(); return; }
     if (id === 'modal-aula' && relatoEmEdicaoAlterado()) {
       guardarRascunhoRelato(aulaEmEdicao, $('#campo-nota-texto'), $('#campo-nota-privada'));
       abrirModal('modal-sair-relato');
@@ -3252,6 +3629,18 @@
 
     var corpo = $('#corpo-modal-aula');
     corpo.innerHTML = '';
+    corpo.classList.remove('janela-aula-tablet');
+    // a tela cheia é só da aula que já existe: a Nova aula fica no modal estreito
+    $('#modal-aula').classList.remove('janela-aula-cheia');
+    /* Ela mexeu na aula nova (aluno, data, hora...): o link do planejamento,
+     * no pé, pergunta antes de fechar (IA, fase 2). */
+    aulaNovaMexida = false;
+    if (!corpo.dataset.ouveMexida) {
+      // uma vez só: o corpo da janela é o mesmo a cada aula aberta
+      corpo.dataset.ouveMexida = '1';
+      corpo.addEventListener('input', function () { aulaNovaMexida = true; });
+      corpo.addEventListener('change', function () { aulaNovaMexida = true; });
+    }
 
     var selAluno = el('select', { id: 'campo-aluno' });
     db.alunos.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome); }).forEach(function (a) {
@@ -3448,6 +3837,13 @@
         class: 'ajuda', id: 'ajuda-aula-nova',
         texto: 'Para salvar rapidamente na agenda, use "Salvar na agenda". Para já definir assunto e abrir a folha, use "Salvar e preparar".'
       }));
+      /* O planejamento de estudos com IA (fase 2): um link discreto no pé da
+       * aula nova, que abre o mesmo fluxo da ficha, sem aluno escolhido. O
+       * toque no "+" continua abrindo a aula, que é o mais comum. */
+      if (podeChamarIA()) {
+        corpo.appendChild(linkDoPlanejamento('aula-planejamento', false, function () { return aulaNovaMexida || relatoEmEdicaoAlterado(); },
+          function (depois) { fecharModal('modal-aula', depois); }));
+      }
 
       atualizarPrevisao();
       abrirModal('modal-aula');
@@ -3688,6 +4084,21 @@
       ])
     ]);
     grupoArquivos.appendChild(acoesAvancadas);
+
+    // F6: a janela de edição do tablet fica em duas colunas. Os grupos são
+    // apenas reorganizados no DOM; os campos e os caminhos de salvamento não mudam.
+    // Uma rolagem só por lado (no tablet, rolagem dentro de rolagem prende o
+    // dedo): à esquerda Preparar e, embaixo, Arquivos; à direita Registrar.
+    var colunaPreparar = el('div', { class: 'janela-aula-coluna janela-aula-preparar', id: 'janela-aula-preparar' });
+    var colunaRegistrar = el('div', { class: 'janela-aula-coluna janela-aula-registrar', id: 'janela-aula-registrar' });
+    var colunaArquivos = el('div', { class: 'janela-aula-coluna janela-aula-arquivos', id: 'janela-aula-arquivos' });
+    colunaPreparar.appendChild(grupoPreparar);
+    colunaRegistrar.appendChild(grupoRegistro);
+    colunaArquivos.appendChild(grupoArquivos);
+    corpo.classList.add('janela-aula-tablet');
+    $('#modal-aula').classList.add('janela-aula-cheia');
+    corpo.appendChild(el('div', { class: 'janela-aula-lado', id: 'janela-aula-esquerda' }, [colunaPreparar, colunaArquivos]));
+    corpo.appendChild(el('div', { class: 'janela-aula-lado', id: 'janela-aula-direita' }, [colunaRegistrar]));
 
     atualizarPrevisao();
     abrirModal('modal-aula');
@@ -5461,6 +5872,9 @@
     resumoEtapas = novo ? null : desenharResumoDeEtapas(painel.dados, alunoEmEdicao, function () {
       if (botaoDaAba.mapeamento) botaoDaAba.mapeamento.click();
     });
+    /* Os planejamentos de estudo do aluno (IA, fase 2), logo abaixo das
+     * etapas: a lista dos salvos e o "Novo planejamento". */
+    if (!novo && mostraSecaoPlanejamentos(alunoEmEdicao.id)) painel.dados.appendChild(secaoPlanejamentos(alunoEmEdicao.id, false));
 
     painel.dados.appendChild(el('label', { class: 'campo' }, [
       el('span', { texto: 'Nome do aluno' }),
@@ -16250,7 +16664,16 @@
     db.ajustes = db.ajustes || {};
     var todas = db.ajustes.mapaDosLivros = db.ajustes.mapaDosLivros || {};
     var doLivro = todas[livroId] = todas[livroId] || {};
-    doLivro[String(entrada.n)] = { titulo: entrada.titulo, assuntos: assuntos.slice(), acao: acao, quando: new Date().toISOString() };
+    /* Fase 1a da nuvem: a palavra nova substitui a correção que já vale
+     * nesse capítulo (que pode estar guardada sob outro número, se o mapa
+     * renumerou), e nunca a de OUTRO capítulo que mora no mesmo número
+     * (Biblioteca.chaveParaGravarCorrecao). O `n` e a `chave` do capítulo
+     * vão junto, para a correção seguir o capítulo no mapa seguinte. */
+    var registro = { titulo: entrada.titulo, assuntos: assuntos.slice(), acao: acao, quando: new Date().toISOString(), n: entrada.n };
+    if (entrada.chave) registro.chave = entrada.chave;
+    doLivro[Biblioteca.chaveParaGravarCorrecao(doLivro, entrada)] = registro;
+    // a busca pelos capítulos passa a ver a correção na próxima consulta
+    indiceDosCapitulos = null;
     // a aula aberta embaixo do leitor (veio pelo "Abrir no livro"): o botão dela passa a ver a correção
     if (aulaEmEdicao && $('#modal-aula').classList.contains('aberto')) atualizarBlocoAssunto(aulaEmEdicao.id);
     return salvar();
@@ -16270,7 +16693,9 @@
         /* tema: o que junta os assuntos irmãos na comparação lado a lado (B6):
          * a unidade na matemática, o bloco nas outras matérias */
         var a = { id: t.id, titulo: (t.pt && t.pt.titulo) || t.id, serie: t.serie, disciplina: Core.MATERIA_PADRAO, eixo: 'ano',
-          tema: t.unidade || '', temaNome: t.unidade ? rotuloUnidade(t) : '' };
+          tema: t.unidade || '', temaNome: t.unidade ? rotuloUnidade(t) : '',
+          // as palavras-chave do assunto: a busca da Biblioteca acha o capítulo ligado a ele por elas
+          chaves: t.chaves || null };
         porId[a.id] = a; lista.push(a);
       });
       (r[1] || []).forEach(function (p) {
@@ -16427,23 +16852,47 @@
    *
    * `destino` (C15.3, o "Abrir no livro" da aula): { pagina } no PDF ou
    * { capitulo, ancora } no EPUB, no lugar de onde ela parou. */
+  /* A posição guardada que ANDOU quando o arquivo do livro mudou (Store,
+   * posicaoNoArquivoNovo): a página dela não existe mais no arquivo novo, ou
+   * o EPUB virou PDF sem a página conhecida. A frase diz onde ela estava;
+   * sem ajuste, nada. A página é a do arquivo antigo, dita pelo número
+   * impresso dela quando o livro antigo tinha numeração (o Store guarda em
+   * ajustadaDe.impressa), como o resto da tela. */
+  function avisoDaPosicaoAjustada(pos) {
+    var de = pos && pos.ajustadaDe;
+    if (!de || typeof de !== 'object') return '';
+    if (de.pagina) return 'Este livro foi atualizado. Você estava na p. ' + (de.impressa || de.pagina) + '.';
+    if (de.capitulo) return 'Este livro foi atualizado. Você estava na parte ' + de.capitulo + '.';
+    return '';
+  }
+
   function abrirLivro(id, destino) {
     return Promise.all([Store.lerLivro(id), Store.lerPosicaoLivro(id).catch(function () { return null; })]).then(function (r) {
       var reg = r[0], pos = r[1];
       if (!reg || !reg.blob) { avisar('Este livro já não está no tablet.'); return false; }
+      // a posição que andou numa troca de arquivo (fase 1a da nuvem): o aviso de onde ela estava, uma vez
+      var ondeEstava = !destino ? avisoDaPosicaoAjustada(pos) : '';
+      /* o ajuste fica na posição até ela mudar de página por conta própria: a
+       * gravação automática da página aberta o repassa (o aviso volta se ela
+       * fechar sem ler), e a primeira página nova dela o tira */
+      var ajuste = ondeEstava ? { de: pos.ajustadaDe, pagina: pos.pagina, capitulo: pos.capitulo, fracao: pos.fracao || 0, mexeu: false } : null;
       if (reg.meta.formato === 'epub') {
-        return abrirLeitorEpub(reg, destino && destino.capitulo ? { capitulo: destino.capitulo, fracao: 0, ancora: destino.ancora || null } : pos);
+        if (ondeEstava) avisar(ondeEstava);
+        var abrindo = abrirLeitorEpub(reg, destino && destino.capitulo ? { capitulo: destino.capitulo, fracao: 0, ancora: destino.ancora || null } : pos);
+        if (leitorEpub && leitorEpub.id === id) leitorEpub.ajuste = ajuste;
+        return abrindo;
       }
       var sumario = sumarioDaTela(reg.meta);
       return abrirLeitorPdf(reg.blob, {
         titulo: tituloDoLivro(reg.meta), nome: reg.id + '.pdf',
         pagina: (destino && destino.pagina) || Biblioteca.paginaDaPosicao(reg.meta, pos) || 1,
         sumario: sumario, livro: reg,
-        dica: sumario.length ? '' : 'Este livro não tem sumário: role as páginas ou use a barra de página.',
+        dica: ondeEstava || (sumario.length ? '' : 'Este livro não tem sumário: role as páginas ou use a barra de página.'),
         aoMudarPagina: function (n, como) {
           // arrastando a barra, a faixa acompanha, e a posição só grava ao soltar
+          if (ajuste && n !== ajuste.pagina) ajuste.mexeu = true;
           if (!como || como.gravar !== false) {
-            Store.gravarPosicaoLivro({ id: id, pagina: n }).catch(function () { /* a leitura segue; só a posição não fica */ });
+            Store.gravarPosicaoLivro({ id: id, pagina: n, sha: reg.meta.hash, ajustadaDe: ajuste && !ajuste.mexeu ? ajuste.de : null }).catch(function () { /* a leitura segue; só a posição não fica */ });
           }
           mostrarCobre('pdf', reg, n);
         }
@@ -16836,7 +17285,33 @@
     f = Math.round(f * 1000) / 1000;
     if (ep.salvo && ep.salvo.capitulo === ep.mostrado && Math.abs(ep.salvo.fracao - f) < 0.002) return;
     ep.salvo = { capitulo: ep.mostrado, fracao: f };
-    Store.gravarPosicaoLivro({ id: ep.id, capitulo: ep.mostrado + 1, fracao: f }).catch(function () { /* a leitura segue */ });
+    // o ajuste de uma troca de arquivo fica até ela mudar de parte ou rolar
+    var aj = ep.ajuste;
+    if (aj && (ep.mostrado + 1 !== aj.capitulo || Math.abs(f - aj.fracao) > 0.02)) aj.mexeu = true;
+    Store.gravarPosicaoLivro({ id: ep.id, capitulo: ep.mostrado + 1, fracao: f, sha: ep.meta && ep.meta.hash,
+      ancoraVista: ancoraVistaDoEpub(), ajustadaDe: aj && !aj.mexeu ? aj.de : null }).catch(function () { /* a leitura segue */ });
+  }
+
+  /* A última âncora "page_N" que já passou do alto da tela, no EPUB feito de
+   * imagens de página (as resoluções do FME): é ela que leva a posição à
+   * página N quando o livro chega remontado em PDF (fase 1a da nuvem). EPUB
+   * sem essas âncoras: null, e nada muda. */
+  function ancoraVistaDoEpub() {
+    var q = $('#epub-quadro');
+    try {
+      var d = q && q.contentDocument;
+      if (!d) return null;
+      var achada = null;
+      var marcas = d.querySelectorAll('[id^="page_"]');
+      for (var i = 0; i < marcas.length; i++) {
+        if (!/^page_\d+$/.test(marcas[i].id)) continue;
+        if (marcas[i].getBoundingClientRect().top > 8) break;
+        achada = marcas[i].id;
+      }
+      // a parte que começa por uma âncora e ainda não rolou: a primeira dela
+      if (!achada) for (var j = 0; j < marcas.length; j++) if (/^page_\d+$/.test(marcas[j].id)) { achada = marcas[j].id; break; }
+      return achada;
+    } catch (e) { return null; }
   }
 
   function mostrarCapituloEpub(i, fracao, ancora) {
@@ -18107,10 +18582,11 @@
     return g.grupo;
   }
 
-  /* Os livros que a busca não alcança, com o nome de cada um, recolhidos num
-   * aviso discreto, que ela pode dispensar até entrar um livro novo: o livro
-   * sem texto pesquisável (escaneado) inteiro, e o que tem só algumas páginas
-   * sem texto. */
+  /* Os livros que a busca no TEXTO não alcança, com o nome de cada um,
+   * recolhidos num aviso discreto, que ela pode dispensar até entrar um livro
+   * novo: o livro sem texto pesquisável (escaneado) inteiro, que entra só
+   * pelos capítulos e assuntos do mapa, e o que tem só algumas páginas sem
+   * texto. */
   function avisoDosLivrosSemTexto(naoLidos) {
     if (!naoLidos || !naoLidos.length) return null;
     var chave = naoLidos.map(function (x) { return x.id; }).sort().join('|');
@@ -18118,8 +18594,9 @@
     var inteiros = naoLidos.filter(function (x) { return x.livroInteiro || (x.total && x.naoLidas >= x.total); });
     var parciais = naoLidos.filter(function (x) { return inteiros.indexOf(x) < 0; });
     var resumo = [];
-    if (inteiros.length) resumo.push(plural(inteiros.length, 'livro', 'livros') + ' sem texto pesquisável ' +
-      (inteiros.length === 1 ? 'não entra' : 'não entram') + ' na busca');
+    // desde 12/11/2026 eles aparecem pelos capítulos e assuntos do mapa, e não pelo texto
+    if (inteiros.length) resumo.push(plural(inteiros.length, 'livro escaneado', 'livros escaneados') +
+      (inteiros.length === 1 ? ' entra' : ' entram') + ' só pelos capítulos e assuntos');
     if (parciais.length) resumo.push(plural(parciais.length, 'livro tem', 'livros têm') + ' páginas sem texto');
     var nome = function (x) {
       var meta = bibLivrosCache[x.id] ? bibLivrosCache[x.id].meta : null;
@@ -18141,36 +18618,376 @@
     return aviso;
   }
 
-  // um capítulo do resultado: o nome e cada página encontrada como botão que abre o leitor nela
-  function blocoDoCapitulo(livro, meta, grupo) {
-    var paginas = grupo.paginas || [];
-    var unidade = livro.formato === 'epub' ? 'parte' : 'página';
+  /* A BUSCA PELOS CAPÍTULOS E ASSUNTOS (pedido do dono, 12/11/2026). O livro
+   * escaneado não tem texto, e não aparecia na busca mesmo com capítulos
+   * mapeados e assuntos ligados. Agora o mesmo campo procura também nos
+   * títulos dos capítulos (o sumário da tela e o mapa, com a correção dela) e
+   * nos títulos e chaves dos assuntos ligados, em TODO livro instalado. A
+   * regra mora em biblioteca.js (indiceDeCapitulos e procurarNosCapitulos).
+   *
+   * O índice dos títulos é montado UMA vez por desenho da Biblioteca, e não a
+   * cada tecla: o desenho (e a correção do mapa) o zera, e a primeira consulta
+   * depois disso o monta. Os nomes e as chaves dos assuntos vêm do índice de
+   * assuntos; até ele abrir, o assunto conta só pelo id, e quando ele abre o
+   * índice se refaz, com a busca à vista. Tudo em memória: nada é gravado. */
+  var indiceDosCapitulos = null;
+  var nomesDosCapitulos = null;
+  function normalizadorDaBusca() {
+    // a mesma normalização da busca no texto; sem ela, a reserva de biblioteca.js faz o mesmo
+    return window.IndiceLivros && typeof window.IndiceLivros.normalizar === 'function' ? window.IndiceLivros.normalizar : null;
+  }
+  // as palavras significativas da consulta, a mesma regra da busca no texto (indice-livros.js)
+  function palavrasDaBuscaNosLivros() {
+    return window.IndiceLivros && typeof window.IndiceLivros.palavrasDaBusca === 'function' ? window.IndiceLivros.palavrasDaBusca : null;
+  }
+  function indiceDosCapitulosDaBiblioteca() {
+    if (indiceDosCapitulos) return indiceDosCapitulos;
+    var nomes = assuntosDosLivros || nomesDosCapitulos;
+    var livros = Object.keys(bibLivrosCache).map(function (id) { return bibLivrosCache[id]; });
+    var indice = Biblioteca.indiceDeCapitulos(livros, correcoesDosLivros(), nomes, normalizadorDaBusca());
+    indiceDosCapitulos = indice;
+    if (!nomes) {
+      carregarAssuntosDosLivros().then(function (v) {
+        if (!v || indiceDosCapitulos !== indice) return;
+        nomesDosCapitulos = v;
+        indiceDosCapitulos = null;
+        var b = buscaLivrosAtual;
+        if (b && b.caixa.grupo.isConnected && String(bibTermo).trim() === b.termo) buscarTextoNosLivros(b.termo, b.caixa);
+      }, function () { /* sem o índice de assuntos, o capítulo conta pelo título e pelo id do assunto */ });
+    }
+    return indice;
+  }
+  function capitulosAchadosNaBusca(termo) {
+    if (typeof Biblioteca === 'undefined' || typeof Biblioteca.procurarNosCapitulos !== 'function') return [];
+    return Biblioteca.procurarNosCapitulos(indiceDosCapitulosDaBiblioteca(), termo, normalizadorDaBusca(), palavrasDaBuscaNosLivros());
+  }
+
+  /* O título que não é capítulo nenhum: o marcador lixo do PDF ("Blank Page",
+   * "Sumário", nome de arquivo), a "Parte III" sem nome, e as páginas fora de
+   * todo capítulo (título nulo). Esses trechos não viram título no resultado:
+   * vão juntos para o fim do livro, como "Outras páginas do livro". */
+  var OUTRAS_PAGINAS = 'Outras páginas do livro';
+  function tituloSemCapitulo(titulo) {
+    var t = String(titulo == null ? '' : titulo).trim();
+    return !t || Biblioteca.marcadorSemSentido(t);
+  }
+  /* "Parte I", "Unidade 3" sozinhos: não é lixo, é um capítulo de cima com
+   * páginas dentro (o Moderna Plus 1 a 3 tem "Parte I" a "Parte III" no topo,
+   * com 41 a 55 seções embaixo; nos 91 livros dos pacotes de 11/2026, são os
+   * únicos 9 títulos assim, e nenhum livro tem o topo todo assim). O título
+   * ganha o nome da primeira seção de dentro: "Parte I: Conjuntos". */
+  var SO_NUMERO_DE_PARTE = /^(parte|unidade|m[oó]dulo|volume)\s+([ivxlcdm]+|\d+)\.?$/i;
+  function tituloComASecaoDeDentro(meta, bloco) {
+    var t = String(bloco.titulo == null ? '' : bloco.titulo).trim();
+    if (!SO_NUMERO_DE_PARTE.test(t) || bloco.inicio === null || !meta) return bloco.titulo;
+    var chave = meta.formato === 'epub' ? 'capitulo' : 'pagina';
+    var sumario = sumarioDaTela(meta) || [];
+    var nivel = nivelDosCapitulos(sumario);
+    var fim = Infinity;
+    sumario.forEach(function (e) {
+      if ((e.nivel || nivel) === nivel && typeof e[chave] === 'number' && e[chave] > bloco.inicio && e[chave] < fim) fim = e[chave];
+    });
+    var dentro = sumario.filter(function (e) {
+      return (e.nivel || nivel) > nivel && typeof e[chave] === 'number' && e[chave] >= bloco.inicio && e[chave] < fim &&
+        !tituloSemCapitulo(e.titulo);
+    }).sort(function (a, b) { return a[chave] - b[chave]; })[0];
+    return dentro ? t + ': ' + dentro.titulo : bloco.titulo;
+  }
+
+  /* Junta, livro a livro, o que a busca achou pelo capítulo e pelo texto. O
+   * livro aparece UMA vez, e o capítulo achado pelos dois caminhos vira um
+   * bloco só, marcado das duas formas: o capítulo do texto e o do mapa são o
+   * mesmo quando têm o mesmo começo e o mesmo título (os dois vêm do sumário
+   * da tela). Os trechos sem capítulo de verdade viram um bloco só, no fim.
+   * Os livros ficam na ordem do tablet, e os blocos, na do livro. */
+  function resultadosDosLivros(porCapitulo, livrosDoTexto) {
+    var ordem = Object.keys(bibLivrosCache);
+    var porId = Object.create(null), lista = [];
+    var norm = normalizadorDaBusca() || function (t) { return String(t || '').toLowerCase(); };
+    function livro(id, base) {
+      if (!porId[id]) {
+        porId[id] = { id: id, titulo: base.titulo || null, volume: base.volume || null, formato: base.formato || 'pdf', blocos: [] };
+        lista.push(porId[id]);
+      }
+      return porId[id];
+    }
+    (livrosDoTexto || []).forEach(function (l) {
+      var r = livro(l.id, l);
+      var grupos = l.capitulos && l.capitulos.length ? l.capitulos
+        : [{ titulo: null, inicio: null, paginas: l.paginas || [], paginasComFrase: l.paginasComFrase || [] }];
+      grupos.forEach(function (g) {
+        if (!(g.paginas || []).length) return;
+        r.blocos.push({ titulo: g.titulo || null, inicio: typeof g.inicio === 'number' ? g.inicio : null, paginas: g.paginas.slice(),
+          paginasComFrase: (g.paginasComFrase || []).slice(), achado: null });
+      });
+    });
+    (porCapitulo || []).forEach(function (l) {
+      var meta = bibLivrosCache[l.id] ? bibLivrosCache[l.id].meta : {};
+      var r = livro(l.id, { titulo: meta.titulo, volume: meta.volume, formato: meta.formato === 'epub' ? 'epub' : 'pdf' });
+      l.capitulos.forEach(function (a) {
+        var c = a.capitulo;
+        var mesmo = r.blocos.filter(function (b) {
+          return !b.achado && b.titulo !== null && b.inicio === c.inicio && norm(b.titulo) === norm(c.titulo);
+        })[0];
+        if (mesmo) mesmo.achado = a;
+        else r.blocos.push({ titulo: c.titulo, inicio: c.inicio, paginas: [], paginasComFrase: [], achado: a });
+      });
+    });
+    lista.forEach(function (r) {
+      var bons = [], outras = null;
+      var metaDoLivro = bibLivrosCache[r.id] ? bibLivrosCache[r.id].meta : null;
+      r.blocos.forEach(function (b) {
+        if (!tituloSemCapitulo(b.titulo)) { b.titulo = tituloComASecaoDeDentro(metaDoLivro, b); bons.push(b); return; }
+        if (!outras) outras = { titulo: OUTRAS_PAGINAS, outras: true, inicio: null, paginas: [], paginasComFrase: [], achado: null };
+        outras.paginas = outras.paginas.concat(b.paginas);
+        outras.paginasComFrase = outras.paginasComFrase.concat(b.paginasComFrase);
+        if (!outras.achado && b.achado) outras.achado = b.achado;
+      });
+      bons.sort(function (x, y) { return (x.inicio === null ? 1e9 : x.inicio) - (y.inicio === null ? 1e9 : y.inicio); });
+      if (outras) {
+        var crescente = function (x, y) { return x - y; };
+        outras.paginas.sort(crescente);
+        outras.paginasComFrase.sort(crescente);
+        bons.push(outras);
+      }
+      r.blocos = bons;
+    });
+    var lugar = function (id) { var i = ordem.indexOf(id); return i < 0 ? 1e9 : i; };
+    return lista.sort(function (a, b) { return lugar(a.id) - lugar(b.id); });
+  }
+
+  /* A RELEVÂNCIA (pedido do dono, 12/11/2026). Do melhor para o pior:
+   *   0  o título do capítulo, ou um assunto ligado, tem a frase inteira;
+   *   1  o título ou os assuntos têm todas as palavras;
+   *   2  só o texto: todas as palavras numa mesma página; dentro dele, mais
+   *      páginas com a frase exata e depois mais páginas vêm primeiro.
+   * "Outras páginas do livro" não disputa o topo. Empate: a ordem do tablet. */
+  function faixaDoBloco(b) {
+    if (b.outras) return 3;
+    if (b.achado) return b.achado.nivel === 'frase' ? 0 : 1;
+    return 2;
+  }
+  function compararBlocos(x, y) {
+    return faixaDoBloco(x.bloco) - faixaDoBloco(y.bloco) ||
+      y.bloco.paginasComFrase.length - x.bloco.paginasComFrase.length ||
+      y.bloco.paginas.length - x.bloco.paginas.length || x.ordem - y.ordem;
+  }
+  var BUSCA_MELHORES = 5;               // o topo do grupo "Nos livros", de qualquer livro
+
+  // "vol. 2" a partir de "Volume 2"; o volume que não começa assim fica como veio
+  function rotuloDoVolume(volume) {
+    var v = String(volume || '').trim();
+    return v.replace(/^volume\s*/i, 'vol. ');
+  }
+  // o livro de vários volumes é uma obra só: o título, sem o volume
+  function chaveDaObra(livro, meta) {
+    var norm = normalizadorDaBusca() || function (t) { return String(t || '').toLowerCase(); };
+    return norm(livro.titulo || (meta && meta.titulo) || livro.id);
+  }
+
+  // "p. 267 a 301, 14 páginas"; com a página impressa quando o livro tem numeração
+  function faixaDePaginas(livro, meta, paginas) {
+    if (!paginas.length) return '';
+    var epub = livro.formato === 'epub';
+    var rotulo = function (n) { return epub ? String(n) : rotuloDePaginaDoLivro(meta, n); };
+    var ini = paginas[0], fim = paginas[paginas.length - 1];
+    var onde = (epub ? (paginas.length > 1 ? 'partes ' : 'parte ') : 'p. ') + rotulo(ini) + (fim !== ini ? ' a ' + rotulo(fim) : '');
+    return onde + ', ' + plural(paginas.length, epub ? 'parte' : 'página', epub ? 'partes' : 'páginas');
+  }
+
+  // "2 capítulos e 3 páginas em 2 livros", "3 páginas em 1 livro", "1 capítulo em 1 livro"
+  function descreverAchadosNosLivros(capitulos, paginas, livros) {
+    return [capitulos ? plural(capitulos, 'capítulo', 'capítulos') : '', paginas ? plural(paginas, 'página', 'páginas') : '']
+      .filter(Boolean).join(' e ') + ' em ' + plural(livros, 'livro', 'livros');
+  }
+
+  /* Um capítulo do resultado, compacto: o nome, por onde foi achado, UMA
+   * linha de páginas e UM botão. Achado pelo mapa ("Pelo capítulo", com o
+   * assunto que casou, se foi por ele), o botão é "Abrir no capítulo", na
+   * página em que ele começa; achado só no texto, é "Abrir", na primeira
+   * página encontrada. As páginas uma a uma ficam atrás de "Ver páginas".
+   * `obra`, quando vem, é o nome do livro (e o volume) na linha de cima: o
+   * topo mistura livros. */
+  function blocoDoCapitulo(livro, meta, bloco, obra) {
+    var paginas = bloco.paginas || [];
+    var epub = livro.formato === 'epub';
+    var unidade = epub ? 'parte' : 'página';
     var abrir = function (n) {
-      return function () { abrirLivro(livro.id, livro.formato === 'epub' ? { capitulo: n } : { pagina: n }); };
+      return function () { abrirLivro(livro.id, epub ? { capitulo: n } : { pagina: n }); };
     };
     var botao = function (n) {
-      var rotulo = livro.formato === 'epub' ? String(n) : rotuloDePaginaDoLivro(meta, n);
+      var rotulo = epub ? String(n) : rotuloDePaginaDoLivro(meta, n);
       return el('button', { type: 'button', class: 'bib-busca-pagina', 'data-pagina': n,
-        'aria-label': livro.formato === 'epub' ? 'Abrir na parte ' + n : 'Abrir na p. ' + rotulo, texto: rotulo, aoClick: abrir(n) });
+        'aria-label': epub ? 'Abrir na parte ' + n : 'Abrir na p. ' + rotulo, texto: rotulo, aoClick: abrir(n) });
     };
-    var botoes = el('div', { class: 'bib-busca-paginas' });
-    paginas.slice(0, BUSCA_PAGINAS_POR_BLOCO).forEach(function (n) { botoes.appendChild(botao(n)); });
-    if (paginas.length > BUSCA_PAGINAS_POR_BLOCO) {
-      var resto = paginas.slice(BUSCA_PAGINAS_POR_BLOCO);
-      var mais = el('button', { type: 'button', class: 'bib-busca-pagina bib-busca-pagina-mais', texto: '+' + resto.length,
-        'aria-label': 'Mostrar mais ' + plural(resto.length, unidade, unidade + 's'), aoClick: function () {
-          resto.forEach(function (n) { botoes.insertBefore(botao(n), mais); });
-          botoes.removeChild(mais);
-        } });
-      botoes.appendChild(mais);
+    var achado = bloco.achado;
+    var filhos = [];
+    if (obra) filhos.push(el('p', { class: 'bib-busca-obra', texto: obra }));
+    filhos.push(el('div', { class: 'bib-busca-livro-paginas' }, [
+      el('strong', { texto: bloco.titulo || OUTRAS_PAGINAS }),
+      paginas.length ? el('span', { class: 'bib-busca-livro-quantas', texto: 'No texto: ' + faixaDePaginas(livro, meta, paginas) }) : null
+    ].filter(Boolean)));
+    if (achado) {
+      var assuntos = achado.assuntos.map(function (a) { return a.titulo; });
+      filhos.push(el('p', { class: 'bib-busca-como', 'data-pelo': 'capitulo',
+        texto: 'Pelo capítulo' + (assuntos.length ? (assuntos.length === 1 ? ', assunto: ' : ', assuntos: ') + assuntos.join('; ') : '') }));
     }
-    return el('div', { class: 'bib-busca-livro-grupo' }, [
-      el('div', { class: 'bib-busca-livro-paginas' }, [
-        el('strong', { texto: grupo.titulo || 'Fora dos capítulos do sumário' }),
-        el('span', { class: 'bib-busca-livro-quantas', texto: plural(paginas.length, unidade, unidade + 's') })
-      ]),
-      botoes
-    ]);
+    var acoes = el('div', { class: 'bib-busca-acoes' });
+    if (achado) {
+      var c = achado.capitulo;
+      var destino = c.obraInteira || c.inicio === null ? null : epub ? { capitulo: c.inicio, ancora: c.ancora || null } : { pagina: c.inicio };
+      acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno bib-busca-abrir-capitulo',
+        'data-inicio': c.inicio === null ? '' : String(c.inicio), texto: 'Abrir no capítulo',
+        'aria-label': 'Abrir no capítulo ' + (bloco.titulo || ''), aoClick: function () { abrirLivro(livro.id, destino); } }));
+    } else if (paginas.length) {
+      acoes.appendChild(el('button', { type: 'button', class: 'btn pequeno bib-busca-abrir', 'data-pagina': paginas[0], texto: 'Abrir',
+        'aria-label': 'Abrir na primeira página encontrada, ' + (epub ? 'parte ' + paginas[0] : 'p. ' + rotuloDePaginaDoLivro(meta, paginas[0])),
+        aoClick: abrir(paginas[0]) }));
+    }
+    var botoes = null;
+    if (paginas.length > 1 || (achado && paginas.length)) {
+      botoes = el('div', { class: 'bib-busca-paginas', hidden: true });
+      var ver = el('button', { type: 'button', class: 'btn pequeno bib-busca-ver-paginas', 'aria-expanded': 'false',
+        texto: 'Ver ' + (epub ? 'partes' : 'páginas'), aoClick: function () {
+          botoes.hidden = !botoes.hidden;
+          ver.setAttribute('aria-expanded', botoes.hidden ? 'false' : 'true');
+          ver.textContent = (botoes.hidden ? 'Ver ' : 'Esconder ') + (epub ? 'partes' : 'páginas');
+        } });
+      acoes.appendChild(ver);
+      paginas.slice(0, BUSCA_PAGINAS_POR_BLOCO).forEach(function (n) { botoes.appendChild(botao(n)); });
+      if (paginas.length > BUSCA_PAGINAS_POR_BLOCO) {
+        var resto = paginas.slice(BUSCA_PAGINAS_POR_BLOCO);
+        var mais = el('button', { type: 'button', class: 'bib-busca-pagina bib-busca-pagina-mais', texto: '+' + resto.length,
+          'aria-label': 'Mostrar mais ' + plural(resto.length, unidade, unidade + 's'), aoClick: function () {
+            resto.forEach(function (n) { botoes.insertBefore(botao(n), mais); });
+            botoes.removeChild(mais);
+          } });
+        botoes.appendChild(mais);
+      }
+    }
+    if (acoes.childNodes.length) filhos.push(acoes);
+    if (botoes) filhos.push(botoes);
+    var caixa = el('div', { class: 'bib-busca-livro-grupo', 'data-livro': livro.id }, filhos);
+    caixa.setAttribute('data-pelo', [achado ? 'capitulo' : '', paginas.length ? 'texto' : ''].filter(Boolean).join(' '));
+    if (bloco.outras) caixa.setAttribute('data-outras', 'true');
+    return caixa;
+  }
+
+  /* Desenha o grupo "Nos livros" com o que veio pelos capítulos (na hora) e
+   * pelo texto (`res`, da consulta ao índice; null enquanto ela corre, ou sem
+   * ela). `modo`: buscando (o texto ainda vem), semTexto (este aparelho não
+   * busca no texto) ou falhou (a consulta ao texto falhou).
+   *
+   * No alto, "Melhores resultados": até 5 capítulos de qualquer livro, pela
+   * relevância. O resto fica em "Mais resultados (N)", recolhido, um cartão
+   * por obra (os volumes do mesmo livro juntos, com o volume ao lado do
+   * capítulo), com os tetos do #162: 30 obras ou 200 capítulos por vez. */
+  function desenharResultadosDosLivros(g, porCapitulo, res, modo) {
+    var status = g.status, resultados = g.resultados;
+    var diz = function (t) { g.contagem.textContent = t; if (g.resumo) g.resumo.diz('livros', t); };
+    modo = modo || {};
+    resultados.innerHTML = '';
+    g.desenhadoPara = null;
+    var livros = resultadosDosLivros(porCapitulo, res ? res.livros : []);
+    var paginas = 0, capitulos = 0, todos = [], obras = [], obraPorChave = Object.create(null);
+    livros.forEach(function (l) {
+      var meta = bibLivrosCache[l.id] ? bibLivrosCache[l.id].meta : {};
+      var chave = chaveDaObra(l, meta);
+      if (!obraPorChave[chave]) { obraPorChave[chave] = { chave: chave, titulo: l.titulo || tituloDoLivro(meta) || l.id, volumes: [] }; obras.push(obraPorChave[chave]); }
+      obraPorChave[chave].volumes.push(l);
+      l.blocos.forEach(function (b) {
+        paginas += b.paginas.length;
+        if (b.achado) capitulos++;
+        todos.push({ livro: l, meta: meta, bloco: b, ordem: todos.length });
+      });
+    });
+    var nomeComVolume = function (l, meta) {
+      var v = l.volume || meta.volume;
+      return (l.titulo || meta.titulo || l.id) + (v ? ', ' + rotuloDoVolume(v) : '');
+    };
+    /* "Outras páginas do livro" só disputa o topo quando não há capítulo
+     * nenhum: o resultado todo nelas não pode deixar o topo vazio e tudo
+     * escondido em "Mais resultados", fechado. */
+    var capitulosDoResultado = todos.filter(function (x) { return !x.bloco.outras; });
+    var melhores = (capitulosDoResultado.length ? capitulosDoResultado : todos).sort(compararBlocos).slice(0, BUSCA_MELHORES);
+    if (melhores.length) {
+      var topo = el('section', { class: 'bib-busca-melhores', 'aria-label': 'Melhores resultados nos livros' }, [
+        el('h3', { class: 'bib-busca-melhores-titulo', texto: 'Melhores resultados' })]);
+      melhores.forEach(function (x) { topo.appendChild(blocoDoCapitulo(x.livro, x.meta, x.bloco, nomeComVolume(x.livro, x.meta))); });
+      resultados.appendChild(topo);
+    }
+    var noTopo = melhores.map(function (x) { return x.bloco; });
+    var restantes = todos.filter(function (x) { return noTopo.indexOf(x.bloco) < 0; });
+    if (restantes.length) {
+      var mais = el('details', { class: 'bib-busca-mais' });
+      mais.appendChild(el('summary', { class: 'bib-busca-mais-cabeca' }, [
+        el('span', { class: 'bib-grupo-seta', 'aria-hidden': 'true' }, [icone('chr')]),
+        el('span', { class: 'bib-busca-mais-titulo', texto: 'Mais resultados (' + restantes.length + ')' })]));
+      var corpoMais = el('div', { class: 'bib-busca-mais-corpo' });
+      mais.appendChild(corpoMais);
+      resultados.appendChild(mais);
+      // o teto: 30 obras ou 200 capítulos por vez, e "Mostrar mais" desenha o resto
+      var obrasComResto = obras.filter(function (o) {
+        return restantes.some(function (x) { return o.volumes.indexOf(x.livro) >= 0; });
+      });
+      var proxima = 0;
+      var botaoMais = el('button', { type: 'button', class: 'btn bib-busca-livros-mais', aoClick: function () { desenharMais(); } });
+      var desenharMais = function () {
+        var obrasAgora = 0, blocosAgora = 0;
+        while (proxima < obrasComResto.length && obrasAgora < BUSCA_LIVROS_POR_VEZ && blocosAgora < BUSCA_BLOCOS_POR_VEZ) {
+          var obra = obrasComResto[proxima++];
+          var cartao = el('article', { class: 'bib-busca-livro', 'data-obra': obra.chave });
+          cartao.appendChild(el('h3', { class: 'bib-busca-livro-titulo', texto: obra.titulo }));
+          var varios = obra.volumes.length > 1;
+          var doCartao = restantes.filter(function (x) { return obra.volumes.indexOf(x.livro) >= 0; });
+          // os capítulos primeiro (volume a volume), e as "Outras páginas" de todos os volumes juntas, no fim
+          doCartao.filter(function (x) { return !x.bloco.outras; }).concat(doCartao.filter(function (x) { return x.bloco.outras; }))
+            .forEach(function (x) {
+              blocosAgora++;
+              var v = x.livro.volume || x.meta.volume;
+              cartao.appendChild(blocoDoCapitulo(x.livro, x.meta, x.bloco, varios && v ? rotuloDoVolume(v) : null));
+            });
+          corpoMais.insertBefore(cartao, botaoMais.parentNode ? botaoMais : null);
+          obrasAgora++;
+        }
+        if (proxima < obrasComResto.length) {
+          botaoMais.textContent = 'Mostrar mais ' + plural(obrasComResto.length - proxima, 'livro', 'livros');
+          if (!botaoMais.parentNode) corpoMais.appendChild(botaoMais);
+        } else if (botaoMais.parentNode) botaoMais.parentNode.removeChild(botaoMais);
+      };
+      desenharMais();
+    }
+    var pendentes = res ? (res.pendentes || []).length : 0;
+    if (livros.length) {
+      var achados = descreverAchadosNosLivros(capitulos, paginas, livros.length);
+      diz(achados);
+      var frase = capitulos ? achados + '.'
+        : plural(paginas, 'página encontrada', 'páginas encontradas') + ' em ' + plural(livros.length, 'livro', 'livros') + '.';
+      if (modo.buscando) frase += ' Buscando também no texto dos livros...';
+      else if (modo.semTexto) frase += ' A busca no texto dos livros não está disponível neste aparelho.';
+      else if (modo.falhou) frase += ' Não consegui consultar o texto dos livros agora.';
+      status.textContent = frase;
+    } else if (modo.semTexto) {
+      diz('');
+      status.textContent = 'A busca no texto dos livros não está disponível neste aparelho.';
+      return;
+    } else if (pendentes) {
+      // a leitura dos livros ainda corre: zero aqui não quer dizer que não existe
+      diz('preparando');
+      status.textContent = 'A busca nos livros ainda está sendo preparada em ' + plural(pendentes, 'livro', 'livros') +
+        '. O resultado aparece aqui quando a leitura terminar.';
+    } else {
+      diz('0');
+      status.textContent = 'Nenhum livro deste tablet tem esse termo.';
+      // nada nos dois grupos: um estado vazio só, no lugar dos dois
+      if (typeof g.aoVazio === 'function' && g.aoVazio()) return;
+    }
+    if (livros.length && pendentes) {
+      resultados.appendChild(el('p', { class: 'ajuda bib-busca-livros-aviso bib-busca-livros-preparando',
+        texto: 'Ainda preparando ' + plural(pendentes, 'livro', 'livros') + ': podem aparecer mais resultados.' }));
+    }
+    var semTexto = res ? avisoDosLivrosSemTexto(res.naoLidos) : null;
+    if (semTexto) resultados.appendChild(semTexto);
   }
 
   function buscarTextoNosLivros(termo, g) {
@@ -18186,73 +19003,31 @@
       status.textContent = 'Digite ao menos duas letras para buscar nos livros.';
       return;
     }
+    // os capítulos e os assuntos do mapa: em memória, na hora, em todo livro do tablet (o escaneado também)
+    var porCapitulo = capitulosAchadosNaBusca(consulta);
     if (!window.IndiceLivros || !window.IndiceLivros.buscarNosLivros) {
-      resultados.innerHTML = '';
-      diz('');
-      status.textContent = 'A busca no texto dos livros não está disponível neste aparelho.';
+      desenharResultadosDosLivros(g, porCapitulo, null, { semTexto: true });
       return;
     }
     // a consulta anterior para no meio: a varredura confere a vez entre um lote e outro
     var cancelada = function () { return vez !== buscaTextoLivrosVez; };
-    if (!resultados.childNodes.length) status.textContent = 'Buscando nos livros deste tablet...';
+    /* Os capítulos aparecem na hora, enquanto o texto vem. Se o grupo já mostra
+     * o resultado inteiro deste mesmo termo (a busca refeita porque um livro
+     * terminou de ser lido, ou porque o leitor fechou), ele fica como está até
+     * o texto chegar: redesenhar só com os capítulos tiraria as páginas debaixo
+     * do dedo dela. */
+    if (porCapitulo.length && g.desenhadoPara !== consulta) desenharResultadosDosLivros(g, porCapitulo, null, { buscando: true });
+    else if (!resultados.childNodes.length) status.textContent = 'Buscando nos livros deste tablet...';
     resultados.setAttribute('aria-busy', 'true');
     window.IndiceLivros.buscarNosLivros(consulta, {}, { cancelada: cancelada }).then(function (res) {
       if (cancelada() || (res && res.cancelada)) return;
       resultados.setAttribute('aria-busy', 'false');
-      resultados.innerHTML = '';
-      var livros = res.livros || [];
-      var total = 0;
-      livros.forEach(function (l) { (l.capitulos && l.capitulos.length ? l.capitulos : [{ paginas: l.paginas || [] }]).forEach(function (c) { total += (c.paginas || []).length; }); });
-      // o teto: 30 livros ou 200 capítulos por vez, e "Mostrar mais" desenha o resto
-      var proximo = 0;
-      function desenharMais() {
-        var livrosAgora = 0, blocosAgora = 0;
-        while (proximo < livros.length && livrosAgora < BUSCA_LIVROS_POR_VEZ && blocosAgora < BUSCA_BLOCOS_POR_VEZ) {
-          var livro = livros[proximo++];
-          var meta = bibLivrosCache[livro.id] ? bibLivrosCache[livro.id].meta : {};
-          var grupos = livro.capitulos && livro.capitulos.length ? livro.capitulos : [{ titulo: null, paginas: livro.paginas || [] }];
-          var cartao = el('article', { class: 'bib-busca-livro', 'data-livro': livro.id });
-          cartao.appendChild(el('h3', { class: 'bib-busca-livro-titulo', texto: livro.titulo || tituloDoLivro(meta) || livro.id }));
-          if (livro.volume || meta.volume) cartao.appendChild(el('p', { class: 'bib-busca-livro-volume', texto: livro.volume || meta.volume }));
-          grupos.forEach(function (grupo) {
-            if (!(grupo.paginas || []).length) return;
-            blocosAgora++;
-            cartao.appendChild(blocoDoCapitulo(livro, meta, grupo));
-          });
-          resultados.insertBefore(cartao, botaoMais.parentNode ? botaoMais : null);
-          livrosAgora++;
-        }
-        if (proximo < livros.length) {
-          botaoMais.textContent = 'Mostrar mais ' + plural(livros.length - proximo, 'livro', 'livros');
-          if (!botaoMais.parentNode) resultados.appendChild(botaoMais);
-        } else if (botaoMais.parentNode) botaoMais.parentNode.removeChild(botaoMais);
-      }
-      var botaoMais = el('button', { type: 'button', class: 'btn bib-busca-livros-mais', aoClick: function () { desenharMais(); } });
-      desenharMais();
-      var pendentes = (res.pendentes || []).length;
-      if (livros.length) {
-        diz(plural(total, 'página', 'páginas') + ' em ' + plural(livros.length, 'livro', 'livros'));
-        status.textContent = plural(total, 'página encontrada', 'páginas encontradas') + ' em ' + plural(livros.length, 'livro', 'livros') + '.';
-      } else if (pendentes) {
-        // a leitura dos livros ainda corre: zero aqui não quer dizer que não existe
-        diz('preparando');
-        status.textContent = 'A busca nos livros ainda está sendo preparada em ' + plural(pendentes, 'livro', 'livros') +
-          '. O resultado aparece aqui quando a leitura terminar.';
-      } else {
-        diz('0');
-        status.textContent = 'Nenhum livro deste tablet tem esse termo.';
-        // nada nos dois grupos: um estado vazio só, no lugar dos dois
-        if (typeof g.aoVazio === 'function' && g.aoVazio()) return;
-      }
-      if (livros.length && pendentes) {
-        resultados.appendChild(el('p', { class: 'ajuda bib-busca-livros-aviso bib-busca-livros-preparando',
-          texto: 'Ainda preparando ' + plural(pendentes, 'livro', 'livros') + ': podem aparecer mais resultados.' }));
-      }
-      var semTexto = avisoDosLivrosSemTexto(res.naoLidos);
-      if (semTexto) resultados.appendChild(semTexto);
+      desenharResultadosDosLivros(g, porCapitulo, res || {}, {});
+      g.desenhadoPara = consulta;
     }).catch(function () {
       if (cancelada()) return;
       resultados.setAttribute('aria-busy', 'false');
+      if (porCapitulo.length) { desenharResultadosDosLivros(g, porCapitulo, null, { falhou: true }); return; }
       diz('');
       status.textContent = 'Não consegui consultar o índice agora. Tente de novo.';
     });
@@ -18294,6 +19069,7 @@
       })).then(function (posicoes) {
         if (vez !== bibLivrosVez) return;
         bibLivrosCache = Object.create(null);
+        indiceDosCapitulos = null;   // o índice dos capítulos se refaz com os livros deste desenho
         var livros = lista.map(function (l, i) {
           var reg = { id: l.id, meta: l.meta || {}, pos: posicoes[i] || null, cor: CORES_DAS_CAPAS[i % CORES_DAS_CAPAS.length] };
           bibLivrosCache[l.id] = reg;
@@ -18572,6 +19348,127 @@
     return abrirLivro(l.id, { pagina: paginaDoArquivo(l.meta, e) });
   }
 
+  /* ---- as correções dela que ficaram órfãs (fase 1a da biblioteca na nuvem) ----
+   *
+   * Depois de um mapa novo, a correção que não achou capítulo com certeza
+   * (Biblioteca.correcoesOrfas) nunca some nem cai calada noutro capítulo: a
+   * tela do livro mostra UMA linha discreta com o número, recolhida (padrão
+   * 1, divulgação progressiva). Aberta, cada correção diz o título que ela
+   * corrigiu e os assuntos que escolheu, com:
+   *   - a sugestão de um toque, quando há um capítulo provável (o mesmo
+   *     título, ou o capítulo da mesma chave): "Ligar a “Exercícios” (p. 11)";
+   *   - "Ligar a um capítulo" (a lista dos capítulos do mapa de agora);
+   *   - "Descartar".
+   * Ligar a um capítulo que JÁ tem correção dela pergunta antes, na própria
+   * linha ("Trocar" ou "Cancelar"). As ações gravam e têm Desfazer (padrão
+   * 5), que devolve SÓ as entradas que a ação mexeu: uma correção feita
+   * depois, em outro capítulo, fica. */
+  var orfasAbertas = Object.create(null);   // livro -> a linha aberta
+  var orfaLigando = Object.create(null);    // livro -> a chave da correção cuja lista de capítulos está aberta
+  var orfaTrocando = Object.create(null);   // livro -> { chave, n }: a pergunta antes de trocar a correção de um capítulo
+
+  function blocoDasCorrecoesOrfas(l, orfas, mapa, nomeDoAssunto) {
+    var aberto = !!orfasAbertas[l.id];
+    var caixa = el('div', { class: 'bibl-orfas', id: 'bib-livro-orfas', 'data-orfas': String(orfas.length) });
+    caixa.appendChild(el('button', { type: 'button', class: 'bibl-orfas-linha bibl-apoio', id: 'bib-livro-orfas-linha',
+      'aria-expanded': aberto ? 'true' : 'false',
+      texto: orfas.length === 1 ? '1 correção sua não achou o capítulo depois da atualização' :
+        orfas.length + ' correções suas não acharam o capítulo depois da atualização',
+      aoClick: function () { orfasAbertas[l.id] = !aberto; desenharTelaDoLivro(l); } }));
+    if (!aberto) return caixa;
+    var naPagina = function (e) { return l.meta.formato !== 'epub' && e.pagina ? ' (p. ' + paginaParaMostrar(l.meta, e.pagina) + ')' : ''; };
+    var doMapa = function (n) { return mapa.filter(function (e) { return e.n === n; })[0] || null; };
+    orfas.forEach(function (o) {
+      var assuntos = o.assuntos.length ? o.assuntos.map(nomeDoAssunto).join(', ') : 'nenhum assunto do índice';
+      var sugerido = o.sugestao ? doMapa(o.sugestao.n) : null;
+      var item = el('div', { class: 'bibl-orfa', 'data-orfa': o.chave }, [
+        el('p', { class: 'bibl-orfa-texto', texto: 'Capítulo “' + o.titulo + '”: ' + assuntos +
+          (o.acao === 'corrigiu' ? ' (corrigido por você)' : ' (confirmado por você)') }),
+        el('div', { class: 'bibl-orfa-acoes' }, [
+          sugerido ? el('button', { type: 'button', class: 'btn pequeno principal', 'data-sugestao': o.chave, 'data-ligar-em': String(sugerido.n),
+            texto: 'Ligar a “' + sugerido.titulo + '”' + naPagina(sugerido),
+            aoClick: function () { mudarCorrecaoOrfa(l, o.chave, sugerido); } }) : null,
+          el('button', { type: 'button', class: 'btn pequeno', 'data-ligar': o.chave, texto: 'Ligar a um capítulo',
+            'aria-expanded': orfaLigando[l.id] === o.chave ? 'true' : 'false',
+            aoClick: function () { orfaLigando[l.id] = orfaLigando[l.id] === o.chave ? null : o.chave; orfaTrocando[l.id] = null; desenharTelaDoLivro(l); } }),
+          el('button', { type: 'button', class: 'btn pequeno', 'data-descartar': o.chave, texto: 'Descartar',
+            aoClick: function () { mudarCorrecaoOrfa(l, o.chave, null); } })
+        ].filter(Boolean))
+      ]);
+      var trocando = orfaTrocando[l.id] && orfaTrocando[l.id].chave === o.chave ? doMapa(orfaTrocando[l.id].n) : null;
+      if (trocando) {
+        item.appendChild(el('div', { class: 'bibl-orfa-pergunta', 'data-trocando': String(trocando.n) }, [
+          el('p', { class: 'bibl-orfa-texto', texto: '“' + trocando.titulo + '” já tem uma correção sua. Trocar pela desta?' }),
+          el('div', { class: 'bibl-orfa-acoes' }, [
+            el('button', { type: 'button', class: 'btn pequeno principal', 'data-trocar': o.chave, texto: 'Trocar',
+              aoClick: function () { mudarCorrecaoOrfa(l, o.chave, trocando, true); } }),
+            el('button', { type: 'button', class: 'btn pequeno', 'data-cancelar': o.chave, texto: 'Cancelar',
+              aoClick: function () { orfaTrocando[l.id] = null; desenharTelaDoLivro(l); } })
+          ])
+        ]));
+      }
+      if (orfaLigando[l.id] === o.chave) {
+        var escolha = el('div', { class: 'bibl-orfa-capitulos', role: 'list' });
+        mapa.forEach(function (e) {
+          escolha.appendChild(el('button', { type: 'button', class: 'bibl-orfa-capitulo', 'data-ligar-em': String(e.n),
+            texto: e.titulo + naPagina(e), aoClick: function () { mudarCorrecaoOrfa(l, o.chave, e); } }));
+        });
+        if (!mapa.length) escolha.appendChild(el('p', { class: 'bibl-falta-texto', texto: 'Este livro não tem capítulos no mapa agora.' }));
+        item.appendChild(escolha);
+      }
+      caixa.appendChild(item);
+    });
+    return caixa;
+  }
+
+  /* Liga a correção órfã ao capítulo `entrada` do mapa de agora, ou a
+   * descarta (entrada null). O capítulo que já tem correção dela pergunta
+   * antes (`confirmado` é a resposta "Trocar"). A correção ligada guarda o
+   * título de onde veio (ligadaDe). Desfazer devolve só as entradas mexidas,
+   * como estavam, e deixa o resto do livro como está na hora do toque. */
+  function mudarCorrecaoOrfa(l, chaveOrfa, entrada, confirmado) {
+    db.ajustes = db.ajustes || {};
+    db.ajustes.mapaDosLivros = db.ajustes.mapaDosLivros || {};
+    var doLivro = db.ajustes.mapaDosLivros[l.id];
+    var tem = function (k) { return !!doLivro && Object.prototype.hasOwnProperty.call(doLivro, k); };
+    if (!tem(chaveOrfa)) { desenharTelaDoLivro(l); return; }
+    if (entrada && entrada.correcaoChave && entrada.correcaoChave !== chaveOrfa && !confirmado) {
+      orfaTrocando[l.id] = { chave: chaveOrfa, n: entrada.n };
+      desenharTelaDoLivro(l);
+      return;
+    }
+    var copia = function (k) { return tem(k) ? JSON.parse(JSON.stringify(doLivro[k])) : undefined; };
+    var antes = {};
+    antes[chaveOrfa] = copia(chaveOrfa);
+    var c = doLivro[chaveOrfa];
+    delete doLivro[chaveOrfa];
+    if (entrada) {
+      var destino = Biblioteca.chaveParaGravarCorrecao(doLivro, entrada);
+      if (!Object.prototype.hasOwnProperty.call(antes, destino)) antes[destino] = copia(destino);
+      var ligada = { titulo: entrada.titulo, assuntos: (c.assuntos || []).slice(), acao: c.acao === 'corrigiu' ? 'corrigiu' : 'confirmou',
+        quando: new Date().toISOString(), n: entrada.n, ligadaDe: c.titulo };
+      if (entrada.chave) ligada.chave = entrada.chave;
+      doLivro[destino] = ligada;
+    }
+    orfaLigando[l.id] = null;
+    orfaTrocando[l.id] = null;
+    // a busca pelos capítulos (#181) passa a ver a correção na próxima consulta
+    indiceDosCapitulos = null;
+    var redesenhar = function () { if (bibLivroAberto === l.id) desenharTelaDoLivro(l); };
+    salvar().then(redesenhar, redesenhar);
+    avisar(entrada ? 'Correção ligada ao capítulo “' + entrada.titulo + '”.' : 'Correção descartada.', 'Desfazer', function () {
+      db.ajustes = db.ajustes || {};
+      db.ajustes.mapaDosLivros = db.ajustes.mapaDosLivros || {};
+      var agora = db.ajustes.mapaDosLivros[l.id] = db.ajustes.mapaDosLivros[l.id] || {};
+      Object.keys(antes).forEach(function (k) {
+        if (antes[k] === undefined) delete agora[k];
+        else agora[k] = antes[k];
+      });
+      indiceDosCapitulos = null;
+      salvar().then(redesenhar, redesenhar);
+    });
+  }
+
   function desenharTelaDoLivro(l, nomesLidos) {
     var tela = $('#bib-livro');
     if (!tela) return;
@@ -18622,6 +19519,10 @@
         sumario.length && !epub ? el('span', { class: 'bibl-apoio', texto: rotuloDaPaginaDoLivro(meta) }) : null
       ])
     ]);
+    var ondeEstava = avisoDaPosicaoAjustada(l.pos);
+    if (ondeEstava) lista.appendChild(el('p', { class: 'bibl-apoio', id: 'bib-livro-onde-estava', texto: ondeEstava }));
+    var orfas = Biblioteca.correcoesOrfas(meta, correcoesDosLivros()[l.id]);
+    if (orfas.length) lista.appendChild(blocoDasCorrecoesOrfas(l, orfas, mapa, nomeDoAssunto));
     if (!sumario.length) {
       lista.appendChild(el('p', { class: 'bibl-falta-texto bibl-sem-sumario', id: 'bib-livro-sem-sumario',
         texto: 'Este livro não tem sumário nem mapa de assuntos. Abra o livro e use Anterior e Próxima.' }));
@@ -18705,7 +19606,7 @@
     tela.hidden = false;
     tela.scrollTop = rolagem;
     // os nomes dos assuntos chegam do índice: sem ele, a tela mostra os ids e se refaz quando ele abre
-    if (!nomes && nLigados) {
+    if (!nomes && (nLigados || orfas.length)) {
       carregarAssuntosDosLivros().then(function (v) {
         if (v && bibLivroAberto === l.id) desenharTelaDoLivro(l, v);
       }, function () { /* fica com os ids */ });
@@ -19814,6 +20715,7 @@
   var MAX_AUTOMATICAS = 3;
   var NIVEIS_DA_LISTA = [['base', 'Base'], ['regular', 'Regular'], ['aprofundamento', 'Aprofundamento']];
   var minhaEmEdicao = null;
+  var editorDeListaMudou = null;   // o mudou() do editor à vista: a guarda do Voltar do aparelho lê
   // a lista que ela carregou no material pelo cartão: o uso fica com ela, e não com outra de mesmo conteúdo
   var listaMinhaCarregada = null;
 
@@ -20164,6 +21066,7 @@
     var mudou = function () {
       return r.titulo !== (original.titulo || '') || r.nivel !== (original.nivel || null) || !mesmaLista(r, original);
     };
+    editorDeListaMudou = function () { return minhaEmEdicao === r && mudou(); };
     corpo.appendChild(voltarBib('Minhas listas', function () {
       if (mudou() && !confirmar('Sair sem guardar as mudanças desta lista?')) return;
       minhaEmEdicao = null;
@@ -21410,6 +22313,7 @@
      * no cartão errado. */
     faixa.hidden = false;
     faixa.classList.toggle('vazia', !(n || m));
+    faixaDoCarrinhoNaBusca();
     if (!(n || m)) {
       faixa.appendChild(el('span', { class: 'bib-carrinho-texto', id: 'bib-carrinho-vazio',
         texto: listaAnexada() ? 'Nada marcado.' : 'Nada marcado ainda.' }));
@@ -22313,6 +23217,15 @@
     });
   }
 
+  /* A faixa do material marcado VAZIA não gruda no alto durante a busca
+   * (pedido do dono, 12/11/2026): "Nada marcado ainda" tomava o alto da tela
+   * em toda a rolagem do resultado. Ela continua no lugar dela, no começo, e
+   * rola junto; com material marcado, volta a grudar, como sempre. */
+  function faixaDoCarrinhoNaBusca() {
+    var faixa = $('#bib-carrinho');
+    if (faixa) faixa.classList.toggle('na-busca', !!String(bibTermo || '').trim());
+  }
+
   function temPacotesDeExercicios() { return !!(bib && bib.pacotes && bib.pacotes.length); }
 
   /* O campo do alto diz onde procura: com livro no tablet, nos exercícios e
@@ -22334,6 +23247,7 @@
    * antes (com os dois grupos, se há livro); só com livros, o miolo mostra
    * o grupo "Nos livros", e o campo vazio devolve a aba como era. */
   function redesenharDaBusca() {
+    faixaDoCarrinhoNaBusca();
     if (temPacotesDeExercicios()) { desenharCorpoBiblioteca(); return; }
     var corpo = $('#bib-corpo');
     if (!corpo) return;
@@ -23132,6 +24046,14 @@
    *                        arrasta a barra: a faixa muda, a posição só ao soltar
    *   opcoes.livro         o registro do livro (C15.4): com ele aparece o
    *                        "Exportar em PDF"
+   *   opcoes.compacto      o PDF de uma página (o planejamento de estudos):
+   *                        some o que não serve (Anterior, Próxima, o contador,
+   *                        o Sumário, o "Ajustar à largura"); fica a barra de
+   *                        uma linha com menos, mais e fechar
+   *   opcoes.zoomInicial   o zoom com que abre (padrão: 1, ajustado à largura)
+   *   opcoes.aoCompartilhar function () do botão de saída do rodapé, com o
+   *                        rótulo opcoes.rotuloCompartilhar
+   * Sem essas três, o leitor é o de sempre (a Biblioteca e o anexo da aula).
    *
    * Devolve uma promessa: true quando a primeira página está desenhada, false
    * quando não abriu (a janela já disse por quê e ofereceu o caminho de fora). */
@@ -23140,7 +24062,16 @@
     if (leitor) soltarLeitorPdf();
     var vez = ++leitorVez;
     var nome = opcoes.nome || opcoes.titulo || 'documento.pdf';
-    leitor = { doc: null, pagina: Math.max(1, parseInt(opcoes.pagina, 10) || 1), total: 0, zoom: 1,
+    /* O modo compacto e a saída do planejamento só valem para quem os pede. */
+    $('#modal-leitor-pdf').classList.toggle('leitor-compacto', !!opcoes.compacto);
+    var saida = $('#leitor-compartilhar');
+    if (saida) {
+      saida.hidden = typeof opcoes.aoCompartilhar !== 'function';
+      saida.textContent = opcoes.rotuloCompartilhar || 'Compartilhar PDF';
+      saida.onclick = typeof opcoes.aoCompartilhar === 'function' ? function () { opcoes.aoCompartilhar(); } : null;
+    }
+    var zoomInicial = Number(opcoes.zoomInicial) > 0 ? Math.min(LEITOR_ZOOM_MAX, Math.max(LEITOR_ZOOM_MIN, Number(opcoes.zoomInicial))) : 1;
+    leitor = { doc: null, pagina: Math.max(1, parseInt(opcoes.pagina, 10) || 1), total: 0, zoom: zoomInicial,
       opcoes: opcoes, nome: nome, fonte: fonte };
     var estado = leitor;
     $('#titulo-modal-leitor-pdf').textContent = opcoes.titulo || nome;
@@ -23733,6 +24664,11 @@
     leitor = null;
     fecharSumarioDoLeitor();
     esconderCobre('pdf');
+    // o modo compacto e a saída do planejamento não ficam para o próximo PDF
+    var modalLeitor = $('#modal-leitor-pdf');
+    if (modalLeitor) modalLeitor.classList.remove('leitor-compacto');
+    var saida = $('#leitor-compartilhar');
+    if (saida) { saida.hidden = true; saida.onclick = null; }
     // o canvas de uma página com zoom passa de 40 MB: sai da tela e da memória
     var corpo = $('#corpo-modal-leitor-pdf');
     if (corpo) { corpo.innerHTML = ''; delete corpo.dataset.paginaDesenhada; }
@@ -24573,7 +25509,7 @@
     telaCelular = tela;
     celularPedeEntrada = false;
     formCelular = null;
-    folhaCelular = null;
+    soltarFolhaCelular();
     fecharMensagemCelular(); // o que ela escreveu já está no rascunho
     alunoCelular = null; // a aba Alunos volta à lista
     diaRoladoCelular = null; // voltando a Hoje, a linha do tempo rola até agora
@@ -24961,7 +25897,7 @@
 
   function irParaDiaCelular(dia) {
     diaCelular = dia;
-    folhaCelular = null;
+    soltarFolhaCelular();
     desenharHojeCelular();
   }
 
@@ -25827,8 +26763,10 @@
     esconderAviso(); // o aviso da ação anterior não fica sob a folha
     folhaCelular = { aulaId: aulaId, passo: 'acoes' };
     desenharFolhaCelular();
+    folhaEntrouNoHistorico();
   }
   function fecharFolhaCelular() {
+    folhaSaiuDoHistorico();
     folhaCelular = null;
     var fundo = $('#cel-folha-fundo');
     if (fundo) fundo.parentNode.removeChild(fundo);
@@ -25837,6 +26775,13 @@
     if (!folhaCelular) return;
     folhaCelular.passo = passo;
     desenharFolhaCelular();
+    // a foto dos campos do passo, para o Voltar perguntar só se algo mudou
+    folhaCelular.foto = fotoDosCampos($('#cel-folha'));
+  }
+  // a folha sai por outro caminho (outro dia, um formulário): a entrada dela sai do histórico
+  function soltarFolhaCelular() {
+    if (folhaCelular) folhaSaiuDoHistorico();
+    folhaCelular = null;
   }
 
   /* O que ela quer ver da aula antes de entrar na casa: o lembrete, a última
@@ -25885,7 +26830,7 @@
     if (velho) velho.parentNode.removeChild(velho);
     if (!folhaCelular || !$('#cel-hoje')) return;
     var a = aulaPorIdCelular(folhaCelular.aulaId);
-    if (!a) { folhaCelular = null; return; }
+    if (!a) { soltarFolhaCelular(); return; }
     var aluno = alunoPorId(a.alunoId);
     var edita = celularEdita() && !!aluno;
     // quem só lê vê a aula e a ficha mínima, e só
@@ -26288,7 +27233,7 @@
 
   function abrirFormularioCelular(form) {
     esconderAviso(); // o aviso da ação anterior não fica em cima do formulário
-    folhaCelular = null;
+    soltarFolhaCelular();
     formCelular = form;
     desenharHojeCelular();
     var conteudo = $('#cel-conteudo');
@@ -26322,6 +27267,15 @@
       function (v, choques) { titulo.textContent = 'Marcar aula às ' + v.hora; ajustarSalvarAoChoque($('#cel-aula-salvar'), 'Salvar na agenda', choques); });
     h.campos.forEach(function (c) { caixa.appendChild(c); });
     caixa.appendChild(el('p', { class: 'ajuda', texto: 'Aula de repetição se marca no tablet.' }));
+    /* O planejamento de estudos com IA (fase 2): o link discreto no pé do
+     * formulário; se ela já mexeu nele, pergunta antes. */
+    if (podeChamarIA()) {
+      var marcarMexido = false;
+      caixa.addEventListener('input', function () { marcarMexido = true; });
+      caixa.addEventListener('change', function () { marcarMexido = true; });
+      caixa.appendChild(linkDoPlanejamento('cel-aula-planejamento', true, function () { return marcarMexido; },
+        function (depois) { depois(); }));
+    }
     caixa.appendChild(rodapeDoFormularioCelular('cel-aula-salvar', 'Salvar na agenda', function () {
       var v = h.ler();
       if (!v.data) { avisar('Escreva a data como dd/mm/aaaa, por exemplo ' + Core.ddmmaaaa(Core.hojeIso()) + '.'); return; }
@@ -26672,6 +27626,7 @@
       }
       editandoFichaAlunoCelular = false;
       caixa.appendChild(fichaMinimaCelular(aberto, aulaDeContextoDoAluno(aberto.id)));
+      if (mostraSecaoPlanejamentos(aberto.id)) caixa.appendChild(secaoPlanejamentos(aberto.id, true));
       caixa.appendChild(el('div', { class: 'barra' }, [
         celularEdita() ? botaoDeAcaoCelular('editar-ficha-aluno', { class: 'btn', id: 'cel-alunos-editar-ficha', texto: 'Editar ficha',
           aoClick: function () { editandoFichaAlunoCelular = true; desenharAlunosCelular(); var c = $('#cel-conteudo'); if (c) c.scrollTop = 0; } }) : null,
@@ -27358,6 +28313,1041 @@
     caixa.appendChild(el('div', { class: 'cartao', id: 'cel-obs-instalar' }, instalar));
     caixa.appendChild(el('p', { class: 'ajuda', id: 'cel-obs-versao', texto: 'Versão ' + VERSAO + ', ' + sonda.rotulo + '.' }));
   }
+
+  // ================= o planejamento de estudos com IA (fase 2) =================
+  /* Na ficha do aluno (tablet e celular), a seção "Planejamentos" com o
+   * "Novo planejamento" e os salvos; e um link discreto no pé da aula nova
+   * (tablet) e do "Marcar aula" (celular), que abre o mesmo fluxo sem aluno.
+   * Uma janela só: o pedido (texto, ditado e prints), o "montando" que dá
+   * para cancelar, a prévia que é o próprio PDF (tocar amplia no leitor do
+   * app), a conferência, o ajuste com "Desfazer ajuste", o compartilhar e o
+   * salvar.
+   *
+   * Quem fala com a IA é o endpoint do próprio site (/api/ia), com o login da
+   * nuvem; o app só monta o corpo (planejamento.js). Os prints NÃO são
+   * guardados: só o plano, em ajustes['planejamento:<id>'] (o porquê está no
+   * store.js, no PREFIXO_PLANEJAMENTO).
+   *
+   * Quem vê o quê:
+   *   - podeVerPlanejamentos: a lista, a prévia e o compartilhar. Só o
+   *     observador (a cópia de outra conta) não vê.
+   *   - podeGravarPlanejamentos: salvar, excluir e trocar o aluno; o
+   *     aparelho que grava (o tablet, o celular da dona).
+   *   - podeChamarIA: o Novo e o Ajustar, que além de gravar exigem a conta
+   *     da nuvem entrada (o endpoint confere o login). */
+  var PREFIXO_PLANEJAMENTO = 'planejamento:';
+  var PRAZO_DA_IA_MS = 150000;
+  var TRAVA_DO_RODAPE_MS = 400;
+  var LISTA_CURTA = 3;
+  var fluxoPlano = null; // o fluxo aberto (abrirPlanejamento)
+  var vezDoPlanejamento = 0;
+  var listaInteiraDe = {}; // ficha com "ver todos" aberto, por aluno
+
+  function podeVerPlanejamentos() {
+    if (typeof Planejamento === 'undefined') return false;
+    return !leOutraConta();
+  }
+  function podeGravarPlanejamentos() {
+    return podeVerPlanejamentos() && (!aparelhoSoLe() || celularEdita());
+  }
+  function podeChamarIA() {
+    if (!podeGravarPlanejamentos() || !temNuvem()) return false;
+    var est = Nuvem.estado();
+    return !!(est && est.entrada && est.entrada.uid);
+  }
+
+  function planejamentosDoAluno(alunoId) {
+    var aj = (db && db.ajustes) || {};
+    return Object.keys(aj).filter(function (k) {
+      var r = aj[k];
+      if (k.indexOf(PREFIXO_PLANEJAMENTO) !== 0 || !r || r.alunoId !== alunoId || !r.plano) return false;
+      /* Um registro que não passa na conferência (veio quebrado de outro
+       * aparelho, ou de uma versão futura) fica de fora da lista, e a ficha
+       * abre do mesmo jeito. */
+      try { return Planejamento.conferirPlano(r.plano, [alunoId]) === null; } catch (e) { return false; }
+    }).map(function (k) { return aj[k]; }).sort(function (a, b) {
+      return String(b.atualizadoEm || '').localeCompare(String(a.atualizadoEm || ''));
+    });
+  }
+
+  /* Os horários fixos do aluno, das séries que valem hoje: é como ela
+   * descreve o aluno ("a de terça e quinta às 11h"). */
+  function horariosFixosDoAluno(alunoId, hoje) {
+    var vistos = {}, saida = [];
+    (db.series || []).forEach(function (s) {
+      if (!s || s.alunoId !== alunoId || !s.dias || !s.dias.length) return;
+      if ((s.status || 'realizada') === 'cancelada') return;
+      if (s.fim && s.fim < hoje) return;
+      var chave = s.dias.slice().sort().join(',') + '@' + (s.hora || '');
+      if (vistos[chave]) return;
+      vistos[chave] = true;
+      saida.push({ dias: s.dias.slice(), hora: s.hora || '' });
+    });
+    return saida;
+  }
+  function alunosParaIA(hoje) {
+    return db.alunos.filter(function (a) { return a.ativo !== false; }).map(function (a) {
+      return { id: a.id, nome: Planejamento.primeiroNome(a.nome), horarios: horariosFixosDoAluno(a.id, hoje) };
+    });
+  }
+
+  /* O nome na tela: o primeiro nome, e a inicial do sobrenome quando outro
+   * aluno ativo tem o mesmo primeiro nome. Só na tela: o pedido à IA continua
+   * só com o primeiro nome. */
+  function nomeNaTela(aluno) {
+    var primeiro = Planejamento.primeiroNome(aluno.nome);
+    var repetido = db.alunos.some(function (o) {
+      return o.id !== aluno.id && o.ativo !== false && Planejamento.primeiroNome(o.nome) === primeiro;
+    });
+    if (!repetido) return primeiro;
+    var resto = String(aluno.nome || '').trim().split(/\s+/).slice(1);
+    return resto.length ? primeiro + ' ' + resto[resto.length - 1].charAt(0).toUpperCase() + '.' : primeiro;
+  }
+
+  /* As aulas do aluno no período, da AGENDA (as gravadas e as previstas das
+   * repetições que ainda não viraram aula), sem as canceladas. */
+  function aulasDoAlunoNoPeriodo(alunoId, inicio, fim) {
+    var saida = [];
+    (db.aulas || []).forEach(function (a) {
+      if (a.alunoId !== alunoId || !a.data || a.data < inicio || a.data > fim) return;
+      if ((a.status || 'realizada') === 'cancelada') return;
+      saida.push({ data: a.data, hora: a.hora || '' });
+    });
+    for (var d = inicio, n = 0; d <= fim && n < 70; d = Planejamento.somaDias(d, 1), n++) {
+      Core.ocorrenciasPrevistasDoDia(db, d).forEach(function (o) {
+        if (o.alunoId === alunoId && (o.status || 'realizada') !== 'cancelada') saida.push({ data: o.data, hora: o.hora || '' });
+      });
+    }
+    return saida;
+  }
+  /* As aulas da agenda que vão ao modelo, para ele saber quais existem e
+   * poder tirar uma da folha (aulasRemovidas): as do aluno, de `inicio` até o
+   * teto do período (o ajuste pode esticar o fim). Só do aluno escolhido:
+   * sem ele, nada vai. */
+  /* O aluno do plano, só quando é certo (veio da ficha, ela escolheu, ou o
+   * modelo teve confiança alta); com o palpite de confiança baixa, null. */
+  function alunoConfirmado(plano) {
+    return plano && plano.alunoId && plano.confiancaAluno === 'alta' && alunoPorId(plano.alunoId) ? plano.alunoId : null;
+  }
+  function agendaParaIA(alunoId, inicio) {
+    if (!alunoId || !alunoPorId(alunoId) || !Planejamento.dataValida(inicio)) return null;
+    var ate = Planejamento.somaDias(inicio, Planejamento.MAX_DIAS - 1);
+    return { de: inicio, ate: ate, aulas: aulasDoAlunoNoPeriodo(alunoId, inicio, ate) };
+  }
+  /* Os feriados nacionais do período, de segunda a sábado (no domingo não
+   * mudam nada no estudo), somados aos que o aviso citou. */
+  function feriadosDoPeriodo(inicio, fim) {
+    var saida = [];
+    for (var d = inicio, n = 0; d <= fim && n < 70; d = Planejamento.somaDias(d, 1), n++) {
+      var f = Core.feriadoEm(d);
+      if (f && f.ambito === 'nacional' && !f.facultativo && Core.diaSemana(d) !== 0) saida.push(d);
+    }
+    return saida;
+  }
+
+  function folhaDoPlano(p) {
+    var aluno = p && p.alunoId ? alunoPorId(p.alunoId) : null;
+    if (!aluno) return { erro: 'Escolha o aluno para ver a folha.' };
+    return Planejamento.desenharFolha(p, {
+      nome: aluno.nome,
+      aulas: aulasDoAlunoNoPeriodo(aluno.id, p.periodo.inicio, p.periodo.fim),
+      feriados: feriadosDoPeriodo(p.periodo.inicio, p.periodo.fim)
+    }, PDFGen);
+  }
+
+  function anunciar(texto) {
+    var r = $('#plan-anuncio');
+    if (!r) return;
+    r.textContent = '';
+    setTimeout(function () { r.textContent = texto; }, 30);
+  }
+
+  /* A seção aparece a quem pode ver, e só quando tem algo: um plano salvo, ou
+   * o "Novo planejamento" (que pede a conta da nuvem). */
+  function mostraSecaoPlanejamentos(alunoId) {
+    return podeVerPlanejamentos() && (podeChamarIA() || planejamentosDoAluno(alunoId).length > 0);
+  }
+
+  /* A seção "Planejamentos" da ficha: os 3 mais recentes, com "ver todos", e
+   * o "Novo planejamento" como ação do cartão. */
+  function secaoPlanejamentos(alunoId, celular) {
+    var caixa = el('div', { class: 'cartao plan-secao', id: celular ? 'cel-plan-secao' : 'plan-secao', 'data-aluno': alunoId });
+    /* No celular da dona, todo botão que leva a uma gravação é uma ação
+     * declarada (D6b): data-acao-celular, como o "Cadastrar aluno". O celular
+     * que só lê abre os salvos com botão comum: abrir não grava. */
+    var acaoDeclarada = celular && celularEdita();
+    var botao = function (acao, atributos) {
+      if (acaoDeclarada) return botaoDeAcaoCelular(acao, atributos);
+      atributos.type = 'button';
+      return el('button', atributos);
+    };
+    caixa.appendChild(el('div', { class: 'plan-secao-cabeca' }, [el('strong', { class: 'cresce', texto: 'Planejamentos de estudo' })]));
+    var lista = planejamentosDoAluno(alunoId);
+    if (!lista.length) {
+      caixa.appendChild(el('p', { class: 'ajuda u-margem-0', texto: 'Mande o aviso da escola, e o plano de estudos sai pronto em PDF.' }));
+    } else {
+      var inteira = !!listaInteiraDe[alunoId];
+      var mostrados = inteira ? lista : lista.slice(0, LISTA_CURTA);
+      caixa.appendChild(el('div', { class: 'plan-lista' }, mostrados.map(function (r) {
+        var rotulo;
+        try { rotulo = Planejamento.rotuloCurto(r.plano); } catch (e) { rotulo = 'Planejamento de estudos'; }
+        var item = botao('planejamento-salvo', { class: 'plan-item', id: (celular ? 'cel-plan-item-' : 'plan-item-') + r.id, 'data-plano': r.id, 'aria-label': rotulo + '. Abrir',
+          aoClick: function () { abrirPlanejamento({ salvo: r }, item); } });
+        item.appendChild(el('span', { class: 'plan-item-texto' }, [
+          el('span', { class: 'plan-item-nome', texto: rotulo }),
+          el('span', { class: 'plan-item-quando', texto: 'feito em ' + Core.ddmm(String(r.criadoEm || '').slice(0, 10) || Core.hojeIso()) })
+        ]));
+        item.appendChild(icone('chr', '', 'plan-item-abre'));
+        return item;
+      })));
+      if (lista.length > LISTA_CURTA) {
+        caixa.appendChild(botao('planejamento-ver-todos', { class: 'btn pequeno plan-ver-todos', id: celular ? 'cel-plan-ver-todos' : 'plan-ver-todos',
+          'aria-expanded': inteira ? 'true' : 'false', texto: inteira ? 'Ver só os recentes' : 'Ver todos (' + lista.length + ')',
+          aoClick: function () {
+            listaInteiraDe[alunoId] = !inteira;
+            redesenharSecoesDePlanejamento();
+            var b = $(celular ? '#cel-plan-ver-todos' : '#plan-ver-todos');
+            if (b) b.focus();
+          } }));
+      }
+    }
+    if (podeChamarIA()) {
+      var novo = botao('planejamento', { class: 'btn principal plan-novo', id: celular ? 'cel-plan-novo' : 'plan-novo', icone: 'plus', texto: 'Novo planejamento' });
+      novo.addEventListener('click', function () { abrirPlanejamento({ alunoFixoId: alunoId }, novo); });
+      caixa.appendChild(el('div', { class: 'plan-secao-acao' }, [novo]));
+    }
+    return caixa;
+  }
+  function redesenharSecoesDePlanejamento() {
+    if (modoCelular) { if (alunoCelular && $('#cel-plan-secao')) desenharAlunosCelular(); return; }
+    var velha = $('#plan-secao');
+    if (velha && velha.parentNode) velha.parentNode.replaceChild(secaoPlanejamentos(velha.dataset.aluno, false), velha);
+  }
+
+  /* O link discreto no pé da aula nova (tablet) e do "Marcar aula" (celular).
+   * `preenchida()` diz se ela já mexeu no formulário: aí passa pela mesma
+   * pergunta do sair sem salvar. */
+  function linkDoPlanejamento(id, celular, preenchida, fechar) {
+    var atributos = { class: 'plan-link', id: id, texto: 'Fazer planejamento de estudos' };
+    var b = celular ? botaoDeAcaoCelular('planejamento', atributos) : el('button', Object.assign({ type: 'button' }, atributos));
+    b.addEventListener('click', function () {
+      var seguir = function () { fechar(function () { abrirPlanejamento({}); }); };
+      if (preenchida()) perguntarAntesDeDescartar('Sair da aula nova?', 'O que você preencheu nesta aula ainda não foi salvo e se perde.', seguir);
+      else seguir();
+    });
+    return el('div', { class: 'plan-atalho' }, [b]);
+  }
+
+  /* abrirPlanejamento({ alunoFixoId }) ou ({ salvo: registro }) ou ({}) (atalho).
+   * `origem` é o botão que abriu: o foco volta para ele ao fechar. */
+  function abrirPlanejamento(o, origem) {
+    o = o || {};
+    if (o.salvo ? !podeVerPlanejamentos() : !podeChamarIA()) return;
+    vezDoPlanejamento++;
+    fluxoPlano = { vez: vezDoPlanejamento, alunoFixoId: o.alunoFixoId || null, estado: 'pedido', texto: '', imagens: [], preparando: null,
+      conversa: null, plano: null, planoAnterior: null, mudou: '', bytes: null, erro: null, erroAjuste: null, textoAjuste: '',
+      salvoId: null, idParaSalvar: null, salvando: false, compartilhando: false, mudouDesdeSalvar: false, parar: null, uso: [],
+      conferirAberto: false, rodapeLivreEm: 0, origem: origem || document.activeElement, focarTitulo: false };
+    if (o.salvo) {
+      fluxoPlano.estado = 'previa';
+      fluxoPlano.alunoFixoId = o.salvo.alunoId;
+      fluxoPlano.plano = JSON.parse(JSON.stringify(o.salvo.plano));
+      fluxoPlano.salvoId = o.salvo.id;
+    }
+    abrirModal('modal-planejamento');
+    desenharPlanejamento();
+    if (fluxoPlano.estado === 'pedido') { var c = $('#plan-texto'); if (c) c.focus(); }
+    else focarTituloDoPlanejamento();
+  }
+  function focarTituloDoPlanejamento() {
+    var t = $('#titulo-modal-planejamento');
+    if (!t) return;
+    t.setAttribute('tabindex', '-1');
+    try { t.focus({ preventScroll: true }); } catch (e) { t.focus(); }
+  }
+  /* Fechar a janela: o pedido em curso é cancelado, o ditado para, e os
+   * prints (base64 e miniaturas), a conversa e o PDF saem da memória. O foco
+   * volta ao botão que abriu. */
+  function pararPlanejamento() {
+    var p = fluxoPlano;
+    if (p && p.parar) { try { p.parar(); } catch (e) { /* já parou */ } }
+    if (p) p.vez = -1;
+    pararDitado();
+    fluxoPlano = null;
+    var origem = p && p.origem;
+    /* o botão de origem pode ter sido redesenhado (a lista da ficha muda ao
+     * salvar): procura pelo mesmo id */
+    if (origem && !document.body.contains(origem) && origem.id) origem = document.getElementById(origem.id);
+    if (origem && document.body.contains(origem) && typeof origem.focus === 'function') setTimeout(function () { try { origem.focus(); } catch (e) { /* saiu */ } }, 0);
+  }
+  /* Há o que perder ao fechar: o pedido sendo montado ou ajustado, texto ou
+   * prints no pedido, ou um plano montado ou ajustado e ainda não salvo. */
+  function planejamentoTemTrabalho() {
+    var p = fluxoPlano;
+    if (!p) return false;
+    if (p.estado === 'montando' || p.ajustando) return true;
+    if (p.estado === 'pedido') return !!(String(p.texto || '').trim() || p.imagens.length || p.preparando);
+    return !!(p.plano && p.mudouDesdeSalvar);
+  }
+
+  /* A pergunta de sair sem salvar, no padrão do modal-sair-relato: o
+   * principal é "Continuar editando"; "Descartar", em vermelho, segue. */
+  var aoDescartarPlanejamento = null;
+  var focoAntesDaPergunta = null;
+  /* Fechou a pergunta sem descartar (Continuar editando, o Voltar, o fundo):
+   * o foco volta para onde estava. */
+  function devolverFocoDaPergunta() {
+    var alvo = focoAntesDaPergunta;
+    focoAntesDaPergunta = null;
+    aoDescartarPlanejamento = null;
+    if (alvo && document.body.contains(alvo) && typeof alvo.focus === 'function') setTimeout(function () { try { alvo.focus(); } catch (e) { /* saiu */ } }, 0);
+  }
+  function perguntarAntesDeDescartar(titulo, texto, aoDescartar) {
+    $('#titulo-sair-planejamento').textContent = titulo;
+    $('#texto-sair-planejamento').textContent = texto;
+    aoDescartarPlanejamento = aoDescartar;
+    var continuar = $('#continuar-planejamento'), descartar = $('#descartar-planejamento');
+    focoAntesDaPergunta = document.activeElement;
+    continuar.onclick = function () {
+      aoDescartarPlanejamento = null;
+      fecharModal('modal-sair-planejamento');
+    };
+    descartar.onclick = function () {
+      var depois = aoDescartarPlanejamento;
+      aoDescartarPlanejamento = null;
+      focoAntesDaPergunta = null; // descartou: o foco vai com quem segue
+      fecharModal('modal-sair-planejamento', function () { if (depois) depois(); });
+    };
+    abrirModal('modal-sair-planejamento');
+    setTimeout(function () { continuar.focus(); }, 0);
+  }
+  function perguntarSairDoPlanejamento() {
+    var p = fluxoPlano;
+    var texto = p && (p.estado === 'montando' || p.ajustando) ? 'O planejamento ainda está sendo montado. Se sair, ele se perde.'
+      : p && p.estado === 'pedido' ? 'O texto e os prints que você pôs se perdem.'
+      : 'O plano montado ainda não foi salvo na ficha e se perde.';
+    perguntarAntesDeDescartar('Sair sem salvar?', texto, function () { fecharModal('modal-planejamento'); });
+  }
+
+  /* Botão do rodapé: ignora o toque logo depois de o rodapé mudar (o Cancelar
+   * do "montando" nasce onde estava o Montar). */
+  function botaoDoRodape(atributos, aoTocar) {
+    var b = el('button', Object.assign({ type: 'button' }, atributos));
+    b.addEventListener('click', function () {
+      var p = fluxoPlano;
+      if (p && Date.now() < p.rodapeLivreEm) return;
+      aoTocar();
+    });
+    return b;
+  }
+
+  function desenharPlanejamento() {
+    var p = fluxoPlano;
+    var corpo = $('#corpo-modal-planejamento'), rodape = $('#rodape-modal-planejamento');
+    if (!p || !corpo) return;
+    pararDitado();
+    // o canvas da prévia que estava na tela sai da memória antes do redesenho
+    Array.prototype.forEach.call(corpo.querySelectorAll('canvas'), function (c) { c.width = 0; c.height = 0; });
+    corpo.innerHTML = '';
+    rodape.innerHTML = '';
+    // a trava do rodapé só quando o estado muda (o botão nasce onde estava outro)
+    if (p.estadoDesenhado !== p.estado) p.rodapeLivreEm = Date.now() + TRAVA_DO_RODAPE_MS;
+    p.estadoDesenhado = p.estado;
+    var modal = corpo.closest('.modal');
+    if (modal) modal.classList.toggle('plan-largo', p.estado === 'previa');
+    if (p.estado === 'montando') desenharMontando(p, corpo, rodape);
+    else if (p.estado === 'previa') desenharPreviaDoPlano(p, corpo, rodape);
+    else desenharPedidoDoPlano(p, corpo, rodape);
+    // o foco volta ao controle que pediu o redesenho (o selo, por exemplo)
+    if (p.focarDepois) {
+      var alvo = $(p.focarDepois);
+      p.focarDepois = null;
+      if (alvo) alvo.focus();
+    }
+  }
+
+  /* ---- o ditado, pela Web Speech API do navegador (pt-BR); sem ela, nada aparece ---- */
+  var ditado = null;
+  var ditadoBloqueado = false; // o microfone negado: o botão fica desligado na sessão
+  var ERROS_DO_DITADO = {
+    'not-allowed': 'O microfone está bloqueado para o app. Libere nas permissões do navegador ou use o microfone do teclado.',
+    'service-not-allowed': 'O microfone está bloqueado para o app. Libere nas permissões do navegador ou use o microfone do teclado.',
+    network: 'O ditado precisa de internet.',
+    'no-speech': 'Não ouvi nada. Toque em Ditar e fale perto do aparelho.'
+  };
+  function temDitado() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
+  function pararDitado() {
+    var r = ditado;
+    ditado = null;
+    if (r) { try { r.stop(); } catch (e) { /* já parou */ } }
+  }
+  /* O ditado do Chrome usa o reconhecimento de voz do Google. Sem aviso na
+   * tela, por decisão do dono (12/11/2026): ele já conversou com ela sobre
+   * isso. */
+  function botaoDeDitar(campo, id) {
+    if (!temDitado()) return null;
+    /* O estado vai na troca do rótulo (Ditar / Parar), e não também em aria-pressed. */
+    var b = el('button', { type: 'button', class: 'btn pequeno plan-ditar', id: id, icone: 'mic', texto: 'Ditar', disabled: ditadoBloqueado ? 'disabled' : null });
+    b.addEventListener('click', function () {
+      if (ditado) { pararDitado(); trocarComIcone(b, 'mic', 'Ditar'); return; }
+      if (ditadoBloqueado) return;
+      var R = window.SpeechRecognition || window.webkitSpeechRecognition;
+      var r;
+      try { r = new R(); } catch (e) { avisar('O ditado não abriu neste aparelho. Use o microfone do teclado.'); return; }
+      r.lang = 'pt-BR';
+      r.continuous = true;
+      r.interimResults = false;
+      r.onresult = function (ev) {
+        var falado = '';
+        for (var i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) falado += ev.results[i][0].transcript;
+        if (!falado) return;
+        campo.value = (campo.value ? campo.value.replace(/\s*$/, ' ') : '') + falado.trim();
+        campo.dispatchEvent(new Event('input', { bubbles: true }));
+      };
+      r.onend = function () { if (ditado === r) { ditado = null; trocarComIcone(b, 'mic', 'Ditar'); } };
+      r.onerror = function (ev) {
+        var codigo = ev && ev.error;
+        if (codigo === 'not-allowed' || codigo === 'service-not-allowed') { ditadoBloqueado = true; b.disabled = true; }
+        if (codigo === 'aborted') return;
+        avisar(ERROS_DO_DITADO[codigo] || 'O ditado parou. Toque em Ditar de novo ou use o microfone do teclado.');
+      };
+      try { r.start(); } catch (e) { avisar('O ditado não abriu neste aparelho. Use o microfone do teclado.'); return; }
+      ditado = r;
+      trocarComIcone(b, 'mic', 'Parar');
+    });
+    return b;
+  }
+
+  /* A redução de imagem, numa função só: o lado maior até `maxLado`, JPEG
+   * com fundo branco, e o canvas zerado logo depois (não fica memória presa). */
+  function imagemReduzida(img, maxLado, qualidade) {
+    var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    var k = Math.min(1, maxLado / Math.max(w, h, 1));
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * k));
+    c.height = Math.max(1, Math.round(h * k));
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    var dataUrl = c.toDataURL('image/jpeg', qualidade);
+    c.width = 0; c.height = 0;
+    return dataUrl;
+  }
+  /* Cada print é reduzido NO APARELHO: até 1568 px no lado maior, JPEG 0,85,
+   * em base64, para a IA; e uma miniatura à parte, de 200 px, para a tela. */
+  function reduzirPrint(arquivo) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(arquivo);
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var grande = imagemReduzida(img, 1568, 0.85);
+          var miniatura = imagemReduzida(img, 200, 0.8);
+          resolve({ media_type: 'image/jpeg', data: grande.slice(grande.indexOf(',') + 1), miniatura: miniatura, nome: arquivo.name || 'print' });
+        } catch (e) { reject(e); } finally { URL.revokeObjectURL(url); }
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('imagem que não abre')); };
+      img.src = url;
+    });
+  }
+  function ampliarPrint(im, n) {
+    var corpo = $('#corpo-modal-plan-print');
+    corpo.innerHTML = '';
+    corpo.appendChild(el('img', { class: 'plan-print-grande', src: 'data:' + im.media_type + ';base64,' + im.data, alt: 'Print ' + n + ', ampliado' }));
+    abrirModal('modal-plan-print');
+  }
+
+  function desenharPedidoDoPlano(p, corpo, rodape) {
+    $('#titulo-modal-planejamento').textContent = 'Novo planejamento';
+    if (p.alunoFixoId && alunoPorId(p.alunoFixoId)) {
+      corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', id: 'plan-para', texto: 'Para ' + alunoPorId(p.alunoFixoId).nome + '.' }));
+    }
+    var offline = navigator.onLine === false;
+    /* Sem permissão ou sem crédito, tentar de novo não resolve: sem o botão,
+     * e o Montar desligado. O resto (rede, prazo, ocupado, sem internet) tem
+     * o "Tentar de novo". */
+    var bloqueado = !offline && (p.erroCodigo === 'sem_permissao' || p.erroCodigo === 'limite_mensal');
+    if (p.erro || offline) {
+      var faixa = el('div', { class: 'faixa-aviso plan-erro', id: 'plan-erro', role: 'alert' }, [
+        el('span', { class: 'cresce', texto: offline ? Planejamento.fraseDoErro('sem_internet') : p.erro })
+      ]);
+      if (offline || ['rede', 'prazo', 'ocupado', 'sem_internet'].indexOf(p.erroCodigo) >= 0) {
+        faixa.appendChild(el('button', { type: 'button', class: 'btn pequeno', id: 'plan-tentar', texto: 'Tentar de novo',
+          aoClick: function () { p.erro = null; p.erroCodigo = null; desenharPlanejamento(); if (navigator.onLine !== false) montar(); } }));
+      }
+      corpo.appendChild(faixa);
+    }
+    var campo = el('textarea', { id: 'plan-texto', rows: '6', 'aria-label': 'O pedido do planejamento',
+      placeholder: 'Cole o aviso da escola ou dite o que precisa. Por exemplo: provas de novembro, uma matéria por dia, revisão na manhã da prova.' });
+    campo.value = p.texto || '';
+    corpo.appendChild(campo);
+
+    var entrada = el('input', { type: 'file', accept: 'image/*', multiple: 'multiple', id: 'plan-arquivos', hidden: 'hidden' });
+    var estadoPrints = el('p', { class: 'ajuda plan-preparando', id: 'plan-preparando', role: 'status', hidden: 'hidden' });
+    var prints = el('div', { class: 'plan-prints', id: 'plan-prints' });
+    var montarBotao = null;
+    function atualizarMontar() {
+      if (!montarBotao) return;
+      var falta = !String(p.texto || '').trim() && !p.imagens.length;
+      montarBotao.disabled = !!(p.preparando || falta || navigator.onLine === false || bloqueado);
+    }
+    campo.addEventListener('input', function () { p.texto = campo.value; atualizarMontar(); });
+    function desenharPrints() {
+      prints.innerHTML = '';
+      p.imagens.forEach(function (im, i) {
+        prints.appendChild(el('div', { class: 'plan-print' }, [
+          el('button', { type: 'button', class: 'plan-print-ver', 'aria-label': 'Ampliar o print ' + (i + 1),
+            aoClick: function () { ampliarPrint(im, i + 1); } }, [el('img', { src: im.miniatura, alt: '' })]),
+          el('button', { type: 'button', class: 'plan-print-tirar', icone: 'x', 'aria-label': 'Tirar o print ' + (i + 1),
+            aoClick: function () { p.imagens.splice(i, 1); desenharPrints(); atualizarMontar(); } })
+        ]));
+      });
+      if (p.preparando) {
+        estadoPrints.hidden = false;
+        estadoPrints.textContent = 'Preparando ' + p.preparando.feitos + ' de ' + p.preparando.total + '...';
+      } else estadoPrints.hidden = true;
+      atualizarMontar();
+    }
+    entrada.addEventListener('change', function () {
+      var arquivos = Array.prototype.slice.call(entrada.files || []);
+      entrada.value = '';
+      var cabem = Planejamento.MAX_IMAGENS - p.imagens.length - (p.preparando ? p.preparando.total - p.preparando.feitos : 0);
+      if (arquivos.length > cabem) avisar('Cabem até ' + Planejamento.MAX_IMAGENS + ' prints. ' + (cabem > 0 ? 'Entraram os ' + cabem + ' primeiros.' : 'Tire algum para pôr outro.'));
+      var fila = arquivos.slice(0, Math.max(0, cabem));
+      if (!fila.length) return;
+      p.preparando = p.preparando || { feitos: 0, total: 0 };
+      p.preparando.total += fila.length;
+      desenharPrints();
+      fila.reduce(function (corrente, arq) {
+        return corrente.then(function () {
+          return reduzirPrint(arq).then(function (im) { if (fluxoPlano === p) p.imagens.push(im); }, function () {
+            avisar('Um dos arquivos não abriu como imagem.');
+          }).then(function () {
+            if (fluxoPlano !== p || !p.preparando) return;
+            p.preparando.feitos++;
+            if (p.preparando.feitos >= p.preparando.total) p.preparando = null;
+            if (p.estado === 'pedido') desenharPrints();
+          });
+        });
+      }, Promise.resolve());
+    });
+    corpo.appendChild(entrada);
+    corpo.appendChild(el('div', { class: 'barra plan-ferramentas' }, [
+      botaoDeDitar(campo, 'plan-ditar'),
+      el('button', { type: 'button', class: 'btn pequeno', id: 'plan-anexar', icone: 'imagem', texto: 'Anexar prints',
+        aoClick: function () { entrada.click(); } })
+    ]));
+    corpo.appendChild(estadoPrints);
+    corpo.appendChild(prints);
+
+    function montar() {
+      if (p.preparando) return;
+      if (!String(p.texto || '').trim() && !p.imagens.length) { avisar('Escreva o pedido ou anexe os prints do aviso.'); campo.focus(); return; }
+      if (navigator.onLine === false) { p.erro = Planejamento.fraseDoErro('sem_internet'); p.erroCodigo = 'sem_internet'; desenharPlanejamento(); return; }
+      var hoje = Planejamento.hojeEmSaoPaulo();
+      var corpoDoPedido = Planejamento.montarPedido({ texto: p.texto, imagens: p.imagens, alunos: alunosParaIA(hoje),
+        alunoFixoId: p.alunoFixoId, hoje: hoje, aulasDaAgenda: agendaParaIA(p.alunoFixoId, hoje) });
+      pedirPlano(p, corpoDoPedido, 'pedido');
+    }
+    rodape.appendChild(botaoDoRodape({ class: 'btn esquerda', id: 'plan-fechar-pedido', texto: 'Cancelar' }, function () { solicitarFecharModal('modal-planejamento'); }));
+    montarBotao = botaoDoRodape({ class: 'btn principal', id: 'plan-montar', texto: 'Montar planejamento' }, montar);
+    rodape.appendChild(montarBotao);
+    desenharPrints();
+  }
+
+  /* O "montando" do primeiro pedido: as etapas, e o Cancelar do OUTRO lado
+   * do rodapé (onde estava o Montar não nasce botão nenhum). */
+  function desenharMontando(p, corpo, rodape) {
+    var etapa = el('strong', { id: 'plan-etapa', texto: p.imagens.length ? 'Lendo os prints...' : 'Lendo o pedido...' });
+    corpo.appendChild(el('div', { class: 'plan-montando', id: 'plan-montando' }, [
+      el('div', { class: 'plan-girando', 'aria-hidden': 'true' }),
+      etapa,
+      el('p', { class: 'ajuda u-margem-0', texto: 'Pode levar 1 ou 2 minutos.' })
+    ]));
+    var vez = p.vez;
+    setTimeout(function () { if (fluxoPlano === p && p.vez === vez && p.estado === 'montando') etapa.textContent = 'Montando a grade...'; }, 15000);
+    rodape.appendChild(botaoDoRodape({ class: 'btn esquerda', id: 'plan-cancelar', texto: 'Cancelar' }, function () { if (p.parar) p.parar(); }));
+    anunciar('Montando o planejamento. Pode levar 1 ou 2 minutos.');
+  }
+
+  /* A chamada ao endpoint. Devolve o JSON dele, ou { ok: false, codigo }
+   * para o que nem chegou lá (sem internet, sem login, cancelado, prazo). */
+  function chamarIA(corpoDoPedido, sinal) {
+    if (navigator.onLine === false) return Promise.resolve({ ok: false, codigo: 'sem_internet' });
+    if (!temNuvem() || typeof Nuvem.tokenParaIA !== 'function') return Promise.resolve({ ok: false, codigo: 'sem_login' });
+    return Nuvem.tokenParaIA().then(function (token) {
+      return fetch(new URL('/api/ia', location.origin).href, {
+        method: 'POST', signal: sinal,
+        headers: { 'content-type': 'application/json', authorization: 'Bearer ' + token },
+        body: JSON.stringify(corpoDoPedido)
+      }).then(function (r) {
+        return r.json().catch(function () { return { ok: false, codigo: 'indisponivel' }; });
+      }, function (e) {
+        if (e && e.name === 'AbortError') return { ok: false, codigo: sinal && sinal.motivo === 'prazo' ? 'prazo' : 'cancelado' };
+        return { ok: false, codigo: navigator.onLine === false ? 'sem_internet' : 'rede' };
+      });
+    }, function (e) {
+      return { ok: false, codigo: e && e.codigo === 'SEM_REDE' ? 'sem_internet' : 'sem_login' };
+    });
+  }
+
+  /* tipo: 'pedido' (o primeiro plano) ou 'ajuste'. No ajuste a prévia fica à
+   * vista, esmaecida, e o "ajustando" fica por cima dela. */
+  function pedirPlano(p, corpoDoPedido, tipo, textoDoAjuste, jaRecomecou) {
+    var controle = typeof AbortController === 'function' ? new AbortController() : null;
+    var sinal = controle ? controle.signal : undefined;
+    var relogio = setTimeout(function () { if (controle) { sinal.motivo = 'prazo'; controle.abort(); } }, PRAZO_DA_IA_MS);
+    var vez = p.vez;
+    /* A resposta crua do turno anterior, quando o ajuste continua a conversa:
+     * o que o modelo só repetiu dela não é pedido novo (normalizarAulas). */
+    var cruAnterior = tipo === 'ajuste' && p.conversa ? p.conversa.cru || null : null;
+    pararDitado();
+    p.erro = null;
+    p.erroAjuste = null;
+    p.erroCodigo = null;
+    p.parar = function () { if (controle) controle.abort(); };
+    if (tipo === 'ajuste') {
+      p.ajustando = true;
+      p.textoAjuste = textoDoAjuste || '';
+      anunciar('Ajustando...');
+    } else {
+      p.estado = 'montando';
+    }
+    desenharPlanejamento();
+    chamarIA(corpoDoPedido, sinal).then(function (resposta) {
+      clearTimeout(relogio);
+      p.parar = null;
+      if (fluxoPlano !== p || p.vez !== vez) return; // a janela fechou ou outro fluxo abriu
+      // no ajuste, o plano de antes decide o pedido mais recente nas listas de aula
+      var lido = Planejamento.lerResposta(resposta, db.alunos.map(function (a) { return a.id; }), tipo === 'ajuste' ? p.plano : null, cruAnterior);
+      /* A conversa passou do teto do endpoint (texto ou turnos): recomeça
+       * sozinha, com o plano atual como texto e o mesmo pedido de ajuste, em
+       * vez de mandar ela encurtar. Uma vez só. */
+      if ((lido.erro === 'texto_demais' || lido.erro === 'conversa_longa') && tipo === 'ajuste' && !jaRecomecou && p.plano && textoDoAjuste) {
+        p.conversa = null;
+        var hoje = Planejamento.hojeEmSaoPaulo();
+        pedirPlano(p, Planejamento.pedidoDeAjusteDoSalvo(p.plano, textoDoAjuste, { alunos: alunosParaIA(hoje), hoje: hoje,
+          aulasDaAgenda: agendaParaIA(alunoConfirmado(p.plano), p.plano.periodo.inicio) }), 'ajuste', textoDoAjuste, true);
+        return;
+      }
+      if (lido.erro) {
+        var frase = lido.erro === 'cancelado' ? null : Planejamento.fraseDoErro(lido.erro);
+        if (tipo === 'ajuste') {
+          // o texto dela volta ao campo, e o erro fica acima dele
+          p.ajustando = false;
+          p.erroAjuste = frase;
+        } else {
+          p.estado = 'pedido';
+          p.erro = frase;
+        }
+        p.erroCodigo = lido.erro;
+        desenharPlanejamento();
+        if (tipo === 'ajuste') { var c = $('#plan-ajuste'); if (c) c.focus(); }
+        return;
+      }
+      if (lido.uso) p.uso.push(lido.uso);
+      p.conversa = { pedido: corpoDoPedido, conteudo: lido.conteudo, cru: lido.cru };
+      /* O que ela escolheu na prévia (o aluno, Aluna ou Aluno) vale nos
+       * ajustes seguintes; senão, o aluno da ficha vale mais que o palpite. */
+      if (p.alunoEscolhido) { lido.plano.alunoId = p.alunoEscolhido; lido.plano.confiancaAluno = 'alta'; }
+      else if (p.alunoFixoId) { lido.plano.alunoId = p.alunoFixoId; lido.plano.confiancaAluno = 'alta'; }
+      if (p.tratamentoEscolhido) lido.plano.tratamento = p.tratamentoEscolhido;
+      /* Com o aluno certo, a agenda dele no período arruma as listas: a
+       * remoção num dia sem aula sai, e a extra sem hora não apaga a hora da
+       * aula da agenda. Sem o aluno confirmado, as listas ficam como vieram. */
+      var alunoDaAgenda = alunoConfirmado(lido.plano);
+      if (alunoDaAgenda) {
+        lido.plano = Planejamento.normalizarAulas(lido.plano, null,
+          aulasDoAlunoNoPeriodo(alunoDaAgenda, lido.plano.periodo.inicio, lido.plano.periodo.fim));
+      }
+      if (tipo === 'ajuste') {
+        p.planoAnterior = p.plano;
+        p.mudou = Planejamento.resumoDaMudanca(p.plano, lido.plano);
+        p.ajustando = false;
+        p.textoAjuste = '';
+      } else {
+        p.planoAnterior = null;
+        p.mudou = '';
+      }
+      p.plano = lido.plano;
+      p.mudouDesdeSalvar = true;
+      p.estado = 'previa';
+      desenharPlanejamento();
+      focarTituloDoPlanejamento();
+      anunciar(tipo === 'ajuste' ? 'Plano ajustado. ' + p.mudou : 'O planejamento está pronto. A prévia da folha está na tela.');
+      /* Plano já salvo e ajustado: a ficha guarda a versão nova sozinha. */
+      if (p.salvoId) salvarPlanoNaFicha(p, true);
+    });
+  }
+
+  /* O seletor de um valor só (role=radiogroup): o marcado tem o ✓. */
+  function seletorUnico(id, rotulo, opcoes, marcado, aoEscolher, desligado) {
+    return el('div', { class: 'plan-seletor', id: id, role: 'radiogroup', 'aria-label': rotulo }, opcoes.map(function (o) {
+      var sim = o.valor === marcado;
+      return el('button', { type: 'button', role: 'radio', class: 'chip-filtro plan-opcao' + (sim ? ' ativo' : ''), 'aria-checked': sim ? 'true' : 'false',
+        'data-valor': o.valor, 'data-aluno': o.aluno || null, 'data-tratamento': o.tratamento || null, disabled: desligado ? 'disabled' : null,
+        icone: sim ? 'check' : null, texto: o.rotulo,
+        aoClick: function () { if (!sim) aoEscolher(o.valor); } });
+    }));
+  }
+
+  function desenharPreviaDoPlano(p, corpo, rodape) {
+    var pl = p.plano;
+    var grava = podeGravarPlanejamentos(), chamaIA = podeChamarIA();
+    $('#titulo-modal-planejamento').textContent = 'Planejamento de estudos';
+    var aluno = pl.alunoId ? alunoPorId(pl.alunoId) : null;
+    if (!aluno) pl.alunoId = null;
+    /* Com confiança baixa, nenhum aluno vem marcado até ela escolher. */
+    var escolhido = aluno && (pl.confiancaAluno !== 'baixa' || p.alunoEscolhido) ? aluno : null;
+
+    var lado = el('div', { class: 'plan-lado' });
+    /* Para qual aluno: do modelo (atalho do +) e no plano SALVO, para o plano
+     * guardado no aluno errado poder mudar de ficha. Seleção única. */
+    if (!p.alunoFixoId || !aluno || p.salvoId) {
+      var ativos = db.alunos.filter(function (a) { return a.ativo !== false; })
+        .sort(function (x, y) { return String(x.nome).localeCompare(String(y.nome)); });
+      lado.appendChild(el('div', { class: 'plan-linha' + (!escolhido ? ' plan-quem-duvida' : ''), id: 'plan-quem' }, [
+        el('span', { class: 'plan-rotulo', id: 'plan-pergunta', texto: 'Para qual aluno?' }),
+        seletorUnico('plan-alunos', 'Para qual aluno?', ativos.map(function (a) { return { valor: a.id, aluno: a.id, rotulo: nomeNaTela(a) }; }),
+          escolhido ? escolhido.id : null, function (id) {
+            pl.alunoId = id;
+            pl.confiancaAluno = 'alta';
+            p.alunoEscolhido = id;
+            /* A conversa de antes era sobre outro aluno (outra lista, outras
+             * aulas): o próximo ajuste recomeça com o plano como texto e o
+             * aluno novo (pedidoDeAjusteDoSalvo). */
+            p.conversa = null;
+            p.mudouDesdeSalvar = true;
+            desenharPlanejamento();
+          }, !grava)
+      ]));
+    }
+    /* "Aluna" ou "Aluno" no alto da folha: sempre à vista, numa linha rotulada. */
+    lado.appendChild(el('div', { class: 'plan-linha', id: 'plan-na-folha' }, [
+      el('span', { class: 'plan-rotulo', texto: 'Tratar por:' }),
+      seletorUnico('plan-tratamento', 'Tratar por Aluna ou Aluno, no alto da folha', [{ valor: 'Aluna', tratamento: 'Aluna', rotulo: 'Aluna' }, { valor: 'Aluno', tratamento: 'Aluno', rotulo: 'Aluno' }],
+        pl.tratamento, function (t) {
+          pl.tratamento = t;
+          p.tratamentoEscolhido = t;
+          p.mudouDesdeSalvar = true;
+          desenharPlanejamento();
+        }, !grava)
+    ]));
+
+    /* A conferência: o que a IA marcou e o que o app conferiu, UM aviso por
+     * prova, num selo recolhível, na mesma linha do "Mudar algo?". O selo só
+     * aparece com o aluno escolhido. Cada item é tocável e ACRESCENTA o dia ao
+     * que já está no campo do ajuste. */
+    var campoAjuste = null;
+    var conferir = escolhido ? Planejamento.itensIncertos(pl, { semAjuste: !chamaIA }) : [];
+    var linhaAcoes = el('div', { class: 'plan-linha plan-acoes', id: 'plan-acoes' });
+    if (conferir.length) {
+      linhaAcoes.appendChild(el('button', { type: 'button', class: 'plan-selo', id: 'plan-conferir', 'aria-expanded': p.conferirAberto ? 'true' : 'false',
+        'aria-controls': 'plan-incertos', icone: 'alerta', texto: conferir.length === 1 ? '1 item para conferir' : conferir.length + ' itens para conferir',
+        aoClick: function () { p.conferirAberto = !p.conferirAberto; p.focarDepois = '#plan-conferir'; desenharPlanejamento(); } }));
+    }
+    if (chamaIA) {
+      linhaAcoes.appendChild(el('button', { type: 'button', class: 'btn pequeno plan-mudar-algo', id: 'plan-mudar-algo', icone: 'pencil', texto: 'Mudar algo?',
+        aoClick: function () { if (campoAjuste) { campoAjuste.scrollIntoView({ block: 'center' }); campoAjuste.focus(); } } }));
+    }
+    if (linhaAcoes.childNodes.length) lado.appendChild(linhaAcoes);
+    if (conferir.length && p.conferirAberto) {
+      lado.appendChild(el('ul', { class: 'faixa-info plan-incertos-lista', id: 'plan-incertos' }, conferir.map(function (item, i) {
+        var marcador = el('span', { class: 'plan-incerto-marca', 'aria-hidden': 'true', texto: '•' });
+        if (!chamaIA) return el('li', { class: 'plan-incerto' }, [marcador, el('span', { class: 'plan-incerto-texto', texto: item.texto })]);
+        return el('li', { class: 'plan-incerto' }, [el('button', { type: 'button', class: 'plan-item-conferir', id: 'plan-conferir-' + i, 'data-data': item.data || null,
+          aoClick: function () {
+            if (!campoAjuste) return;
+            if (item.data) {
+              var atual = campoAjuste.value.replace(/\s+$/, '');
+              campoAjuste.value = (atual ? atual + ' ' : '') + 'No dia ' + Planejamento.ddmm(item.data) + ': ';
+              p.textoAjuste = campoAjuste.value;
+            }
+            campoAjuste.focus();
+            try { campoAjuste.setSelectionRange(campoAjuste.value.length, campoAjuste.value.length); } catch (e) { /* campo sem seleção */ }
+          } }, [marcador, el('span', { class: 'plan-incerto-texto', texto: item.texto }), el('span', { class: 'plan-incerto-ir', texto: 'Ajustar ›' })])]);
+      })));
+    }
+    /* O que o último ajuste mudou, com o Desfazer. */
+    if (p.planoAnterior && !p.ajustando) {
+      lado.appendChild(el('div', { class: 'plan-linha plan-mudou', id: 'plan-mudou' }, [
+        el('span', { class: 'cresce', texto: p.mudou }),
+        el('button', { type: 'button', class: 'btn pequeno', id: 'plan-desfazer-ajuste', icone: 'undo', texto: 'Desfazer ajuste',
+          aoClick: function () {
+            /* volta a grade, as provas e as aulas tiradas ou postas na folha
+             * (o plano de antes inteiro); o aluno e o Aluna ou
+             * Aluno escolhidos DEPOIS continuam */
+            var agora = p.plano;
+            p.plano = p.planoAnterior;
+            p.plano.alunoId = agora.alunoId;
+            p.plano.confiancaAluno = agora.confiancaAluno;
+            p.plano.tratamento = agora.tratamento;
+            p.planoAnterior = null;
+            p.mudou = '';
+            p.conversa = null; // a conversa era do plano que saiu
+            p.mudouDesdeSalvar = true;
+            desenharPlanejamento();
+            anunciar('Ajuste desfeito.');
+            if (p.salvoId) salvarPlanoNaFicha(p, true);
+          } })
+      ]));
+    }
+
+    /* A prévia: o PRÓPRIO PDF; tocar amplia no leitor do app. */
+    var caixaPrevia = el('div', { class: 'plan-previa' + (p.ajustando ? ' plan-previa-esmaecida' : ''), id: 'plan-previa' });
+    p.bytes = null;
+    if (!escolhido) {
+      caixaPrevia.appendChild(el('p', { class: 'ajuda plan-previa-recado', id: 'plan-sem-aluno', texto: 'Escolha o aluno para ver a folha.' }));
+    } else {
+      var folha = folhaDoPlano(pl);
+      if (folha.erro) caixaPrevia.appendChild(el('div', { class: 'faixa-aviso', id: 'plan-erro-folha', role: 'alert', texto: folha.erro }));
+      else { p.bytes = folha.bytes; desenharPreviaPdf(p, folha.bytes, caixaPrevia); }
+    }
+    if (p.ajustando) {
+      caixaPrevia.appendChild(el('div', { class: 'plan-ajustando', id: 'plan-ajustando' }, [
+        el('div', { class: 'plan-girando', 'aria-hidden': 'true' }),
+        el('strong', { texto: 'Ajustando...' }),
+        el('button', { type: 'button', class: 'btn pequeno', id: 'plan-cancelar-ajuste', texto: 'Cancelar', aoClick: function () { if (p.parar) p.parar(); } })
+      ]));
+    }
+
+    /* O ajuste: curto, por texto ou ditado. A conversa continua (ou, no plano
+     * salvo, recomeça com o plano como está). */
+    var blocoAjuste = null;
+    if (chamaIA) {
+      campoAjuste = el('input', { type: 'text', id: 'plan-ajuste', autocomplete: 'off', placeholder: 'Ex.: Geografia no dia 21', disabled: p.ajustando ? 'disabled' : null });
+      campoAjuste.value = p.textoAjuste || '';
+      // o que ela escreve sobrevive ao redesenho (selo, aluno, Aluna ou Aluno)
+      campoAjuste.addEventListener('input', function () { p.textoAjuste = campoAjuste.value; });
+      var ajustar = function () {
+        var t = campoAjuste.value.trim();
+        if (!t) { avisar('Escreva ou dite o que mudar.'); campoAjuste.focus(); return; }
+        var corpoDoAjuste;
+        /* as aulas da agenda vão no turno novo: é delas que ela pede para tirar
+         * uma da folha. Só do aluno confirmado: com o palpite de confiança
+         * baixa, a agenda de outro aluno não sai. E o plano como está na
+         * folha vai junto, porque a resposta crua da conversa pode mostrar
+         * listas que o app arrumou. */
+        var agenda = agendaParaIA(alunoConfirmado(pl), pl.periodo.inicio);
+        if (p.conversa) corpoDoAjuste = Planejamento.pedidoDeAjuste(p.conversa, t, agenda, pl);
+        else {
+          var hoje = Planejamento.hojeEmSaoPaulo();
+          corpoDoAjuste = Planejamento.pedidoDeAjusteDoSalvo(pl, t, { alunos: alunosParaIA(hoje), hoje: hoje, aulasDaAgenda: agenda });
+        }
+        pedirPlano(p, corpoDoAjuste, 'ajuste', t);
+      };
+      campoAjuste.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); ajustar(); } });
+      blocoAjuste = el('div', { class: 'plan-ajuste', id: 'plan-bloco-ajuste' }, [
+        p.erroAjuste ? el('div', { class: 'faixa-aviso', id: 'plan-erro-ajuste', role: 'alert', texto: p.erroAjuste }) : null,
+        el('label', { class: 'campo u-margem-0', for: 'plan-ajuste' }, [el('span', { texto: 'O que mudar?' })]),
+        campoAjuste,
+        el('div', { class: 'barra u-margem-baixo-0' }, [
+          p.ajustando ? null : botaoDeDitar(campoAjuste, 'plan-ajuste-ditar'),
+          el('button', { type: 'button', class: 'btn principal', id: 'plan-ajustar', texto: 'Ajustar', disabled: p.ajustando ? 'disabled' : null, aoClick: ajustar })
+        ])
+      ]);
+    }
+    var grade = el('div', { class: 'plan-grade-previa' }, [lado, caixaPrevia, blocoAjuste]);
+    if (p.salvoId && grava) {
+      grade.appendChild(el('div', { class: 'plan-excluir-linha' }, [
+        el('button', { type: 'button', class: 'btn pequeno perigo', id: 'plan-excluir', texto: 'Excluir este plano',
+          disabled: p.ajustando ? 'disabled' : null, aoClick: function () { excluirPlanoSalvo(p.salvoId); } })
+      ]));
+    }
+    corpo.appendChild(grade);
+
+    var podeCompartilhar = false;
+    try {
+      podeCompartilhar = !!(navigator.canShare && navigator.canShare({ files: [new File([new Uint8Array(1)], 'a.pdf', { type: 'application/pdf' })] }));
+    } catch (e) { podeCompartilhar = false; }
+    p.rotuloEntregar = podeCompartilhar ? 'Compartilhar PDF' : 'Baixar PDF';
+    if (grava) {
+      var salvar = botaoDoRodape({ class: 'btn', id: 'plan-salvar',
+        texto: p.salvoId && !p.mudouDesdeSalvar ? 'Salvo na ficha' : 'Salvar na ficha',
+        disabled: !escolhido || p.ajustando || p.salvando || (p.salvoId && !p.mudouDesdeSalvar) ? 'disabled' : null }, function () { salvarPlanoNaFicha(p, false); });
+      rodape.appendChild(salvar);
+    }
+    rodape.appendChild(botaoDoRodape({ class: 'btn principal', id: 'plan-compartilhar',
+      icone: podeCompartilhar ? null : 'download', texto: p.rotuloEntregar,
+      disabled: p.bytes && !p.ajustando ? null : 'disabled' }, function () { entregarPlano(p, podeCompartilhar); }));
+  }
+
+  /* Compartilhar a folha: o cancelar da folha de compartilhamento (AbortError)
+   * não vira download, e o botão fica travado enquanto ela está aberta. */
+  function entregarPlano(p, podeCompartilhar) {
+    if (!p.bytes || p.compartilhando) return;
+    /* A família vai receber: o plano fica guardado na ficha, e fechar depois
+     * não pergunta mais. */
+    if (podeGravarPlanejamentos() && (!p.salvoId || p.mudouDesdeSalvar)) salvarPlanoNaFicha(p, false);
+    var pl = p.plano, aluno = pl && pl.alunoId ? alunoPorId(pl.alunoId) : null;
+    var nome = Planejamento.nomeDoArquivo(pl, aluno ? aluno.nome : '');
+    var blob = new Blob([p.bytes], { type: 'application/pdf' });
+    if (!podeCompartilhar) { baixar(nome, blob); return; }
+    var arquivo;
+    try { arquivo = new File([blob], nome, { type: 'application/pdf' }); } catch (e) { baixar(nome, blob); return; }
+    p.compartilhando = true;
+    var b = $('#plan-compartilhar');
+    if (b) b.disabled = true;
+    var fim = function () {
+      p.compartilhando = false;
+      var bb = $('#plan-compartilhar');
+      if (bb && p.bytes && !p.ajustando) bb.disabled = false;
+    };
+    Promise.resolve().then(function () { return navigator.share({ files: [arquivo], title: nome.replace(/\.pdf$/, '') }); }).then(fim, function (e) {
+      fim();
+      if (!(e && e.name === 'AbortError')) baixar(nome, blob);
+    });
+  }
+
+  /* A prévia é o PRÓPRIO PDF, desenhado pelo leitor do app (PDF.js). Tocar
+   * nela abre o mesmo PDF no leitor, em tela cheia, com zoom. */
+  function desenharPreviaPdf(p, bytes, caixa) {
+    var espera = el('p', { class: 'ajuda plan-previa-recado', texto: 'Desenhando a folha...' });
+    caixa.insertBefore(espera, caixa.firstChild);
+    var vez = p.vez;
+    var docPdf = null, canvas = null, usado = false;
+    carregarPdfJs().then(function (lib) {
+      return lib.getDocument({ data: bytes.slice(), isEvalSupported: false, enableXfa: false }).promise;
+    }).then(function (doc) {
+      docPdf = doc;
+      var largura = Math.max(260, caixa.clientWidth || 320);
+      var escala = Math.min(window.devicePixelRatio || 1, 2.5);
+      var w = Math.round(largura * escala), h = Math.round(w * PDFGen.PAGINA_A / PDFGen.PAGINA_L);
+      return desenharPaginaPdfEmCanvas(doc, 1, w, h);
+    }).then(function (c) {
+      canvas = c;
+      if (fluxoPlano !== p || p.vez !== vez || p.bytes !== bytes) return;
+      usado = true;
+      c.className = 'plan-previa-folha';
+      c.setAttribute('aria-hidden', 'true');
+      /* "Toque para ampliar" SOBRE a folha, no canto de cima: sempre à vista. */
+      var ver = el('button', { type: 'button', class: 'plan-previa-ver', id: 'plan-ampliar', 'aria-label': 'Ampliar a folha',
+        aoClick: function () {
+          var aluno = alunoPorId(p.plano.alunoId);
+          var nome = Planejamento.nomeDoArquivo(p.plano, aluno ? aluno.nome : '');
+          /* O leitor do app no modo do planejamento: uma página, só menos, mais e
+           * fechar; no celular já abre a 150% (a letra legível e a semana com
+           * pouca rolagem de lado); e a saída é a mesma
+           * da prévia. A Biblioteca não passa estas opções e fica como era. */
+          abrirLeitorPdf(new Blob([bytes], { type: 'application/pdf' }), {
+            titulo: 'Planejamento de estudos', nome: nome, comoFolha: false, compacto: true,
+            zoomInicial: window.innerWidth < 600 ? 1.5 : 1,
+            rotuloCompartilhar: p.rotuloEntregar || 'Compartilhar PDF',
+            aoCompartilhar: function () { entregarPlano(p, p.rotuloEntregar === 'Compartilhar PDF'); }
+          });
+        } }, [c, el('span', { class: 'plan-lupa', id: 'plan-legenda', 'aria-hidden': 'true' }, [icone('search'), el('span', { texto: 'Toque para ampliar' })])]);
+      espera.remove();
+      caixa.insertBefore(ver, caixa.firstChild);
+    }).catch(function () {
+      if (fluxoPlano !== p || p.vez !== vez) return;
+      espera.remove();
+      caixa.insertBefore(el('p', { class: 'ajuda plan-previa-recado', id: 'plan-previa-falhou',
+        texto: 'A prévia não abriu aqui. O PDF sai igual pelo botão ' + (p.rotuloEntregar || 'Baixar PDF') + '.' }), caixa.firstChild);
+    }).then(function () {
+      // finally: o canvas que não foi para a tela é zerado, e o documento é solto
+      if (canvas && !usado) { canvas.width = 0; canvas.height = 0; }
+      if (docPdf) soltarDocPdf(docPdf);
+    });
+  }
+
+  /* Excluir o plano salvo: desfazer em vez de confirmar (PRINCIPIOS, padrão
+   * 5). A janela fecha, a ficha atualiza, e o aviso tem o Desfazer, que põe o
+   * mesmo registro de volta. */
+  function excluirPlanoSalvo(id) {
+    var chave = PREFIXO_PLANEJAMENTO + id;
+    var registro = db.ajustes && db.ajustes[chave];
+    if (!registro) return;
+    var comoAcao = function (fazer) { return modoCelular ? comoAcaoDoCelular(fazer) : fazer(); };
+    comoAcao(function () {
+      delete db.ajustes[chave];
+      return salvarEDepois(function (gravou) {
+        if (!gravou) return;
+        if (fluxoPlano && fluxoPlano.salvoId === id) fluxoPlano.mudouDesdeSalvar = false;
+        fecharModal('modal-planejamento');
+        redesenharSecoesDePlanejamento();
+        avisar('Planejamento excluído.', 'Desfazer', function () {
+          comoAcao(function () {
+            db.ajustes = db.ajustes || {};
+            db.ajustes[chave] = registro;
+            return salvarEDepois(function (voltou) {
+              if (voltou) { redesenharSecoesDePlanejamento(); avisar('Planejamento de volta na ficha.'); }
+            });
+          });
+        });
+      });
+    });
+  }
+
+  /* Salvar na ficha. O id nasce UMA vez por fluxo (idParaSalvar), e a trava
+   * `salvando`, ligada antes de qualquer espera, faz o segundo toque não
+   * gravar um segundo plano. Um pedido de salvar que chega com a gravação
+   * pendente não se perde: fica marcado (salvarDeNovo), e na volta, se o plano
+   * da tela não é mais o que foi gravado (ela trocou o aluno, o Aluna ou
+   * Aluno, desfez um ajuste), grava de novo com o MESMO id. Só então a tela
+   * diz "Salvo". Falhou: a trava sai e o botão volta. */
+  function salvarPlanoNaFicha(p, calado) {
+    var pl = p.plano;
+    if (p.salvando) { p.salvarDeNovo = true; if (!calado) p.avisarAoSalvar = true; return; }
+    if (!pl || !pl.alunoId || !alunoPorId(pl.alunoId)) { avisar('Escolha o aluno antes de salvar.'); return; }
+    p.salvando = true;
+    p.idParaSalvar = p.idParaSalvar || p.salvoId || Core.uid();
+    var botaoSalvar = $('#plan-salvar');
+    if (botaoSalvar) botaoSalvar.disabled = true;
+    var id = p.idParaSalvar;
+    var chave = PREFIXO_PLANEJAMENTO + id;
+    var agora = new Date().toISOString();
+    db.ajustes = db.ajustes || {};
+    var antes = db.ajustes[chave];
+    var registro = { id: id, alunoId: pl.alunoId, criadoEm: antes && antes.criadoEm ? antes.criadoEm : agora, atualizadoEm: agora,
+      plano: JSON.parse(JSON.stringify(pl)) };
+    function gravar() {
+      db.ajustes[chave] = registro;
+      return salvarEDepois(function (gravou) {
+        p.salvando = false;
+        var deNovo = p.salvarDeNovo;
+        var avisarDeNovo = p.avisarAoSalvar;
+        p.salvarDeNovo = false;
+        p.avisarAoSalvar = false;
+        if (!gravou) {
+          var b = $('#plan-salvar');
+          if (fluxoPlano === p && b) b.disabled = false;
+          return;
+        }
+        // o plano da tela ainda é o que foi gravado?
+        var igual = JSON.stringify(registro.plano) === JSON.stringify(p.plano);
+        if (fluxoPlano === p) {
+          p.salvoId = id;
+          p.alunoFixoId = registro.alunoId;
+          if (igual) {
+            p.mudouDesdeSalvar = false;
+            if (p.estado === 'previa') {
+              var b2 = $('#plan-salvar');
+              if (b2) { b2.textContent = 'Salvo na ficha'; b2.disabled = true; }
+            }
+          }
+        }
+        redesenharSecoesDePlanejamento();
+        if (fluxoPlano === p && !igual && (deNovo || p.mudouDesdeSalvar)) {
+          // mudou no meio: grava a versão da tela, com o mesmo id
+          salvarPlanoNaFicha(p, calado && !avisarDeNovo);
+          return;
+        }
+        if (!calado || avisarDeNovo) avisar('Planejamento salvo na ficha ' + (alunoPorId(registro.alunoId) ? 'de ' + Planejamento.primeiroNome(alunoPorId(registro.alunoId).nome) : '') + '.');
+      });
+    }
+    try {
+      if (modoCelular) comoAcaoDoCelular(gravar); else gravar();
+    } catch (e) {
+      p.salvando = false;
+      if (botaoSalvar) botaoSalvar.disabled = false;
+      throw e;
+    }
+  }
+
+  /* Sem internet ou com ela de volta: o Montar acompanha. */
+  window.addEventListener('online', function () { if (fluxoPlano && fluxoPlano.estado === 'pedido') desenharPlanejamento(); });
+  window.addEventListener('offline', function () { if (fluxoPlano && fluxoPlano.estado === 'pedido') desenharPlanejamento(); });
 
   // ================= partida =================
 

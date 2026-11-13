@@ -322,6 +322,7 @@ def travas(p, placar, zip_caminho=None, esperado=None, amostra=False):
     placar.conferir('banco: curadoria aplicada', pg.trava_curadoria(p))
     placar.conferir('banco: todo caractere com o seu glifo', pg.trava_glifos(p))
     placar.conferir('banco: nada depois do fim do conteudo', trava_fim_do_livro(p))
+    placar.conferir('banco: comentario ao professor fora do enunciado', pg.trava_comentario_fora_do_enunciado(p))
 
 
 def venenos(p, temp, placar, cur):
@@ -383,6 +384,61 @@ def venenos(p, temp, placar, cur):
     placar.conferir('problema sumido', trava_contagens(q), True, 'nao dao')
 
 
+def trava_comentario_amostra(p):
+    """No volume sintetico com comentario (fazer_com_comentario), cada caso no lugar."""
+    erros = []
+    por_n = {i['numero']: i for i in p.itens}
+    if sorted(por_n) != [1, 2]:
+        return ['o volume com comentario tem os problemas %s, e nao 1 e 2: %r' % (
+            sorted(por_n), [(e['numero'], e['motivo'][:60]) for a in p.relatorio['anos'] for e in a['excluidos']])]
+    i1, i2 = por_n[1], por_n[2]
+    if 'presente para o professor' not in i1['texto']:
+        erros.append('o enunciado 1 perdeu "presente para o professor", que e enunciado')
+    if 'reservado' in i1['texto'] or 'reservado' in pg.texto_dos_pedacos(p, i1, 'enunciado'):
+        erros.append('o enunciado 1 leva o texto do comentario')
+    if 'texto reservado' not in pg.texto_dos_pedacos(p, i1, 'solucao', True):
+        erros.append('a solucao 1 nao leva o comentario no fim')
+    if 'observacao' not in i2['texto']:
+        erros.append('a "Observacao:" do aluno saiu do enunciado 2')
+    if any(pz.get('comentario') for pz in pg.pedacos(i2, 'solucao')) or \
+            'fica onde esta' not in pg.texto_dos_pedacos(p, i2, 'solucao'):
+        erros.append('o comentario que ja estava na solucao 2 mudou de lugar')
+    return erros
+
+
+def comentario_ao_professor(temp, placar, cur, navegador=True):
+    """A regra D2 do Banco num volume sintetico proprio, com as travas do recorte e o veneno."""
+    pdfs = os.path.join(temp, 'pdfs_comentario')
+    caminho = fazer_amostra_banco.fazer_com_comentario(pdfs)
+
+    def gerar_c(trabalho):
+        return banco.gerar(pdfs, 1, 1, trabalho + '_zip', cur, trabalho=trabalho, arquivos={2098: caminho},
+                           gerado_em='2026-11-12T00:00:00-03:00', commit='amostra')
+    gerar_c(os.path.join(temp, 'c'))
+    q = PacoteBanco(os.path.join(temp, 'c'), pdfs)
+    placar.conferir('banco comentario: recorte', trava_recorte(q))
+    placar.conferir('banco comentario: nenhum texto fora de recorte', trava_tinta(q))
+    placar.conferir('banco comentario: svg autocontido', pg.trava_svg(q))
+    placar.conferir('banco comentario: fora do enunciado, no fim da solucao', pg.trava_comentario_fora_do_enunciado(q))
+    placar.conferir('banco comentario: cada caso da amostra no lugar', trava_comentario_amostra(q))
+    if navegador:
+        i1 = next(i for i in q.itens if i['numero'] == 1)
+        sorteio = [(i1['id'], t, k) for t in ('enunciado', 'solucao') for k in range(len(pg.pedacos(i1, t)))]
+        erros, _ = pg.trava_fidelidade(q, sorteio, temp)
+        placar.conferir('banco comentario: fidelidade dos %d pedacos do problema 1' % len(sorteio), erros)
+    antes = banco.COMENTARIO_AO_PROFESSOR
+    banco.COMENTARIO_AO_PROFESSOR = False
+    try:
+        gerar_c(os.path.join(temp, 'v_comentario'))
+    finally:
+        banco.COMENTARIO_AO_PROFESSOR = antes
+    v = PacoteBanco(os.path.join(temp, 'v_comentario'), pdfs)
+    placar.conferir('banco: comentario no enunciado (gerador antigo)', pg.trava_comentario_fora_do_enunciado(v), True,
+                    'comentario ao professor no enunciado')
+    placar.conferir('banco: gabarito sem o comentario (gerador antigo)', trava_comentario_amostra(v), True,
+                    'a solucao 1 nao leva o comentario')
+
+
 def principal():
     ap = argparse.ArgumentParser()
     ap.add_argument('--real', action='store_true')
@@ -414,6 +470,7 @@ def principal():
             placar.conferir('banco: determinismo', pg.trava_determinismo(p, PacoteBanco(os.path.join(temp, 'b'), pdfs)))
             travas(p, placar, None, None, amostra=True)
             venenos(p, temp, placar, cur)
+            comentario_ao_professor(temp, placar, cur, not a.sem_navegador)
         if not a.sem_navegador:
             sorteio = pg.sortear_pedacos(p)
             erros, medidas = pg.trava_fidelidade(p, sorteio, temp)
