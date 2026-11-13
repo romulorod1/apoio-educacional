@@ -408,6 +408,22 @@ const checa = (rotulo, obtido, esperado, doVeneno) => {
     '; fim do texto da camada na linha: ' + (fimCamada === null ? 'nenhum' : fimCamada.toFixed(1) + ' pt'));
   conf('a prova achou a tinta da linha do exercício no canvas', tinta !== null && tinta > 300 && tinta < 560, true);
   conf('e o fim do texto da camada na mesma linha', fimCamada !== null && fimCamada > 300 && fimCamada < 560, true);
+  /* A camada é o que o dedo seleciona e o realce que ela vê: tem de acabar onde a
+   * letra desenhada acaba. Camada que passa da tinta (ou fica aquém) é defeito de
+   * alinhamento da camada, e o conserto é nela, não no arrasto da prova. Folga de
+   * 3 pt: meia letra do corpo 12 do livro sintético. O diagnóstico imprime cada
+   * pedaço da linha (texto, largura, --scale-x, fonte), para achar a causa. */
+  const pedacos = await pag.evaluate(() => {
+    const b = document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="206"]'), q = b.getBoundingClientRect();
+    return Array.from(b.querySelectorAll('.textLayer span')).filter(s => !s.children.length && s.textContent.trim()).map(s => {
+      const r = s.getBoundingClientRect(), cs = getComputedStyle(s);
+      return { t: s.textContent.slice(0, 40), esq: ((r.left - q.left) * 595 / q.width).toFixed(1), dir: ((r.right - q.left) * 595 / q.width).toFixed(1),
+        scaleX: s.style.getPropertyValue('--scale-x') || cs.getPropertyValue('--scale-x'), fonte: cs.fontFamily, tam: cs.fontSize, transf: cs.transform };
+    });
+  });
+  for (const p of pedacos) console.log('   pedaço: ' + JSON.stringify(p));
+  console.log('   camada menos tinta na linha do exercício: ' + (tinta !== null && fimCamada !== null ? (fimCamada - tinta).toFixed(1) + ' pt' : 'sem medida'));
+  conf('a camada acaba onde a tinta acaba, na linha do exercício (diferença até 3 pt)', tinta !== null && fimCamada !== null && Math.abs(fimCamada - tinta) <= 3, true);
   const LINHA = 'Exercício 206. Calcule a soma dos números de 1 a 206.';
   const TITULO = 'Página 206 do livro do leitor.';
   const arrastaECopia = async (dePt, atePt) => {
@@ -477,7 +493,9 @@ const checa = (rotulo, obtido, esperado, doVeneno) => {
   conf('o toque da caneta fez o navegador disparar o selectstart (o instrumento enxerga)', inicios.length > 0, true);
   checa('o app cancelou o selectstart da caneta', inicios.split(',').every(v => v === 'cancelado'), true, 'caneta-seleciona');
   checa('e o cursor da seleção não foi posto onde a caneta desceu', ancCaneta.valor || '', '', 'caneta-seleciona');
-  conf('e nada ficou selecionado', selCaneta, '');
+  // No Chrome do Linux (CI) o arrasto pen do CDP seleciona sem o bloqueio, e esta
+  // verificação é o controle positivo dele; no Windows ele nunca selecionava.
+  checa('e nada ficou selecionado', selCaneta, '', 'caneta-seleciona');
   if (await pararNoVeneno(3)) return;
 
   // ================================================================
