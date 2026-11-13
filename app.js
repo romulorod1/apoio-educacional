@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.104';
+  var VERSAO = '1.42.112';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -85,9 +85,15 @@
    * ganha, e onde encontrar. */
   var NOVIDADES = [
     {
-      versao: '1.42.104',
+      versao: '1.42.112',
       itens: [
         'Na Biblioteca, a busca mostra os assuntos que casam com o que você digitou. O toque abre a página do assunto, com os capítulos dos livros, a teoria, os exercícios, a OBMEP e os assuntos vizinhos.'
+      ]
+    },
+    {
+      versao: '1.42.105',
+      itens: [
+        'Remarcar uma aula da repetição para o dia de outra aula da mesma repetição, num mês que ainda não abriu, não faz mais sumir a aula fixa daquele dia: quando o mês abre, as duas aparecem e entram no fechamento.'
       ]
     },
     {
