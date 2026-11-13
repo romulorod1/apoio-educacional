@@ -120,7 +120,7 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
     Store.gravarPosicaoLivro = function (pos) {
       if (pos && pos.id) window.__idLivro = pos.id;
       window.__gravando++;
-      const fim = () => { window.__gravando--; };
+      const fim = () => { window.__gravando--; window.__gravadas = (window.__gravadas || 0) + 1; };
       const p = original.apply(Store, arguments);
       Promise.resolve(p).then(fim, fim);
       return p;
@@ -444,12 +444,48 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
 
   // ================================================================
   secao('7. A posição gravada nas bordas do livro');
-  // a posição lida só depois de toda gravação pedida terminar (o contador de gravações em curso em zero)
-  const posicaoGravada = async () => {
-    await estavel('antes de ler a posição');
-    const g = await esperar('as gravações de posição terminaram', () => pag.evaluate(() => window.__gravando || 0), v => v === 0, 5000);
-    conf('as gravações de posição terminaram', g.ok, true);
-    return pag.evaluate(() => window.__idLivro ? Store.lerPosicaoLivro(window.__idLivro).then(r => r ? r.pagina : null) : null);
+  /* A GRAVAÇÃO DO GESTO, medida sem depender do evento de rolagem. Na
+   * máquina 2, o veneno escapou 1 vez em 10: a gravação errada do gesto
+   * (p. 2) foi coberta por uma gravação certa vinda de um evento de rolagem
+   * tardio, e a prova leu a p. 1, que era também a posição de antes. Agora:
+   *   - o evento de rolagem do leitor fica segurado durante a medida (fase de
+   *     captura no documento), e quem grava é só o gesto;
+   *   - antes do gesto, o leitor e a posição gravada estão numa página
+   *     DIFERENTE da do meio (Ir p. 2 e depois a rolagem ao alto, sem evento);
+   *   - a prova espera uma gravação NOVA (o contador de concluídas sobe e não
+   *     sobra nenhuma pendente). Sem ela no prazo, reprova com o nome, sem ler
+   *     o valor velho. */
+  const segurarRolagem = liga => pag.evaluate(l => {
+    if (l) {
+      window.__seguraRolagem = e => { if (e.target && e.target.id === 'corpo-modal-leitor-pdf') e.stopImmediatePropagation(); };
+      document.addEventListener('scroll', window.__seguraRolagem, true);
+    } else if (window.__seguraRolagem) {
+      document.removeEventListener('scroll', window.__seguraRolagem, true);
+      delete window.__seguraRolagem;
+    }
+  }, liga);
+  const lerPosicao = () => pag.evaluate(() => window.__idLivro ? Store.lerPosicaoLivro(window.__idLivro).then(r => r ? r.pagina : null) : null);
+  const contagemDeGravacoes = () => pag.evaluate(() => ({ concluidas: window.__gravadas || 0, pendentes: window.__gravando || 0 }));
+  // espera uma gravação a mais que `antes` e nenhuma pendente; devolve null se o prazo estourar
+  const gravacaoNova = async (rotulo, antes) => {
+    const r = await esperar(rotulo + ': uma gravação nova da posição', contagemDeGravacoes,
+      v => v.concluidas > antes && v.pendentes === 0, 3000);
+    return r.ok ? lerPosicao() : null;
+  };
+  /* põe o leitor na página `n` (contador e posição gravada) e depois rola, sem
+   * evento, até `rolar` (0 é o alto, 'fim' é o fim): a página do meio passa a
+   * ser outra, e o leitor ainda acha que é a `n` */
+  const prepararBorda = async (rotulo, n, rolar) => {
+    await segurarRolagem(true);
+    const antes = (await contagemDeGravacoes()).concluidas;
+    await pag.evaluate(v => { const i = document.querySelector('#leitor-ir-pagina'); i.value = String(v); i.dispatchEvent(new Event('change')); }, n);
+    const g = await gravacaoNova(rotulo + ', o Ir p. ' + n, antes);
+    conf(rotulo + ': antes do gesto, a posição gravada é a p. ' + n, g, n);
+    await pag.evaluate(r => { const c = document.querySelector('#corpo-modal-leitor-pdf'); c.scrollTop = r === 'fim' ? c.scrollHeight : r; }, rolar);
+    await estavel(rotulo);
+    const e = await estadoDoLeitor();
+    conf(rotulo + ': o contador ainda diz a p. ' + n + ' (a rolagem não chegou ao leitor)', contaDiz(e, n), true);
+    return e;
   };
   // zoom 0,5 e depois 0,6: a p. 1 e o alto da p. 2 cabem juntos na área
   await irParaPagina(1);
@@ -459,43 +495,43 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   s6 = await estadoDoLeitor();
   await pinca(s6.area.x + s6.area.w * 0.5, s6.area.y + s6.area.h * 0.5, 150, 180, 0, 0, 6);
   await depoisDoZoom('o zoom 0,6 na p. 1', s6.largura);
-  // a posição fixada antes do gesto medido: o alto do livro, e a página do meio já tratada pela rolagem
-  await pag.evaluate(() => { document.querySelector('#corpo-modal-leitor-pdf').scrollTop = 0; });
-  await esperar('o alto do livro com a p. 1 no meio e no contador', estadoDoLeitor, v => v.scrollTop === 0 && v.meio === 1 && contaDizNaPagina(v.contador, 1) && v.malDesenhadas === '', 8000);
-  await estavel('o alto do livro');
+  // ---- o alto do livro: o leitor na p. 2, a rolagem em 0 (a p. 1 no meio), os dedos na p. 2
+  const s7 = await prepararBorda('no alto', 2, 0);
   const alto = await pag.evaluate(() => {
     const c = document.querySelector('#corpo-modal-leitor-pdf'), r = c.getBoundingClientRect();
     const p2 = document.querySelector('[data-pagina-arquivo="2"]').getBoundingClientRect();
     return { scrollTop: c.scrollTop, p2: p2.top, fundo: r.top + c.clientHeight };
   });
-  const s7 = await estadoDoLeitor();
   const yDedos = alto.p2 + 40;
   conf('no alto do livro (rolagem em 0), com a p. 1 no meio', alto.scrollTop + '|' + s7.meio, '0|1');
   conf('e o alto da p. 2 à vista, onde os dedos vão', yDedos < alto.fundo - 10, true);
-  conf('antes da pinça, a posição gravada é a p. 1', await posicaoGravada(), 1);
+  let antes7 = (await contagemDeGravacoes()).concluidas;
   await pinca(s7.area.x + s7.area.w * 0.5, yDedos, 180, 150, 0, 0, 6);
   await depoisDoZoom('a pinça com os dedos na p. 2', s7.largura);
+  const pos7 = await gravacaoNova('a pinça no alto', antes7);
   const d7 = await estadoDoLeitor();
-  const pos7 = await posicaoGravada();
-  console.log('   no alto: a rolagem ficou em ' + Math.round(d7.scrollTop) + ' px, a p. ' + d7.meio + ' no meio, a posição gravada é a p. ' + pos7);
+  console.log('   no alto: a rolagem ficou em ' + Math.round(d7.scrollTop) + ' px, a p. ' + d7.meio + ' no meio, a gravação do gesto: ' + (pos7 === null ? 'nenhuma no prazo' : 'p. ' + pos7));
   conf('a pinça reduziu a página (a troca aconteceu)', d7.largura < s7.largura - 10, true);
-  checa('perto da p. 1, a posição gravada é a página do meio, e não a dos dedos', pos7 + '|' + d7.meio, d7.meio + '|1', 'gesto-grava-pela-ancora');
+  checa('perto da p. 1, o gesto gravou uma posição nova', pos7 !== null, true, 'gesto-grava-pela-ancora');
+  if (pos7 !== null) checa('e ela é a página do meio (a 1), e não a dos dedos', pos7 + '|' + d7.meio, '1|1', 'gesto-grava-pela-ancora');
   checa('e o contador diz a página do meio', contaDiz(d7, d7.meio), true, 'gesto-grava-pela-ancora');
-  // o fim do livro: a rolagem no máximo, os dedos na página de cima da área
-  await irParaPagina(400);
-  await pag.evaluate(() => { const c = document.querySelector('#corpo-modal-leitor-pdf'); c.scrollTop = c.scrollHeight; });
-  await esperar('o fim do livro à vista e desenhado', estadoDoLeitor, v => v.meio === 400 && v.malDesenhadas === '', 8000);
-  await estavel('o fim do livro');
-  const s8 = await estadoDoLeitor();
+  await segurarRolagem(false);
+  // ---- o fim do livro: o leitor na p. 399, a rolagem no fim (a p. 400 no meio), os dedos na p. 399
+  const s8 = await prepararBorda('no fim', 399, 'fim');
   const cima = await pontoDoConteudo(s8.area.x + s8.area.w * 0.5, s8.area.y + 30);
   console.log('   no fim: a p. ' + s8.meio + ' no meio, a p. ' + (cima && cima.n) + ' no alto da área');
+  conf('no fim, a p. 400 no meio e a p. 399 no alto da área, onde os dedos vão', s8.meio + '|' + (cima && cima.n), '400|399');
+  const antes8 = (await contagemDeGravacoes()).concluidas;
   await pinca(s8.area.x + s8.area.w * 0.5, s8.area.y + 30, 150, 180, 0, 0, 6);
   await depoisDoZoom('a pinça no fim do livro', s8.largura);
+  const pos8 = await gravacaoNova('a pinça no fim', antes8);
   const d8 = await estadoDoLeitor();
-  const pos8 = await posicaoGravada();
-  console.log('   no fim: a p. ' + d8.meio + ' no meio, a posição gravada é a p. ' + pos8);
-  checa('no fim do livro, a posição gravada é a página do meio', pos8, d8.meio, 'gesto-grava-pela-ancora');
+  console.log('   no fim: a p. ' + d8.meio + ' no meio, a gravação do gesto: ' + (pos8 === null ? 'nenhuma no prazo' : 'p. ' + pos8));
+  checa('no fim do livro, o gesto gravou uma posição nova', pos8 !== null, true, 'gesto-grava-pela-ancora');
+  if (pos8 !== null) checa('e ela é a página do meio, e não a dos dedos', pos8 + '|' + (pos8 === d8.meio), '400|true', 'gesto-grava-pela-ancora');
   checa('e o contador diz a página do meio', contaDiz(d8, d8.meio), true, 'gesto-grava-pela-ancora');
+  await segurarRolagem(false);
+  void antes7;
   await clicar(pag, '#leitor-largura');
   await depoisDoZoom('a volta à largura no fim', d8.largura);
 
