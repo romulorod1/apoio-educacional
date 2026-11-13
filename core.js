@@ -352,7 +352,7 @@
   }
 
   /* A DATA DE ORIGEM de uma aula de repetição: a `dataOriginal`, gravada na
-   * primeira remarcação desde a 1.42.97, ou a data do id determinístico
+   * primeira remarcação desde a 1.42.105, ou a data do id determinístico
    * `serieId@data` (desde o N1, 08/11/2026; o sufixo +r ou +N fica de fora).
    * null quando não dá para saber: aula materializada antes do N1, com id
    * aleatório, e nunca remarcada depois. */
