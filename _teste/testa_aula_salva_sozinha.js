@@ -459,7 +459,20 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
     await pag.click('#cancelar-aula');
     await pausa(300);
     const av13 = await avisoAgora(pag);
-    conf('(arranjo) o aviso de Desfazer continua (' + av13.texto + ')', /^Aula atualizada/.test(av13.texto) && /Desfazer/.test(av13.acao), true);
+    conf('(arranjo) o aviso ainda é o da aula (' + av13.texto + ')', /^Aula atualizada/.test(av13.texto), true);
+    /* O Desfazer de uma aula só é POR AULA (comDesfazerDaAula): o relato
+     * gravado depois em outra aula não o encerra, porque ele não volta o banco
+     * inteiro. Com o veneno (o Desfazer da aula vira o comDesfazer do banco
+     * inteiro), a trava da rodada 6 encerra o Desfazer na gravação do relato:
+     * ela perde o Desfazer da aula. Sem a trava, o mesmo veneno apagaria o
+     * relato da outra aula. Os dois são o mesmo defeito, e a prova olha os dois. */
+    const vivo13 = await pag.evaluate(() => { const b = document.querySelector('#aviso-acao');
+      return getComputedStyle(b).display !== 'none' && !!b.onclick && /Desfazer/.test(b.textContent); });
+    if (MODO === MODOS[5] && !vivo13) {
+      conf('VENENO visto: o Desfazer da aula continua depois do relato da outra, e quebrou', vivo13, false);
+      fimDoVeneno();
+    }
+    conf('o Desfazer da aula continua depois do relato gravado na outra', vivo13, true);
     await tocarAcaoDoAviso(pag);
     await esperar('o Desfazer voltou a situação', () => lerAula(pag, AVULSA), a => a && a.status === antes13.status, 5000);
     const outra13 = await lerAula(pag, OUTRA);
