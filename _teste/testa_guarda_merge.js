@@ -8,9 +8,13 @@
  *    publica o veredito; workflow_run sem número acha o PR pelo sha; sem PR não
  *    publica; fork é pulado sem publicar nada; publicar que falha sai 1; o
  *    merge NUNCA é chamado; descrição até 140.
- * 2. A main andou: todos os PRs abertos são rejulgados. O caso da revisão: dois
- *    PRs sobem para a MESMA versão, o primeiro entra, e o segundo, que tinha
- *    success, passa a failure; o PR só de teste continua success.
+ *    Desde o 13f, a regra da publicação pelo guarda (novidade nova, VERSAO
+ *    igual à da main) e a transição (main sem o gerador: VERSAO e CACHE
+ *    maiores).
+ * 2. A main andou: todos os PRs abertos são rejulgados. O caso da revisão, na
+ *    regra do 13f: dois PRs do app trazem a MESMA novidade, o primeiro entra, e
+ *    o segundo, que tinha success, passa a failure; o PR só de teste continua
+ *    success, e com novidade de nome próprio o segundo também (controle).
  * 3. O guarda não julga a si mesmo (com controle sem a regra).
  * 4. O workflow: trava da PROPRIEDADE (três passos fixos, um run literal, sem
  *    ref, repository nem cache, sem ${{ }} no run, nada que puxe o PR fora do env
@@ -65,6 +69,8 @@ const semRegra = fonte.replace(/ *if \(GUARDA\.indexOf\(nome\) >= 0\) return;\r?
 conf('controle: achei a regra do guarda para tirar', semRegra !== fonte, true);
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'guarda_merge_'));
 fs.writeFileSync(path.join(tmp, 'merge_seguro_sem_regra.js'), semRegra);
+// Desde o 13f o merge_seguro carrega o versao_publicada.js ao lado.
+fs.copyFileSync(path.join(__dirname, 'versao_publicada.js'), path.join(tmp, 'versao_publicada.js'));
 p = pr(9, A);
 p.statusCheckRollup.push({ __typename: 'StatusContext', context: 'portao-merge', state: 'FAILURE', createdAt: '2026-10-26T12:30:00Z' });
 conf('controle: sem a regra, o próprio status vermelho recusaria para sempre', require(path.join(tmp, 'merge_seguro_sem_regra.js')).decidir(p).ok, false);
@@ -122,7 +128,12 @@ fs.writeFileSync(gitFalso, [
   "  process.stdout.write(sha + '\\trefs/heads/main\\n');",
   "} else if (a[0] === 'fetch') {}",
   "else if (a[0] === 'merge-tree') process.stdout.write(arvore(a[3]) + '\\n');",
-  "else if (a[0] === 'diff') { const s = daArvore(a[4]); process.stdout.write((m.merge[s].levados || []).map(f => f + '\\0').join('')); }",
+  // 13f: o diff e o --name-status -z (com -c core.quotePath=false na frente); o
+  // levado 'A caminho' e um arquivo adicionado, o resto sai como modificado.
+  "else if (a[0] === '-c' && a[2] === 'diff') { const s = daArvore(a[a.length - 1]); process.stdout.write((m.merge[s].levados || []).map(f => /^A /.test(f) ? 'A\\0' + f.slice(2) + '\\0' : 'M\\0' + f + '\\0').join('')); }",
+  // A transicao: a main sem o gerador (_teste/versao_publicada.js) julga pela regra antiga.
+  "else if (a[0] === 'cat-file') { if (m.transicao) { process.stderr.write('fatal: path does not exist'); process.exit(128); } }",
+  "else if (a[0] === 'show' && /:novidades\\//.test(a[1])) process.stdout.write('# nada muda para ela\\n');",
   "else if (a[0] === 'show') {",
   "  const [rev, arq] = a[1].split(':');",
   "  const v = rev === 'origin/main' ? m.main : m.merge[daArvore(rev)];",
@@ -150,74 +161,97 @@ function rodar(mundo, env) {
   return { codigo, saida, chamadas, status };
 }
 const V = (cache, versao, levados) => ({ cache, versao, levados: levados || [] });
+// Desde o 13f a regra do merge e a da publicacao: VERSAO e CACHE iguais aos da
+// main, e o PR que leva arquivo do site traz um novidades/<nome>.txt NOVO.
+const NOVA = 'A novidades/pr9.txt';
 const mundoUm = (prs, merge, main, extra) => Object.assign({ prs, merge, main }, extra || {});
 const so = (r, sha) => r.status.filter(s => s.sha === sha).map(s => s.estado).join(',');
 const merge = r => r.chamadas.some(c => c[0] === 'pr' && c[1] === 'merge');
 
 console.log('\n=== 1. Um PR ===');
-let r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55', ['app.js']) }, V(134, '1.42.54')));
+let r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(134, '1.42.54', ['app.js', NOVA]) }, V(134, '1.42.54')));
 conf('aprovado sai 0', r.codigo, 0);
 conf('pending no começo, success no fim, na cabeça que julgou', so(r, A), 'pending,success');
 conf('contexto portao-merge e o link da rodada', r.status.every(s => s.contexto === 'portao-merge' && s.url === 'https://exemplo/rodada/1'), true);
 conf('o merge nunca é chamado', merge(r), false);
 
 p = pr(9, A); p.comments = [];
-r = rodar(mundoUm({ 9: p }, { [A]: V(135, '1.42.55', ['app.js']) }, V(134, '1.42.54')));
+r = rodar(mundoUm({ 9: p }, { [A]: V(134, '1.42.54', ['app.js', NOVA]) }, V(134, '1.42.54')));
 conf('recusado sai 0 (recusa não é erro do job)', r.codigo, 0);
 conf('recusado: pending e depois failure', so(r, A), 'pending,failure');
 conf('com o primeiro motivo na descrição', /falta revisao adversarial/.test(r.status[1] && r.status[1].descricao), true);
 conf('a descrição cabe em 140', r.status.every(s => Array.from(s.descricao || '').length <= 140), true);
 conf('recusado também nunca chama o merge', merge(r), false);
 
-r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55', ['app.js']) }, V(134, '1.42.54'), { cabecaDepois: { 9: OUTRA } }));
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(134, '1.42.54', ['app.js', NOVA]) }, V(134, '1.42.54'), { cabecaDepois: { 9: OUTRA } }));
 conf('cabeça que andou durante a conferência: só o pending, sem veredito', so(r, A), 'pending');
 conf('e diz por que', /a cabeça mudou de/.test(r.saida), true);
 
-r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55', ['app.js']) }, V(134, '1.42.54')), { PR_NUM: '', SHA_DO_EVENTO: A });
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(134, '1.42.54', ['app.js', NOVA]) }, V(134, '1.42.54')), { PR_NUM: '', SHA_DO_EVENTO: A });
 conf('workflow_run sem número acha o PR pelo sha e publica', so(r, A), 'pending,success');
-r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55') }, V(134, '1.42.54')), { PR_NUM: '', SHA_DO_EVENTO: OUTRA });
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(134, '1.42.54') }, V(134, '1.42.54')), { PR_NUM: '', SHA_DO_EVENTO: OUTRA });
 conf('sem PR aberto para o sha: sai 0 e não publica', r.codigo === 0 && r.status.length === 0 && /nada a julgar/.test(r.saida), true);
 
-r = rodar(mundoUm({ 9: pr(9, A, { isCrossRepository: true }) }, { [A]: V(135, '1.42.55') }, V(134, '1.42.54')));
+r = rodar(mundoUm({ 9: pr(9, A, { isCrossRepository: true }) }, { [A]: V(134, '1.42.54') }, V(134, '1.42.54')));
 conf('PR de fork: sai 0 e não publica nada', r.codigo === 0 && r.status.length === 0, true);
 conf('PR de fork: diz por que', /vem de fork/.test(r.saida), true);
 conf('PR de fork: nem roda o merge_seguro', r.chamadas.filter(c => c[0] === 'pr' && c[1] === 'view').length, 1);
 
-r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55') }, V(134, '1.42.54'), { statusErro: true }));
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(134, '1.42.54') }, V(134, '1.42.54'), { statusErro: true }));
 conf('publicar que falha sai 1', r.codigo, 1);
 conf('e diz que não publicou', /não consegui publicar/.test(r.saida), true);
 
 // A main que anda no meio do julgamento: o veredito foi contra a main velha e
 // não sai; fica o pending, e o job do push decide.
 const M0 = '0'.repeat(39) + '1', M1 = '0'.repeat(39) + '2';
-r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55', ['app.js']) }, V(134, '1.42.54'), { mainSha: M0, mainShaDepois: M1 }));
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(134, '1.42.54', ['app.js', NOVA]) }, V(134, '1.42.54'), { mainSha: M0, mainShaDepois: M1 }));
 conf('main que anda no meio: só o pending, nenhum success', so(r, A), 'pending');
 conf('main que anda no meio: diz que o job do push decide', /a main andou de 0000000 para 0000000/.test(r.saida) && /job do push na main decide/.test(r.saida), true);
 conf('main que anda no meio: sai 0 (não é erro)', r.codigo, 0);
 p = pr(9, A); p.comments = [];
-r = rodar(mundoUm({ 9: p }, { [A]: V(135, '1.42.55', ['app.js']) }, V(134, '1.42.54'), { mainSha: M0, mainShaDepois: M1 }));
+r = rodar(mundoUm({ 9: p }, { [A]: V(134, '1.42.54', ['app.js', NOVA]) }, V(134, '1.42.54'), { mainSha: M0, mainShaDepois: M1 }));
 conf('main que anda no meio: também não publica failure velho', so(r, A), 'pending');
-r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55', ['app.js']) }, V(134, '1.42.54'), { mainSha: M0 }));
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(134, '1.42.54', ['app.js', NOVA]) }, V(134, '1.42.54'), { mainSha: M0 }));
 conf('controle: main parada, o mesmo PR recebe success', so(r, A), 'pending,success');
-r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55', ['app.js']) }, V(134, '1.42.54'), { mainErro: true }));
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(134, '1.42.54', ['app.js', NOVA]) }, V(134, '1.42.54'), { mainErro: true }));
 conf('main que não se lê: sai 1, só o pending', r.codigo === 1 && so(r, A) === 'pending', true);
-r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55') }, V(134, '1.42.54'), { viewErro: { 9: true } }));
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(134, '1.42.54') }, V(134, '1.42.54'), { viewErro: { 9: true } }));
 conf('modo um, PR que não se lê: sai 1 e diz', r.codigo === 1 && /não consegui ler o PR #9/.test(r.saida), true);
+// Regra nova pelo guarda, dos dois lados: o PR do app sem novidade nova recusa,
+// e o que muda a VERSAO recusa.
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(134, '1.42.54', ['app.js']) }, V(134, '1.42.54')));
+conf('regra nova: PR do app sem novidade NOVA vira failure', so(r, A) === 'pending,failure' && /NOVO/.test(r.status[1] && r.status[1].descricao), true);
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(134, '1.42.55', ['app.js', NOVA]) }, V(134, '1.42.54')));
+conf('regra nova: PR que muda a VERSAO vira failure', so(r, A) === 'pending,failure' && /VERSAO mudou/.test(r.status[1] && r.status[1].descricao), true);
+// A transicao (a main ainda sem o gerador, o merge do proprio 13f): vale a regra
+// antiga, VERSAO e CACHE MAIORES que os da main; igual recusa.
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(135, '1.42.55', ['app.js', NOVA]) }, V(134, '1.42.54'), { transicao: true }));
+conf('transição: VERSAO e CACHE maiores que os da main, success', so(r, A), 'pending,success');
+r = rodar(mundoUm({ 9: pr(9, A) }, { [A]: V(134, '1.42.54', ['app.js', NOVA]) }, V(134, '1.42.54'), { transicao: true }));
+conf('transição: iguais aos da main, failure com o motivo', so(r, A) === 'pending,failure' && /nao e MAIOR/.test(r.status[1] && r.status[1].descricao), true);
 
 console.log('\n=== 2. A main andou: todos os PRs abertos são rejulgados ===');
-// Antes: main em v133 / 1.42.53. O #10 e o #11 sobem os dois para v134 / 1.42.54;
-// o #12 é só de teste. Os três recebem success.
+// Desde o 13f a versao nao e mais do PR, e o caso da revisao (dois PRs que sobem
+// para a MESMA versao) vira o equivalente da regra nova: dois PRs do app que
+// trazem a MESMA novidades/igual.txt. Antes: os dois a adicionam; o #12 e so de
+// teste. Os tres recebem success.
+const IGUAL = 'A novidades/igual.txt';
 const prs = { 10: pr(10, A), 11: pr(11, B), 12: pr(12, C) };
-const antes = { [A]: V(134, '1.42.54', ['app.js', 'sw.js']), [B]: V(134, '1.42.54', ['app.js', 'sw.js']), [C]: V(133, '1.42.53') };
-r = rodar(mundoUm(prs, antes, V(133, '1.42.53')), { MODO: 'todos' });
+const antes = { [A]: V(134, '1.42.54', ['app.js', IGUAL]), [B]: V(134, '1.42.54', ['tela.js', IGUAL]), [C]: V(134, '1.42.54', ['_teste/x.js']) };
+r = rodar(mundoUm(prs, antes, V(134, '1.42.54')), { MODO: 'todos' });
 conf('antes: os três aprovados', [so(r, A), so(r, B), so(r, C)].join(' | '), 'pending,success | pending,success | pending,success');
-// O #10 entra: a main vai a v134 / 1.42.54 e o push dispara o rejulgamento.
+// O #10 entra: a main ganha a novidades/igual.txt, e o push dispara o
+// rejulgamento. No merge do #11 ela ja nao e NOVA (a main tem a mesma).
 const depois = { 11: prs[11], 12: prs[12] };
-const mergeDepois = { [B]: V(134, '1.42.54', ['app.js', 'sw.js']), [C]: V(134, '1.42.54') };
+const mergeDepois = { [B]: V(134, '1.42.54', ['tela.js']), [C]: V(134, '1.42.54', ['_teste/x.js']) };
 r = rodar(mundoUm(depois, mergeDepois, V(134, '1.42.54')), { MODO: 'todos' });
 conf('depois do push: rejulga os PRs abertos', /rejulgo 2 PR/.test(r.saida), true);
-conf('o #11, com a MESMA versão que entrou, vira failure', so(r, B), 'pending,failure');
-conf('e o motivo é a versão igual', /igual/.test((r.status.find(s => s.sha === B && s.estado === 'failure') || {}).descricao), true);
+conf('o #11, com a MESMA novidade que entrou, vira failure', so(r, B), 'pending,failure');
+conf('e o motivo é a novidade que não é nova', /NOVO/.test((r.status.find(s => s.sha === B && s.estado === 'failure') || {}).descricao), true);
+// Controle: com novidade de nome proprio, o mesmo #11 segue success depois do
+// push (o 13f tira o conflito de versao entre PRs do app).
+r = rodar(mundoUm(depois, { [B]: V(134, '1.42.54', ['tela.js', 'A novidades/pr11.txt']), [C]: V(134, '1.42.54', ['_teste/x.js']) }, V(134, '1.42.54')), { MODO: 'todos' });
+conf('controle: com novidade de nome próprio, o #11 segue success', so(r, B), 'pending,success');
 conf('o #12, só de teste, segue success', so(r, C), 'pending,success');
 conf('nenhum merge', merge(r), false);
 // Controle: sem o rejulgamento (só o modo "um" do #11 antigo), nada muda no #11.

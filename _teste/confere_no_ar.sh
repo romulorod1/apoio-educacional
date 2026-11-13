@@ -11,13 +11,34 @@
 #
 # Saida: 0 bateu, 1 nao bateu no prazo. Nunca sai 0 sem ter lido os tres
 # arquivos do ar: pedido que falha conta como "ainda nao", e nao como igual.
+#
+#   sh _teste/confere_no_ar.sh --montado https://apoio-educacional.pages.dev [segundos]
+#
+# Com --montado (o endereco novo, publicado pelo publica-cloudflare), o esperado
+# e o SITE MONTADO deste checkout (.github/monta_site.sh), e nao o disco: desde
+# o 13f a VERSAO do app.js e o CACHE do sw.js sao gerados na publicacao, e o
+# arquivo do commit traz o valor fixo de desenvolvimento. Sem --montado (o
+# endereco antigo, o GitHub Pages, que serve o repositorio cru), o esperado e o
+# disco, como sempre.
 cd "$(dirname "$0")/.."
 
-site="${1:?uso: confere_no_ar.sh URL [segundos]}"
+montado=0
+if [ "${1:-}" = "--montado" ]; then montado=1; shift; fi
+site="${1:?uso: confere_no_ar.sh [--montado] URL [segundos]}"
 prazo="${2:-900}"
 arquivos="sw.js app.js index.html"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+esperado="."
+if [ "$montado" = "1" ]; then
+  # O mesmo montador do deploy, no mesmo commit: falhou, a conferencia falha.
+  sh .github/monta_site.sh "$tmp/site" > "$tmp/montagem" 2>&1 || {
+    printf 'FALHOU  nao consegui montar o site deste checkout para comparar:\n'
+    sed 's/^/        /' "$tmp/montagem"
+    exit 1
+  }
+  esperado="$tmp/site"
+fi
 
 versao_de() { sed -n "s/^ *var VERSAO = '\([^']*\)'.*/\1/p" "$1" | head -1; }
 cache_de()  { sed -n "s/^var CACHE = '\([^']*\)'.*/\1/p" "$1" | head -1; }
@@ -25,8 +46,9 @@ cache_de()  { sed -n "s/^var CACHE = '\([^']*\)'.*/\1/p" "$1" | head -1; }
 # conferencia rodada a mao numa maquina Windows reprova o site que esta certo.
 hash_de()   { tr -d '\r' < "$1" | sha256sum | cut -d' ' -f1; }
 
-printf 'esperado: VERSAO %s, cache %s\n' "$(versao_de app.js)" "$(cache_de sw.js)"
-[ -n "$(versao_de app.js)" ] && [ -n "$(cache_de sw.js)" ] || {
+printf 'esperado: VERSAO %s, cache %s (%s)\n' "$(versao_de "$esperado/app.js")" "$(cache_de "$esperado/sw.js")" \
+  "$(if [ "$montado" = "1" ]; then echo 'site montado'; else echo 'disco do commit'; fi)"
+[ -n "$(versao_de "$esperado/app.js")" ] && [ -n "$(cache_de "$esperado/sw.js")" ] || {
   printf 'FALHOU  nao consegui ler VERSAO no app.js ou CACHE no sw.js deste checkout\n'
   exit 1
 }
@@ -42,19 +64,19 @@ while :; do
     # index.html nunca batia; o GitHub Pages responde 200 direto.
     if curl -fsSL -m 30 -H 'Cache-Control: no-cache' \
          -o "$tmp/$f" "$site/$f?conferencia=$(date +%s)$rodada" 2>"$tmp/erro"; then
-      [ "$(hash_de "$tmp/$f")" = "$(hash_de "$f")" ] || diferentes="$diferentes $f"
+      [ "$(hash_de "$tmp/$f")" = "$(hash_de "$esperado/$f")" ] || diferentes="$diferentes $f"
     else
       diferentes="$diferentes $f(sem resposta: $(head -c 120 "$tmp/erro"))"
     fi
   done
   passou=$(( $(date +%s) - inicio ))
   if [ -z "$diferentes" ]; then
-    printf 'ok      no ar em %s s: VERSAO %s, cache %s; sw.js, app.js e index.html iguais ao commit\n' \
+    printf 'ok      no ar em %s s: VERSAO %s, cache %s; sw.js, app.js e index.html iguais ao esperado\n' \
       "$passou" "$(versao_de "$tmp/app.js")" "$(cache_de "$tmp/sw.js")"
     exit 0
   fi
   if [ "$passou" -ge "$prazo" ]; then
-    printf 'FALHOU  depois de %s s o ar ainda difere do commit:%s\n' "$passou" "$diferentes"
+    printf 'FALHOU  depois de %s s o ar ainda difere do esperado:%s\n' "$passou" "$diferentes"
     [ -f "$tmp/app.js" ] && printf '        no ar: VERSAO %s, cache %s\n' \
       "$(versao_de "$tmp/app.js")" "$(cache_de "$tmp/sw.js" 2>/dev/null)"
     exit 1

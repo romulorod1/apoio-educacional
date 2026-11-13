@@ -166,9 +166,23 @@
  * mapa sobrevivem à troca de meta e de arquivo do livro.
  * O v182 traz o Voltar sem entrada sobrando no histórico depois de recarregar com uma janela aberta.
  * O v186 traz a pinça e o duplo toque no livro aberto.
+ * O v188 traz a ligação de assunto entre matérias nos mapas dos livros (biblioteca.js e app.js).
  * O v187 traz o conteúdo escrito no pedido do planejamento valendo como o do aviso.
+ * O v192 traz a página do assunto na Biblioteca (B1).
+ * O v195 traz a ligação de assunto entre matérias com a versão 1.42.115.
+ * O v199 traz a janela PDF pronto e as próximas aulas no Gerar material da Biblioteca.
+ * O v201 é o último escrito à mão: o 13f passa a gerar VERSAO e CACHE na publicação,
+ * com 1.42.121 e v201 como valores fixos e piso.
+ *
+ * DESDE O 13f ESTE HISTÓRICO PAROU, e o CACHE abaixo fica fixo. O nome que o
+ * tablet vê é gerado na publicação (_teste/versao_publicada.js):
+ * apoio-educacional-v(1000 + N), em que N é o contador de publicações da main,
+ * que sobe em todo commit que muda o que o tablet baixa. O valor daqui é o valor
+ * de desenvolvimento e o piso da publicação. Não mude no PR (o merge_seguro
+ * recusa) e não acrescente linha neste comentário: era ele, junto com a VERSAO
+ * e as NOVIDADES, que fazia todo PR do app conflitar com o anterior.
  */
-var CACHE = 'apoio-educacional-v187';
+var CACHE = 'apoio-educacional-v201';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
