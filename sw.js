@@ -158,9 +158,9 @@
  * passar sem cache. O v148 traz o aviso de novidades do planejamento.
  * O v152 reorganiza a janela da aula em duas colunas no tablet.
  * O v156 traz os 6 assuntos novos de química da revisão dos mapas dos livros no banco/topicos/quimica.json.
- * O v159 traz a pinça e o duplo toque no livro aberto.
+ * O v163 traz a pinça e o duplo toque no livro aberto.
  */
-var CACHE = 'apoio-educacional-v159';
+var CACHE = 'apoio-educacional-v163';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
