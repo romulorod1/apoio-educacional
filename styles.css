@@ -3911,6 +3911,11 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bib-assunto-vizinhos { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .bib-assunto-vizinho { min-height: var(--alvo); max-width: 100%; white-space: normal; text-align: left; }
 .bib-assunto-vazio { margin: 0; }
+/* com a página do assunto aberta, o topo dos exercícios e a faixa do material saem: a página começa no alto */
+#tela-biblioteca.com-pagina-do-assunto #bib-exercicios-cabeca,
+#tela-biblioteca.com-pagina-do-assunto #bib-contexto,
+#tela-biblioteca.com-pagina-do-assunto #bib-carrinho { display: none; }
+.bib-assuntos-mais { min-height: var(--alvo); margin-top: 4px; }
 /* "Melhores resultados" no alto do grupo "Nos livros", e o resto recolhido em "Mais resultados (N)" */
 .bib-busca-melhores { margin-top: 8px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
 .bib-busca-melhores-titulo { margin: 0; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }

@@ -543,6 +543,9 @@ roda "biblioteca livros tela --envenenado-largura-vai-ao-alto" node "_teste/test
 roda "biblioteca livros tela --envenenado-vizinhas-sem-desenho" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-vizinhas-sem-desenho
 roda "biblioteca livros tela --envenenado-canvas-sem-soltar" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-canvas-sem-soltar
 roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-sumario-dos-marcadores
+# B1 (revisao cega do #192): a navegacao sai da pagina do assunto; o veneno a
+# deixa presa, e ela volta no Limpar e no Voltar do modulo.
+roda "biblioteca livros tela --envenenado-pagina-presa" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-pagina-presa
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
