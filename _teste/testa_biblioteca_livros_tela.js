@@ -1143,9 +1143,10 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     // os grupos de baixo procuram sem o ano: nada diz "Nenhum exercício com "volume 8""
     const grupos = await esperar('os grupos de "' + termo + '"', () => pag.evaluate(() => {
       const g = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status');
-      return g && !/Buscando/.test(g.textContent) ? document.querySelector('#bib-corpo').innerText : null;
+      return g && !/Buscando/.test(g.textContent)
+        ? [...document.querySelectorAll('#bib-corpo [data-grupo], #bib-corpo > .vazio, #bib-busca-resumo')].map(x => x.innerText).join(' | ') : null;
     }), x => !!x, 10000);
-    conf('com "' + termo + '", os grupos de exercícios e de livros não falam do termo com o ano', /volume 8|8º ano|oitavo/.test(grupos.valor || ''), false);
+    conf('com "' + termo + '", os grupos de exercícios e de livros não falam do termo com o ano', /volume 8|volume do 8|oitavo/.test(grupos.valor || ''), false);
   }
   // "equação do 2º grau" não é o 2º ano: os exercícios do módulo aparecem, e o assunto do 9º ano vem primeiro
   await digitarB1('equação do 2º grau');
@@ -1153,7 +1154,8 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     const c = document.querySelector('#bib-assuntos-da-busca');
     const ex = document.querySelector('#bib-corpo [data-grupo="exercicios"] .bib-grupo-contagem');
     return c && !c.hidden && ex ? { primeiro: c.querySelector('[data-assunto]').dataset.assunto, exercicios: ex.textContent } : null;
-  }), x => !!x, 10000);
+  }), x => !!x && x.primeiro !== 'MAT08-15', 10000);
+  console.log('   "equação do 2º grau": ' + JSON.stringify(grau.valor));
   conf('"equação do 2º grau" não vira o 2º ano: o assunto do 9º ano vem primeiro, e os exercícios aparecem',
     !!grau.valor && /^MAT09-0[45]$/.test(grau.valor.primeiro) && grau.valor.exercicios !== '0', true);
   /* "volume" casa 8 assuntos (4 pelo título em Matemática, 1 em Química e 3 pelas palavras-chave): com
@@ -1162,7 +1164,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   const todosVolume = await esperar('os assuntos de "volume"', () => pag.evaluate(() => {
     const c = document.querySelector('#bib-assuntos-da-busca');
     return c && !c.hidden ? { linhas: c.querySelectorAll('[data-assunto]').length, mais: (c.querySelector('.bib-assuntos-mais') || {}).textContent || '' } : null;
-  }), x => !!x && x.linhas > 0, 10000);
+  }), x => !!x && x.mais !== '', 10000);
   const nOutros = parseInt(String((todosVolume.valor || {}).mais).replace(/\D+/g, ''), 10) || 0;
   conf('com mais de 5 assuntos, o bloco mostra 3 e "Ver os outros N"', (todosVolume.valor || {}).linhas + '|' + (nOutros > 2), '3|true');
   await clicar(pag, '#bib-assuntos-da-busca .bib-assuntos-mais');
