@@ -2232,6 +2232,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-cobre .cobre-rolagem { flex: 1 1 100%; margin: 0; }
 .livro-linha .detalhe { margin-top: 2px; }
 #lista-livros-biblioteca .livros-total { font-weight: 600; margin: 4px 0 8px; }
+/* fase 1c: a linha da biblioteca na nuvem, com o botão ao lado (quebra quando falta largura) */
+#lista-livros-biblioteca .livros-nuvem { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 10px; }
+#lista-livros-biblioteca .livros-nuvem .ajuda { margin: 0; min-width: 12rem; overflow-wrap: anywhere; }
 #lista-instalados-biblioteca > summary {
   cursor: pointer;
   color: inherit;
