@@ -590,6 +590,12 @@ roda "biblioteca mirim --envenenado-diversos"   node "_teste/testa_biblioteca_mi
 # serve o app.js sem a origem no cartao.
 roda "biblioteca cadernos sme"                 node "_teste/testa_biblioteca_cadernos_sme.js"
 roda "biblioteca cadernos sme --envenenado-sem-origem" node "_teste/testa_biblioteca_cadernos_sme.js" --envenenado-sem-origem
+# L6: o credito que a licenca da fonte pede (atribuicao e licenca do item)
+# no cartao, na tela cheia e no bloco "Creditos" da lista e do gabarito, sem
+# depender da caixa "origem"; item sem os campos nao ganha linha. O veneno
+# serve o pdf.js sem o bloco de creditos.
+roda "biblioteca credito da licenca"           node "_teste/testa_biblioteca_credito.js"
+roda "biblioteca credito da licenca --envenenado-sem-credito" node "_teste/testa_biblioteca_credito.js" --envenenado-sem-credito
 # FRENTE B: selecionar e compor. Sem navegador, o compositor do pdf.js (lista
 # renumerada, gabarito separado, sem solucao escrito, quebra entre pedacos, marca
 # por cima so nesta folha e os outros documentos byte a byte iguais aos de main).

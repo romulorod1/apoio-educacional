@@ -4040,7 +4040,8 @@
    *   incluirTeoria, incluirLista, incluirGabarito, gabaritoSeparado,
    *   espacoParaResposta (pt), mostrarOrigem,
    *   teoria: [{ img: {bytes, wPx, hPx}, larguraPt, alturaPt }],
-   *   itens: [{ id, origem, semSolucao, resposta (letra, só sem solução),
+   *   itens: [{ id, origem, credito (texto ou null), semSolucao,
+   *             resposta (letra, só sem solução),
    *             enunciado: Peca, solucao: Peca | null }]
    * }
    * Peca = { larguraPt, alturaPt, rotulo: [x0,y0,x1,y1] | null,
@@ -4172,6 +4173,26 @@
       doc.y -= extra + 12;        // folga entre um recorte e o seguinte
     }
 
+    /* OS CRÉDITOS DA LICENÇA (L6), no fim da lista e no fim do gabarito, cada
+     * linha com o número do exercício na folha. Fonte aberta que exige
+     * atribuição (os Cadernos de Apoio e Aprendizagem da SME-SP, CC BY-NC-SA)
+     * manda creditar em toda cópia, e o gabarito sai em arquivo separado: por
+     * isso os dois levam o bloco. Ele NÃO obedece ao mostrarOrigem, que é uma
+     * preferência dela; o crédito é condição da licença e não se desliga. O
+     * texto vem pronto do app (o que o item traz); folha sem item com crédito
+     * fica byte a byte como era. */
+    function creditos(parte) {
+      var com = [];
+      itens.forEach(function (it, i) { if (it.credito) com.push((parte === 'lista' ? 'Exercício ' : '') + (i + 1) + '. ' + it.credito); });
+      if (!com.length) return;
+      doc.garanteEspaco(14 + 2 * 7 * 1.4);   // o título nunca fica sozinho no pé da página
+      var antes = doc.paginas.length - 1;
+      doc.y -= 12;
+      doc.texto('Créditos', MARG_E, doc.y, { tam: 8, bold: true, cor: COR.muted });
+      com.forEach(function (linha) { doc.paragrafo(linha, { tam: 7, cor: COR.muted, alturaLinha: 7 * 1.4 }); });
+      for (var p = antes; p < doc.paginas.length; p++) if (mapa[parte].indexOf(p) < 0) mapa[parte].push(p);
+    }
+
     doc.novaPagina();
 
     if (op.incluirTeoria && op.teoria && op.teoria.length) {
@@ -4196,6 +4217,7 @@
       itens.forEach(function (it, i) {
         recorte('lista', i + 1, it.enunciado, op.espacoParaResposta || 0, op.mostrarOrigem ? it.origem : null);
       });
+      creditos('lista');
     }
 
     if (op.incluirGabarito && itens.length) {
@@ -4215,6 +4237,7 @@
         doc.y -= 8;
         anota('gabarito');
       });
+      creditos('gabarito');
     }
 
     /* A marca por tipo de página (decisão da orquestradora em 22/09, PLANO,

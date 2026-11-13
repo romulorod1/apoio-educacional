@@ -21318,7 +21318,8 @@
         el('div', { class: 'bib-tags' }, [
           el('span', { class: 'tag bib-lp-min-item', texto: minutosEstimados(lp.minutosDe[it.id]) }),
           etiquetaDesafio(it)
-        ])
+        ]),
+        creditoDaLicenca(it) ? el('div', { class: 'bib-credito', texto: creditoDaLicenca(it) }) : null
       ])]));
     });
     corpo.appendChild(grade);
@@ -21506,7 +21507,8 @@
             ? el('span', { class: 'tag bib-lp-min-item', texto: minutosEstimados(lp.minutosDe[id]) })
             : el('span', { class: 'tag bib-lp-min-item', texto: 'acrescentado por você' }),
           lp.minutosDe[id] !== undefined ? etiquetaDesafio(it) : null
-        ])
+        ]),
+        creditoDaLicenca(it) ? el('div', { class: 'bib-credito', texto: creditoDaLicenca(it) }) : null
       ]);
       grade.appendChild(celulaComCaixa(cartao, 'itens', it.id, setas));
     });
@@ -21588,7 +21590,8 @@
           (it.titulo ? ': ' + it.titulo : '') }),
         miniaturaBib(it.pacote, it.assets.enunciado, it.medidas && it.medidas.enunciado, 520),
         el('div', { class: 'bib-tags' }, tags),
-        it.origem_citada ? el('div', { class: 'bib-origem', texto: it.origem_citada }) : null
+        it.origem_citada ? el('div', { class: 'bib-origem', texto: it.origem_citada }) : null,
+        creditoDaLicenca(it) ? el('div', { class: 'bib-credito', texto: creditoDaLicenca(it) }) : null
       ]), 'itens', it.id, etiquetaDela(it)));
     });
     corpo.appendChild(barraFiltroDeDificuldade(grade, lista, mod.banco));
@@ -22775,6 +22778,28 @@
     abrirModal('modal-bib-gerar');
   }
 
+  /* O crédito que a licença da fonte pede (L6). Fonte aberta que exige
+   * atribuição (os Cadernos de Apoio e Aprendizagem da SME-SP, pelo Decreto
+   * municipal 52.681/2011, que equivale à CC BY-NC-SA) traz no item os campos
+   * `atribuicao` e `licenca`; o aplicativo desenha o que o item traz, sem texto
+   * de fonte nenhuma escrito aqui, no cartão, na tela cheia e na folha (lista e
+   * gabarito). Na folha ele NÃO depende da caixa "origem": a licença manda
+   * creditar, então ninguém o desliga. Item sem os dois campos devolve null e
+   * fica exatamente como era. O endereço entra só quando o item traz um. */
+  function creditoDaLicenca(it) {
+    if (!it) return null;
+    var limpo = function (v) { return typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : ''; };
+    var ponto = function (t) { return /[.!?]$/.test(t) ? t : t + '.'; };
+    var atrib = limpo(it.atribuicao), lic = limpo(it.licenca);
+    if (!atrib && !lic) return null;
+    var partes = [];
+    if (atrib) partes.push('Fonte: ' + ponto(atrib));
+    if (lic) partes.push('Licença: ' + ponto(lic));
+    var link = limpo(it.link) || limpo(it.url);
+    if (/^https?:\/\/\S+$/.test(link)) partes.push(link);
+    return partes.join(' ');
+  }
+
   function origemCurta(it) {
     var fonte = it.fonte === 'obmep-portal' ? 'Portal da OBMEP' : it.fonte === 'obmep-banco' ? 'Banco de Questões da OBMEP' : (it.fonte || '');
     return [fonte, it.modulo.titulo, (eDoBanco(it) ? 'problema ' : 'exercício ') + it.numero]
@@ -22800,7 +22825,7 @@
         return Biblioteca.rasterizarRecorte(b, it.medidas.solucao, it.origem && it.origem.solucao && it.origem.solucao.pedacos);
       });
     return Promise.all([enun, sol]).then(function (r) {
-      return { id: it.id, origem: origemCurta(it), enunciado: r[0], solucao: r[1],
+      return { id: it.id, origem: origemCurta(it), credito: creditoDaLicenca(it), enunciado: r[0], solucao: r[1],
         semSolucao: !!(it.sem_solucao || !it.assets.solucao), resposta: respostaSemSolucao(it) };
     });
   }
@@ -24216,6 +24241,9 @@
     ]));
     if (peca.item && peca.item.origem_citada) {
       corpo.appendChild(el('div', { class: 'bib-origem u-texto-centro', texto: peca.item.origem_citada }));
+    }
+    if (peca.item && creditoDaLicenca(peca.item)) {
+      corpo.appendChild(el('div', { class: 'bib-credito u-texto-centro', texto: creditoDaLicenca(peca.item) }));
     }
     // sem solução e com a letra do gabarito (ENEM): o "Ver resposta" mostra a letra
     var resposta = bibVendo.tipo === 'exercicio' ? respostaSemSolucao(peca.item) : null;
