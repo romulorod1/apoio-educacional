@@ -30387,11 +30387,16 @@
     if (f.pedindo) campo.disabled = true;
     var botoes = [];
     if (f.pedindo) botoes.push(el('button', { type: 'button', class: 'btn esquerda', id: 'ass-cancelar', texto: 'Cancelar', aoClick: function () { if (rodapeLivre(f) && f.controle) f.controle.abort(); } }));
-    else { var d = botaoDeDitar(campo, 'ass-ditar'); if (d) { d.classList.add('esquerda'); botoes.push(d); } }
+    else if (!f.erro) { var d = botaoDeDitar(campo, 'ass-ditar'); if (d) { d.classList.add('esquerda'); botoes.push(d); } }
     botoes.push(perguntar);
     if (semInternet && !f.pedindo) rodape.appendChild(el('p', { class: 'ajuda u-margem-0', id: 'ass-offline', texto: 'Sem internet: o assistente volta quando a conexão voltar.' }));
-    rodape.appendChild(el('div', { class: 'ass-campo' }, [campo]));
-    rodape.appendChild(el('div', { class: 'ass-botoes' }, botoes));
+    /* Com o erro aberto, o rodapé fica baixo: o campo numa linha e o
+     * Perguntar ao lado dele (o "Tentar de novo" já está na linha do erro). */
+    if (f.erro && !f.pedindo) rodape.appendChild(el('div', { class: 'ass-campo ass-campo-junto' }, [campo, perguntar]));
+    else {
+      rodape.appendChild(el('div', { class: 'ass-campo' }, [campo]));
+      rodape.appendChild(el('div', { class: 'ass-botoes' }, botoes));
+    }
     // a última resposta (ou o erro) fica à vista
     var alvo = $('#ass-esperando') || $('#ass-vez-' + (historicoAssistente.length - 1));
     if (alvo && alvo.scrollIntoView) alvo.scrollIntoView({ block: 'start' });
