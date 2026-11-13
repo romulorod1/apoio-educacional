@@ -174,8 +174,31 @@ def casa_forte(texto, titulo):
     return bool(t) and bool(a) and len(t) >= min(len(a), 10) and (a.startswith(t) or t.startswith(a))
 
 
+def fontes_no(pgn, r):
+    """{indice da linha: (fonte, corpo)} das linhas com centro em r, na ordem de linhas_no."""
+    r = pymupdf.Rect(r)
+    out = []
+    for b in pgn.get_text('dict')['blocks']:
+        if b['type'] != 0:
+            continue
+        for l in b['lines']:
+            t = ''.join(sp['text'] for sp in l['spans']).strip()
+            if not t:
+                continue
+            c = pymupdf.Point((l['bbox'][0] + l['bbox'][2]) / 2, (l['bbox'][1] + l['bbox'][3]) / 2)
+            if r.contains(c):
+                sp = next((x for x in l['spans'] if x['text'].strip()), l['spans'][0])
+                out.append((sp['font'], round(sp['size'], 1)))
+    return out
+
+
 def trava_titulo_alheio(p):
-    """Nenhum recorte leva a linha de titulo de OUTRA atividade do caderno."""
+    """Nenhum recorte leva a linha de titulo de OUTRA atividade do caderno.
+
+    A linha de titulo e a que esta na MESMA fonte e no mesmo corpo do titulo
+    da propria atividade (o titulo e desenhado numa fonte so): uma linha do
+    corpo do texto que comeca pela palavra de um titulo curto ("comprimento",
+    "formas geometricas") nao conta."""
     erros = []
     titulos = {}
     for lista in (p.itens, p.relatorio['excluidos'], p.relatorio['fora_do_alvo']):
@@ -186,9 +209,20 @@ def trava_titulo_alheio(p):
         doc = p.doc(it['origem']['arquivo'])
         outros = {k: v for k, v in titulos.get(it['serie'], {}).items() if k != it['id']}
         proprio = it['origem_detalhe']['atividade']
-        for pz in pg.pedacos(it, 'enunciado'):
-            for bb, t, corpo, girada, _ in linhas_no(doc[pz['pagina'] - 1], pz['bbox']):
-                if girada or corpo < 10 or casa_forte(t, proprio):
+        if it['origem_detalhe'].get('questao'):
+            continue  # a questao solta nao tem titulo proprio no recorte
+        ps = pg.pedacos(it, 'enunciado')
+        ls0 = linhas_no(doc[ps[0]['pagina'] - 1], ps[0]['bbox'])
+        fs0 = fontes_no(doc[ps[0]['pagina'] - 1], ps[0]['bbox'])
+        fonte_titulo = set(f for l, f in zip(ls0, fs0) if casa_forte(l[1], proprio))
+        if not fonte_titulo:
+            continue
+        for pz in ps:
+            pgn = doc[pz['pagina'] - 1]
+            for (bb, t, corpo, girada, _), f in zip(linhas_no(pgn, pz['bbox']), fontes_no(pgn, pz['bbox'])):
+                # a segunda linha do proprio titulo ("formas geometricas", de
+                # "Descobertas sobre as formas geometricas") tambem e dele
+                if girada or f not in fonte_titulo or casa_forte(t, proprio) or (letras(t) and letras(t) in letras(proprio)):
                     continue
                 for k, tit in outros.items():
                     if casa_forte(t, tit):
@@ -261,7 +295,10 @@ def trava_credito(p):
             ims = [pymupdf.Rect(b['bbox']) for b in pgn.get_text('dict')['blocks'] if b['type'] == 1]
             for bb, t, corpo, girada, _ in linhas_no(pgn, pz['bbox']):
                 tem_letra = sum(c.isalpha() for c in t) >= 2
-                junto_de_imagem = any((pymupdf.Rect(bb) + (-6, -6, 6, 6)).intersects(i) for i in ims)
+                # ao lado da imagem, e nao dentro dela (o rotulo do eixo do grafico em imagem)
+                dentro = any(not (pymupdf.Rect(bb) & i).is_empty and (pymupdf.Rect(bb) & i).get_area() > 0.2 * pymupdf.Rect(bb).get_area()
+                             for i in ims)
+                junto_de_imagem = not dentro and any((pymupdf.Rect(bb) + (-6, -6, 6, 6)).intersects(i) for i in ims)
                 if tem_letra and ((girada and corpo <= 7) or (girada and corpo <= 8.5 and junto_de_imagem)
                                   or (corpo <= 8.5 and CREDITO.search(t))):
                     erros.append('%s: credito de imagem de terceiro no recorte: %r (p%d)' % (it['id'], t[:50], pz['pagina']))
@@ -314,7 +351,7 @@ def trava_cobertura(p):
         for pno in range(min(pags), doc.page_count + 1):
             pgn = doc[pno - 1]
             W, H = pgn.rect.width, pgn.rect.height
-            if pno > max(pags) and letras(pgn.get_text()).startswith('anotacoes'):
+            if pno > max(pags) and 'anotacoes' in letras(pgn.get_text()):
                 break
             ls = [l for l in linhas_no(pgn, (0, H * 0.12, W, H * 0.88)) if not l[3] and l[2] > 6
                   and not (l[2] <= 8.5 and CREDITO.search(l[1]))]
