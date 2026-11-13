@@ -375,6 +375,10 @@ roda "planejamento com IA (fase 2)" node _teste/testa_planejamento.js
 # o salvar com a gravacao pendente: a mudanca no meio grava de novo, com o mesmo id
 roda "planejamento (salvar pendente)" node _teste/testa_planejamento_salvar.js
 roda "planejamento --envenenado-zera-sem-comparar" node _teste/testa_planejamento_salvar.js --envenenado-zera-sem-comparar
+# O assistente so de leitura com IA (fase 3): cada ferramenta sobre um banco
+# sintetico CONGELADO (nada grava, byte a byte), o laco com o content intacto,
+# o teto de 5 voltas e as 20 frases de datas relativas.
+roda "assistente com IA (fase 3)" node _teste/testa_assistente.js
 # Politica de testes por checkpoint (09/11/2026): o nivel 1 (quais provas de
 # navegador rodam pelos arquivos tocados, com o mapa em mapa_provas.tsv) e o
 # nivel 3 (a main reaproveita a bateria inteira se o tree for igual ao da cabeca
@@ -887,6 +891,10 @@ roda "planejamento (fluxo, IA fase 2)"              node "_teste/testa_planejame
 roda "planejamento --envenenado-salva-duplo"       node "_teste/testa_planejamento_navegador.js" --envenenado-salva-duplo
 roda "planejamento (registro e versao antiga)"      node "_teste/testa_planejamento_registro_navegador.js"
 roda "planejamento --envenenado-cascata-deixa-plano" node "_teste/testa_planejamento_registro_navegador.js" --envenenado-cascata-deixa-plano
+# IA, fase 3: o assistente no app (tablet e celular), com o /api/ia falso num roteiro
+# de tool_use: quem ve o botao, os cartoes que so abrem com o toque, o teto de 5
+# voltas, os erros, nada grava e o transbordo a 360, 390 e 412 px e 130%.
+roda "assistente (fluxo, IA fase 3)"                node "_teste/testa_assistente_navegador.js"
 # N1: a volta depois do rollback. O codigo da 4 republicado com o numero novo abre
 # um banco nesse numero sem os depositos novos; o codigo novo, voltando, sonda o
 # banco, cria o que falta na versao mais um e migra. O veneno sem a deteccao TEM
