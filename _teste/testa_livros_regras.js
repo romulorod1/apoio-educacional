@@ -98,7 +98,11 @@ function carregar(nome, troca) {
 const RELANCA_CORTADO = "if (e && e.cortado) throw Recusa(e.message, 'download');";
 const TETO = 'var TETO_POR_LIVRO = 160 * 1024 * 1024;';
 const FILTRO_DE_ANO = 'if (!ano) return true;';
-const CORRECAO_VALE = 'var vale = !!c && c.titulo === e.titulo && Array.isArray(c.assuntos);';
+/* Desde a fase 1a da nuvem (12/11/2026) a correção casa em passos
+ * (resolverCorrecoes): os dois venenos tiram, um, todas as correções válidas,
+ * e o outro, a conferência do título no passo do número. */
+const CORRECOES_VALIDAS = 'var validas = Object.keys(todas).filter(function (k) {';
+const CORRECAO_VALE = 'var mesmoNumeroETitulo = numeroDaCorrecao(k, c) === e.n && c.titulo === e.titulo;';
 const TIRA_AS_RESPOSTAS = 'var semRespostas = todas.filter(function (u) { return respostas.indexOf(u) < 0; });';
 const SUMARIO_DO_MAPA = 'if (!doMapa) return sumario;';
 const SO_MAPA_DE_VERDADE = 'if (caps.length < MINIMO_DE_CAPITULOS_DO_MAPA || coberturaDoMapa(meta, caps) < COBERTURA_MINIMA_DO_MAPA) return false;';
@@ -107,8 +111,8 @@ const TROCAS = {
   '--envenenado-cortado-le-tudo': [RELANCA_CORTADO, ''],
   '--envenenado-teto-antigo': [TETO, 'var TETO_POR_LIVRO = 40 * 1024 * 1024;'],
   '--envenenado-sem-ano': [FILTRO_DE_ANO, 'return true;'],
-  '--envenenado-correcao-ignorada': [CORRECAO_VALE, 'var vale = false;'],
-  '--envenenado-correcao-sem-titulo': [CORRECAO_VALE, 'var vale = !!c && Array.isArray(c.assuntos);'],
+  '--envenenado-correcao-ignorada': [CORRECOES_VALIDAS, 'var validas = [].filter(function (k) {'],
+  '--envenenado-correcao-sem-titulo': [CORRECAO_VALE, 'var mesmoNumeroETitulo = numeroDaCorrecao(k, c) === e.n;'],
   '--envenenado-respostas-no-capitulo': [TIRA_AS_RESPOSTAS, 'var semRespostas = todas;'],
   '--envenenado-fim-do-capitulo-tira': [GAB_SO_DO_LIVRO, 'var doLivro = g ? g.faixas : [], doFim = [];'],
   '--envenenado-sumario-dos-marcadores': [SUMARIO_DO_MAPA, 'return sumario;'],
