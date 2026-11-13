@@ -628,6 +628,20 @@ roda "leitor nitidez --envenenado-sem-detalhe"      node "_teste/testa_leitor_ni
 roda "leitor nitidez --envenenado-sem-teto"         node "_teste/testa_leitor_nitidez.js" --envenenado-sem-teto
 roda "leitor nitidez --envenenado-direcao-errada"   node "_teste/testa_leitor_nitidez.js" --envenenado-direcao-errada
 roda "leitor nitidez --envenenado-sem-meia-densidade" node "_teste/testa_leitor_nitidez.js" --envenenado-sem-meia-densidade
+# Fatia 7 do leitor: texto selecionavel sobre a pagina. Na p. 206 a camada de
+# texto existe, arrastar pela linha desenhada e copiar traz "Exercicio 206", a
+# caneta (pen) nao seleciona, so as paginas desenhadas tem texto vivo e o
+# escaneado nao tem camada e diz a frase uma vez. Um veneno por criterio.
+roda "leitor texto"                                 node "_teste/testa_leitor_texto.js"
+roda "leitor texto --envenenado-sem-camada"         node "_teste/testa_leitor_texto.js" --envenenado-sem-camada
+roda "leitor texto --envenenado-sem-selecao"        node "_teste/testa_leitor_texto.js" --envenenado-sem-selecao
+roda "leitor texto --envenenado-caneta-seleciona"   node "_teste/testa_leitor_texto.js" --envenenado-caneta-seleciona
+roda "leitor texto --envenenado-texto-sem-soltar"   node "_teste/testa_leitor_texto.js" --envenenado-texto-sem-soltar
+roda "leitor texto --envenenado-escaneado-com-camada" node "_teste/testa_leitor_texto.js" --envenenado-escaneado-com-camada
+roda "leitor texto --envenenado-aviso-repetido"     node "_teste/testa_leitor_texto.js" --envenenado-aviso-repetido
+roda "leitor texto --envenenado-sem-fim-do-conteudo" node "_teste/testa_leitor_texto.js" --envenenado-sem-fim-do-conteudo
+roda "leitor texto --envenenado-camada-visivel"     node "_teste/testa_leitor_texto.js" --envenenado-camada-visivel
+roda "leitor texto --envenenado-letra-fora-da-camada" node "_teste/testa_leitor_texto.js" --envenenado-letra-fora-da-camada
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
