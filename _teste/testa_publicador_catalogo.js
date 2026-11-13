@@ -289,7 +289,7 @@ const retrato = async () => {
   secao('1. Sem --publicar, nada é gravado');
   const M1 = manifesto('m1.json', [livro('livro-a', 'a1', { mapa: MAPA_A }), livro('livro-b', 'b1', { mapa: [cap(1, 'Funções', 2, 90, ['MAT09-06'])] })]);
   r = publicador(['--manifesto', M1].concat(comuns()));
-  conf('sem o registro de ids e sem --primeira-publicacao, recusa (registro sumido nunca vira vazio)', r.st + '|' + /o registro de ids não existe/.test(r.saida), '2|true');
+  if (MODO !== '--envenenado-registro-vazio-passa') conf('sem o registro de ids e sem --primeira-publicacao, recusa (registro sumido nunca vira vazio)', r.st + '|' + /o registro de ids não existe/.test(r.saida), '2|true');
   r = publicador(['--manifesto', M1, '--primeira-publicacao'].concat(comuns()));
   conf('o relatório diz o que mudaria, e sai bem', r.st + '|' + /livro-a: novo/.test(r.saida) + '|' + /sem --publicar, nada foi gravado/.test(r.saida), '0|true|true');
   conf('nada no emulador', (await retrato()).indice + '|' + (await retrato()).livros, 'nenhum|');
@@ -415,12 +415,14 @@ const retrato = async () => {
   fs.writeFileSync(classif, '﻿arquivo;título;resultado;motivo;fonte\nLivro-B.pdf;B;FICA;teoria e exercícios;A\nlivro f.pdf;F;SO_TEORIA;livro do professor;B\n' +
     'livro-c.pdf;C;SAI;caderno de atividades;A\nlivro-d.pdf;D;DÚVIDA;pouca teoria;A\n');
   const LONGO = 'x'.repeat(90);
-  fs.appendFileSync(classif, 'livro-g.pdf;G;SAI;caderno;A\nlivro-g.pdf;G;FICA;engano;A\n6ano/repetido.pdf;R6;SAI;caderno;A\n7ano/repetido.pdf;R7;FICA;teoria;A\n' +
+  fs.appendFileSync(classif, '6ano/repetido.pdf;R6;SAI;caderno;A\n7ano/repetido.pdf;R7;FICA;teoria;A\n' +
     'mesmo-nome.pdf;M;FICA;teoria;A\nlivro-h.pdf;H;FICA?;não sei;A\n' + LONGO + ' volume 1.pdf;L1;SAI;caderno;A\n' + LONGO + ' volume 2.pdf;L2;FICA;teoria;A\n' +
     'dup.pdf;D;FICA;teoria;A\nFisica/dup.pdf;D2;SAI;caderno;A\nlivro-i.pdf;I;SAI;caderno pelo arquivo;A\n');
   // a mesma lista ganha uma coluna id para o livro-i: a linha pelo id diz FICA, a do arquivo diz SAI
   fs.writeFileSync(classif, fs.readFileSync(classif, 'utf8').replace('\ufeffarquivo;título;resultado;motivo;fonte\n', '\ufeffid;arquivo;título;resultado;motivo;fonte\n')
-    .split('\n').map((l, i) => i === 0 || !l ? l : ';' + l).join('\n') + 'livro-i;;I;FICA;teoria pelo id;A\n');
+    .split('\n').map((l, i) => i === 0 || !l ? l : ';' + l).join('\n') + 'livro-i;;I;FICA;teoria pelo id;A\n' +
+    // o livro-g repetido pelo id (o repetido pelo nome sem pasta, na lista, é ambíguo)
+    'livro-g;;G;SAI;caderno;A\nlivro-g;;G;FICA;engano;A\n');
   const m10 = [livro('livro-b', 'b2', { formato: 'epub', mapa: [], arquivo_origem: 'Matematica/Livro-B.pdf' }), livro('livro-f', 'f1', { mapa: [], arquivo_origem: 'Matematica/livro f.pdf' }),
     livro('livro-c', 'c1', { mapa: [] }), livro('livro-d', 'd1', { mapa: [] }), livro('livro-e', 'e1', { mapa: [] }), livro('livro-g', 'g1', { mapa: [] }),
     livro('repetido', 'r6', { mapa: [], arquivo_origem: '6ano/repetido.pdf' }), livro('repetido-2', 'r7', { mapa: [], arquivo_origem: '7ano/repetido.pdf' }),
