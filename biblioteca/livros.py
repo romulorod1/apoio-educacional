@@ -34,6 +34,44 @@ segmento, sumario e hash) e o hash de cada arquivo em `arquivos`. Os livros
 vao "stored" (sem compressao): PDF e EPUB ja sao comprimidos, e assim o
 tablet le cada livro direto do zip, sem inflar.
 
+A NUMERAÇÃO IMPRESSA (item 12a), em `numeracao` do livro PDF: a lista de
+trechos {de, ate, inicio, estilo} que biblioteca.js lê (paginaImpressa) para
+o sumário, o "Abrir na p." e o contador do leitor mostrarem a página
+IMPRESSA. `de` e `ate` são páginas do arquivo, `inicio` é a impressa da página
+`de`, e `estilo` é "arabico" ou "romano". Os trechos vêm em ordem e sem
+sobreposição, e a página fora de trecho mostra o número do arquivo. A fonte,
+por ordem:
+  - os rótulos de página do próprio PDF (/PageLabels), quando o PDF os tem.
+    Vale só o estilo decimal e o romano, sem prefixo. O mapa não muda nada
+    nesse livro, e a nota diz se ele também tentava dizer a numeração;
+  - sem rótulo, o mapa da orquestradora, em duas camadas:
+      * DERIVADA: cada entrada com `pag_impressa` vira um trecho do
+        `pag_arquivo_inicio` ao `pag_arquivo_fim`, começando na
+        `pag_impressa`. Ela tem de fechar com o `deslocamento` (o da entrada,
+        ou o do livro): `pag_arquivo_inicio - deslocamento == pag_impressa`.
+        A entrada que não fecha fica sem número, e a nota diz. Entrada com
+        `pag_impressa: null` não numera nada. A página de transição fica com
+        a entrada seguinte;
+      * EXPLÍCITA: o campo novo `numeracao_trechos` do livro no mapa, uma
+        lista no mesmo formato {de, ate, inicio, estilo}, com o estilo
+        "arabico" por padrão. Os trechos explícitos têm precedência: a
+        derivada é cortada onde eles estão. São para o que o mapa sozinho não
+        diz:
+          - a página dupla: um trecho de uma página com o número da esquerda;
+          - as páginas fora de ordem: um trecho para cada pedaço (o mp1, PDF
+            299 a 304 com as impressas 290, 291 e 286 a 289);
+          - os recomeços: os capítulos adicionais do mp1 e do mp3, e a
+            Resolução do ca1;
+          - a página impressa que não existe: o trecho seguinte começa depois
+            dela (o caderno do tel7 pula a 44).
+        Um trecho explícito mal formado (fora do arquivo, sobreposto, início
+        inválido, estilo desconhecido) derruba a numeração inteira do livro:
+        sem `numeracao`, e a `numeracao_nota` diz qual trecho, em vez de
+        mostrar a derivada errada justo nas páginas que o trecho consertaria.
+A conferência é a mesma do aplicativo (erro_da_numeracao espelha o
+conferirNumeracao): uma numeração que o aplicativo recusaria nunca sai.
+`numeracao_origem` ("rotulos" ou "mapa") e `numeracao_nota` acompanham.
+
 O MAPA capitulo para assunto (C15.2), em `mapa` de cada livro: capitulo,
 paginas (ou a posicao na espinha, no EPUB) e os ids de assunto do indice de
 banco/topicos/, sem uma linha do conteudo do livro. A fonte, por ordem:
@@ -291,6 +329,182 @@ def ler_mapas(pasta):
             if isinstance(livro, dict) and livro.get('arquivo') and isinstance(livro.get('capitulos'), list):
                 por_arquivo.setdefault(chave_de_arquivo(livro['arquivo']), (nome, livro))
     return por_arquivo
+
+
+# ------------------------------------------------------------------ a numeracao impressa (item 12a)
+
+ESTILOS_DE_NUMERACAO = ('arabico', 'romano')
+# Os estilos de rotulo do PDF que o aplicativo sabe mostrar: decimal e romano.
+ESTILO_DO_ROTULO = {'D': 'arabico', 'r': 'romano', 'R': 'romano'}
+
+
+def inteiro(v):
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def erro_da_numeracao(trechos, total):
+    """None se a lista de trechos passa na mesma regra do aplicativo
+    (conferirNumeracao, em biblioteca.js); senao, a frase do defeito."""
+    fim_anterior = 0
+    for i, t in enumerate(trechos):
+        onde = 'trecho %d' % (i + 1)
+        if not isinstance(t, dict):
+            return '%s não é um trecho' % onde
+        if t.get('estilo') not in ESTILOS_DE_NUMERACAO:
+            return '%s com estilo desconhecido (%s)' % (onde, limpar_texto(t.get('estilo'))[:20])
+        de, ate, inicio = t.get('de'), t.get('ate'), t.get('inicio')
+        if not (inteiro(de) and inteiro(ate) and 1 <= de <= ate <= total):
+            return '%s fora das páginas do arquivo (%r a %r, de %d)' % (onde, de, ate, total)
+        if not inteiro(inicio) or inicio < 1 or (t['estilo'] == 'romano' and inicio + (ate - de) > 3999):
+            return '%s com início inválido (%r)' % (onde, inicio)
+        if de <= fim_anterior:
+            return '%s sobrepõe ou inverte o anterior' % onde
+        fim_anterior = ate
+    return None
+
+
+def juntar_trechos(trechos):
+    """Trechos seguidos que continuam a mesma contagem viram um so."""
+    saida = []
+    for t in trechos:
+        p = saida[-1] if saida else None
+        if p and p['estilo'] == t['estilo'] and t['de'] == p['ate'] + 1 and t['inicio'] == p['inicio'] + (p['ate'] - p['de'] + 1):
+            p['ate'] = t['ate']
+        else:
+            saida.append(dict(t))
+    return saida
+
+
+def numeracao_dos_rotulos(doc):
+    """Os rotulos de pagina do proprio PDF (/PageLabels) em trechos. So os
+    estilos decimal e romano, sem prefixo; o resto fica sem numero."""
+    total = doc.page_count
+    try:
+        regras = sorted(doc.get_page_labels() or [], key=lambda r: r.get('startpage', 0))
+    except Exception:  # noqa: BLE001 (rotulo ilegivel e livro sem rotulo)
+        regras = []
+    trechos = []
+    for i, r in enumerate(regras):
+        de = int(r.get('startpage', 0)) + 1
+        ate = int(regras[i + 1].get('startpage', 0)) if i + 1 < len(regras) else total
+        estilo = ESTILO_DO_ROTULO.get(r.get('style') or '')
+        if not estilo or r.get('prefix') or not (1 <= de <= ate <= total):
+            continue
+        trechos.append({'de': de, 'ate': ate, 'inicio': int(r.get('firstpagenum') or 1), 'estilo': estilo})
+    return bool(regras), juntar_trechos(trechos)
+
+
+def numeracao_derivada(livro_do_mapa, total):
+    """Os trechos que o mapa da orquestradora diz pelas entradas: cada entrada
+    com `pag_impressa` vira um trecho do `pag_arquivo_inicio` ao
+    `pag_arquivo_fim`, comecando em `pag_arquivo_inicio - deslocamento` (o da
+    entrada, ou o do livro). Devolve (trechos, notas)."""
+    desl_livro = livro_do_mapa.get('deslocamento')
+    brutos, notas = [], []
+    for cap in livro_do_mapa.get('capitulos') or []:
+        imp = cap.get('pag_impressa')
+        if imp is None:
+            continue
+        ini, fim = cap.get('pag_arquivo_inicio'), cap.get('pag_arquivo_fim')
+        desl = cap.get('deslocamento')
+        if desl is None:
+            desl = desl_livro
+        titulo = limpar_texto(cap.get('titulo'))[:60]
+        if not (inteiro(ini) and inteiro(fim) and inteiro(imp) and 1 <= ini <= fim <= total):
+            notas.append('a entrada "%s" não tem páginas e página impressa inteiras dentro do arquivo' % titulo)
+            continue
+        if desl is not None and (not inteiro(desl) or ini - desl != imp):
+            notas.append('a entrada "%s" tem página impressa %d que não fecha com o deslocamento %r' % (titulo, imp, desl))
+            continue
+        if imp < 1:
+            continue
+        brutos.append({'de': ini, 'ate': fim, 'inicio': imp, 'estilo': 'arabico'})
+    brutos.sort(key=lambda t: t['de'])
+    trechos = []
+    for t in brutos:
+        # a pagina de transicao (o fim de uma entrada e o comeco da seguinte) fica com a seguinte
+        if trechos and t['de'] <= trechos[-1]['ate']:
+            trechos[-1]['ate'] = t['de'] - 1
+            if trechos[-1]['ate'] < trechos[-1]['de']:
+                trechos.pop()
+        trechos.append(t)
+    return trechos, notas
+
+
+def tirar_paginas(trechos, cobertos):
+    """Os trechos sem as paginas de `cobertos` (lista de [de, ate])."""
+    saida = []
+    for t in trechos:
+        pedacos = [(t['de'], t['ate'])]
+        for a, b in cobertos:
+            novos = []
+            for de, ate in pedacos:
+                if b < de or a > ate:
+                    novos.append((de, ate))
+                    continue
+                if de < a:
+                    novos.append((de, a - 1))
+                if ate > b:
+                    novos.append((b + 1, ate))
+            pedacos = novos
+        for de, ate in pedacos:
+            saida.append({'de': de, 'ate': ate, 'inicio': t['inicio'] + (de - t['de']), 'estilo': t['estilo']})
+    return saida
+
+
+def numeracao_do_pdf(doc, achado):
+    """A `numeracao` do livro (os trechos que biblioteca.js le), a origem e a
+    nota. Ver o cabecalho, "A NUMERACAO IMPRESSA". {} quando nao ha nada."""
+    total = doc.page_count
+    tem_rotulo, dos_rotulos = numeracao_dos_rotulos(doc)
+    if tem_rotulo:
+        if not dos_rotulos:
+            return {'numeracao_nota': 'O PDF tem rótulos de página, mas em estilo que o aplicativo não mostra: sem numeração impressa.'}
+        erro = erro_da_numeracao(dos_rotulos, total)
+        if erro:
+            return {'numeracao_nota': 'Os rótulos de página do PDF não formam uma numeração válida (%s): sem numeração impressa.' % erro}
+        nota = 'A numeração impressa veio dos rótulos de página do próprio PDF.'
+        if achado and (achado[1].get('numeracao_trechos') is not None or
+                       any(c.get('pag_impressa') is not None for c in achado[1].get('capitulos') or [])):
+            nota += ' O mapa também diz a numeração, mas os rótulos do PDF vencem.'
+        return {'numeracao': dos_rotulos, 'numeracao_origem': 'rotulos', 'numeracao_nota': nota}
+    if not achado or 'capitulos' not in achado[1]:
+        return {}
+    nome_mapa, livro = achado
+    explicitos = livro.get('numeracao_trechos')
+    if explicitos is not None:
+        if not isinstance(explicitos, list):
+            return {'numeracao_nota': 'O campo numeracao_trechos do mapa (%s) não é uma lista: sem numeração impressa.' % nome_mapa}
+        explicitos = [dict(t, estilo=t.get('estilo', 'arabico')) if isinstance(t, dict) else t for t in explicitos]
+        erro = erro_da_numeracao(explicitos, total)
+        if erro:
+            return {'numeracao_nota': 'Os trechos explícitos do mapa (%s, numeracao_trechos) estão mal formados (%s): '
+                                      'sem numeração impressa.' % (nome_mapa, erro)}
+        explicitos = [{k: t[k] for k in ('de', 'ate', 'inicio', 'estilo')} for t in explicitos]
+    derivados, notas = numeracao_derivada(livro, total)
+    if explicitos:
+        derivados = tirar_paginas(derivados, [(t['de'], t['ate']) for t in explicitos])
+    trechos = juntar_trechos(sorted((explicitos or []) + derivados, key=lambda t: t['de']))
+    if not trechos:
+        return {'numeracao_nota': 'O mapa não diz a página impressa de nenhuma entrada: sem numeração impressa.'} if notas else {}
+    erro = erro_da_numeracao(trechos, total)
+    if erro:
+        return {'numeracao_nota': 'A numeração tirada do mapa (%s) não é válida (%s): sem numeração impressa.' % (nome_mapa, erro)}
+    nota = 'A numeração impressa veio do mapa da orquestradora (%s, livro %s): ' % (nome_mapa, livro.get('livro'))
+    nota += ('%d trecho(s) explícito(s) e o resto pelo deslocamento de cada entrada.' % len(explicitos) if explicitos
+             else 'pelo deslocamento e pela página impressa de cada entrada.')
+    if notas:
+        nota += ' Ficaram sem número: ' + '; '.join(notas) + '.'
+    return {'numeracao': trechos, 'numeracao_origem': 'mapa', 'numeracao_nota': nota}
+
+
+def ler_numeracao(caminho, achado):
+    """Abre o PDF so para os rotulos de pagina e calcula a numeracao."""
+    doc = pymupdf.open(caminho)
+    try:
+        return numeracao_do_pdf(doc, achado)
+    finally:
+        doc.close()
 
 
 # ------------------------------------------------------------------ o mapa (C15.2)
@@ -1235,6 +1449,9 @@ def gerar(planilha, rotulo, versao, saida, pasta_livros=None, materia=None, mapa
             livro['capitulos'] = info['capitulos']
             livro['epub'] = info['epub']
         livro.update(montar_mapa(livro, info, por_mapa.get(chave_de_arquivo(caminho)), catalogo))
+        if formato == 'pdf':
+            # item 12a: a numeracao impressa (rotulos do PDF, ou o mapa)
+            livro.update(ler_numeracao(caminho, por_mapa.get(chave_de_arquivo(caminho))))
         # C15.5: o gabarito de cada capitulo, e a planilha de conferencia do livro
         try:
             linhas_conf = localizar_gabarito(caminho, livro)
