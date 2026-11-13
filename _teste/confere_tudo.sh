@@ -644,6 +644,9 @@ roda "biblioteca tela principal"               node "_teste/testa_biblioteca_tel
 roda "biblioteca tela principal --envenenado-some-sem-material" node "_teste/testa_biblioteca_tela_principal.js" --envenenado-some-sem-material
 roda "biblioteca tela principal --envenenado-tudo-apagado" node "_teste/testa_biblioteca_tela_principal.js" --envenenado-tudo-apagado
 roda "biblioteca tela principal --envenenado-estante-nao-abre" node "_teste/testa_biblioteca_tela_principal.js" --envenenado-estante-nao-abre
+# Os dois medios da revisao cega do #211: o Continuar lendo da estante e so o da disciplina, e Minhas listas aparece uma vez.
+roda "biblioteca tela principal --envenenado-continuar-de-outra-materia" node "_teste/testa_biblioteca_tela_principal.js" --envenenado-continuar-de-outra-materia
+roda "biblioteca tela principal --envenenado-minhas-listas-dobrada" node "_teste/testa_biblioteca_tela_principal.js" --envenenado-minhas-listas-dobrada
 roda "biblioteca tela principal --controle-pai" node "_teste/testa_biblioteca_tela_principal.js" --controle-pai
 # T2 (listas): o bloco "Teoria e exercicios" da pagina do assunto, numa pagina
 # de prova (a pagina do assunto e de outra executora), a 1280x800, 800x1280 e

@@ -828,7 +828,13 @@ async function secaoP2(pag) {
   await clicar(pag, '#bib-livro-voltar');
   await esperar('a aba de volta', () => lerSecao(pag), v => v.visivel && /livro-de-prova/.test(v.continuar), 5000);
   s = await lerSecao(pag);
-  conf('o Continuar lendo põe o último lido primeiro', s.continuar, 'livro-de-prova|Cap. 3, O fim,livro-com-marcadores|Cap. 2, Frações · p. 4');
+  // P3 (revisão cega do #211): na estante de uma disciplina, só o Continuar lendo dela
+  conf('na estante da Literatura, o Continuar lendo é o do livro dela, com a posição', s.continuar, 'livro-de-prova|Cap. 3, O fim');
+  await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  await abrirEstante(pag);
+  s = (await esperar('a estante da Matemática', () => lerSecao(pag), v => v.visivel && !!v.continuar, 5000)).valor;
+  conf('na da Matemática, o livro de Matemática lido, e não o de Literatura', s.continuar, 'livro-com-marcadores|Cap. 2, Frações · p. 4');
+  await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="literatura"]');
 
   // ================================================================
   secao('6. O livro sem sumário diz isso');

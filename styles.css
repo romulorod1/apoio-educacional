@@ -4146,8 +4146,6 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bibl-so-matematica { margin: 8px 0 0; }
 .bibl-painel-estante > .bib-voltar { margin-bottom: 8px; }
 .bibl-painel-estante .bibl-continuar { margin: 14px 0 4px; }
-.bibl-estante-atalhos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.bibl-estante-minhas { min-height: var(--alvo); }
 /* com a lista de assuntos à vista, o começo dos exercícios fica na estante */
 #tela-biblioteca.bibl-com-assuntos.bib-corpo-home #bib-corpo,
 #tela-biblioteca.bibl-com-assuntos.bib-corpo-home #bib-exercicios-cabeca,

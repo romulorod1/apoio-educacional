@@ -56,14 +56,22 @@ const PORTA = 8977;
 const PYTHON = process.env.PYTHON || 'python';
 const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
-const VENENOS = ['--envenenado-some-sem-material', '--envenenado-tudo-apagado', '--envenenado-estante-nao-abre', '--controle-pai'];
+const VENENOS = ['--envenenado-some-sem-material', '--envenenado-tudo-apagado', '--envenenado-estante-nao-abre',
+  '--envenenado-continuar-de-outra-materia', '--envenenado-minhas-listas-dobrada', '--controle-pai'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 const ANCORA_SOME = "if (!m.tem) { l.classList.add('sem-material');";
 const ANCORA_APAGADO = 'm.tem = m.capitulos + m.inteiros + m.teoria + m.exercicios > 0;';
 const ANCORA_ESTANTE = "aoClick: function () { abrirTelaDoLivro(l.id); } }, [\n        capaDoLivro(l),";
+/* Os dois médios da revisão cega do #211: o Continuar lendo da estante é só o
+ * da disciplina, e Minhas listas aparece num lugar só (a aba). */
+const ANCORA_CONTINUAR = 'return l.pos && l.pos.quando && disciplinaDoLivro(l.meta).id === disc.id; })';
+const ANCORA_MINHAS = '    // Minhas listas mora num lugar só: a aba "Por série / Minhas listas", logo abaixo da estante\n';
 const trocas = {};
+if (MODO === '--envenenado-continuar-de-outra-materia') trocas['/app.js'] = APP.split(ANCORA_CONTINUAR).join('return l.pos && l.pos.quando; })');
+if (MODO === '--envenenado-minhas-listas-dobrada') trocas['/app.js'] = APP.split(ANCORA_MINHAS).join(
+  "    painel.appendChild(el('button', { type: 'button', class: 'btn', id: 'bib-estante-minhas', texto: 'Minhas listas (' + quantasMinhasListas() + ')' }));\n");
 if (MODO === '--envenenado-some-sem-material') trocas['/app.js'] = APP.split(ANCORA_SOME).join('if (!m.tem) { return;');
 if (MODO === '--envenenado-tudo-apagado') trocas['/app.js'] = APP.split(ANCORA_APAGADO).join('m.tem = false;');
 if (MODO === '--envenenado-estante-nao-abre') trocas['/app.js'] = APP.split(ANCORA_ESTANTE).join("aoClick: function () {} }, [\n        capaDoLivro(l),");
@@ -146,7 +154,9 @@ const lerTela = pag => pag.evaluate(() => {
     outro: Array.from(document.querySelectorAll('#tela-biblioteca .bibl-tipo-selo')).filter(s => /^\s*Outro\s*$/.test(s.textContent)).length,
     corpo: vis(document.querySelector('#bib-corpo')),
     cabecaExercicios: vis(document.querySelector('#bib-exercicios-cabeca')),
-    minhas: vis(document.querySelector('#bib-estante-minhas')) || visiveis('#bib-corpo [data-aba="minhas"]').length > 0,
+    minhas: visiveis('#bib-corpo [data-aba="minhas"]').length > 0,
+    // quantas vezes "Minhas listas" aparece à vista na aba inteira (a faixa do material marcado conta)
+    minhasVezes: Array.from(document.querySelectorAll('#tela-biblioteca button')).filter(b => vis(b) && /^\s*Minhas listas/.test(b.textContent)).length,
     modulos: visiveis('#bib-corpo .item-lista .nome').map(n => n.textContent.trim()).join(' | '),
     soMatematica: (visiveis('#bib-so-matematica')[0] || {}).textContent || '',
     busca: vis(document.querySelector('#busca-biblioteca')),
@@ -189,7 +199,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   secao('0. A prova se confere');
   conf('a lista de venenos não está vazia', VENENOS.length > 0, true);
   conf('cada âncora dos venenos aparece uma vez só no app.js',
-    [ANCORA_SOME, ANCORA_APAGADO, ANCORA_ESTANTE].map(a => APP.split(a).length - 1).join(','), '1,1,1');
+    [ANCORA_SOME, ANCORA_APAGADO, ANCORA_ESTANTE, ANCORA_CONTINUAR, ANCORA_MINHAS].map(a => APP.split(a).length - 1).join(','), '1,1,1,1,1');
   if (MODO && MODO !== '--controle-pai') conf('o app.js servido está envenenado (' + MODO + ')', trocas['/app.js'] !== APP && !!trocas['/app.js'], true);
   if (MODO === '--controle-pai') conf('o app.js servido é o do commit pai, e não o desta fatia', trocas['/app.js'].replace(/\r\n/g, '\n') !== APP, true);
 
@@ -346,6 +356,8 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('a estante mostra as capas do 8º ano de Matemática', T.capas, 'p3-mat8a,p3-mat8b');
   conf('a estante tem o Continuar lendo do livro lido', T.continuar, 'p3-mat8a');
   conf('a estante tem Minhas listas', T.minhas, true);
+  if (MODO === '--envenenado-minhas-listas-dobrada') return venenoVisto('"Minhas listas" aparece duas vezes na estante', T.minhasVezes > 1, T.minhasVezes);
+  conf('"Minhas listas" aparece uma vez só na estante (a aba)', T.minhasVezes, 1);
   conf('a estante tem os exercícios por série, logo abaixo', T.corpo && /Equações do Segundo Grau/.test(T.modulos), true);
   conf('na estante a lista de assuntos sai', T.linhas.length, 0);
   conf('a estante não tem a etiqueta "Outro" nem a seção de comparar', T.outro + '|' + T.comparar, '0|0');
@@ -384,6 +396,9 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   const f = await esperar('a estante da Física', () => lerTela(pag), v => v.ativa === 'fisica' && !!v.capas, 6000);
   T = f.valor || {};
   conf('a Física abre a estante dela, com a capa', T.capas, 'p3-fis');
+  if (MODO === '--envenenado-continuar-de-outra-materia') return venenoVisto('o livro de Matemática lido aparece no Continuar lendo da Física', T.continuar === 'p3-mat8a', T.continuar);
+  conf('o Continuar lendo da Física não traz o livro de Matemática (nenhum de Física lido: sem o bloco)', T.continuar + '|' +
+    await pag.evaluate(() => document.querySelectorAll('#bib-livros .bibl-continuar').length), '|0');
   conf('sem lista de assuntos nem botão da Estante', T.linhas.length + '|' + T.estanteBotao, '0|false');
   conf('a tela diz, sem jargão, que por enquanto só a Matemática está por assunto', T.soMatematica,
     'Por enquanto, só a Matemática está organizada por assunto. Aqui ficam os livros de Física, por ano.');

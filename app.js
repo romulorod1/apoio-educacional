@@ -20067,10 +20067,13 @@
       painel.appendChild(el('p', { class: 'bibl-apoio bibl-so-matematica', id: 'bib-so-matematica',
         texto: 'Por enquanto, só a Matemática está organizada por assunto. Aqui ficam os livros de ' + disc.nome + ', por ano.' }));
     }
-    if (recentes.length) {
+    // o Continuar lendo da estante é o desta disciplina (revisão cega do #211): o livro de outra matéria não entra
+    var lidosAqui = livros.filter(function (l) { return l.pos && l.pos.quando && disciplinaDoLivro(l.meta).id === disc.id; })
+      .sort(function (a, b) { return b.pos.quando - a.pos.quando; }).slice(0, 3);
+    if (lidosAqui.length) {
       painel.appendChild(el('section', { class: 'bibl-continuar', 'aria-label': 'Continuar lendo' }, [
         el('h3', { class: 'bibl-rotulo', texto: 'Continuar lendo' }),
-        el('div', { class: 'bibl-continuar-linha' }, recentes.map(function (l) {
+        el('div', { class: 'bibl-continuar-linha' }, lidosAqui.map(function (l) {
           var barra = el('span', { class: 'bibl-progresso', 'aria-hidden': 'true' }, [el('i')]);
           barra.firstChild.style.width = Math.round(progressoDoLivro(l) * 100) + '%';
           return el('button', { type: 'button', class: 'bibl-continuar-cartao', 'data-continuar': l.id,
@@ -20086,13 +20089,7 @@
         }))
       ]));
     }
-    // Minhas listas, junto dos livros: o toque leva a elas, logo abaixo
-    if (disc.id === Core.MATERIA_PADRAO && temPacotesDeExercicios()) {
-      painel.appendChild(el('div', { class: 'bibl-estante-atalhos' }, [
-        el('button', { type: 'button', class: 'btn bibl-estante-minhas', id: 'bib-estante-minhas',
-          texto: 'Minhas listas (' + quantasMinhasListas() + ')', aoClick: function () { irNaBiblioteca({ minhas: {} }); } })
-      ]));
-    }
+    // Minhas listas mora num lugar só: a aba "Por série / Minhas listas", logo abaixo da estante
     if (disc.listaAnos.some(function (a) { return a !== SEM_ANO; })) {
       painel.appendChild(pilulasDoAno(caixa, disc.listaAnos, bibLivrosNav.ano, function (a) {
         bibLivrosNav.ano = a;
