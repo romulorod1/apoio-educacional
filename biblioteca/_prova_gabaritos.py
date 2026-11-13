@@ -17,7 +17,9 @@ Travas:
                livro numera os capitulos; casar com o capitulo seguinte.
   variacoes    no fim do proprio capitulo (sem numero: casa pelo lugar); quadro
                de respostas no MEIO do capitulo (ignorado, nunca casado); so as
-               impares (marcado); so no manual do professor (vazio, e a nota diz);
+               impares (marcado, só pelo título da seção e pela linha seguinte,
+               nunca por uma resposta com "impar", o mp1 p. 193; veneno: a busca
+               no alto de todas as páginas); so no manual do professor (vazio, e a nota diz);
                numeracao que recomeca (nao fecha); "Resposta pessoal" nao e
                titulo; EPUB com uma parte para dois capitulos (nao fecha). Venenos:
                o fim do capitulo aceito em qualquer lugar; "Resposta pessoal" como
@@ -186,7 +188,8 @@ def casos(placar):
     placar.conferir('gabarito: só as ímpares, marcado',
                     esperado(r, {1: [[3, 3]], 2: [[4, 4]]}) +
                     ([] if all(g['so_impares'] for g in r['por_capitulo'].values()) else ['so_impares %r' % r['por_capitulo']]))
-    manual = [pag('Capítulo 1', CONTEUDO, 'Respostas no Manual do Professor.'), pag('Capítulo 1', CONTEUDO)]
+    so_impares(placar)
+    manual =[pag('Capítulo 1', CONTEUDO, 'Respostas no Manual do Professor.'), pag('Capítulo 1', CONTEUDO)]
     r = livros.propor_gabaritos(manual, caps((1, 2), numeros=[1]))
     placar.conferir('gabarito: só no manual do professor fica vazio, e a nota diz',
                     esperado(r, {}) + ([] if 'Manual do Professor' in r['nota'] else ['nota %r' % r['nota']]))
@@ -287,6 +290,54 @@ def casos(placar):
 
     titulo_no_fim(placar)
     quadro_de_margem(placar)
+
+
+def so_impares(placar):
+    """"Só as ímpares" vem do TÍTULO da seção, e não de uma resposta. O mp1
+    (Moderna Plus Matemática 1): a p. 193, no meio das respostas dos caps. 1 a
+    5, traz "e expoente impar tem o mesmo sinal", e a busca nas linhas do alto
+    de todas as páginas marcava os cinco capítulos, embora a p. 182 tenha
+    respostas pares e ímpares."""
+    cs = caps((1, 1), (2, 2), numeros=[1, 2])
+    expoente = [pag('Capítulo 1', CONTEUDO), pag('Capítulo 2', CONTEUDO),
+                pag('Respostas dos exercícios', 'Capítulo 1', '1. 4', '2. 9', 'Base negativa',
+                    'e expoente impar tem o mesmo sinal', '3. 16', '4. 25'),
+                pag('Respostas dos exercícios', '5. 36', 'Capítulo 2', '1. positivo',
+                    'e expoente impar tem o mesmo sinal', '2. 8', '3. 27')]
+    r = livros.propor_gabaritos(expoente, cs)
+
+    def nenhum(r):
+        marcados = [n for n, g in r['por_capitulo'].items() if g['so_impares']]
+        return (esperado(r, {1: [[3, 4]], 2: [[4, 4]]}) +
+                (['marcou só as ímpares nos capítulos %r por uma resposta' % marcados] if marcados else []))
+    placar.conferir('gabarito: "expoente impar" no meio das respostas não marca só as ímpares (o mp1, p. 193)', nenhum(r))
+    variantes = (('"Respostas dos exercícios ímpares" numa linha', ['Respostas dos exercícios ímpares']),
+                 ('"Respostas" e "dos exercícios ímpares" na linha seguinte', ['Respostas', 'dos exercícios ímpares']))
+    for rot, titulo in variantes:
+        textos = [pag('Capítulo 1', CONTEUDO), pag('Capítulo 2', CONTEUDO),
+                  pag(*titulo, 'Capítulo 1', '1. 4 metros', '3. 9 metros'),
+                  pag('Capítulo 2', '1. 2 metros', '3. 6 metros', '5. 10 metros')]
+        r = livros.propor_gabaritos(textos, cs)
+        placar.conferir('gabarito: título %s marca só as ímpares' % rot,
+                        esperado(r, {1: [[3, 3]], 2: [[4, 4]]}) +
+                        ([] if [g['so_impares'] for g in r['por_capitulo'].values()] == [True, True]
+                         else ['so_impares %r' % r['por_capitulo']]))
+    # a linha seguinte ao título só conta se não for resposta
+    textos = [pag('Capítulo 1', CONTEUDO), pag('Capítulo 2', CONTEUDO),
+              pag('Respostas', '1. o expoente impar mantém o sinal', 'Capítulo 1', '1. 4', '2. 9'),
+              pag('Respostas', 'Capítulo 2', '1. 2', '2. 6')]
+    r = livros.propor_gabaritos(textos, cs)
+    placar.conferir('gabarito: resposta logo abaixo do título com "impar" não marca só as ímpares',
+                    esperado(r, {1: [[3, 3]], 2: [[4, 4]]}) +
+                    ([] if not any(g['so_impares'] for g in r['por_capitulo'].values()) else ['so_impares %r' % r['por_capitulo']]))
+    # veneno: a busca antiga, nas linhas do alto de todas as páginas da seção
+    rv = com_fonte_trocada(placar, 'ímpares na página toda',
+                           'impares = any(SO_IMPARES.search(l) for l in perto_do_titulo)',
+                           'impares = any(SO_IMPARES.search(l) for u in range(a, b + 1) for l in linhas[u - 1][:LINHAS_DO_ALTO + 2])',
+                           expoente, cs)
+    if rv is not None:
+        placar.conferir('gabarito: só as ímpares procurado no alto de todas as páginas (a regra antiga)', nenhum(rv),
+                        deve_reprovar=True)
 
 
 def livro_titulo_no_fim(pagina_rala=True):

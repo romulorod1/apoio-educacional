@@ -954,8 +954,9 @@ def propor_gabaritos(textos, capitulos, formato='pdf'):
             onde = range(len(ls))
         for k in onde:
             if TITULO_DE_RESPOSTAS.match(ls[k]):
-                # o terceiro campo diz se o titulo so foi achado nas ultimas linhas (LINHAS_DO_FIM)
-                titulo_em[i + 1] = (k / max(1, len(ls)), ls[k], formato == 'pdf' and k >= LINHAS_DO_ALTO)
+                # o terceiro campo diz se o titulo so foi achado nas ultimas linhas
+                # (LINHAS_DO_FIM); o quarto e a linha do titulo (para o SO_IMPARES)
+                titulo_em[i + 1] = (k / max(1, len(ls)), ls[k], formato == 'pdf' and k >= LINHAS_DO_ALTO, k)
                 break
     manual = [i + 1 for i, t in enumerate(textos) if NO_MANUAL.search(' '.join(linhas[i]))]
 
@@ -1014,7 +1015,14 @@ def propor_gabaritos(textos, capitulos, formato='pdf'):
             if limpas and limpas[-1][1] == x[1]:
                 continue
             limpas.append(x)
-        impares = any(SO_IMPARES.search(l) for u in range(a, b + 1) for l in linhas[u - 1][:LINHAS_DO_ALTO + 2])
+        # "Só as ímpares" vale só no TÍTULO da seção, na página em que ela abre:
+        # a linha do título e a seguinte ("Respostas" / "dos exercícios ímpares"),
+        # esta só se não for resposta. Nas linhas do alto de todas as páginas, uma
+        # resposta casava: "e expoente impar tem o mesmo sinal" (mp1, p. 193)
+        # marcava os caps. 1 a 5 inteiros, e a p. 182 tem pares e ímpares.
+        ls_a, k_titulo = linhas[a - 1], titulo_em[a][3]
+        perto_do_titulo = [ls_a[k_titulo]] + [l for l in ls_a[k_titulo + 1:k_titulo + 2] if not PARECE_RESPOSTA.match(l)]
+        impares = any(SO_IMPARES.search(l) for l in perto_do_titulo)
         evidencia = '"%s" (%s %d)' % (titulo_em[a][1], nome, a)
         numeros = [x[1] for x in limpas]
         # sem texto perto da secao (dentro dela ou colada nela), pode faltar resposta: a certeza baixa
