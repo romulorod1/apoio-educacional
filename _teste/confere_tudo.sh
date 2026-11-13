@@ -854,6 +854,13 @@ roda "livros indice --envenenado-erro-vira-pronto"    node "_teste/testa_livros_
 roda "livros indice --envenenado-apagar-espera-indice" node "_teste/testa_livros_indice.js" --envenenado-apagar-espera-indice
 # A pagina que sempre falha (de forma passageira) sai sozinha; o livro fica na busca.
 roda "livros indice --envenenado-pagina-ruim-derruba-livro" node "_teste/testa_livros_indice.js" --envenenado-pagina-ruim-derruba-livro
+# 12/11/2026: a busca tambem acha os capitulos pelo titulo e pelos assuntos do
+# mapa, inclusive no livro escaneado (sem texto). O veneno desliga a busca por
+# capitulo, e o livro escaneado some do resultado.
+roda "livros indice --envenenado-busca-sem-capitulos" node "_teste/testa_livros_indice.js" --envenenado-busca-sem-capitulos
+# A revisao do #181: com o resultado todo em "Outras paginas do livro", elas
+# disputam o topo; o veneno deixa os "Melhores resultados" vazios.
+roda "livros indice --envenenado-topo-vazio" node "_teste/testa_livros_indice.js" --envenenado-topo-vazio
 # C15.2 e C15.3: "Este capitulo cobre" no leitor, Confirmar e Corrigir (so a
 # materia e o ano do livro), a correcao depois de recarregar e na copia de
 # seguranca (os livros nao), e o "Abrir no livro" da aula na pagina do PDF e no
