@@ -1061,8 +1061,10 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     picoPx = Math.max(picoPx, m.pixels);
   }
   console.log('   zoom 4: pico de ' + picoZ4 + ' canvases vivos e ' + (picoPx / 1e6).toFixed(2) + ' milhões de pixels rolando de 300 em 300 px');
-  conf('no zoom 4, o pico fica em no máximo 16 milhões de pixels de canvas vivos', picoPx <= 16000000, true);
-  conf('e em no máximo 5 canvases (as à vista, os detalhes delas e a pré-desenhada)', picoZ4 <= 5, true);
+  /* com o veneno canvas-sem-soltar a pré-desenhada de cada passo fica viva e
+   * o orçamento estoura: aqui também é a falha que o veneno tem de dar */
+  checa('no zoom 4, o pico fica em no máximo 16 milhões de pixels de canvas vivos', picoPx <= 16000000, true, 'canvas-sem-soltar');
+  checa('e em no máximo 5 canvases (as à vista, os detalhes delas e a pré-desenhada)', picoZ4 <= 5, true, 'canvas-sem-soltar');
   conf('e a página à vista segue desenhada', (await esperar('o zoom 4: a página à vista desenhada', meioDoLeitor, v => v.vazias === '', 8000)).ok, true);
   await clicar(pag, '#leitor-largura');
   await pausa(400);
