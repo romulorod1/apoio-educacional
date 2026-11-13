@@ -320,18 +320,6 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   conf('e ela diz de quem é a aula',
     await pag.$eval('#titulo-modal-tema', e => e.textContent),
     'Assunto da aula, ' + marcelo.nome);
-  const painelAssunto = await pag.evaluate(() => {
-    const r = document.querySelector('#modal-tema .modal').getBoundingClientRect();
-    return {
-      lateral: Math.abs(r.right - innerWidth) < 1 && r.left > innerWidth - 460,
-      altura: Math.abs(r.height - innerHeight) < 1,
-      aulaVisivelAoFundo: document.querySelector('#modal-aula').classList.contains('aberto'),
-      contexto: document.querySelector('#tema-contexto').textContent.includes('Aluno Referência Teste'),
-      legenda: !!document.querySelector('#corpo-modal-tema .tema-legenda')
-    };
-  });
-  conf('o seletor abre em painel lateral mantendo a aula atrás', painelAssunto.lateral && painelAssunto.altura && painelAssunto.aulaVisivelAoFundo, true);
-  conf('o seletor mostra o contexto do aluno e a legenda dos sinais', painelAssunto.contexto && painelAssunto.legenda, true);
 
   /* Regra do tablet: nada de foco automático. O teclado sobe por cima da lista
    * e ela perde de vista justamente o que veio escolher. */

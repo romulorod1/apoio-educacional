@@ -52,8 +52,8 @@ const { conf, secao, pausa, esperar } = H;
 
 const MODOS = ['--envenenado-sem-55', '--envenenado-texto-errado', '--envenenado-abre-sozinho', '--envenenado-campo-obrigatorio',
   '--envenenado-campos-nao-sobem', '--envenenado-cobranca-retrato', '--envenenado-observador-cadastra',
-  '--envenenado-extracao-antiga', '--envenenado-aceita-http', '--envenenado-nunca-desatualizado'];
-const [V_55, V_TEXTO, V_SOZINHO, V_OBRIGATORIO, V_NAO_SOBE, V_RETRATO, V_OBS, V_EXTRACAO, V_HTTP, V_HORA] = MODOS;
+  '--envenenado-extracao-antiga', '--envenenado-aceita-http', '--envenenado-nunca-desatualizado', '--envenenado-planejamento-solto'];
+const [V_55, V_TEXTO, V_SOZINHO, V_OBRIGATORIO, V_NAO_SOBE, V_RETRATO, V_OBS, V_EXTRACAO, V_HTTP, V_HORA, V_PLAN] = MODOS;
 const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 function prop(rotulo, ok, veneno) {
@@ -89,7 +89,10 @@ const ANCORAS = {
   [V_EXTRACAO]: [["    return aluno && telefoneValidado(aluno.telefone) ? String(aluno.telefone).trim() : '';", '    return telefoneDoAluno(aluno);'],
     ['  function telefoneValidado(texto) {', "  function telefoneValidado(texto) { var achados = [], m0, RE0 = /(?:^|[^\\d])((?:\\+?55[\\s.-]?)?(?:\\(?\\d{2}\\)?[\\s.-]?)?9?\\d{4}[\\s.-]?\\d{4})(?!\\d)/g; while ((m0 = RE0.exec(String(texto || ''))) !== null) achados.push(m0[1]); if (achados.length !== 1) return ''; var d0 = achados[0].replace(/\\D/g, ''); if (d0.length >= 12 && /^55/.test(d0)) d0 = d0.slice(2); return d0;"]],
   [V_HTTP]: ['if (/^https:\\/\\//i.test(t)) return t;', 'if (/^https?:\\/\\//i.test(t)) return t;'],
-  [V_HORA]: ['var desatualizado = !!r.erroRecebimento || agora.getTime() - d.getTime() > HORAS_SEM_RECEBER * 3600 * 1000;', 'var desatualizado = false;']
+  [V_HORA]: ['var desatualizado = !!r.erroRecebimento || agora.getTime() - d.getTime() > HORAS_SEM_RECEBER * 3600 * 1000;', 'var desatualizado = false;'],
+  /* (IA, fase 2) a seção Planejamentos do celular volta a botões comuns, sem
+   * data-acao-celular: o código de 1b6cfca */
+  [V_PLAN]: ['      if (acaoDeclarada) return botaoDeAcaoCelular(acao, atributos);', '      if (false) return botaoDeAcaoCelular(acao, atributos);']
 };
 const paresDe = m => Array.isArray(ANCORAS[m][0]) ? ANCORAS[m] : [ANCORAS[m]];
 conf('cada âncora de veneno está no app.js uma vez só', MODOS.map(m => paresDe(m).map(par => APP.split(par[0]).length - 1).join('+')).join(','),
@@ -448,7 +451,7 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
 
   secao('3. A aba Alunos: a lista dos ativos');
   conf('a aba Alunos está nas abas de baixo, depois de Hoje', await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-abas .cel-aba')).filter(b => !b.hidden).map(b => b.textContent).join(',')),
-    'Hoje,Alunos,Biblioteca,Fechamento,Enviar,+ Aula'); // B1: a Biblioteca entrou e F2 trouxe a ação para a barra
+    'Hoje,Alunos,Livros,Fechar mês,Enviar,+ Aula'); // B1: a Biblioteca entrou; F2 encurtou os rótulos na barra
   await aba(pagC, 'alunos');
   const lista = await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-alunos-lista .cel-aluno-item')).map(b => b.dataset.aluno + '=' + b.querySelector('.cel-aluno-nome').textContent));
   conf('a lista traz os ativos em ordem de nome, sem o inativo', lista.join(', '),
@@ -489,6 +492,20 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   conf('a ficha: alvos de 48 px (os links também) e sem rolagem de lado', telaBoa(m), '');
   conf('(painel) o telefone na ficha em letra maior (16 px, peso 600 do sistema visual)', await pagC.evaluate(() => { const c = getComputedStyle(document.querySelector('#cel-ficha-telefone')); return c.fontSize + ' ' + c.fontWeight + ' ' + document.querySelector('#cel-ficha-telefone').textContent; }), '16px 600 Telefone: ' + TEL_ALFA);
   conf('a ficha: nenhum botão nem campo de edição', m.soltos.join(', ') + '|' + m.campos.join(','), '|');
+  /* (IA, fase 2, D6b) a seção Planejamentos da dona: o "Novo planejamento" é
+   * ação declarada, e nenhum botão da seção fica fora de [data-acao-celular].
+   * A regra de cima mede pelo texto de edição e não vê este botão; esta mede
+   * pela seção inteira. */
+  const plan = await pagC.evaluate(() => {
+    const secao = document.querySelector('#cel-plan-secao');
+    if (!secao) return { secao: false, novo: false, soltos: [] };
+    return { secao: true, novo: !!document.querySelector('#cel-plan-novo[data-acao-celular="planejamento"]'),
+      soltos: Array.from(secao.querySelectorAll('button')).filter(b => !b.closest('[data-acao-celular]')).map(b => b.id || b.textContent.trim()) };
+  });
+  conf('(arranjo) a ficha da dona tem a seção Planejamentos', plan.secao, true);
+  prop('o "Novo planejamento" do celular é ação declarada (data-acao-celular="planejamento")', plan.novo, V_PLAN);
+  prop('nenhum botão da seção Planejamentos fora de [data-acao-celular] (' + (plan.soltos.join(', ') || 'nenhum') + ')', plan.soltos.length === 0, V_PLAN);
+  if (MODO === V_PLAN) fimDoVeneno();
   await tirarPrint(pagC, '2_ficha_minima.png');
 
   secao('5. As mensagens prontas: wa.me com o telefone do responsável e o texto certo, e nada sai sozinho');
@@ -549,16 +566,16 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   const abriuVelho = await abrirFichaPelaLista(pagC, 'velho');
   prop('a ficha do aluno sem os campos novos abre (' + (pagC.errosDePagina.join(' | ') || 'sem erro de página') + ')', abriuVelho && pagC.errosDePagina.length === 0, V_OBRIGATORIO);
   if (MODO === V_OBRIGATORIO) fimDoVeneno();
-  prop('o contato das observações NÃO liga nem abre o WhatsApp: mostra o texto e "Confira o telefone no tablet" (' + (await href(pagC, '#cel-ficha-ligar')) + ')',
+  prop('o contato das observações NÃO liga nem abre o WhatsApp: mostra o texto e indica a edição no celular (' + (await href(pagC, '#cel-ficha-ligar')) + ')',
     !(await existe(pagC, '#cel-ficha-ligar')) && !(await existe(pagC, '#cel-ficha-whatsapp')) && (await texto(pagC, '#cel-ficha-telefone')) === 'Contato: ' + TEL_VELHO &&
-    /^Confira o telefone no tablet/.test((await texto(pagC, '#cel-ficha-confira')) || ''), V_EXTRACAO);
+    /^Para cadastrar ou corrigir, abra Alunos e toque em Editar ficha\./.test((await texto(pagC, '#cel-ficha-confira')) || ''), V_EXTRACAO);
   conf('sem casa nem online, a ficha não mostra o lugar; o valor é o dele', (await existe(pagC, '#cel-ficha-lugar')) + ' ' + (await texto(pagC, '#cel-ficha-valor')).replace(/\s/g, ' '), 'false Valor por hora: R$ 80,00');
   conf('sem relato, a ficha diz', await texto(pagC, '#cel-ficha-relato'), 'Ainda sem relato de aula.');
   await clicar(pagC, '#cel-alunos-voltar');
   await abrirFichaPelaLista(pagC, 'nada');
-  conf('sem telefone: a ficha diz onde pôr, e não oferece ligar, WhatsApp nem mensagem pronta',
+  conf('sem telefone: a ficha direciona para edição no celular, sem oferecer ligar, WhatsApp nem mensagem pronta',
     (await texto(pagC, '#cel-ficha-sem-telefone')) + ' | ' + (await pagC.evaluate(() => document.querySelectorAll('#cel-ficha a').length)),
-    'Sem telefone do responsável. Ele se põe no tablet, na ficha do aluno. | 0');
+    'Sem telefone do responsável. Para cadastrar, abra Alunos e toque em Editar ficha. | 0');
   conf('sem valor por hora, a ficha diz', await texto(pagC, '#cel-ficha-valor'), 'Sem valor por hora para hoje.');
   await clicar(pagC, '#cel-alunos-voltar');
   await abrirFichaPelaLista(pagC, 'online');
@@ -569,7 +586,8 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   await irParaDia(pagC, HOJE);
   await clicar(pagC, '.cel-bloco[data-aula="aula-velho"]');
   conf('a folha da aula do aluno sem os campos novos tem as ações de sempre', await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-folha button')).map(b => b.id).filter(Boolean).join(',')),
-    'cel-folha-ficha,cel-folha-realizada,cel-folha-faltou,cel-folha-remarcar,cel-folha-registrar,cel-folha-cancelar,cel-folha-fechar');
+    // o Ajustar duração (#168) entra depois do Remarcar, como em toda aula que ela edita
+    'cel-folha-ficha,cel-folha-realizada,cel-folha-faltou,cel-folha-remarcar,cel-folha-duracao,cel-folha-registrar,cel-folha-cancelar,cel-folha-fechar');
   await clicar(pagC, '#cel-folha-fechar');
 
   secao('6b. (revisão) Só o campo telefone liga: os contatos das observações não viram link, pela tela');
@@ -582,7 +600,7 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   const c1 = await doCaso('c1'), c2 = await doCaso('c2'), c3 = await doCaso('c3'), c4 = await doCaso('c4'), c5 = await doCaso('c5');
   console.log('   casos: ' + JSON.stringify({ c1, c2, c3, c4, c5 }));
   prop('"98765-4321 (casa 2)" nas observações: nenhum link, e pede para conferir (' + [c1.ligar, c1.whats, c1.msgs, c1.confira].join('|') + ')', [c1.ligar, c1.whats, c1.msgs, c1.confira].join('|') === '||0|true', V_EXTRACAO);
-  conf('"mãe, prédio 12": nenhum link, o texto à vista e "Confira o telefone no tablet"', [c2.ligar, c2.whats, c2.msgs, c2.confira, c2.texto].join('|'), '||0|true|Contato: mãe, prédio 12');
+  conf('"mãe, prédio 12": nenhum link, o texto à vista e o aviso de edição na aba Alunos', [c2.ligar, c2.whats, c2.msgs, c2.confira, c2.texto].join('|'), '||0|true|Contato: mãe, prédio 12');
   conf('dois números ("mãe 11 98765-4321, pai 11 91234-5678"): nenhum link, e pede para conferir', [c3.ligar, c3.whats, c3.msgs, c3.confira].join('|'), '||0|true');
   conf('"ramal 2": nenhum link, e pede para conferir', [c4.ligar, c4.whats, c4.msgs, c4.confira].join('|'), '||0|true');
   conf('o campo telefone próprio vence o "Contato:" das observações', c5.ligar + ' ' + c5.whats, 'tel:+5531900000005 https://wa.me/5531900000005');
@@ -775,7 +793,7 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
   conf('trouxe a cópia da dona pelo código da conta dela', await trazerCopiaNoCelular(pagD, dona.localId), true);
   await pausa(400);
   const abasD = await pagD.evaluate(() => Array.from(document.querySelectorAll('#cel-abas .cel-aba')).filter(b => !b.hidden).map(b => b.textContent + ':' + Math.round(b.getBoundingClientRect().height)));
-  conf('o observador tem a aba Alunos, com as dele (' + abasD.join(', ') + ')', abasD.map(t => t.split(':')[0]).join(','), 'Hoje,Alunos,Fechamento,Diagnóstico,Ajustes');
+  conf('o observador tem a aba Alunos, com as dele (' + abasD.join(', ') + ')', abasD.map(t => t.split(':')[0]).join(','), 'Hoje,Alunos,Fechar mês,Diagnóstico,Ajustes');
   await aba(pagD, 'alunos');
   m = await medirTela(pagD);
   conf('o observador, a lista: alvos de 48 px e sem rolagem de lado, com as cinco abas', telaBoa(m), '');

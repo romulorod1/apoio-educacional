@@ -4,6 +4,7 @@
  *
  *   sh _teste/merge_seguro.sh 74            confere e faz o merge
  *   sh _teste/merge_seguro.sh 74 --conferir so confere, nao faz merge
+ *   node _teste/merge_seguro.js 74 --guarda o job portao-merge do CI (veja principal)
  *
  * Existe porque a protecao de branch do GitHub some quando o repositorio vira
  * privado no plano gratuito (onda 3, D1). Enquanto o repositorio e publico, a
@@ -48,6 +49,22 @@
  * comments nao traz as "reviews" do GitHub: revisao postada como review nunca
  * e vista por este script.
  *
+ * Por ultimo, logo antes do merge, a ORDEM do CACHE (sw.js) e da VERSAO
+ * (app.js): git fetch da origin/main e da cabeca do PR NA HORA, e a pergunta e
+ * "o PR leva para a main algum arquivo que muda o que o tablet baixa?" (app.js,
+ * sw.js ou um arquivo da lista ARQUIVOS do sw.js). Quem responde e o diff da
+ * origin/main contra a arvore do MERGE (git merge-tree), e nao a base do merge:
+ * depois que o ramo traz a main, a base vira a ponta da main e um ramo que subiu
+ * para o MESMO valor que a main alcancou parecia "nao mudou". Se leva, CACHE e
+ * VERSAO da arvore do merge tem de ser ESTRITAMENTE MAIORES que os da main
+ * atual, como numero (o vNNN do cache; x.y.z da versao, campo a campo, entao
+ * 1.42.10 e maior que 1.42.9). Igual reaproveita um nome ja publicado e menor o
+ * rebaixa: nos dois o tablet ja instalado pode nao receber o codigo novo. Se nao
+ * leva, passa. Leitura que falha, conflito com a main, CACHE fora de
+ * apoio-educacional-vNNN ou constante declarada duas vezes recusam.
+ * A regra pura e decidirOrdens(), e a leitura e lerOrdensGit(), as duas
+ * provadas em _teste/testa_ordem_versao.js, que tambem confere o portao.
+ *
  * O merge vai com --match-head-commit: se alguem empurrar um commit entre a
  * conferencia e o merge, o GitHub recusa, em vez de mergear o que ninguem
  * conferiu.
@@ -64,6 +81,8 @@ const CAMPOS = 'number,state,isDraft,baseRefName,headRefOid,commits,comments,sta
 // restauração, nuvem, dinheiro, cache do sw.js), marcado com o rótulo `risco`.
 // PR de tela, de prova e de CI entra com a bateria verde na própria cabeça,
 // mesmo atrás; a main roda a bateria depois do merge (decisão de 09/11/2026).
+/* O status e o job do guarda de merge no CI (guarda-merge.yml), fora da conta. */
+const GUARDA = ['portao-merge', 'guarda-merge'];
 function ehRisco(pr) {
   return (pr.labels || []).some(l => String(l && l.name).toLowerCase() === 'risco');
 }
@@ -97,6 +116,11 @@ function decidir(pr) {
   const porNome = {};
   (pr.statusCheckRollup || []).forEach(c => {
     const nome = c.name || c.context || '?';
+    // O GUARDA NAO JULGA A SI MESMO. O status portao-merge e o job guarda-merge
+    // sao o veredito DESTA regra no CI: contados aqui, um vermelho antigo ou o
+    // proprio job em andamento recusariam para sempre a rodada que viria
+    // corrigi-lo.
+    if (GUARDA.indexOf(nome) >= 0) return;
     const terminou = c.__typename === 'StatusContext' ? !/PENDING|EXPECTED/i.test(c.state || '') : c.status === 'COMPLETED';
     let quando = valida(c.startedAt) || valida(c.createdAt) || valida(c.completedAt);
     if (quando === null) quando = terminou ? 0 : Infinity;
@@ -120,6 +144,23 @@ function decidir(pr) {
     if (c.status !== 'COMPLETED') return 'EM_ANDAMENTO';
     return String(c.conclusion || '').toUpperCase();
   };
+  // FATIAS-VELHAS-INICIO
+  // O nivel 1 abre de 0 a 8 fatias, e o nome da fatia leva o N da rodada
+  // ("portao-tocadas (fatia 3 de 7)", #174). Uma fatia vermelha de uma rodada
+  // anterior no MESMO commit pode ficar sem rodada mais nova do mesmo nome: a
+  // seguinte abriu outro N, ou nenhuma fatia (o caso do "pronto"). Quem diz o
+  // resultado do nivel 1 e o juntador portao-tocadas, que so fica verde com o
+  // plano e todas as fatias DA RODADA DELE verdes. Entao a fatia que comecou
+  // antes de um juntador verde e de rodada vencida, e nao conta. Fatia vermelha
+  // mais nova que o juntador verde conta (e recusa); juntador vermelho mais novo
+  // recusa por si.
+  if (estado('portao-tocadas') === 'SUCCESS') {
+    const juntador = porNome['portao-tocadas'].quando;
+    Object.keys(porNome).forEach(nome => {
+      if (/^portao-tocadas \(fatia /.test(nome) && porNome[nome].quando < juntador) delete porNome[nome];
+    });
+  }
+  // FATIAS-VELHAS-FIM
   if (estado('portao-rapido') !== 'SUCCESS') {
     motivos.push('o check portao-rapido nao esta verde (' + estado('portao-rapido') + ')');
   }
@@ -186,6 +227,115 @@ function decidir(pr) {
   return { ok: motivos.length === 0, motivos, cabeca };
 }
 
+/* A ORDEM DO CACHE E DA VERSAO. Puras: sem git e sem gh.
+ *
+ * Ate 12/11/2026 a unica trava era a do confere_tudo.sh, e ela so exigia que o
+ * CACHE fosse DIFERENTE do da base do merge. Com PRs em paralelo, um ramo com
+ * v130 integrado depois de a main estar em v134 passava verde, e a VERSAO nao
+ * tinha trava nenhuma. Aqui a exigencia e ser MAIOR que a da main ATUAL. */
+/* Le UMA declaracao real da constante. Duas declaracoes (var, let ou const no
+ * comeco da linha) devolvem null: ler a primeira e confiar seria conferir um
+ * valor que talvez nao seja o que o navegador usa. Comentario nao conta. */
+function lerConstante(texto, nome, padrao) {
+  const t = String(texto == null ? '' : texto).replace(/\r/g, '');
+  const declaracoes = t.match(new RegExp('^[ \\t]*(var|let|const)[ \\t]+' + nome + '[ \\t]*=', 'gm')) || [];
+  if (declaracoes.length !== 1) return null;
+  const m = padrao.exec(t);
+  return m ? m[1] : null;
+}
+function lerCache(sw) { return lerConstante(sw, 'CACHE', /^var CACHE = '([^']*)';/m); }
+function lerVersao(app) { return lerConstante(app, 'VERSAO', /^ *var VERSAO = '([^']*)';/m); }
+/* A lista ARQUIVOS do sw.js, como caminhos do repositorio ('./' e a raiz e sai). */
+function listaArquivos(sw) {
+  const linhas = String(sw == null ? '' : sw).replace(/\r/g, '').split('\n');
+  const ini = linhas.findIndex(l => /^var ARQUIVOS = \[/.test(l));
+  if (ini < 0) return [];
+  const fora = [];
+  for (let i = ini + 1; i < linhas.length && !/^\];/.test(linhas[i]); i++) {
+    const m = /^ *'(?:\.\/)?([^']*)' *,? *$/.exec(linhas[i]);
+    if (m && m[1]) fora.push(m[1]);
+  }
+  return fora;
+}
+/* O numero do nome do cache. Os DOIS lados tem de casar o padrao que o sw.js
+ * reconhece (VERSAO_DO_APP = /^apoio-educacional-v\d+$/): fora dele o activate
+ * nao ve o cache novo como versao do app. */
+const NOME_DO_CACHE = /^apoio-educacional-v([0-9]+)$/;
+function compararCache(a, b) {
+  const x = NOME_DO_CACHE.exec(String(a || '')), y = NOME_DO_CACHE.exec(String(b || ''));
+  if (!x || !y) return null;
+  return Number(x[1]) - Number(y[1]);
+}
+/* x.y.z campo a campo, como numero: '1.42.10' > '1.42.9'. Formato fora de x.y.z da null. */
+function compararSemver(a, b) {
+  const pa = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(String(a || ''));
+  const pb = /^([0-9]+)\.([0-9]+)\.([0-9]+)$/.exec(String(b || ''));
+  if (!pa || !pb) return null;
+  for (let i = 1; i <= 3; i++) {
+    const d = Number(pa[i]) - Number(pb[i]);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+/* Uma constante: o valor da arvore do merge (agora), o da main atual e os
+ * arquivos do app que o PR leva para a main. Devolve { ok, motivo }. */
+function decidirOrdem(nome, agora, main, levados, comparar) {
+  if (agora == null || main == null) {
+    return { ok: false, motivo: 'nao consegui ler ' + nome + ' (merge:[' + agora + '] main:[' + main + ']): ' +
+      'falta a declaracao, ou ha mais de uma' };
+  }
+  const c = comparar(agora, main);
+  if (c === null) return { ok: false, motivo: nome + ' fora do formato: merge ' + agora + ', main ' + main };
+  if (!levados || !levados.length) {
+    return { ok: true, motivo: nome + ' ' + agora + ': o PR nao leva arquivo do app para a main' };
+  }
+  const quais = ' (leva ' + levados.slice(0, 3).join(', ') + (levados.length > 3 ? ' e mais ' + (levados.length - 3) : '') + ')';
+  if (c > 0) return { ok: true, motivo: nome + ' ' + agora + ' e maior que o da main atual, ' + main + quais };
+  return { ok: false, motivo: nome + ' ' + agora + ' do PR nao e MAIOR que o da main atual, ' + main +
+    (c === 0 ? ' (igual: reaproveita o que ja foi publicado)' : ' (menor: rebaixa o que ja foi publicado)') +
+    quais + '; suba para a proxima livre' };
+}
+/* v = { levados: [arquivos do app que mudam], cache: { agora, main }, versao: { agora, main } } */
+function decidirOrdens(v) {
+  const r = [
+    decidirOrdem('CACHE', v.cache.agora, v.cache.main, v.levados, compararCache),
+    decidirOrdem('VERSAO', v.versao.agora, v.versao.main, v.levados, compararSemver)
+  ];
+  return { ok: r.every(x => x.ok), motivos: r.map(x => x.motivo), recusas: r.filter(x => !x.ok).map(x => x.motivo) };
+}
+
+/* O que o PR LEVA para a main, lido do git. g(args) devolve a saida ou lanca.
+ * A arvore do merge sai do `git merge-tree --write-tree main alvo`, que e o que
+ * a main fica depois do merge; o diff dela contra a main e o que o PR leva, sem
+ * contar o que a main andou enquanto o ramo ficou atras. Conflito (merge-tree
+ * sai 1) lanca. Arquivo do app: app.js, sw.js e a lista ARQUIVOS do sw.js da
+ * main e da arvore do merge. */
+function lerOrdensGit(g, alvo, main) {
+  let arvore;
+  try {
+    arvore = g(['merge-tree', '--write-tree', main, alvo]).split('\n')[0].trim();
+  } catch (e) {
+    const err = new Error('o PR tem conflito com a main ou o merge-tree falhou: ' + String(e.stderr || e.message).split('\n')[0]);
+    err.stderr = err.message;
+    throw err;
+  }
+  if (!/^[0-9a-f]{40,64}$/.test(arvore)) throw new Error('o merge-tree nao devolveu uma arvore: [' + arvore + ']');
+  const mudados = g(['diff', '--name-only', '-z', main, arvore]).split('\0').filter(Boolean);
+  const swMerge = g(['show', arvore + ':sw.js']), swMain = g(['show', main + ':sw.js']);
+  const app = new Set(['app.js', 'sw.js'].concat(listaArquivos(swMerge), listaArquivos(swMain)));
+  return {
+    levados: mudados.filter(f => app.has(f)),
+    cache: { agora: lerCache(swMerge), main: lerCache(swMain) },
+    versao: { agora: lerVersao(g(['show', arvore + ':app.js'])), main: lerVersao(g(['show', main + ':app.js'])) }
+  };
+}
+
+/* No merge: busca a origin/main e a cabeca do PR AGORA, e le o que ele leva. */
+function lerOrdens(numero, cabeca) {
+  git(['fetch', 'origin', 'main', 'refs/pull/' + numero + '/head']);
+  return lerOrdensGit(git, cabeca, 'origin/main');
+}
+
 /* Quantos commits a cabeca esta atras da main. Lanca se nao conseguir medir. */
 function commitsAtras(cabeca) {
   const saida = gh(['api', 'repos/' + REPO + '/compare/main...' + cabeca]);
@@ -222,16 +372,25 @@ function conferirVersao() {
   }
 }
 
+/* --guarda: o modo do job portao-merge (.github/workflows/guarda-merge.yml).
+ * Confere como o --conferir, nunca faz merge, e imprime "cabeca <sha>" assim
+ * que le o PR, para o job publicar o veredito no commit que ele julgou. Nao faz
+ * a conferencia de "sou a copia da main": no CI o arquivo sai do checkout do
+ * evento, que nos quatro gatilhos e a main (pull_request_target, comentario,
+ * bateria e push), e a main pode ter andado desde o evento; quem cuida disso e o
+ * guarda, que nao publica veredito se a main andou durante o julgamento, e o job
+ * do push na main, que rejulga todos os PRs abertos. */
 function principal(argv) {
   const numero = argv[0];
-  const soConferir = argv.indexOf('--conferir') >= 0;
-  const velho = conferirVersao();
+  const guarda = argv.indexOf('--guarda') >= 0;
+  const soConferir = guarda || argv.indexOf('--conferir') >= 0;
+  const velho = guarda ? null : conferirVersao();
   if (velho) {
     console.log('RECUSADO  ' + velho);
     return 1;
   }
   if (!/^[0-9]+$/.test(numero || '')) {
-    console.log('uso: sh _teste/merge_seguro.sh <numero do PR> [--conferir]');
+    console.log('uso: sh _teste/merge_seguro.sh <numero do PR> [--conferir | --guarda]');
     return 2;
   }
   let pr;
@@ -241,6 +400,7 @@ function principal(argv) {
     console.log('RECUSADO  nao consegui ler o PR #' + numero + ': ' + String(e.message).split('\n')[0]);
     return 1;
   }
+  if (guarda) console.log('cabeca    ' + String(pr.headRefOid || ''));
   const r = decidir(pr);
   if (!r.ok) {
     console.log('RECUSADO  PR #' + numero + ':');
@@ -262,6 +422,21 @@ function principal(argv) {
     return 1;
   }
   // BEHIND-FIM
+  // ORDEM-INICIO
+  let ordem;
+  try {
+    ordem = decidirOrdens(lerOrdens(numero, r.cabeca));
+  } catch (e) {
+    console.log('RECUSADO  nao consegui conferir CACHE e VERSAO contra a origin/main: ' + String(e.stderr || e.message).split('\n')[0]);
+    return 1;
+  }
+  if (!ordem.ok) {
+    console.log('RECUSADO  PR #' + numero + ':');
+    ordem.recusas.forEach(m => console.log('  - ' + m));
+    return 1;
+  }
+  ordem.motivos.forEach(m => console.log('ordem     ' + m));
+  // ORDEM-FIM
   console.log('ok        PR #' + numero + ' cumpre o processo no commit ' + r.cabeca.slice(0, 7));
   if (soConferir) return 0;
   try {
@@ -275,4 +450,4 @@ function principal(argv) {
 }
 
 if (require.main === module) process.exit(principal(process.argv.slice(2)));
-module.exports = { decidir, principal };
+module.exports = { decidir, principal, decidirOrdem, decidirOrdens, lerOrdensGit, listaArquivos, compararCache, compararSemver, lerCache, lerVersao };

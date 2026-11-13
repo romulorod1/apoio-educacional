@@ -197,11 +197,31 @@ fs.writeFileSync(gitFalso,
   "const fs = require('fs');\n" +
   "const a = process.argv.slice(2);\n" +
   "fs.appendFileSync(process.env.FALSO_GIT_LOG, a.join(' ') + '\\n');\n" +
+  // A ordem do CACHE e da VERSAO: o merge-tree da main com a cabeca devolve a
+  // arvore ARVORE, o diff dela contra a main devolve os levados, e o show de
+  // sw.js e app.js sai da tabela FALSO_ORDEM (levados, merge, main). Sem a
+  // tabela, nada e levado e os valores sao iguais (PR que nao toca o app).
+  "const ARVORE = 'a'.repeat(40);\n" +
+  "const t = process.env.FALSO_ORDEM ? JSON.parse(process.env.FALSO_ORDEM) : {};\n" +
   "if (a[0] === 'fetch') {\n" +
   "  if (process.env.FALSO_FETCH === 'erro') { process.stderr.write('fatal: unable to access origin'); process.exit(128); }\n" +
   "} else if (a[0] === 'show' && a[1] === 'origin/main:_teste/merge_seguro.js') {\n" +
   "  if (process.env.FALSO_SHOW === 'erro') { process.stderr.write('fatal: path not in origin/main'); process.exit(128); }\n" +
   "  process.stdout.write(fs.readFileSync(process.env.FALSO_MAIN, 'utf8'));\n" +
+  "} else if (a[0] === 'merge-tree') {\n" +
+  "  if (process.env.FALSO_ORDEM_ERRO === 'merge-tree') { process.stderr.write('CONFLICT (content): Merge conflict in sw.js'); process.exit(1); }\n" +
+  "  if (a[2] !== 'origin/main' || a[3] !== process.env.FALSO_CABECA) { process.stderr.write('merge-tree inesperado ' + a.join(' ')); process.exit(3); }\n" +
+  "  process.stdout.write(ARVORE + '\\n');\n" +
+  "} else if (a[0] === 'diff') {\n" +
+  "  if (a.join(' ') !== 'diff --name-only -z origin/main ' + ARVORE) { process.stderr.write('diff inesperado ' + a.join(' ')); process.exit(3); }\n" +
+  "  process.stdout.write((t.levados || []).map(f => f + '\\0').join(''));\n" +
+  "} else if (a[0] === 'show' && /:(sw|app)\\.js$/.test(a[1])) {\n" +
+  "  const [rev, arq] = a[1].split(':');\n" +
+  "  const qual = rev === 'origin/main' ? 'main' : rev === ARVORE ? 'merge' : null;\n" +
+  "  if (!qual) { process.stderr.write('fatal: revisao inesperada ' + rev); process.exit(128); }\n" +
+  "  const v = t[qual] || { cache: 133, versao: '1.42.53' };\n" +
+  "  if (arq === 'sw.js') process.stdout.write(\"var ARQUIVOS = [\\n  './',\\n  './tela.js'\\n];\\nvar CACHE = 'apoio-educacional-v\" + v.cache + \"';\\n\");\n" +
+  "  else process.stdout.write(\"(function () {\\n  var VERSAO = '\" + v.versao + \"';\\n})();\\n\");\n" +
   "} else { process.stderr.write('git: chamada inesperada'); process.exit(3); }\n");
 const script = path.join(__dirname, 'merge_seguro.js');
 function rodar(pr, extra, behind, scriptAlvo, git) {
@@ -215,7 +235,8 @@ function rodar(pr, extra, behind, scriptAlvo, git) {
       encoding: 'utf8',
       env: Object.assign({}, process.env, { GH: falso, FALSO_LOG: log, FALSO_PR: json, FALSO_BEHIND: String(behind === undefined ? 0 : behind),
         GIT: gitFalso, FALSO_GIT_LOG: logGit, FALSO_MAIN: git.main || scriptAlvo || script,
-        FALSO_FETCH: git.fetch || '', FALSO_SHOW: git.show || '' })
+        FALSO_FETCH: git.fetch || '', FALSO_SHOW: git.show || '',
+        FALSO_CABECA: CABECA, FALSO_ORDEM: git.ordem ? JSON.stringify(git.ordem) : '', FALSO_ORDEM_ERRO: git.ordemErro || '' })
     });
   } catch (e) { codigo = e.status; saida = String(e.stdout || ''); }
   return { codigo, saida, chamadas: fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean),
@@ -298,10 +319,40 @@ fs.writeFileSync(arqSemRotulo, semRotulo);
 r = rodar(prBom(), [], 3, arqSemRotulo);
 conf('controle: ignorando o rotulo, o risco ATRAS passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge/.test(c)).length === 1, true);
 
+console.log('\n=== 3b. Fatia do nivel 1 vencida por um juntador verde mais novo (#174) ===');
+// O nome da fatia leva o N da rodada; a rodada seguinte (outro N, ou zero
+// fatias com o "pronto") nao tem fatia do mesmo nome para desbancar a vermelha.
+function comFatiaVelha(conclusaoJuntador, inicioFatia) {
+  const q = prBom();
+  q.statusCheckRollup.push(
+    { __typename: 'CheckRun', name: 'portao-tocadas (fatia 3 de 7)', status: 'COMPLETED', conclusion: 'FAILURE', startedAt: inicioFatia || '2026-10-26T12:01:00Z' },
+    { __typename: 'CheckRun', name: 'portao-tocadas (fatia ${{ matrix.fatia }} de ${{ needs.portao-tocadas-plano.outputs.fatias }})', status: 'COMPLETED', conclusion: 'SKIPPED', startedAt: '2026-10-26T12:10:00Z' },
+    { __typename: 'CheckRun', name: 'portao-tocadas', status: 'COMPLETED', conclusion: conclusaoJuntador, startedAt: '2026-10-26T12:11:00Z' });
+  return q;
+}
+conf('fatia vermelha antiga, juntador e bateria verdes mais novos: passa', decidir(comFatiaVelha('SUCCESS')).ok, true);
+r = rodar(comFatiaVelha('SUCCESS'));
+conf('ponta a ponta com o gh falso: sai 0 e chama o merge', r.codigo === 0 && r.chamadas.filter(c => /^pr merge 9 /.test(c)).length === 1, true);
+conf('controle: juntador vermelho mais novo recusa', motivo(comFatiaVelha('FAILURE'), 'portao-tocadas esta FAILURE'), true);
+r = rodar(comFatiaVelha('FAILURE'));
+conf('controle ponta a ponta: juntador vermelho sai 1 e NAO chama o merge', r.codigo === 1 && !r.chamadas.some(c => /^pr merge/.test(c)), true);
+conf('controle: fatia vermelha MAIS NOVA que o juntador verde recusa',
+  motivo(comFatiaVelha('SUCCESS', '2026-10-26T12:20:00Z'), 'portao-tocadas (fatia 3 de 7) esta FAILURE'), true);
+conf('controle: juntador em andamento nao vence a fatia vermelha',
+  (() => { const q = comFatiaVelha('SUCCESS'); const j = q.statusCheckRollup[q.statusCheckRollup.length - 1]; j.status = 'IN_PROGRESS'; j.conclusion = null; return motivo(q, 'portao-tocadas (fatia 3 de 7) esta FAILURE'); })(), true);
+conf('controle: a regra vale so para o nivel 1, nao para a fatia da bateria',
+  (() => { const q = comFatiaVelha('SUCCESS'); q.statusCheckRollup.push({ __typename: 'CheckRun', name: 'portao-navegador (fatia 2 de 8)', status: 'COMPLETED', conclusion: 'FAILURE', startedAt: '2026-10-26T12:01:00Z' }); return motivo(q, 'portao-navegador (fatia 2 de 8) esta FAILURE'); })(), true);
+const semVelhas = fonte.replace(/ *\/\/ FATIAS-VELHAS-INICIO[\s\S]*?\/\/ FATIAS-VELHAS-FIM\r?\n/, '');
+conf('controle: achei o bloco das fatias vencidas para tirar', semVelhas !== fonte, true);
+const arqSemVelhas = path.join(tmp, 'merge_seguro_sem_fatias_velhas.js');
+fs.writeFileSync(arqSemVelhas, semVelhas);
+r = rodar(comFatiaVelha('SUCCESS'), [], 0, arqSemVelhas);
+conf('controle: sem o bloco, a fatia vermelha antiga recusa o merge (o defeito da revisao)', r.codigo === 1 && /portao-tocadas \(fatia 3 de 7\) esta FAILURE/.test(r.saida), true);
+
 console.log('\n=== 4. O merge_seguro e o da main? (cópia velha recusa) ===');
 r = rodar(prBom(), ['--conferir']);
 conf('cópia igual à da main passa para as checagens seguintes', r.codigo === 0 && /^ok /m.test(r.saida), true);
-conf('fez o fetch da origin main e o show do arquivo', r.chamadasGit.join('|'), 'fetch origin main|show origin/main:_teste/merge_seguro.js');
+conf('fez o fetch da origin main e o show do arquivo', r.chamadasGit.slice(0, 2).join('|'), 'fetch origin main|show origin/main:_teste/merge_seguro.js');
 // Fim de linha: a main em CRLF e a cópia em LF (e o inverso) são o mesmo conteúdo.
 const principalMain = path.join(tmp, 'main_crlf.js');
 fs.writeFileSync(principalMain, fonte.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n'));
@@ -335,9 +386,69 @@ conf('CASO REAL: nem chegou a ler o PR no gh', r.chamadas.length, 0);
 // Controle: a mesma cópia velha, se a checagem de versão não existisse, diria ok.
 const semVersao = path.join(tmp, 'sem_versao', 'merge_seguro.js');
 fs.mkdirSync(path.dirname(semVersao));
-fs.writeFileSync(semVersao, sem.replace("  const velho = conferirVersao();", "  const velho = null;"));
+// --guarda (o job do CI): nao faz a checagem de "sou a copia da main", imprime a
+// cabeca, e nunca faz merge. A copia velha que recusa acima passa no --guarda.
+r = rodar(prBom(), ['--guarda'], 0, velha, { main: script });
+conf('--guarda: a cópia diferente da main não recusa pela versão', r.saida.indexOf(FRASE) < 0 && r.codigo === 0, true);
+conf('--guarda: imprime a cabeça inteira', r.saida.indexOf('cabeca    ' + CABECA) >= 0, true);
+conf('--guarda: nunca chama o merge', r.chamadas.some(c => /^pr merge/.test(c)), false);
+conf('--guarda: nem faz o show do merge_seguro da main', r.chamadasGit.some(c => /_teste\/merge_seguro\.js/.test(c)), false);
+p = prBom(); p.comments = [];
+r = rodar(p, ['--guarda']);
+conf('--guarda: recusa como o --conferir, e imprime a cabeça antes', r.codigo === 1 && /falta revisao adversarial/.test(r.saida) && r.saida.indexOf('cabeca    ' + CABECA) >= 0, true);
+const LINHA_VERSAO = '  const velho = guarda ? null : conferirVersao();';
+conf('controle: achei a linha da checagem de versão para tirar', sem.indexOf(LINHA_VERSAO) >= 0, true);
+fs.writeFileSync(semVersao, sem.replace(LINHA_VERSAO, "  const velho = null;"));
 r = rodar(prBom(), ['--conferir'], 9, semVersao, { main: script });
 conf('controle: sem a checagem de versão e sem BEHIND, o PR 9 atrás diz ok', r.codigo === 0 && /^ok /m.test(r.saida), true);
+
+console.log('\n=== 5. CACHE e VERSAO do PR MAIORES que os da main buscada na hora ===');
+// A regra pura esta provada no testa_ordem_versao.js; aqui, o caminho do merge:
+// a busca na hora, a recusa sem chamar o merge, e o controle sem o bloco.
+// ordem(levados, merge, main): os arquivos do app que o PR leva, e os valores
+// na arvore do merge e na origin/main.
+const ordem = (levados, merge, main) => ({ levados, merge, main });
+const V = (cache, versao) => ({ cache, versao });
+const LEVA = ['app.js', 'sw.js'];
+r = rodar(semRisco(), [], 0, undefined, { ordem: ordem(LEVA, V(134, '1.42.54'), V(133, '1.42.53')) });
+conf('v134 / 1.42.54 sobre main v133 / 1.42.53 passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge 9 /.test(c)).length === 1, true);
+conf('buscou a origin/main e a cabeca do PR na hora', r.chamadasGit.indexOf('fetch origin main refs/pull/9/head') >= 0, true);
+conf('a busca da ordem vem DEPOIS da conferencia da copia', r.chamadasGit.indexOf('fetch origin main refs/pull/9/head') > r.chamadasGit.indexOf('fetch origin main'), true);
+conf('a arvore e a do merge da origin/main com a cabeca', r.chamadasGit.indexOf('merge-tree --write-tree origin/main ' + CABECA) >= 0, true);
+conf('leu o sw.js e o app.js da origin/main', ['show origin/main:sw.js', 'show origin/main:app.js'].every(c => r.chamadasGit.indexOf(c) >= 0), true);
+conf('nao usa mais a base do merge', r.chamadasGit.some(c => /^merge-base/.test(c)), false);
+const CASO_V130 = ordem(LEVA, V(130, '1.42.54'), V(134, '1.42.53'));
+r = rodar(semRisco(), [], 0, undefined, { ordem: CASO_V130 });
+conf('v130 sobre main v134 recusa, sai 1', r.codigo, 1);
+conf('v130 sobre main v134 NAO chama o merge', r.chamadas.some(c => /^pr merge/.test(c)), false);
+conf('e diz que o CACHE nao e MAIOR que o da main', /CACHE apoio-educacional-v130 do PR nao e MAIOR que o da main atual, apoio-educacional-v134/.test(r.saida), true);
+r = rodar(semRisco(), ['--conferir'], 0, undefined, { ordem: CASO_V130 });
+conf('v130 sobre main v134 recusa tambem no --conferir', r.codigo === 1 && !/^ok /m.test(r.saida), true);
+r = rodar(semRisco(), [], 0, undefined, { ordem: ordem(LEVA, V(134, '1.42.54'), V(134, '1.42.54')) });
+conf('igual a main (v134 / 1.42.54) recusa e nao mergeia', r.codigo === 1 && !r.chamadas.some(c => /^pr merge/.test(c)), true);
+conf('e as duas recusas aparecem', /CACHE .*igual/.test(r.saida) && /VERSAO .*igual/.test(r.saida), true);
+// O caso da revisao: o ramo trouxe a main e ficou igual; so tela.js e levada.
+r = rodar(prBom(), [], 0, undefined, { ordem: ordem(['tela.js'], V(134, '1.42.54'), V(134, '1.42.54')) });
+conf('REVISAO: ramo que trouxe a main, igual, levando tela.js, recusa e nao mergeia', r.codigo === 1 && !r.chamadas.some(c => /^pr merge/.test(c)), true);
+conf('REVISAO: e o motivo cita o que e levado', /leva tela\.js/.test(r.saida), true);
+// Arquivo fora da lista ARQUIVOS (o tablet nao baixa) nao pede subir nada.
+r = rodar(semRisco(), [], 0, undefined, { ordem: ordem(['functions/ia.js'], V(134, '1.42.54'), V(134, '1.42.54')) });
+conf('arquivo fora da lista (functions/ia.js), valor igual, passa', r.codigo, 0);
+r = rodar(semRisco(), [], 0, undefined, { ordem: ordem(LEVA, V(135, '1.42.9'), V(134, '1.42.10')) });
+conf('VERSAO 1.42.9 sobre main 1.42.10 recusa (numero, e nao texto)', r.codigo === 1 && /VERSAO 1\.42\.9 do PR nao e MAIOR/.test(r.saida), true);
+r = rodar(semRisco(), [], 0, undefined, { ordem: ordem(LEVA, V(135, '1.42.10'), V(134, '1.42.9')) });
+conf('VERSAO 1.42.10 sobre main 1.42.9 passa', r.codigo, 0);
+r = rodar(semRisco(), [], 3, undefined, { ordem: ordem([], V(134, '1.42.54'), V(134, '1.42.54')) });
+conf('PR so de teste, atras da main, com valor igual, passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge 9 /.test(c)).length === 1, true);
+r = rodar(semRisco(), [], 0, undefined, { ordem: CASO_V130, ordemErro: 'merge-tree' });
+conf('conflito com a main recusa e nao mergeia', r.codigo === 1 && !r.chamadas.some(c => /^pr merge/.test(c)) && /conflito com a main/.test(r.saida), true);
+// Controle: sem o bloco da ordem, o mesmo v130 sobre v134 passaria e mergearia.
+const semOrdem = fonte.replace(/ *\/\/ ORDEM-INICIO[\s\S]*?\/\/ ORDEM-FIM\r?\n/, '');
+conf('controle: achei o bloco da ordem para tirar', semOrdem !== fonte, true);
+const arqSemOrdem = path.join(tmp, 'merge_seguro_sem_ordem.js');
+fs.writeFileSync(arqSemOrdem, semOrdem);
+r = rodar(semRisco(), [], 0, arqSemOrdem, { main: arqSemOrdem, ordem: CASO_V130 });
+conf('controle: sem o bloco, v130 sobre main v134 passa e mergeia', r.codigo === 0 && r.chamadas.filter(c => /^pr merge/.test(c)).length === 1, true);
 
 fs.rmSync(tmp, { recursive: true, force: true });
 

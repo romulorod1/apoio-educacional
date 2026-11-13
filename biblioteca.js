@@ -176,6 +176,163 @@
    * perto de um livro. A prova do gerador confere os dois tetos juntos. */
   var TETO_POR_LIVRO = 160 * 1024 * 1024;
 
+  /* A página impressa (B3): o livro traz opcionalmente `numeracao`, uma lista
+   * ordenada de trechos [{ de, ate, inicio, estilo }], onde `de` e `ate` são
+   * páginas do ARQUIVO (1..paginas), em ordem crescente e sem sobreposição,
+   * `inicio` é inteiro >= 1 (a primeira página impressa daquele trecho) e
+   * `estilo` é 'arabico' ou 'romano'. As páginas fora de qualquer trecho (capa,
+   * folha de rosto, ficha catalográfica) não têm página impressa. */
+  var ESTILOS_DE_NUMERACAO = { arabico: true, romano: true };
+  var PARES_ROMANOS = [
+    [1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'],
+    [100, 'c'], [90, 'xc'], [50, 'l'], [40, 'xl'],
+    [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']
+  ];
+  var VALORES_ROMANOS = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 };
+
+  function paraRomano(n) {
+    if (!inteiro(n) || n < 1 || n > 3999) return null;
+    var resto = n, s = '';
+    for (var i = 0; i < PARES_ROMANOS.length; i++) {
+      var valor = PARES_ROMANOS[i][0], algarismo = PARES_ROMANOS[i][1];
+      while (resto >= valor) { s += algarismo; resto -= valor; }
+    }
+    return s;
+  }
+
+  function deRomano(s) {
+    if (typeof s !== 'string') return null;
+    var limpo = s.trim().toLowerCase();
+    if (!limpo || !/^[ivxlcdm]+$/.test(limpo)) return null;
+    var total = 0, anterior = 0;
+    for (var i = limpo.length - 1; i >= 0; i--) {
+      var v = VALORES_ROMANOS[limpo.charAt(i)];
+      if (!v) return null;
+      if (v < anterior) total -= v;
+      else { total += v; anterior = v; }
+    }
+    if (total < 1 || total > 3999 || paraRomano(total) !== limpo) return null;
+    return total;
+  }
+
+  function conferirNumeracao(l) {
+    if (!l || l.numeracao === undefined || l.numeracao === null) return null;
+    var id = l.id || 'sem-id';
+    if (!Array.isArray(l.numeracao)) {
+      return 'A numeração do livro ' + id + ' não é uma lista.';
+    }
+    if (!inteiro(l.paginas) || l.paginas < 1) {
+      return 'O livro ' + id + ' precisa ter um total de p\u00e1ginas v\u00e1lido para usar numera\u00e7\u00e3o impressa.';
+    }
+    var limite = l.paginas;
+    var fimAnterior = 0;
+    for (var i = 0; i < l.numeracao.length; i++) {
+      var t = l.numeracao[i];
+      if (!t || typeof t !== 'object') {
+        return 'A numeração do livro ' + id + ' é inválida no trecho ' + (i + 1) + '.';
+      }
+      if (!ESTILOS_DE_NUMERACAO[t.estilo]) {
+        return 'A numeração do livro ' + id + ' tem estilo desconhecido no trecho ' + (i + 1) + '.';
+      }
+      if (!inteiro(t.inicio) || t.inicio < 1 || (t.estilo === 'romano' && t.inicio + Math.max(0, (inteiro(t.ate) && inteiro(t.de) ? t.ate - t.de : 0)) > 3999)) {
+        return 'A numeração do livro ' + id + ' tem início inválido no trecho ' + (i + 1) + '.';
+      }
+      if (!inteiro(t.de) || !inteiro(t.ate) || t.de < 1 || t.de > t.ate || (limite !== null && t.ate > limite)) {
+        return 'A numeração do livro ' + id + ' aponta para fora dele no trecho ' + (i + 1) + '.';
+      }
+      if (t.de <= fimAnterior) {
+        return 'A numeração do livro ' + id + ' sobrepõe ou inverte trechos no trecho ' + (i + 1) + '.';
+      }
+      fimAnterior = t.ate;
+    }
+    return null;
+  }
+
+  /* Converte a página do arquivo (1..paginas) para a página impressa do livro:
+   * número inteiro nos trechos arábicos, string em minúsculas ('i', 'xiv') nos
+   * trechos romanos, ou null quando o livro não traz `numeracao` ou a página
+   * está fora dos trechos (capa, folha de rosto, páginas em branco). */
+  function paginaImpressa(meta, paginaArq) {
+    if (!meta || !Array.isArray(meta.numeracao) || !meta.numeracao.length) return null;
+    if (!inteiro(paginaArq) || paginaArq < 1) return null;
+    if (inteiro(meta.paginas) && paginaArq > meta.paginas) return null;
+    if (conferirNumeracao(meta)) return null;
+    for (var i = 0; i < meta.numeracao.length; i++) {
+      var t = meta.numeracao[i];
+      if (paginaArq >= t.de && paginaArq <= t.ate) {
+        var n = t.inicio + (paginaArq - t.de);
+        return t.estilo === 'romano' ? paraRomano(n) : n;
+      }
+    }
+    return null;
+  }
+
+  /* Converte a página impressa para a página do arquivo (1..paginas):
+   * aceita número (45), string arábica ('45') ou string romana ('iv', 'IV'), e
+   * um `estilo` opcional ('arabico' ou 'romano'). Quando a mesma página
+   * impressa existe em mais de um trecho do mesmo estilo, devolve o primeiro
+   * trecho que a contém. Fora de qualquer trecho ou sem `numeracao`, devolve null. */
+  function paginaDoArquivo(meta, impressa, estilo) {
+    if (!meta || !Array.isArray(meta.numeracao) || !meta.numeracao.length) return null;
+    if (conferirNumeracao(meta)) return null;
+    if (estilo !== undefined && estilo !== null && !ESTILOS_DE_NUMERACAO[estilo]) return null;
+    var n = null, estiloAlvo = estilo || null;
+    if (typeof impressa === 'number') {
+      if (!inteiro(impressa) || impressa < 1) return null;
+      n = impressa;
+      if (!estiloAlvo) estiloAlvo = 'arabico';
+    } else if (typeof impressa === 'string') {
+      var s = impressa.trim();
+      if (!s) return null;
+      if (/^\d+$/.test(s)) {
+        n = parseInt(s, 10);
+        if (!inteiro(n) || n < 1) return null;
+        if (!estiloAlvo) estiloAlvo = 'arabico';
+      } else {
+        if (estiloAlvo && estiloAlvo !== 'romano') return null;
+        n = deRomano(s);
+        if (!n) return null;
+        estiloAlvo = 'romano';
+      }
+    } else {
+      return null;
+    }
+    for (var i = 0; i < meta.numeracao.length; i++) {
+      var t = meta.numeracao[i];
+      if (t.estilo !== estiloAlvo) continue;
+      if (n < t.inicio) continue;
+      var arq = t.de + (n - t.inicio);
+      if (arq >= t.de && arq <= t.ate) {
+        if (inteiro(meta.paginas) && arq > meta.paginas) return null;
+        return arq;
+      }
+    }
+    return null;
+  }
+
+  /* A página onde o leitor abre a partir da posição guardada em livros_posicoes:
+   * pos.pagina já é página do ARQUIVO e nunca passa por paginaDoArquivo. */
+  function paginaDaPosicao(meta, pos) {
+    var p = pos && inteiro(pos.pagina) && pos.pagina >= 1 ? pos.pagina : null;
+    return p;
+  }
+
+  /* No "Ir para a página" do leitor: aceita a página impressa quando o livro
+   * tem `numeracao` válida, e cai na página do arquivo quando não tem. */
+  function resolverPaginaDoLeitor(meta, texto, total) {
+    var lim = inteiro(total) && total >= 1 ? total : (meta && inteiro(meta.paginas) ? meta.paginas : 0);
+    if (meta && Array.isArray(meta.numeracao) && meta.numeracao.length && !conferirNumeracao(meta)) {
+      var arq = paginaDoArquivo(meta, texto);
+      if (arq !== null && (!lim || arq <= lim)) return arq;
+      return null;
+    }
+    var s = typeof texto === 'number' ? String(texto) : String(texto || '').trim();
+    if (!/^\d+$/.test(s)) return null;
+    var n = parseInt(s, 10);
+    if (!inteiro(n) || n < 1 || (lim && n > lim)) return null;
+    return n;
+  }
+
   /* Confere a FORMA do que vai para a tela e para o leitor: id, formato, o
    * arquivo que existe no zip com o mesmo hash da lista, e o sumário dentro
    * do livro (página de 1 ao total no PDF, capítulo da espinha no EPUB). Um
@@ -184,7 +341,7 @@
   function lerLivros(manifest, noZip, lista) {
     var livros = manifest.livros;
     if (!Array.isArray(livros) || !livros.length) throw Recusa('O pacote de livros não traz livro nenhum.', 'defeito');
-    var vistos = Object.create(null), citados = Object.create(null);
+    var vistos = Object.create(null), citados = Object.create(null), recusados = [];
     var saida = livros.map(function (l) {
       if (!l || typeof l.id !== 'string' || !ID_DE_LIVRO.test(l.id)) {
         throw Recusa('O pacote de livros tem livro sem identificador válido.', 'defeito');
@@ -209,11 +366,19 @@
         if (ok && espinha) ok = inteiro(e.capitulo) && e.capitulo >= 1 && e.capitulo <= espinha.length;
         if (!ok) throw Recusa('O sumário do livro ' + l.id + ' aponta para fora dele na entrada ' + (i + 1) + '.', 'defeito');
       });
+      var erroNum = conferirNumeracao(l);
+      if (erroNum) {
+        recusados.push({ id: l.id, motivo: erroNum });
+        return null;
+      }
       return { meta: l };
     });
     Object.keys(noZip).forEach(function (n) {
       if (!citados[n]) throw Recusa('O pacote de livros tem um arquivo que nenhum livro cita: ' + n + '.', 'defeito');
     });
+    saida = saida.filter(Boolean);
+    if (!saida.length && recusados.length) throw Recusa(recusados[0].motivo, 'defeito');
+    if (recusados.length) saida.recusados = recusados;
     return saida;
   }
 
@@ -298,6 +463,128 @@
     return achada;
   }
 
+  /* ---------------------------- o sumário que a tela usa (marcadores lixo) */
+
+  /* Vários PDFs comerciais trazem MARCADORES que não são capítulo nenhum: um
+   * por página ("page1", "page2_2"), "Blank Page", "Sem nome", o nome do
+   * arquivo de diagramação ("GA_MAT_7_LP_4ED_PNLD24_OB1_U8_278A307_FECHADO",
+   * "PMR9_1capa"). O gerador (biblioteca/livros.py) usa os marcadores sempre
+   * que existem, e o sumário do mapa só entra quando o PDF não tem nenhum.
+   * Então a tela decide aqui, sem mexer no pacote, qual sumário mostrar.
+   *
+   * Título SEM SENTIDO (marcadorSemSentido):
+   *   - "page12", "pag 3", "página 7", "p12", com ou sem "_2" no fim;
+   *   - "Blank Page", "Página em branco", "Sem nome", "Sem título",
+   *     "Untitled", "Sumário", "Índice", "Contents";
+   *   - nome de arquivo: sem espaço nenhum E com sublinhado, ou terminando em
+   *     .pdf, .indd ou .idml; ou com "_FECHADO";
+   *   - vazio, ou só pontuação.
+   * Número puro ("1", "2") NÃO é lixo: há livro cujo mapa repete os mesmos
+   * números dos marcadores, e trocar um pelo outro não ganha nada.
+   *
+   * O sumário dos marcadores é INÚTIL (sumarioDosMarcadoresInutil) quando
+   * vale tudo isto:
+   *   1. o livro é PDF e o sumário veio dos marcadores (sumario_origem);
+   *   2. o mapa tem PELO MENOS 2 capítulos com título com sentido e página
+   *      inicial dentro do livro (capitulosDoMapaParaSumario);
+   *   3. esses capítulos COBREM pelo menos 25% das páginas do livro
+   *      (coberturaDoMapa: a união das faixas pagina a pagina_fim sobre
+   *      meta.paginas; sem meta.paginas não há como medir, e os marcadores
+   *      ficam);
+   *   4. e, dos marcadores, MAIS DA METADE é sem sentido, OU os que fazem
+   *      sentido são MENOS DA METADE dos capítulos do mapa (os 2 ou 4
+   *      marcadores soltos de um livro de 22 capítulos).
+   * Os itens 2 e 3 existem porque os marcadores, mesmo lixo, ainda levam a
+   * algum lugar (no Praticando 9, ao manual do professor na p. 274), e um
+   * mapa que só conhece um trecho do livro tiraria esses atalhos sem pôr
+   * nada no lugar: o mapa do Praticando 9 tem UMA entrada boa, de 20 das
+   * 394 páginas (5%). Por que 25%: nos pacotes reais (11/2026), os livros
+   * em que a troca é a certa têm mapa de 9 a 36 capítulos cobrindo de 51%
+   * (Teláris 6) a 96% (Tópicos de Física) das páginas; 25% fica a meio
+   * caminho entre os 5% do mapa parcial e os 51% do pior mapa bom, longe dos
+   * dois.
+   *
+   * O sumário que a tela usa (sumarioDoLivro) vem do MAPA quando o livro é
+   * PDF e
+   *   - o sumário do pacote está VAZIO e o mapa tem ao menos UM capítulo que
+   *     sirva, de qualquer tamanho (o PDF sem marcadores de um pacote cujo
+   *     mapa chegou depois, como o volume de uma entrada só do Araribá 8, 7
+   *     de 442 páginas): sem sumário não há atalho a perder; ou
+   *   - o sumário dos marcadores é inútil (os itens 1 a 4).
+   * Fora disso fica o do pacote: EPUB, livro sem mapa (com ou sem
+   * sumário), marcadores bons, mapa pequeno ou parcial diante de marcadores,
+   * e sumário que já veio do mapa.
+   *
+   * O sumário do mapa tem a mesma forma do gerador (sumario_do_mapa):
+   * { n, nivel: 1, titulo, pagina, pagina_fim, mapa_n }, em ordem de página.
+   * `mapa_n` é o número do capítulo no mapa, para a tela achar os assuntos
+   * dele sem depender só do título. */
+  var MARCADOR_DE_PAGINA = /^(page|pag|p[aá]gina|p)\s*[._-]?\s*\d+([._-]\d+)*$/i;
+  var MARCADOR_VAZIO = /^(blank\s*page|p[aá]gina\s+em\s+branco|sem\s+nome|sem\s+t[ií]tulo|untitled|sum[aá]rio|[ií]ndice|contents)$/i;
+  function marcadorSemSentido(titulo) {
+    var t = String(titulo == null ? '' : titulo).trim();
+    if (!t || !/[0-9A-Za-zÀ-ÿ]/.test(t)) return true;
+    if (MARCADOR_DE_PAGINA.test(t) || MARCADOR_VAZIO.test(t)) return true;
+    if (/_FECHADO/i.test(t) || /\.(pdf|indd|idml)$/i.test(t)) return true;
+    return !/\s/.test(t) && t.indexOf('_') >= 0;
+  }
+  /* os capítulos do mapa que servem de sumário: número, título COM SENTIDO e
+   * página dentro do livro. As entradas de mapa feitas dos próprios
+   * marcadores lixo (nomes de arquivo no Geração Alpha e no Praticando 9)
+   * não servem e ficam de fora; o que sobra ainda passa pelos itens 2 e 3
+   * acima antes de tomar o lugar de marcadores. */
+  function capitulosDoMapaParaSumario(meta) {
+    var total = meta && inteiro(meta.paginas) ? meta.paginas : Infinity;
+    return (meta && Array.isArray(meta.mapa) ? meta.mapa : []).filter(function (e) {
+      return !!e && inteiro(e.n) && typeof e.titulo === 'string' && !marcadorSemSentido(e.titulo) &&
+        inteiro(e.pagina) && e.pagina >= 1 && e.pagina <= total;
+    });
+  }
+  var MINIMO_DE_CAPITULOS_DO_MAPA = 2;
+  var COBERTURA_MINIMA_DO_MAPA = 0.25;
+  /* A fração das páginas do livro dentro de algum capítulo do mapa: a união
+   * das faixas pagina a pagina_fim (sem pagina_fim, só a primeira página),
+   * cortadas no fim do livro, sobre meta.paginas. Sem meta.paginas, 0. */
+  function coberturaDoMapa(meta, caps) {
+    var total = meta && inteiro(meta.paginas) && meta.paginas > 0 ? meta.paginas : 0;
+    if (!total) return 0;
+    var faixas = caps.map(function (e) {
+      var fim = inteiro(e.pagina_fim) ? Math.max(e.pagina, e.pagina_fim) : e.pagina;
+      return [e.pagina, Math.min(total, fim)];
+    }).sort(function (a, b) { return a[0] - b[0]; });
+    var cobertas = 0, ate = 0;
+    faixas.forEach(function (f) {
+      var ini = Math.max(f[0], ate + 1);
+      if (f[1] >= ini) { cobertas += f[1] - ini + 1; ate = f[1]; }
+    });
+    return cobertas / total;
+  }
+  function sumarioDosMarcadoresInutil(meta) {
+    if (!meta || meta.formato === 'epub' || meta.sumario_origem !== 'marcadores') return false;
+    var marcadores = Array.isArray(meta.sumario) ? meta.sumario : [];
+    var caps = capitulosDoMapaParaSumario(meta);
+    if (!caps.length) return false;
+    if (!marcadores.length) return true;
+    // diante de marcadores, só um mapa de verdade: 2 capítulos ou mais, cobrindo 25% do livro
+    if (caps.length < MINIMO_DE_CAPITULOS_DO_MAPA || coberturaDoMapa(meta, caps) < COBERTURA_MINIMA_DO_MAPA) return false;
+    var lixo =marcadores.filter(function (e) { return !e || marcadorSemSentido(e.titulo); }).length;
+    var uteis = marcadores.length - lixo;
+    return lixo * 2 > marcadores.length || uteis * 2 < caps.length;
+  }
+  function sumarioDoLivro(meta) {
+    var sumario = meta && Array.isArray(meta.sumario) ? meta.sumario : [];
+    if (!meta || meta.formato === 'epub') return sumario;
+    var doMapa = !sumario.length ? capitulosDoMapaParaSumario(meta).length > 0 : sumarioDosMarcadoresInutil(meta);
+    if (!doMapa) return sumario;
+    var total = inteiro(meta.paginas) ? meta.paginas : Infinity;
+    return capitulosDoMapaParaSumario(meta).slice().sort(function (a, b) { return a.pagina - b.pagina || a.n - b.n; })
+      .map(function (e, i) {
+        var s = { n: i + 1, nivel: 1, titulo: e.titulo, pagina: e.pagina, mapa_n: e.n };
+        if (inteiro(e.pagina_fim)) s.pagina_fim = Math.min(total, Math.max(e.pagina, e.pagina_fim));
+        return s;
+      });
+  }
+
   /* O ano do livro serve ao "Abrir no livro" (C15.3): REGRA de quem entra. O
    * livro entra se for do ano pedido (meta.series, do gerador: o ano do mapa
    * ou o segmento da planilha). Sem ano pedido (aluno sem ano e assunto sem
@@ -326,6 +613,139 @@
       return String(a.meta.titulo || '').localeCompare(String(b.meta.titulo || ''), 'pt-BR') ||
         (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) || a.entrada.n - b.entrada.n;
     });
+  }
+
+  /* ------------------------- a busca pelos capítulos e assuntos (12/11/2026) */
+
+  /* Pedido do dono: o livro escaneado (sem texto) não aparecia na busca da
+   * Biblioteca, mesmo com capítulos mapeados e assuntos ligados. A busca passa
+   * a procurar também, em TODO livro instalado:
+   *   - nos títulos dos capítulos do sumário que a tela usa (sumarioDoLivro);
+   *   - nos títulos das entradas do mapa, já com a correção dela por cima
+   *     (mapaDoLivro);
+   *   - nos títulos e nas chaves dos assuntos ligados a cada entrada do mapa.
+   * A chave do assunto são as palavras-chave que o índice de matemática
+   * guarda (chaves.r e chaves.d); o id ("MAT08-15") não entra, porque "mat"
+   * casaria todo assunto de matemática. Título casa por trecho,
+   * como o texto; chave casa pelo começo de uma palavra, porque são radicais
+   * soltos ("cubo", "litro"), e por trecho "de" casaria quase todas.
+   *
+   * Só lê: nada é gravado. O índice é montado UMA vez por desenho da
+   * Biblioteca (app.js), e a consulta é uma varredura em memória.
+   *
+   * indiceDeCapitulos(livros, correcoesPorLivro, nomes, normalizar)
+   *   livros: [{ id, meta }]; correcoesPorLivro: { <id>: correções };
+   *   nomes: { porId: { <id do assunto>: { titulo, chaves } } } (ou nada: o
+   *   assunto fica só com o id); normalizar: a mesma da busca no texto
+   *   (IndiceLivros.normalizar), com esta como reserva.
+   * Devolve { livros: [{ id, formato, capitulos: [...] }], capitulos: total }. */
+  function normalizarTermo(texto) {
+    return String(texto == null ? '' : texto).normalize('NFKD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+  function indiceDeCapitulos(livros, correcoesPorLivro, nomes, normalizar) {
+    var norm = typeof normalizar === 'function' ? normalizar : normalizarTermo;
+    var porId = (nomes && nomes.porId) || {};
+    var saida = { livros: [], capitulos: 0 };
+    var assuntoDoIndice = Object.create(null);
+    function assunto(id) {
+      if (assuntoDoIndice[id]) return assuntoDoIndice[id];
+      var a = porId[id];
+      var titulo = a && a.titulo ? String(a.titulo) : id;
+      var chaves = a && a.chaves ? [a.chaves.r, a.chaves.d].filter(function (x) { return typeof x === 'string'; }).join(' ') : '';
+      assuntoDoIndice[id] = { id: id, titulo: titulo, alvoTitulo: norm(titulo), alvoChaves: ' ' + norm(chaves) + ' ' };
+      return assuntoDoIndice[id];
+    }
+    (livros || []).forEach(function (l) {
+      if (!l || !l.meta) return;
+      var meta = l.meta, epub = meta.formato === 'epub';
+      var chaveIni = epub ? 'capitulo' : 'pagina';
+      var caps = [], doMapa = Object.create(null);
+      mapaDoLivro(meta, (correcoesPorLivro || {})[l.id]).forEach(function (e) {
+        var c = { n: e.n, mapaN: e.n, titulo: e.titulo, inicio: inteiro(e[chaveIni]) ? e[chaveIni] : null,
+          ancora: e.ancora || null, obraInteira: !!e.obraInteira,
+          // o título lixo (nome de arquivo, "page12") não entra na busca; os assuntos dele, sim
+          alvo: marcadorSemSentido(e.titulo) ? '' : norm(e.titulo),
+          assuntos: e.assuntos.map(assunto) };
+        doMapa[e.n] = c;
+        caps.push(c);
+      });
+      var sumario = sumarioDoLivro(meta);
+      var nivel = Infinity;
+      sumario.forEach(function (s) { if (s && typeof s.nivel === 'number' && s.nivel < nivel) nivel = s.nivel; });
+      if (nivel === Infinity) nivel = 1;
+      sumario.forEach(function (s) {
+        if (!s || typeof s.titulo !== 'string' || (typeof s.nivel === 'number' ? s.nivel : nivel) !== nivel) return;
+        var ini = inteiro(s[chaveIni]) ? s[chaveIni] : null, alvo = marcadorSemSentido(s.titulo) ? '' : norm(s.titulo);
+        // o capítulo do sumário que é a mesma entrada do mapa vira uma só, com o título que a tela mostra
+        var par = s.mapa_n !== undefined && doMapa[s.mapa_n] ? doMapa[s.mapa_n] : caps.filter(function (c) {
+          return c.mapaN !== undefined && c.sumarioN === undefined && c.inicio === ini && c.alvo === alvo;
+        })[0];
+        if (par) {
+          par.sumarioN = s.n;
+          par.titulo = s.titulo;
+          if (alvo) par.alvo = alvo;
+          return;
+        }
+        caps.push({ n: s.n, sumarioN: s.n, titulo: s.titulo, inicio: ini, ancora: s.ancora || null, obraInteira: false, alvo: alvo, assuntos: [] });
+      });
+      caps.sort(function (a, b) {
+        var ia = a.inicio === null ? Infinity : a.inicio, ib = b.inicio === null ? Infinity : b.inicio;
+        return ia - ib || (a.n || 0) - (b.n || 0);
+      });
+      saida.livros.push({ id: l.id, formato: epub ? 'epub' : 'pdf', capitulos: caps });
+      saida.capitulos += caps.length;
+    });
+    return saida;
+  }
+
+  /* procurarNosCapitulos(indice, termo, normalizar, palavras): os capítulos
+   * achados, livro a livro, na ordem do índice:
+   *   [{ id, capitulos: [{ capitulo, nivel, peloTitulo, assuntos: [{ id, titulo, pela }] }] }]
+   * A regra é a da busca no texto (indice-livros.js, palavrasDaBusca): o
+   * capítulo entra quando TODAS as palavras significativas estão no título
+   * dele ou nos assuntos ligados (título ou chave), juntos. `nivel` é
+   *   'frase'    o título do capítulo, ou o de um assunto, tem a frase inteira;
+   *   'palavras' as palavras estão todas lá, mas não em sequência.
+   * `peloTitulo` diz se o título do capítulo sozinho tem a frase ou todas as
+   * palavras; `assuntos` são os que casaram ao menos uma palavra, e `pela`
+   * diz se pelo 'titulo' ou pela 'chave'. `palavras` é a função das palavras
+   * significativas (IndiceLivros.palavrasDaBusca); sem ela, todas as palavras
+   * contam. Termo de menos de duas letras não procura. */
+  function casaPalavraNoTitulo(texto, p) {
+    if (!texto) return false;
+    if (p.length > 1) return texto.indexOf(p) >= 0;
+    return new RegExp('(^|[^a-z0-9])' + p + '([^a-z0-9]|$)').test(texto);
+  }
+  function procurarNosCapitulos(indice, termo, normalizar, palavras) {
+    var norm = typeof normalizar === 'function' ? normalizar : normalizarTermo;
+    var alvo = norm(termo);
+    var saida = [];
+    if (!indice || alvo.length < 2 || !/[a-z0-9]/.test(alvo)) return saida;
+    var lista = typeof palavras === 'function' ? palavras(alvo) : alvo.split(/[^a-z0-9]+/).filter(Boolean);
+    if (!lista.length) return saida;
+    indice.livros.forEach(function (l) {
+      var achados = [];
+      l.capitulos.forEach(function (c) {
+        var noTitulo = lista.filter(function (p) { return casaPalavraNoTitulo(c.alvo, p); });
+        var faltam = lista.filter(function (p) { return noTitulo.indexOf(p) < 0; });
+        var frase = !!c.alvo && c.alvo.indexOf(alvo) >= 0;
+        var assuntos = [];
+        c.assuntos.forEach(function (a) {
+          var peloTitulo = lista.filter(function (p) { return casaPalavraNoTitulo(a.alvoTitulo, p); });
+          var pelaChave = lista.filter(function (p) { return peloTitulo.indexOf(p) < 0 && a.alvoChaves.indexOf(' ' + p) >= 0; });
+          if (a.alvoTitulo.indexOf(alvo) >= 0) frase = true;
+          if (!peloTitulo.length && !pelaChave.length) return;
+          faltam = faltam.filter(function (p) { return peloTitulo.indexOf(p) < 0 && pelaChave.indexOf(p) < 0; });
+          assuntos.push({ id: a.id, titulo: a.titulo, pela: peloTitulo.length ? 'titulo' : 'chave' });
+        });
+        if (!frase && faltam.length) return;
+        achados.push({ capitulo: c, nivel: frase ? 'frase' : 'palavras', assuntos: assuntos,
+          peloTitulo: (!!c.alvo && c.alvo.indexOf(alvo) >= 0) || noTitulo.length === lista.length });
+      });
+      if (achados.length) saida.push({ id: l.id, capitulos: achados });
+    });
+    return saida;
   }
 
   /* ------------------------------ exportar o capítulo (C15.4) e o gabarito (C15.5) */
@@ -610,7 +1030,8 @@
   /* Confere um livro lido em trechos de 1 MB: tamanho, CRC do zip e hash do
    * manifest. Nenhum trecho fica para o próximo. */
   var TRECHO = 1024 * 1024;
-  function conferirLivroPorTrechos(blob, entrada, shaHex) {
+  var PRAZO_CONFERENCIA_LIVRO_MS = 120000;
+  function conferirLivroPorTrechos(blob, entrada, shaHex, aoProgredir) {
     var sha = new Sha256(), crc = 0, pos = 0, total = blob.size;
     function somar(b) { crc = Zip.crc32(b, crc); sha.atualizar(b); }
     /* Com leitor "byob", os trechos caem sempre no MESMO buffer de 1 MB: nada
@@ -624,6 +1045,7 @@
         if (r.done) return;
         somar(r.value);
         pos += r.value.length;
+        if (aoProgredir) aoProgredir(pos, total);
         return porByob(r.value.buffer);
       });
     }
@@ -633,6 +1055,7 @@
       return blob.slice(pos, ate).arrayBuffer().then(function (ab) {
         somar(new Uint8Array(ab));
         pos = ate;
+        if (aoProgredir) aoProgredir(pos, total);
         return porFatias();
       });
     }
@@ -643,6 +1066,48 @@
         throw Recusa('O arquivo ' + entrada.nome + ' do pacote está corrompido.');
       }
       if (sha.fim() !== shaHex) throw Recusa('O arquivo ' + entrada.nome + ' do pacote não confere com o manifest.', 'defeito');
+    });
+  }
+
+  /* A conferência pesada de cada livro roda isolada. Se a leitura do Blob não
+   * responder, o chamador encerra o Worker e segue para o próximo livro. */
+  function conferirLivroIsolado(arquivo, entrada, formato, shaHex, aoProgredir) {
+    if (typeof Worker !== 'function') {
+      return Promise.reject(Recusa('Este navegador não consegue conferir livros em segurança. Atualize o Chrome e tente de novo.'));
+    }
+    return new Promise(function (resolve, reject) {
+      var worker;
+      var encerrado = false;
+      var timer = setTimeout(function () {
+        encerrar();
+        reject(Recusa('A conferência passou de 2 minutos; este livro foi pulado.'));
+      }, PRAZO_CONFERENCIA_LIVRO_MS);
+      function encerrar() {
+        if (encerrado) return;
+        encerrado = true;
+        clearTimeout(timer);
+        try { if (worker) worker.terminate(); } catch (e) { /* já encerrado */ }
+      }
+      try {
+        worker = new Worker('conferir-livro-worker.js');
+        worker.onmessage = function (ev) {
+          if (ev.data && ev.data.progresso) {
+            if (aoProgredir) aoProgredir(ev.data.progresso.bytes, ev.data.progresso.total);
+            return;
+          }
+          encerrar();
+          if (ev.data && ev.data.ok) resolve(ev.data.blob);
+          else reject(Recusa(ev.data && ev.data.erro || 'Não foi possível conferir este livro; ele foi pulado.'));
+        };
+        worker.onerror = function () {
+          encerrar();
+          reject(Recusa('A conferência deste livro falhou; ele foi pulado.'));
+        };
+        worker.postMessage({ arquivo: arquivo, entrada: entrada, formato: formato, shaHex: shaHex });
+      } catch (e) {
+        encerrar();
+        reject(Recusa('Não foi possível iniciar a conferência deste livro; ele foi pulado.'));
+      }
     });
   }
 
@@ -683,7 +1148,8 @@
    *     e os bytes são soltos antes do próximo: o pico é perto de UM livro;
    *   - o que vai para a gravação é a fatia do próprio arquivo (o livro vem
    *     sem compressão), que o navegador copia do disco para o banco.
-   * Devolve { manifest, livros: [{ meta, blob }], bytesTotais }. */
+   * Devolve { manifest, livros: [{ meta, blob }], erros, idsDoPacote,
+   * bytesTotais }. Erro num livro não impede os seguintes. */
   function abrirLivrosDoArquivo(espiado, aoProgredir) {
     var zipArq = espiado.zip, manifest = espiado.manifest;
     return Promise.resolve().then(function () {
@@ -700,6 +1166,7 @@
         noZip[n] = true;
       });
       var livros = lerLivros(manifest, noZip, lista);
+      var recusados = livros.recusados || [];
       livros.forEach(function (l) {
         var en = porNome[l.meta.arquivo];
         if (en.tamanho > TETO_POR_LIVRO) {
@@ -710,24 +1177,37 @@
           throw Recusa('O livro "' + l.meta.titulo + '" veio comprimido no pacote, e o aplicativo só lê livro sem compressão.', 'defeito');
         }
       });
-      var i = 0, bytesTotais = 0;
+      var i = 0, bytesTotais = 0, erros = [];
       function proximo() {
         if (i >= livros.length) return Promise.resolve();
         var l = livros[i++];
         var en = porNome[l.meta.arquivo];
         var m = /^sha256:([0-9a-f]{64})$/.exec(String(lista[l.meta.arquivo] || ''));
-        if (!m) return Promise.reject(Recusa('O manifest.json não traz o hash de ' + l.meta.arquivo + '.'));
+        function registrarErro(e) {
+          erros.push({ id: l.meta.id, titulo: l.meta.titulo, arquivo: l.meta.arquivo,
+            mensagem: e && e.message || 'Não foi possível conferir este livro.' });
+          if (aoProgredir) aoProgredir(i, livros.length, l.meta, false, erros[erros.length - 1]);
+          return proximo();
+        }
+        if (!m) return registrarErro(Recusa('O manifest.json não traz o hash deste livro.'));
         // a fatia do próprio arquivo: conferida por trechos e, depois, gravada como está
-        return Zip.fatiaDoArquivo(zipArq, en, FORMATOS_DE_LIVRO[l.meta.formato]).then(function (blob) {
-          return conferirLivroPorTrechos(blob, en, m[1]).then(function () { return blob; });
+        return conferirLivroIsolado(zipArq.arquivo, en, FORMATOS_DE_LIVRO[l.meta.formato], m[1], function (bytes, total) {
+          if (aoProgredir) aoProgredir(i, livros.length, l.meta, null, null, bytes, total);
         }).then(function (blob) {
           bytesTotais += blob.size;
           l.blob = blob;
-          if (aoProgredir) aoProgredir(i, livros.length);
+          if (aoProgredir) aoProgredir(i, livros.length, l.meta, true, null);
           return proximo();
+        }).catch(function (e) {
+          return registrarErro(e);
         });
       }
-      return proximo().then(function () { return { manifest: manifest, livros: livros, bytesTotais: bytesTotais }; });
+      return proximo().then(function () {
+          return { manifest: manifest, livros: livros.filter(function (l) { return !!l.blob; }),
+            idsDoPacote: livros.map(function (l) { return l.meta.id; }).concat(recusados.map(function (l) { return l.id; })),
+            erros: erros, bytesTotais: bytesTotais,
+            recusados: recusados };
+      });
     }).catch(function (e) {
       if (e && e.message === 'SEM_DESCOMPRESSAO') throw Recusa(SEM_NAVEGADOR);
       if (e && e.zip) throw Recusa(e.message || 'O pacote não pôde ser aberto.');
@@ -982,9 +1462,15 @@
   return {
     ESQUEMA: ESQUEMA, SEM_NAVEGADOR: SEM_NAVEGADOR,
     abrirPacote: abrirPacote, espiarPacote: espiarPacote, abrirLivrosDoArquivo: abrirLivrosDoArquivo,
+    conferirLivroPorTrechos: conferirLivroPorTrechos,
     TETO_POR_LIVRO: TETO_POR_LIVRO, sha256PorPartes: sha256PorPartes, resumo: resumo, nomeDaSerie: nomeDaSerie, mb: mb, resumoDeLivros: resumoDeLivros,
     sha256: sha256, tipoDoAsset: tipoDoAsset,
+    paginaImpressa: paginaImpressa, paginaDoArquivo: paginaDoArquivo, paginaDaPosicao: paginaDaPosicao,
+    resolverPaginaDoLeitor: resolverPaginaDoLeitor, conferirNumeracao: conferirNumeracao, paraRomano: paraRomano, deRomano: deRomano,
     mapaDoLivro: mapaDoLivro, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
+    indiceDeCapitulos: indiceDeCapitulos, procurarNosCapitulos: procurarNosCapitulos,
+    marcadorSemSentido: marcadorSemSentido, sumarioDosMarcadoresInutil: sumarioDosMarcadoresInutil, sumarioDoLivro: sumarioDoLivro,
+    coberturaDoMapa: coberturaDoMapa, COBERTURA_MINIMA_DO_MAPA: COBERTURA_MINIMA_DO_MAPA,
     TETO_DE_PAGINAS_EXPORTADAS: TETO_DE_PAGINAS_EXPORTADAS, livroTemGabarito: livroTemGabarito,
     estimarPdfExportado: estimarPdfExportado, AVISO_DE_TAMANHO_EXPORTADO: AVISO_DE_TAMANHO_EXPORTADO,
     partesDoCapitulo: partesDoCapitulo, paginasEscolhidas: paginasEscolhidas, descreverUnidades: descreverUnidades,

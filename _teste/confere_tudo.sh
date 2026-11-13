@@ -297,17 +297,49 @@ roda "biblioteca (zip)" node _teste/testa_biblioteca_zip.js
 # puseram aqui. Passavam sozinhos; ninguem os rodava antes do merge.
 roda "fechamento em ordem"   node _teste/testa_fechamento_ordem_alfabetica.js
 roda "rotulos da aula"       node _teste/testa_rotulos_aula.js
+roda "vagos e repeticoes (F3)" node _teste/testa_vagos_repeticao.js
 roda "sugestoes matematica"  node _teste/testa_sugestoes_matematica.js
 roda "virada anual"          node _teste/testa_virada_anual.js
 # A regra do merge na main (_teste/merge_seguro.sh), que segura o processo
 # quando a protecao de branch do GitHub sumir com o repositorio privado.
 roda "merge seguro"          node _teste/testa_merge_seguro.js
+# O guarda de merge no CI (item 13c): o guarda_merge.js julga pelo merge_seguro
+# e publica o status portao-merge na cabeca que julgou. Com gh e git falsos:
+# pending no comeco, success ou failure com o motivo, cabeca que andou nao
+# publica, fork e pulado, e o merge nunca e chamado; quando a main anda, todos os
+# PRs abertos sao rejulgados (o caso dos dois PRs com a mesma versao); o guarda
+# nao julga a si mesmo (com controle sem a regra); e o workflow so roda codigo da
+# main, sem checkout da cabeca do PR, com so a escrita de status e sem strict.
+roda "guarda de merge"       node _teste/testa_guarda_merge.js
+# CACHE do sw.js e VERSAO do app.js do PR MAIORES que os da main atual, e nao so
+# diferentes da base do merge (12/11/2026: um ramo em v130 integrado com a main
+# em v134 passava verde). A regra e a do merge_seguro; a prova a exercita dos dois
+# lados, como numero (1.42.9 contra 1.42.10), e num repositorio de mentira pelo
+# caminho real do --conferir, inclusive o ramo que trouxe a main e ficou igual a
+# ela. O veneno devolve a regra antiga, "mudou desde a base, passa", e os casos
+# de menor, de igual e o da revisao TEM de sair errados. A conferencia do repositorio
+# roda mais abaixo, na secao do cache.
+roda "ordem cache e versao"  node _teste/testa_ordem_versao.js
+roda "ordem cache e versao --envenenado-so-diferente" node _teste/testa_ordem_versao.js --envenenado-so-diferente
 # As fatias do portao inteiro no CI: toda prova de navegador em exatamente uma
 # fatia, para qualquer numero de fatias, com controle que reprova.
 roda "fatias do portao"      node _teste/testa_pedacos_do_portao.js
 # B4: o deploy no Cloudflare Pages so depois do portao inteiro verde na main,
 # com venenos, e o site montado com tudo o que o aplicativo pede.
 roda "publica cloudflare (B4)" node _teste/testa_publica_cloudflare.js
+# O endpoint de IA (fase 1 do projeto IA no app): login, lista de uids, limites,
+# modelo decidido no servidor, erro traduzido e registro sem conteudo. Sem rede.
+roda "endpoint de IA"         node _teste/testa_ia_endpoint.js
+# O mesmo empacotamento que o deploy faz (npm ci e wrangler pages functions
+# build), antes do merge: sem ele, um import quebrado so apareceria travando
+# o deploy da main. Precisa do registro do npm; sem rede, falha.
+roda "endpoint de IA (empacota)" node _teste/testa_ia_empacota.js
+# O planejamento de estudos com IA (fase 2): o modulo puro (pedido, leitura da
+# resposta, ajuste com o content intacto, a folha de uma pagina), dados sinteticos.
+roda "planejamento com IA (fase 2)" node _teste/testa_planejamento.js
+# o salvar com a gravacao pendente: a mudanca no meio grava de novo, com o mesmo id
+roda "planejamento (salvar pendente)" node _teste/testa_planejamento_salvar.js
+roda "planejamento --envenenado-zera-sem-comparar" node _teste/testa_planejamento_salvar.js --envenenado-zera-sem-comparar
 # Politica de testes por checkpoint (09/11/2026): o nivel 1 (quais provas de
 # navegador rodam pelos arquivos tocados, com o mapa em mapa_provas.tsv) e o
 # nivel 3 (a main reaproveita a bateria inteira se o tree for igual ao da cabeca
@@ -428,6 +460,10 @@ done
 # { relogioReal: true }; o veneno serve o helper sem o padrao e a virada tem de
 # abrir ("VENENO visto").
 roda "relogio padrao --envenenado-sem-padrao"   node "_teste/testa_relogio_padrao.js" --envenenado-sem-padrao
+# F6 (#157): a janela da aula com a grade antiga (cartoes de altura fixa, cada um
+# com rolagem propria, o "Escrever a mao" cortado). A prova de rolagem e da
+# primeira dobra tem de ve-la ("VENENO visto").
+roda "modal aula --envenenado-grade-antiga"     node "_teste/testa_modal_aula_navegador.js" --envenenado-grade-antiga
 
 # D2: o service worker com cache primeiro. Fechar o aplicativo sem tocar no
 # aviso nao troca a versao (o navegador ativa o worker em espera sozinho, e a
@@ -501,6 +537,12 @@ roda "navegacao biblioteca --envenenado-rotulo-corta" node "_teste/testa_navegac
 # capitulo na pagina 1, e a prova tem de ver.
 roda "biblioteca livros tela"                   node "_teste/testa_biblioteca_livros_tela.js"
 roda "biblioteca livros tela --envenenado-capitulo-abre-pagina-errada" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-capitulo-abre-pagina-errada
+roda "biblioteca livros tela --envenenado-zoom-sem-ancora" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-zoom-sem-ancora
+roda "biblioteca livros tela --envenenado-giro-sem-ancora-guardada" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-giro-sem-ancora-guardada
+roda "biblioteca livros tela --envenenado-largura-vai-ao-alto" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-largura-vai-ao-alto
+roda "biblioteca livros tela --envenenado-vizinhas-sem-desenho" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-vizinhas-sem-desenho
+roda "biblioteca livros tela --envenenado-canvas-sem-soltar" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-canvas-sem-soltar
+roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-sumario-dos-marcadores
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
@@ -611,9 +653,14 @@ roda "salvar --envenenado-salvar-no-pedido"     node "_teste/testa_store_grava_n
 # saida); --envenenado-nota-no-pedido o faz responder com ela aberta e tem de
 # acusar EXATAMENTE o salvarNota
 roda "salvar --envenenado-nota-no-pedido"       node "_teste/testa_store_grava_no_commit.js" --envenenado-nota-no-pedido
+# N2 (fatia 2, anexos na nuvem): o salvarMidia, o salvarAnexo e o apagarAnexo
+# tem transacao propria (deposito, estado e fila); --envenenado-arquivo-no-pedido
+# os faz responder com ela aberta e tem de acusar EXATAMENTE os tres
+roda "salvar --envenenado-arquivo-no-pedido"    node "_teste/testa_store_grava_no_commit.js" --envenenado-arquivo-no-pedido
 # E o outro lado, que o conserto criou: a escrita que falha passa a REJEITAR.
-# --envenenado-nao-rejeita tira o onabort do escrever, e a transacao abortada
-# depois do sucesso do pedido tem de deixar a promessa pendurada a vista;
+# --envenenado-nao-rejeita tira o onabort do escrever (a miniatura 'bib:' passa
+# por ele) e os dois tratamentos de falha do salvarArquivo, e a transacao
+# abortada depois do sucesso do pedido tem de deixar as duas promessas penduradas;
 # --envenenado-nao-rele tira a releitura do disco do app.js, e uma copia que
 # rejeita no meio tem de deixar o proximo salvar gravar o estado velho.
 roda "salvar --envenenado-nao-rejeita"          node "_teste/testa_store_grava_no_commit.js" --envenenado-nao-rejeita
@@ -760,6 +807,14 @@ roda "banco v5 --envenenado-restauro-sem-fila"    node "_teste/testa_banco_v5.js
 # registros, e TEM de ser visto.
 roda "rollback v4 (N1)"                           node "_teste/testa_rollback_v4.js"
 roda "rollback v4 --envenenado-registros-ressuscitam" node "_teste/testa_rollback_v4.js" --envenenado-registros-ressuscitam
+# IA, fase 2: o fluxo do planejamento no app (ficha, atalho do +, previa em PDF,
+# ajuste, salvar, compartilhar, erros, observador e transbordo), com o /api/ia falso;
+# e a pergunta de producao: o plano salvo como ajuste sobrevive ao store.js de antes
+# (1f0b839), e o tipo novo seria apagado por ele (controle).
+roda "planejamento (fluxo, IA fase 2)"              node "_teste/testa_planejamento_navegador.js"
+roda "planejamento --envenenado-salva-duplo"       node "_teste/testa_planejamento_navegador.js" --envenenado-salva-duplo
+roda "planejamento (registro e versao antiga)"      node "_teste/testa_planejamento_registro_navegador.js"
+roda "planejamento --envenenado-cascata-deixa-plano" node "_teste/testa_planejamento_registro_navegador.js" --envenenado-cascata-deixa-plano
 # N1: a volta depois do rollback. O codigo da 4 republicado com o numero novo abre
 # um banco nesse numero sem os depositos novos; o codigo novo, voltando, sonda o
 # banco, cria o que falta na versao mais um e migra. O veneno sem a deteccao TEM
@@ -799,6 +854,13 @@ roda "livros indice --envenenado-erro-vira-pronto"    node "_teste/testa_livros_
 roda "livros indice --envenenado-apagar-espera-indice" node "_teste/testa_livros_indice.js" --envenenado-apagar-espera-indice
 # A pagina que sempre falha (de forma passageira) sai sozinha; o livro fica na busca.
 roda "livros indice --envenenado-pagina-ruim-derruba-livro" node "_teste/testa_livros_indice.js" --envenenado-pagina-ruim-derruba-livro
+# 12/11/2026: a busca tambem acha os capitulos pelo titulo e pelos assuntos do
+# mapa, inclusive no livro escaneado (sem texto). O veneno desliga a busca por
+# capitulo, e o livro escaneado some do resultado.
+roda "livros indice --envenenado-busca-sem-capitulos" node "_teste/testa_livros_indice.js" --envenenado-busca-sem-capitulos
+# A revisao do #181: com o resultado todo em "Outras paginas do livro", elas
+# disputam o topo; o veneno deixa os "Melhores resultados" vazios.
+roda "livros indice --envenenado-topo-vazio" node "_teste/testa_livros_indice.js" --envenenado-topo-vazio
 # C15.2 e C15.3: "Este capitulo cobre" no leitor, Confirmar e Corrigir (so a
 # materia e o ano do livro), a correcao depois de recarregar e na copia de
 # seguranca (os livros nao), e o "Abrir no livro" da aula na pagina do PDF e no
@@ -810,6 +872,12 @@ roda "livros mapa --envenenado-sem-ano-na-tela"   node "_teste/testa_livros_mapa
 # faixa e apagava a lista do Corrigir aberta; a prova esperava pela pagina que
 # ja estava a vista e falhava uma vez em dez. O veneno volta a refazer a faixa.
 roda "livros mapa --envenenado-faixa-refeita"     node "_teste/testa_livros_mapa.js" --envenenado-faixa-refeita
+# 12/11/2026: a versao nova de um pacote de livros que so muda o mapa (o MAT08-15
+# de volume): mesmo arquivo, versao maior, so o meta trocado; a posicao de
+# leitura e a correcao dela intactas, inclusive no livro cujo sumario era vazio;
+# o v1 depois do v2 nao rebaixa. O veneno deixa de trocar o meta. Porta 8887.
+roda "livros reimportar mapa"                     node "_teste/testa_livros_reimportar_mapa.js"
+roda "livros reimportar mapa --envenenado-meta-nao-troca" node "_teste/testa_livros_reimportar_mapa.js" --envenenado-meta-nao-troca
 # C15.4 e C15.5: "Exportar em PDF" do capitulo 2 com o gabarito dele no mesmo
 # arquivo, anexado na aula: o texto do capitulo e DEPOIS o do gabarito do 2 (e
 # nao o do 1), o rodape de fonte, nenhum travessao; sem o gabarito; paginas
@@ -858,6 +926,12 @@ roda "alerta da copia --envenenado-alerta-so-local" node "_teste/testa_alerta_co
 roda "alerta da copia --envenenado-idade-do-envio" node "_teste/testa_alerta_copia_nuvem.js" --envenenado-idade-do-envio
 roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_aluno_cascata.js"
 roda "relato e Voltar"                            node "_teste/testa_relato_voltar.js"
+# F7 (#159): a aula salva sozinha nunca grava por cima de versao mais nova (chega
+# pela nuvem com a janela aberta), a falha de disco aparece e o relato volta depois
+# de recarregar. Os venenos tiram a conferencia e o rascunho na saida da pagina.
+roda "aula salva sozinha"                          node "_teste/testa_aula_salva_sozinha.js"
+roda "aula salva sozinha --envenenado-grava-por-cima" node "_teste/testa_aula_salva_sozinha.js" --envenenado-grava-por-cima
+roda "aula salva sozinha --envenenado-sem-rascunho-ao-sair" node "_teste/testa_aula_salva_sozinha.js" --envenenado-sem-rascunho-ao-sair
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
 # N0: a copia na nuvem contra o Firebase Emulator Suite: as regras nos tres
 # casos (dona, observador, estranho), a ida e volta entre dois aparelhos pela
@@ -957,6 +1031,23 @@ roda "nuvem folhas --envenenado-pagina-grande-tenta" node "_teste/testa_nuvem_fo
 roda "nuvem folhas --envenenado-sem-reconciliar"    node "_teste/testa_nuvem_folhas.js" --envenenado-sem-reconciliar
 # (lente B, 2a rodada) a pagina grande na quarentena que a copia restaurada nao tem sai da fila
 roda "nuvem folhas --envenenado-quarentena-sobrevive-ao-restauro" node "_teste/testa_nuvem_folhas.js" --envenenado-quarentena-sobrevive-ao-restauro
+# N2 (fase 2 da nuvem, fatia 2): os anexos e as imagens das folhas sobem pelo
+# sha256 (arquivos/{sha} em partes de 768 KiB, anexos/{id} liga o arquivo a
+# aula), so do tablet; o celular baixa ao abrir e confere o sha256; o mesmo
+# arquivo em duas aulas sobe uma vez; o Remover e a exclusao em cascata
+# lapidam; o anexo de antes desta versao nao sobe sozinho; a restauracao e a
+# volta para a versao do ar nao perdem nem duplicam nada. Venenos: o sha256
+# errado no envio TEM de ser recusado por quem baixa; a dedupe que sai TEM de
+# ser vista no segundo envio.
+roda "nuvem anexos (N2 fatia 2)"                    node "_teste/testa_nuvem_anexos.js"
+roda "nuvem anexos --envenenado-sha-errado"         node "_teste/testa_nuvem_anexos.js" --envenenado-sha-errado
+roda "nuvem anexos --envenenado-sobe-duas-vezes"    node "_teste/testa_nuvem_anexos.js" --envenenado-sobe-duas-vezes
+# (lente B da fatia 2) o download que falha no segundo tablet fica "a baixar" e
+# nunca vira lapide; a lapide de anexo que a aula viva ainda cita nao apaga o
+# arquivo. Venenos: a reconciliacao que lapida o recebido TEM de apagar o PDF
+# do tablet A; sem a defesa, a lapide TEM de apagar o PDF.
+roda "nuvem anexos --envenenado-lapida-o-recebido"  node "_teste/testa_nuvem_anexos.js" --envenenado-lapida-o-recebido
+roda "nuvem anexos --envenenado-sem-defesa"         node "_teste/testa_nuvem_anexos.js" --envenenado-sem-defesa
 # (revisao do PR 118) o "Apagar tudo" zera a fila deste aparelho e o recebimento
 # em curso confere a marca dentro da transacao; o celular nao enfileira a lapide
 # da fusao; a restauracao enfileira tambem o que e igual a copia; a confirmacao
@@ -1009,6 +1100,10 @@ roda "celular edita --envenenado-cobranca-volta"    node "_teste/testa_celular_e
 # (portao de 09/11) a rolagem inicial com o relogio fixo em varias horas: a folga antiga deixa
 # a linha de agora cortada sob a faixa dos dias as 00:30 e as 06:00
 roda "celular edita --envenenado-rolagem-antiga"   node "_teste/testa_celular_edita.js" --envenenado-rolagem-antiga
+# (#168) Ajustar duracao: gravar com escopo todas muda a repeticao inteira e o dinheiro do mes; a
+# lista fixa faz a aula de 1h15 abrir marcando outra duracao
+roda "celular edita --envenenado-ajuste-todas"     node "_teste/testa_celular_edita.js" --envenenado-ajuste-todas
+roda "celular edita --envenenado-ajuste-lista-fixa" node "_teste/testa_celular_edita.js" --envenenado-ajuste-lista-fixa
 # D6c (lote 2): a aba Alunos e a ficha minima (ligar, WhatsApp, valor por hora,
 # ultimo relato, casa ou online), as mensagens prontas em wa.me, os campos
 # opcionais que sobem pela fila e chegam ao tablet, e a cobranca do "Escrever
@@ -1027,6 +1122,7 @@ roda "celular ficha --envenenado-observador-cadastra" node "_teste/testa_celular
 # de um estranho; a tabela dos 28 casos dela), o link online com http, e o alto que nunca avisa que pode
 # estar desatualizado
 roda "celular ficha --envenenado-extracao-antiga"   node "_teste/testa_celular_ficha.js" --envenenado-extracao-antiga
+roda "celular ficha --envenenado-planejamento-solto" node "_teste/testa_celular_ficha.js" --envenenado-planejamento-solto
 roda "celular ficha --envenenado-aceita-http"       node "_teste/testa_celular_ficha.js" --envenenado-aceita-http
 roda "celular ficha --envenenado-nunca-desatualizado" node "_teste/testa_celular_ficha.js" --envenenado-nunca-desatualizado
 # D6c (lote 3): dinheiro de relance. O selo de cada familia (pago, parcial, em
@@ -1245,6 +1341,16 @@ roda "livros (regras) --envenenado-respostas-no-capitulo" node "_teste/testa_liv
 # Revisao do C15.5: o gabarito do fim do capitulo (achado so pelo lugar) nunca
 # tira pagina do capitulo exportado. O veneno volta a regra antiga.
 roda "livros (regras) --envenenado-fim-do-capitulo-tira" node "_teste/testa_livros_regras.js" --envenenado-fim-do-capitulo-tira
+# O sumario que a tela usa: marcadores lixo e sumario vazio dao lugar ao mapa.
+roda "livros (regras) --envenenado-sumario-dos-marcadores" node "_teste/testa_livros_regras.js" --envenenado-sumario-dos-marcadores
+roda "livros (regras) --envenenado-mapa-parcial-troca" node "_teste/testa_livros_regras.js" --envenenado-mapa-parcial-troca
+# B3: a pagina impressa do livro (trechos romanos e arabicos, mudanca no meio,
+# ida e volta em todas as paginas, tela e leitor mostrando a impressa e abrindo
+# e gravando em pagina do arquivo, e recusa so do livro com numeracao invalida).
+roda "livros (pagina impressa)"                 node "_teste/testa_livros_impressa.js"
+roda "livros (pagina impressa) --envenenado-impressa-fora-por-um" node "_teste/testa_livros_impressa.js" --envenenado-impressa-fora-por-um
+roda "livros (pagina impressa) --envenenado-posicao-lida-como-impressa" node "_teste/testa_livros_impressa.js" --envenenado-posicao-lida-como-impressa
+roda "livros (pagina impressa) --envenenado-trecho-romano-zero" node "_teste/testa_livros_impressa.js" --envenenado-trecho-romano-zero
 # C15.5: o passe semiautomatico do gabarito (titulos de respostas, numero do
 # capitulo, o fim do capitulo, so as impares, manual do professor, sem texto),
 # a trava do casamento medida pelo texto e os venenos dentro da prova (casar
@@ -1351,6 +1457,23 @@ else
   printf '  FALHOU  %-24s a lista de ARQUIVOS mudou desde a base do merge e o cache continua %s\n' \
     "nome do cache" "$(nome_sw "$sw_agora")"
   falhou=1
+fi
+
+# A ORDEM: diferente da base nao basta. Se o HEAD leva para a origin/main (a do
+# CI e buscada no job) algum arquivo que muda o que o tablet baixa (app.js, sw.js
+# ou a lista ARQUIVOS), pela arvore do merge e nao pela base, CACHE e VERSAO tem
+# de ser MAIORES que os da origin/main, como numero. Igual reaproveita um nome ja
+# publicado e menor o rebaixa; nos dois o tablet ja instalado pode ficar sem o
+# codigo novo. PR que nao leva arquivo do app passa. A regra e a do merge_seguro,
+# que confere de novo contra a origin/main buscada na hora do merge. Le o HEAD
+# commitado, nao o disco. Saida: 0 passou, 1 reprovou, 2 sem main (INSTAVEL).
+saida=$(node _teste/testa_ordem_versao.js --conferir 2>&1) && codigo=0 || codigo=$?
+printf '%s\n' "$saida"
+if [ "$codigo" = "1" ]; then
+  falhou=1
+fi
+if [ "$codigo" != "0" ] && [ "$codigo" != "1" ]; then
+  pulada=1
 fi
 
 # O CONTEUDO DOS ARQUIVOS DO CACHE, e nao so a lista.
@@ -1663,9 +1786,12 @@ fi
 
 printf '\n'
 if [ -n "$pn" ] && [ -n "$provas_lista" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
-  # o nivel 1 em fatias: a fatia pode nao ter prova da lista, e isso e verde
-  printf 'FATIA %s DE %s: nenhuma prova da lista cai nesta fatia; nada a rodar.\n' "$pk" "$pn"
-  exit 0
+  # o nivel 1 em fatias (#174): o plano so abre a fatia que tem prova da
+  # selecao (provas_tocadas.js e divide_portao.js com PORTAO_SELECAO). Fatia do
+  # nivel 1 sem prova e plano e fatia desencontrados, e era o unico verde sem
+  # prova nenhuma: agora falha.
+  printf 'HA FALHA. A fatia %s de %s do nivel 1 nao rodou prova nenhuma da lista: o plano e a fatia nao batem.\n' "$pk" "$pn"
+  exit 1
 fi
 if [ -n "$pn" ] && [ "$rodadas_aqui" = "0" ] && [ "$falhou" = "0" ]; then
   # fatia vazia nao e fatia verde: com mais fatias que provas, a conta esta errada

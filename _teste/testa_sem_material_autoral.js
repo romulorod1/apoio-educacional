@@ -87,7 +87,7 @@ const series = fs.readdirSync(path.join(RAIZ, 'banco')).filter(n => /^serie-.*\.
 conf('nenhuma série do banco ficou', series.join(', ') || 'nenhuma', 'nenhuma');
 const indice = JSON.parse(ler('banco/topicos/matematica.json'));
 const temasHoje = indice.temas;
-conf('o índice de assuntos tem os 148 de matemática', temasHoje.length, 148);
+conf('o índice de assuntos tem os 171 de matemática (148 de 09/2026, o MAT08-15 e os 22 da revisão dos mapas)', temasHoje.length, 171);
 conf('sem conteúdo nenhum (resumo, inglês, exercícios)',
   temasHoje.some(t => (t.pt && t.pt.resumo) || t.en || t.qtd != null || t.exercicios), false);
 const SW = ler('sw.js');

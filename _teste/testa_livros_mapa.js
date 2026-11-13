@@ -151,16 +151,23 @@ async function fecharModal(pag, id) {
   }, id);
   await esperar('a janela ' + id + ' fechou', () => pag.evaluate(i => !document.querySelector('#' + i + '.aberto'), id), v => v, 5000);
 }
-/* Faz `acao` e espera o leitor de PDF trocar o canvas: cada desenho de página
- * nasce num canvas NOVO (desenharPaginaDoLeitor), então o antigo marcado some
- * quando o desenho pedido termina, mesmo que a página seja a mesma. */
-async function novoDesenho(pag, acao, rotulo) {
-  await pag.evaluate(() => { const c = document.querySelector('#corpo-modal-leitor-pdf canvas'); if (c) c.dataset.velho = '1'; });
+/* O leitor contínuo mantém o canvas das páginas próximas. Ao navegar para a
+ * página atual, confirme o destino e sua faixa sem exigir recriação do canvas. */
+async function navegarAoCapituloAtual(pag, acao, rotulo) {
   await acao();
   return esperar(rotulo, () => pag.evaluate(() => {
-    const c = document.querySelector('#corpo-modal-leitor-pdf canvas');
-    return !!c && !c.dataset.velho;
+    const corpo = document.querySelector('#corpo-modal-leitor-pdf');
+    const n = corpo && corpo.dataset.paginaDesenhada;
+    return !!n && !!corpo.querySelector('[data-pagina-arquivo="' + n + '"] canvas');
   }), v => v === true, 15000);
+}
+async function reaplicarPaginaAtual(pag) {
+  await pag.evaluate(() => {
+    const corpo = document.querySelector('#corpo-modal-leitor-pdf');
+    const slider = document.querySelector('#leitor-slider-pagina');
+    slider.value = corpo.dataset.paginaDesenhada;
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 }
 async function irAoCapitulo(pag, rotulo) {
   await pag.evaluate(() => document.querySelector('#leitor-sumario').click());
@@ -271,7 +278,9 @@ async function printar(pag, nome) {
   console.log('   ' + opcoes.length + ' opções: ' + opcoes.slice(0, 6).join(', ') + ' ... ' + opcoes.slice(-3).join(', '));
   conf('as opções são só de matemática do 6º ao 9º ano (o ano do livro)',
     opcoes.filter(x => x).every(x => /^MAT0[6-9]-/.test(x)), true);
-  conf('com os 56 assuntos desses anos, e "Nenhum assunto do índice"', opcoes.filter(x => x).length + '+' + opcoes.filter(x => !x).length, '56+1');
+  // 57 desde 12/11/2026, com o MAT08-15 (volume do 8º ano); 71 desde a revisão dos mapas dos
+  // livros, que criou 14 assuntos do 6º ao 9º (MAT06-15 a 19, MAT07-15 e 16, MAT08-16 a 19, MAT09-15 a 17)
+  conf('com os 71 assuntos desses anos, e "Nenhum assunto do índice"', opcoes.filter(x => x).length + '+' + opcoes.filter(x => !x).length, '71+1');
   conf('o assunto atual do capítulo vem marcado na lista, e só ele', await marcados(p), 'MAT06-05 ✓');
   const rolagem = await p.evaluate(() => {
     const l = document.querySelector('#leitor-cobre .cobre-escolha');
@@ -281,7 +290,7 @@ async function printar(pag, nome) {
       atualAVista: !!m && m.offsetTop >= l.scrollTop && m.offsetTop + m.offsetHeight <= l.scrollTop + l.clientHeight };
   });
   console.log('   rolagem: ' + JSON.stringify(rolagem));
-  conf('a lista rola, e o fim dela diz isso ("Role a lista ... 57 opções")', rolagem.rola && /Role a lista.*57 opções/.test(rolagem.linha), true);
+  conf('a lista rola, e o fim dela diz isso ("Role a lista ... 72 opções")', rolagem.rola && /Role a lista.*72 opções/.test(rolagem.linha), true);
   conf('e abre com o assunto atual à vista', rolagem.atualAVista, true);
   await p.evaluate(() => document.querySelector('#leitor-cobre .cobre-escolha').scrollIntoView({ block: 'center' }));
   await printar(p, 'c15b_corrigir.png');
@@ -301,11 +310,9 @@ async function printar(pag, nome) {
   await H.abrirApp(p, amb.ORIGEM);
   await abrirPelaEstante(p, 'livro-com-marcadores');
   await esperar('o livro reaberto', () => paginaDesenhada(p), v => /^\d+$/.test(v || ''), 30000);
-  /* O livro reabre onde ela parou, que JÁ É a página 3: esperar "página 3"
-   * depois do toque no sumário passava na hora, com o desenho do toque ainda
-   * por vir, e ele chegava no meio do passo seguinte (a causa da rodada em dez
-   * que falhava). A espera é pelo canvas NOVO, o do toque. */
-  await novoDesenho(p, () => irAoCapitulo(p, 'Capítulo 2'), 'a página 3 desenhada pelo toque no sumário');
+  /* O livro reabre onde ela parou, que já é a página 3. Confirme que o toque
+   * no sumário mantém a página atual e que ela continua desenhada. */
+  await navegarAoCapituloAtual(p, () => irAoCapitulo(p, 'Capítulo 2'), 'a página 3 aberta pelo toque no sumário');
   conf('o livro reabriu no capítulo 2, na página 3', await paginaDesenhada(p), '3');
   const c2c = (await esperar('a faixa do capítulo 2 depois de recarregar', () => cobre(p, 'pdf'), v => !!v && v.capitulo === '2', 10000)).valor;
   console.log('   capítulo 2 depois de recarregar: ' + JSON.stringify(c2c));
@@ -323,11 +330,9 @@ async function printar(pag, nome) {
   await p.evaluate(() => document.querySelector('#cobre-corrigir').click());
   await esperar('a lista do Corrigir de novo', () => p.evaluate(() => document.querySelectorAll('#leitor-cobre .cobre-escolha [data-assunto]').length), v => v > 3, 10000);
   conf('o Corrigir agora marca a escolha dela', await marcados(p), 'MAT06-06 ✓');
-  /* A página desenhada de novo com a lista aberta (o sumário levando à página
-   * onde ela já está; o zoom faz o mesmo) não pode apagar a lista: até 31/10
-   * a faixa era refeita a cada desenho. Com o canvas novo à vista, a lista
-   * tem de continuar lá, com a marca. */
-  conf('a página foi mesmo desenhada de novo (canvas novo)', (await novoDesenho(p, () => irAoCapitulo(p, 'Capítulo 2'), 'a mesma página desenhada de novo, com a lista aberta')).ok, true);
+  /* Reaplicar a página atual chama a atualização da faixa sem trocar o canvas.
+   * Isso protege a lista aberta contra uma atualização redundante do mesmo capítulo. */
+  conf('a página atual continua desenhada', (await navegarAoCapituloAtual(p, () => reaplicarPaginaAtual(p), 'a página atual, com a lista aberta')).ok, true);
   const depoisDoDesenho = await marcados(p);
   if (MODO === '--envenenado-faixa-refeita') {
     secao('VENENO: a faixa refeita a cada desenho');

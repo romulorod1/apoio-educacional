@@ -1,0 +1,9 @@
+{
+  "name": "apoio-educacional-functions",
+  "private": true,
+  "description": "Dependencias das Pages Functions (endpoint de IA). O wrangler empacota no deploy; nada daqui vai para o aparelho.",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.6.0"
+  }
+}

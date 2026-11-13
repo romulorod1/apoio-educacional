@@ -436,8 +436,12 @@ function gerar(saida, opcoes) {
           origem: { arquivo: `PDF/matematica/sintetico/${SERIE}/${m.slug}__exercicios-${l.slug}.pdf`,
             enunciado: { pagina: 1, coluna: 1, bbox: [33, 100, 295, 100 + alt] },
             solucao: semSolucao ? undefined : empilhada
+              // o segundo pedaço tem a forma que o gerador dá ao comentário ao professor
+              // levado do enunciado para o fim da solução (L2, decisão D2): o campo
+              // "comentario" é aditivo, e o app empilha pelos bbox como sempre
               ? { pagina: 5, coluna: 1, bbox: [33, 100, 295, 500],
-                pedacos: [{ pagina: 5, coluna: 1, bbox: [33, 100, 295, 500] }, { pagina: 5, coluna: 2, bbox: [305, 60, 567, 440] }] }
+                pedacos: [{ pagina: 5, coluna: 1, bbox: [33, 100, 295, 500] },
+                  { pagina: 5, coluna: 2, bbox: [305, 60, 567, 440], comentario: true }] }
               : { pagina: 5, coluna: 1, bbox: [33, 100, 295, 160 + alt] } }
         });
         docs.push({ id, tipo: 'exercicio', titulo: '', resumo: `${l.titulo} ${m.titulo}`, texto });

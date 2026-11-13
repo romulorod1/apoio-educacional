@@ -1,4 +1,4 @@
-/* A5: relato recuperável, saída protegida e Voltar fecha uma janela por vez. */
+/* A5: relato recuperável, saída protegida e Voltar fecha uma janela por vez (com o F7, o relato salva sozinho). */
 'use strict';
 const H = require('./_bib_navegador');
 /* O relógio da rodada: segunda, 16/11/2026, às 11:00, no processo e na página
@@ -30,75 +30,40 @@ const { conf, secao, esperar } = H;
   await pag.click('[data-aula-id="a5_aula"]');
   conf('aula abriu', await pag.$eval('#modal-aula', e => e.classList.contains('aberto')), true);
 
-  secao('rascunho e saída por fechar');
+  /* F7 (#159): a aula que já existe salva sozinha. A janela de "sair sem
+   * salvar" (modal-sair-relato) deixa de aparecer: o relato vai para o banco
+   * na pausa da digitação, e fechar, tocar fora ou o Voltar só fecham depois
+   * de gravar. O rascunho no aparelho e o recarregar estão na prova do F7,
+   * testa_aula_salva_sozinha.js. */
+  secao('relato salvo sozinho e saída por fechar');
+  const notaNoBanco = () => pag.evaluate(async () => (await Store.carregar()).aulas.find(a => a.id === 'a5_aula').notaTexto || '');
   await pag.$eval('#campo-nota-texto', e => {
-    e.value = 'Relato preservado no rascunho';
+    e.value = 'Relato salvo sem botão';
     e.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await new Promise(r => setTimeout(r, 800));
-  conf('rascunho guardado com hora', await pag.evaluate(() => {
-    const r = JSON.parse(localStorage.getItem('rascunho-relato-aula:a5_aula') || 'null');
-    return !!r && r.notaTexto === 'Relato preservado no rascunho' && Number.isFinite(r.quando);
-  }), true);
+  const salvoSozinho = await esperar('relato salvo sozinho', notaNoBanco, s => s === 'Relato salvo sem botão', 5000);
+  conf('o relato vai para o banco sem botão', salvoSozinho.ok, true);
+  conf('e o rascunho sai quando o banco já tem o mesmo texto', await pag.evaluate(() =>
+    !localStorage.getItem('rascunho-relato-aula:a5_aula')), true);
   await pag.click('#modal-aula .fechar');
-  conf('fechar abre escolha sem fechar aula', await pag.evaluate(() =>
-    document.querySelector('#modal-aula').classList.contains('aberto') &&
-    document.querySelector('#modal-sair-relato').classList.contains('aberto')), true);
-  if (process.env.A5_PRINT_DEPOIS) await pag.screenshot({ path: process.env.A5_PRINT_DEPOIS });
-  await pag.click('#continuar-relato');
-  const voltou = await esperar('continuar volta à aula', () => pag.evaluate(() =>
-    !document.querySelector('#modal-sair-relato').classList.contains('aberto') &&
-    document.querySelector('#modal-aula').classList.contains('aberto')), Boolean, 5000);
-  conf('continuar escrevendo preserva aula aberta', voltou.ok, true);
-  await pag.click('#cancelar-aula');
-  conf('Cancelar também protege o relato', await pag.$eval('#modal-sair-relato', e => e.classList.contains('aberto')), true);
-  await pag.click('#continuar-relato');
-  await pag.evaluate(() => {
-    const fundo = document.querySelector('#modal-aula');
-    fundo.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-    fundo.click();
-  });
-  conf('toque fora também protege o relato', await pag.$eval('#modal-sair-relato', e => e.classList.contains('aberto')), true);
-  await pag.click('#continuar-relato');
+  const fechou = await esperar('fechar fecha a aula', () => pag.evaluate(() =>
+    !document.querySelector('#modal-aula').classList.contains('aberto') &&
+    !document.querySelector('#modal-sair-relato').classList.contains('aberto')), Boolean, 5000);
+  conf('fechar fecha a aula, sem a pergunta de sair', fechou.ok, true);
 
-  secao('Voltar do Android');
+  secao('Voltar do Android com o relato recém-escrito');
+  await pag.click('[data-aula-id="a5_aula"]');
+  await pag.$eval('#campo-nota-texto', e => {
+    e.value = 'Relato escrito e Voltar na hora';
+    e.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   await pag.evaluate(() => history.back());
-  const aviso = await esperar('Voltar pede decisão', () => pag.$eval('#modal-sair-relato', e => e.classList.contains('aberto')), Boolean, 5000);
-  conf('Voltar não perde relato', aviso.ok, true);
-  await pag.evaluate(() => history.back());
-  const soAula = await esperar('Voltar fecha apenas confirmação', () => pag.evaluate(() =>
-    !document.querySelector('#modal-sair-relato').classList.contains('aberto') &&
-    document.querySelector('#modal-aula').classList.contains('aberto')), Boolean, 5000);
-  conf('segundo Voltar fecha só janela de cima', soAula.ok, true);
-  await pag.click('#modal-aula .fechar');
-  await pag.click('#descartar-relato');
-  const fechadas = await esperar('descartar fecha as duas janelas', () => pag.evaluate(() =>
-    !document.querySelector('#modal-sair-relato').classList.contains('aberto') &&
+  const voltou = await esperar('Voltar grava e fecha', () => pag.evaluate(() =>
     !document.querySelector('#modal-aula').classList.contains('aberto')), Boolean, 5000);
-  conf('Descartar fecha ambas e limpa rascunho', fechadas.ok && await pag.evaluate(() =>
-    !localStorage.getItem('rascunho-relato-aula:a5_aula')), true);
-
-  secao('restauração após recarregar e salvar');
-  await pag.click('[data-aula-id="a5_aula"]');
-  await pag.$eval('#campo-nota-texto', e => {
-    e.value = 'Relato que sobrevive ao recarregamento';
-    e.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-  await new Promise(r => setTimeout(r, 800));
-  await H.abrirApp(pag, amb.ORIGEM);
-  await H.irParaAba(pag, 'agenda');
-  await pag.click('[data-aula-id="a5_aula"]');
-  conf('rascunho restaurado com aviso de hora', await pag.evaluate(() =>
-    document.querySelector('#campo-nota-texto').value === 'Relato que sobrevive ao recarregamento' &&
-    /Rascunho recuperado às/.test(document.querySelector('#aviso-rascunho-relato').textContent)), true);
-  await pag.click('#modal-aula .fechar');
-  await pag.click('#salvar-sair-relato');
-  const salvo = await esperar('relato salvo', () => pag.evaluate(async () =>
-    (await Store.carregar()).aulas.find(a => a.id === 'a5_aula').notaTexto),
-  s => s === 'Relato que sobrevive ao recarregamento', 8000);
-  conf('Salvar e sair guarda no banco', salvo.ok, true);
-  conf('rascunho sai após gravação', await pag.evaluate(() =>
-    !localStorage.getItem('rascunho-relato-aula:a5_aula')), true);
+  conf('o Voltar fecha a aula', voltou.ok, true);
+  conf('e o relato escrito logo antes foi gravado', (await esperar('relato do Voltar no banco', notaNoBanco,
+    s => s === 'Relato escrito e Voltar na hora', 5000)).ok, true);
+  conf('sem entrada fantasma: o histórico não ficou com a aula', await pag.evaluate(() => !(history.state && history.state.apoioModal)), true);
 
   secao('janelas aninhadas');
   await H.irParaAba(pag, 'alunos');

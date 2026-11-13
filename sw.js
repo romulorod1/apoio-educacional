@@ -142,11 +142,28 @@
  * styles.css), com a lista igual. O v108 adicionou o indexador de livros; o
  * v109 e o v110 trouxeram navegação e Biblioteca por disciplina e ano. O v111
  * atualiza esses assets após sincronizar a Biblioteca com a main atualizada.
- * O v118 traz a navegação dia a dia no celular, o v119 atualiza a descrição
- * de ausência de vínculo no mapa, o v120 inclui Vagos, o v121 reorganiza a
- * janela, o v122 adiciona o seletor de assunto e o v123 salva automaticamente
- * as edições na aula. */
-var CACHE = 'apoio-educacional-v123';
+ * O v118 traz navegação dia a dia no celular; v119 ajusta a legenda do mapa.
+ * O v120 isola a conferência de livros; v121 traz Marcar pago; v122, página impressa;
+ * v123, edição da ficha móvel; v126, encaixe da agenda no celular. O v127
+ * sincroniza PDFs e fotos anexados a aulas; v128 traz os filtros de tipo na Biblioteca.
+ * O v129 atualiza os assets de Vagos em cache exclusivo. O v134 traz o sumário do mapa
+ * quando os marcadores do PDF são lixo. O v135 traz o assunto de volume do 8º ano no
+ * banco/topicos/matematica.json. O v137 inclui o ajuste pontual da duração de uma
+ * aula no celular. O v138 traz a leitura contínua dos livros e a exportação por página.
+ * O v139 traz a busca no texto dos livros. O v140 traz os 22 assuntos novos de
+ * matemática da revisão dos mapas dos livros no banco/topicos/matematica.json.
+ * O v141 traz os 11 assuntos novos de física da revisão dos mapas dos livros no banco/topicos/fisica.json.
+ * O v143 traz o planejamento de estudos com IA: './planejamento.js' entra na
+ * lista. O endpoint de IA (/api/ia) só recebe POST, que o fetch abaixo já deixa
+ * passar sem cache. O v148 traz o aviso de novidades do planejamento.
+ * O v152 reorganiza a janela da aula em duas colunas no tablet.
+ * O v156 traz os 6 assuntos novos de química da revisão dos mapas dos livros no banco/topicos/quimica.json.
+ * O v158 traz a busca da Biblioteca nos capítulos e assuntos do mapa, com todas as palavras e os melhores resultados.
+ * O v166 traz as aulas tiradas e postas só na folha do planejamento.
+ * O v168 traz a correção dos módulos ligados a 14 assuntos no banco/topicos/matematica.json.
+ * O v174 traz a aula que salva sozinha, sem gravar por cima de versão mais nova.
+ */
+var CACHE = 'apoio-educacional-v174';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
@@ -162,6 +179,7 @@ var ARQUIVOS = [
    * nunca passa por aqui: ele vai para o IndexedDB ao ser importado. */
   './zip.js',
   './biblioteca.js',
+  './conferir-livro-worker.js',
   /* O índice de texto dos livros (B12): o mesmo arquivo é o script da página
    * e o Web Worker que lê os livros. Os livros e o índice nunca passam por
    * aqui: ficam no IndexedDB. */
@@ -173,6 +191,10 @@ var ARQUIVOS = [
   /* A cópia na nuvem (N0): o motor e o gerador do QR da chave. Fora da lista,
    * o app.js novo abriria Ajustes sem o Nuvem depois de uma atualização. */
   './nuvem.js',
+  /* O planejamento de estudos com IA (fase 2): o pedido, a leitura do plano
+   * e o desenho da folha. Fora da lista, o app.js novo abriria o botão sem o
+   * módulo depois de uma atualização sem sinal. */
+  './planejamento.js',
   './app.js',
   './manifest.webmanifest',
   './icons/icon-192.png',

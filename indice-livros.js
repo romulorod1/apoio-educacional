@@ -83,6 +83,35 @@
   /* Página com texto é a que tem ao menos uma letra ou um algarismo. */
   function temTexto(normalizado) { return /[a-z0-9]/.test(normalizado); }
 
+  /* AS PALAVRAS DA CONSULTA (pedido do dono, 12/11/2026). "volume do
+   * cilindro" achava a frase inteira em páginas de física ("o volume do
+   * cilindro de gás") e, na tela, misturava tudo. A regra agora:
+   *   - a página entra quando tem TODAS as palavras significativas da
+   *     consulta, em qualquer ordem;
+   *   - as palavras de ligação abaixo não contam (sem elas, "volume do
+   *     cilindro" pede "volume" e "cilindro");
+   *   - a palavra de uma letra só ("x", o "2" de "capítulo 2") casa só
+   *     inteira, porque por trecho casaria quase toda página;
+   *   - a FRASE exata, em sequência, é contada à parte (paginasComFrase), e a
+   *     tela a põe na frente;
+   *   - consulta só de palavras de ligação ("de") procura ela mesma, por
+   *     trecho, como antes.
+   * Normalizado é o texto que já passou por normalizar. */
+  var PALAVRAS_DE_LIGACAO = ['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o', 'as', 'os', 'em', 'no', 'na', 'um', 'uma', 'para', 'com', 'por'];
+  function palavrasDaBusca(normalizado) {
+    var alvo = String(normalizado == null ? '' : normalizado);
+    var significativas = alvo.split(/[^a-z0-9]+/).filter(function (p) { return p && PALAVRAS_DE_LIGACAO.indexOf(p) < 0; });
+    return significativas.length ? significativas : (temTexto(alvo) ? [alvo] : []);
+  }
+  function casaPalavra(texto, p) {
+    if (p.length > 1) return texto.indexOf(p) >= 0;
+    return new RegExp('(^|[^a-z0-9])' + p + '([^a-z0-9]|$)').test(texto);
+  }
+  function casaTodas(texto, palavras) {
+    for (var i = 0; i < palavras.length; i++) if (!casaPalavra(texto, palavras[i])) return false;
+    return palavras.length > 0;
+  }
+
   /* O que fazer com um livro, dado o registro do índice (ou nada) e o livro
    * do tablet ({ id, hash }):
    *   'refazer'   sem registro, arquivo trocado (hash novo) ou motor velho;
@@ -901,10 +930,26 @@
 
     // ------------------------------------------------------- a consulta
 
+    /* O PONTO ÚNICO que diz de onde vêm os capítulos do resultado. O sumário
+     * cru do PDF pode ser lixo ("page45", "Blank Page", nome de arquivo); o
+     * Biblioteca.sumarioDoLivro (PR #169) devolve o sumário que a tela do
+     * livro mostra, o do mapa quando os marcadores não servem. Enquanto ele
+     * não existe, vale o cru. Só lê: nada derivado do sumário é gravado. */
+    function sumarioDosCapitulos(meta) {
+      var B = root.Biblioteca;
+      if (B && typeof B.sumarioDoLivro === 'function') {
+        try {
+          var efetivo = B.sumarioDoLivro(meta);
+          if (Array.isArray(efetivo) && efetivo.length) return efetivo;
+        } catch (e) { /* cai no sumário cru */ }
+      }
+      return Array.isArray(meta.sumario) && meta.sumario.length ? meta.sumario : (Array.isArray(meta.mapa) ? meta.mapa : []);
+    }
+
     function capitulosDoLivro(meta, total) {
       var epub = meta.formato === 'epub';
       var chaveIni = epub ? 'capitulo' : 'pagina', chaveFim = epub ? 'capitulo_fim' : 'pagina_fim';
-      var fonte = Array.isArray(meta.sumario) && meta.sumario.length ? meta.sumario : (Array.isArray(meta.mapa) ? meta.mapa : []);
+      var fonte = sumarioDosCapitulos(meta);
       var validas = fonte.filter(function (e) { return e && typeof e.titulo === 'string' && Number.isInteger(e[chaveIni]); });
       if (!validas.length) return [];
       // o capítulo é o nível de cima do sumário
@@ -938,15 +983,22 @@
      * põe o livro inteiro (nem todos os livros) na memória de uma vez, e cada
      * lote é uma transação, o que devolve a vez à tela entre eles. */
     var LOTE_DA_BUSCA = 50;
-    function paginasComTermo(id, alvo) {
-      var achadas = [];
+    function paginasComTermo(id, alvo, cancelada) {
+      // todas as palavras na mesma página; a frase exata vai à parte (achadas.frase)
+      var achadas = [], palavras = palavrasDaBusca(alvo);
+      achadas.frase = [];
       function lote(depoisDe) {
+        if (cancelada && cancelada()) return Promise.resolve(achadas);
         return transacao(['paginas'], 'readonly', function (t, dar) {
           var faixa = depoisDe == null ? faixaDoLivro(id) : IDBKeyRange.bound([id, depoisDe], [id, Infinity], true, false);
           var q = t.objectStore('paginas').getAll(faixa, LOTE_DA_BUSCA);
           q.onsuccess = function () { dar(q.result || []); };
         }).then(function (ps) {
-          ps.forEach(function (p) { if (p.texto.indexOf(alvo) >= 0) achadas.push(p.pagina); });
+          ps.forEach(function (p) {
+            if (!casaTodas(p.texto, palavras)) return;
+            achadas.push(p.pagina);
+            if (p.texto.indexOf(alvo) >= 0) achadas.frase.push(p.pagina);
+          });
           if (ps.length < LOTE_DA_BUSCA) return achadas;
           return lote(ps[ps.length - 1].pagina);
         });
@@ -971,8 +1023,10 @@
      *     livros: [{ id, titulo, volume, formato, unidade ('pagina' no PDF,
      *       'parte' no EPUB: a posição na espinha), total, naoLidas (quantas
      *       páginas daquele livro não puderam ser lidas; semTexto é o mesmo
-     *       número), pronto, paginas: [todas as páginas do ARQUIVO com o
-     *       termo], capitulos: [{ n, titulo, inicio, fim, paginas: [...] }] }]
+     *       número), pronto, paginas: [todas as páginas do ARQUIVO com todas
+     *       as palavras do termo (palavrasDaBusca)], paginasComFrase: [as que
+     *       têm o termo inteiro, em sequência], capitulos: [{ n, titulo,
+     *       inicio, fim, paginas: [...], paginasComFrase: [...] }] }]
      *       (as páginas fora de todo capítulo ficam num capítulo de n e
      *       titulo null, no fim);
      *     naoLidos: [{ id, titulo, volume, formato, total, naoLidas,
@@ -982,7 +1036,9 @@
      *       lida, com acerto ou sem;
      *     pendentes: [ids dos livros do filtro ainda não indexados] }
      * Os livros vêm na ordem do tablet (título). */
-    function buscarNosLivros(termo, filtros) {
+    function buscarNosLivros(termo, filtros, opcoes) {
+      // opcoes.cancelada: função que diz que esta consulta já foi superada (a tela digitou de novo)
+      var cancelada = opcoes && typeof opcoes.cancelada === 'function' ? opcoes.cancelada : null;
       var alvo = normalizar(termo);
       var saida = { termo: String(termo == null ? '' : termo), normalizado: alvo, livros: [], naoLidos: [], pendentes: [] };
       if (!suportado || !temTexto(alvo) || !root.Store) return Promise.resolve(saida);
@@ -1007,25 +1063,28 @@
           }
           if (reg.erro) return;
           // o livro começado já responde pelas páginas lidas
-          seq = seq.then(function () { return paginasComTermo(l.id, alvo); }).then(function (paginas) {
+          seq = seq.then(function () { return cancelada && cancelada() ? [] : paginasComTermo(l.id, alvo, cancelada); }).then(function (paginas) {
             if (!paginas.length) return;
             var caps = capitulosDoLivro(l.meta, reg.total);
-            var grupos = caps.map(function (c) { return { n: c.n, titulo: c.titulo, inicio: c.inicio, fim: c.fim, paginas: [] }; });
-            var fora = { n: null, titulo: null, inicio: null, fim: null, paginas: [] };
+            var grupos = caps.map(function (c) { return { n: c.n, titulo: c.titulo, inicio: c.inicio, fim: c.fim, paginas: [], paginasComFrase: [] }; });
+            var fora = { n: null, titulo: null, inicio: null, fim: null, paginas: [], paginasComFrase: [] };
+            var comFrase = paginas.frase || [];
             paginas.forEach(function (p) {
               var g = null;
               grupos.forEach(function (c) { if (p >= c.inicio && p <= c.fim && (!g || c.inicio >= g.inicio)) g = c; });
               (g || fora).paginas.push(p);
+              if (comFrase.indexOf(p) >= 0) (g || fora).paginasComFrase.push(p);
             });
             saida.livros.push({
               id: l.id, titulo: l.meta.titulo || l.id, volume: l.meta.volume || null, formato: d.formato,
               unidade: d.formato === 'epub' ? 'parte' : 'pagina', total: reg.total,
-              naoLidas: naoLidas, semTexto: naoLidas, pronto: estadoDoLivro === 'pronto', paginas: paginas,
+              naoLidas: naoLidas, semTexto: naoLidas, pronto: estadoDoLivro === 'pronto', paginas: paginas.slice(),
+              paginasComFrase: comFrase.slice(),
               capitulos: grupos.filter(function (c) { return c.paginas.length; }).concat(fora.paginas.length ? [fora] : [])
             });
           });
         });
-        return seq.then(function () { return saida; });
+        return seq.then(function () { if (cancelada && cancelada()) saida.cancelada = true; return saida; });
       });
     }
 
@@ -1035,7 +1094,7 @@
        * importação de livros corre: o índice para e devolve a memória. */
       quandoOcupado: function (fn) { ocupadoFn = typeof fn === 'function' ? fn : null; },
       aoMudar: function (fn) { ouvintes.push(fn); },
-      normalizar: normalizar, NOME_BANCO: NOME, MOTOR: MOTOR
+      normalizar: normalizar, palavrasDaBusca: palavrasDaBusca, NOME_BANCO: NOME, MOTOR: MOTOR
     };
     // a tela de busca (outra fatia) chama daqui
     root.buscarNosLivros = buscarNosLivros;

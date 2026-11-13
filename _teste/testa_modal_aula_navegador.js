@@ -19,10 +19,26 @@
 const H = require('./_bib_navegador');
 const amb = H.criarAmbiente(8847, 'nath_t08_modal');
 const { conf, secao, esperar, pausa } = H;
+/* --prints <pasta>: os prints da janela da aula (dados fictícios).
+ * --envenenado-grade-antiga: devolve aos cartões as alturas da grade antiga do F6
+ * (Preparar com 420 px e Arquivos com 190 px, cada um com rolagem própria); as
+ * conferências de rolagem e da primeira dobra têm de cair. */
+const PRINTS = (() => { const i = process.argv.indexOf('--prints'); return i >= 0 ? process.argv[i + 1] : ''; })();
+const GRADE_ANTIGA = process.argv.indexOf('--envenenado-grade-antiga') >= 0;
 
 async function rodar() {
   await amb.subir();
   const pag = await amb.pagina();
+  if (GRADE_ANTIGA) {
+    await pag.evaluateOnNewDocument(() => {
+      document.addEventListener('DOMContentLoaded', () => {
+        const s = document.createElement('style');
+        s.textContent = '.janela-aula-preparar{max-height:420px;overflow-y:auto}.janela-aula-arquivos{max-height:190px;overflow-y:auto}';
+        document.head.appendChild(s);
+      });
+    });
+    conf('(veneno) a grade antiga foi posta nas páginas', true, true);
+  }
   await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
   await H.abrirApp(pag, amb.ORIGEM);
 
@@ -35,6 +51,12 @@ async function rodar() {
 
   const tituloNovo = await pag.$eval('#titulo-modal-aula', e => e.textContent.trim());
   conf('título é Nova aula', tituloNovo, 'Nova aula');
+  /* F6 (#157): a Nova aula, com poucos campos, fica no modal estreito no tablet
+   * deitado; a tela cheia em duas colunas é só da aula que já existe. */
+  const novaLargura = await pag.evaluate(() => ({ largura: Math.round(document.querySelector('#modal-aula .modal').getBoundingClientRect().width),
+    cheia: document.querySelector('#modal-aula').classList.contains('janela-aula-cheia') }));
+  conf('a Nova aula fica no modal estreito a 1280x800 (' + novaLargura.largura + ' px)', novaLargura.largura <= 640 && !novaLargura.cheia, true);
+  if (PRINTS) await pag.screenshot({ path: require('path').join(PRINTS, 'f6_nova_aula_1280x800.png') });
 
   const botaoSalvarTexto = await pag.$eval('#salvar-aula', e => e.textContent.trim());
   conf('botão de salvar na agenda tem rótulo claro', botaoSalvarTexto, 'Salvar na agenda');
@@ -184,12 +206,16 @@ async function rodar() {
     };
   }));
   conf('a repetição tem outras aulas para proteger', !!serieAntes && serieAntes.irmas.length > 0, true);
+  /* F7: numa aula de repetição, o horário NÃO salva sozinho (a escolha de
+   * escopo é dela). O rodapé diz para tocar em Concluir registro; o Concluir
+   * pergunta o escopo, e "Somente esta aula" muda só esta. */
   await pag.evaluate(() => {
     const hora = document.querySelector('#campo-hora');
     hora.value = '16:30';
     hora.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  const serieDepois = await esperar('salva o horário só nesta ocorrência', () => pag.evaluate(ids =>
+  await pausa(1200);
+  const lerSerie = () => pag.evaluate(ids =>
     new Promise(resolve => {
       const req = indexedDB.open('apoio-educacional');
       req.onsuccess = () => {
@@ -204,15 +230,21 @@ async function rodar() {
           });
         };
       };
-    }), serieAntes || { id: '', serieId: '' }), v => !!v && !!v.atual && v.atual.hora === '16:30' &&
+    }), serieAntes || { id: '', serieId: '' });
+  const semConcluir = await lerSerie();
+  conf('na repetição, o horário não salva sozinho', !!semConcluir.atual && semConcluir.atual.hora !== '16:30', true);
+  conf('e o rodapé pede o Concluir registro', /Concluir registro/.test(await pag.$eval('#estado-salvamento-aula', e => e.textContent)), true);
+  await pag.click('#salvar-aula');
+  const escopo = await esperar('pergunta de escopo', () => pag.evaluate(() =>
+    document.querySelector('#modal-escopo').classList.contains('aberto')), Boolean, 5000);
+  conf('o Concluir pergunta o escopo da mudança', escopo.ok, true);
+  await pag.evaluate(() => Array.from(document.querySelectorAll('.opcao-escopo')).find(o => /Somente esta aula/.test(o.textContent)).click());
+  const serieDepois = await esperar('salva o horário só nesta ocorrência', lerSerie, v => !!v && !!v.atual && v.atual.hora === '16:30' &&
       v.irmas.length > 0 && v.irmas.every(h => h === '16:00'), 5000);
   conf('salvar uma aula da repetição não muda as irmãs', serieDepois.ok, true);
-  const statusAutosaveSerie = await pag.$eval('#estado-salvamento-aula', e => e.textContent.trim());
-  conf('rodapé confirma o salvamento com horário', /^Salvo \d{2}:\d{2}$/.test(statusAutosaveSerie), true);
-
-  await pag.click('#modal-aula [data-fechar]');
-  await esperar('modal da série fechado', () => pag.evaluate(() =>
-    !document.querySelector('#modal-aula').classList.contains('aberto')), v => v === true, 5000);
+  const fechouSerie = await esperar('a aula fecha depois do Concluir', () => pag.evaluate(() =>
+    !document.querySelector('#modal-aula').classList.contains('aberto')), Boolean, 5000);
+  conf('o Concluir fecha a aula', fechouSerie.ok, true);
 
   // ================================================================
   secao('4. Organização em 3 blocos e memória na primeira dobra');
@@ -227,8 +259,10 @@ async function rodar() {
     const corpos = Array.from(document.querySelectorAll('#corpo-modal-aula .bloco-grupo-aula'));
     return corpos.map(b => b.id);
   });
+  // F6 (#157): a ordem é a da leitura no tablet, a coluna da esquerda (Preparar e
+  // Arquivos) e depois a da direita (Registrar), cada uma com a sua rolagem
   conf('os 3 blocos existem na ordem correta', blocos.join(' | '),
-    'grupo-preparar | grupo-registro | grupo-arquivos');
+    'grupo-preparar | grupo-arquivos | grupo-registro');
 
   const gradeTablet = await pag.evaluate(() => {
     const caixa = e => {
@@ -253,6 +287,94 @@ async function rodar() {
   conf('Registrar fica na coluna direita', gradeTablet.registroNaDireita, true);
   conf('Arquivos ficam abaixo de Preparar', gradeTablet.arquivosSobPreparar, true);
   conf('o painel cabe sem rolagem própria a 1280x800', gradeTablet.corpoSemRolagem, true);
+
+  /* F6 (#157, revisão de UX): no máximo uma rolagem por lado, nenhum cartão rola
+   * por dentro, e o "Escrever à mão" fica inteiro na parte visível da coluna, com
+   * a letra a 100% e a 130% (o documentElement em 130%, como a letra do Android).
+   * O veneno --envenenado-grade-antiga devolve as alturas da grade antiga aos
+   * cartões e a prova tem de cair. */
+  const rolagensDaJanela = (letra) => pag.evaluate(async (letra) => {
+    document.documentElement.style.fontSize = letra === 100 ? '' : letra + '%';
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const corpo = document.querySelector('#corpo-modal-aula');
+    const rolam = [];
+    corpo.querySelectorAll('*').forEach(e => {
+      if (/^(TEXTAREA|SELECT|INPUT)$/.test(e.tagName)) return;
+      const oy = getComputedStyle(e).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && e.scrollHeight > e.clientHeight + 1) rolam.push(e.id || e.className);
+    });
+    const lados = rolam.filter(n => /janela-aula-lado/.test(n) || /^janela-aula-(esquerda|direita)$/.test(n));
+    const cartoes = rolam.filter(n => lados.indexOf(n) < 0);
+    const botao = Array.from(document.querySelectorAll('#linha-folha button')).find(b => /Escrever à mão|Abrir folha/.test(b.textContent));
+    const lado = document.querySelector('#janela-aula-esquerda');
+    let inteiro = false, onde = 'sem botão';
+    if (botao && lado) {
+      lado.scrollTop = 0;
+      const rb = botao.getBoundingClientRect(), rl = lado.getBoundingClientRect();
+      inteiro = rb.top >= rl.top - 1 && rb.bottom <= rl.bottom + 1 && rb.height > 0;
+      onde = Math.round(rb.top) + '..' + Math.round(rb.bottom) + ' em ' + Math.round(rl.top) + '..' + Math.round(rl.bottom);
+    }
+    document.documentElement.style.fontSize = '';
+    return { lados: lados.length, cartoes: cartoes.join(','), inteiro, onde };
+  }, letra);
+  for (const letra of [100, 130]) {
+    const r = await rolagensDaJanela(letra);
+    if (GRADE_ANTIGA) {
+      // com o veneno, a propriedade TEM de quebrar: cartão rolando ou botão cortado
+      conf('VENENO visto a ' + letra + '%: cartões sem rolagem própria e "Escrever à mão" inteiro (' + r.cartoes + '; ' + r.onde + '), e quebrou',
+        r.cartoes === '' && r.inteiro, false);
+      continue;
+    }
+    conf('a ' + letra + '%, nenhum cartão rola por dentro (' + r.cartoes + ')', r.cartoes, '');
+    conf('a ' + letra + '%, no máximo uma rolagem por lado (' + r.lados + ')', r.lados <= 2, true);
+    conf('a ' + letra + '%, o "Escrever à mão" fica inteiro na primeira dobra da coluna (' + r.onde + ')', r.inteiro, true);
+  }
+  if (GRADE_ANTIGA) { await H.fim(amb)(); return; }
+  if (PRINTS) {
+    await pag.screenshot({ path: require('path').join(PRINTS, 'f6_janela_1280x800.png') });
+    await pag.evaluate(() => { document.documentElement.style.fontSize = '130%'; });
+    await new Promise(r => setTimeout(r, 200));
+    await pag.screenshot({ path: require('path').join(PRINTS, 'f6_janela_1280x800_130.png') });
+    await pag.evaluate(() => { document.documentElement.style.fontSize = ''; });
+  }
+
+  /* F6 (#157): nada transborda de lado, nem a 1280x800 (duas colunas) nem a
+   * 800x1280 (tablet em pé: o fluxo vertical), e o Salvar continua à vista. */
+  const transbordoDaJanela = () => pag.evaluate(() => {
+    const modal = document.querySelector('#modal-aula .modal').getBoundingClientRect();
+    const largos = [];
+    document.querySelectorAll('#modal-aula .modal *').forEach(e => {
+      const r = e.getBoundingClientRect();
+      if (!r.width || !r.height || getComputedStyle(e).visibility === 'hidden') return;
+      let p = e.parentElement, rola = false;
+      while (p && p !== document.body) { // dentro de algo que rola de lado de propósito, não conta
+        const cs = getComputedStyle(p);
+        if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && p.scrollWidth > p.clientWidth + 1) { rola = true; break; }
+        p = p.parentElement;
+      }
+      if (!rola && (r.left < modal.left - 1 || r.right > modal.right + 1)) largos.push((e.id || e.className || e.tagName) + ' ' + Math.round(r.right - modal.right) + 'px');
+    });
+    const colunas = Array.from(document.querySelectorAll('.janela-aula-coluna')).filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.id);
+    const salvar = document.querySelector('#salvar-aula');
+    const rs = salvar ? salvar.getBoundingClientRect() : null;
+    const prep = document.querySelector('#janela-aula-preparar').getBoundingClientRect();
+    const reg = document.querySelector('#janela-aula-registrar').getBoundingClientRect();
+    return { largos: largos.slice(0, 5).join('; '), colunas: colunas.join(','), paginaDeLado: document.documentElement.scrollWidth > innerWidth + 1,
+      salvarAVista: !!rs && rs.top >= 0 && rs.bottom <= innerHeight + 1, lado: reg.left >= prep.right - 1, empilhado: reg.top >= prep.bottom - 1 };
+  });
+  const a1280 = await transbordoDaJanela();
+  conf('a 1280x800, nada da janela passa da borda nem rola de lado (' + a1280.largos + a1280.colunas + ')',
+    a1280.largos + '|' + a1280.colunas + '|' + a1280.paginaDeLado, '||false');
+  conf('a 1280x800, o rodapé com Salvar está à vista', a1280.salvarAVista, true);
+  await pag.setViewport({ width: 800, height: 1280, hasTouch: true });
+  await new Promise(r => setTimeout(r, 300));
+  const a800 = await transbordoDaJanela();
+  conf('a 800x1280, a janela volta ao fluxo vertical: Registrar embaixo de Preparar', a800.empilhado + '|' + a800.lado, 'true|false');
+  conf('a 800x1280, nada da janela passa da borda nem rola de lado (' + a800.largos + a800.colunas + ')',
+    a800.largos + '|' + a800.colunas + '|' + a800.paginaDeLado, '||false');
+  conf('a 800x1280, o rodapé com Salvar está à vista', a800.salvarAVista, true);
+  await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
+  await new Promise(r => setTimeout(r, 300));
 
   // Confere que memória/trilha vêm antes do bloco de quando (primeira dobra)
   const ordemInternaGrupo1 = await pag.evaluate(() => {
@@ -314,7 +436,7 @@ async function rodar() {
   await pausa(100);
   const modalPermaneceComDataObrigatoria = await pag.evaluate(() =>
     document.querySelector('#modal-aula').classList.contains('aberto') &&
-    document.querySelector('#estado-salvamento-aula').textContent.includes('Informe a data'));
+    document.querySelector('#estado-salvamento-aula').textContent.includes('Termine de preencher a data'));
   conf('modal não fecha enquanto a data obrigatória estiver vazia', modalPermaneceComDataObrigatoria, true);
   await pag.evaluate(valor => {
     const data = document.querySelector('#campo-data');

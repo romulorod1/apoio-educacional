@@ -57,7 +57,13 @@
  *                                 banco do índice, sem prazo: com outra
  *                                 janela segurando a conexão, não termina;
  *   --envenenado-pagina-ruim-derruba-livro  a página que sempre falha relança
- *                                 o erro, e o livro inteiro fica fora da busca.
+ *                                 o erro, e o livro inteiro fica fora da busca;
+ *   --envenenado-busca-sem-capitulos  o app.js servido não procura nos
+ *                                 capítulos e assuntos do mapa: o livro
+ *                                 escaneado some da busca (seção 3.2);
+ *   --envenenado-topo-vazio        "Outras páginas do livro" nunca disputa
+ *                                 o topo: o resultado só delas deixa os
+ *                                 "Melhores resultados" vazios (seção 3.3).
  *
  * Porta 8898. Relógio fixo da rodada (relogioDaRodada).
  */
@@ -71,7 +77,8 @@ const { conf, secao, esperar, pausa } = H;
 
 const PORTA = 8898;
 const VENENOS = ['--envenenado-indice-na-copia', '--envenenado-refaz-indexado', '--envenenado-com-acento',
-  '--envenenado-erro-vira-pronto', '--envenenado-apagar-espera-indice', '--envenenado-pagina-ruim-derruba-livro'];
+  '--envenenado-erro-vira-pronto', '--envenenado-apagar-espera-indice', '--envenenado-pagina-ruim-derruba-livro',
+  '--envenenado-busca-sem-capitulos', '--envenenado-topo-vazio'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const PYTHON = process.env.PYTHON || 'python';
 const relogio = H.relogioDaRodada('2026-11-16', '10:00');
@@ -91,6 +98,7 @@ function prop(rotulo, ok, veneno) {
 
 const STORE = fs.readFileSync(path.join(H.RAIZ, 'store.js'), 'utf8');
 const INDICE = fs.readFileSync(path.join(H.RAIZ, 'indice-livros.js'), 'utf8');
+const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 
 // as âncoras dos venenos: cada uma tem de aparecer exatamente uma vez
 const COPIA_FECHA = /pacote\.biblioteca = \{ uso: \(bib\[0\] \|\| \[\]\)\.filter\(function \(r\) \{\r?\n        return idsAlunos\[r\.alunoId\] && idsAulas\[r\.aulaId\];\r?\n      \}\), etiquetas: bib\[1\] \|\| \[\], listas: bib\[2\] \|\| \[\] \};\r?\n      return pacote;/g;
@@ -108,6 +116,10 @@ const APAGA_SEM_ESPERAR = /      indiceDosLivros\('apagar'\);\r?\n      return r
 const APAGA_ESPERANDO = "      return new Promise(function (ok) { var q = indexedDB.deleteDatabase('indice-livros'); " +
   "q.onsuccess = function () { ok(r); }; q.onerror = function () { ok(r); }; });";
 const SEM_ACENTO = ".replace(/[\\u0300-\\u036f]/g, '')";
+// 12/11/2026: a busca procura também nos capítulos e assuntos do mapa; o veneno desliga isso
+// a revisão do #181: com o resultado todo em "Outras páginas", elas disputam o topo; o veneno deixa o topo vazio
+const TOPO_NUNCA_VAZIO = '(capitulosDoResultado.length ? capitulosDoResultado : todos)';
+const BUSCA_NOS_CAPITULOS = 'return Biblioteca.procurarNosCapitulos(indiceDosCapitulosDaBiblioteca(), termo, normalizadorDaBusca(), palavrasDaBuscaNosLivros());';
 
 secao('0. As âncoras e os venenos');
 conf('a lista de venenos não está vazia', VENENOS.length > 0, true);
@@ -117,6 +129,8 @@ conf('a âncora do acento (normalizar) aparece uma vez no indice-livros.js', IND
 conf('a âncora da falha permanente aparece uma vez no indice-livros.js', INDICE.split(PERMANENTE).length - 1, 1);
 conf('a âncora da página ruim aparece uma vez no indice-livros.js', INDICE.split(PAGINA_RUIM).length - 1, 1);
 conf('a âncora do apagar sem esperar o índice aparece uma vez no store.js', (STORE.match(APAGA_SEM_ESPERAR) || []).length, 1);
+conf('a âncora da busca nos capítulos aparece uma vez no app.js', APP.split(BUSCA_NOS_CAPITULOS).length - 1, 1);
+conf('a âncora do topo nunca vazio aparece uma vez no app.js', APP.split(TOPO_NUNCA_VAZIO).length - 1, 1);
 conf('o banco principal continua na versão 6 no store.js', /var VERSAO_BANCO = 6;/.test(STORE), true);
 
 const trocas = {};
@@ -126,9 +140,11 @@ if (MODO === '--envenenado-com-acento') trocas['/indice-livros.js'] = INDICE.spl
 if (MODO === '--envenenado-pagina-ruim-derruba-livro') trocas['/indice-livros.js'] = INDICE.split(PAGINA_RUIM).join('if (++tentativa >= TENTATIVAS_POR_PAGINA) throw e;');
 if (MODO === '--envenenado-erro-vira-pronto') trocas['/indice-livros.js'] = INDICE.split(PERMANENTE).join(PERMANENTE + ' return true;');
 if (MODO === '--envenenado-apagar-espera-indice') trocas['/store.js'] = STORE.replace(APAGA_SEM_ESPERAR, APAGA_ESPERANDO);
+if (MODO === '--envenenado-busca-sem-capitulos') trocas['/app.js'] = APP.split(BUSCA_NOS_CAPITULOS).join('return [];');
+if (MODO === '--envenenado-topo-vazio') trocas['/app.js'] = APP.split(TOPO_NUNCA_VAZIO).join('capitulosDoResultado');
 if (MODO) {
-  const servido = trocas['/store.js'] || trocas['/indice-livros.js'];
-  const original = trocas['/store.js'] ? STORE : INDICE;
+  const servido = trocas['/store.js'] || trocas['/indice-livros.js'] || trocas['/app.js'];
+  const original = trocas['/store.js'] ? STORE : trocas['/indice-livros.js'] ? INDICE : APP;
   conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', !!servido && servido !== original, true);
 }
 
@@ -378,8 +394,10 @@ async function importar(pag, arquivo) {
   conf('e só no Livro B', (r.livros || []).map(l => l.id).join(','), 'indice-longo');
   r = await buscar(pag, 'paragrafo 3 do capitulo 2');
   const d = (r.livros || []).find(l => l.id === 'livro-de-prova');
-  conf('o EPUB responde pela parte 2, no Capítulo 2: O meio',
-    d ? JSON.stringify([d.unidade, d.capitulos.map(c => [c.titulo, c.paginas])]) : '', JSON.stringify(['parte', [['Capítulo 2: O meio', [2]]]]));
+  // todas as palavras ficam em mais de uma parte ("Parágrafo 3 do capítulo 1" tem o 2 noutro parágrafo); a frase exata, só na parte 2
+  conf('o EPUB responde pela parte 2, no Capítulo 2: O meio, com a frase exata',
+    d ? JSON.stringify([d.unidade, d.paginas.indexOf(2) >= 0, d.capitulos.filter(c => c.paginasComFrase.length).map(c => [c.titulo, c.paginasComFrase])]) : '',
+    JSON.stringify(['parte', true, [['Capítulo 2: O meio', [2]]]]));
   r = await buscar(pag, 'paragrafo', { disciplina: 'literatura' });
   conf('o filtro de disciplina deixa só o livro de literatura', (r.livros || []).map(l => l.id).join(','), 'livro-de-prova');
   r = await buscar(pag, 'mediana', { ano: '08' });
@@ -389,11 +407,403 @@ async function importar(pag, arquivo) {
   r = await buscar(pag, 'palavra que não existe');
   conf('termo que não existe não acha nada, sem erro', (r.livros || []).length + '/' + (r.pendentes || []).length, '0/0');
 
+  secao('3.1. A busca na tela da Biblioteca');
+  await H.irParaAba(pag, 'biblioteca');
+  const campoUnico = await esperar('o campo de busca da Biblioteca', () => pag.evaluate(() => {
+    const c = document.querySelector('#busca-biblioteca'), cartao = document.querySelector('#bib-busca-cartao');
+    return { visivel: !!cartao && getComputedStyle(cartao).display !== 'none', rotulo: c.getAttribute('aria-label'), campos: document.querySelectorAll('.bibl-busca input').length };
+  }), v => !!v && v.visivel, 10000);
+  conf('só com livros (sem pacote de exercícios), o campo único aparece e diz que busca nos livros', JSON.stringify(campoUnico.valor),
+    JSON.stringify({ visivel: true, rotulo: 'Buscar nos livros', campos: 1 }));
+  /* buscar não grava: o banco principal inteiro (livros_posicoes junto)
+   * fica idêntico antes e depois de uma busca com resultado */
+  const fotoDoBanco = () => pag.evaluate(() => new Promise((res, rej) => {
+    const q = indexedDB.open('apoio-educacional');
+    q.onerror = () => rej(q.error);
+    q.onsuccess = () => {
+      const b = q.result, nomes = Array.from(b.objectStoreNames).sort(), saida = {};
+      const t = b.transaction(nomes, 'readonly');
+      nomes.forEach(n => { const r = t.objectStore(n).getAll(); r.onsuccess = () => { saida[n] = r.result; }; });
+      t.oncomplete = () => { b.close(); res(JSON.stringify(saida)); };
+      t.onerror = () => rej(t.error);
+    };
+  }));
+  const bancoAntes = await fotoDoBanco();
+  await pag.evaluate(() => { const c = document.querySelector('#busca-biblioteca'); c.value = 'mediana'; c.dispatchEvent(new Event('input', { bubbles: true })); });
+  await esperar('a busca por "mediana" com resultado', () => pag.evaluate(() =>
+    (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''), v => /encontrada/.test(v), 10000);
+  await pausa(600);
+  const bancoDepois = await fotoDoBanco();
+  conf('buscar não grava: o banco principal e livros_posicoes ficam idênticos', bancoDepois === bancoAntes && bancoAntes.indexOf('livros_posicoes') >= 0, true);
+  await pag.evaluate(() => {
+    const campo = document.querySelector('#busca-biblioteca');
+    campo.value = 'FRAÇÕES';
+    campo.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const telaBusca = await esperar('a tela acha as páginas do livro', () => pag.evaluate(() => ({
+    status: document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status').textContent,
+    livro: [...document.querySelectorAll('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"] .bib-busca-pagina')].map(b => b.getAttribute('aria-label')).join('|'),
+    botao: (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"] .bib-busca-pagina') || { getAttribute: () => '' }).getAttribute('aria-label')
+  })), v => !!v && (MODO === '--envenenado-busca-sem-capitulos' ? /2 páginas encontradas/ : /^1 capítulo e 2 páginas em 1 livro\./).test(v.status) &&
+    v.livro === 'Abrir na p. 3|Abrir na p. 4' && v.botao === 'Abrir na p. 3', 10000);
+  // "FRAÇÕES" casa o texto das p. 3 e 4 e o título "Capítulo 2: Frações": o capítulo é um bloco só, marcado das duas formas
+  conf('a busca mostra o livro, o capítulo, as páginas e o atalho para a página encontrada', telaBusca.ok, true);
+  await pag.setViewport({ width: 360, height: 800, hasTouch: true });
+  const larguraBusca = await pag.evaluate(() => {
+    document.documentElement.style.fontSize = '130%';
+    const caixa = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"]');
+    const ver = caixa && caixa.querySelector('.bib-busca-ver-paginas');
+    if (ver && ver.getAttribute('aria-expanded') !== 'true') ver.click();
+    const botao = caixa && caixa.querySelector('.bib-busca-pagina');
+    const r = botao && botao.getBoundingClientRect();
+    const medida = { rolaDeLado: document.documentElement.scrollWidth > innerWidth + 1,
+      botaoFora: !!r && (r.left < 0 || r.right > innerWidth + 1), botaoPequeno: !!r && r.height < 47.5 };
+    document.documentElement.style.fontSize = '';
+    return medida;
+  });
+  conf('a busca e a página tocável cabem a 360 px com a letra a 130%', JSON.stringify(larguraBusca), JSON.stringify({ rolaDeLado: false, botaoFora: false, botaoPequeno: false }));
+  await pag.setViewport({ width: 1280, height: 1000, hasTouch: true });
+  await pag.evaluate(() => document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"] .bib-busca-pagina').click());
+  const leitorBusca = await esperar('o resultado abre na página 3', () => pag.evaluate(() =>
+    document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada || ''), v => v === '3', 10000);
+  conf('abrir o resultado leva à página encontrada no livro', leitorBusca.ok, true);
+  await pag.evaluate(() => document.querySelector('#modal-leitor-pdf [data-fechar]').click());
+  await esperar('o leitor da busca fecha', () => pag.evaluate(() => !document.querySelector('#modal-leitor-pdf.aberto')), v => v, 5000);
+  // cada página da lista abre o leitor nela: a segunda, a 4
+  await pag.evaluate(() => document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-curto"] .bib-busca-pagina[data-pagina="4"]').click());
+  const leitor4 = await esperar('o toque na página 4 abre nela', () => pag.evaluate(() =>
+    document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada || ''), v => v === '4', 10000);
+  conf('tocar na segunda página da lista abre o leitor nela (4)', leitor4.ok, true);
+  await pag.evaluate(() => document.querySelector('#modal-leitor-pdf [data-fechar]').click());
+  await esperar('o leitor da página 4 fecha', () => pag.evaluate(() => !document.querySelector('#modal-leitor-pdf.aberto')), v => v, 5000);
+  /* a palavra que só existe no texto de um livro (a página 200 do Livro B,
+   * de 600): a tela acha, diz a parte e a página, e o toque abre nela; o
+   * livro escaneado (C) não aparece, e o aviso diz que há texto que não foi lido */
+  await pag.evaluate(() => {
+    const campo = document.querySelector('#busca-biblioteca');
+    campo.value = 'Paralelepípedo';
+    campo.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const telaLongo = await esperar('a tela acha a página 200 do Livro B', () => pag.evaluate(() => {
+    const caixa = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-longo"]');
+    const aviso = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-sem-texto');
+    return { status: document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status').textContent,
+      livros: [...new Set([...document.querySelectorAll('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados .bib-busca-livro-grupo[data-livro]')].map(x => x.dataset.livro))].join(','),
+      grupo: caixa ? caixa.querySelector('.bib-busca-livro-paginas').textContent : '',
+      botao: caixa && caixa.querySelector('.bib-busca-abrir') ? caixa.querySelector('.bib-busca-abrir').getAttribute('aria-label') : '',
+      aviso: aviso ? aviso.querySelector('summary').textContent : '', avisoAberto: aviso ? aviso.open : null,
+      quais: aviso ? [...aviso.querySelectorAll('li')].map(li => li.dataset.livro + '=' + li.textContent).join('|') : '' };
+  }), v => !!v && /1 página encontrada em 1 livro/.test(v.status) && /p\. 200$/.test(v.botao), 10000);
+  conf('só o texto do Livro B tem "paralelepípedo": um livro, a parte e a página 200',
+    telaLongo.valor && telaLongo.valor.livros + ' | ' + /Parte 2/.test(telaLongo.valor.grupo) + ' | ' + /1 página$/.test(telaLongo.valor.grupo) + ' | ' + telaLongo.valor.botao, 'indice-longo | true | true | Abrir na primeira página encontrada, p. 200');
+  conf('o livro escaneado não aparece no resultado, e o aviso diz que há texto que não foi lido',
+    telaLongo.valor && telaLongo.valor.aviso + ' | ' + telaLongo.valor.avisoAberto + ' | ' + /indice-sem-texto/.test(telaLongo.valor.livros),
+    '1 livro escaneado entra só pelos capítulos e assuntos; 1 livro tem páginas sem texto. | false | false');
+  conf('o aviso diz QUAIS livros: o escaneado inteiro e o de uma página sem texto', telaLongo.valor && telaLongo.valor.quais,
+    'indice-sem-texto=Livro C sem texto: o livro inteiro|indice-curto=Livro A curto: 1 página de 6');
+  conf('o aviso e os grupos têm a seta de recolher', await pag.evaluate(() =>
+    !!document.querySelector('#bib-corpo [data-grupo="livros"] > summary .bib-grupo-seta svg') &&
+    !!document.querySelector('#bib-corpo .bib-busca-livros-sem-texto > summary .bib-grupo-seta svg')), true);
+  await pag.evaluate(() => document.querySelector('#bib-corpo .bib-busca-livros-sem-texto .bib-busca-livros-dispensar').click());
+  await pag.evaluate(() => { const c = document.querySelector('#busca-biblioteca'); c.value = 'paralelepipedo'; c.dispatchEvent(new Event('input', { bubbles: true })); });
+  await esperar('a busca de novo, sem acento', () => pag.evaluate(() =>
+    (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''), v => /1 página encontrada/.test(v), 10000);
+  await pausa(300);
+  conf('o aviso dispensado não volta na busca seguinte', await pag.evaluate(() => !document.querySelector('#bib-corpo .bib-busca-livros-sem-texto')), true);
+  await pag.evaluate(() => document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-resultados [data-livro="indice-longo"] .bib-busca-abrir').click());
+  const leitorLongo = await esperar('o resultado abre na página 200', () => pag.evaluate(() =>
+    document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada || ''), v => v === '200', 20000);
+  conf('abrir o resultado do Livro B leva à página 200 do arquivo', leitorLongo.ok, true);
+  await pag.evaluate(() => document.querySelector('#modal-leitor-pdf [data-fechar]').click());
+  await esperar('o leitor do Livro B fecha', () => pag.evaluate(() => !document.querySelector('#modal-leitor-pdf.aberto')), v => v, 5000);
+  /* o ponto único dos capítulos: quando existe Biblioteca.sumarioDoLivro (o
+   * sumário que a tela do livro mostra, PR #169), o resultado usa o nome dele,
+   * e não o marcador cru do PDF; sem ele, volta ao cru. Nada é gravado. */
+  const comSumarioEfetivo = await pag.evaluate(async () => {
+    const tinha = Object.prototype.hasOwnProperty.call(Biblioteca, 'sumarioDoLivro'), antes = Biblioteca.sumarioDoLivro;
+    Biblioteca.sumarioDoLivro = meta => meta && meta.titulo === 'Livro B longo'
+      ? [{ n: 1, nivel: 1, titulo: 'Capítulo do mapa: Geometria espacial', pagina: 150, pagina_fim: 250 }] : (meta.sumario || []);
+    try {
+      const r = await buscarNosLivros('paralelepipedo', {});
+      const b = (r.livros || []).find(l => l.id === 'indice-longo');
+      return b ? JSON.stringify(b.capitulos.map(c => [c.titulo, c.paginas])) : '';
+    } finally { if (tinha) Biblioteca.sumarioDoLivro = antes; else delete Biblioteca.sumarioDoLivro; }
+  });
+  conf('com o sumário efetivo da tela, o resultado nomeia o capítulo por ele', comSumarioEfetivo, JSON.stringify([['Capítulo do mapa: Geometria espacial', [200]]]));
+  const semSumarioEfetivo = await buscar(pag, 'paralelepipedo');
+  const bCru = (semSumarioEfetivo.livros || []).find(l => l.id === 'indice-longo');
+  conf('com o sumarioDoLivro de verdade, o livro de marcadores bons segue com o sumário do PDF', bCru ? JSON.stringify(bCru.capitulos.map(c => [c.titulo, c.paginas])) : '', JSON.stringify([['Parte 2: Espaço', [200]]]));
+  /* com a leitura dos livros ainda em andamento, o grupo "Nos livros" diz
+   * isso, e não "nenhum resultado" (a consulta é dublada só aqui) */
+  const preparando = await pag.evaluate(async () => {
+    const original = IndiceLivros.buscarNosLivros;
+    IndiceLivros.buscarNosLivros = () => Promise.resolve({ livros: [], pendentes: ['indice-longo'], naoLidos: [] });
+    try {
+      const c = document.querySelector('#busca-biblioteca');
+      c.value = 'termo da leitura em curso';
+      c.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 900));
+      const g = document.querySelector('#bib-corpo [data-grupo="livros"]');
+      return g ? g.querySelector('.bib-grupo-contagem').textContent + ' | ' + g.querySelector('.bib-busca-livros-status').textContent : 'sem o grupo';
+    } finally { IndiceLivros.buscarNosLivros = original; }
+  });
+  conf('com a leitura em andamento, o grupo "Nos livros" diz que está preparando, e não zero',
+    preparando, 'preparando | A busca nos livros ainda está sendo preparada em 1 livro. O resultado aparece aqui quando a leitura terminar.');
+  /* a busca se refaz quando um LIVRO termina, e não a cada página indexada
+   * (o caso da lente: páginas a cada 500 ms davam 120 buscas inteiras em
+   * 60 s). Roda o ligarBuscaAoIndice do app.js de verdade, com relógio falso. */
+  {
+    const app = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
+    const ini = app.indexOf('  function precisaRefazerABusca(');
+    const corpoLigar = app.indexOf('  function ligarBuscaAoIndice() {');
+    const fim = app.indexOf('\n  }\n', corpoLigar) + 4;
+    conf('o ligarBuscaAoIndice e a regra dele estão no app.js', ini > 0 && corpoLigar > ini && fim > corpoLigar, true);
+    const simular = (intervaloMs, duracaoMs, livroACadaMs) => {
+      let agora = 0, id = 0, timers = [], buscas = 0, ouvinte = null;
+      const setT = (f, ms) => { const x = { id: ++id, em: agora + ms, f }; timers.push(x); return x.id; };
+      const clearT = n => { timers = timers.filter(x => x.id !== n); };
+      const janela = { IndiceLivros: { aoMudar: fn => { ouvinte = fn; } } };
+      const fabrica = new Function('window', 'setTimeout', 'clearTimeout', 'buscarTextoNosLivros', 'buscaLivrosAtual', 'bibTermo',
+        app.slice(ini, fim) + '\nreturn ligarBuscaAoIndice;');
+      fabrica(janela, setT, clearT, () => { buscas++; }, { termo: 'volume', caixa: { grupo: { isConnected: true } } }, 'volume')();
+      for (agora = 0; agora <= duracaoMs + 1000; agora += 10) {
+        if (agora <= duracaoMs && agora % intervaloMs === 0) {
+          ouvinte({ prontos: Math.floor(agora / livroACadaMs), total: 4, rodando: agora < duracaoMs });
+        }
+        timers.filter(x => x.em <= agora).forEach(x => { clearT(x.id); x.f(); });
+      }
+      return buscas;
+    };
+    const porLivro = simular(500, 60000, 20000);
+    const controle = simular(500, 60000, 500);
+    console.log('   página a cada 500 ms por 60 s, um livro a cada 20 s: ' + porLivro + ' buscas; controle (um livro por página): ' + controle);
+    conf('páginas a cada 500 ms por 60 s refazem a busca só quando um livro termina (no máximo 5 vezes)', porLivro <= 5, true);
+    conf('controle: com um livro novo a cada evento, o mesmo relógio conta mais de 100 buscas', controle > 100, true);
+  }
+  // a consulta superada para cedo: a varredura confere a vez entre um lote e outro
+  const cancelamento = await pag.evaluate(async () => {
+    let n = 0;
+    const r = await IndiceLivros.buscarNosLivros('paralelepipedo', {}, { cancelada: () => ++n > 1 });
+    return { cancelada: !!r.cancelada, livros: (r.livros || []).length, perguntas: n };
+  });
+  conf('a consulta superada para no meio, sem resultado, e diz que foi cancelada',
+    cancelamento.cancelada + ' | ' + cancelamento.livros + ' | ' + (cancelamento.perguntas < 12), 'true | 0 | true');
+  await pag.evaluate(() => { const campo = document.querySelector('#busca-biblioteca'); campo.value = ''; campo.dispatchEvent(new Event('input', { bubbles: true })); });
+
   const norm = await pag.evaluate(() => [IndiceLivros.normalizar('multipli-' + String.fromCharCode(10) + 'cação'),
     IndiceLivros.normalizar('multi' + String.fromCharCode(0xAD) + 'plicação'), IndiceLivros.normalizar('Frações  EQUIVALENTES'),
     IndiceLivros.normalizar('bem-vindo')].join('|'));
   conf('a palavra partida no fim da linha e o hífen invisível voltam a ser uma palavra; o hífen do meio fica',
     norm, 'multiplicacao|multiplicacao|fracoes equivalentes|bem-vindo');
+
+  secao('3.2. A busca pelos capítulos e assuntos do mapa (também no livro escaneado)');
+  /* Dois livros SINTÉTICOS gravados à parte, e tirados no fim da seção:
+   *   Livro K com texto  4 páginas; "volume" no texto das páginas 3 e 4; o
+   *                      sumário dos marcadores tem "Capítulo 2: Volume e
+   *                      capacidade" na p. 3, e o mapa liga o mesmo capítulo
+   *                      ao assunto MAT08-15;
+   *   Livro L escaneado  o PDF de 3 páginas sem texto; o mapa tem "Volume e
+   *                      capacidade" nas p. 2 a 3, ligado ao MAT08-15, e
+   *                      "Ângulos" na p. 1, ligado a outro assunto do 8º ano.
+   * A busca "volume" mostra o L pelo capítulo e o K uma vez só, com o
+   * capítulo marcado pelo capítulo e no texto. */
+  const temas = JSON.parse(fs.readFileSync(path.join(H.RAIZ, 'banco', 'topicos', 'matematica.json'), 'utf8')).temas;
+  const semAcento = t => String(t).normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const volume = temas.find(t => t.id === 'MAT08-15');
+  const palavrasDe = t => ' ' + semAcento(t.pt.titulo + ' ' + ((t.chaves && (t.chaves.r + ' ' + t.chaves.d)) || '')) + ' ';
+  // o assunto do outro capítulo não pode casar "volume" (nem a chave escolhida abaixo)
+  const outro = temas.find(t => /^MAT08-/.test(t.id) && t.id !== 'MAT08-15' && palavrasDe(t).indexOf(' volume') < 0);
+  /* o termo que casa SÓ a chave do assunto: uma palavra-chave do MAT08-15
+   * que não está no título dele nem no título dos capítulos de prova */
+  const titulosDaProva = ['capitulo 1: numeros', 'capitulo 2: volume e capacidade', 'volume e capacidade', 'angulos', semAcento(volume.pt.titulo), semAcento(outro.pt.titulo)];
+  const daChave = ((volume.chaves && (volume.chaves.d + ' ' + volume.chaves.r)) || '').split(' ')
+    .filter(w => w.length >= 8 && titulosDaProva.every(t => t.indexOf(w) < 0) && palavrasDe(outro).indexOf(' ' + w) < 0)
+    .sort((a, b) => (b === 'reservatorio') - (a === 'reservatorio'))[0];
+  conf('há uma palavra-chave do MAT08-15 fora dos títulos (' + daChave + ')', !!daChave, true);
+  const textoK = path.join(TMP, 'livro-k-texto.pdf');
+  const rk = spawnSync(PYTHON, ['-X', 'utf8', '-c', 'import sys, pymupdf\nd = pymupdf.open()\n' +
+    'for t in ["Numeros naturais e operacoes.", "A reta numerica e a ordem.", "O volume do cubo: aresta vezes aresta vezes aresta.", "A capacidade da caixa em litros mede o volume interno."]:\n' +
+    '    d.new_page().insert_text((72, 90), t)\nd.save(sys.argv[1])', textoK], { encoding: 'utf8' });
+  conf('o PDF do Livro K foi gerado', rk.status === 0 && fs.existsSync(textoK), true);
+  amb.extras['/cap-texto.pdf'] = { tipo: 'application/pdf', corpo: fs.existsSync(textoK) ? fs.readFileSync(textoK) : Buffer.from('') };
+  amb.extras['/cap-escaneado.pdf'] = { tipo: 'application/pdf', corpo: fs.readFileSync(path.join(raizIndice, 'indice-sem-texto.pdf')) };
+  await gravarLivros(pag, 'prova-capitulos', [
+    { url: '/cap-texto.pdf', meta: { id: 'cap-com-texto', hash: 'sha256:k', titulo: 'Livro K com texto', paginas: 4, sumario_origem: 'marcadores',
+      sumario: [{ n: 1, nivel: 1, titulo: 'Capítulo 1: Números', pagina: 1 }, { n: 2, nivel: 1, titulo: 'Capítulo 2: Volume e capacidade', pagina: 3 }],
+      mapa: [{ n: 2, titulo: 'Capítulo 2: Volume e capacidade', pagina: 3, pagina_fim: 4, assuntos: [{ id: 'MAT08-15' }] }] } },
+    { url: '/cap-escaneado.pdf', meta: { id: 'cap-escaneado', hash: 'sha256:l', titulo: 'Livro L escaneado', paginas: 3,
+      mapa: [{ n: 1, titulo: 'Ângulos', pagina: 1, pagina_fim: 1, assuntos: [{ id: outro.id }] },
+        { n: 2, titulo: 'Volume e capacidade', pagina: 2, pagina_fim: 3, assuntos: [{ id: 'MAT08-15' }] }] } }]);
+  const seis = await esperar('os dois livros da prova lidos pelo índice', () => estado(pag), parado(6, 6), 60000);
+  conf('os dois livros da prova foram lidos pelo índice (6 de 6)', seis.ok, true);
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'biblioteca');
+  await esperar('os livros da prova na Biblioteca', () => pag.evaluate(() => !!document.querySelector('#bib-busca-cartao') &&
+    getComputedStyle(document.querySelector('#bib-busca-cartao')).display !== 'none'), v => v, 10000);
+  const lerNosLivros = () => pag.evaluate(() => {
+    const g = document.querySelector('#bib-corpo [data-grupo="livros"]');
+    if (!g) return null;
+    const livro = id => {
+      const bs = [...g.querySelectorAll('.bib-busca-livros-resultados .bib-busca-livro-grupo[data-livro="' + id + '"]')];
+      return bs.length ? bs.map(b => [b.querySelector('.bib-busca-livro-paginas strong').textContent,
+        b.dataset.pelo, (b.querySelector('.bib-busca-como') || {}).textContent || '', (b.querySelector('.bib-busca-livro-quantas') || {}).textContent || '',
+        !!b.querySelector('.bib-busca-abrir-capitulo'), [...b.querySelectorAll('.bib-busca-pagina')].map(x => x.dataset.pagina).join(',')]) : null;
+    };
+    return { status: g.querySelector('.bib-busca-livros-status').textContent, contagem: g.querySelector('.bib-grupo-contagem').textContent,
+      livros: [...g.querySelectorAll('.bib-busca-livros-resultados .bib-busca-livro-grupo[data-livro]')].map(x => x.dataset.livro),
+      K: livro('cap-com-texto'), L: livro('cap-escaneado'),
+      aviso: (g.querySelector('.bib-busca-livros-sem-texto > summary') || {}).textContent || '' };
+  });
+  const digitar = termo => pag.evaluate(t => { const c = document.querySelector('#busca-biblioteca'); c.value = t; c.dispatchEvent(new Event('input', { bubbles: true })); }, termo);
+  const fotoAntes = await fotoDoBanco(), indiceAntes = JSON.stringify(await registrosDoIndice(pag));
+  await digitar('volume');
+  const vol = await esperar('a busca "volume" com os dois livros', lerNosLivros,
+    v => !!v && !/Buscando/.test(v.status) && !!v.L && !!v.K && /assunto/.test(JSON.stringify(v.L)), 15000);
+  const V = vol.valor || {};
+  console.log('   "volume": ' + JSON.stringify(V));
+  prop('o livro escaneado aparece pelo capítulo "Volume e capacidade", com o botão "Abrir no capítulo"',
+    JSON.stringify(V.L) === JSON.stringify([['Volume e capacidade', 'capitulo', 'Pelo capítulo, assunto: ' + volume.pt.titulo, '', true, '']]),
+    '--envenenado-busca-sem-capitulos');
+  conf('o livro com texto aparece UMA vez, com o capítulo marcado pelo capítulo e no texto, e as páginas 3 e 4',
+    JSON.stringify(V.K), JSON.stringify([['Capítulo 2: Volume e capacidade', 'capitulo texto', 'Pelo capítulo, assunto: ' + volume.pt.titulo, 'No texto: p. 3 a 4, 2 páginas', true, '3,4']]));
+  conf('cada livro aparece uma vez só', V.livros && V.livros.length === new Set(V.livros).size && V.livros.filter(x => /^cap-/.test(x)).length, 2);
+  conf('a contagem do grupo e a linha-resumo dizem capítulos, páginas e livros',
+    V.contagem + ' | ' + V.status + ' | ' + await pag.evaluate(() => (document.querySelector('#bib-busca-resumo') || {}).textContent || '(sem resumo)'),
+    '2 capítulos e 2 páginas em 2 livros | 2 capítulos e 2 páginas em 2 livros. | (sem resumo)');
+  conf('o aviso dos escaneados diz que eles entram pelos capítulos e assuntos', /livros escaneados entram só pelos capítulos e assuntos/.test(V.aviso), true);
+  await pausa(400);
+  conf('buscar pelos capítulos não grava: o banco principal (meta e posição) e o índice ficam idênticos',
+    (await fotoDoBanco()) === fotoAntes && JSON.stringify(await registrosDoIndice(pag)) === indiceAntes, true);
+  // "Abrir no capítulo" do livro escaneado abre na página em que o capítulo começa (a 2)
+  await pag.evaluate(() => document.querySelector('#bib-corpo .bib-busca-livro-grupo[data-livro="cap-escaneado"] .bib-busca-abrir-capitulo').click());
+  const abriuCap = await esperar('o capítulo do escaneado abre na página 2', () => pag.evaluate(() =>
+    (document.querySelector('#modal-leitor-pdf.aberto') && document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada) || ''), v => v === '2', 15000);
+  conf('"Abrir no capítulo" abre o livro escaneado na página inicial do capítulo (2)', abriuCap.valor, '2');
+  await pag.evaluate(() => document.querySelector('#modal-leitor-pdf [data-fechar]').click());
+  await esperar('o leitor do capítulo fecha', () => pag.evaluate(() => !document.querySelector('#modal-leitor-pdf.aberto')), v => v, 5000);
+  // o termo que casa só a chave do assunto (não o título dele, nem o do capítulo)
+  await digitar(daChave);
+  const chave = await esperar('a busca pela chave do assunto', lerNosLivros, v => !!v && !/Buscando/.test(v.status) && !!v.L, 15000);
+  console.log('   "' + daChave + '": ' + JSON.stringify(chave.valor));
+  conf('um termo que casa só a chave do assunto acha o capítulo ligado a ele, e diz qual assunto',
+    JSON.stringify(chave.valor && chave.valor.L), JSON.stringify([['Volume e capacidade', 'capitulo', 'Pelo capítulo, assunto: ' + volume.pt.titulo, '', true, '']]));
+  // o id do assunto não é chave: "mat08" casaria todo assunto do 8º ano de matemática
+  await digitar('mat08');
+  const peloId = await esperar('a busca pelo id do assunto', lerNosLivros, v => !!v && /Nenhum livro/.test(v.status), 15000);
+  conf('o id do assunto ("mat08") não acha o capítulo ligado a ele', peloId.ok && !peloId.valor.L && !peloId.valor.K, true);
+  // o lado oposto: um termo que não está em nada não acha nada
+  await digitar('zqxjkw capitulo');
+  const nada = await esperar('a busca por um termo que não existe', lerNosLivros, v => !!v && /Nenhum livro/.test(v.status), 15000);
+  conf('um termo que não está em nada não acha capítulo nem página', nada.valor && nada.valor.livros.length + ' | ' + nada.valor.contagem, '0 | 0');
+  // a busca por capítulo é instantânea: 79 livros e cerca de 1.500 capítulos, montar o índice e consultar abaixo de 50 ms
+  const tempo = await pag.evaluate(() => {
+    const porId = {};
+    for (let i = 0; i < 400; i++) porId['A' + i] = { titulo: 'Assunto ' + i + ' de geometria e medidas', chaves: { r: 'raiz' + i + ' calcular medir volume', d: 'agua altura area base caixa centimetro cubico cubo exemplo largura metro qual quanto raio' } };
+    const livros = [];
+    for (let l = 0; l < 79; l++) {
+      const mapa = [];
+      for (let c = 1; c <= 19; c++) mapa.push({ n: c, titulo: 'Capítulo ' + c + ': Tema ' + l + '.' + c + ' de frações e ângulos', pagina: c * 10, pagina_fim: c * 10 + 9,
+        assuntos: [{ id: 'A' + ((l * 19 + c) % 400) }, { id: 'A' + ((l + c) % 400) }] });
+      livros.push({ id: 'L' + l, meta: { formato: 'pdf', paginas: 200, sumario: [], mapa } });
+    }
+    const t0 = performance.now();
+    const ind = Biblioteca.indiceDeCapitulos(livros, {}, { porId }, IndiceLivros.normalizar);
+    const t1 = performance.now();
+    const r = Biblioteca.procurarNosCapitulos(ind, 'angulos', IndiceLivros.normalizar);
+    const t2 = performance.now();
+    return { capitulos: ind.capitulos, montar: Math.round((t1 - t0) * 10) / 10, buscar: Math.round((t2 - t1) * 10) / 10, achados: r.length };
+  });
+  console.log('   desempenho: ' + JSON.stringify(tempo));
+  conf('79 livros e ' + tempo.capitulos + ' capítulos: montar o índice e consultar ficam abaixo de 50 ms cada', tempo.capitulos >= 1500 && tempo.montar < 50 && tempo.buscar < 50 && tempo.achados === 79, true);
+  await digitar('');
+  // os livros da prova saem, e o índice volta aos quatro do pacote
+  await pag.evaluate(() => Promise.all([Store.removerLivro('cap-com-texto'), Store.removerLivro('cap-escaneado')]).then(() => IndiceLivros.sincronizar()));
+  const quatro = await esperar('o índice de volta aos quatro livros', () => estado(pag), parado(4, 4), 30000);
+  conf('os livros da prova saíram, e o índice voltou aos quatro do pacote', quatro.ok, true);
+
+  secao('3.3. Todas as palavras, a relevância e o rótulo de lixo ("volume do cilindro")');
+  /* O padrão dos prints do dono (12/11/2026), com três livros SINTÉTICOS:
+   *   Livro M  o capítulo "Comprimento da circunferência, área do círculo e
+   *            volume do cilindro" (sumário e mapa, p. 2 a 3), com a frase
+   *            no texto da p. 3; volume 2 de uma obra;
+   *   Livro N  física: "volume" só numa página de calor, sem "cilindro";
+   *   Livro O  o marcador "Blank Page" como único sumário, e "o volume do
+   *            cilindro de gás" na p. 2.
+   * O 1º dos melhores resultados é o capítulo com o título; o de calor não
+   * aparece; e "Blank Page" não vira título: vai para "Outras páginas do livro". */
+  const pdfDe = (nome, paginas) => {
+    const arq = path.join(TMP, nome);
+    const r = spawnSync(PYTHON, ['-X', 'utf8', '-c', 'import sys, json, pymupdf\nd = pymupdf.open()\n' +
+      'for t in json.loads(sys.argv[2]):\n    d.new_page().insert_text((72, 90), t)\nd.save(sys.argv[1])', arq, JSON.stringify(paginas)], { encoding: 'utf8' });
+    conf('o PDF ' + nome + ' foi gerado', r.status === 0 && fs.existsSync(arq), true);
+    return fs.existsSync(arq) ? fs.readFileSync(arq) : Buffer.from('');
+  };
+  amb.extras['/rel-m.pdf'] = { tipo: 'application/pdf', corpo: pdfDe('rel-m.pdf', ['Areas de figuras planas.', 'Comprimento da circunferencia.', 'O volume do cilindro e a area da base vezes a altura.', 'Exercicios finais.']) };
+  amb.extras['/rel-n.pdf'] = { tipo: 'application/pdf', corpo: pdfDe('rel-n.pdf', ['Temperatura e escalas.', 'Calor sensivel: o gas aquece e o volume aumenta.', 'Calor latente e mudancas de estado.']) };
+  amb.extras['/rel-o.pdf'] = { tipo: 'application/pdf', corpo: pdfDe('rel-o.pdf', ['Capa.', 'Mistura de gases: o volume do cilindro de gas.', 'Estatica dos fluidos: o volume do cilindro submerso.']) };
+  const TITULO_M = 'Comprimento da circunferência, área do círculo e volume do cilindro';
+  await gravarLivros(pag, 'prova-relevancia', [
+    { url: '/rel-m.pdf', meta: { id: 'rel-m', hash: 'sha256:m', titulo: 'Livro M de matemática', volume: 'Volume 2', paginas: 4, sumario_origem: 'marcadores',
+      sumario: [{ n: 1, nivel: 1, titulo: 'Áreas', pagina: 1 }, { n: 2, nivel: 1, titulo: TITULO_M, pagina: 2 }, { n: 3, nivel: 1, titulo: 'Exercícios', pagina: 4 }],
+      mapa: [{ n: 2, titulo: TITULO_M, pagina: 2, pagina_fim: 3, assuntos: [] }] } },
+    { url: '/rel-n.pdf', meta: { id: 'rel-n', hash: 'sha256:n', titulo: 'Livro N de física', paginas: 3, materia: 'fisica',
+      sumario: [{ n: 1, nivel: 1, titulo: 'Calor sensível e calor latente', pagina: 1 }] } },
+    { url: '/rel-o.pdf', meta: { id: 'rel-o', hash: 'sha256:o', titulo: 'Livro O com marcador lixo', paginas: 3, sumario_origem: 'marcadores',
+      sumario: [{ n: 1, nivel: 1, titulo: 'Blank Page', pagina: 1 }, { n: 2, nivel: 1, titulo: 'Parte II', pagina: 3 },
+        { n: 3, nivel: 2, titulo: 'Estática dos fluidos', pagina: 3 }] } }]);
+  const sete = await esperar('os três livros da relevância lidos pelo índice', () => estado(pag), parado(7, 7), 60000);
+  conf('os três livros da relevância foram lidos pelo índice (7 de 7)', sete.ok, true);
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'biblioteca');
+  const r33 = await buscar(pag, 'volume do cilindro');
+  conf('no motor, "volume do cilindro" pede as duas palavras: o livro de calor (só "volume") não vem',
+    (r33.livros || []).map(l => l.id).filter(id => /^rel-/.test(id)).sort().join(','), 'rel-m,rel-o');
+  const m33 = (r33.livros || []).find(l => l.id === 'rel-m');
+  conf('e a frase exata em sequência vem contada à parte (a p. 3 do Livro M)', m33 ? JSON.stringify(m33.paginasComFrase) : '', '[3]');
+  await digitar('volume do cilindro');
+  const rel = await esperar('a busca "volume do cilindro" na tela', () => pag.evaluate(() => {
+    const g = document.querySelector('#bib-corpo [data-grupo="livros"]');
+    if (!g) return null;
+    const blocos = [...g.querySelectorAll('.bib-busca-livros-resultados .bib-busca-livro-grupo[data-livro]')];
+    const melhores = [...g.querySelectorAll('.bib-busca-melhores .bib-busca-livro-grupo')];
+    return { status: g.querySelector('.bib-busca-livros-status').textContent,
+      primeiro: melhores[0] ? melhores[0].dataset.livro + ' | ' + melhores[0].querySelector('.bib-busca-livro-paginas strong').textContent + ' | ' +
+        (melhores[0].querySelector('.bib-busca-obra') || {}).textContent : '',
+      livros: [...new Set(blocos.map(b => b.dataset.livro))].filter(x => /^rel-/.test(x)).sort().join(','),
+      titulosO: blocos.filter(b => b.dataset.livro === 'rel-o').map(b => b.querySelector('.bib-busca-livro-paginas strong').textContent).join('|'),
+      blankPage: /Blank Page/.test(g.textContent),
+      linhaM: (melhores[0] && melhores[0].querySelector('.bib-busca-livro-quantas') || {}).textContent || '',
+      abrirM: melhores[0] ? [...melhores[0].querySelectorAll('.bib-busca-acoes .btn')].map(b => b.textContent).join('|') : '',
+      paginasVisiveis: melhores[0] ? [...melhores[0].querySelectorAll('.bib-busca-pagina')].filter(b => b.offsetParent !== null).length : -1 };
+  }), v => !!v && !/Buscando/.test(v.status) && /rel-o/.test(v.livros), 15000);
+  const R = rel.valor || {};
+  console.log('   "volume do cilindro": ' + JSON.stringify(R));
+  conf('o 1º dos melhores resultados é o capítulo com "volume do cilindro" no título, com o volume ao lado da obra', R.primeiro,
+    'rel-m | ' + TITULO_M + ' | Livro M de matemática, vol. 2');
+  conf('o livro de calor (só "volume", sem "cilindro") não aparece', R.livros, 'rel-m,rel-o');
+  conf('"Blank Page" não vira título: a página dele vai para "Outras páginas do livro"', R.titulosO + ' | ' + R.blankPage,
+    'Parte II: Estática dos fluidos|Outras páginas do livro | false');
+  // "Parte II" sozinho no topo, com seção dentro, é capítulo: ganha o nome da primeira seção (o caso do Moderna Plus)
+  conf('a "Parte II" de cima não vira lixo: aparece como "Parte II: Estática dos fluidos"', /Parte II: Estática dos fluidos/.test(R.titulosO), true);
+  // o resultado todo em "Outras páginas do livro": o topo não fica vazio
+  await digitar('mistura de gases');
+  const soOutras = await esperar('a busca que só acha "Outras páginas"', () => pag.evaluate(() => {
+    const g = document.querySelector('#bib-corpo [data-grupo="livros"]');
+    if (!g) return null;
+    const topo = [...g.querySelectorAll('.bib-busca-melhores .bib-busca-livro-grupo')];
+    return { status: g.querySelector('.bib-busca-livros-status').textContent,
+      topo: topo.map(b => b.dataset.livro + ':' + b.querySelector('.bib-busca-livro-paginas strong').textContent).join('|'),
+      mais: !!g.querySelector('.bib-busca-mais') };
+  }), v => !!v && /em 1 livro/.test(v.status), 15000);
+  console.log('   "mistura de gases": ' + JSON.stringify(soOutras.valor));
+  prop('com o resultado todo em "Outras páginas do livro", elas aparecem nos melhores resultados, e nada fica escondido',
+    !!soOutras.valor && soOutras.valor.topo === 'rel-o:Outras páginas do livro' && !soOutras.valor.mais, '--envenenado-topo-vazio');
+  conf('o capítulo mostra uma linha de páginas e um botão de abrir, sem os números soltos à vista',
+    R.linhaM + ' | ' + R.abrirM + ' | ' + R.paginasVisiveis, 'No texto: p. 3, 1 página | Abrir no capítulo|Ver páginas | 0');
+  await digitar('');
+  await pag.evaluate(() => Promise.all(['rel-m', 'rel-n', 'rel-o'].map(id => Store.removerLivro(id))).then(() => IndiceLivros.sincronizar()));
+  const quatroDeNovo = await esperar('o índice de volta aos quatro livros', () => estado(pag), parado(4, 4), 30000);
+  conf('os livros da relevância saíram, e o índice voltou aos quatro do pacote', quatroDeNovo.ok, true);
 
   secao('4. A página sem texto e a linha no fim');
   const c = depois && depois.livros['indice-sem-texto'];
@@ -597,7 +1007,8 @@ async function importar(pag, arquivo) {
     '--envenenado-pagina-ruim-derruba-livro');
   r = await buscar(pag, 'paragrafo 1 do capitulo 3');
   const d3 = (r.livros || []).find(l => l.id === 'livro-de-prova');
-  conf('a busca acha o termo nas outras partes do livro (parte 3)', d3 ? JSON.stringify([d3.paginas, d3.naoLidas]) : '', '[[3],1]');
+  // todas as palavras também estão na parte 1 ("Parágrafo 3 do capítulo 1"); a frase exata, só na 3
+  conf('a busca acha o termo nas outras partes do livro (a frase exata na parte 3)', d3 ? JSON.stringify([d3.paginasComFrase, d3.paginas.indexOf(2) < 0, d3.naoLidas]) : '', '[[3],true,1]');
   const naoLidoD = (r.naoLidos || []).find(l => l.id === 'livro-de-prova');
   conf('e o livro diz 1 parte que não pôde ser lida, sem sair da busca',
     naoLidoD ? naoLidoD.naoLidas + '/' + naoLidoD.livroInteiro + '/' + naoLidoD.motivo : '', '1/false/leitura');
