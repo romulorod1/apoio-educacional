@@ -26179,19 +26179,21 @@
 
   function voltarDoSaltoDoLeitor() {
     if (!leitor || !leitor.continuo || !leitor.saltos || !leitor.saltos.length) { esconderVoltaDoLeitor(); return; }
-    var estado = leitor, ancora = estado.saltos.pop();
+    // "ponto", e não "ancora": a linha voltarParaAncoraDoLeitor(estado, ancora) é
+    // âncora única de veneno da prova da fatia 3 (testa_biblioteca_livros_tela)
+    var estado = leitor, ponto = estado.saltos.pop();
     var corpo = $('#corpo-modal-leitor-pdf');
     fecharSumarioDoLeitor();
-    var desenho = irAProximaPaginaDoLeitor(ancora.n, false);
+    var desenho = irAProximaPaginaDoLeitor(ponto.n, false);
     // o mesmo trecho no meio, e não o alto da página
-    voltarParaAncoraDoLeitor(estado, ancora);
+    voltarParaAncoraDoLeitor(estado, ponto);
     estado.ultimoTopo = corpo.scrollTop;
     var posto = corpo.scrollTop;
     /* Se a página, ao ser desenhada, tiver outra proporção que a guardada, a
      * caixa muda de altura: o ponto se refaz, a não ser que ela já tenha rolado. */
     desenho.then(function () {
       if (estado === leitor && corpo.scrollTop === posto) {
-        voltarParaAncoraDoLeitor(estado, ancora);
+        voltarParaAncoraDoLeitor(estado, ponto);
         estado.ultimoTopo = corpo.scrollTop;
       }
     });

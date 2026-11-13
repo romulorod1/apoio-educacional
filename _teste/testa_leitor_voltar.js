@@ -63,8 +63,8 @@ const TOLERANCIA_PX = 24;
 const VOLTA_MS = 10000, FOLGA_MS = 3000, ANTES_MS = 500;
 const PAI = 'a39e13f';
 const VENENOS = {
-  'volta-no-topo': ['var estado = leitor, ancora = estado.saltos.pop();',
-    'var estado = leitor, ancora = estado.saltos.pop(); ancora = { n: ancora.n, fy: 0, fx: 0.5, alvoY: 0 };'],
+  'volta-no-topo': ['var estado = leitor, ponto = estado.saltos.pop();',
+    'var estado = leitor, ponto = estado.saltos.pop(); ponto = { n: ponto.n, fy: 0, fx: 0.5, alvoY: 0 };'],
   'pilha-de-um': ['leitor.saltos.push(origem);', 'leitor.saltos = [origem];'],
   'nao-some': ['leitorVoltaTimer = setTimeout(esconderVoltaDoLeitor, LEITOR_VOLTA_MS);', 'leitorVoltaTimer = null;'],
   'aparece-na-rolagem': ['leitor.ancora = ancoraDoLeitorContinuo(leitor, n);',
