@@ -518,6 +518,9 @@ async function anexarEm(pag, aulaId, itens, paginas, extra) {
   await esperar('janela fechada', () => pag.$eval('#modal-bib-gerar', e => e.classList.contains('aberto')), v => v === false, 30000);
   await pausa(500);
   conf('as aulas estão iguais', JSON.stringify((await lerDados(pag)).aulas) === antes13, true);
+  // o arquivo fica na janela PDF pronto (L1), e ela fecha para seguir
+  conf('o PDF fica na janela PDF pronto', await pag.$eval('#modal-bib-compartilhar', e => e.classList.contains('aberto')), true);
+  await pag.evaluate(() => document.querySelector('#modal-bib-compartilhar [data-fechar]').click());
 
   // ================================================================
   secao('14. Tema do banco que a biblioteca também tem: o Material abre o módulo');
