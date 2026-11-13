@@ -38,6 +38,9 @@
  *   --envenenado-voltar-sem-tela   o Voltar sem janela não devolve a tela (o código de antes)
  *   --envenenado-volta-dois-passos o Voltar devolve a tela e anda mais um passo
  *   --envenenado-seta-nao-tira     a seta de voltar da tela deixa a entrada no histórico
+ *   --envenenado-estante-fora-do-retrato  o retrato da tela sem a vista da Biblioteca (P3):
+ *                                  abrir a Estante não é passo, e o Voltar nela sai da Biblioteca
+ *   --envenenado-vista-nao-volta   o passo existe, mas o Voltar não devolve a vista (a Estante fica)
  */
 'use strict';
 const fs = require('fs');
@@ -66,11 +69,16 @@ const VENENOS_DA_PROVA = {
   // a janela aberta sobre a raiz não repõe a guarda
   'guarda-depois-da-janela': ["        if (typeof guardaNaRaiz === 'function') guardaNaRaiz();", '        void 0;'],
   // a volta para a Biblioteca logo depois de recarregar desenha sem a Biblioteca carregada
+  // P3: o retrato sem a vista da Biblioteca (Assuntos ou Estante): abrir a Estante não deixa entrada
+  'estante-fora-do-retrato': ["      bibVista: naBib ? JSON.stringify({ d: bibLivrosNav.disciplina || null, e: bibLivrosNav.vista === 'estante' }) : null,",
+    '      bibVista: null,'],
+  // P3: o Voltar acha a entrada, mas não devolve a vista
+  'vista-nao-volta': ["            bibLivrosNav.vista = vista.e ? 'estante' : 'assuntos';", '            void 0;'],
   'sem-ramo-bib': ['            if (!bib) {\n              // a Biblioteca ainda está carregando', '            if (false) {\n              // a Biblioteca ainda está carregando']
 };
 const VENENOS = ['--envenenado-voltar-sem-tela', '--envenenado-volta-dois-passos', '--envenenado-seta-nao-tira',
   '--envenenado-pergunta-da-lista-some', '--envenenado-folha-fora-do-historico', '--envenenado-pergunta-do-formulario-some',
-  '--envenenado-guarda-depois-da-janela', '--envenenado-sem-ramo-bib'];
+  '--envenenado-guarda-depois-da-janela', '--envenenado-sem-ramo-bib', '--envenenado-estante-fora-do-retrato', '--envenenado-vista-nao-volta'];
 const VENENO = Object.keys(VENENOS_DA_PROVA).find(k => process.argv.indexOf('--envenenado-' + k) !== -1) || null;
 const PYTHON = process.env.PYTHON || 'python';
 const trocas = {};
@@ -224,14 +232,24 @@ const esperarBib = pag => esperar('a Biblioteca desenhada', () => pag.evaluate((
   const v2 = await esperar('o Voltar do módulo', () => lugar(pag), v => !!v && v.aba === 'biblioteca' && v.titulo === '', 4000);
   checa('2º Voltar: do módulo à lista de módulos', v2.ok, true, TODOS);
   checa('e a rolagem volta onde estava (a menos de 4 px)', !!v2.valor && Math.abs(v2.valor.rolagem - rolagemAntes) <= 4, true, TODOS);
+  // P3: o Voltar do módulo devolve a Estante, de onde ela entrou
+  const vista = () => pag.evaluate(() => ({ estante: !!document.querySelector('#bib-livros .bibl-painel-estante'),
+    assuntos: !!document.querySelector('#bib-livros .bibl-assunto-linha'), aba: (document.querySelector('#abas .aba.ativa') || { dataset: {} }).dataset.tela || '' }));
+  const comLivros = await pag.evaluate(() => !!document.querySelector('#bib-livros') && !document.querySelector('#bib-livros').hidden);
+  conf('o tablet desta prova tem livro (a Estante existe)', comLivros, true);
+  checa('e o Voltar do módulo devolve a Estante', (await vista()).estante, true, TODOS.concat(['vista-nao-volta']));
+  await pausa(300);
+  await voltar(pag);
+  const vE = await esperar('o Voltar da Estante', vista, v => !!v && v.aba === 'biblioteca' && v.assuntos && !v.estante, 4000);
+  checa('3º Voltar: da Estante aos Assuntos (sem sair da Biblioteca)', vE.ok, true, TODOS.concat(['estante-fora-do-retrato', 'vista-nao-volta']));
   await pausa(300);
   await voltar(pag);
   const v3 = await esperar('o Voltar da Biblioteca', () => lugar(pag), v => !!v && v.aba === 'agenda', 4000);
-  checa('3º Voltar: da Biblioteca à Agenda', v3.ok, true, TODOS);
+  checa('4º Voltar: da Biblioteca à Agenda', v3.ok, true, TODOS);
   await pausa(300);
   await voltar(pag);
   const aviso1 = await esperar('o aviso de sair', () => avisos(pag), v => /Toque em Voltar de novo para sair\./.test(v || ''), 3000);
-  checa('4º Voltar, na tela inicial: o aviso "Toque em Voltar de novo para sair."', aviso1.ok, true, ['volta-dois-passos']);
+  checa('5º Voltar, na tela inicial: o aviso "Toque em Voltar de novo para sair."', aviso1.ok, true, ['volta-dois-passos']);
   checa('e o app continua aberto, na Agenda', (await lugar(pag)).aba, 'agenda', ['volta-dois-passos']);
 
   secao('2. A guarda da raiz volta com um passo dado depois do aviso');

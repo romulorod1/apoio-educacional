@@ -1739,6 +1739,11 @@
       // t: a página do assunto (B1), que é um lugar da Biblioteca como o módulo e a aula
       bib: naBib ? JSON.stringify({ s: bibNav.serie, m: bibNav.modulo, a: bibNav.aula, l: bibNav.minhas, t: bibNav.assunto || null }) : null,
       bibNav: naBib ? JSON.parse(JSON.stringify(bibNav)) : null,
+      /* P3: a disciplina à vista e a vista dela (os Assuntos ou a Estante) são
+       * lugares da Biblioteca: abrir a Estante é um passo, e o Voltar nela
+       * devolve os Assuntos; o Voltar de um módulo aberto pela Estante devolve
+       * a Estante, na mesma rolagem. */
+      bibVista: naBib ? JSON.stringify({ d: bibLivrosNav.disciplina || null, e: bibLivrosNav.vista === 'estante' }) : null,
       termo: naBib ? String(bibTermo || '') : '',
       livro: naBib ? (bibLivroAberto || null) : null,
       rolagem: conteudo ? conteudo.scrollTop : 0
@@ -1748,7 +1753,7 @@
   // o que conta como "outra tela": a aba, o lugar e o livro (a rolagem e o termo digitado não)
   function mesmaTela(a, b) {
     return !!a && !!b && a.aba === b.aba && a.alunoCelular === b.alunoCelular && a.fichaEditando === b.fichaEditando &&
-      a.form === b.form && a.bib === b.bib && a.livro === b.livro;
+      a.form === b.form && a.bib === b.bib && a.bibVista === b.bibVista && a.livro === b.livro;
   }
 
   /* O trabalho não salvo da tela à vista: a pergunta que a seta da tela faz,
@@ -1843,6 +1848,16 @@
           var b = $('#abas .aba[data-tela="' + r.aba + '"]');
           if (b) b.click();
         }
+        // a disciplina e a vista (P3) voltam antes do lugar: o desenho dos livros as usa
+        var mudouVista = false;
+        if (r.aba === 'biblioteca' && r.bibVista) {
+          var vista = JSON.parse(r.bibVista);
+          if (vista.d !== (bibLivrosNav.disciplina || null) || vista.e !== (bibLivrosNav.vista === 'estante')) {
+            mudouVista = true;
+            if (vista.d !== bibLivrosNav.disciplina) { bibLivrosNav.disciplina = vista.d; bibLivrosNav.ano = null; bibLivrosNav.tipo = 'todos'; }
+            bibLivrosNav.vista = vista.e ? 'estante' : 'assuntos';
+          }
+        }
         if (r.aba === 'biblioteca' && r.bibNav) {
           var mudouBib = JSON.stringify({ s: bibNav.serie, m: bibNav.modulo, a: bibNav.aula, l: bibNav.minhas, t: bibNav.assunto || null }) !== r.bib;
           var termo = String(r.termo || '');
@@ -1864,6 +1879,11 @@
           }
           if (r.livro && r.livro !== bibLivroAberto) abrirTelaDoLivro(r.livro);
           else if (!r.livro && bibLivroAberto) fecharTelaDoLivro();
+          // a vista mudou: os livros se redesenham, e a rolagem guardada volta depois do desenho
+          if (mudouVista) desenharLivrosDaBiblioteca().then(function () {
+            var c = $('.conteudo');
+            if (c) c.scrollTop = r.rolagem;
+          });
         }
       }
     } finally {
@@ -21035,7 +21055,7 @@
     else if (nav.modulo !== undefined || nav.aula !== undefined || nav.serie !== undefined || nav.minhas !== undefined) sairDaPaginaDoAssunto();
     // entrar num módulo ou numa série sai de Minhas listas
     var estavaEmMinhas = !!bibNav.minhas;
-    if (nav.minhas || (nav.serie && !nav.modulo && !nav.assunto)) irParaAEstante();
+    if (!restaurandoTela && (nav.minhas || (nav.serie && !nav.modulo && !nav.assunto))) irParaAEstante();
     if (nav.minhas !== undefined) bibNav.minhas = nav.minhas;
     else if (nav.modulo || nav.serie) bibNav.minhas = null;
     // a faixa esconde o botão "Minhas listas" dentro da própria aba: redesenha ao entrar e ao sair
