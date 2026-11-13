@@ -868,6 +868,8 @@ async function secaoP2(pag) {
   // ================================================================
   secao('7b. O topo do desenho, a largura estreita e o Material da aula');
   await H.irParaAba(pag, 'biblioteca');
+  await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  await esperar('a lista de assuntos', () => pag.evaluate(() => !!document.querySelector('#bib-livros .bibl-assunto-linha')), v => v, 10000);
   await pausa(400);
   const topo = await pag.evaluate(() => {
     const t = document.querySelector('.bibl-topo .titulo').getBoundingClientRect();
@@ -891,7 +893,7 @@ async function secaoP2(pag) {
     return cont ? Math.round(cont.getBoundingClientRect().top - area.top) : null;
   });
   conf('na Estante, o Continuar lendo fica no alto dela (a menos de 260 px do alto da área)', contNaEstante !== null && contNaEstante < 260, true);
-  console.log('   Continuar lendo a ' + topo.continuar + ' px do alto');
+  console.log('   navegação por assunto a ' + topo.navegacao + ' px do alto; Continuar lendo na Estante a ' + contNaEstante + ' px');
   ruins = await medir(pag, '.bibl-topo');
   conf('o topo não transborda', ruins.join('; '), '');
   await pag.setViewport({ width: 800, height: 1280, hasTouch: true });
@@ -1151,6 +1153,7 @@ async function secaoP2(pag) {
   await importar(pag, zipLeitor);
   await abrirBiblioteca(pag);
   await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  await abrirEstante(pag);
   let achou = false;
   for (const ano of await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-livros .bibl-ano')).map(b => b.dataset.ano))) {
     await clicar(pag, '#bib-livros .bibl-ano[data-ano="' + ano + '"]');
