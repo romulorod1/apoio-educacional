@@ -1930,7 +1930,10 @@
     'modal-plan-print': true,
     // FILA 2b: o leitor de livro é uma tela para ela; o Voltar fecha o leitor e volta ao livro
     'modal-leitor-pdf': true,
-    'modal-leitor-epub': true
+    'modal-leitor-epub': true,
+    /* L1: a janela PDF pronto da Biblioteca. Sem a entrada, o Voltar do tablet
+     * deixava a janela aberta e trocava a tela da Biblioteca por baixo dela. */
+    'modal-bib-compartilhar': true
   };
 
   function abrirModal(id) {

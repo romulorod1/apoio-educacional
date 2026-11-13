@@ -30,6 +30,9 @@
  *   4. SEM COMPARTILHAMENTO NO APARELHO, um arquivo só: o botão de
  *      compartilhar some, ficam baixar e ver, e nada é baixado sozinho (o
  *      caminho antigo baixava na hora).
+ *   3b. O VOLTAR DO APARELHO (history.back): com o leitor aberto por cima da
+ *      janela, fecha só o leitor; depois fecha a janela PDF pronto, e a tela
+ *      da Biblioteca por baixo continua a mesma.
  *   5. O TUTORIAL não manda imprimir: a etapa 4 diz mandar ao aluno ou
  *      guardar no tablet.
  *
@@ -44,6 +47,10 @@
  *                                   escolhida sozinha (achado da revisão).
  *   --envenenado-filtro-fora        o filtro guardado vale mesmo fora da tela
  *                                   (achado da segunda revisão).
+ *   --envenenado-voltar             a janela PDF pronto sai do histórico: o
+ *                                   Voltar do aparelho deixa a janela aberta e
+ *                                   troca a tela por baixo (achado da
+ *                                   orquestradora no #196).
  *
  * Com --prints=PASTA, guarda três prints a 1280 x 800 (a janela PDF pronto, a
  * Gerar material com as próximas aulas e a etapa 4 do tutorial).
@@ -60,7 +67,7 @@ const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8853;
 const MODOS = ['--envenenado-baixa-ao-cancelar', '--envenenado-so-hoje', '--envenenado-sem-sugestao',
-  '--envenenado-sugere-depois', '--envenenado-filtro-fora'];
+  '--envenenado-sugere-depois', '--envenenado-filtro-fora', '--envenenado-voltar'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const PRINTS = (process.argv.filter(a => a.indexOf('--prints=') === 0)[0] || '').slice('--prints='.length);
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
@@ -76,6 +83,8 @@ const L_GASTA = '&& !bibSugestaoGasta) {';
 const T_GASTA = ') {';
 const L_FORA = '    var filtroNaTela = !!(bibFiltroAluno && seletorDoFiltro && seletorDoFiltro.value === bibFiltroAluno &&';
 const T_FORA = '    var filtroNaTela = !!(bibFiltroAluno &&';
+const L_VOLTAR = "    'modal-bib-compartilhar': true";
+const T_VOLTAR = "    'modal-bib-compartilhar-fora-do-historico': true";
 function umaVez(texto, ancora) { return texto.split(ancora).length === 2; }
 
 const trocas = {};
@@ -84,6 +93,7 @@ if (MODO === '--envenenado-so-hoje') trocas['/app.js'] = APP.split(L_LIMITE).joi
 if (MODO === '--envenenado-sem-sugestao') trocas['/app.js'] = APP.split(L_SUGESTAO).join(T_SUGESTAO);
 if (MODO === '--envenenado-sugere-depois') trocas['/app.js'] = APP.split(L_GASTA).join(T_GASTA);
 if (MODO === '--envenenado-filtro-fora') trocas['/app.js'] = APP.split(L_FORA).join(T_FORA);
+if (MODO === '--envenenado-voltar') trocas['/app.js'] = APP.split(L_VOLTAR).join(T_VOLTAR);
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'l1_pdf_pronto_'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
@@ -95,7 +105,7 @@ const HOJE = '2026-11-16';
 
 // ---------------------------------------------------------------- 0 (Node)
 secao('0. Sem navegador: as âncoras dos venenos e o texto do tutorial');
-[['cancelar', L_CANCELA], ['limite', L_LIMITE], ['sugestão', L_SUGESTAO], ['sugestão gasta', L_GASTA], ['filtro na tela', L_FORA]]
+[['cancelar', L_CANCELA], ['limite', L_LIMITE], ['sugestão', L_SUGESTAO], ['sugestão gasta', L_GASTA], ['filtro na tela', L_FORA], ['voltar', L_VOLTAR]]
   .forEach(([n, a]) => conf('âncora de veneno uma vez só: ' + n, umaVez(APP, a), true));
 const etapa4 = APP.slice(APP.indexOf("etapa: 'Etapa 4 de 4"), APP.indexOf("etapa: 'Etapa 4 de 4") + 900);
 conf('a etapa 4 do tutorial existe', etapa4.length > 100, true);
@@ -383,6 +393,15 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   conf('nada foi baixado nem compartilhado sozinho', JSON.stringify(await baixados(pag)) + ' ' +
     (await pag.evaluate(() => window.__share.chamadas.length)), '[] 0');
   await print(pag, 'L1-1-pdf-pronto.png');
+  if (PRINTS) {
+    // a mesma janela em retrato (tablet) e na largura de um celular
+    await pag.setViewport({ width: 800, height: 1280, hasTouch: true });
+    await print(pag, 'L1-1b-pdf-pronto-retrato-800x1280.png');
+    await pag.setViewport({ width: 412, height: 915, hasTouch: true });
+    await print(pag, 'L1-1c-pdf-pronto-412x915.png');
+    await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
+    await pausa(400);
+  }
 
   // compartilhar com sucesso
   await pag.evaluate(() => document.querySelector('#bib-pdf-compartilhar-lista').click());
@@ -437,11 +456,33 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   })), v => v && v.aberto && !!v.pagina, 30000);
   conf('ver abre a lista no leitor do aplicativo, com a página desenhada', leitor.ok && /lista.*\.pdf$/.test(leitor.valor.titulo), true);
   conf('sem o "Abrir como folha" (é só para conferir)', await pag.evaluate(() => document.querySelector('#leitor-como-folha').style.display), 'none');
-  await pag.evaluate(() => document.querySelector('#modal-leitor-pdf [data-fechar]').click());
-  await pausa(300);
-  conf('fechado o leitor, a janela PDF pronto continua', (await janelaPdf(pag)).aberta, true);
+
+  /* 3b. O VOLTAR DO APARELHO. A tela por baixo é guardada antes: a aba e o
+   * começo do corpo da Biblioteca. O primeiro Voltar fecha só o leitor; o
+   * segundo fecha a janela PDF pronto, e a tela continua a mesma. */
+  const telaDaBiblioteca = () => pag.evaluate(() => (document.querySelector('#abas .aba.ativa') || { dataset: {} }).dataset.tela +
+    ' | ' + ((document.querySelector('#bib-corpo') || {}).innerText || '').slice(0, 160));
+  const telaAntes = await telaDaBiblioteca();
+  await pag.evaluate(() => history.back());
+  const leitorFechou = await esperar('o Voltar fechar o leitor', () => pag.evaluate(() =>
+    !document.querySelector('#modal-leitor-pdf').classList.contains('aberto')), v => v === true, 5000);
+  await pausa(400);
+  conf('o Voltar com o leitor aberto fecha só o leitor', leitorFechou.ok, true);
+  conf('e a janela PDF pronto continua', (await janelaPdf(pag)).aberta, true);
   conf('e ver não baixou nada', (await baixados(pag)).length, 1);
-  await pag.evaluate(() => document.querySelector('#modal-bib-compartilhar [data-fechar]').click());
+  await pag.evaluate(() => history.back());
+  const fechou = await esperar('o Voltar fechar a janela PDF pronto', () => janelaPdf(pag), v => v && !v.aberta, 5000);
+  await pausa(600);
+  const telaDepois = await telaDaBiblioteca();
+  if (MODO === '--envenenado-voltar') {
+    secao('VENENO: a janela PDF pronto fora do histórico');
+    conf('envenenado: o Voltar deixou a janela aberta ou trocou a tela por baixo (defeito enxergado)',
+      !fechou.ok || telaDepois !== telaAntes, true);
+    throw fim();
+  }
+  conf('o Voltar seguinte fecha a janela PDF pronto', fechou.ok, true);
+  conf('e a tela da Biblioteca por baixo continua a mesma', telaDepois, telaAntes);
+  await pag.evaluate(() => { const b = document.querySelector('#modal-bib-compartilhar.aberto [data-fechar]'); if (b) b.click(); });
   await pausa(300);
 
   // ================================================================
