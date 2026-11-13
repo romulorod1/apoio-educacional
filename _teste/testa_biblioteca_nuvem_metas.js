@@ -167,8 +167,9 @@ function subirEmulador() {
   }));
   const env = Object.assign({}, process.env);
   if (JAVA_HOME) env.PATH = path.join(JAVA_HOME, 'bin') + path.delimiter + (env.PATH || env.Path || '');
+  // no Linux o emulador vai num grupo de processos próprio, para sair inteiro (o java junto) no fim
   emulador = spawn(process.execPath, [FIREBASE, 'emulators:start', '--only', 'auth,firestore', '--project', PROJETO, '--non-interactive'],
-    { cwd: PASTA, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    { cwd: PASTA, env, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
   let saida = '';
   emulador.stdout.on('data', d => { saida += d; });
   emulador.stderr.on('data', d => { saida += d; });
@@ -180,15 +181,26 @@ function subirEmulador() {
     return !!(a && a.authEmulator && a.authEmulator.ready) && f === 200;
   }, v => v === true, 120000);
 }
+// um emulador que já responde nas portas é de outra rodada: a prova falaria com ele (conta e catálogo dela)
+async function portasLivres() {
+  const a = await fetch(AUTH + '/').then(r => r.status).catch(() => 0);
+  const f = await fetch(FS + '/').then(r => r.status).catch(() => 0);
+  return a === 0 && f === 0;
+}
+function matarGrupo(sinal) {
+  try { process.kill(-emulador.pid, sinal); } catch (e) { /* já saiu */ }
+}
 function derrubarEmulador() {
   return new Promise(resolve => {
     if (!emulador || emulador.saiu !== undefined) { resolve(); return; }
     emulador.on('exit', () => resolve());
     if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(emulador.pid), '/T', '/F'], { stdio: 'ignore' });
-    else emulador.kill('SIGINT');
-    setTimeout(resolve, 8000);
+    else matarGrupo('SIGINT');
+    setTimeout(() => { if (process.platform !== 'win32') matarGrupo('SIGKILL'); resolve(); }, 8000);
   });
 }
+// o fim de toda rodada derruba o emulador antes de sair (a rodada seguinte da fatia usa as mesmas portas)
+const fim = () => derrubarEmulador().then(() => H.fim(amb)());
 const conta = (email, senha) => fetch(AUTH + '/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake', { method: 'POST',
   headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: senha, returnSecureToken: true }) }).then(r => r.json());
 
@@ -295,8 +307,10 @@ const so = (r, id) => { const l = JSON.parse(r.livros[id]); delete l.meta; delet
   conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
   const vj = /version "(\d+)/.exec(((r) => (r.stderr || '') + (r.stdout || ''))(spawnSync(JAVA_HOME ? path.join(JAVA_HOME, 'bin', 'java') : 'java', ['-version'], { encoding: 'utf8' })));
   conf('há um JDK 21 ou mais novo (' + (JAVA_HOME || 'java do PATH') + ')', !!vj && Number(vj[1]) >= 21, true);
-  if (H.placar.falhas) return H.fim(amb)();
+  if (H.placar.falhas) return fim();
 
+  conf('as portas do emulador estão livres (nenhum emulador de outra rodada responde nelas)', await portasLivres(), true);
+  if (H.placar.falhas) return fim();
   const subiu = await subirEmulador();
   if (!subiu.ok) throw new Error('o emulador não subiu');
   const dona = await conta('dona@exemplo.test', 'senha-da-dona-1');
@@ -333,7 +347,7 @@ const so = (r, id) => { const l = JSON.parse(r.livros[id]); delete l.meta; delet
   const dbAntes = await dbDela(pag);
   if (MODO === '--envenenado-liga-na-abertura') {
     conf('VENENO visto: os metas trocaram sozinhos na abertura', defasados(antes).length < 3, true);
-    return H.fim(amb)();
+    return fim();
   }
   conf('antes do toque, os três livros que ficam estão defasados', defasados(antes).join(','), 'fica-a,fica-b,teoria-e');
 
@@ -348,19 +362,19 @@ const so = (r, id) => { const l = JSON.parse(r.livros[id]); delete l.meta; delet
   const puts = await pag.evaluate(() => window.__putsLivros.slice().sort().join(','));
   if (MODO === '--envenenado-regrava-o-igual') {
     conf('VENENO visto: o livro de meta igual foi regravado', puts.split(',').indexOf('igual-g') !== -1, true);
-    return H.fim(amb)();
+    return fim();
   }
   if (MODO === '--envenenado-troca-o-blob') {
     conf('VENENO visto: o Blob de um livro trocado foi regravado', depois.blobs['fica-a'] !== antes.blobs['fica-a'], true);
-    return H.fim(amb)();
+    return fim();
   }
   if (MODO === '--envenenado-solta-a-posicao') {
     conf('VENENO visto: a posição de leitura de um livro trocado sumiu', !depois.posicoes['fica-a'], true);
-    return H.fim(amb)();
+    return fim();
   }
   if (MODO === '--envenenado-aceita-meta-invalido') {
     conf('VENENO visto: o meta com o sumário fora do livro entrou', JSON.parse(depois.livros['invalido-f']).meta.sumario.length, 1);
-    return H.fim(amb)();
+    return fim();
   }
   conf('a ACEITAÇÃO: a defasagem nos livros que ficam vai a zero', defasados(depois).join(','), '');
   conf('o mapa novo leva a chave estável de cada capítulo', JSON.parse(depois.livros['fica-a']).meta.mapa.every(e => /^c[0-9a-f]{6}$/.test(e.chave)), true);
@@ -409,9 +423,9 @@ const so = (r, id) => { const l = JSON.parse(r.livros[id]); delete l.meta; delet
   }).then(c => c.trocados.length + '|' + c.invalidos), SHA_C, mudar);
   const r6 = { id: await trava({ id: 'fica-a' }), formato: await trava({ formato: 'epub' }), paginas: await trava({ paginas: 12 }) };
   const depois6 = await retrato(pag);
-  if (MODO === '--envenenado-store-aceita-outro-id') { conf('VENENO visto: o meta de outro livro entrou', r6.id, '1|0'); return H.fim(amb)(); }
-  if (MODO === '--envenenado-aceita-outro-formato') { conf('VENENO visto: o meta de outro formato entrou', r6.formato, '1|0'); return H.fim(amb)(); }
-  if (MODO === '--envenenado-aceita-outras-paginas') { conf('VENENO visto: o meta de outro número de páginas entrou', r6.paginas, '1|0'); return H.fim(amb)(); }
+  if (MODO === '--envenenado-store-aceita-outro-id') { conf('VENENO visto: o meta de outro livro entrou', r6.id, '1|0'); return fim(); }
+  if (MODO === '--envenenado-aceita-outro-formato') { conf('VENENO visto: o meta de outro formato entrou', r6.formato, '1|0'); return fim(); }
+  if (MODO === '--envenenado-aceita-outras-paginas') { conf('VENENO visto: o meta de outro número de páginas entrou', r6.paginas, '1|0'); return fim(); }
   conf('o meta de outro livro não entra', r6.id, '0|1');
   conf('o meta de outro formato não entra', r6.formato, '0|1');
   conf('o meta de outro número de páginas não entra', r6.paginas, '0|1');
@@ -429,7 +443,7 @@ const so = (r, id) => { const l = JSON.parse(r.livros[id]); delete l.meta; delet
     };
     return [await um([]), await um('nao sou lista'), await um([null]), await um([['dentro']])].join(',');
   }, VELHOS[3], SHA_C);
-  if (MODO === '--envenenado-aceita-mapa-texto') { conf('VENENO visto: o mapa em texto passou', r7.split(',')[1], 'ACEITO'); return H.fim(amb)(); }
+  if (MODO === '--envenenado-aceita-mapa-texto') { conf('VENENO visto: o mapa em texto passou', r7.split(',')[1], 'ACEITO'); return fim(); }
   conf('a lista vazia passa (controle); texto, null e lista dentro de lista, não', r7, 'ACEITO,recusado,recusado,recusado');
 
   secao('8. Em lotes: a falha de um lote não desfaz os anteriores');
@@ -473,8 +487,8 @@ const so = (r, id) => { const l = JSON.parse(r.livros[id]); delete l.meta; delet
   const r8 = await retrato(pag);
   const trocados8 = LOTE.filter(id => JSON.parse(r8.livros[id]).meta.mapa[0].titulo === 'Decimais').join(',');
   const entregues = await pag.evaluate(() => window.__entregues.join(','));
-  if (MODO === '--envenenado-um-lote-so') { conf('VENENO visto: a falha de um lote desfez os anteriores', trocados8, ''); return H.fim(amb)(); }
-  if (MODO === '--envenenado-app-aceita-outro-id') { conf('VENENO visto: o documento de outro livro chegou ao Store', /lote-8:lote-9/.test(entregues), true); return H.fim(amb)(); }
+  if (MODO === '--envenenado-um-lote-so') { conf('VENENO visto: a falha de um lote desfez os anteriores', trocados8, ''); return fim(); }
+  if (MODO === '--envenenado-app-aceita-outro-id') { conf('VENENO visto: o documento de outro livro chegou ao Store', /lote-8:lote-9/.test(entregues), true); return fim(); }
   conf('os cinco do primeiro lote ficaram trocados; os do lote que falhou, não', trocados8, 'lote-1,lote-2,lote-3,lote-4,lote-5');
   conf('o documento de outro livro nem chegou ao Store', entregues.split(',').filter(x => x.split(':')[0] !== x.split(':')[1]).join(','), '');
   conf('a linha diz os trocados, o não conferido, os que ficaram e a correção sem capítulo', linha8.valor.replace(/\d\d:\d\d/, 'HH:MM'),
@@ -494,15 +508,20 @@ const so = (r, id) => { const l = JSON.parse(r.livros[id]); delete l.meta; delet
   await clicar(pag, '#livros-nuvem-atualizar');
   const aviso = await esperar('o aviso da entrada vencida', () => pag.evaluate(() => (document.querySelector('#aviso-texto') || {}).textContent || ''),
     v => /entr|Tente de novo/i.test(v), 15000);
-  if (MODO === '--envenenado-vencida-pede-tente') { conf('VENENO visto: a entrada vencida diz "tente de novo"', /Tente de novo/.test(aviso.valor), true); return H.fim(amb)(); }
+  if (MODO === '--envenenado-vencida-pede-tente') { conf('VENENO visto: a entrada vencida diz "tente de novo"', /Tente de novo/.test(aviso.valor), true); return fim(); }
   conf('a entrada vencida pede para entrar de novo', aviso.valor, 'A entrada na nuvem venceu. Entre de novo para atualizar a biblioteca.');
 
   secao('10. Nenhum erro de página');
   conf('nenhum erro de página', pag.errosDePagina.join(' | '), '');
-  return H.fim(amb)();
-})().catch(e => { console.error('erro:', e && e.stack || e); H.placar.falhas++; return H.fim(amb)(); });
+  return fim();
+})().catch(e => { console.error('erro:', e && e.stack || e); H.placar.falhas++; return fim(); });
 
 process.on('exit', () => {
-  try { if (emulador && emulador.saiu === undefined && process.platform === 'win32') spawnSync('taskkill', ['/PID', String(emulador.pid), '/T', '/F'], { stdio: 'ignore' }); } catch (e) { /* ok */ }
+  try {
+    if (emulador && emulador.saiu === undefined) {
+      if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(emulador.pid), '/T', '/F'], { stdio: 'ignore' });
+      else matarGrupo('SIGKILL');
+    }
+  } catch (e) { /* ok */ }
   try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ }
 });
