@@ -471,8 +471,16 @@
       if (x.id === raizId || x.serieOrigemId === raizId) seriesIds[x.id] = true;
     });
     seriesIds[aula.serieId] = true;
+    /* A aula com relato (notaTexto não vazio) fica de fora do "todas" e do
+     * "desta em diante", por regra declarada: aula com relato é aula dada e
+     * registrada, e mudar o padrão da série não reescreve o passado dela (a
+     * duração, a situação e a cobrança de um mês já cobrado). Antes isso vinha
+     * de carona no "destacada", que o relato marcava; desde o F7 o relato
+     * grava direto, sem destacar. A própria aula editada sempre entra. */
     var irmas = (db.aulas || []).filter(function (a) {
-      return seriesIds[a.serieId] && (a.id === aula.id || !a.destacada);
+      if (!seriesIds[a.serieId]) return false;
+      if (a.id === aula.id) return true;
+      return !a.destacada && !String(a.notaTexto || '').trim();
     });
     if (escopo === 'seguintes') {
       return irmas.filter(function (a) { return a.data >= aula.data; });

@@ -302,6 +302,10 @@ roda "sugestoes matematica"  node _teste/testa_sugestoes_matematica.js
 roda "virada anual"          node _teste/testa_virada_anual.js
 # A regra do merge na main (_teste/merge_seguro.sh), que segura o processo
 # quando a protecao de branch do GitHub sumir com o repositorio privado.
+# F7 (#159): no "todas" e no "desta em diante", a aula com relato fica de fora
+# (core, alvosDoEscopo); o veneno tira a regra e so o lado da aula com relato cai.
+roda "escopo sem a aula com relato" node _teste/testa_escopo_relato.js
+roda "escopo sem a aula com relato --envenenado-sem-regra-do-relato" node _teste/testa_escopo_relato.js --envenenado-sem-regra-do-relato
 roda "merge seguro"          node _teste/testa_merge_seguro.js
 # O guarda de merge no CI (item 13c): o guarda_merge.js julga pelo merge_seguro
 # e publica o status portao-merge na cabeca que julgou. Com gh e git falsos:

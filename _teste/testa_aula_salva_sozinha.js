@@ -29,8 +29,9 @@
  *     rascunho volta ao reabrir.
  * 11. (B3) Excluir com mudança pendente: o aviso é o da exclusão, com o
  *     Desfazer. Dividir com mudança pendente: um aviso só, com as duas frases.
- * 12. (B4) O relato numa aula da repetição não a destaca, e o "todas" de uma
- *     irmã muda o horário dela sem tocar o relato.
+ * 12. (B4) O relato numa aula da repetição não a destaca; o "todas" de uma
+ *     irmã muda o horário da irmã sem relato e deixa a aula com relato como
+ *     está (regra do core, testa_escopo_relato.js).
  * 13. (B5) O Desfazer de "Aula atualizada" volta só aquela aula: o relato
  *     gravado depois em outra aula fica.
  *
@@ -382,23 +383,26 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
       /^Aula dividida em/.test(av11b.texto) && /não foi gravada/.test(av11b.texto) && /Desfazer/.test(av11b.acao), true);
     conf('o horário pendente não gravou', (await lerAula(pag, DIVIDE)).hora, '08:00');
 
-    secao('12. (B4) O relato não destaca a aula da repetição');
-    const irmas = await pag.evaluate(sid => Store.carregar().then(d => d.aulas.filter(a => a.serieId === sid && !a.destacada)
+    secao('12. (B4) O relato não destaca a aula da repetição, e a aula com relato fica fora do "todas"');
+    const irmas = await pag.evaluate(sid => Store.carregar().then(d => d.aulas.filter(a => a.serieId === sid && !a.destacada && !(a.notaTexto || '').trim())
       .sort((x, y) => x.data.localeCompare(y.data)).map(a => a.id)), serie.id);
-    conf('(arranjo) há duas aulas não destacadas na repetição', irmas.length >= 2, true);
+    conf('(arranjo) há três aulas sem relato e não destacadas na repetição', irmas.length >= 3, true);
     conf('(arranjo) a aula da repetição abriu', (await abrir(pag, irmas[0])).ok, true);
     await escrever(pag, '#campo-nota-texto', 'Relato da irmã');
     const r12 = await esperar('o relato salvou', () => lerAula(pag, irmas[0]), a => a && a.notaTexto === 'Relato da irmã', 5000);
     conf('o relato gravou e a aula não ficou destacada', r12.ok && !r12.valor.destacada, true);
     await pag.click('#cancelar-aula');
     await pausa(400);
+    const horaDoRelato = (await lerAula(pag, irmas[0])).hora;
     conf('(arranjo) a outra irmã abriu', (await abrir(pag, irmas[1])).ok, true);
     await escolher(pag, '#campo-hora', '15:00');
     await pag.click('#salvar-aula');
     await esperar('pergunta de escopo', () => pag.evaluate(() => document.querySelector('#modal-escopo').classList.contains('aberto')), Boolean, 4000);
     await pag.evaluate(() => Array.from(document.querySelectorAll('.opcao-escopo')).find(o => /Todas as aulas/.test(o.textContent)).click());
-    const t12 = await esperar('o todas chegou na irmã do relato', () => lerAula(pag, irmas[0]), a => a && a.hora === '15:00', 5000);
-    conf('o "todas" muda o horário da irmã do relato e não toca o relato', t12.ok && t12.valor.notaTexto === 'Relato da irmã', true);
+    const t12 = await esperar('o todas chegou na irmã sem relato', () => lerAula(pag, irmas[2]), a => a && a.hora === '15:00', 5000);
+    conf('o "todas" muda o horário da irmã sem relato', t12.ok, true);
+    const comRelato12 = await lerAula(pag, irmas[0]);
+    conf('e não toca a aula com relato: nem o horário, nem o relato', comRelato12.hora === horaDoRelato && comRelato12.notaTexto === 'Relato da irmã', true);
   }
 
   if (MODO === MODOS[5] || !MODO) {
