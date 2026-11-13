@@ -926,12 +926,14 @@ roda "alerta da copia --envenenado-alerta-so-local" node "_teste/testa_alerta_co
 roda "alerta da copia --envenenado-idade-do-envio" node "_teste/testa_alerta_copia_nuvem.js" --envenenado-idade-do-envio
 roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_aluno_cascata.js"
 roda "relato e Voltar"                            node "_teste/testa_relato_voltar.js"
-# F7 (#159): a aula salva sozinha nunca grava por cima de versao mais nova (chega
-# pela nuvem com a janela aberta), a falha de disco aparece e o relato volta depois
-# de recarregar. Os venenos tiram a conferencia e o rascunho na saida da pagina.
+# F7 (#159): na aula que ja existe, o relato salva sozinho e data, horario, duracao,
+# situacao e cobranca gravam so ao Fechar ou Concluir (com Desfazer); nunca por cima de
+# versao mais nova, mesmo campo ou outro; Descartar volta ao que havia; a repeticao pede
+# o escopo. Os venenos tiram a conferencia, o rascunho na saida e o retrato por chave (A1).
 roda "aula salva sozinha"                          node "_teste/testa_aula_salva_sozinha.js"
 roda "aula salva sozinha --envenenado-grava-por-cima" node "_teste/testa_aula_salva_sozinha.js" --envenenado-grava-por-cima
 roda "aula salva sozinha --envenenado-sem-rascunho-ao-sair" node "_teste/testa_aula_salva_sozinha.js" --envenenado-sem-rascunho-ao-sair
+roda "aula salva sozinha --envenenado-retrato-absorve-tudo" node "_teste/testa_aula_salva_sozinha.js" --envenenado-retrato-absorve-tudo
 roda "Voltar do aparelho nas telas"              node "_teste/testa_voltar_android.js"
 roda "Voltar do aparelho --envenenado-voltar-sem-tela" node "_teste/testa_voltar_android.js" --envenenado-voltar-sem-tela
 roda "Voltar do aparelho --envenenado-volta-dois-passos" node "_teste/testa_voltar_android.js" --envenenado-volta-dois-passos

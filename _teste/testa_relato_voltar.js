@@ -142,6 +142,8 @@ const { conf, secao, esperar } = H;
   await pag.click('[data-aula-id="a5_aula"]');
   conf('recarregar após falha recupera texto', await pag.$eval('#campo-nota-texto', e => e.value),
     'Relato após falha de gravação');
+  conf('com o aviso "Rascunho recuperado às"', await pag.evaluate(() =>
+    /Rascunho recuperado às/.test((document.querySelector('#aviso-rascunho-relato') || {}).textContent || '')), true);
 
   secao('fechar uma janela e abrir outra imediatamente');
   await pag.click('#modal-aula .fechar');

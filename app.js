@@ -72,13 +72,15 @@
   var diaComZoom = null;
   var editorAtual = null;
   var aulaEmEdicao = null;
-  /* O salvar sozinho da aula aberta (F7); as regras moram em gravarAutosaveAula. */
+  /* O salvar sozinho da aula aberta (F7); as regras moram no bloco "salvar sozinho a aula aberta". */
   var temporizadorAutosaveAula = null;
   var promessaAutosaveAula = null;   // a última gravação pedida ao disco
   var snapshotAutosaveAula = null;   // o formulário como ficou gravado (a base do que ela mudou)
   var baseBancoAutosaveAula = null;  // a aula no banco como esta janela a viu por último
   var conflitoAutosaveAula = false;  // a aula mudou fora desta janela: nada mais grava daqui
   var baseDiscoRelatoAula = null;    // o relato da aula aberta como está no DISCO (a base do rascunho)
+  var aberturaDaAula = null;         // { registro, valores } da aula ao abrir (o Descartar volta a isto)
+  var geracaoDoBanco = 0;            // anda quando a memória é trocada pelo que chegou (nunca "Salvo" sobre ela)
   var alunoEmEdicao = null;
   /* Redesenha o resumo de etapas do alto da aba Dados. Quem marca a etapa é o
    * quadro da aba Mapeamento, e ele avisa aqui para as duas abas nunca
@@ -94,7 +96,7 @@
     {
       versao: '1.42.94',
       itens: [
-        'Na janela de uma aula que já existe, o que você muda no horário, na situação, na cobrança e nos relatos salva sozinho, só nesta aula. O rodapé mostra "Salvo" com a hora, e os botões passam a ser "Fechar" e "Concluir registro". Se a aula mudar em outro aparelho enquanto está aberta, nada é gravado por cima: o rodapé avisa e fechar pergunta antes.'
+        'Na janela de uma aula que já existe, o relato e a nota só sua salvam sozinhos enquanto você escreve. Data, horário, duração, situação e cobrança gravam quando você fecha a aula ou toca em Concluir registro, com um aviso do que mudou e o Desfazer. "Descartar alterações" fecha sem gravar e volta o relato ao que era. Se a aula mudar em outro aparelho enquanto está aberta, nada é gravado por cima: o rodapé avisa e fechar pergunta antes.'
       ]
     },
     {
@@ -2000,6 +2002,17 @@
   window.addEventListener('resize', posicionarAviso);
 
   function fecharModal(id, depoisDoHistorico) {
+    /* F7: a aula fechada direto por uma ação (dividir, recuperar para trás, o
+     * material da aula) com mudança pendente. O relato grava pelo salvar
+     * sozinho; data, horário, duração, situação e cobrança só gravam pelo
+     * Fechar ou pelo Concluir, e o aviso diz que não gravaram. */
+    if (id === 'modal-aula' && !fechandoAulaPelasRegras && typeof janelaDaAulaAberta === 'function' &&
+        janelaDaAulaAberta() && !conflitoAutosaveAula) {
+      if (relatoEmEdicaoAlterado()) gravarRelatoDaAula();
+      if (camposPendentesDaAula(CAMPOS_FECHAMENTO_AULA).length) {
+        avisar('A mudança de data, horário, duração, situação ou cobrança desta aula não foi gravada. Abra a aula de novo para fazê-la.');
+      }
+    }
     if (id === 'modal-excluir-aluno' && exclusaoAlunoPendente) return;
     // o planejamento fechado no meio do "montando" cancela o pedido à IA
     if (id === 'modal-planejamento') pararPlanejamento();
@@ -3122,10 +3135,10 @@
     ['input', 'change'].forEach(function (tipo) {
       corpoAutosaveAula.addEventListener(tipo, function (ev) {
         var alvo = ev.target;
-        if (!alvo || !alvo.matches || !alvo.matches(
-          '#campo-data, #campo-hora, #campo-duracao, #campo-status, #campo-cobrar, ' +
-          '#campo-nota-texto, #campo-nota-privada')) return;
-        agendarAutosaveAula();
+        if (!alvo || !alvo.matches) return;
+        // só o relato e a nota só dela salvam na pausa; o resto grava ao fechar (F7)
+        if (alvo.matches('#campo-nota-texto, #campo-nota-privada')) agendarAutosaveAula();
+        else if (alvo.matches('#campo-data, #campo-hora, #campo-duracao, #campo-status, #campo-cobrar')) avisarFechamentoPendente();
       });
     });
     /* F7, regra 5: o app indo embora (recarregar, trocar de app, fechar) com a
@@ -3135,9 +3148,10 @@
     window.addEventListener('pagehide', function () {
       if (!aulaEmEdicao || !$('#modal-aula').classList.contains('aberto')) return;
       clearTimeout(esperaRascunhoRelato);
-      guardarRascunhoRelato(aulaEmEdicao, $('#campo-nota-texto'), $('#campo-nota-privada'), baseDiscoRelatoAula);
-      if (aulaTemMudancasParaAutosave()) gravarAutosaveAula();
+      guardarRascunhoRelato(aulaEmEdicao, $('#campo-nota-texto'), $('#campo-nota-privada'), baseDiscoRelatoAula); // o rascunho, na hora
+      if (relatoEmEdicaoAlterado()) gravarRelatoDaAula(); // e o relato, para a memória e o disco
     });
+    if ($('#descartar-aula')) $('#descartar-aula').addEventListener('click', descartarAlteracoesDaAula);
     if ($('#salvar-preparar-aula')) {
       $('#salvar-preparar-aula').addEventListener('click', function (e) { salvarAula(e, true); });
     }
@@ -3642,22 +3656,42 @@
 
   /* ================= salvar sozinho a aula aberta (F7) =================
    *
-   * As regras de dados, que nenhum caminho daqui pula:
-   * 1. Grava só o que ELA mudou nesta janela (a diferença do formulário para
-   *    o que já estava gravado), pelo Core.aplicarEdicaoAula com escopo
-   *    'esta': numa repetição, as aulas irmãs não mudam.
-   * 2. Nunca por cima de versão mais nova: antes de gravar, cada campo que ela
-   *    mudou é conferido no banco. Se ele também mudou ali desde que a janela o
-   *    viu (outro aparelho, pela nuvem), nada é gravado e a janela avisa;
-   *    fechar pede a decisão dela.
-   * 3. Nunca com data vazia ou data e hora pela metade (o navegador diz que a
-   *    entrada ainda é inválida): espera ela terminar.
-   * 4. A falha de disco aparece: no rodapé da janela e na faixa de gravação,
-   *    que tenta de novo sozinha. A memória já tem o que ela fez.
-   * 5. O relato tem rascunho no aparelho (a cada pausa na digitação) até a
-   *    gravação confirmar: fechar, voltar ou recarregar não o perde.
-   * Não há Desfazer aqui: a edição de horário, situação e relato é a mesma do
-   * Salvar de antes, só que sem esperar o botão. */
+   * A regra (decisão da orquestradora, 13/11/2026, para proteger o dinheiro):
+   * - SALVAM SOZINHOS na pausa da digitação: o relato e a nota só dela;
+   * - GRAVAM SÓ AO FECHAR OU AO CONCLUIR: data, horário, duração, situação e
+   *   cobrança. Nunca na pausa: datas intermediárias não gravam, e nada vai
+   *   para as exclusões da repetição sem a data final.
+   * - Ao fechar com algum desses mudado, sai o aviso com Desfazer ("Aula
+   *   atualizada: cancelada, sem cobrança"), pelo comDesfazer: o Desfazer volta
+   *   exatamente o banco de antes. Numa repetição, horário, duração, situação e
+   *   cobrança perguntam o escopo, como antes.
+   * - Na aula que já existe há "Descartar alterações": fecha sem gravar o que
+   *   estava pendente e volta o relato ao que havia ao abrir.
+   *
+   * E as regras de dados que nenhum caminho pula:
+   * 1. Grava só o que ELA mudou (a diferença do formulário para o que já está
+   *    gravado), e o retrato do que está gravado só absorve as chaves que de
+   *    fato gravaram.
+   * 2. Nunca por cima de versão mais nova: cada campo que ela mudou é conferido
+   *    no banco contra a versão que a janela viu. Mudou fora: nada é gravado, e
+   *    fechar pergunta. Registro que chega da nuvem com a janela aberta rebaseia
+   *    a janela (registrosChegaram -> rebasearAulaAberta).
+   * 3. Nunca com data vazia ou data e hora pela metade.
+   * 4. A falha de disco aparece no rodapé e na faixa de gravação.
+   * 5. O relato tem rascunho no aparelho a cada pausa e na saída da página,
+   *    com a base do relato como está no DISCO. */
+  /* Os fechamentos que já passaram pelas regras (gravaram, ou ela decidiu
+   * descartar) levam a marca: o fecharModal não precisa fazer nada por eles. */
+  var fechandoAulaPelasRegras = false;
+  function fecharAulaPelasRegras(depois) {
+    fechandoAulaPelasRegras = true;
+    try { fecharModal('modal-aula', depois || undefined); } finally { fechandoAulaPelasRegras = false; }
+  }
+
+  var CAMPOS_RELATO_AULA = ['notaTexto', 'notaPrivada'];
+  var CAMPOS_FECHAMENTO_AULA = ['data', 'hora', 'duracaoMin', 'status', 'cobravel'];
+  var CAMPOS_PADRAO_SERIE = ['hora', 'duracaoMin', 'status', 'cobravel'];
+
   function valoresEditadosDaAula() {
     if (!aulaEmEdicao) return null;
     return {
@@ -3671,8 +3705,8 @@
     };
   }
 
-  /* A aula como está no banco agora, nos mesmos campos, sempre do mesmo jeito:
-   * é a base da conferência antes de gravar (regra 2). Aula que sumiu: null. */
+  /* A aula como está no banco agora, nos mesmos campos e sempre do mesmo jeito:
+   * a base da conferência antes de gravar (regra 2). Aula que sumiu: null. */
   function valoresDaAulaNoBanco(id) {
     var a = (db.aulas || []).filter(function (x) { return x.id === id; })[0];
     if (!a) return null;
@@ -3683,22 +3717,23 @@
     };
   }
 
-  function aulaTemMudancasParaAutosave() {
-    if (!aulaEmEdicao || !$('#modal-aula').classList.contains('aberto')) return false;
-    var v = valoresEditadosDaAula();
-    var antes = snapshotAutosaveAula || {
-      data: aulaEmEdicao.data, hora: aulaEmEdicao.hora || '',
-      duracaoMin: aulaEmEdicao.duracaoMin, status: aulaEmEdicao.status || 'realizada',
-      cobravel: aulaEmEdicao.cobravel, notaTexto: aulaEmEdicao.notaTexto || '',
-      notaPrivada: aulaEmEdicao.notaPrivada || ''
-    };
-    return Object.keys(v).some(function (k) { return v[k] !== antes[k]; });
+  function janelaDaAulaAberta() {
+    return !!aulaEmEdicao && $('#modal-aula').classList.contains('aberto');
   }
 
-  /* Quem pergunta "ela tem coisa não gravada na aula?" (o link do
+  // As chaves de `campos` em que o formulário difere do que já está gravado.
+  function camposPendentesDaAula(campos) {
+    if (!janelaDaAulaAberta() || !snapshotAutosaveAula) return [];
+    var v = valoresEditadosDaAula();
+    return campos.filter(function (k) { return v[k] !== snapshotAutosaveAula[k]; });
+  }
+  function aulaTemMudancasParaAutosave() {
+    return camposPendentesDaAula(CAMPOS_RELATO_AULA.concat(CAMPOS_FECHAMENTO_AULA)).length > 0;
+  }
+  /* Quem pergunta "ela tem relato não gravado na aula?" (o link do
    * planejamento, na aula nova, do #172) continua perguntando por este nome. */
   function relatoEmEdicaoAlterado() {
-    return aulaTemMudancasParaAutosave();
+    return camposPendentesDaAula(CAMPOS_RELATO_AULA).length > 0;
   }
 
   // Data vazia, ou data e hora que o navegador ainda acha inválidas (regra 3).
@@ -3708,17 +3743,6 @@
     if (!data.value || (data.validity && data.validity.badInput)) faltas.push('a data');
     if (hora && hora.validity && hora.validity.badInput) faltas.push('o horário');
     return faltas.join(' e ');
-  }
-
-  /* Numa aula de repetição, o horário, a duração, a situação e a cobrança são
-   * o "padrão" que pode valer para esta, para as seguintes ou para todas: a
-   * escolha é dela (perguntarEscopo, no Concluir registro). Estes ficam fora do
-   * salvar sozinho. Devolve os que ela mudou e ainda não gravou. */
-  var CAMPOS_PADRAO_SERIE = ['hora', 'duracaoMin', 'status', 'cobravel'];
-  function padraoPendenteNaSerie() {
-    if (!aulaEmEdicao || !$('#modal-aula').classList.contains('aberto') || !Core.serieDe(db, aulaEmEdicao)) return [];
-    var v = valoresEditadosDaAula(), antes = snapshotAutosaveAula || {};
-    return CAMPOS_PADRAO_SERIE.filter(function (k) { return v[k] !== antes[k]; });
   }
 
   function horaDoSalvamentoAula() {
@@ -3732,77 +3756,70 @@
     e.style.display = texto ? '' : 'none';
   }
 
-  /* Resolve true quando o que ela mudou já está na memória (o disco pode ter
-   * falhado: a faixa avisa e tenta de novo); false quando NÃO gravou (conflito
-   * com versão mais nova, ou campo pela metade), e aí a janela não fecha sozinha. */
-  function gravarAutosaveAula() {
+  var FRASE_CONFLITO_AULA = 'Esta aula mudou em outro aparelho enquanto estava aberta. O que você mudou aqui não foi gravado por cima: feche e abra de novo para ver a versão nova.';
+
+  /* Regra 2: dos campos `chaves`, os que mudaram no banco desde que a janela o
+   * viu. Aula que sumiu: todos. */
+  function mudaramForaDaJanela(chaves) {
+    var noBanco = valoresDaAulaNoBanco(aulaEmEdicao.id);
+    if (!noBanco) return chaves.slice();
+    var base = baseBancoAutosaveAula || {};
+    return chaves.filter(function (k) { return noBanco[k] !== base[k]; });
+  }
+
+  /* Depois de uma gravação, a janela passa a ser a referência de "nada
+   * mudou": o retrato do que está gravado absorve SÓ as chaves gravadas (A1),
+   * a base do banco anda, e a foto do Voltar (#179) é refeita. */
+  function absorverGravadoNaJanela(chaves, valores) {
+    var s = Object.assign({}, snapshotAutosaveAula || {});
+    chaves.forEach(function (k) { s[k] = valores[k]; });
+    snapshotAutosaveAula = s;
+    baseBancoAutosaveAula = valoresDaAulaNoBanco(aulaEmEdicao.id);
+    if (typeof tirarFotoDaJanela === 'function' && !aulaTemMudancasParaAutosave()) tirarFotoDaJanela('modal-aula');
+  }
+
+  /* O relato e a nota só dela (salvam sozinhos). Resolve true quando o que
+   * ela escreveu está na memória (o disco pode ter falhado: a faixa avisa e
+   * tenta de novo); false quando NÃO gravou (conflito). */
+  function gravarRelatoDaAula() {
     if (temporizadorAutosaveAula) clearTimeout(temporizadorAutosaveAula);
     temporizadorAutosaveAula = null;
-    if (!aulaTemMudancasParaAutosave()) return promessaAutosaveAula || Promise.resolve(true);
+    if (!janelaDaAulaAberta()) return Promise.resolve(true);
+    var chaves = camposPendentesDaAula(CAMPOS_RELATO_AULA);
+    if (!chaves.length) return promessaAutosaveAula || Promise.resolve(true);
     if (conflitoAutosaveAula) return Promise.resolve(false);
-
-    var aula = aulaEmEdicao;
-    var incompleto = campoIncompletoDaAula();
-    if (incompleto) {
-      rotuloEstadoAutosaveAula('Termine de preencher ' + incompleto + ' para salvar.');
-      return Promise.resolve(false);
-    }
-    var valores = valoresEditadosDaAula();
-    var antes = snapshotAutosaveAula || {};
-    var mudancas = {};
-    Object.keys(valores).forEach(function (chave) {
-      if (valores[chave] !== antes[chave]) mudancas[chave] = valores[chave];
-    });
-    // na repetição, os campos do padrão esperam o Concluir registro (a escolha do escopo é dela)
-    var padrao = padraoPendenteNaSerie();
-    padrao.forEach(function (k) { delete mudancas[k]; });
-    if (!Object.keys(mudancas).length) {
-      if (padrao.length) rotuloEstadoAutosaveAula('Esta aula se repete: toque em Concluir registro para escolher se a mudança vale só para ela ou também para as outras.');
-      return promessaAutosaveAula || Promise.resolve(true);
-    }
-
-    // regra 2: o campo que ela mudou não pode ter mudado no banco desde que a janela o viu
-    var noBanco = valoresDaAulaNoBanco(aula.id);
-    var base = baseBancoAutosaveAula || {};
-    var mexidasFora = noBanco ? Object.keys(mudancas).filter(function (k) { return noBanco[k] !== base[k]; }) : ['aula'];
-    if (mexidasFora.length) {
+    if (mudaramForaDaJanela(chaves).length) {
       conflitoAutosaveAula = true;
-      rotuloEstadoAutosaveAula(noBanco
-        ? 'Esta aula mudou em outro aparelho enquanto estava aberta. Nada foi gravado por cima: feche e abra de novo para ver a versão nova.'
-        : 'Esta aula foi apagada em outro aparelho. Nada foi gravado.');
+      rotuloEstadoAutosaveAula(FRASE_CONFLITO_AULA);
       return Promise.resolve(false);
     }
-
+    var aula = aulaEmEdicao;
+    var valores = valoresEditadosDaAula();
+    var mudancas = {};
+    chaves.forEach(function (k) { mudancas[k] = valores[k]; });
+    // relato e nota não escorrem pela repetição: só esta aula
     Core.aplicarEdicaoAula(db, aula.id, mudancas, 'esta');
-    // a situação e a data mudam o que a trilha conta como dado, como no Salvar de antes
-    if ('status' in mudancas || 'data' in mudancas) revisarTrilhasDoAluno(aula.alunoId);
-    snapshotAutosaveAula = Object.assign({}, antes, valores);
-    baseBancoAutosaveAula = valoresDaAulaNoBanco(aula.id);
+    absorverGravadoNaJanela(chaves, valores);
+    var relatoGravado = { notaTexto: valores.notaTexto, notaPrivada: valores.notaPrivada };
+    var geracao = geracaoDoBanco;
     rotuloEstadoAutosaveAula('Salvando...');
-    // o relato que esta gravação leva ao disco (o salvar grava a memória inteira)
-    var naMemoria = valoresDaAulaNoBanco(aula.id) || {};
-    var relatoGravado = { notaTexto: naMemoria.notaTexto || '', notaPrivada: naMemoria.notaPrivada || '' };
     var p = salvar().then(function () {
-      if (aulaEmEdicao && aulaEmEdicao.id === aula.id) {
+      if (aulaEmEdicao && aulaEmEdicao.id === aula.id && geracao === geracaoDoBanco) {
         // regra 5: o disco agora tem este relato; o rascunho só fica se a tela já tiver mais que isso
         baseDiscoRelatoAula = relatoGravado;
-        var gravada = (db.aulas || []).filter(function (x) { return x.id === aula.id; })[0];
-        if (gravada) guardarRascunhoRelato(gravada, $('#campo-nota-texto'), $('#campo-nota-privada'), baseDiscoRelatoAula);
-      }
-      if (p === promessaAutosaveAula && aulaEmEdicao && aulaEmEdicao.id === aula.id) {
-        if (padraoPendenteNaSerie().length) {
-          rotuloEstadoAutosaveAula('Esta aula se repete: toque em Concluir registro para escolher se a mudança vale só para ela ou também para as outras.');
-        } else if (!aulaTemMudancasParaAutosave()) {
-          rotuloEstadoAutosaveAula('Salvo ' + horaDoSalvamentoAula());
+        guardarRascunhoRelato(aula, $('#campo-nota-texto'), $('#campo-nota-privada'), baseDiscoRelatoAula);
+        if (p === promessaAutosaveAula && !conflitoAutosaveAula) {
+          rotuloEstadoAutosaveAula(camposPendentesDaAula(CAMPOS_FECHAMENTO_AULA).length
+            ? 'Relato salvo ' + horaDoSalvamentoAula() + '. Data, horário, duração, situação e cobrança gravam ao fechar.'
+            : 'Salvo ' + horaDoSalvamentoAula());
+          if (typeof tirarFotoDaJanela === 'function' && !aulaTemMudancasParaAutosave()) tirarFotoDaJanela('modal-aula');
         }
-        $('#titulo-modal-aula').textContent = 'Aula de ' + Core.ddmmaaaa(valores.data);
       }
-      desenharAgenda();
       return true;
     }, function () {
       // regra 4: a faixa de gravação também aparece e tenta de novo sozinha
       if (p === promessaAutosaveAula && aulaEmEdicao && aulaEmEdicao.id === aula.id) {
-        rotuloEstadoAutosaveAula('Não foi possível gravar neste tablet. O que você mudou continua aqui, e eu tento de novo sozinho.');
+        rotuloEstadoAutosaveAula('Não foi possível gravar neste tablet. O que você escreveu continua aqui, e eu tento de novo sozinho.');
       }
       return true;
     }).then(function (r) {
@@ -3812,39 +3829,177 @@
     promessaAutosaveAula = p;
     return p;
   }
+  // o nome de antes: quem chama "grave o que der" (a troca de aula, a saída da página)
+  function gravarAutosaveAula() { return gravarRelatoDaAula(); }
 
   function agendarAutosaveAula() {
-    if (!aulaEmEdicao || !$('#modal-aula').classList.contains('aberto') || conflitoAutosaveAula) return;
+    if (!janelaDaAulaAberta() || conflitoAutosaveAula) return;
     if (temporizadorAutosaveAula) clearTimeout(temporizadorAutosaveAula);
     rotuloEstadoAutosaveAula('Alterações pendentes');
     temporizadorAutosaveAula = setTimeout(function () {
-      gravarAutosaveAula();
+      gravarRelatoDaAula();
     }, 600);
+  }
+
+  // Data, horário, duração, situação e cobrança mudaram: gravam ao fechar.
+  function avisarFechamentoPendente() {
+    if (!janelaDaAulaAberta() || conflitoAutosaveAula) return;
+    if (camposPendentesDaAula(CAMPOS_FECHAMENTO_AULA).length) {
+      rotuloEstadoAutosaveAula('Data, horário, duração, situação e cobrança gravam ao fechar.');
+    }
+  }
+
+  /* "Aula atualizada: cancelada, sem cobrança." O que mudou, na voz dela. */
+  function frasDoQueMudouNaAula(mudancas) {
+    var partes = [];
+    if ('data' in mudancas) partes.push('para ' + Core.ddmmaaaa(mudancas.data));
+    if ('hora' in mudancas) partes.push(mudancas.hora ? 'às ' + mudancas.hora : 'sem horário');
+    if ('duracaoMin' in mudancas) partes.push(Core.fmtDuracao(mudancas.duracaoMin));
+    if ('status' in mudancas) partes.push(((Core.STATUS[mudancas.status] && Core.STATUS[mudancas.status].rotulo) || mudancas.status).toLowerCase());
+    if ('cobravel' in mudancas) partes.push(mudancas.cobravel ? 'com cobrança' : 'sem cobrança');
+    return 'Aula atualizada: ' + partes.join(', ') + '.';
+  }
+
+  /* Fechar ou Concluir a aula que já existe, com todas as regras. `depois` roda
+   * quando a janela fecha (abrir outra aula, por exemplo). `concluir`: o botão
+   * Concluir registro (sem mudança de fechamento, diz "Aula salva."). */
+  function fecharAulaComRegras(depois, concluir) {
+    var fim = function () { if (depois) depois(); };
+    if (!janelaDaAulaAberta()) { fim(); return; }
+    var pendentes = camposPendentesDaAula(CAMPOS_FECHAMENTO_AULA);
+    if (conflitoAutosaveAula && aulaTemMudancasParaAutosave()) {
+      // regra 2: fechar aqui descarta o que ela mudou, e só com o sim dela
+      if (confirmar('Esta aula mudou em outro aparelho enquanto estava aberta, e o que você mudou aqui não foi gravado. Fechar sem gravar?')) {
+        fecharAulaPelasRegras(depois || null);
+      }
+      return;
+    }
+    var incompleto = pendentes.length ? campoIncompletoDaAula() : '';
+    if (incompleto && pendentes.some(function (k) { return k === 'data' || k === 'hora'; })) {
+      // regra 3: a data ou o horário pela metade não gravam; ela decide se sai assim
+      if (!confirmar('Falta terminar ' + incompleto + ' desta aula. Fechar sem gravar a mudança de data e horário?')) return;
+      pendentes = pendentes.filter(function (k) { return k !== 'data' && k !== 'hora'; });
+    }
+    gravarRelatoDaAula().then(function (gravou) {
+      if (!gravou || !janelaDaAulaAberta()) return;
+      if (!pendentes.length) {
+        var trilha = concluir ? revisarTrilhasDoAluno(aulaEmEdicao.alunoId) : null;
+        fecharAulaPelasRegras(depois || null);
+        if (concluir) { desenharTudo(); avisar('Aula salva.' + textoDeTrilha(trilha)); }
+        return;
+      }
+      var fora = mudaramForaDaJanela(pendentes);
+      if (fora.length) {
+        conflitoAutosaveAula = true;
+        rotuloEstadoAutosaveAula(FRASE_CONFLITO_AULA);
+        return;
+      }
+      var valores = valoresEditadosDaAula();
+      var mudancas = {};
+      pendentes.forEach(function (k) { mudancas[k] = valores[k]; });
+      var aula = aulaEmEdicao;
+      var alunoId = aula.alunoId;
+      var naSerie = Core.serieDe(db, aula) && pendentes.some(function (k) { return CAMPOS_PADRAO_SERIE.indexOf(k) >= 0; });
+      var aplicar = function (escopo) {
+        var mexeu = null;
+        var rotulo = function () {
+          var base = frasDoQueMudouNaAula(mudancas);
+          if (escopo === 'seguintes') base = base.replace('Aula atualizada', 'Aulas atualizadas desta data em diante');
+          if (escopo === 'todas') base = base.replace('Aula atualizada', 'Todas as aulas da repetição atualizadas');
+          return base + textoDeTrilha(mexeu);
+        };
+        comDesfazer(rotulo, function () {
+          Core.aplicarEdicaoAula(db, aula.id, mudancas, escopo);
+          mexeu = revisarTrilhasDoAluno(alunoId);
+        }).then(function () {
+          if (aulaEmEdicao && aulaEmEdicao.id === aula.id) absorverGravadoNaJanela(pendentes, valores);
+          fecharAulaPelasRegras(depois || null);
+          desenharTudo();
+        });
+      };
+      if (naSerie) perguntarEscopo('Salvar a alteração em', aplicar);
+      else aplicar('esta');
+    });
+  }
+
+  /* "Descartar alterações": fecha sem gravar o que está pendente e volta o
+   * relato e a nota ao que havia ao abrir, com a marca de "destacada" da
+   * repetição como era (o relato salvo sozinho destaca a ocorrência). Só
+   * esses três campos: o assunto, o domínio e os arquivos, que gravam na hora
+   * por outros caminhos, ficam. E só se ninguém mais mexeu nela desde a última
+   * gravação daqui (regra 2). */
+  function descartarAlteracoesDaAula() {
+    if (!janelaDaAulaAberta()) return;
+    var aula = aulaEmEdicao;
+    if (!confirmar('Descartar o que você mudou nesta aula desde que a abriu, inclusive o relato?')) return;
+    if (temporizadorAutosaveAula) clearTimeout(temporizadorAutosaveAula);
+    temporizadorAutosaveAula = null;
+    limparRascunhoRelato(aula.id);
+    var i = (db.aulas || []).map(function (x) { return x.id; }).indexOf(aula.id);
+    var gravouRelato = aberturaDaAula && JSON.stringify(valoresDaAulaNoBanco(aula.id)) !== JSON.stringify(aberturaDaAula.valores);
+    if (!gravouRelato || i < 0) { fecharAulaPelasRegras(null); return; }
+    if (mudaramForaDaJanela(CAMPOS_RELATO_AULA.concat(CAMPOS_FECHAMENTO_AULA)).length) {
+      avisar('Esta aula mudou em outro aparelho: nada foi desfeito. O que você mudou continua gravado.');
+      fecharAulaPelasRegras(null);
+      return;
+    }
+    var era = aberturaDaAula.registro, agora = db.aulas[i];
+    ['notaTexto', 'notaPrivada', 'destacada'].forEach(function (k) {
+      if (Object.prototype.hasOwnProperty.call(era, k)) agora[k] = era[k]; else delete agora[k];
+    });
+    salvarEDepois(function (gravou) {
+      fecharAulaPelasRegras(null);
+      desenharTudo();
+      if (gravou) avisar('Alterações descartadas: a aula voltou ao que era.');
+    });
+  }
+
+  /* Registros chegaram da nuvem com a janela aberta (regra 2, A4): a memória
+   * foi trocada. O campo que ela NÃO mexeu aqui mostra o valor novo; o que ela
+   * mexeu e também mudou lá vira conflito, com a frase certa. Nunca "Salvo". */
+  function rebasearAulaAberta() {
+    if (!janelaDaAulaAberta()) return;
+    var id = aulaEmEdicao.id;
+    var novo = (db.aulas || []).filter(function (x) { return x.id === id; })[0];
+    if (!novo) {
+      conflitoAutosaveAula = true;
+      rotuloEstadoAutosaveAula('Esta aula foi apagada em outro aparelho. Nada foi gravado.');
+      return;
+    }
+    aulaEmEdicao = novo;
+    var noBanco = valoresDaAulaNoBanco(id);
+    var base = baseBancoAutosaveAula || {};
+    var mudaram = Object.keys(noBanco).filter(function (k) { return noBanco[k] !== base[k]; });
+    if (!mudaram.length) return;
+    var mexidas = camposPendentesDaAula(mudaram);
+    if (mexidas.length) {
+      conflitoAutosaveAula = true;
+      rotuloEstadoAutosaveAula(FRASE_CONFLITO_AULA);
+      return;
+    }
+    // o que ela não mexeu: o formulário passa a mostrar a versão nova
+    var CAMPO = { data: '#campo-data', hora: '#campo-hora', duracaoMin: '#campo-duracao', status: '#campo-status',
+      cobravel: '#campo-cobrar', notaTexto: '#campo-nota-texto', notaPrivada: '#campo-nota-privada' };
+    var s = Object.assign({}, snapshotAutosaveAula || {});
+    mudaram.forEach(function (k) {
+      var c = $(CAMPO[k]);
+      if (!c) return;
+      if (k === 'cobravel') c.checked = noBanco[k] !== false; else c.value = String(noBanco[k]);
+      s[k] = valoresEditadosDaAula()[k];
+    });
+    snapshotAutosaveAula = s;
+    baseBancoAutosaveAula = noBanco;
+    if (mudaram.some(function (k) { return CAMPOS_RELATO_AULA.indexOf(k) >= 0; })) {
+      baseDiscoRelatoAula = { notaTexto: noBanco.notaTexto, notaPrivada: noBanco.notaPrivada };
+    }
+    rotuloEstadoAutosaveAula('Chegou uma mudança desta aula do outro aparelho; a janela já mostra a versão nova.');
+    if (typeof tirarFotoDaJanela === 'function' && !aulaTemMudancasParaAutosave()) tirarFotoDaJanela('modal-aula');
   }
 
   var aulaNovaMexida = false; // a aula nova já preenchida (o link do planejamento pergunta antes)
   function solicitarFecharModal(id) {
     if (id === 'modal-planejamento' && planejamentoTemTrabalho()) { perguntarSairDoPlanejamento(); return; }
-    if (id === 'modal-aula' && aulaEmEdicao && $('#modal-aula').classList.contains('aberto')) {
-      if (conflitoAutosaveAula && aulaTemMudancasParaAutosave()) {
-        // regra 2: fechar aqui descarta o que ela mudou, e só com o sim dela
-        if (confirmar('Esta aula mudou em outro aparelho enquanto estava aberta, e o que você mudou aqui não foi gravado. Fechar sem gravar?')) {
-          fecharModal(id);
-        }
-        return;
-      }
-      // na repetição, horário, duração, situação e cobrança só gravam no Concluir (com o escopo)
-      if (padraoPendenteNaSerie().length && !confirmar('Você mudou o horário, a duração, a situação ou a ' +
-          'cobrança desta aula, que se repete, e não tocou em Concluir registro. Fechar sem gravar essa mudança?')) {
-        return;
-      }
-      if (aulaTemMudancasParaAutosave() || promessaAutosaveAula) {
-        gravarAutosaveAula().then(function (gravou) {
-          if (gravou) fecharModal(id);
-        });
-        return;
-      }
-    }
+    if (id === 'modal-aula' && janelaDaAulaAberta()) { fecharAulaComRegras(null, false); return; }
     fecharModal(id);
   }
 
@@ -3856,12 +4011,20 @@
       avisar('Cadastre um aluno antes de marcar a primeira aula.');
       return;
     }
-    /* Outra aula abre por cima desta (o "Salvar e preparar", a série): o que
-     * ela mudou na aula de antes vai para a memória ANTES de o formulário ser
-     * refeito, com as mesmas regras (sem conflito e sem campo pela metade). */
-    if (aulaEmEdicao && $('#modal-aula').classList.contains('aberto') && aulaTemMudancasParaAutosave()) {
-      gravarAutosaveAula();
+    /* Outra aula abre por cima desta com mudança pendente na de antes: a de
+     * antes fecha primeiro pelas regras dela (grava, ou pergunta com conflito
+     * ou data pela metade) e só então a outra abre. Nada se perde calado. */
+    if (janelaDaAulaAberta() && (aulaTemMudancasParaAutosave() || promessaAutosaveAula) && !(aulaId && aulaEmEdicao.id === aulaId)) {
+      fecharAulaComRegras(function () { abrirAula(aulaId, dataSugerida); }, false);
+      return;
     }
+    /* A MESMA aula redesenhada com a janela aberta (depois de gravar o
+     * mapeamento ou a sondagem): o formulário é refeito, e o que estava
+     * pendente nele, com o estado do salvar sozinho, volta depois. */
+    var mantidoDaAula = (janelaDaAulaAberta() && aulaId && aulaEmEdicao.id === aulaId) ? {
+      form: valoresEditadosDaAula(), snapshot: snapshotAutosaveAula, base: baseBancoAutosaveAula,
+      conflito: conflitoAutosaveAula, disco: baseDiscoRelatoAula, abertura: aberturaDaAula
+    } : null;
     aulaEmEdicao = aulaId ? db.aulas.filter(function (a) { return a.id === aulaId; })[0] : null;
     var novo = !aulaEmEdicao;
     var serie = aulaEmEdicao ? Core.serieDe(db, aulaEmEdicao) : null;
@@ -3876,6 +4039,8 @@
     baseBancoAutosaveAula = null;
     conflitoAutosaveAula = false;
     baseDiscoRelatoAula = null;
+    aberturaDaAula = null;
+    if ($('#descartar-aula')) $('#descartar-aula').style.display = novo ? 'none' : '';
     // nada foi salvo ainda nesta abertura: o rodapé só fala quando há o que dizer
     rotuloEstadoAutosaveAula('');
     if ($('#salvar-preparar-aula')) $('#salvar-preparar-aula').style.display = novo ? '' : 'none';
@@ -4367,7 +4532,25 @@
       });
       // a aula no banco como esta janela a viu ao abrir: a base da conferência antes de gravar
       baseBancoAutosaveAula = valoresDaAulaNoBanco(aulaEmEdicao.id);
+      // o registro inteiro da abertura: o "Descartar alterações" volta exatamente a isto
+      aberturaDaAula = { registro: JSON.parse(JSON.stringify(aulaEmEdicao)), valores: valoresDaAulaNoBanco(aulaEmEdicao.id) };
       baseDiscoRelatoAula = { notaTexto: aulaEmEdicao.notaTexto || '', notaPrivada: aulaEmEdicao.notaPrivada || '' };
+    }
+    if (mantidoDaAula && aulaEmEdicao) {
+      var CAMPO_DA_AULA = { data: '#campo-data', hora: '#campo-hora', duracaoMin: '#campo-duracao', status: '#campo-status',
+        cobravel: '#campo-cobrar', notaTexto: '#campo-nota-texto', notaPrivada: '#campo-nota-privada' };
+      Object.keys(CAMPO_DA_AULA).forEach(function (k) {
+        var c = $(CAMPO_DA_AULA[k]);
+        if (!c) return;
+        if (k === 'cobravel') c.checked = !!mantidoDaAula.form[k]; else c.value = String(mantidoDaAula.form[k]);
+      });
+      snapshotAutosaveAula = mantidoDaAula.snapshot;
+      baseBancoAutosaveAula = mantidoDaAula.base;
+      conflitoAutosaveAula = mantidoDaAula.conflito;
+      baseDiscoRelatoAula = mantidoDaAula.disco;
+      aberturaDaAula = mantidoDaAula.abertura;
+      if (relatoEmEdicaoAlterado()) agendarAutosaveAula();
+      else avisarFechamentoPendente();
     }
     atualizarPrevisao();
     abrirModal('modal-aula');
@@ -5486,61 +5669,12 @@
       return;
     }
 
-    /* edição (F7): o que ela muda já salva sozinho. "Concluir registro" grava o
-     * que ainda falta pelo MESMO caminho (gravarAutosaveAula, com a conferência
-     * contra versão mais nova e a recusa de campo pela metade) e fecha.
-     *
-     * A exceção é a aula de repetição: horário, duração, situação e cobrança
-     * podem valer para esta, para as seguintes ou para todas, e essa escolha é
-     * dela. Esses campos não salvam sozinhos (ficam pendentes no rodapé) e só
-     * gravam aqui, depois da pergunta de escopo de sempre, com a mesma
-     * conferência contra versão mais nova. */
-    var padrao = padraoPendenteNaSerie();
-    if (!padrao.length || conflitoAutosaveAula) { solicitarFecharModal('modal-aula'); return; }
-    gravarAutosaveAula().then(function (gravou) {
-      if (!gravou || !aulaEmEdicao) return;
-      var noBanco = valoresDaAulaNoBanco(aulaEmEdicao.id);
-      var base = baseBancoAutosaveAula || {};
-      if (!noBanco || padrao.some(function (k) { return noBanco[k] !== base[k]; })) {
-        conflitoAutosaveAula = true;
-        rotuloEstadoAutosaveAula('Esta aula mudou em outro aparelho enquanto estava aberta. Nada foi gravado por cima: feche e abra de novo para ver a versão nova.');
-        return;
-      }
-      var v = valoresEditadosDaAula();
-      var mudancas = {};
-      padrao.forEach(function (k) { mudancas[k] = v[k]; });
-      perguntarEscopo('Salvar a alteração em', function (escopo) {
-        var rotulos = {
-          esta: 'Aula alterada.',
-          seguintes: 'Aulas alteradas desta data em diante.',
-          todas: 'Todas as aulas da repetição foram alteradas.'
-        };
-        var alunoId = aulaEmEdicao.alunoId;
-        var mexeu = null;
-        var acao = function () {
-          Core.aplicarEdicaoAula(db, aulaEmEdicao.id, mudancas, escopo);
-          mexeu = revisarTrilhasDoAluno(alunoId);
-        };
-        if (escopo === 'esta') {
-          acao();
-          salvarEDepois(function () {
-            fecharModal('modal-aula');
-            desenharTudo();
-            avisar(rotulos[escopo] + textoDeTrilha(mexeu));
-          });
-        } else {
-          /* O rótulo é uma função porque só depois da ação se sabe quantos
-           * passos se mexeram. Nos escopos "seguintes" e "todas", que são
-           * justamente os que desmarcam vários de uma vez, a trilha andava para
-           * trás em silêncio: o aviso saía sem contar nada. */
-          comDesfazer(function () { return rotulos[escopo] + textoDeTrilha(mexeu); }, acao)
-            .then(function () {
-              fecharModal('modal-aula');
-              desenharTudo();
-            });
-        }
-      });
-    });
+    /* edição (F7): "Concluir registro" fecha pelas mesmas regras do Fechar
+     * (fecharAulaComRegras): o relato grava; data, horário, duração, situação e
+     * cobrança gravam com o aviso de Desfazer (numa repetição, depois da
+     * pergunta de escopo); com conflito ou data pela metade, pergunta. Sem
+     * mudança de fechamento, diz "Aula salva." com o que andou na trilha. */
+    fecharAulaComRegras(null, true);
   }
 
   function excluirAulaAtual() {
@@ -11347,30 +11481,15 @@
    * O caminho é justamente o de quem estava escrevendo: ela digita o que
    * rendeu, rola até o alto para conferir onde os dois pararam, toca em Abrir.
    *
-   * Desde o F7, tudo o que ela mudou nesta janela (anotações, data, horário,
-   * duração, situação e cobrança) já salva sozinho só nesta aula, e antes de
-   * navegar o que faltar grava pelo mesmo caminho, com a conferência contra
-   * versão mais nova. Não há mais o que perder ao abrir a outra aula; com
-   * conflito, a janela pergunta, e o padrão é ficar. */
+   * Desde o F7, a aula de agora fecha pelas regras dela antes de a outra abrir:
+   * o relato e a nota gravam; data, horário, duração, situação e cobrança
+   * gravam com o aviso de Desfazer (numa repetição, com a pergunta de escopo);
+   * com conflito ou data pela metade, a janela pergunta, e o padrão é ficar. */
   function irParaOutraAula(aulaId) {
-    var seguir = function () {
-      fecharModal('modal-aula');
-      setTimeout(function () { abrirAula(aulaId, null); }, 120);
-    };
-    if (!aulaEmEdicao || !$('#modal-aula').classList.contains('aberto')) { seguir(); return; }
-    /* F7: o que ela mudou nesta aula vai antes de navegar pelo MESMO salvar
-     * sozinho (só o que mudou, escopo 'esta', conferido contra versão mais
-     * nova, sem campo pela metade). Com conflito, a decisão é dela. */
-    if (conflitoAutosaveAula && aulaTemMudancasParaAutosave()) {
-      if (confirmar('Esta aula mudou em outro aparelho enquanto estava aberta, e o que você mudou aqui não foi gravado. Abrir a outra aula sem gravar?')) seguir();
-      return;
-    }
-    // na repetição, horário, duração, situação e cobrança só gravam no Concluir (com o escopo)
-    if (padraoPendenteNaSerie().length && !confirmar('Você mudou o horário, a duração, a situação ou a ' +
-        'cobrança desta aula, que se repete, e não tocou em Concluir registro. Abrir a outra aula sem gravar essa mudança?')) {
-      return;
-    }
-    gravarAutosaveAula().then(function (gravou) { if (gravou) seguir(); });
+    var abrirOutra = function () { setTimeout(function () { abrirAula(aulaId, null); }, 120); };
+    if (!janelaDaAulaAberta()) { fecharModal('modal-aula'); abrirOutra(); return; }
+    // F7: a aula de agora fecha pelas regras dela (grava, ou pergunta) e só então a outra abre
+    fecharAulaComRegras(abrirOutra, false);
   }
 
   /* O que ela marcou no mapeamento, de TODAS as matérias, numa lista só.
@@ -24852,7 +24971,9 @@
     Store.carregar().then(function (lido) {
       if (!lido) return;
       db = lido;
+      geracaoDoBanco++; // F7: a gravação em curso na aula aberta não diz "Salvo" sobre a memória trocada
       corteSoNaMemoria = null;
+      rebasearAulaAberta(); // F7: a janela da aula aberta passa a ver o que chegou (ou mostra o conflito)
       valoresOcultos = !!(db.ajustes && db.ajustes.valoresOcultos);
       desenharTudo();
       if (modoCelular) desenharCelularDepoisDaNuvem();

@@ -381,10 +381,9 @@
       <div class="modal-corpo" id="corpo-modal-aula"></div>
       <div class="modal-rodape" id="rodape-modal-aula">
         <button class="btn perigo esquerda" id="excluir-aula" type="button">Excluir</button>
-        <span class="ajuda-salvamento" id="aviso-salvamento-aula" style="display:none">
-          A aula salva as alterações automaticamente.
-        </span>
         <span class="estado-salvamento-aula" id="estado-salvamento-aula" aria-live="polite" style="display:none"></span>
+        <!-- F7: na aula que já existe, fecha sem gravar o pendente e volta o relato ao que havia ao abrir -->
+        <button class="btn" type="button" id="descartar-aula" style="display:none">Descartar alterações</button>
         <button class="btn" data-fechar type="button" id="cancelar-aula">Cancelar</button>
         <button class="btn secundaria" id="salvar-preparar-aula" type="button" style="display:none">Salvar e preparar</button>
         <button class="btn principal" id="salvar-aula" type="button">Salvar</button>

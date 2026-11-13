@@ -29,6 +29,8 @@ const GRADE_ANTIGA = process.argv.indexOf('--envenenado-grade-antiga') >= 0;
 async function rodar() {
   await amb.subir();
   const pag = await amb.pagina();
+  const dialogos = [];
+  pag.on('dialog', async d => { dialogos.push(d.message()); try { await d.dismiss(); } catch (e) { /* ok */ } });
   if (GRADE_ANTIGA) {
     await pag.evaluateOnNewDocument(() => {
       document.addEventListener('DOMContentLoaded', () => {
@@ -233,7 +235,7 @@ async function rodar() {
     }), serieAntes || { id: '', serieId: '' });
   const semConcluir = await lerSerie();
   conf('na repetição, o horário não salva sozinho', !!semConcluir.atual && semConcluir.atual.hora !== '16:30', true);
-  conf('e o rodapé pede o Concluir registro', /Concluir registro/.test(await pag.$eval('#estado-salvamento-aula', e => e.textContent)), true);
+  conf('e o rodapé diz que grava ao fechar', /gravam ao fechar/.test(await pag.$eval('#estado-salvamento-aula', e => e.textContent)), true);
   await pag.click('#salvar-aula');
   const escopo = await esperar('pergunta de escopo', () => pag.evaluate(() =>
     document.querySelector('#modal-escopo').classList.contains('aberto')), Boolean, 5000);
@@ -403,10 +405,10 @@ async function rodar() {
   const seloPrivado = await pag.$eval('#grupo-registro .destino-privado', e => e.textContent.trim());
   conf('campo privado identifica nota privada só da professora', seloPrivado, 'Só você vê');
 
-  // Aviso de salvamento no rodapé
-  const textoAvisoRodape = await pag.$eval('#aviso-salvamento-aula', e => e.textContent.trim());
-  conf('aviso do registro explica que as alterações salvam automaticamente',
-    textoAvisoRodape.includes('automaticamente'), true);
+  // F7: o rodapé fala do que está gravado; na aula que já existe, há "Descartar alterações"
+  conf('a aula que já existe oferece Fechar e Descartar alterações', await pag.evaluate(() =>
+    document.querySelector('#cancelar-aula').textContent.trim() + '|' +
+    (getComputedStyle(document.querySelector('#descartar-aula')).display !== 'none')), 'Fechar|true');
 
   // ================================================================
   secao('5. Alterações de horário e relato salvam automaticamente');
@@ -432,12 +434,14 @@ async function rodar() {
     };
   }), aulaGravada1.id);
   conf('data vazia não é gravada na aula existente', dataVaziaNaoGravou, dataAntesDeLimpar);
+  const dialogosAntesDaData = dialogos.length;
   await pag.click('#cancelar-aula');
-  await pausa(100);
+  await pausa(300);
+  // a pergunta sobre a data pela metade; o "não" (cancelar) deixa a janela aberta
   const modalPermaneceComDataObrigatoria = await pag.evaluate(() =>
-    document.querySelector('#modal-aula').classList.contains('aberto') &&
-    document.querySelector('#estado-salvamento-aula').textContent.includes('Termine de preencher a data'));
-  conf('modal não fecha enquanto a data obrigatória estiver vazia', modalPermaneceComDataObrigatoria, true);
+    document.querySelector('#modal-aula').classList.contains('aberto')) &&
+    /Falta terminar a data/.test(dialogos.slice(dialogosAntesDaData).join(' '));
+  conf('fechar com a data vazia pergunta, e o "não" deixa a janela aberta', modalPermaneceComDataObrigatoria, true);
   await pag.evaluate(valor => {
     const data = document.querySelector('#campo-data');
     data.value = valor;
@@ -478,7 +482,10 @@ async function rodar() {
     }), aulaGravada1.id), v => !!v && v.hora === '10:30' &&
       v.notaTexto === 'Relato sintético salvo automaticamente.' &&
       v.notaPrivada === 'Nota privada sintética salva automaticamente.', 5000);
-  conf('horário, relato e nota privada salvaram sem botão', autosavePersistiu.ok, true);
+  conf('horário, relato e nota privada gravaram ao Fechar', autosavePersistiu.ok, true);
+  conf('e o aviso diz o que mudou, com Desfazer', await pag.evaluate(() =>
+    /^Aula atualizada: às 10:30/.test(document.querySelector('#aviso-texto').textContent) &&
+    /Desfazer/.test((document.querySelector('#aviso-acao') || {}).textContent || '')), true);
 
   // Reabre via UI e confirma que os dados continuam gravados.
   await pag.click('[data-aula-id="' + aulaGravada1.id + '"]');
