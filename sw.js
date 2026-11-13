@@ -158,8 +158,17 @@
  * passar sem cache. O v148 traz o aviso de novidades do planejamento.
  * O v152 reorganiza a janela da aula em duas colunas no tablet.
  * O v156 traz os 6 assuntos novos de química da revisão dos mapas dos livros no banco/topicos/quimica.json.
+ * O v158 traz a busca da Biblioteca nos capítulos e assuntos do mapa, com todas as palavras e os melhores resultados.
+ * O v166 traz as aulas tiradas e postas só na folha do planejamento.
+ * O v168 traz a correção dos módulos ligados a 14 assuntos no banco/topicos/matematica.json.
+ * O v169 traz o Voltar do aparelho dentro do aplicativo.
+ * O v171 traz a fase 1a da biblioteca na nuvem: a posição de leitura e a correção do
+ * mapa sobrevivem à troca de meta e de arquivo do livro.
+ * O v182 traz o Voltar sem entrada sobrando no histórico depois de recarregar com uma janela aberta.
+ * O v186 traz a pinça e o duplo toque no livro aberto.
+ * O v187 traz o conteúdo escrito no pedido do planejamento valendo como o do aviso.
  */
-var CACHE = 'apoio-educacional-v156';
+var CACHE = 'apoio-educacional-v187';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
