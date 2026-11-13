@@ -3291,6 +3291,7 @@
     }
     $('#corpo-modal-leitor-pdf').addEventListener('scroll', rolarLeitorContinuo, { passive: true });
     ligarGestosDoLeitor($('#corpo-modal-leitor-pdf'));
+    ligarCanetaSemSelecao($('#corpo-modal-leitor-pdf'));
     $('#leitor-slider-pagina').addEventListener('input', function () {
       // rolagem DIRETA: a suave atravessava as páginas do caminho, desenhava cada uma
       // e deixava o temporizador gravar posições intermediárias depois de soltar
@@ -25212,6 +25213,7 @@
         if (antigo) { antigo.width = 0; antigo.height = 0; }
         registro.caixa.innerHTML = '';
         registro.caixa.appendChild(canvas);
+        criarCamadaDeTexto(estado, registro, pagina, vp);
         registro.temCanvas = true;
         registro.esticado = false;
         registro.densidade = densidade;
@@ -25321,11 +25323,60 @@
     }).catch(function () { /* o detalhe é só nitidez: a página inteira continua lá */ }).then(atualizarOcupacaoDoLeitor);
   }
 
+  /* A CAMADA DE TEXTO (fatia 7 do leitor): o texto da página, transparente,
+   * por cima do canvas, para o dedo selecionar e copiar (o TextLayer do
+   * pdf.js). Nasce com o canvas da página (desenharPaginaContinua) e sai com
+   * ele (liberarPaginaContinua): só as páginas desenhadas têm texto vivo.
+   * Página sem texto (a do escaneado) não ganha camada, e o livro escaneado
+   * (a sonda da fatia 3) é dito uma vez por abertura. O anexo da aula (página
+   * única) continua sem camada. */
+  var LEITOR_SEM_TEXTO = 'Este livro é imagem: o texto não pode ser selecionado nem buscado.';
+  function criarCamadaDeTexto(estado, registro, pagina, vp) {
+    if (estado.escaneado && !estado.avisouImagem) { estado.avisouImagem = true; avisar(LEITOR_SEM_TEXTO); }
+    var velha = registro.texto;
+    // a página foi redesenhada no mesmo tamanho (a segunda passada): a camada pronta volta
+    if (velha && velha.escala === vp.scale) { if (velha.temTexto) registro.caixa.appendChild(velha.div); return; }
+    soltarCamadaDeTexto(registro);
+    var camada = { div: el('div', { class: 'textLayer leitor-pdf-texto' }), escala: vp.scale, tarefa: null, temTexto: false };
+    camada.div.style.setProperty('--total-scale-factor', String(vp.scale));
+    registro.texto = camada;
+    Promise.all([carregarPdfJs(), pagina.getTextContent({ includeMarkedContent: true, disableNormalization: true })]).then(function (r) {
+      // a página saiu (ou foi redesenhada em outro tamanho) enquanto o texto chegava
+      if (registro.texto !== camada || estado !== leitor) return null;
+      var temTexto = (r[1].items || []).some(function (i) { return i.str && i.str.trim(); });
+      // caixa.dataset.texto diz que a página já foi lida: '1' com camada pronta, '0' sem texto
+      if (!temTexto) { registro.caixa.dataset.texto = '0'; return null; }
+      camada.temTexto = true;
+      if (registro.temCanvas && !camada.div.parentNode) registro.caixa.appendChild(camada.div);
+      camada.tarefa = new r[0].TextLayer({ textContentSource: r[1], container: camada.div, viewport: vp });
+      return camada.tarefa.render().then(function () { if (registro.texto === camada) registro.caixa.dataset.texto = '1'; });
+    }).catch(function () { /* sem a camada a página continua lá; só não seleciona */ });
+  }
+
+  function soltarCamadaDeTexto(registro) {
+    var camada = registro.texto;
+    delete registro.caixa.dataset.texto;
+    if (!camada) return;
+    registro.texto = null;
+    if (camada.tarefa) { try { camada.tarefa.cancel(); } catch (e) { /* já terminou */ } }
+    if (camada.div.parentNode) camada.div.parentNode.removeChild(camada.div);
+  }
+
+  /* A S Pen não seleciona o texto do livro: a caneta é da folha (padrão 4.5
+   * do benchmark). O navegador começa a seleção depois do pointerdown; se ele
+   * veio da caneta, o selectstart é cancelado. O dedo e o mouse selecionam. */
+  var canetaNoLeitor = false;
+  function ligarCanetaSemSelecao(corpo) {
+    corpo.addEventListener('pointerdown', function (ev) { canetaNoLeitor = ev.pointerType === 'pen'; }, true);
+    corpo.addEventListener('selectstart', function (ev) { if (canetaNoLeitor) ev.preventDefault(); });
+  }
+
   function liberarPaginaContinua(registro) {
     soltarDetalhe(registro);
     if (registro.tarefa) { registro.tarefa.cancel(); registro.tarefa = null; }
     var c = registro.caixa.querySelector('canvas');
     if (c) { c.width = 0; c.height = 0; registro.caixa.removeChild(c); }
+    soltarCamadaDeTexto(registro);
     registro.caixa.innerHTML = '';
     registro.caixa.appendChild(el('div', { class: 'leitor-pdf-pagina-vazia', 'aria-hidden': 'true' }));
     registro.desenhando = false;

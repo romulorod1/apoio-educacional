@@ -2174,6 +2174,27 @@ button.alvo-rascunho:hover { background: var(--soft); }
 /* O canvas de detalhe do zoom alto (fatia 3): só o pedaço à vista, na densidade
    da tela, por cima da página inteira; o toque passa direto para a página. */
 .leitor-pdf-pagina canvas.leitor-pdf-detalhe { position: absolute; pointer-events: none; }
+/* A camada de texto do livro (fatia 7): o CSS do textLayer do pdf.js 6.4.299
+   (pdf_viewer.css), só o que a camada usa. O texto fica transparente, por cima
+   do canvas e do detalhe, no lugar da letra desenhada; a seleção aparece em
+   azul claro. O tamanho é o da caixa da página (o pdf.js o escreve com round(),
+   que nem todo navegador tem). */
+.leitor-pdf-pagina .textLayer { position: absolute; inset: 0; width: 100% !important; height: 100% !important;
+  z-index: 1; overflow: clip; opacity: 1; line-height: 1; text-align: initial;
+  -webkit-text-size-adjust: none; text-size-adjust: none; forced-color-adjust: none;
+  transform-origin: 0 0; caret-color: CanvasText;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+.leitor-pdf-pagina .textLayer span, .leitor-pdf-pagina .textLayer br { color: transparent; position: absolute;
+  white-space: pre; cursor: text; transform-origin: 0% 0%;
+  --font-height: 0; font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1; --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv)); }
+.leitor-pdf-pagina .textLayer span.markedContent { top: 0; height: 0; }
+.leitor-pdf-pagina .textLayer ::selection { background: rgba(0, 0, 255, 0.25); background: color-mix(in srgb, AccentColor, transparent 75%); }
+.leitor-pdf-pagina .textLayer br::selection { background: transparent; }
 .leitor-pdf-pagina-vazia { width: 100%; height: 100%; background: var(--branco); }
 /* A frase do C3 ("Escolha a página e toque em...") fica colada embaixo da
    barra, de ponta a ponta, sem rolar junto com a página. */

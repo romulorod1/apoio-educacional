@@ -1,0 +1,383 @@
+/* testa_leitor_texto.js
+ *
+ * A fatia 7 do leitor: texto selecionável sobre a página. No Chrome de
+ * verdade, com densidade de tela 2 (a do tablet), e com dois livros
+ * SINTÉTICOS do gerador (biblioteca/_amostra/fazer_amostra_livros.py
+ * --texto): o de 400 páginas do leitor, em que cada página traz a linha
+ * "Exercício N. Calcule a soma dos números de 1 a N.", e um "escaneado" de 12
+ * páginas, cada uma uma imagem JPEG da página inteira, sem texto. Nenhum livro
+ * de verdade, nenhum nome de criança.
+ *
+ * O que prova (o aceite da fatia 7 no DIAGNOSTICO_E_PLANO do leitor):
+ *   1. na p. 206, em pé (800x1280), a área tem mais de 0 elementos de texto
+ *      sobre a página;
+ *   2. arrastar o mouse por cima da linha do exercício, no lugar em que ela
+ *      está DESENHADA no canvas (a conta vem da geometria do gerador, não da
+ *      camada), e copiar (Ctrl+C) põe "Exercício 206" na área de
+ *      transferência;
+ *   3. o mesmo arrasto com o ponteiro da caneta (pen, a S Pen) não seleciona
+ *      nada;
+ *   4. elementos de texto vivos só nas páginas desenhadas: em 80 passos de
+ *      300 px, a cada passo, nenhuma camada de texto numa página sem canvas;
+ *   5. no escaneado, 0 elementos de texto (nenhuma camada) depois de todas as
+ *      páginas lidas, e a frase "Este livro é imagem: o texto não pode ser
+ *      selecionado nem buscado." aparece UMA vez; no livro de texto, nenhuma;
+ *   6. nenhum erro de página.
+ *
+ * NENHUMA ESPERA POR TEMPO FIXO: cada leitura espera a condição dela (o leitor
+ * diz que não tem desenho por fazer em corpo.dataset.ocupado, a rolagem
+ * parada em dois quadros seguidos, cada página desenhada diz que o texto dela
+ * já foi lido em caixa.dataset.texto).
+ *
+ * Venenos (o app.js ou o styles.css servido sem uma peça; um por critério, e
+ * a prova TEM de ver pelo valor, "VENENO visto"; ela para depois da seção do
+ * veneno):
+ *   --envenenado-sem-camada            a camada não é criada com o canvas (1)
+ *   --envenenado-sem-selecao           a camada sem seleção (user-select none
+ *                                      no CSS): o arrasto não copia nada (2)
+ *   --envenenado-caneta-seleciona      a caneta não é barrada: ela seleciona (3)
+ *   --envenenado-texto-sem-soltar      a camada não sai com o canvas: fica
+ *                                      texto nas páginas soltas (4)
+ *   --envenenado-escaneado-com-camada  a página sem texto ganha camada (5)
+ *   --envenenado-aviso-repetido        a frase do escaneado a cada página (5)
+ *
+ *   --app-de <pasta>   serve o app.js e o styles.css dessa pasta (o controle
+ *                      no commit pai): as verificações rodam e TÊM de falhar.
+ *   --prints <pasta>   grava os prints da p. 206 antes e depois da seleção em
+ *                      <pasta>/antes e <pasta>/depois (inteiro e recorte).
+ */
+'use strict';
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { spawnSync } = require('child_process');
+const H = require('./_bib_navegador.js');
+const { conf, secao, esperar } = H;
+
+const PORTA = 8976;
+const FRASE = 'Este livro é imagem: o texto não pode ser selecionado nem buscado.';
+const VENENOS = {
+  'sem-camada': ['app.js', '        criarCamadaDeTexto(estado, registro, pagina, vp);\n', ''],
+  'sem-selecao': ['styles.css', '-webkit-user-select: text; user-select: text;', '-webkit-user-select: none; user-select: none;'],
+  'caneta-seleciona': ['app.js', 'if (canetaNoLeitor) ev.preventDefault();', '/* veneno: a caneta passa */'],
+  'texto-sem-soltar': ['app.js', "    soltarCamadaDeTexto(registro);\n    registro.caixa.innerHTML = '';\n", ''],
+  'escaneado-com-camada': ['app.js', "      if (!temTexto) { registro.caixa.dataset.texto = '0'; return null; }\n", ''],
+  'aviso-repetido': ['app.js', 'if (estado.escaneado && !estado.avisouImagem)', 'if (estado.escaneado)']
+};
+// a seção depois da qual o veneno já foi medido (a prova para ali)
+const SECAO_DO_VENENO = { 'sem-camada': 1, 'sem-selecao': 2, 'caneta-seleciona': 3, 'texto-sem-soltar': 4,
+  'escaneado-com-camada': 5, 'aviso-repetido': 5 };
+const VENENO = Object.keys(VENENOS).find(k => process.argv.indexOf('--envenenado-' + k) !== -1) || null;
+const iPrints = process.argv.indexOf('--prints');
+const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
+const iAppDe = process.argv.indexOf('--app-de');
+const APP_DE = iAppDe > 0 ? process.argv[iAppDe + 1] : null;
+const PYTHON = process.env.PYTHON || 'python';
+
+const ler = nome => fs.readFileSync(path.join(H.RAIZ, nome), 'utf8').replace(/\r\n/g, '\n');
+const FONTES = { 'app.js': ler('app.js'), 'styles.css': ler('styles.css') };
+const trocas = {};
+if (VENENO) {
+  const v = VENENOS[VENENO];
+  trocas['/' + v[0]] = FONTES[v[0]].split(v[1]).join(v[2]);
+}
+if (APP_DE) {
+  trocas['/app.js'] = fs.readFileSync(path.join(APP_DE, 'app.js'), 'utf8');
+  trocas['/styles.css'] = fs.readFileSync(path.join(APP_DE, 'styles.css'), 'utf8');
+}
+
+const amb = H.criarAmbiente(PORTA, 'perfil_leitor_texto', trocas);
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'leitor_texto_'));
+process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
+
+function gerarLivros() {
+  const r = spawnSync(PYTHON, ['-X', 'utf8', path.join(H.RAIZ, 'biblioteca', '_amostra', 'fazer_amostra_livros.py'), TMP, '--texto'],
+    { encoding: 'utf8' });
+  const linhas = String(r.stdout || '').trim().split(/\r?\n/);
+  const zip = linhas[linhas.length - 1];
+  if (r.status !== 0 || !zip || !fs.existsSync(zip)) { console.log(String(r.stderr || '').slice(0, 800)); return null; }
+  return zip;
+}
+
+const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelector(s); if (!b) return false; b.click(); return true; }, sel);
+
+// checa: no modo normal é um conf; no veneno, a falha da verificação daquele veneno é o que se quer ver
+const visto = [];
+const checa = (rotulo, obtido, esperado, doVeneno) => {
+  if (VENENO) { if (doVeneno === VENENO && String(obtido) !== String(esperado)) visto.push(rotulo + ' [obtido: ' + obtido + ']'); return; }
+  conf(rotulo, obtido, esperado);
+};
+
+(async () => {
+  secao('0. A prova se confere');
+  conf('cada âncora de veneno aparece uma vez só no arquivo dela',
+    Object.keys(VENENOS).map(k => k + ':' + (FONTES[VENENOS[k][0]].split(VENENOS[k][1]).length - 1)).join(','),
+    Object.keys(VENENOS).map(k => k + ':1').join(','));
+  if (VENENO) conf('o ' + VENENOS[VENENO][0] + ' servido está envenenado (' + VENENO + ')',
+    trocas['/' + VENENOS[VENENO][0]].indexOf(VENENOS[VENENO][1]) === -1, true);
+  const zip = gerarLivros();
+  conf('os livros sintéticos (400 páginas com o exercício e escaneado de 12) foram gerados', !!zip, true);
+  if (!zip) throw Object.assign(new Error('sem os livros'), { jaContado: true });
+
+  const nav = await amb.subir();
+  // a área de transferência de verdade: o Ctrl+C copia, e a prova lê o que foi copiado
+  await nav.defaultBrowserContext().overridePermissions(amb.ORIGEM, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
+  const pag = await amb.pagina();
+  const errosDePagina = [];
+  pag.on('pageerror', e => errosDePagina.push(e.message));
+  pag.on('console', m => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) errosDePagina.push(m.text()); });
+  await pag.setViewport({ width: 800, height: 1280, hasTouch: true, deviceScaleFactor: 2 });
+  await H.abrirApp(pag, amb.ORIGEM);
+
+  /* Quantas vezes a frase do escaneado foi dita, por livro: cada aviso novo
+   * troca o texto do #aviso-texto (mesmo texto de novo também troca o nó). */
+  await pag.evaluate(frase => {
+    window.__frases = {};
+    window.__ponteiros = [];
+    const alvo = document.querySelector('#aviso-texto');
+    new MutationObserver(() => {
+      if (alvo.textContent !== frase) return;
+      const livro = window.__livroAberto || '';
+      window.__frases[livro] = (window.__frases[livro] || 0) + 1;
+    }).observe(alvo, { childList: true, characterData: true, subtree: true });
+    document.addEventListener('pointerdown', e => window.__ponteiros.push(e.pointerType), true);
+    window.__copias = [];
+    document.addEventListener('copy', () => window.__copias.push(String(window.getSelection())), true);
+  }, FRASE);
+
+  await H.irParaAba(pag, 'ajustes');
+  await pag.evaluate(() => { document.querySelector('#estado-importacao-biblioteca').innerHTML = ''; });
+  await (await pag.$('#arquivo-biblioteca')).uploadFile(zip);
+  await esperar('a importação dos livros', () => pag.evaluate(() => {
+    const c = document.querySelector('#estado-importacao-biblioteca');
+    return [c ? c.innerText.trim() : '', document.querySelector('#importar-biblioteca').disabled];
+  }), v => !!v[0] && !/Conferindo|Gravando/.test(v[0]) && v[1] === false, 60000);
+
+  const abrirLivro = async id => {
+    await H.irParaAba(pag, 'biblioteca');
+    await esperar('a aba Biblioteca desenhada', () => pag.evaluate(() => !!document.querySelector('#bib-corpo').children.length), v => v, 10000);
+    await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+    await esperar('os anos da matemática', () => pag.evaluate(() => document.querySelectorAll('#bib-livros .bibl-ano').length), v => v > 0, 5000);
+    let achou = false;
+    for (const ano of await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-livros .bibl-ano')).map(b => b.dataset.ano))) {
+      await clicar(pag, '#bib-livros .bibl-ano[data-ano="' + ano + '"]');
+      const r = await esperar('o livro ' + id + ' no ano ' + ano, () => pag.evaluate(i => !!document.querySelector('#bib-livros [data-livro="' + i + '"]'), id), v => v, 1500);
+      if (r.ok && await clicar(pag, '#bib-livros [data-livro="' + id + '"]')) { achou = true; break; }
+    }
+    conf('o livro ' + id + ' está na Biblioteca', achou, true);
+    await esperar('a tela do livro', () => pag.evaluate(() => { const t = document.querySelector('#bib-livro'); return !!t && !t.hidden; }), v => v, 5000);
+    await pag.evaluate(i => { window.__livroAberto = i; }, id);
+    await clicar(pag, '#bib-livro-continuar');
+    const aberto = await esperar('o leitor aberto na p. 1', () => pag.evaluate(() => {
+      const c = document.querySelector('#corpo-modal-leitor-pdf');
+      return document.querySelector('#modal-leitor-pdf.aberto') && c ? c.dataset.paginaDesenhada || '' : '';
+    }), v => v === '1', 30000);
+    conf('o leitor abriu ' + id + ' na p. 1', aberto.ok, true);
+  };
+
+  // ---- as medidas
+  const estado = () => pag.evaluate(() => {
+    const c = document.querySelector('#corpo-modal-leitor-pdf'), r = c.getBoundingClientRect();
+    const area = { x: r.left + c.clientLeft, y: r.top + c.clientTop, w: c.clientWidth, h: c.clientHeight };
+    const caixas = Array.from(c.querySelectorAll('.leitor-pdf-pagina'));
+    const aVista = caixas.filter(b => {
+      const q = b.getBoundingClientRect(); return q.bottom > area.y + 1 && q.top < area.y + area.h - 1;
+    });
+    const temCanvas = b => { const k = b.querySelector('canvas'); return !!(k && k.width > 0); };
+    const malDesenhadas = aVista.filter(b => {
+      const k = b.querySelector('canvas'); return !k || k.width === 0 || Math.abs(parseFloat(k.style.width) - b.getBoundingClientRect().width) > 2;
+    }).map(b => b.dataset.paginaArquivo);
+    const desenhadas = caixas.filter(temCanvas);
+    const camadas = Array.from(c.querySelectorAll('.textLayer'));
+    const camadaSemCanvas = camadas.map(t => t.closest('[data-pagina-arquivo]')).filter(b => !b || !temCanvas(b))
+      .map(b => b ? b.dataset.paginaArquivo : '?');
+    const spans = n => { const b = c.querySelector('[data-pagina-arquivo="' + n + '"]'); return b ? b.querySelectorAll('.textLayer span').length : 0; };
+    return { area, ocupado: c.dataset.ocupado || '', aVista: aVista.map(b => b.dataset.paginaArquivo).join(','),
+      malDesenhadas: malDesenhadas.join(','), desenhadas: desenhadas.map(b => b.dataset.paginaArquivo).join(','),
+      // as desenhadas que ainda não disseram se o texto delas foi lido (no app de antes não há o aviso)
+      semLeitura: desenhadas.filter(b => !b.dataset.texto).map(b => b.dataset.paginaArquivo).join(','),
+      camadas: camadas.length, spansVivos: c.querySelectorAll('.textLayer span').length,
+      camadaSemCanvas: camadaSemCanvas.join(','), spans206: spans(206), canvases: desenhadas.length };
+  });
+  // a rolagem parada: scrollTop igual em dois quadros seguidos
+  const estavel = rotulo => pag.evaluate(() => new Promise(fim => {
+    const c = document.querySelector('#corpo-modal-leitor-pdf');
+    let antes = null, iguais = 0, quadros = 0;
+    const olha = () => {
+      const agora = c.scrollTop + '|' + c.scrollLeft;
+      iguais = agora === antes ? iguais + 1 : 0;
+      antes = agora;
+      if (iguais >= 2 || ++quadros > 240) { fim(iguais >= 2); return; }
+      requestAnimationFrame(olha);
+    };
+    requestAnimationFrame(olha);
+  })).then(ok => { if (!ok) conf((rotulo || 'a rolagem') + ' parou em até 240 quadros', false, true); return ok; });
+  /* pronto: a rolagem parada, as páginas à vista desenhadas no tamanho da
+   * caixa, nenhum desenho por fazer e o texto de cada página desenhada lido.
+   * No app de antes (o controle) e no veneno sem camada não há o aviso do
+   * texto: ali vale o resto. */
+  const semAvisoDoTexto = !!APP_DE || VENENO === 'sem-camada';
+  const pronto = async (rotulo, extra) => {
+    await estavel(rotulo);
+    const r = await esperar(rotulo + ': o leitor sem desenho nem texto por fazer', estado,
+      v => v.malDesenhadas === '' && v.ocupado !== '1' && (semAvisoDoTexto || v.semLeitura === '') && (!extra || extra(v)), 20000);
+    if (!r.ok) conf(rotulo + ': o leitor terminou de desenhar e de ler o texto', false, true);
+    return r.valor;
+  };
+  const irParaPagina = async n => {
+    await pag.evaluate(v => { const i = document.querySelector('#leitor-ir-pagina'); i.value = String(v); i.dispatchEvent(new Event('change')); }, n);
+    return pronto('a ida à p. ' + n, v => v.aVista.split(',').indexOf(String(n)) >= 0);
+  };
+  const rolar = dy => pag.evaluate(dy => new Promise(fim => {
+    const c = document.querySelector('#corpo-modal-leitor-pdf');
+    const passos = Math.max(1, Math.ceil(Math.abs(dy) / 100));
+    let i = 0;
+    const anda = () => {
+      c.scrollTop += dy / passos;
+      if (++i < passos) requestAnimationFrame(anda); else requestAnimationFrame(() => fim());
+    };
+    requestAnimationFrame(anda);
+  }), dy);
+  /* O ponto da tela em que está DESENHADO o ponto (x, y), em pontos de PDF
+   * (595 x 842), da página n: pela caixa da página, e não pela camada. */
+  const pontoDaPagina = (n, x, y) => pag.evaluate((n, x, y) => {
+    const q = document.querySelector('#corpo-modal-leitor-pdf [data-pagina-arquivo="' + n + '"]').getBoundingClientRect();
+    return { x: q.left + q.width * x / 595, y: q.top + q.height * y / 842 };
+  }, n, x, y);
+  const selecao = () => pag.evaluate(() => String(window.getSelection()));
+  const limparSelecao = () => pag.evaluate(() => window.getSelection().removeAllRanges());
+  const print = async (pasta, nome) => {
+    if (!PRINTS) return;
+    const dir = path.join(PRINTS, pasta);
+    fs.mkdirSync(dir, { recursive: true });
+    await pag.screenshot({ path: path.join(dir, nome + '.png') });
+    // o recorte: o alto da p. 206, com o título e a linha do exercício
+    const a = await pontoDaPagina(206, 40, 50);
+    await pag.screenshot({ path: path.join(dir, nome + '_recorte.png'),
+      clip: { x: Math.max(0, Math.round(a.x)), y: Math.max(0, Math.round(a.y)), width: 640, height: 200 } });
+  };
+  const pararNoVeneno = async n => {
+    if (!VENENO || SECAO_DO_VENENO[VENENO] !== n) return false;
+    secao('VENENO: ' + VENENO);
+    conf('envenenado-' + VENENO + ': a prova viu o defeito', visto.length > 0, true);
+    if (visto.length) console.log('VENENO visto: ' + visto.join(' ; '));
+    await H.fim(amb)();
+    return true;
+  };
+
+  // ================================================================
+  secao('1. A p. 206 tem texto sobre a página');
+  await abrirLivro('livro-leitor-400');
+  await pronto('a p. 1 aberta');
+  await irParaPagina(206);
+  const t1 = await esperar('o texto da p. 206 sobre a página', estado, v => v.spans206 > 0, 8000);
+  const s1 = t1.valor;
+  console.log('   p. 206: ' + s1.spans206 + ' elementos de texto; ' + s1.camadas + ' camadas e ' + s1.spansVivos +
+    ' elementos vivos em ' + s1.canvases + ' páginas desenhadas (' + s1.desenhadas + ')');
+  checa('na p. 206 a área tem mais de 0 elementos de texto', s1.spans206 > 0, true, 'sem-camada');
+  if (await pararNoVeneno(1)) return;
+
+  // ================================================================
+  secao('2. Arrastar pela linha do exercício e copiar traz "Exercício 206"');
+  await limparSelecao();
+  await print('antes', 'p206_antes_da_selecao');
+  // a linha começa em x = 72 pt (o arrasto sai de dentro do "E", em 74), com a base em y = 140 pt e letra de 14 pt: o meio dela fica em y = 135
+  const de = await pontoDaPagina(206, 74, 135), ate = await pontoDaPagina(206, 300, 135);
+  console.log('   no ponto de partida: ' + await pag.evaluate(p => {
+    const e = document.elementFromPoint(p.x, p.y), r = document.caretRangeFromPoint(p.x, p.y);
+    return (e ? e.tagName + '.' + e.className + ' "' + (e.textContent || '').slice(0, 20) + '"' : 'nada') +
+      '; cursor em ' + (r ? JSON.stringify((r.startContainer.textContent || '').slice(0, 20)) + ' +' + r.startOffset : 'nada');
+  }, de));
+  await pag.mouse.move(de.x, de.y);
+  await pag.mouse.down();
+  /* o arrasto só anda depois que o navegador pôs o cursor da seleção onde o
+   * mouse desceu: com os movimentos colados no down, o Chrome do teste às
+   * ancorou a seleção no título, na linha de cima, numa rodada sem a espera
+   * (com o mesmo ponto de partida em cima do "E"); a espera é pela condição,
+   * sem tempo fixo */
+  const ancoraSel = () => pag.evaluate(() => { const s = window.getSelection(); return s.anchorNode ? JSON.stringify((s.anchorNode.textContent || '').slice(0, 12)) + ' +' + s.anchorOffset : ''; });
+  const anc = await esperar('o cursor da seleção onde o mouse desceu', ancoraSel, v => !!v, 3000);
+  console.log('   cursor da seleção: ' + (anc.valor || 'nenhum'));
+  await pag.mouse.move(ate.x, ate.y, { steps: 12 });
+  await pag.mouse.up();
+  const selMouse = await selecao();
+  await pag.bringToFront();
+  await pag.keyboard.down('Control');
+  await pag.keyboard.press('KeyC');
+  await pag.keyboard.up('Control');
+  const copia = await esperar('o Ctrl+C chegou ao documento', () => pag.evaluate(() => window.__copias.length), v => v > 0, 3000);
+  const copiado = await pag.evaluate(() => navigator.clipboard.readText().catch(e => 'ERRO: ' + e.message));
+  console.log('   seleção do mouse: ' + JSON.stringify(selMouse) + '; copiado: ' + JSON.stringify(copiado) + ' (evento copy: ' + copia.ok + ')');
+  await print('depois', 'p206_depois_da_selecao');
+  // o arrasto sai de dentro do primeiro E: a cópia COMEÇA no exercício (a camada está no lugar da letra desenhada)
+  checa('arrastar o mouse pela linha e copiar põe na área de transferência o texto que começa em "Exercício 206"', /^Exercício 206/.test(copiado), true, 'sem-selecao');
+  if (await pararNoVeneno(2)) return;
+
+  // ================================================================
+  secao('3. A caneta (S Pen) não seleciona');
+  await limparSelecao();
+  const cdp = await pag.target().createCDPSession();
+  const caneta = (type, p, buttons) => cdp.send('Input.dispatchMouseEvent',
+    { type, x: p.x, y: p.y, button: 'left', buttons, clickCount: 1, pointerType: 'pen' });
+  await pag.evaluate(() => { window.__ponteiros = []; });
+  await caneta('mouseMoved', de, 0);
+  await caneta('mousePressed', de, 1);
+  for (let i = 1; i <= 12; i++) await caneta('mouseMoved', { x: de.x + (ate.x - de.x) * i / 12, y: de.y }, 1);
+  await caneta('mouseReleased', ate, 0);
+  const ponteiros = await pag.evaluate(() => window.__ponteiros.join(','));
+  const selCaneta = await selecao();
+  console.log('   ponteiros vistos: ' + ponteiros + '; seleção da caneta: ' + JSON.stringify(selCaneta));
+  conf('o arrasto foi mesmo da caneta (pointerType pen)', ponteiros, 'pen');
+  checa('o mesmo arrasto com a caneta não seleciona nada', selCaneta, '', 'caneta-seleciona');
+  if (await pararNoVeneno(3)) return;
+
+  // ================================================================
+  secao('4. Texto vivo só nas páginas desenhadas, em 80 passos de 300 px');
+  await limparSelecao();
+  let pior = { camadaSemCanvas: '', passo: 0 }, maxCamadas = 0, maxSpans = 0, maxCanvases = 0;
+  for (let i = 1; i <= 80; i++) {
+    await rolar(300);
+    const s = await estado();
+    maxCamadas = Math.max(maxCamadas, s.camadas);
+    maxSpans = Math.max(maxSpans, s.spansVivos);
+    maxCanvases = Math.max(maxCanvases, s.canvases);
+    if (s.camadaSemCanvas && !pior.camadaSemCanvas) pior = { camadaSemCanvas: s.camadaSemCanvas, passo: i };
+  }
+  const s4 = await pronto('a rolagem de 80 passos parou');
+  console.log('   em 80 passos: no máximo ' + maxCamadas + ' camadas, ' + maxSpans + ' elementos de texto e ' + maxCanvases +
+    ' páginas desenhadas; no fim, à vista ' + s4.aVista + ', desenhadas ' + s4.desenhadas + ', camadas ' + s4.camadas +
+    (pior.camadaSemCanvas ? '; primeira camada sem canvas no passo ' + pior.passo + ': p. ' + pior.camadaSemCanvas : ''));
+  checa('em nenhum dos 80 passos uma página sem canvas tinha camada de texto', pior.camadaSemCanvas, '', 'texto-sem-soltar');
+  checa('no fim, camada de texto só nas páginas desenhadas', s4.camadaSemCanvas, '', 'texto-sem-soltar');
+  conf('e as páginas à vista no fim têm o texto delas', s4.camadas > 0, true);
+  if (await pararNoVeneno(4)) return;
+
+  // ================================================================
+  secao('5. O escaneado: nenhuma camada, e a frase uma vez');
+  const frasesTexto = await pag.evaluate(() => window.__frases['livro-leitor-400'] || 0);
+  checa('no livro de texto a frase do escaneado não aparece', frasesTexto, 0, 'aviso-repetido');
+  await clicar(pag, '#modal-leitor-pdf .fechar');
+  await esperar('o leitor fechado', () => pag.evaluate(() => !document.querySelector('#modal-leitor-pdf.aberto')), v => v, 5000);
+  await abrirLivro('livro-escaneado-12');
+  await pronto('o escaneado aberto');
+  // as 12 páginas passam pela tela: cada uma é desenhada e lida
+  const lidas = new Set();
+  for (let i = 0; i < 40 && lidas.size < 12; i++) {
+    const s = await pronto('o escaneado, passo ' + i);
+    s.desenhadas.split(',').filter(Boolean).forEach(n => lidas.add(n));
+    if (lidas.size >= 12) break;
+    await rolar(700);
+  }
+  const s5 = await estado();
+  const frasesEsc = await pag.evaluate(() => window.__frases['livro-escaneado-12'] || 0);
+  console.log('   escaneado: ' + lidas.size + ' páginas desenhadas e lidas; ' + s5.camadas + ' camadas e ' + s5.spansVivos +
+    ' elementos de texto; a frase dita ' + frasesEsc + ' vez(es)');
+  conf('as 12 páginas do escaneado passaram pela tela', lidas.size, 12);
+  checa('no escaneado, 0 elementos de texto (nenhuma camada)', s5.camadas + s5.spansVivos, 0, 'escaneado-com-camada');
+  checa('a frase "' + FRASE + '" aparece uma vez', frasesEsc, 1, 'aviso-repetido');
+  if (await pararNoVeneno(5)) return;
+
+  conf('nenhum erro de página', errosDePagina.join(' | '), '');
+  if (PRINTS) console.log('   prints em ' + PRINTS);
+  await H.fim(amb)();
+})().catch(H.fim(amb));
