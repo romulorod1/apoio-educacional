@@ -32355,6 +32355,8 @@
     mudou: 'A agenda mudou desde a proposta, e nada foi gravado. Pergunte de novo.',
     erro: 'Não gravei: a aula não está mais como estava. Pergunte de novo.'
   };
+  /* O que o Confirmar desligado diz no lugar de "Confirmar" (Assistente.opsConfirmadas, falta). */
+  var FALTA_NO_BOTAO = { cobranca: 'Escolha se cobra', nada: 'Marque uma aula', texto: 'Escreva o texto', poupadas: 'Nada a confirmar' };
   function cartaoDaProposta(h, n) {
     var c = h.proposta, linhas = c.linhas;
     var aberto = c.estado === 'aberto';
@@ -32367,10 +32369,20 @@
       var marcadas = linhas.filter(function (l, i) { var x = Assistente.situacaoDaLinha(linhas, i); return !c.semLinha[i] && !(x && x.fora); }).length;
       var esperando = !!(fluxoAssistente && fluxoAssistente.pedindo);
       botaoConfirmar.disabled = !r.ops || c.estado !== 'aberto' || esperando;
-      botaoConfirmar.textContent = !varias ? 'Confirmar' : marcadas === linhas.length ? 'Confirmar tudo' : 'Confirmar ' + marcadas + ' de ' + linhas.length;
+      /* O botão desligado diz o que falta, no próprio texto: a dica de baixo
+       * pode estar fora da vista (revisão cega do 213, cartão 02). O relato
+       * e o feedback dizem Salvar: é o que acontece, nada é enviado. */
+      var falta = !esperando && c.estado === 'aberto' && !r.ops ? FALTA_NO_BOTAO[r.falta] : null;
+      var salvar = linhas.every(function (l) { return l.op && (l.op.k === 'relato' || l.op.k === 'feedback'); });
+      var verbo = salvar ? 'Salvar' : 'Confirmar';
+      var pronto = !varias ? (salvar ? (linhas[0].op.k === 'feedback' ? 'Salvar o feedback' : 'Salvar o relato') : 'Confirmar')
+        : marcadas === linhas.length ? verbo + ' tudo' : verbo + ' ' + marcadas + ' de ' + linhas.length;
+      var oQueMuda = linhas.map(function (l) { return l.titulo; }).join('; ');
+      botaoConfirmar.textContent = falta || pronto;
+      botaoConfirmar.setAttribute('aria-label', falta ? falta + ' antes de confirmar: ' + oQueMuda : (salvar ? pronto + ', sem enviar: ' : 'Confirmar e gravar: ') + oQueMuda);
       var dica = caixa.querySelector('.ass-falta-escolher');
       var porque = esperando ? 'Espere a resposta.' : { cobranca: 'Escolha a cobrança de cada aula para confirmar.', nada: 'Marque ao menos uma aula para confirmar.', texto: 'Escreva o texto para confirmar.',
-        poupadas: 'Todas ficam de fora: já registradas ou de mês com pagamento. Nada a confirmar.' }[r.falta];
+        poupadas: 'Todas ficam de fora: já têm registro de como foi ou são de mês com pagamento marcado. Nada a confirmar.' }[r.falta];
       if (dica) { dica.hidden = !porque; dica.textContent = porque || ''; }
       if (porque) botaoConfirmar.setAttribute('aria-describedby', 'ass-dica-' + n); else botaoConfirmar.removeAttribute('aria-describedby');
     }
@@ -32434,6 +32446,14 @@
       cabeca.appendChild(icone(ICONE_DA_PROPOSTA[l.tipo] || 'cal', '', 'ass-cartao-ico'));
       cabeca.appendChild(el('strong', { class: 'ass-linha-titulo', texto: l.titulo }));
       bloco.appendChild(cabeca);
+      if (deFora) {
+        /* A linha que o lote deixa de fora mostra só o título e o motivo: o
+         * antes, o depois, os avisos, o dinheiro e as opções são de quem
+         * entra, e aqui contradiriam o motivo (revisão cega do 213). */
+        bloco.appendChild(el('p', { class: 'ass-poupada ass-poupada-fora', 'data-motivo': l.poupada }, [icone('alerta', '', 'ass-cartao-ico'), el('strong', { texto: situacao.texto })]));
+        caixa.appendChild(bloco);
+        return;
+      }
       bloco.appendChild(el('p', { class: 'ass-entendido', texto: 'Entendi: ' + l.entendido + (l.nome ? ', ' + l.nome : '') + '.' }));
       if (l.antes || l.depois) {
         bloco.appendChild(el('dl', { class: 'ass-antes-depois' }, [
@@ -32441,10 +32461,10 @@
           l.depois ? el('dt', { texto: 'Depois' }) : null, l.depois ? el('dd', { texto: l.depois }) : null
         ].filter(Boolean)));
       }
-      if (situacao) bloco.appendChild(el('p', { class: 'ass-poupada' + (deFora ? ' ass-poupada-fora' : ''), 'data-motivo': l.poupada }, [icone('alerta', '', 'ass-cartao-ico'), el('strong', { texto: situacao.texto })]));
+      if (situacao) bloco.appendChild(el('p', { class: 'ass-poupada', 'data-motivo': l.poupada }, [icone('alerta', '', 'ass-cartao-ico'), el('strong', { texto: situacao.texto })]));
       if (l.dinheiro) bloco.appendChild(el('p', { class: 'ass-dinheiro', texto: l.dinheiro }));
       (l.avisos || []).forEach(function (a) { bloco.appendChild(el('p', { class: 'ass-aviso' }, [icone('alerta', '', 'ass-cartao-ico'), el('span', { texto: a })])); });
-      if (l.opcoes && !deFora) bloco.appendChild(escolhas(l.opcoes, c.escolha[i], function (id) { c.escolha[i] = id; }, 'Como fica a aula: ' + l.titulo));
+      if (l.opcoes) bloco.appendChild(escolhas(l.opcoes, c.escolha[i], function (id) { c.escolha[i] = id; }, 'Como fica a aula: ' + l.titulo));
       if (l.editavel) {
         var ed = c.edicao[i] = c.edicao[i] || {};
         /* O texto que já estava aparece à parte, só para ler (ele nunca muda);
@@ -32466,10 +32486,14 @@
           filhos.push(t);
           return el('label', { class: 'campo ass-campo-rascunho' + (antigo.trim() ? ' com-antigo' : '') }, filhos);
         };
-        if (l.op.k === 'feedback') bloco.appendChild(area('feedback', 'Feedback para a família (pode editar)', 'ass-feedback-' + n + '-' + i));
-        else {
+        /* O que o Salvar faz, dito antes do toque: guarda, não envia (revisão cega do 213). */
+        if (l.op.k === 'feedback') {
+          bloco.appendChild(area('feedback', 'Feedback para a família (pode editar)', 'ass-feedback-' + n + '-' + i));
+          bloco.appendChild(el('p', { class: 'ajuda u-margem-0 ass-salva-onde', texto: 'O feedback fica salvo no mês e não é enviado para a família.' }));
+        } else {
           bloco.appendChild(area('relato', 'Para a família (pode editar)', 'ass-relato-' + n + '-' + i));
           bloco.appendChild(area('nota', 'Só para mim (a família não vê)', 'ass-nota-' + n + '-' + i));
+          bloco.appendChild(el('p', { class: 'ajuda u-margem-0 ass-salva-onde', texto: 'O texto para a família fica salvo na aula e não é enviado. O "Só para mim" a família não vê.' }));
           var fichas = function (lista, chave, rotulo) {
             if (!lista.length) return;
             ed[chave] = ed[chave] || {};
@@ -32531,7 +32555,7 @@
     if (ops.length > 1) return ops.length + ' mudanças gravadas.';
     var l = linhas.filter(function (x) { return x.op === ops[0] || (x.opcoes && x.opcoes.some(function (o) { return o.op === ops[0]; })) || (x.op && x.op.k === ops[0].k && x.op.k !== 'editar' && x.op.k !== 'criar'); })[0] || linhas[0];
     var o = ops[0], nome = l.nome;
-    if (o.k === 'relato') return 'Registro da aula de ' + nome + ' salvo.';
+    if (o.k === 'relato') return 'Relato da aula de ' + nome + ' salvo.';
     if (o.k === 'feedback') return 'Feedback de ' + nome + ' salvo.';
     if (o.k === 'criar') return (o.campos.status === 'reposicao' ? 'Reposição de ' : 'Aula de ') + nome + ' marcada: ' + l.depois + '.';
     var m = o.mudancas;
@@ -32780,6 +32804,13 @@
     // a última resposta (ou o erro) fica à vista
     var alvo = $('#ass-esperando') || $('#ass-vez-' + (historicoAssistente.length - 1));
     if (alvo && alvo.scrollIntoView) alvo.scrollIntoView({ block: 'start' });
+    /* O cartão aberto que pede a cobrança: as opções da primeira linha sem
+     * escolha sobem até ficar à vista, acima do Confirmar preso ao pé
+     * (.ass-opcoes tem a folga do pé no scroll-margin-bottom). Sem isso, no
+     * tablet deitado e no celular elas ficavam escondidas sem pista. */
+    var pedeEscolha = alvo ? Array.prototype.filter.call(alvo.querySelectorAll('.ass-proposta[data-estado="aberto"] .ass-linha:not(.tirada) .ass-opcoes'),
+      function (g) { return !g.querySelector('.ass-opcao.escolhida'); })[0] : null;
+    if (pedeEscolha && pedeEscolha.scrollIntoView) pedeEscolha.scrollIntoView({ block: 'nearest' });
     var erro = $('#ass-erro');
     if (erro && erro.scrollIntoView) erro.scrollIntoView({ block: 'nearest' });
     // o foco que estava na janela volta: ao campo no tablet, ao título no celular (o teclado não sobe sozinho)

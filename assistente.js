@@ -1180,8 +1180,8 @@
         tipo: 'remarcar', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
         titulo: 'Remarcar ' + nome + ', ' + quandoCurto(a.data, '', ctx.hoje) + ': de ' + (mesmoDia ? horaCurta(a.hora) + ' para ' + horaCurta(nh) : quandoCurto(a.data, a.hora, ctx.hoje) + ' para ' + quandoCurto(nd, nh, ctx.hoje)),
         antes: descricao(a, ctx), depois: quandoCurto(nd, nh, ctx.hoje) + ' (' + duracaoCurta(dur) + ')',
-        avisos: [avisoDeChoque(choques(ctx, a, nd, nh, dur)), a.serieId ? 'É da repetição: muda só esta aula, e as outras continuam como estão.' : null,
-          nd === ctx.hoje && minutos(nh) !== null && minutos(nh) < ctx.agoraMin ? 'Esse horário de hoje já passou: a aula entra como dada.' : null,
+        avisos: [avisoDeChoque(choques(ctx, a, nd, nh, dur)), a.serieId ? 'É uma aula fixa: muda só esta, e as outras semanas continuam iguais.' : null,
+          nd === ctx.hoje && minutos(nh) !== null && minutos(nh) < ctx.agoraMin ? 'Esse horário de hoje já passou: a aula entra como já dada.' : null,
           jaAcabou(a, ctx) && ctx.Core.temConteudo(a) && (nd > ctx.hoje || (nd === ctx.hoje && minutos(nh) !== null && minutos(nh) >= ctx.agoraMin)) ? 'Esta aula já foi dada e tem registro: remarcada, ela volta a ser agendada, com o registro junto.' : null],
         op: opDeEdicao(a, { data: nd, hora: nh, duracaoMin: dur })
       };
@@ -1196,7 +1196,7 @@
         tipo: 'mudar_duracao', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
         titulo: 'Duração da aula de ' + nome + ', ' + quandoCurto(a.data, a.hora, ctx.hoje) + ': de ' + duracaoCurta(atual) + ' para ' + duracaoCurta(dur),
         antes: descricao(a, ctx), depois: quandoCurto(a.data, a.hora, ctx.hoje) + ' (' + duracaoCurta(dur) + ')',
-        avisos: [avisoDeChoque(choques(ctx, a, a.data, a.hora, dur)), a.serieId ? 'É da repetição: muda só esta aula.' : null],
+        avisos: [avisoDeChoque(choques(ctx, a, a.data, a.hora, dur)), a.serieId ? 'É uma aula fixa: muda só esta, e as outras semanas continuam iguais.' : null],
         op: opDeEdicao(a, { duracaoMin: dur })
       };
     },
@@ -1209,8 +1209,8 @@
       var base = {
         tipo: 'cancelar', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
         antes: descricao(a, ctx),
-        avisos: [jaConta ? 'Esta aula está como ' + (a.status === 'falta' ? 'falta cobrada' : 'dada') + ': veja abaixo o que muda no valor do mês.' : null,
-          a.serieId ? 'É da repetição: cancela só esta aula, e as outras continuam.' : null]
+        avisos: [jaConta ? (a.status === 'falta' ? 'Esta aula já é falta cobrada' : 'Esta aula já foi dada') + ': veja abaixo o que muda no valor do mês.' : null,
+          a.serieId ? 'É uma aula fixa: cancela só esta, e as outras semanas continuam iguais.' : null]
       };
       if (cob === 'perguntar') {
         var ops = ['sem', 'com'];
@@ -1266,7 +1266,7 @@
       var futura = !jaAcabou(a, ctx);
       return {
         tipo: 'voltar_a_dada', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
-        titulo: (futura ? 'Voltar a agendar a aula de ' : 'A aula de ') + nome + ', ' + quandoCurto(a.data, a.hora, ctx.hoje) + (futura ? '' : ' volta a contar como dada'),
+        titulo: (futura ? 'Voltar a agendar a aula de ' : 'A aula de ') + nome + ', ' + quandoCurto(a.data, a.hora, ctx.hoje) + (futura ? '' : ' volta a contar como realizada'),
         antes: descricao(a, ctx), depois: futura ? 'Agendada (cobrada)' : 'Realizada (cobrada)',
         op: opDeEdicao(a, { status: 'realizada', cobravel: true })
       };
@@ -1284,7 +1284,7 @@
     var status = reposicao ? 'reposicao' : 'realizada';
     var opDe = function (cob) { return { k: 'criar', alunoId: aluno.id, data: it.data, campos: { alunoId: aluno.id, data: it.data, hora: it.hora, duracaoMin: dur, status: status, cobravel: cob } }; };
     var op = opDe(cobrar);
-    var agoraPassou = it.data === ctx.hoje && minutos(it.hora) !== null && minutos(it.hora) < ctx.agoraMin ? 'Esse horário de hoje já passou: a aula entra como dada.' : null;
+    var agoraPassou = it.data === ctx.hoje && minutos(it.hora) !== null && minutos(it.hora) < ctx.agoraMin ? 'Esse horário de hoje já passou: a aula entra como já dada.' : null;
     if (dec === 'perguntar') {
       return linha(ctx, { tipo: reposicao ? 'criar_reposicao' : 'criar_aula', alunoId: aluno.id, nome: nome, entendido: rotuloDoDia(it.data, ctx.hoje) + ', ' + horaCurta(it.hora),
         titulo: (reposicao ? 'Marcar a reposição de ' : 'Marcar aula de ') + nome + ', ' + quandoCurto(it.data, it.hora, ctx.hoje) + ' (' + duracaoCurta(dur) + '): com ou sem cobrança?',
@@ -1539,7 +1539,7 @@
   function situacaoDaLinha(linhas, i) {
     var l = linhas && linhas[i];
     if (!l || !l.poupada) return null;
-    if (noLote(linhas, i)) return { fora: true, texto: 'Fica de fora: ' + (l.poupada === 'registrada' ? 'já registrada' : 'de mês com pagamento') + '.' };
+    if (noLote(linhas, i)) return { fora: true, texto: l.poupada === 'registrada' ? 'Fica de fora: esta aula já tem registro de como foi.' : 'Fica de fora: o mês dela já tem pagamento marcado.' };
     return { fora: false, texto: l.poupada === 'registrada' ? 'Esta aula já tem registro.' : 'Este mês já tem pagamento marcado' + (l.poupadaMuda ? ': o valor muda.' : '.') };
   }
   function opsConfirmadas(linhas, estado) {

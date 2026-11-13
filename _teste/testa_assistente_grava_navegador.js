@@ -220,6 +220,9 @@ async function transbordo(pag, raizSel) {
   conf('o cartão: o que muda, o Entendi, o antes e o depois, o dinheiro e os dois botões', c1, {
     titulo: 'Remarcar Zélia, qui 19/11: de 15:30 para 17:30', entendido: 'Entendi: quinta, 19/11, 15:30, Zélia.',
     antesDepois: ['qui 19/11, 15:30 (1h), agendada', 'qui 19/11, 17:30 (1h)'], dinheiro: 'O valor do mês não muda.', botoes: ['Agora não', 'Confirmar'] });
+  /* Revisão cega do 213: o aviso da repetição na língua dela ("aula fixa"), sem o termo interno. */
+  conf('o aviso da aula fixa, na língua dela, e nenhum aviso fala em "repetição"', await pag.evaluate(s => { const t = Array.from(document.querySelectorAll(s + ' .ass-aviso')).map(a => a.textContent);
+    return [t.indexOf('É uma aula fixa: muda só esta, e as outras semanas continuam iguais.') >= 0, t.some(x => /repetição/.test(x))]; }, ultimoCartao), [true, false]);
   conf('com o cartão aberto, NADA gravou: o banco e a fila iguais', (await banco(pag)) === inicio, true);
   await clicar(pag, ultimoCartao + ' [id^="ass-agora-nao-"]');
   conf('"Agora não": o cartão diz que nada foi gravado, e o banco e a fila seguem iguais', [await pag.evaluate(s => document.querySelector(s).querySelector('.ass-estado').textContent, ultimoCartao), (await banco(pag)) === inicio], ['Nada foi gravado.', true]);
@@ -297,6 +300,9 @@ async function transbordo(pag, raizSel) {
   conf('"cancela a do Bruno": o cartão pergunta, com as três saídas e o dinheiro de cada uma', pergunta.opcoes,
     ['Cancelada sem cobrança: O valor de novembro diminui R$ 150,00.', 'Cancelada e cobrada: O valor do mês não muda.', 'Falta sem aviso (cobrada): O valor do mês não muda.']);
   conf('sem escolher, o Confirmar fica desligado', pergunta.confirmar, true);
+  /* Revisão cega do 213: o botão desligado diz o que falta, no texto e no aria-label. */
+  conf('desligado, o botão diz o que falta: "Escolha se cobra", e o aria-label acompanha', await pag.evaluate(s => { const b = document.querySelector(s + ' [id^="ass-confirmar-"]');
+    return [b.textContent, b.getAttribute('aria-label').indexOf('Escolha se cobra antes de confirmar: Cancelar a aula de Bruno') === 0]; }, ultimoCartao), ['Escolha se cobra', true]);
   conf('D6b: o Confirmar é a ação declarada do celular (data-acao-celular="assistente-confirmar")', pergunta.declarado, 'assistente-confirmar');
   conf('os outros botões do cartão não gravam (Agora não e as opções)', pergunta.soltos.sort(), ['Agora não', 'Cancelada e cobrada', 'Cancelada sem cobrança', 'Falta sem aviso (cobrada)'].sort());
   await clicar(pag, ultimoCartao + ' .ass-opcao[data-opcao="sem"]');
@@ -327,9 +333,16 @@ async function transbordo(pag, raizSel) {
   await perguntar(pag, 'hoje com o Bruno foi bem, equações', [ferramentas([['propor_relato', { itens: [{ alunoId: 'al2', nome_dito: 'Bruno', data: HOJE, hora: null, relato_familia: 'Foi bem.', nota_so_minha: '', assuntos: [{ titulo: 'Equações', ref: null }], areas: [] }] }]]), texto('Confira o rascunho.')]);
   conf('o relato aparece como rascunho editável, com o assunto', await pag.evaluate(s => [document.querySelector(s + ' textarea[id^="ass-relato-"]').value, document.querySelector(s + ' textarea[id^="ass-nota-"]').value, Array.from(document.querySelectorAll(s + ' .ass-ficha')).map(b => b.textContent)], ultimoCartao),
     ['Foi bem.', '', ['✓ Equações']]);
+  /* Revisão cega do 213: o botão do relato diz o que faz (salva, não envia), e a linha curta explica. */
+  conf('o relato: "Salvar o relato", e a linha diz que fica salvo na aula, não é enviado, e o "Só para mim" a família não vê', await pag.evaluate(s => { const c = document.querySelector(s); const b = c.querySelector('[id^="ass-confirmar-"]');
+    return [b.textContent, b.getAttribute('aria-label').indexOf('Salvar o relato, sem enviar: ') === 0, (c.querySelector('.ass-salva-onde') || {}).textContent]; }, ultimoCartao),
+    ['Salvar o relato', true, 'O texto para a família fica salvo na aula e não é enviado. O "Só para mim" a família não vê.']);
   await clicar(pag, ultimoCartao + ' [id^="ass-confirmar-"]');
   await esperar('o relato gravou', () => soBanco(pag), v => v !== antesCel, 8000);
   const relatoCartao = await soBanco(pag);
+  await esperar('o aviso do relato', () => visivel(pag, '#aviso-acao'), v => v === true, 10000);
+  const avisoRelato = await pag.evaluate(() => document.querySelector('#aviso-texto').textContent);
+  conf('o aviso depois de salvar diz salvo, e não fala em envio (' + avisoRelato + ')', [avisoRelato.indexOf('Relato da aula de Bruno salvo.') === 0, /envi/i.test(avisoRelato)], [true, false]);
   await desfazerPeloAviso(pag);
   await pag.evaluate(() => { const f = document.querySelector('#modal-assistente .fechar'); if (f) f.click(); });
   await pausa(400);
@@ -389,9 +402,12 @@ async function transbordo(pag, raizSel) {
     ['propor_relato', { itens: [{ alunoId: 'al2', nome_dito: 'Bruno', data: HOJE, hora: null, relato_familia: 'Trabalhamos equações do primeiro grau com problemas de enunciado longo; foi muito bem e terminou a lista.', nota_so_minha: 'Combinar revisão antes da prova.', assuntos: [{ titulo: 'Equações do primeiro grau com problemas', ref: null }], areas: ['enunciado', 'ansiedade'] }] }]
   ]), texto('Confira o cartão.')]);
   /* Lente da romul-ac, 9: a escolha da cobrança é POR LINHA (não há mais a escolha do conjunto). */
-  conf('um cartão só, com as quatro linhas, a pergunta da cobrança em CADA uma das duas canceladas, e "Confirmar tudo"', await pag.evaluate(s => {
+  /* Revisão cega do 213: sem as escolhas, o botão diz o que falta ("Escolha se cobra"); escolhidas, volta a contar. */
+  conf('um cartão só, com as quatro linhas, a pergunta da cobrança em CADA uma das duas canceladas, e o botão dizendo "Escolha se cobra"', await pag.evaluate(s => {
     const c = document.querySelector(s); return [c.querySelectorAll('.ass-linha').length, c.querySelectorAll('.ass-opcoes').length, !!c.querySelector('.ass-pergunta-conjunto'), c.querySelector('[id^="ass-confirmar-"]').textContent]; }, ultimoCartao),
-    [4, 2, false, 'Confirmar tudo']);
+    [4, 2, false, 'Escolha se cobra']);
+  await pag.evaluate(s => Array.from(document.querySelectorAll(s + ' .ass-opcoes')).forEach(g => g.querySelector('.ass-opcao[data-opcao="sem"]').click()), ultimoCartao);
+  conf('escolhida a cobrança das duas: "Confirmar tudo"', await pag.evaluate(s => document.querySelector(s + ' [id^="ass-confirmar-"]').textContent, ultimoCartao), 'Confirmar tudo');
   await clicar(pag, ultimoCartao + ' .ass-marca');
   conf('tirar o ✓ de uma linha muda o botão', await pag.evaluate(s => document.querySelector(s + ' [id^="ass-confirmar-"]').textContent, ultimoCartao), 'Confirmar 3 de 4');
   await clicar(pag, ultimoCartao + ' .ass-marca');
@@ -476,16 +492,36 @@ async function transbordo(pag, raizSel) {
     estadoConc === 'mudou' && b2Depois.status === 'realizada' && (await soBanco(pag)) === depoisDaChegada, V_CONF);
   if (MODO === V_CONF) { await H.fim(amb)(); return; }
   conf('7: o cartão diz que a agenda mudou e nada foi gravado', await pag.evaluate(s => document.querySelector(s).textContent.indexOf('A agenda mudou desde a proposta, e nada foi gravado.') >= 0, ultimoCartao), true);
-  /* 1: o lote. Hoje (b1, novembro pago) e 20/11 (b2, agora registrada) ficam de fora; a quinta da Zélia entra. */
-  await perguntar(pag, 'cancela as do Bruno de hoje e do dia 20 e a da Zélia de quinta, sem cobrar', [ferramentas([['propor_aulas', { itens: [
+  /* 1: o lote. Hoje (b1, novembro pago) e 20/11 (b2, agora registrada) ficam de fora; a quinta da Zélia entra.
+   * No tablet deitado de 1280x800 (revisão cega do 213: ali as opções da Zélia ficavam escondidas sob o Confirmar). */
+  await pag.setViewport({ width: 1280, height: 800 });
+  await pausa(300);
+  const LOTE = [ferramentas([['propor_aulas', { itens: [
     item({ acao: 'cancelar', alunoId: 'al2', nome_dito: 'Bruno', data: HOJE, hora: '08:00', cobranca: 'sem' }),
     item({ acao: 'cancelar', alunoId: 'al2', nome_dito: 'Bruno', data: '2026-11-20', hora: '17:30', cobranca: 'sem' }),
-    item({ acao: 'cancelar', alunoId: 'al1', nome_dito: 'Zélia', data: '2026-11-19', hora: '15:30', cobranca: 'sem' })] }]]), texto('Confira.')]);
-  conf('1: no lote, as linhas poupadas ficam de fora com o motivo escrito, sem marca, e o botão conta só a que entra', await pag.evaluate(s => {
+    item({ acao: 'cancelar', alunoId: 'al1', nome_dito: 'Zélia', data: '2026-11-19', hora: '15:30', cobranca: 'sem' })] }]]), texto('Confira.')];
+  const FALA_LOTE = 'cancela as do Bruno de hoje e do dia 20 e a da Zélia de quinta, sem cobrar';
+  /* As opções da primeira linha que pede escolha à vista: abaixo do topo da área que rola e acima do Confirmar preso ao pé. */
+  const escolhaAVista = () => pag.evaluate(s => {
+    const c = document.querySelector(s); const g = c && c.querySelector('.ass-linha:not(.tirada) .ass-opcoes');
+    const pe = c && c.querySelector('.ass-confirmar'); const corpo = document.querySelector('#corpo-modal-assistente');
+    if (!g || !pe || !corpo) return 'faltou: opções ' + !!g + ', pé ' + !!pe + ', corpo ' + !!corpo;
+    const rg = g.getBoundingClientRect(), rp = pe.getBoundingClientRect(), rc = corpo.getBoundingClientRect();
+    return rg.top >= rc.top - 1 && rg.bottom <= rp.top + 1 ? 'à vista' : 'cortada: opções ' + Math.round(rg.top) + ' a ' + Math.round(rg.bottom) + ', pé em ' + Math.round(rp.top) + ', topo em ' + Math.round(rc.top); }, ultimoCartao);
+  await perguntar(pag, FALA_LOTE, LOTE);
+  conf('1: no lote, as linhas poupadas ficam de fora com o motivo na língua dela, sem marca, e o botão diz o que falta', await pag.evaluate(s => {
     const c = document.querySelector(s);
     return [Array.from(c.querySelectorAll('.ass-linha')).map(l => (l.getAttribute('data-poupada') || 'entra') + ':' + ((l.querySelector('.ass-poupada') || {}).textContent || '')),
       c.querySelectorAll('.ass-marca[role="checkbox"]').length, c.querySelector('[id^="ass-confirmar-"]').textContent]; }, ultimoCartao),
-    [['fora:Fica de fora: de mês com pagamento.', 'fora:Fica de fora: já registrada.', 'entra:'], 1, 'Confirmar 1 de 3']);
+    [['fora:Fica de fora: o mês dela já tem pagamento marcado.', 'fora:Fica de fora: esta aula já tem registro de como foi.', 'entra:'], 1, 'Escolha se cobra']);
+  /* A linha de fora mostra SÓ o título e o motivo: o antes, os avisos ("Esta aula já foi dada: veja abaixo..."), o dinheiro e as opções contradiriam o motivo. */
+  conf('1: a linha de fora tem só o título e o motivo (sem Entendi, Antes, Depois, aviso, dinheiro ou opções)', await pag.evaluate(s =>
+    Array.from(document.querySelectorAll(s + ' .ass-linha[data-poupada="fora"]')).map(l => Array.from(l.children).map(x => x.className).join(' | ')), ultimoCartao),
+    ['ass-linha-cabeca | ass-poupada ass-poupada-fora', 'ass-linha-cabeca | ass-poupada ass-poupada-fora']);
+  conf('1: a linha que entra continua com o Entendi, o Antes e as opções', await pag.evaluate(s => { const l = document.querySelector(s + ' .ass-linha:not([data-poupada])');
+    return [!!l.querySelector('.ass-entendido'), !!l.querySelector('.ass-antes-depois'), !!l.querySelector('.ass-opcoes')]; }, ultimoCartao), [true, true, true]);
+  conf('1: o aria-label do botão desligado diz o que falta', await pag.evaluate(s => document.querySelector(s + ' [id^="ass-confirmar-"]').getAttribute('aria-label').indexOf('Escolha se cobra antes de confirmar: ') === 0, ultimoCartao), true);
+  conf('1: a 1280x800, as opções da Zélia ficam à vista, acima do Confirmar', await escolhaAVista(), 'à vista');
   const antesLote = await soBanco(pag);
   /* A frase cita o Bruno e a Zélia juntos: pela regra "na dúvida, o cartão pergunta" (lentes do
    * #213), o "sem cobrar" é ambíguo para a linha da Zélia, e o cartão pergunta. Sem a escolha o
@@ -506,6 +542,19 @@ async function transbordo(pag, raizSel) {
   conf('1: uma linha só, de mês com pagamento: o destaque, e o Confirmar ligado', await pag.evaluate(s => { const c = document.querySelector(s);
     return [(c.querySelector('.ass-poupada') || {}).textContent, c.querySelector('.ass-linha').getAttribute('data-poupada'), c.querySelector('[id^="ass-confirmar-"]').disabled]; }, ultimoCartao),
     ['Este mês já tem pagamento marcado.', 'destaque', false]);
+  await clicar(pag, ultimoCartao + ' [id^="ass-agora-nao-"]');
+  /* Revisão cega do 213: o feedback do mês também diz o que faz (salva, não envia). */
+  await perguntar(pag, 'escreve o feedback do Bruno de novembro: foi um bom mês', [ferramentas([['propor_feedback', { alunoId: 'al2', nome_dito: 'Bruno', mes: '2026-11', texto: 'Foi um bom mês.' }]]), texto('Confira.')]);
+  conf('o feedback: "Salvar o feedback", e a linha diz que fica salvo no mês e não é enviado', await pag.evaluate(s => { const c = document.querySelector(s); const b = c && c.querySelector('[id^="ass-confirmar-"]');
+    return b ? [b.textContent, b.disabled, (c.querySelector('.ass-salva-onde') || {}).textContent] : 'sem cartão'; }, ultimoCartao),
+    ['Salvar o feedback', false, 'O feedback fica salvo no mês e não é enviado para a família.']);
+  await clicar(pag, ultimoCartao + ' [id^="ass-agora-nao-"]');
+  /* O mesmo lote no celular de 412x915: as opções da Zélia à vista, acima do Confirmar. */
+  await modo(pag, 'dona-celular', 412, 915);
+  await clicar(pag, '#cel-assistente');
+  await perguntar(pag, FALA_LOTE, LOTE);
+  conf('1: a 412x915 no celular, o lote mostra as opções da Zélia à vista, acima do Confirmar', await escolhaAVista(), 'à vista');
+  conf('1: a 412x915, o botão desligado diz o que falta', await pag.evaluate(s => document.querySelector(s + ' [id^="ass-confirmar-"]').textContent, ultimoCartao), 'Escolha se cobra');
   await clicar(pag, ultimoCartao + ' [id^="ass-agora-nao-"]');
 
   conf('nenhum pedido saiu para fora do servidor da prova', paraFora.length, 0);

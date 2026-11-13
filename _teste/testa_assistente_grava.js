@@ -173,7 +173,7 @@ let r = propor('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'mar'
 let l = r.linhas && r.linhas[0];
 conf('o cartão diz em linguagem dela: "Remarcar Marina, qui 19/11: de 15:30 para 17:30"', l && l.titulo, 'Remarcar Marina, qui 19/11: de 15:30 para 17:30');
 conf('o Entendi, o antes, o depois e o dinheiro (do core)', l && [l.entendido, l.antes, l.depois, l.dinheiro], ['quinta, 19/11, 15:30', 'qui 19/11, 15:30 (1h), agendada', 'qui 19/11, 17:30 (1h)', 'O valor do mês não muda.']);
-conf('na aula de repetição, o cartão diz que muda só esta', l && l.avisos.some(a => /muda só esta aula/.test(a)), true);
+conf('na aula de repetição, o cartão diz que muda só esta, como "aula fixa"', l && l.avisos.indexOf('É uma aula fixa: muda só esta, e as outras semanas continuam iguais.') >= 0, true);
 conf('o resultado ao modelo diz que NADA foi gravado', /NADA foi gravado/.test(JSON.stringify(r.resultado)), true);
 conf('confirmado = o Remarcar do celular (Core.aplicarEdicaoAula só nesta, { data, hora, duracaoMin }), byte a byte',
   JSON.stringify(confirmado(r.linhas)), JSON.stringify(pelaTela(db => Core.aplicarEdicaoAula(db, 's1@2026-11-19', { data: '2026-11-19', hora: '17:30', duracaoMin: 60 }, 'esta'))));
@@ -228,7 +228,7 @@ conf('escolhida "com": = o "Cancelar e cobrar" do celular',
 r = propor('propor_aulas', { itens: [item({ acao: 'cancelar', alunoId: 'bru', nome_dito: 'Bruno', data: HOJE, hora: '08:00', cobranca: 'perguntar' })] });
 l = r.linhas[0];
 conf('a aula de hoje (já dada): três saídas, com a falta, e o aviso de que ela já conta',
-  [l.opcoes.map(o => o.id + ': ' + o.dinheiro), l.avisos.some(a => /está como dada/.test(a))],
+  [l.opcoes.map(o => o.id + ': ' + o.dinheiro), l.avisos.some(a => a === 'Esta aula já foi dada: veja abaixo o que muda no valor do mês.')],
   [['sem: O valor de novembro diminui R$ 150,00.', 'com: O valor do mês não muda.', 'falta: O valor do mês não muda.'], true]);
 conf('novembro do Bruno já tem "pago em": a saída que muda o valor avisa do selo', l.opcoes[0].avisos, ['Novembro de 2026 já tem pagamento marcado: o selo do mês vai mudar.']);
 r = propor('propor_aulas', { itens: [item({ acao: 'cancelar', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19', cobranca: 'sem' })] });
@@ -244,7 +244,7 @@ conf('G11 "não cobra esta aula": diminui R$ 150 e = o "Não cobrar" do Fechamen
 secao('5. Voltar (G07, G13), criar (G01) e reposição (G12)');
 r = propor('propor_aulas', { itens: [item({ acao: 'voltar_a_dada', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-05' })] });
 conf('G07 "a falta foi engano": volta a dada, = o "Realizada" do celular', [r.linhas[0].titulo, JSON.stringify(confirmado(r.linhas)) === JSON.stringify(pelaTela(db => Core.aplicarEdicaoAula(db, 's1@2026-11-05', { status: 'realizada', cobravel: true }, 'esta')))],
-  ['A aula de Marina, qui 05/11, 15:30 volta a contar como dada', true]);
+  ['A aula de Marina, qui 05/11, 15:30 volta a contar como realizada', true]);
 conf('recusa: voltar uma aula que não é falta nem cancelada', propor('propor_aulas', { itens: [item({ acao: 'voltar_a_dada', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19' })] }).erro, true);
 r = propor('propor_aulas', { itens: [item({ acao: 'criar_aula', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-11-21', hora: '10:00', duracao_min: null })] });
 conf('G01 "marca uma aula com o Bruno sábado às 10h": 1h, cobrada, aumenta R$ 150', [r.linhas[0].titulo, r.linhas[0].dinheiro], ['Marcar aula de Bruno, sáb 21/11, 10:00 (1h)', 'O valor de novembro aumenta R$ 150,00.']);
@@ -602,7 +602,7 @@ secao('7d. Segunda rodada adversarial do #213 (scratchpad\\sonda.js): na dúvida
   conf('N7: a origem com mais de 12 meses é recusada', [r7b.erro, /mais de 12 meses atrás/.test(r7b.resultado.erro)], [true, true]);
   conf('N7 (controle): a aula deste mês não leva o aviso', exec('propor_aulas', { itens: [item({ acao: 'falta', alunoId: 'bru', nome_dito: 'Bruno', data: HOJE, hora: '08:00' })] }, ctxDe(db7, { fala: 'o Bruno faltou' })).linhas[0].avisos.filter(a => /fechado/.test(a)).length, 0);
   const r1 = exec('propor_aulas', { itens: [item({ acao: 'remarcar', alunoId: 'bru', nome_dito: 'Bruno', data: '2026-11-20', hora: '17:30', nova_data: HOJE, nova_hora: '09:00' })] }, ctxDe(db7, { fala: 'passa a do Bruno para hoje às 9' }));
-  conf('B1: destino hoje num horário que já passou: o aviso', r1.linhas[0].avisos.indexOf('Esse horário de hoje já passou: a aula entra como dada.') >= 0, true);
+  conf('B1: destino hoje num horário que já passou: o aviso', r1.linhas[0].avisos.indexOf('Esse horário de hoje já passou: a aula entra como já dada.') >= 0, true);
   conf('N6: o sistema pede para repetir as linhas no cartão novo', /Um cartão novo troca os cartões ainda abertos: repita nele as linhas que ela ainda quer\./.test(A.SISTEMA_GRAVA), true);
   const fonteApp = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
   conf('N6: o cartão trocado não promete o de baixo, e o texto editado dele vai ao modelo', [/substituido: 'Trocado por um cartão novo\. Nada foi gravado por este\.'/.test(fonteApp), /o texto que ela deixou no cartão/.test(fonteApp)], [true, true]);
@@ -658,7 +658,7 @@ global.__lentesAc = true;
   r = P('cancela todas as aulas do Bruno de outubro sem cobrar', ['2026-10-06', '2026-10-13', '2026-10-20', '2026-10-27'].map(d => canc(d)));
   conf('1: o LOTE das quatro de outubro pago: todas ficam de fora, com o motivo, e o Confirmar não tem o que gravar',
     [r.linhas.map((l, i) => A.situacaoDaLinha(r.linhas, i).texto), A.opsConfirmadas(r.linhas, {}).falta],
-    [['Fica de fora: já registrada.', 'Fica de fora: de mês com pagamento.', 'Fica de fora: de mês com pagamento.', 'Fica de fora: de mês com pagamento.'], 'poupadas']);
+    [['Fica de fora: esta aula já tem registro de como foi.', 'Fica de fora: o mês dela já tem pagamento marcado.', 'Fica de fora: o mês dela já tem pagamento marcado.', 'Fica de fora: o mês dela já tem pagamento marcado.'], 'poupadas']);
   const mistura = P('cancela a do Bruno de 13 de outubro e a de 20 de novembro, sem cobrar', [canc('2026-10-13'), canc('2026-11-20')]);
   const opsMistura = A.opsConfirmadas(mistura.linhas, {}).ops;
   conf('1: lote misturado: só a de 20/11 entra no plano; a de outubro pago fica de fora e o modelo fica sabendo', [opsMistura.map(o => o.aulaId), mistura.resultado.ficam_de_fora],
@@ -721,7 +721,7 @@ secao('7f. Rodada final da orquestradora na 4e61542: o lote é por ação, a pre
   const duasFaltas = P1('o Bruno faltou hoje e no dia 9', [falta(HOJE, '08:00'), falta('2026-11-09', '08:00')]);
   conf('1: DUAS faltas no mês pago são lote: as duas ficam de fora e o Confirmar não tem o que gravar',
     [duasFaltas.linhas.map((l, i) => A.situacaoDaLinha(duasFaltas.linhas, i).texto), A.opsConfirmadas(duasFaltas.linhas, {}).falta, duasFaltas.resultado.ficam_de_fora.length],
-    [['Fica de fora: de mês com pagamento.', 'Fica de fora: de mês com pagamento.'], 'poupadas', 2]);
+    [['Fica de fora: o mês dela já tem pagamento marcado.', 'Fica de fora: o mês dela já tem pagamento marcado.'], 'poupadas', 2]);
   const misto = P1('o Bruno faltou hoje e no dia 9, marca a reposição sábado', [falta(HOJE, '08:00'), falta('2026-11-09', '08:00'), repo]);
   conf('1: o cartão que mistura aplica o lote só dentro da ação: as duas faltas ficam de fora, a reposição entra',
     [misto.linhas.map((l, i) => { const x = A.situacaoDaLinha(misto.linhas, i); return x ? x.fora : null; }), A.opsConfirmadas(misto.linhas, {}).ops.map(o => o.k)], [[true, true, null], ['criar']]);
@@ -749,7 +749,7 @@ secao('7f. Rodada final da orquestradora na 4e61542: o lote é por ação, a pre
   conf('2 (controle): as duas são PREVISTAS (a op vai pela série e pela data, sem aulaId)', duasPrev.linhas.map(l => [l.op.aulaId, l.op.serieId, l.op.data]), [[undefined, 's9', '2026-10-08'], [undefined, 's9', '2026-10-15']].map(x => x.slice()));
   conf('2: cancelar DUAS previstas do outubro pago: as duas ficam de fora (Core.motivoParaPoupar, pelo Core.pagamentoDe do mês)',
     [duasPrev.linhas.map(l => l.poupada), duasPrev.linhas.map((l, i) => A.situacaoDaLinha(duasPrev.linhas, i).texto), A.opsConfirmadas(duasPrev.linhas, {}).falta],
-    [['paga', 'paga'], ['Fica de fora: de mês com pagamento.', 'Fica de fora: de mês com pagamento.'], 'poupadas']);
+    [['paga', 'paga'], ['Fica de fora: o mês dela já tem pagamento marcado.', 'Fica de fora: o mês dela já tem pagamento marcado.'], 'poupadas']);
   const umaPrev = P2('cancela a aula do Bruno de 8 de outubro sem cobrar', [canc('2026-10-08')]);
   conf('2: UMA prevista do outubro pago passa, com o destaque', [A.situacaoDaLinha(umaPrev.linhas, 0), !!A.opsConfirmadas(umaPrev.linhas, {}).ops],
     [{ fora: false, texto: 'Este mês já tem pagamento marcado: o valor muda.' }, true]);
@@ -775,6 +775,22 @@ secao('7f. Rodada final da orquestradora na 4e61542: o lote é por ação, a pre
   conf('VENENO (lendo a fala da conversa): a prova acusa, a fala anterior com rascunho leva os feedbacks na consulta',
     'feedbacks_recentes' in pelaFala.executar('historico_aluno', { alunoId: 'mar', n: 3 }, ctxDe(DB, { fala: 'escreve o feedback da Marina\nfeedbacks pendentes?', pergunta: 'feedbacks pendentes?' })).resultado, true);
   conf('nada gravou no banco congelado', JSON.stringify(DB) === FOTO, true);
+}
+
+secao('7g. Revisão cega de tela do #213: os textos do cartão na língua dela');
+{
+  /* A aula fixa: remarcar, mudar a duração e cancelar a da repetição dizem "aula fixa", e nenhum aviso fala em "repetição". */
+  const avisosDe = it => { const x = propor('propor_aulas', { itens: [item(it)] }); return (x.linhas[0].avisos || []); };
+  const fixa = [avisosDe({ acao: 'remarcar', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19', hora: '15:30', nova_data: '2026-11-19', nova_hora: '17:30' }),
+    avisosDe({ acao: 'mudar_duracao', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19', duracao_min: 90 }),
+    avisosDe({ acao: 'cancelar', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-19', cobranca: 'perguntar' })];
+  conf('7g: a aula fixa nas três ações, e nenhum aviso com "repetição"', [fixa.map(a => a.filter(t => /^É uma aula fixa/.test(t))), fixa.some(a => a.some(t => /repeti/.test(t)))],
+    [[['É uma aula fixa: muda só esta, e as outras semanas continuam iguais.'], ['É uma aula fixa: muda só esta, e as outras semanas continuam iguais.'], ['É uma aula fixa: cancela só esta, e as outras semanas continuam iguais.']], false]);
+  /* "como dada" saiu de todo texto que o cartão mostra (título, antes, depois, avisos, opções). */
+  const dada = propor('propor_aulas', { itens: [item({ acao: 'cancelar', alunoId: 'bru', nome_dito: 'Bruno', data: HOJE, hora: '08:00', cobranca: 'perguntar' })] });
+  const voltar = propor('propor_aulas', { itens: [item({ acao: 'voltar_a_dada', alunoId: 'mar', nome_dito: 'Marina', data: '2026-11-05' })] });
+  const textos = [dada, voltar].map(x => x.linhas[0]).map(l => [l.titulo, l.antes, l.depois].concat(l.avisos || [], (l.opcoes || []).map(o => o.rotulo + ' ' + o.dinheiro)).filter(Boolean).join(' | '));
+  conf('7g: nenhum texto do cartão diz "como dada" (' + textos.join(' || ') + ')', textos.some(t => /como dada/.test(t)), false);
 }
 
 secao('8. "Nada grava sem Confirmar", K6 e K7 num cartão só, e o Confirmar que confere de novo');
