@@ -1,0 +1,2 @@
+Nos exercícios de fontes de licença aberta, como os Cadernos de Apoio e Aprendizagem da Secretaria Municipal de Educação de São Paulo, o crédito da fonte (autor, licença e endereço) aparece sempre: no cartão, na tela cheia, no PDF da lista e do gabarito, e na folha da aula quando você usa "Abrir como folha" ou "Lista como folha".
+Com "Mostrar a origem" marcada, a linha de origem na folha agora quebra em mais de uma linha quando é longa, e mostra o nome da fonte.

@@ -625,7 +625,7 @@ roda "leitor nitidez --envenenado-direcao-errada"   node "_teste/testa_leitor_ni
 roda "leitor nitidez --envenenado-sem-meia-densidade" node "_teste/testa_leitor_nitidez.js" --envenenado-sem-meia-densidade
 # Fatia 6 do leitor: voltar para onde eu estava. Depois do Sumario, do Ir p. e
 # da barra de pagina aparece por 10 s "Voltar a p. 45", e o toque volta ao
-# mesmo trecho no meio (24 px); tres saltos e tres voltas refazem o caminho;
+# mesmo trecho no meio (24 px) e a pilula some, ate o proximo salto;
 # rolar, o zoom e a Proxima nao sao salto. Um veneno por criterio, e o
 # controle no commit pai (a39e13f), onde os criterios tem de falhar.
 roda "leitor voltar"                               node "_teste/testa_leitor_voltar.js"
@@ -634,6 +634,20 @@ roda "leitor voltar --envenenado-continua-depois-do-toque" node "_teste/testa_le
 roda "leitor voltar --envenenado-nao-some"         node "_teste/testa_leitor_voltar.js" --envenenado-nao-some
 roda "leitor voltar --envenenado-aparece-na-rolagem" node "_teste/testa_leitor_voltar.js" --envenenado-aparece-na-rolagem
 roda "leitor voltar --controle-pai"                node "_teste/testa_leitor_voltar.js" --controle-pai
+# Fatia 7 do leitor: texto selecionavel sobre a pagina. Na p. 206 a camada de
+# texto existe, arrastar pela linha desenhada e copiar traz "Exercicio 206", a
+# caneta (pen) nao seleciona, so as paginas desenhadas tem texto vivo e o
+# escaneado nao tem camada e diz a frase uma vez. Um veneno por criterio.
+roda "leitor texto"                                 node "_teste/testa_leitor_texto.js"
+roda "leitor texto --envenenado-sem-camada"         node "_teste/testa_leitor_texto.js" --envenenado-sem-camada
+roda "leitor texto --envenenado-sem-selecao"        node "_teste/testa_leitor_texto.js" --envenenado-sem-selecao
+roda "leitor texto --envenenado-caneta-seleciona"   node "_teste/testa_leitor_texto.js" --envenenado-caneta-seleciona
+roda "leitor texto --envenenado-texto-sem-soltar"   node "_teste/testa_leitor_texto.js" --envenenado-texto-sem-soltar
+roda "leitor texto --envenenado-escaneado-com-camada" node "_teste/testa_leitor_texto.js" --envenenado-escaneado-com-camada
+roda "leitor texto --envenenado-aviso-repetido"     node "_teste/testa_leitor_texto.js" --envenenado-aviso-repetido
+roda "leitor texto --envenenado-sem-fim-do-conteudo" node "_teste/testa_leitor_texto.js" --envenenado-sem-fim-do-conteudo
+roda "leitor texto --envenenado-camada-visivel"     node "_teste/testa_leitor_texto.js" --envenenado-camada-visivel
+roda "leitor texto --envenenado-letra-fora-da-camada" node "_teste/testa_leitor_texto.js" --envenenado-letra-fora-da-camada
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
@@ -666,6 +680,28 @@ roda "biblioteca mirim --envenenado-diversos"   node "_teste/testa_biblioteca_mi
 # serve o app.js sem a origem no cartao.
 roda "biblioteca cadernos sme"                 node "_teste/testa_biblioteca_cadernos_sme.js"
 roda "biblioteca cadernos sme --envenenado-sem-origem" node "_teste/testa_biblioteca_cadernos_sme.js" --envenenado-sem-origem
+# L6: o credito que a licenca da fonte pede (atribuicao, licenca e link do
+# item) no cartao da lista do assunto, na previa e na edicao da lista pronta,
+# na tela cheia, queimado no recorte do "Abrir como folha" e da lista como
+# folha, e no bloco "Creditos" da lista e do gabarito em PDF, sem depender da
+# caixa "origem"; item sem os campos nao ganha linha. Um veneno por superficie.
+roda "biblioteca credito da licenca"           node "_teste/testa_biblioteca_credito.js"
+roda "biblioteca credito da licenca --envenenado-cartao" node "_teste/testa_biblioteca_credito.js" --envenenado-cartao
+roda "biblioteca credito da licenca --envenenado-visor" node "_teste/testa_biblioteca_credito.js" --envenenado-visor
+roda "biblioteca credito da licenca --envenenado-previa" node "_teste/testa_biblioteca_credito.js" --envenenado-previa
+roda "biblioteca credito da licenca --envenenado-edicao" node "_teste/testa_biblioteca_credito.js" --envenenado-edicao
+roda "biblioteca credito da licenca --envenenado-link" node "_teste/testa_biblioteca_credito.js" --envenenado-link
+roda "biblioteca credito da licenca --envenenado-abrir" node "_teste/testa_biblioteca_credito.js" --envenenado-abrir
+roda "biblioteca credito da licenca --envenenado-listafolha" node "_teste/testa_biblioteca_credito.js" --envenenado-listafolha
+roda "biblioteca credito da licenca --envenenado-pdf" node "_teste/testa_biblioteca_credito.js" --envenenado-pdf
+# O gabarito resolvido por agente e conferido: o item sem solucao que traz
+# gabarito (origem agente-conferido) mostra as respostas e, sempre, a marca
+# "Resposta conferida por duas IAs" na tela cheia e no gabarito do PDF, sem
+# depender da caixa "origem"; item sem o campo nao ganha nada. Um veneno por
+# superficie.
+roda "gabarito do agente"                     node "_teste/testa_gabarito_agente.js"
+roda "gabarito do agente --envenenado-sem-marca-visor" node "_teste/testa_gabarito_agente.js" --envenenado-sem-marca-visor
+roda "gabarito do agente --envenenado-sem-marca-pdf" node "_teste/testa_gabarito_agente.js" --envenenado-sem-marca-pdf
 # FRENTE B: selecionar e compor. Sem navegador, o compositor do pdf.js (lista
 # renumerada, gabarito separado, sem solucao escrito, quebra entre pedacos, marca
 # por cima so nesta folha e os outros documentos byte a byte iguais aos de main).
@@ -991,6 +1027,15 @@ roda "livros mapa --envenenado-sem-ano-na-tela"   node "_teste/testa_livros_mapa
 # faixa e apagava a lista do Corrigir aberta; a prova esperava pela pagina que
 # ja estava a vista e falhava uma vez em dez. O veneno volta a refazer a faixa.
 roda "livros mapa --envenenado-faixa-refeita"     node "_teste/testa_livros_mapa.js" --envenenado-faixa-refeita
+# 12a, parte 0 (13/11/2026): o mapa de capitulos de EPUB, por parte e ancora,
+# sobre o EPUB sintetico do gerador (dois capitulos na mesma parte). O meta
+# novo nao mexe na posicao antiga, a tela e o leitor mostram o sumario do mapa
+# e o "Abrir no livro" leva a parte e a ancora, com a faixa do capitulo certo.
+# Porta 8983.
+roda "livros mapa epub"                           node "_teste/testa_livros_mapa_epub.js"
+roda "livros mapa epub --envenenado-sem-ancora"   node "_teste/testa_livros_mapa_epub.js" --envenenado-sem-ancora
+roda "livros mapa epub --envenenado-cobre-sem-ancora" node "_teste/testa_livros_mapa_epub.js" --envenenado-cobre-sem-ancora
+roda "livros mapa epub --envenenado-posicao-solta" node "_teste/testa_livros_mapa_epub.js" --envenenado-posicao-solta
 # 12/11/2026: a versao nova de um pacote de livros que so muda o mapa (o MAT08-15
 # de volume): mesmo arquivo, versao maior, so o meta trocado; a posicao de
 # leitura e a correcao dela intactas, inclusive no livro cujo sumario era vazio;
@@ -1112,6 +1157,44 @@ roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip
 # 21 em JAVA_HOME; sem eles, a prova diz onde procurou e REPROVA, nunca passa
 # calada. Os venenos: a regra que deixa qualquer conta ler tem de ser vista pela
 # parte das regras; a que deixa quem le escrever registro, idem.
+# Fase 1b da biblioteca na nuvem (13/11/2026): o publicador do catalogo
+# (biblioteca/publicar_catalogo.py) contra o emulador do Firestore e do Auth,
+# com manifests sinteticos: sem --publicar nada e gravado; publicar grava num
+# commit so; republicar igual nao escreve; a falha no meio do lote deixa a
+# versao anterior; as recusas (id trocado, livro que some, formato, assunto
+# fora do banco, caminho fora da lista); a classificacao do acervo; e as
+# regras do catalogo (a dona le e nao escreve); os registros que somem sao recusa
+# e o que ficou para tras e refeito pelo indice da nuvem. Portas 9031 a 9035.
+roda "publicador do catalogo"                       node "_teste/testa_publicador_catalogo.js"
+roda "publicador do catalogo --envenenado-aceita-id-trocado" node "_teste/testa_publicador_catalogo.js" --envenenado-aceita-id-trocado
+roda "publicador do catalogo --envenenado-escreve-fora-da-lista" node "_teste/testa_publicador_catalogo.js" --envenenado-escreve-fora-da-lista
+roda "publicador do catalogo --envenenado-dois-lotes" node "_teste/testa_publicador_catalogo.js" --envenenado-dois-lotes
+roda "publicador do catalogo --envenenado-regra-herda-escrita" node "_teste/testa_publicador_catalogo.js" --envenenado-regra-herda-escrita
+roda "publicador do catalogo --envenenado-repetido-ultima-vence" node "_teste/testa_publicador_catalogo.js" --envenenado-repetido-ultima-vence
+roda "publicador do catalogo --envenenado-nome-cortado" node "_teste/testa_publicador_catalogo.js" --envenenado-nome-cortado
+roda "publicador do catalogo --envenenado-registro-vazio-passa" node "_teste/testa_publicador_catalogo.js" --envenenado-registro-vazio-passa
+roda "publicador do catalogo --envenenado-relatorio-grava" node "_teste/testa_publicador_catalogo.js" --envenenado-relatorio-grava
+roda "publicador do catalogo --envenenado-so-pelo-id" node "_teste/testa_publicador_catalogo.js" --envenenado-so-pelo-id
+roda "publicador do catalogo --envenenado-homonimo-na-lista" node "_teste/testa_publicador_catalogo.js" --envenenado-homonimo-na-lista
+# Fase 1c (13/11/2026): o mapa novo chega ao tablet pelo catalogo, de ponta a
+# ponta no emulador: o publicador da 1b publica os metas vivos; o "Atualizar a
+# biblioteca" troca so o meta dos livros de mesmo arquivo; a defasagem da
+# romul-c0 vai a zero nos que ficam; Blob, posicao e correcoes byte a byte; o
+# SAI, o de outro arquivo e o de meta invalido intocados; nada na abertura.
+# Portas 9041 a 9046.
+roda "biblioteca na nuvem, metas"                   node "_teste/testa_biblioteca_nuvem_metas.js"
+roda "biblioteca na nuvem, metas --envenenado-troca-o-blob" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-troca-o-blob
+roda "biblioteca na nuvem, metas --envenenado-solta-a-posicao" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-solta-a-posicao
+roda "biblioteca na nuvem, metas --envenenado-aceita-meta-invalido" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-aceita-meta-invalido
+roda "biblioteca na nuvem, metas --envenenado-liga-na-abertura" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-liga-na-abertura
+roda "biblioteca na nuvem, metas --envenenado-regrava-o-igual" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-regrava-o-igual
+roda "biblioteca na nuvem, metas --envenenado-store-aceita-outro-id" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-store-aceita-outro-id
+roda "biblioteca na nuvem, metas --envenenado-aceita-outro-formato" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-aceita-outro-formato
+roda "biblioteca na nuvem, metas --envenenado-aceita-outras-paginas" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-aceita-outras-paginas
+roda "biblioteca na nuvem, metas --envenenado-aceita-mapa-texto" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-aceita-mapa-texto
+roda "biblioteca na nuvem, metas --envenenado-um-lote-so" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-um-lote-so
+roda "biblioteca na nuvem, metas --envenenado-app-aceita-outro-id" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-app-aceita-outro-id
+roda "biblioteca na nuvem, metas --envenenado-vencida-pede-tente" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-vencida-pede-tente
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
@@ -1499,6 +1582,24 @@ roda "corrigir pacote Mirim C7"                 python biblioteca/_prova_corrigi
 # livro), a origem do sumario (marcadores, mapa, nenhum, nav do EPUB) e o
 # determinismo. Sem Chrome.
 roda "livros (gerador)"                         python biblioteca/_prova_livros.py
+# 12a, parte 0: o mapa de capitulos de EPUB no gerador (parte, fim e ancora,
+# a ancora conferida na parte), o sumario do mapa sem sumario no EPUB e com
+# "sumario": "mapa", e o mapa de PDF fora do EPUB. Os venenos rodam dentro da
+# prova. Sem Chrome.
+roda "mapa de EPUB (gerador)"                   python biblioteca/_prova_mapa_epub.py
+# O lado do aplicativo, no biblioteca.js: o sumario do EPUB sem sumario sai do
+# mapa, e a ancora escolhe o capitulo na parte de varios. Sem Chrome.
+roda "mapa de EPUB (regras)"                    node "_teste/testa_livros_mapa_epub_regras.js"
+roda "mapa de EPUB (regras) --envenenado-sumario-so-do-pacote" node "_teste/testa_livros_mapa_epub_regras.js" --envenenado-sumario-so-do-pacote
+roda "mapa de EPUB (regras) --envenenado-cobre-sem-ancora" node "_teste/testa_livros_mapa_epub_regras.js" --envenenado-cobre-sem-ancora
+# Fase 1b: a chave estavel do capitulo (biblioteca/chaves.py), pelos mesmos
+# criterios que o aplicativo confere (titulo igual, par da heranca; o mesmo
+# comeco so com titulo parecido ou com o par). Sem Chrome e sem rede.
+roda "chaves dos capitulos"                     python _teste/testa_chaves_capitulos.py
+roda "chaves dos capitulos --envenenado-chave-pela-pagina" python _teste/testa_chaves_capitulos.py --envenenado-chave-pela-pagina
+roda "chaves dos capitulos --envenenado-sem-heranca" python _teste/testa_chaves_capitulos.py --envenenado-sem-heranca
+roda "chaves dos capitulos --envenenado-titulo-sem-unicidade" python _teste/testa_chaves_capitulos.py --envenenado-titulo-sem-unicidade
+roda "chaves dos capitulos --envenenado-repetido-sem-ordem" python _teste/testa_chaves_capitulos.py --envenenado-repetido-sem-ordem
 # A revisao do C15.1: o pacote cortado recusado ja na espiada, sem ler o
 # arquivo inteiro, e o teto de 160 MB do aplicativo. Sem Chrome.
 roda "livros (regras)"                          node "_teste/testa_livros_regras.js"

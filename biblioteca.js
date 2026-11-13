@@ -382,6 +382,39 @@
     return saida;
   }
 
+  /* O META DE UM LIVRO DO CATÁLOGO DA NUVEM (fase 1c), conferido antes de
+   * entrar no aparelho: o documento catalogo/{id} traz o meta como texto
+   * (metaJson) e o hash dele (metaHash). Vale só se o meta é o do livro do
+   * documento (id, "sha256:" + sha256 e o tamanho) e passa na MESMA
+   * conferência de forma do pacote zip (lerLivros: arquivo, título, sumário
+   * dentro do livro, numeração). `hashDoTexto` é o sha256 do metaJson, que a
+   * página calcula (WebCrypto). Devolve o meta, ou null com o motivo em
+   * `porque`. */
+  function conferirMetaDaNuvem(doc, hashDoTexto) {
+    var porque = function (m) { return { meta: null, porque: m }; };
+    if (!doc || typeof doc.metaJson !== 'string' || typeof doc.id !== 'string') return porque('documento sem meta');
+    if (hashDoTexto !== doc.metaHash) return porque('o meta não confere com o metaHash');
+    var meta;
+    try { meta = JSON.parse(doc.metaJson); } catch (e) { return porque('o meta não é JSON'); }
+    if (!meta || meta.id !== doc.id) return porque('o meta é de outro livro');
+    if (!/^[0-9a-f]{64}$/.test(String(doc.sha256 || '')) || meta.hash !== 'sha256:' + doc.sha256) return porque('o meta é de outro arquivo');
+    if (!inteiro(meta.bytes) || meta.bytes !== doc.tamanho) return porque('o tamanho não confere');
+    // o mapa, quando vem, é uma lista de capítulos: nem texto, nem null, nem lista dentro de lista
+    if (meta.mapa !== undefined && (!Array.isArray(meta.mapa) || meta.mapa.some(function (e) { return !e || typeof e !== 'object' || Array.isArray(e); }))) {
+      return porque('o mapa não é uma lista de capítulos');
+    }
+    var noZip = {}, lista = {};
+    noZip[meta.arquivo] = true;
+    lista[meta.arquivo] = meta.hash;
+    try {
+      var lidos = lerLivros({ livros: [meta] }, noZip, lista);
+      if (!lidos.length) return porque((lidos.recusados && lidos.recusados[0] && lidos.recusados[0].motivo) || 'a forma do meta não confere');
+    } catch (e) {
+      return porque(e && e.message || 'a forma do meta não confere');
+    }
+    return { meta: meta, porque: null };
+  }
+
   /* As linhas que a tela mostra depois de importar livros. */
   function resumoDeLivros(contas) {
     var linhas = [];
@@ -655,8 +688,17 @@
 
   /* A entrada do mapa onde a leitura está: no PDF, a que tem a página entre o
    * começo e o fim; no EPUB, a que tem a parte (posição na espinha). Com duas
-   * (capítulos que se cruzam), a que começa mais perto. */
-  function entradaDoMapa(mapa, formato, valor) {
+   * (capítulos que se cruzam), a que começa mais perto.
+   *
+   * Item 12a, parte 0: no EPUB, vários capítulos podem começar na MESMA parte,
+   * cada um na sua âncora (o FME de teoria). Com a `ancora` por onde ela
+   * entrou na parte (o "Abrir no livro" ou o sumário), vale o capítulo que
+   * começa nela; sem âncora, ou sem capítulo nela, a regra de sempre. */
+  function entradaDoMapa(mapa, formato, valor, ancora) {
+    if (formato === 'epub' && ancora) {
+      var naAncora = (mapa || []).filter(function (e) { return e.capitulo === valor && e.ancora === ancora; });
+      if (naAncora.length) return naAncora[0];
+    }
     var achada = null;
     (mapa || []).forEach(function (e) {
       var ini = formato === 'epub' ? e.capitulo : e.pagina;
@@ -776,9 +818,30 @@
     var uteis = marcadores.length - lixo;
     return lixo * 2 > marcadores.length || uteis * 2 < caps.length;
   }
+  /* Item 12a, parte 0: o EPUB com mapa de capítulos por parte e âncora. O
+   * gerador já põe o sumário do mapa no pacote quando o EPUB não tem sumário
+   * (sumario_origem "mapa"); aqui vale o mesmo para o pacote que chegou com o
+   * sumário vazio e o mapa. Só os capítulos com título com sentido e parte
+   * dentro da espinha, em ordem de parte e, na mesma parte, na ordem do mapa
+   * (o gerador já ordena pela âncora no texto). Forma do sumário de EPUB:
+   * { n, nivel: 1, titulo, capitulo, ancora?, mapa_n }. */
+  function sumarioDoMapaDoEpub(meta) {
+    var partes = ((meta.epub && meta.epub.espinha) || []).length;
+    return (Array.isArray(meta.mapa) ? meta.mapa : []).filter(function (e) {
+      return !!e && inteiro(e.n) && !e.obra_inteira && typeof e.titulo === 'string' && !marcadorSemSentido(e.titulo) &&
+        inteiro(e.capitulo) && e.capitulo >= 1 && e.capitulo <= partes;
+    }).map(function (e, i) { return { e: e, i: i }; })
+      .sort(function (a, b) { return a.e.capitulo - b.e.capitulo || a.i - b.i; })
+      .map(function (x, i) {
+        var s = { n: i + 1, nivel: 1, titulo: x.e.titulo, capitulo: x.e.capitulo, mapa_n: x.e.n };
+        if (typeof x.e.ancora === 'string' && x.e.ancora) s.ancora = x.e.ancora;
+        return s;
+      });
+  }
   function sumarioDoLivro(meta) {
     var sumario = meta && Array.isArray(meta.sumario) ? meta.sumario : [];
-    if (!meta || meta.formato === 'epub') return sumario;
+    if (meta && meta.formato === 'epub') return sumario.length ? sumario : sumarioDoMapaDoEpub(meta);
+    if (!meta) return sumario;
     var doMapa = !sumario.length ? capitulosDoMapaParaSumario(meta).length > 0 : sumarioDosMarcadoresInutil(meta);
     if (!doMapa) return sumario;
     var total = inteiro(meta.paginas) ? meta.paginas : Infinity;
@@ -2043,6 +2106,7 @@
     sha256: sha256, tipoDoAsset: tipoDoAsset,
     paginaImpressa: paginaImpressa, paginaDoArquivo: paginaDoArquivo, paginaDaPosicao: paginaDaPosicao,
     resolverPaginaDoLeitor: resolverPaginaDoLeitor, conferirNumeracao: conferirNumeracao, paraRomano: paraRomano, deRomano: deRomano,
+    conferirMetaDaNuvem: conferirMetaDaNuvem,
     mapaDoLivro: mapaDoLivro, resolverCorrecoes: resolverCorrecoes, correcoesOrfas: correcoesOrfas,
     chaveParaGravarCorrecao: chaveParaGravarCorrecao, tituloNormalizado: tituloNormalizado, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
     indiceDeCapitulos: indiceDeCapitulos, procurarNosCapitulos: procurarNosCapitulos,

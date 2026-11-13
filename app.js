@@ -3413,6 +3413,8 @@
     }
     $('#corpo-modal-leitor-pdf').addEventListener('scroll', rolarLeitorContinuo, { passive: true });
     ligarGestosDoLeitor($('#corpo-modal-leitor-pdf'));
+    ligarCanetaSemSelecao($('#corpo-modal-leitor-pdf'));
+    ligarFimDoConteudo();
     $('#leitor-slider-pagina').addEventListener('input', function () {
       // rolagem DIRETA: a suave atravessava as páginas do caminho, desenhava cada uma
       // e deixava o temporizador gravar posições intermediárias depois de soltar
@@ -17474,6 +17476,169 @@
   }
 
   /* A lista de Ajustes: cada livro com o tamanho e o Remover, e o total. */
+  /* ---- a biblioteca na nuvem, fase 1c: o mapa novo chega pelo catálogo ----
+   *
+   * O "Atualizar a biblioteca" (Ajustes, Livros) lê o índice do catálogo
+   * (Nuvem.lerCatalogo) e, para cada livro do aparelho com o MESMO arquivo do
+   * catálogo e um meta que ainda não foi aplicado, baixa o documento do livro,
+   * confere o meta (Biblioteca.conferirMetaDaNuvem) e troca SÓ o meta
+   * (Store.trocarMetaDaNuvem). Nada de PDF baixado nem regravado; a posição e
+   * as correções dela ficam como estão. O livro de outro arquivo, ou que ainda
+   * não está no aparelho, só entra na conta "chegam com a próxima versão"
+   * (fase 2). Só no tablet, com a conta dela: o celular e o observador ficam
+   * para a 2c.
+   *
+   * A conferência sozinha na abertura fica DESLIGADA até a orquestradora
+   * conferir o relatório da primeira publicação real (decisão de 13/11): até
+   * lá, só o botão. Ligar é trocar esta constante, com prova. */
+  var ATUALIZAR_BIBLIOTECA_NA_ABERTURA = false;
+  var UMA_HORA_MS = 60 * 60 * 1000;
+  var atualizandoBiblioteca = null;
+  var CHAVE_ESTADO_DA_BIBLIOTECA = 'apoio-educacional:biblioteca-nuvem';
+  // a entrada dela venceu ou não existe: a linha pede para entrar de novo, e não "tente de novo"
+  var PEDE_ENTRAR_DE_NOVO = { SEM_SESSAO: true, TOKEN_EXPIRED: true, INVALID_REFRESH_TOKEN: true, USER_NOT_FOUND: true, UNAUTHENTICATED: true };
+  function estadoDaBibliotecaNuvem() {
+    try { return JSON.parse(localStorage.getItem(CHAVE_ESTADO_DA_BIBLIOTECA) || 'null'); } catch (e) { return null; }
+  }
+  function guardarEstadoDaBibliotecaNuvem(est) {
+    try { localStorage.setItem(CHAVE_ESTADO_DA_BIBLIOTECA, JSON.stringify(est)); } catch (e) { /* só a linha de Ajustes depende disto */ }
+  }
+
+  function atualizarBibliotecaDaNuvem() {
+    if (atualizandoBiblioteca) return atualizandoBiblioteca;
+    if (modoCelular || aparelhoSoLe() || typeof Nuvem !== 'object' || !Nuvem || typeof Nuvem.lerCatalogo !== 'function') {
+      return Promise.resolve(null);
+    }
+    var antes = estadoDaBibliotecaNuvem() || {};
+    // a marca do livro cujo meta da nuvem veio IGUAL ao do aparelho (não regravado): o metaHash do
+    // catálogo e o hash do meta do aparelho; se um dos dois mudar, o livro volta a ser conferido
+    var marcas = antes.conferidos && typeof antes.conferidos === 'object' ? antes.conferidos : {};
+    var estado = { quando: new Date().toISOString(), trocados: 0, chegam: 0, invalidos: 0, faltaram: 0, semEspaco: false, orfas: 0,
+      semCatalogo: false, conferidos: {} };
+    var hashDoMeta = function (m) { return Store.sha256Hex(Store.canonicoDoMeta(m)); };
+    var doAparelho = {};
+    var itens = [];
+    atualizandoBiblioteca = Promise.all([Nuvem.lerCatalogo(), Store.listarLivros()]).then(function (r) {
+      var indice = r[0], lista = r[1] || [];
+      if (!indice || !indice.livros || typeof indice.livros !== 'object') { estado.semCatalogo = true; return null; }
+      var candidatos = [];
+      lista.forEach(function (l) {
+        doAparelho[l.id] = l;
+        var e = indice.livros[l.id];
+        if (!e || e.retiradoEm) return;
+        if (!l.meta || l.meta.hash !== 'sha256:' + e.sha256) { estado.chegam++; return; }
+        if (l.nuvem && l.nuvem.metaHash === e.metaHash) return;
+        candidatos.push({ id: l.id, entrada: e });
+      });
+      Object.keys(indice.livros).forEach(function (id) {
+        if (!doAparelho[id] && !indice.livros[id].retiradoEm) estado.chegam++;
+      });
+      return Promise.all(candidatos.map(function (ped) {
+        var m = marcas[ped.id];
+        if (!m || m.metaHash !== ped.entrada.metaHash) return ped;
+        return hashDoMeta(doAparelho[ped.id].meta).then(function (h) {
+          if (h !== m.local) return ped;
+          estado.conferidos[ped.id] = m;
+          return null;
+        });
+      })).then(function (l) {
+        var pedidos = l.filter(Boolean);
+        // um livro por vez: são poucos KB cada, e a rede do tablet é a da aula
+        return pedidos.reduce(function (p, ped) {
+          return p.then(function () {
+            return Nuvem.lerLivroDoCatalogo(ped.id).then(function (doc) {
+              if (!doc || doc.id !== ped.id || doc.metaHash !== ped.entrada.metaHash || doc.sha256 !== ped.entrada.sha256) { estado.invalidos++; return; }
+              return Store.sha256Hex(doc.metaJson).then(function (h) {
+                var c = Biblioteca.conferirMetaDaNuvem(doc, h);
+                if (!c.meta) { estado.invalidos++; return; }
+                itens.push({ id: ped.id, sha256: doc.sha256, meta: c.meta, metaHash: doc.metaHash, metaVersao: doc.metaVersao });
+              });
+            });
+          });
+        }, Promise.resolve());
+      }).then(function () {
+        return itens.length ? Store.trocarMetaDaNuvem(itens) : null;
+      });
+    }).then(function (contas) {
+      if (!contas) return null;
+      estado.trocados = contas.trocados.length;
+      estado.invalidos += contas.invalidos;
+      estado.faltaram = contas.faltaram;
+      estado.semEspaco = !!(contas.falha && contas.falha.name === 'QuotaExceededError');
+      // as correções dela que o mapa novo deixou sem capítulo (as que já estavam órfãs não contam)
+      var correcoes = correcoesDosLivros();
+      itens.forEach(function (it) {
+        var c = correcoes[it.id];
+        if (!c || contas.trocados.indexOf(it.id) === -1) return;
+        try {
+          var velhas = {};
+          Biblioteca.correcoesOrfas(doAparelho[it.id].meta, c).forEach(function (o) { velhas[o.chave] = true; });
+          estado.orfas += Biblioteca.correcoesOrfas(it.meta, c).filter(function (o) { return !velhas[o.chave]; }).length;
+        } catch (e) { /* a conta é só da linha; a tela do livro mostra as órfãs de qualquer jeito */ }
+      });
+      return Promise.all(contas.iguais.map(function (id) {
+        var it = itens.filter(function (x) { return x.id === id; })[0];
+        return hashDoMeta(doAparelho[id].meta).then(function (h) { estado.conferidos[id] = { metaHash: it.metaHash, local: h }; });
+      }));
+    }).then(function () {
+      guardarEstadoDaBibliotecaNuvem(estado);
+      if (estado.trocados) {
+        indiceDosCapitulos = null;   // a busca pelos capítulos (#181) refaz com os mapas novos
+        return desenharLivrosAjustes().then(function () { return estado; });
+      }
+      desenharEstadoDaBibliotecaNuvem();
+      return estado;
+    }).then(function (est) { atualizandoBiblioteca = null; return est; }, function (e) {
+      atualizandoBiblioteca = null;
+      throw e;
+    });
+    return atualizandoBiblioteca;
+  }
+
+  // na abertura, no máximo uma vez por hora, e só com a constante ligada
+  function atualizarBibliotecaNaAbertura() {
+    if (!ATUALIZAR_BIBLIOTECA_NA_ABERTURA) return Promise.resolve(null);
+    var est = estadoDaBibliotecaNuvem();
+    if (est && est.quando && Date.now() - Date.parse(est.quando) < UMA_HORA_MS) return Promise.resolve(null);
+    return atualizarBibliotecaDaNuvem().catch(function () { return null; });
+  }
+
+  function textoDoEstadoDaBibliotecaNuvem(est) {
+    if (!est || !est.quando) return 'A biblioteca ainda não foi conferida com a nuvem.';
+    if (est.semCatalogo) return 'A biblioteca da nuvem ainda não tem livros.';
+    var d = new Date(est.quando);
+    var hoje = new Date();
+    var dia = d.toDateString() === hoje.toDateString() ? 'hoje' : 'em ' + ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
+    var partes = ['Biblioteca conferida ' + dia + ' às ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2)];
+    partes.push(est.trocados ? est.trocados + ' ' + palavraPlural(est.trocados, 'livro com mapa novo', 'livros com mapa novo') : 'nenhum livro com mapa novo');
+    if (est.chegam) partes.push(est.chegam + ' ' + palavraPlural(est.chegam, 'livro chega', 'livros chegam') + ' com a próxima versão');
+    if (est.invalidos) partes.push(est.invalidos + ' ' + palavraPlural(est.invalidos, 'livro não pôde ser conferido', 'livros não puderam ser conferidos'));
+    if (est.faltaram) {
+      partes.push(est.faltaram + ' ' + palavraPlural(est.faltaram, 'livro ficou', 'livros ficaram') + ' para o próximo toque' +
+        (est.semEspaco ? ', por falta de espaço no tablet' : ''));
+    }
+    if (est.orfas) partes.push(est.orfas + ' ' + palavraPlural(est.orfas, 'correção sua ficou', 'correções suas ficaram') + ' sem capítulo; veja no livro');
+    return partes.join(' · ');
+  }
+
+  function desenharEstadoDaBibliotecaNuvem() {
+    var linha = $('#livros-nuvem-estado');
+    if (linha) linha.textContent = textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem());
+  }
+
+  function tocarAtualizarBiblioteca(botao) {
+    if (botao) botao.disabled = true;
+    return atualizarBibliotecaDaNuvem().then(function (est) {
+      if (botao) botao.disabled = false;
+      if (est === null && (modoCelular || aparelhoSoLe())) avisar('A biblioteca se atualiza no tablet.');
+    }, function (e) {
+      if (botao) botao.disabled = false;
+      var codigo = e && e.codigo;
+      avisar(codigo === 'SEM_SESSAO' ? 'Entre na nuvem para atualizar a biblioteca.'
+        : PEDE_ENTRAR_DE_NOVO[codigo] ? 'A entrada na nuvem venceu. Entre de novo para atualizar a biblioteca.' : 'Não consegui conferir a biblioteca agora. Tente de novo daqui a pouco.');
+    });
+  }
+
   function desenharLivrosAjustes() {
     var caixa = $('#lista-livros-biblioteca');
     return Store.listarLivros().then(function (lista) {
@@ -17513,7 +17678,13 @@
         el('div', { class: 'livros-total', id: 'livros-total', 'data-bytes': String(total),
           texto: lista.length + (lista.length === 1 ? ' livro, ' : ' livros, ') + Biblioteca.mb(total) + ' no total' }),
         el('div', { class: 'ajuda u-margem-0-0-6', texto: 'Os livros ficam só neste tablet: a cópia de segurança não os leva. Para usar num tablet novo, ' +
-            'importe o pacote de livros de novo do Drive.' })
+            'importe o pacote de livros de novo do Drive.' }),
+        // fase 1c: o mapa novo dos livros chega pelo catálogo da nuvem, sem baixar livro nenhum
+        el('div', { class: 'livros-nuvem', id: 'livros-nuvem' }, [
+          el('div', { class: 'ajuda cresce', id: 'livros-nuvem-estado', texto: textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem()) }),
+          el('button', { type: 'button', class: 'btn pequeno', id: 'livros-nuvem-atualizar', texto: 'Atualizar a biblioteca',
+            aoClick: function () { tocarAtualizarBiblioteca($('#livros-nuvem-atualizar')); } })
+        ])
       ].concat(linhas)));
     }).catch(function () { quantosLivros = 0; livrosDoTablet = []; livrosDoTabletMudaram(); if (caixa) caixa.innerHTML = ''; });
   }
@@ -17621,11 +17792,13 @@
     ['livro', 'capitulo', 'estado', 'assuntos'].forEach(function (k) { delete caixa.dataset[k]; });
   }
 
-  function mostrarCobre(formato, reg, valor) {
+  /* `ancora` (só no EPUB): a âncora por onde ela entrou na parte, que escolhe
+   * o capítulo quando vários começam na mesma parte (item 12a, parte 0). */
+  function mostrarCobre(formato, reg, valor, ancora) {
     var caixa = caixaDoCobre(formato);
     if (!caixa || !reg || !reg.meta) return;
     var mapa = Biblioteca.mapaDoLivro(reg.meta, correcoesDosLivros()[reg.id]);
-    var e = Biblioteca.entradaDoMapa(mapa, formato, valor);
+    var e = Biblioteca.entradaDoMapa(mapa, formato, valor, ancora);
     if (!e) { esconderCobre(formato); return; }
     /* O mesmo capítulo, com o mesmo estado e os mesmos assuntos, já à vista:
      * nada a redesenhar. A página é desenhada de novo no zoom, no "Ajustar à
@@ -17638,7 +17811,7 @@
         (assuntosDosLivros || !e.assuntos.length) && !/abrindo o índice/.test(caixa.textContent)) {
       return;
     }
-    var redesenhar = function () { mostrarCobre(formato, reg, valor); };
+    var redesenhar = function () { mostrarCobre(formato, reg, valor, ancora); };
     desenharCobre(caixa, reg, e, assuntosDosLivros, redesenhar);
     if (!assuntosDosLivros) {
       carregarAssuntosDosLivros().then(function (nomes) {
@@ -17913,7 +18086,8 @@
       desenho: 0, relogio: null };
     espinha.forEach(function (c, i) { ep.indiceDe[c] = i; });
     $('#titulo-modal-leitor-epub').textContent = tituloDoLivro(meta);
-    $('#epub-sumario').hidden = !(meta.sumario && meta.sumario.length);
+    // item 12a, parte 0: o EPUB sem sumário mostra o do mapa (sumarioDaTela), como a tela do livro
+    $('#epub-sumario').hidden = !sumarioDaTela(meta).length;
     fecharSumarioEpub();
     esconderCobre('epub');
     var corpo = $('#corpo-modal-leitor-epub');
@@ -18062,7 +18236,7 @@
           } catch (e) { /* a caixa sem acesso: o texto continua à vista */ }
           ep.mostrado = i;
           corpo.dataset.capituloAberto = String(i + 1);
-          mostrarCobre('epub', { id: ep.id, meta: ep.meta }, i + 1);
+          mostrarCobre('epub', { id: ep.id, meta: ep.meta }, i + 1, ancora);
           guardarPosicaoEpub();
           ok(true);
         }, { once: true });
@@ -18120,7 +18294,8 @@
     var lista = $('#epub-sumario-lista');
     if (!ep || !lista) return;
     if (!lista.hidden) { fecharSumarioEpub(); return; }
-    desenharSumario(lista, ep.meta.sumario, entradaAtualDoSumario(ep.meta.sumario, 'capitulo', ep.capitulo + 1), function (e) {
+    var sumario = sumarioDaTela(ep.meta);
+    desenharSumario(lista, sumario, entradaAtualDoSumario(sumario, 'capitulo', ep.capitulo + 1), function (e) {
       fecharSumarioEpub();
       mostrarCapituloEpub(e.capitulo - 1, 0, e.ancora || null);
     });
@@ -20024,7 +20199,8 @@
     var epub = meta.formato === 'epub';
     var doMapa = e.mapa_n != null ? mapa.filter(function (m) { return m.n === e.mapa_n; })[0] : null;
     return doMapa || mapa.filter(function (m) { return m.titulo === e.titulo; })[0] ||
-      mapa.filter(function (m) { return epub ? m.capitulo === e.capitulo && !e.ancora : m.pagina === e.pagina; })[0] || null;
+      // no EPUB, a mesma parte E a mesma âncora: vários capítulos podem começar na mesma parte (item 12a, parte 0)
+      mapa.filter(function (m) { return epub ? m.capitulo === e.capitulo && (m.ancora || null) === (e.ancora || null) : m.pagina === e.pagina; })[0] || null;
   }
 
   function abrirCapitulo(l, e) {
@@ -21973,7 +22149,8 @@
         el('div', { class: 'bib-tags' }, [
           el('span', { class: 'tag bib-lp-min-item', texto: minutosEstimados(lp.minutosDe[it.id]) }),
           etiquetaDesafio(it)
-        ])
+        ]),
+        linhaDeCredito(it)
       ])]));
     });
     corpo.appendChild(grade);
@@ -22161,7 +22338,8 @@
             ? el('span', { class: 'tag bib-lp-min-item', texto: minutosEstimados(lp.minutosDe[id]) })
             : el('span', { class: 'tag bib-lp-min-item', texto: 'acrescentado por você' }),
           lp.minutosDe[id] !== undefined ? etiquetaDesafio(it) : null
-        ])
+        ]),
+        linhaDeCredito(it)
       ]);
       grade.appendChild(celulaComCaixa(cartao, 'itens', it.id, setas));
     });
@@ -22243,7 +22421,8 @@
           (it.titulo ? ': ' + it.titulo : '') }),
         miniaturaBib(it.pacote, it.assets.enunciado, it.medidas && it.medidas.enunciado, 520),
         el('div', { class: 'bib-tags' }, tags),
-        it.origem_citada ? el('div', { class: 'bib-origem', texto: it.origem_citada }) : null
+        it.origem_citada ? el('div', { class: 'bib-origem', texto: it.origem_citada }) : null,
+        linhaDeCredito(it)
       ]), 'itens', it.id, etiquetaDela(it)));
     });
     corpo.appendChild(barraFiltroDeDificuldade(grade, lista, mod.banco));
@@ -23563,8 +23742,54 @@
     abrirModal('modal-bib-gerar');
   }
 
+  /* O crédito que a licença da fonte pede (L6). Fonte aberta que exige
+   * atribuição (os Cadernos de Apoio e Aprendizagem da SME-SP, pelo Decreto
+   * municipal 52.681/2011, que equivale à CC BY-NC-SA) traz no item os campos
+   * `atribuicao` e `licenca`; o aplicativo desenha o que o item traz, sem texto
+   * de fonte nenhuma escrito aqui, no cartão, na tela cheia e na folha (lista e
+   * gabarito). Na folha ele NÃO depende da caixa "origem": a licença manda
+   * creditar, então ninguém o desliga. Item sem os dois campos devolve null e
+   * fica exatamente como era. O endereço entra só quando o item traz um. */
+  function creditoDaLicenca(it) {
+    if (!it) return null;
+    var limpo = function (v) { return typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : ''; };
+    var ponto = function (t) { return /[.!?]$/.test(t) ? t : t + '.'; };
+    var atrib = limpo(it.atribuicao), lic = limpo(it.licenca);
+    if (!atrib && !lic) return null;
+    var partes = [];
+    if (atrib) partes.push('Fonte: ' + ponto(atrib));
+    if (lic) partes.push('Licença: ' + ponto(lic));
+    /* O endereço: o do item e, na falta dele, o fonte.url do manifest do
+     * pacote (pacote importado antes do campo `link` também mostra). */
+    var ehLink = function (t) { return /^https?:\/\/\S+$/.test(t); };
+    var link = [limpo(it.link), limpo(it.url), limpo((fonteDoPacote(it) || {}).url)].filter(ehLink)[0];
+    if (link) partes.push(link);
+    return partes.join(' ');
+  }
+
+  /* A linha do crédito no cartão e na tela cheia, ou null (item sem os campos). */
+  function linhaDeCredito(it, classeExtra) {
+    var texto = creditoDaLicenca(it);
+    return texto ? el('div', { class: 'bib-credito' + (classeExtra ? ' ' + classeExtra : ''), texto: texto }) : null;
+  }
+
+  /* O nome da fonte para gente ler: os dois da OBMEP pelo nome de sempre; os
+   * outros pelo fonte.nome do manifest do pacote do item; o id cru
+   * ("cadernos-sme-sp") só quando o pacote não diz o nome. */
+  function fonteDoPacote(it) {
+    var p = ((bib && bib.pacotes) || []).filter(function (x) { return x.pacote === it.pacote; })[0];
+    return (p && p.manifest && p.manifest.fonte) || null;
+  }
+
+  function nomeDaFonte(it) {
+    if (it.fonte === 'obmep-portal') return 'Portal da OBMEP';
+    if (it.fonte === 'obmep-banco') return 'Banco de Questões da OBMEP';
+    var f = fonteDoPacote(it);
+    return (f && typeof f.nome === 'string' && f.nome.trim()) || it.fonte || '';
+  }
+
   function origemCurta(it) {
-    var fonte = it.fonte === 'obmep-portal' ? 'Portal da OBMEP' : it.fonte === 'obmep-banco' ? 'Banco de Questões da OBMEP' : (it.fonte || '');
+    var fonte = nomeDaFonte(it);
     return [fonte, it.modulo.titulo, (eDoBanco(it) ? 'problema ' : 'exercício ') + it.numero]
       .filter(Boolean).join(', ') + (it.origem_citada ? ' (' + it.origem_citada + ')' : '');
   }
@@ -23588,8 +23813,9 @@
         return Biblioteca.rasterizarRecorte(b, it.medidas.solucao, it.origem && it.origem.solucao && it.origem.solucao.pedacos);
       });
     return Promise.all([enun, sol]).then(function (r) {
-      return { id: it.id, origem: origemCurta(it), enunciado: r[0], solucao: r[1],
-        semSolucao: !!(it.sem_solucao || !it.assets.solucao), resposta: respostaSemSolucao(it) };
+      return { id: it.id, origem: origemCurta(it), credito: creditoDaLicenca(it), enunciado: r[0], solucao: r[1],
+        semSolucao: !!(it.sem_solucao || !it.assets.solucao), resposta: respostaSemSolucao(it),
+        gabaritoAgente: respostasDoAgente(it) };
     });
   }
 
@@ -23598,6 +23824,54 @@
    * solução mostra a solução, e a letra fica dentro dela. */
   function respostaSemSolucao(it) {
     return it && !it.assets.solucao && it.formato === 'objetiva' && /^[A-E]$/.test(it.resposta || '') ? it.resposta : null;
+  }
+
+  /* O GABARITO RESOLVIDO POR AGENTE E CONFERIDO (aditivo no pacote). Fonte
+   * sem solução (os Cadernos da SME-SP: o caderno do aluno não traz respostas)
+   * pode trazer no item `gabarito: { origem: 'agente-conferido', respostas:
+   * [{ subitem, resposta }] }`, a resposta de duas IAs que resolveram separadas
+   * e chegaram ao mesmo resultado (o gerador grava pelo --gabarito-externo).
+   * Onde a resposta aparece (a tela cheia e o gabarito do PDF), a marca vai
+   * SEMPRE junto, e nenhuma caixa a desliga: quem lê precisa saber que aquela
+   * resposta não veio do livro. Item sem o campo, ou de outra origem, devolve
+   * null e fica exatamente como era. As linhas saem prontas para mostrar,
+   * como { texto, semResposta }: "1) 38" por subitem, ou "Resposta: 38"
+   * quando o item não tem subitens. A resposta PARCIAL é de propósito (o
+   * subitem em que as duas IAs não concordaram fica sem entrada): item com
+   * subitens lista TODOS, e o que não tem resposta sai "sem resposta
+   * conferida". */
+  var MARCA_GABARITO_AGENTE = 'Resposta conferida por duas IAs';
+  var EXPLICA_GABARITO_AGENTE = 'Este livro não traz gabarito. Duas IAs resolveram separadas e chegaram à mesma resposta.';
+  var SEM_RESPOSTA_CONFERIDA = 'sem resposta conferida';
+  function respostasDoAgente(it) {
+    var g = it && it.gabarito;
+    if (!g || g.origem !== 'agente-conferido' || !Array.isArray(g.respostas)) return null;
+    var limpo = function (v) { return typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : ''; };
+    var rs = g.respostas.filter(function (r) { return r && limpo(r.resposta); });
+    if (!rs.length) return null;
+    var subs = (Array.isArray(it.subitens) ? it.subitens : []).map(limpo).filter(Boolean);
+    if (subs.length) {
+      var de = {};
+      rs.forEach(function (r) { if (limpo(r.subitem)) de[limpo(r.subitem)] = limpo(r.resposta); });
+      return subs.map(function (s) {
+        return de[s] ? { texto: s + ') ' + de[s], semResposta: false }
+          : { texto: s + ') ' + SEM_RESPOSTA_CONFERIDA, semResposta: true };
+      });
+    }
+    if (rs.length === 1 && !limpo(rs[0].subitem)) return [{ texto: 'Resposta: ' + limpo(rs[0].resposta), semResposta: false }];
+    return rs.map(function (r) {
+      return { texto: (limpo(r.subitem) ? limpo(r.subitem) + ') ' : '') + limpo(r.resposta), semResposta: false };
+    });
+  }
+
+  /* A marca, que se toca para ler o porquê. Um <details>: sem script, e o
+   * leitor de tela anuncia que abre. */
+  function marcaDoAgente() {
+    return el('details', { id: 'bib-marca-ia', class: 'bib-marca-ia u-texto-centro' }, [
+      el('summary', {}, [el('span', { class: 'bib-grupo-seta', 'aria-hidden': 'true' }, [icone('chr')]),
+        el('span', { texto: MARCA_GABARITO_AGENTE })]),
+      el('p', { id: 'bib-marca-ia-explica', class: 'bib-marca-ia-explica', texto: EXPLICA_GABARITO_AGENTE })
+    ]);
   }
 
   /* Módulo de prova que não é assunto do aplicativo ("Diversos", C12) não vira
@@ -23921,28 +24195,28 @@
   function listaComoFolha(aulaId, itens, pecas) {
     var L = Draw.FOLHA_L, A = Draw.FOLHA_A, MARGEM = 40, ESPACO = 150;
     var paginas = [], atual = null, y = 0;
-    var tarefas = [];
-    pecas.forEach(function (p, i) {
-      var e = p.enunciado;
-      var altPt = e.alturaPt + (numeroNoLugar(e, i + 1) ? 0 : 16);   // na faixa, o número soma 16 pt em cima
-      var esc = Math.min(1.9, (L - 2 * MARGEM) / e.larguraPt);
-      var h = altPt * esc;
-      if (h > A - 2 * MARGEM) { esc = (A - 2 * MARGEM) / altPt; h = A - 2 * MARGEM; }
-      if (!atual || y + h > A - MARGEM) { atual = { fundo: 'branco', itens: [] }; paginas.push(atual); y = MARGEM; }
+    /* Cada recorte é desenhado ANTES de ser posto na página: o crédito da
+     * licença (L6) vai queimado embaixo dele, e só o desenho pronto diz quantas
+     * linhas o crédito tomou. A altura sai da proporção da imagem final. */
+    var medidas = [];
+    var indice = 0;
+    return emFila(pecas, function (p, i) {
       var ref = Core.uid();
-      var destino = atual;
-      var pos = { x: MARGEM, y: y, w: e.larguraPt * esc, h: h };
-      tarefas.push(function () {
-        return imagemNumerada(e, i + 1, esc).then(function (r) {
-          return Store.salvarMidia(ref, r, { aulaId: aulaId }).then(function () {
-            destino.itens.push({ t: 'imagem', ref: ref, x: pos.x, y: pos.y, w: pos.w, h: pos.h });
-          });
+      return imagemNumerada(p.enunciado, i + 1, 0, p.credito).then(function (r) {
+        return Store.salvarMidia(ref, r, { aulaId: aulaId }).then(function () {
+          medidas[i] = { ref: ref, w: r.w, h: r.h };
         });
       });
-      y += h + ESPACO;
-    });
-    var indice = 0;
-    return emFila(tarefas, function (t) { return t(); }, 1).then(function () {
+    }, 1).then(function () {
+      pecas.forEach(function (p, i) {
+        var e = p.enunciado, m = medidas[i];
+        var w = e.larguraPt * Math.min(1.9, (L - 2 * MARGEM) / e.larguraPt);
+        var h = w * m.h / m.w;
+        if (h > A - 2 * MARGEM) { w = w * (A - 2 * MARGEM) / h; h = A - 2 * MARGEM; }
+        if (!atual || y + h > A - MARGEM) { atual = { fundo: 'branco', itens: [] }; paginas.push(atual); y = MARGEM; }
+        atual.itens.push({ t: 'imagem', ref: m.ref, x: MARGEM, y: y, w: w, h: h });
+        y += h + ESPACO;
+      });
       return Store.lerNota(aulaId);
     }).then(function (nota) {
       var temConteudo = nota && nota.paginas && nota.paginas.some(function (p) { return (p.itens || []).length; });
@@ -23973,7 +24247,7 @@
 
   /* O enunciado já rasterizado (JPEG, rótulo coberto), junto de novo num canvas
    * com "Exercício N." escrito onde o rótulo estava. */
-  function imagemNumerada(peca, n, escFolha) {
+  function imagemNumerada(peca, n, escFolha, credito) {
     var partes = peca.pedacos ? peca.pedacos : [{ img: peca.img, alturaPt: peca.alturaPt }];
     return Promise.all(partes.map(function (p) {
       return new Promise(function (ok, falha) {
@@ -24011,7 +24285,8 @@
         cx.font = 'bold ' + tam + 'px Helvetica, Arial, sans-serif';
         cx.textBaseline = 'alphabetic';
         cx.fillText(texto, r[0] * k, r[3] * k - 1.5 * k);
-        return { dataUrl: cv.toDataURL('image/jpeg', 0.9), w: cv.width, h: cv.height };
+        var cvc = comCreditoQueimado(cv, credito, k);
+        return { dataUrl: cvc.toDataURL('image/jpeg', 0.9), w: cvc.width, h: cvc.height };
       }
       // sem caixa do rótulo: uma faixa em cima com o número
       var faixa = Math.round(16 * k);
@@ -24023,8 +24298,49 @@
       c2.font = 'bold ' + Math.round(11 * k) + 'px Helvetica, Arial, sans-serif';
       c2.fillText(texto, 0, Math.round(12 * k));
       c2.drawImage(cv, 0, faixa);
-      return { dataUrl: cv2.toDataURL('image/jpeg', 0.9), w: cv2.width, h: cv2.height };
+      var cvf = comCreditoQueimado(cv2, credito, k);
+      return { dataUrl: cvf.toDataURL('image/jpeg', 0.9), w: cvf.width, h: cvf.height };
     });
+  }
+
+  /* O CRÉDITO DA LICENÇA QUEIMADO NO RECORTE (L6). A folha da aula guarda a
+   * imagem colada, e é ela que sai em todo PDF que a folha gera (a folha da
+   * aula, o PDF do aluno) e em toda cópia pela nuvem: com o crédito DENTRO da
+   * imagem, nenhum exportador precisa saber dele, e apagar o crédito é apagar
+   * o exercício. Faixa branca embaixo do recorte, em cinza, no corpo de 6,5 pt
+   * do recorte (pxPorPt é a escala do canvas), quebrada na largura dele. Sem
+   * crédito, devolve o mesmo canvas, intocado. */
+  var CREDITO_QUEIMADO_PT = 6.5;
+  function comCreditoQueimado(cv, credito, pxPorPt) {
+    if (!credito) return cv;
+    var tam = CREDITO_QUEIMADO_PT * pxPorPt, alt = Math.ceil(tam * 1.35), folga = Math.ceil(tam * 0.8);
+    var fonte = tam.toFixed(2) + 'px Helvetica, Arial, sans-serif';
+    var cx0 = cv.getContext('2d');
+    cx0.font = fonte;
+    var linhas = [], atual = '';
+    String(credito).split(/\s+/).filter(Boolean).forEach(function (p) {
+      var tenta = atual ? atual + ' ' + p : p;
+      if (cx0.measureText(tenta).width <= cv.width) { atual = tenta; return; }
+      if (atual) { linhas.push(atual); atual = ''; }
+      // palavra mais larga que o recorte (o endereço, num recorte estreito): quebra por caractere
+      Array.from(p).forEach(function (ch) {
+        if (atual && cx0.measureText(atual + ch).width > cv.width) { linhas.push(atual); atual = ''; }
+        atual += ch;
+      });
+    });
+    if (atual) linhas.push(atual);
+    var nv = document.createElement('canvas');
+    nv.width = cv.width;
+    nv.height = cv.height + folga + linhas.length * alt;
+    var c = nv.getContext('2d');
+    c.fillStyle = '#FFFFFF';
+    c.fillRect(0, 0, nv.width, nv.height);
+    c.drawImage(cv, 0, 0);
+    c.fillStyle = '#5B6573';
+    c.font = fonte;
+    c.textBaseline = 'top';
+    linhas.forEach(function (l, i) { c.fillText(l, 0, cv.height + folga + i * alt); });
+    return nv;
   }
 
 
@@ -25548,12 +25864,22 @@
     if (peca.item && peca.item.origem_citada) {
       corpo.appendChild(el('div', { class: 'bib-origem u-texto-centro', texto: peca.item.origem_citada }));
     }
+    var credVisor = linhaDeCredito(peca.item, 'u-texto-centro');
+    if (credVisor) corpo.appendChild(credVisor);
     // sem solução e com a letra do gabarito (ENEM): o "Ver resposta" mostra a letra
     var resposta = bibVendo.tipo === 'exercicio' ? respostaSemSolucao(peca.item) : null;
     if (resposta && bibVendo.solucao) {
       corpo.appendChild(el('div', { id: 'bib-resposta', class: 'bib-resposta u-texto-centro u-letra-6 u-peso-negrito u-cor-navy u-margem-topo-10',
         texto: 'Resposta: ' + resposta }));
     }
+    /* A resposta de duas IAs conferida (item sem solução na fonte): pelo mesmo
+     * "Ver resposta", e a marca embaixo SEMPRE, aberta ou não a resposta. */
+    var doAgente = bibVendo.tipo === 'exercicio' ? respostasDoAgente(peca.item) : null;
+    if (doAgente && bibVendo.solucao) {
+      corpo.appendChild(el('div', { id: 'bib-resposta-agente', class: 'bib-resposta u-texto-centro u-margem-topo-10' },
+        doAgente.map(function (l) { return el('div', { class: l.semResposta ? 'bib-sem-resposta' : 'u-peso-negrito u-cor-navy', texto: l.texto }); })));
+    }
+    if (doAgente) corpo.appendChild(marcaDoAgente());
     var vez = ++bibVezDoVisor;
     Store.lerAssetBiblioteca(peca.pacote, peca.caminho).then(function (blob) {
       // ela pode ter andado para outra página enquanto esta era lida
@@ -25567,7 +25893,7 @@
     if (bibVendo.tipo === 'exercicio' && peca.item.assets.solucao) {
       sol.style.display = '';
       sol.textContent = bibVendo.solucao ? 'Ver enunciado' : 'Ver solução';
-    } else if (resposta) {
+    } else if (resposta || doAgente) {
       sol.style.display = '';
       sol.textContent = bibVendo.solucao ? 'Esconder a resposta' : 'Ver resposta';
     } else {
@@ -25630,7 +25956,8 @@
       return;
     }
     var peca = pecaVista();
-    mostrarAulasParaFolha({ pacote: peca.pacote, caminho: peca.caminho, medidas: peca.medidas, forma: peca.forma, titulo: peca.titulo });
+    mostrarAulasParaFolha({ pacote: peca.pacote, caminho: peca.caminho, medidas: peca.medidas, forma: peca.forma, titulo: peca.titulo,
+      credito: peca.item ? creditoDaLicenca(peca.item) : null });
   }
 
   /* A escolha da aula, separada de quem pediu: a biblioteca e o leitor de PDF
@@ -25729,7 +26056,18 @@
        * recém-criada, por exemplo): sem a aula, nada é gravado. */
       aula = db.aulas.filter(function (a) { return a.id === aulaId; })[0];
       if (!aula) { var sem = new Error('aula desfeita'); sem.desfeita = true; throw sem; }
-      return Store.salvarMidia(ref, { dataUrl: c.toDataURL('image/jpeg', 0.9), w: lpx, h: apx }, { aulaId: aulaId });
+      /* O crédito da licença (L6) entra queimado embaixo do recorte, e a caixa
+       * na folha cresce na mesma proporção; sem crédito, nada muda. */
+      if (alvo.credito) {
+        var wpt = (alvo.medidas && alvo.medidas.largura_pt) || 612;
+        c = comCreditoQueimado(c, alvo.credito, lpx / wpt);
+        pos.h = pos.w * c.height / c.width;
+        if (pos.y + pos.h > Draw.FOLHA_A - 16) {
+          var red = (Draw.FOLHA_A - 16 - pos.y) / pos.h;
+          pos.w *= red; pos.h *= red;
+        }
+      }
+      return Store.salvarMidia(ref, { dataUrl: c.toDataURL('image/jpeg', 0.9), w: alvo.credito ? c.width : lpx, h: alvo.credito ? c.height : apx }, { aulaId: aulaId });
     }).then(function () {
       return Store.lerNota(aulaId);
     }).then(function (nota) {
@@ -26392,6 +26730,7 @@
         if (antigo) { antigo.width = 0; antigo.height = 0; }
         registro.caixa.innerHTML = '';
         registro.caixa.appendChild(canvas);
+        criarCamadaDeTexto(estado, registro, pagina, vp);
         registro.temCanvas = true;
         registro.esticado = false;
         registro.densidade = densidade;
@@ -26501,11 +26840,131 @@
     }).catch(function () { /* o detalhe é só nitidez: a página inteira continua lá */ }).then(atualizarOcupacaoDoLeitor);
   }
 
+  /* A CAMADA DE TEXTO (fatia 7 do leitor): o texto da página, transparente,
+   * por cima do canvas, para o dedo selecionar e copiar (o TextLayer do
+   * pdf.js). Nasce com o canvas da página (desenharPaginaContinua) e sai com
+   * ele (liberarPaginaContinua): só as páginas desenhadas têm texto vivo.
+   * Página sem texto (a do escaneado) não ganha camada, e o livro escaneado
+   * (a sonda da fatia 3) é dito uma vez por abertura. O anexo da aula (página
+   * única) continua sem camada. */
+  var LEITOR_SEM_TEXTO = 'Este livro é imagem: o texto não pode ser selecionado nem buscado.';
+  function criarCamadaDeTexto(estado, registro, pagina, vp) {
+    if (estado.escaneado && !estado.avisouImagem) { estado.avisouImagem = true; avisar(LEITOR_SEM_TEXTO); }
+    var velha = registro.texto;
+    // a página foi redesenhada no mesmo tamanho (a segunda passada): a camada pronta volta
+    if (velha && velha.escala === vp.scale) { if (velha.temTexto) registro.caixa.appendChild(velha.div); return; }
+    soltarCamadaDeTexto(registro);
+    var camada = { div: el('div', { class: 'textLayer leitor-pdf-texto' }), escala: vp.scale, tarefa: null, temTexto: false };
+    camada.div.style.setProperty('--total-scale-factor', String(vp.scale));
+    registro.texto = camada;
+    Promise.all([carregarPdfJs(), pagina.getTextContent({ includeMarkedContent: true, disableNormalization: true })]).then(function (r) {
+      // a página saiu (ou foi redesenhada em outro tamanho) enquanto o texto chegava
+      if (registro.texto !== camada || estado !== leitor) return null;
+      var temTexto = (r[1].items || []).some(function (i) { return i.str && i.str.trim(); });
+      // caixa.dataset.texto diz que a página já foi lida: '1' com camada pronta, '0' sem texto
+      if (!temTexto) { registro.caixa.dataset.texto = '0'; return null; }
+      camada.temTexto = true;
+      if (registro.temCanvas && !camada.div.parentNode) registro.caixa.appendChild(camada.div);
+      camada.tarefa = new r[0].TextLayer({ textContentSource: r[1], container: camada.div, viewport: vp });
+      return camada.tarefa.render().then(function () {
+        if (registro.texto !== camada) return;
+        /* a letra de cada pedaço no tamanho que ele tem na página: geometria do
+         * PDF, em px, e não tipografia do app (por isso não está no styles.css) */
+        Array.prototype.forEach.call(camada.div.querySelectorAll('span'), function (s) {
+          s.style.fontSize = 'calc(var(--text-scale-factor) * var(--font-height))';
+        });
+        camada.div.appendChild(el('div', { class: 'endOfContent' }));
+        registro.caixa.dataset.texto = '1';
+      });
+    }).catch(function () { /* sem a camada a página continua lá; só não seleciona */ });
+  }
+
+  function soltarCamadaDeTexto(registro) {
+    var camada = registro.texto;
+    delete registro.caixa.dataset.texto;
+    if (!camada) return;
+    registro.texto = null;
+    if (camada.tarefa) { try { camada.tarefa.cancel(); } catch (e) { /* já terminou */ } }
+    if (camada.div.parentNode) camada.div.parentNode.removeChild(camada.div);
+  }
+
+  /* A S Pen não seleciona o texto do livro: a caneta é da folha (padrão 4.5
+   * do benchmark). O navegador começa a seleção depois do pointerdown; se ele
+   * veio da caneta, o selectstart é cancelado. O dedo e o mouse selecionam. */
+  var canetaNoLeitor = false;
+  function ligarCanetaSemSelecao(corpo) {
+    corpo.addEventListener('pointerdown', function (ev) { canetaNoLeitor = ev.pointerType === 'pen'; }, true);
+    corpo.addEventListener('selectstart', function (ev) { if (canetaNoLeitor) ev.preventDefault(); });
+  }
+
+  /* O FIM DO CONTEÚDO: o mecanismo do TextLayerBuilder do visualizador do
+   * pdf.js (web/text_layer_builder.js), que o TextLayer do núcleo não traz.
+   * Sem ele, o arrasto que termina depois do fim da linha (o dedo quase sempre
+   * passa) cai no vazio da camada e o Chrome põe a ponta da seleção longe: a
+   * seleção some ou pula para a linha de cima. Cada camada tem no fim um
+   * div.endOfContent; enquanto há seleção nela (classe selecting) ele cobre a
+   * camada inteira por baixo dos pedaços de texto (styles.css), e a cada
+   * mudança da seleção ele é posto logo depois do pedaço em que a ponta está:
+   * o arrasto no vazio pega até o fim daquele pedaço, e não mais. Uma escuta
+   * só, no documento, para todas as páginas. */
+  function ligarFimDoConteudo() {
+    var apertado = false, anterior = null;
+    var camadas = function () { return document.querySelectorAll('#corpo-modal-leitor-pdf .leitor-pdf-texto'); };
+    var devolver = function (camada) {
+      var fim = camada.querySelector('.endOfContent');
+      if (fim) { fim.style.width = ''; fim.style.height = ''; fim.style.userSelect = ''; if (fim.parentNode !== camada || fim.nextSibling) camada.appendChild(fim); }
+      camada.classList.remove('selecting');
+    };
+    var devolverTodas = function () { Array.prototype.forEach.call(camadas(), devolver); };
+    document.addEventListener('pointerdown', function (ev) {
+      apertado = true;
+      var camada = ev.pointerType !== 'pen' && ev.target.closest && ev.target.closest('.leitor-pdf-texto');
+      if (camada) camada.classList.add('selecting');
+    });
+    document.addEventListener('pointerup', function () { apertado = false; devolverTodas(); });
+    window.addEventListener('blur', function () { apertado = false; devolverTodas(); });
+    document.addEventListener('keyup', function () { if (!apertado) devolverTodas(); });
+    document.addEventListener('selectionchange', function () {
+      var sel = document.getSelection();
+      if (!sel.rangeCount) { devolverTodas(); return; }
+      var r = sel.getRangeAt(0), ativa = false;
+      Array.prototype.forEach.call(camadas(), function (c) {
+        if (r.intersectsNode(c)) { c.classList.add('selecting'); ativa = true; } else devolver(c);
+      });
+      if (!ativa) { anterior = null; return; }
+      // a ponta que o arrasto está mexendo: a do começo, se a do fim ficou parada
+      var mexeInicio = !!anterior && (r.compareBoundaryPoints(Range.END_TO_END, anterior) === 0 ||
+        r.compareBoundaryPoints(Range.START_TO_END, anterior) === 0);
+      var ponta = mexeInicio ? r.startContainer : r.endContainer;
+      if (ponta.nodeType === Node.TEXT_NODE) ponta = ponta.parentNode;
+      if (!mexeInicio && r.endOffset === 0) {
+        // a ponta no começo de um pedaço: o fim vai depois do pedaço com texto anterior
+        do {
+          while (ponta && !ponta.previousSibling) ponta = ponta.parentNode;
+          ponta = ponta && ponta.previousSibling;
+        } while (ponta && !ponta.childNodes.length);
+      }
+      var camada = ponta && ponta.parentElement && ponta.parentElement.closest('.leitor-pdf-texto');
+      var fim = camada && camada.querySelector('.endOfContent');
+      if (fim && ponta !== fim) {
+        fim.style.width = camada.clientWidth + 'px';
+        fim.style.height = camada.clientHeight + 'px';
+        // no Chrome o fim do conteúdo tem de ser selecionável enquanto está atrás
+        // da ponta (o TextLayerBuilder do pdf.js faz o mesmo): com user-select
+        // none, o ponteiro que passa do fim da linha cai num ponto do meio dela
+        fim.style.userSelect = 'text';
+        ponta.parentElement.insertBefore(fim, mexeInicio ? ponta : ponta.nextSibling);
+      }
+      anterior = r.cloneRange();
+    });
+  }
+
   function liberarPaginaContinua(registro) {
     soltarDetalhe(registro);
     if (registro.tarefa) { registro.tarefa.cancel(); registro.tarefa = null; }
     var c = registro.caixa.querySelector('canvas');
     if (c) { c.width = 0; c.height = 0; registro.caixa.removeChild(c); }
+    soltarCamadaDeTexto(registro);
     registro.caixa.innerHTML = '';
     registro.caixa.appendChild(el('div', { class: 'leitor-pdf-pagina-vazia', 'aria-hidden': 'true' }));
     registro.desenhando = false;
@@ -27157,6 +27616,8 @@
     if (typeof Store.aoReceber === 'function') Store.aoReceber(registrosChegaram);
     var lembretePronto = function () { lembreteNuvemPronta = true; relerFilaDoLembrete(); };
     Nuvem.pronto().then(lembretePronto, lembretePronto);
+    // fase 1c: a conferência do catálogo na abertura (desligada até a primeira publicação conferida)
+    Nuvem.pronto().then(atualizarBibliotecaNaAbertura, function () { /* sem nuvem, sem catálogo */ });
     Nuvem.pronto().then(function () {
       desenharNuvem();
       // o celular busca a cópia mais nova; quem sobe a dele é só o tablet
