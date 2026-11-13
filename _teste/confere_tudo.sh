@@ -277,6 +277,14 @@ roda "venenos existem" node _teste/testa_venenos_existem.js
 roda "venenos existem --envenenado-nome-falso" node _teste/testa_venenos_existem.js --envenenado-nome-falso
 roda "venenos existem --envenenado-letra-trocada" node _teste/testa_venenos_existem.js --envenenado-letra-trocada
 roda "venenos existem --envenenado-prefixo" node _teste/testa_venenos_existem.js --envenenado-prefixo
+# Nada da fonte privada de anos iniciais no repositorio publico: todo arquivo de
+# git ls-files, pelo nome, pelo conteudo (zip e PDF inclusive) e pelo SHA contra
+# a lista privada, quando ela existe. Fica nesta secao, e nao no mapa, para rodar
+# no portao-rapido em TODO push, mexa o PR no que mexer: arquivo novo de qualquer
+# nome e pego. O veneno monta um repositorio temporario com as marcas e tem de
+# acusar cada uma.
+roda "sem fonte privada" node _teste/testa_sem_fonte_privada.js
+roda "sem fonte privada --envenenado-com-fonte-privada" node _teste/testa_sem_fonte_privada.js --envenenado-com-fonte-privada
 # A tabela de materias e uma so (core.js) e as copias tem que bater com ela:
 # a do cartao.js, a do pdf.js, o banco/topicos/indice.json e a exportada para
 # o Python. Foi a divergencia entre quatro vocabularios de materia que deixou
