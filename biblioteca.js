@@ -399,6 +399,10 @@
     if (!meta || meta.id !== doc.id) return porque('o meta é de outro livro');
     if (!/^[0-9a-f]{64}$/.test(String(doc.sha256 || '')) || meta.hash !== 'sha256:' + doc.sha256) return porque('o meta é de outro arquivo');
     if (!inteiro(meta.bytes) || meta.bytes !== doc.tamanho) return porque('o tamanho não confere');
+    // o mapa, quando vem, é uma lista de capítulos: nem texto, nem null, nem lista dentro de lista
+    if (meta.mapa !== undefined && (!Array.isArray(meta.mapa) || meta.mapa.some(function (e) { return !e || typeof e !== 'object' || Array.isArray(e); }))) {
+      return porque('o mapa não é uma lista de capítulos');
+    }
     var noZip = {}, lista = {};
     noZip[meta.arquivo] = true;
     lista[meta.arquivo] = meta.hash;
