@@ -167,8 +167,11 @@
  * O v182 traz o Voltar sem entrada sobrando no histórico depois de recarregar com uma janela aberta.
  * O v186 traz a pinça e o duplo toque no livro aberto.
  * O v188 traz a ligação de assunto entre matérias nos mapas dos livros (biblioteca.js e app.js).
+ * O v187 traz o conteúdo escrito no pedido do planejamento valendo como o do aviso.
+ * O v192 traz a página do assunto na Biblioteca (B1).
+ * O v195 traz a ligação de assunto entre matérias com a versão 1.42.115.
  */
-var CACHE = 'apoio-educacional-v188';
+var CACHE = 'apoio-educacional-v195';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
