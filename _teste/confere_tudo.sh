@@ -1438,9 +1438,9 @@ roda "livros (gerador)"                         python biblioteca/_prova_livros.
 # Fase 1b: a chave estavel do capitulo (biblioteca/chaves.py), pelos mesmos
 # criterios que o aplicativo confere (titulo igual, par da heranca; o mesmo
 # comeco so com titulo parecido ou com o par). Sem Chrome e sem rede.
-roda "chaves dos capitulos"                     python -X utf8 biblioteca/_prova_chaves.py
-roda "chaves dos capitulos --envenenado-chave-pela-pagina" python -X utf8 biblioteca/_prova_chaves.py --envenenado-chave-pela-pagina
-roda "chaves dos capitulos --envenenado-sem-heranca" python -X utf8 biblioteca/_prova_chaves.py --envenenado-sem-heranca
+roda "chaves dos capitulos"                     python biblioteca/_prova_chaves.py
+roda "chaves dos capitulos --envenenado-chave-pela-pagina" python biblioteca/_prova_chaves.py --envenenado-chave-pela-pagina
+roda "chaves dos capitulos --envenenado-sem-heranca" python biblioteca/_prova_chaves.py --envenenado-sem-heranca
 # A revisao do C15.1: o pacote cortado recusado ja na espiada, sem ler o
 # arquivo inteiro, e o teto de 160 MB do aplicativo. Sem Chrome.
 roda "livros (regras)"                          node "_teste/testa_livros_regras.js"
