@@ -45,6 +45,8 @@ const DB = {
   series: [],
   aulas: [
     { id: 'a1', alunoId: 'al1', data: HOJE, hora: '15:00', duracaoMin: 60, status: 'realizada', notaTexto: '', anexos: [], temas: [], areas: [] },
+    // ontem, sem registro: o aviso do alto (o selinho) divide a linha do dia com o ícone
+    { id: 'a0', alunoId: 'al2', data: '2026-11-15', hora: '10:00', duracaoMin: 60, status: 'realizada', notaTexto: '', anexos: [], temas: [], areas: [] },
     { id: 'a2', alunoId: 'al2', data: '2026-11-18', hora: '09:00', duracaoMin: 60, status: 'realizada', notaTexto: '', anexos: [], temas: [], areas: [] }
   ]
 };
@@ -129,7 +131,8 @@ async function transbordo(pag, raizSel) {
     const abrir = window.open;
     window.open = function (u) { window.__aberturas.push(String(u)); return null; };
     document.addEventListener('click', ev => { const a = ev.target.closest && ev.target.closest('a[href]'); if (a) { window.__aberturas.push('toque ' + a.getAttribute('href')); ev.preventDefault(); } }, true);
-    const modo = sessionStorage.getItem('modo-da-prova') || 'sem';
+    let modo = 'sem';
+    try { modo = sessionStorage.getItem('modo-da-prova') || 'sem'; } catch (e) { return; }
     let guardado;
     Object.defineProperty(window, 'Nuvem', { configurable: true, get() { return guardado; }, set(v) {
       guardado = v;
@@ -285,11 +288,23 @@ async function transbordo(pag, raizSel) {
       await pag.evaluate(l => { document.documentElement.style.fontSize = l; }, letra);
       await pausa(300);
       (await transbordo(pag, '#cel-semana')).forEach(f => falhas.push(largura + '/' + letra + ' linha do dia: ' + f));
+      /* A linha do dia com o ícone, e a mesma linha sem ele (o desenho de
+       * antes, como controle): o ícone não pode empurrar a agenda para baixo. */
       const m = await pag.evaluate(() => { const t = document.querySelector('#cel-dia-titulo'); const lh = parseFloat(getComputedStyle(t).lineHeight) || 20;
-        return { linhas: Math.round(t.getBoundingClientRect().height / lh), alto: Math.round(document.querySelector('#cel-semana').getBoundingClientRect().bottom) }; });
-      linhas.push(largura + '/' + letra + ': título em ' + m.linhas + ' linha(s), linha do dia até ' + m.alto + ' px');
-      if (m.linhas > 2) falhas.push(largura + '/' + letra + ' o título da linha do dia quebra em ' + m.linhas + ' linhas');
-      if (m.alto > 800 * 0.2) falhas.push(largura + '/' + letra + ' o alto preso passa de 20% (' + m.alto + ' px)');
+        const linha = document.querySelector('.cel-semana-topo');
+        const r = { linhas: Math.round(t.getBoundingClientRect().height / lh), alto: Math.round(linha.getBoundingClientRect().height), semana: (t.textContent),
+          selo: !!linha.querySelector('#cel-avisos-selo'), relogio: getComputedStyle(document.querySelector('#cel-abrir-vagos .ico')).display };
+        const b = document.querySelector('#cel-assistente'); const prox = b.nextSibling;
+        b.remove(); linha.classList.remove('com-assistente');
+        r.altoSem = Math.round(linha.getBoundingClientRect().height); r.relogioSem = getComputedStyle(document.querySelector('#cel-abrir-vagos .ico')).display; r.linhasSem = Math.round(t.getBoundingClientRect().height / lh);
+        linha.insertBefore(b, prox); linha.classList.add('com-assistente');
+        return r; });
+      linhas.push(largura + '/' + letra + ': título em ' + m.linhas + ' linha(s) (sem o ícone: ' + m.linhasSem + '), a linha do dia com ' + m.alto + ' px (sem o ícone: ' + m.altoSem + ')');
+      if (m.linhas > Math.max(2, m.linhasSem)) falhas.push(largura + '/' + letra + ' o título da linha do dia quebra em ' + m.linhas + ' linhas (sem o ícone: ' + m.linhasSem + ')');
+      if (m.alto > m.altoSem) falhas.push(largura + '/' + letra + ' o ícone aumenta a linha do dia (' + m.altoSem + ' para ' + m.alto + ' px)');
+      if (m.semana.indexOf('Hoje, seg 16/11') !== 0) falhas.push('o texto do título mudou: ' + m.semana);
+      if (!m.selo) falhas.push(largura + '/' + letra + ' (arranjo) o selinho dos avisos não está na linha');
+      if (m.relogio === 'none' || m.relogioSem !== 'none') falhas.push(largura + '/' + letra + ' o relógio do Vagos: com o ícone ' + m.relogio + ', sem ' + m.relogioSem);
     }
   }
   linhas.forEach(l => console.log('   ' + l));

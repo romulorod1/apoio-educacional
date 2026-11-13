@@ -25044,7 +25044,14 @@
       el('button', { type: 'button', class: 'btn pequeno cel-semana-passo', id: 'cel-dia-anterior',
         'aria-label': 'Dia anterior, voltar um dia', title: 'Dia anterior', icone: 'chl', texto: '1 dia',
         aoClick: function () { irParaDiaCelular(somarDiasCelular(dia, -1)); } }),
-      el('h2', { class: 'cel-titulo cresce', id: 'cel-dia-titulo', texto: titulo }),
+      /* O dia da semana num span: com o assistente na linha, no celular, ele
+       * sai da vista (a faixa logo abaixo já diz "seg") e continua para o
+       * leitor de tela; o texto do título não muda. */
+      el('h2', { class: 'cel-titulo cresce', id: 'cel-dia-titulo' }, [
+        dia === hoje ? el('span', { class: 'cel-titulo-hoje', texto: 'Hoje, ' }) : null,
+        el('span', { class: 'cel-titulo-semana', texto: Core.diaSemanaCurto(dia) + ' ' }),
+        document.createTextNode(titulo.slice((dia === hoje ? 'Hoje, ' : '').length + Core.diaSemanaCurto(dia).length + 1))
+      ]),
       el('button', { type: 'button', class: 'btn pequeno cel-semana-passo', id: 'cel-dia-seguinte',
         'aria-label': 'Dia seguinte, avançar um dia', title: 'Dia seguinte', icone: 'chr', texto: '1 dia',
         aoClick: function () { irParaDiaCelular(somarDiasCelular(dia, 1)); } })
@@ -25054,7 +25061,7 @@
         aoClick: function () { irParaDiaCelular(hoje); } }));
     }
     if (edita) topo.push(el('button', { type: 'button', class: 'btn pequeno cel-abrir-vagos', id: 'cel-abrir-vagos',
-      'aria-label': 'Ver horários vagos', texto: 'Vagos', aoClick: function () {
+      'aria-label': 'Ver horários vagos', texto: 'Vagos', icone: 'clock', aoClick: function () {
         var h = Core.hojeIso();
         semanaVagosCelular = inicioSemanaVagosCelular(h);
         diaVagosCelular = h >= semanaVagosCelular && h <= somarDiasCelular(semanaVagosCelular, 5) ? h : semanaVagosCelular;

@@ -3048,6 +3048,8 @@ body.modo-celular .celular .ajuda { color: var(--novidades-subtitulo); }
 .cel-semana-bolinhas { display: flex; gap: 2px; min-height: 7px; }
 .cel-bolinha { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1px var(--branco); }
 .cel-abrir-vagos { margin: 0; min-height: var(--alvo-celular); }
+/* o relógio do Vagos só aparece quando o assistente divide a linha (abaixo) */
+.cel-abrir-vagos .ico { display: none; }
 .cel-semana-topo .cel-abrir-vagos { flex: 0 0 auto; min-width: var(--alvo-celular); padding: 4px; }
 .cel-vagos-topo { display: flex; align-items: center; gap: 4px; margin: 0 0 8px; padding: 4px 0; border-bottom: 1px solid var(--fio-claro); }
 .cel-vagos-topo .btn { flex: 0 0 auto; min-width: var(--alvo-celular); min-height: var(--alvo-celular); padding: 4px; }
@@ -4211,13 +4213,22 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 @media (max-width: 720px) {
   .olho.assistente-topo { position: absolute; top: 8px; right: 64px; }
 }
-/* No celular, o ícone na linha do dia. No celular estreito, com o
-   assistente na linha, as setas ficam só com a seta (o "1 dia" continua no
-   nome que o leitor de tela lê), para a data não quebrar em três linhas. */
+/* No celular, o ícone na linha do dia. Com o assistente na linha, num
+   celular (até 430 px), as setas ficam só com a seta (o "1 dia" continua no
+   nome que o leitor de tela lê) e o dia da semana do título sai da vista (a
+   faixa dos dias logo abaixo já o diz; o leitor de tela continua lendo), para
+   a data não quebrar em três linhas com a letra a 130%. */
 .cel-semana-topo .cel-abrir-assistente { flex: 0 0 auto; min-width: var(--alvo-celular); min-height: var(--alvo-celular); padding: 0; color: var(--navy); }
-@media (max-width: 380px) {
-  .cel-semana-topo.com-assistente .cel-semana-passo { font-size: 0; min-width: var(--alvo-celular); }
+@media (max-width: 430px) {
+  .cel-semana-topo.com-assistente .cel-semana-passo { font-size: 0; min-width: var(--alvo-celular); padding: 0; }
   .cel-semana-topo.com-assistente .cel-semana-passo .ico { width: 20px; height: 20px; }
+  .cel-semana-topo.com-assistente .cel-abrir-vagos { font-size: 0; padding: 0; }
+  .cel-semana-topo.com-assistente .cel-abrir-vagos .ico { display: inline-block; width: 22px; height: 22px; }
+  .cel-semana-topo.com-assistente .cel-titulo-semana { font-size: 0; }
+}
+/* No celular mais estreito, com o selinho dos avisos também na linha, o "Hoje," sai da vista (o dia de hoje está marcado na faixa logo abaixo, e o botão "Hoje" aparece em qualquer outro dia). */
+@media (max-width: 380px) {
+  .cel-semana-topo.com-assistente .cel-titulo-hoje { font-size: 0; }
 }
 
 .ass-modal { max-width: 640px; height: 88vh; }
