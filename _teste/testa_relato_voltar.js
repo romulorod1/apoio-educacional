@@ -118,18 +118,21 @@ const { conf, secao, esperar } = H;
   await pag.click('#modal-aula .fechar');
 
   secao('falha de gravação mantém o rascunho');
+  /* F7: com o disco recusando, o salvar sozinho põe o relato na memória e a
+   * faixa avisa; o rascunho no aparelho fica, com a base do DISCO, para o
+   * texto voltar mesmo depois de recarregar (a memória se perde). */
   await H.irParaAba(pag, 'agenda');
   await pag.click('[data-aula-id="a5_aula"]');
-  await pag.$eval('#campo-nota-texto', e => {
-    e.value = 'Relato após falha de gravação';
-    e.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-  await pag.click('#modal-aula .fechar');
   await pag.evaluate(() => {
     window.__salvarOriginalA5 = Store.salvar;
     Store.salvar = () => Promise.reject(new Error('falha simulada no disco'));
   });
-  await pag.click('#salvar-sair-relato');
+  await pag.$eval('#campo-nota-texto', e => {
+    e.value = 'Relato após falha de gravação';
+    e.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await new Promise(r => setTimeout(r, 1200));
+  await pag.click('#modal-aula .fechar');
   const falhaSaiu = await esperar('janela fecha com faixa de falha', () => pag.$eval('#modal-aula', e => !e.classList.contains('aberto')), Boolean, 5000);
   conf('falha de gravação não apaga o rascunho', falhaSaiu.ok && await pag.evaluate(() =>
     !!localStorage.getItem('rascunho-relato-aula:a5_aula')), true);
@@ -142,7 +145,6 @@ const { conf, secao, esperar } = H;
 
   secao('fechar uma janela e abrir outra imediatamente');
   await pag.click('#modal-aula .fechar');
-  await pag.click('#descartar-relato');
   await esperar('aula anterior fechada', () => pag.$eval('#modal-aula', e => !e.classList.contains('aberto')), Boolean, 5000);
   await pag.click('#nova-aula');
   await pag.click('#salvar-preparar-aula');

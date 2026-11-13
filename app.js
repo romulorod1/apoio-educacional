@@ -78,6 +78,7 @@
   var snapshotAutosaveAula = null;   // o formulário como ficou gravado (a base do que ela mudou)
   var baseBancoAutosaveAula = null;  // a aula no banco como esta janela a viu por último
   var conflitoAutosaveAula = false;  // a aula mudou fora desta janela: nada mais grava daqui
+  var baseDiscoRelatoAula = null;    // o relato da aula aberta como está no DISCO (a base do rascunho)
   var alunoEmEdicao = null;
   /* Redesenha o resumo de etapas do alto da aba Dados. Quem marca a etapa é o
    * quadro da aba Mapeamento, e ele avisa aqui para as duas abas nunca
@@ -1941,10 +1942,14 @@
     mudancaNaoGuardada = false;
     clearTimeout(tempoNovaTentativa);
     esconderFaixaGravacao();
-    // a nova tentativa sozinha guardou o que a aula aberta tinha na memória: o rodapé volta a "Salvo"
-    if (aulaEmEdicao && $('#modal-aula').classList.contains('aberto') && !conflitoAutosaveAula &&
-        !aulaTemMudancasParaAutosave()) {
-      rotuloEstadoAutosaveAula('Salvo ' + horaDoSalvamentoAula());
+    // a nova tentativa sozinha guardou o que a aula aberta tinha na memória
+    if (aulaEmEdicao && $('#modal-aula').classList.contains('aberto') && !conflitoAutosaveAula) {
+      var noDisco = valoresDaAulaNoBanco(aulaEmEdicao.id);
+      if (noDisco) {
+        baseDiscoRelatoAula = { notaTexto: noDisco.notaTexto, notaPrivada: noDisco.notaPrivada };
+        guardarRascunhoRelato(aulaEmEdicao, $('#campo-nota-texto'), $('#campo-nota-privada'), baseDiscoRelatoAula);
+      }
+      if (!aulaTemMudancasParaAutosave()) rotuloEstadoAutosaveAula('Salvo ' + horaDoSalvamentoAula());
     }
   }
 
@@ -2805,7 +2810,7 @@
     window.addEventListener('pagehide', function () {
       if (!aulaEmEdicao || !$('#modal-aula').classList.contains('aberto')) return;
       clearTimeout(esperaRascunhoRelato);
-      guardarRascunhoRelato(aulaEmEdicao, $('#campo-nota-texto'), $('#campo-nota-privada'));
+      guardarRascunhoRelato(aulaEmEdicao, $('#campo-nota-texto'), $('#campo-nota-privada'), baseDiscoRelatoAula);
       if (aulaTemMudancasParaAutosave()) gravarAutosaveAula();
     });
     if ($('#salvar-preparar-aula')) {
@@ -3269,17 +3274,23 @@
     } catch (e) { return null; }
   }
 
-  function guardarRascunhoRelato(aula, campoTexto, campoPrivado) {
+  /* `base` (F7): o relato como está no DISCO ({ notaTexto, notaPrivada }). Com o
+   * salvar sozinho, a memória pode estar à frente do disco (a gravação falhou
+   * e a faixa tenta de novo): a base do rascunho tem de ser o disco, que é o
+   * que se lê ao recarregar, senão o rascunho seria recusado e o texto sumiria. */
+  function guardarRascunhoRelato(aula, campoTexto, campoPrivado, base) {
     if (!aula || !campoTexto || !campoPrivado) return;
+    var baseTexto = base ? base.notaTexto : (aula.notaTexto || '');
+    var basePrivada = base ? base.notaPrivada : (aula.notaPrivada || '');
     try {
       var chave = chaveRascunhoRelato(aula.id);
-      if (campoTexto.value === (aula.notaTexto || '') && campoPrivado.value === (aula.notaPrivada || '')) {
+      if (campoTexto.value === baseTexto && campoPrivado.value === basePrivada) {
         localStorage.removeItem(chave);
         return;
       }
       localStorage.setItem(chave, JSON.stringify({
         notaTexto: campoTexto.value, notaPrivada: campoPrivado.value,
-        baseTexto: aula.notaTexto || '', basePrivada: aula.notaPrivada || '', quando: Date.now()
+        baseTexto: baseTexto, basePrivada: basePrivada, quando: Date.now()
       }));
     } catch (e) { /* a confirmação de saída ainda protege o texto em memória */ }
   }
@@ -3443,11 +3454,17 @@
     snapshotAutosaveAula = Object.assign({}, antes, valores);
     baseBancoAutosaveAula = valoresDaAulaNoBanco(aula.id);
     rotuloEstadoAutosaveAula('Salvando...');
+    // o relato que esta gravação leva ao disco (o salvar grava a memória inteira)
+    var naMemoria = valoresDaAulaNoBanco(aula.id) || {};
+    var relatoGravado = { notaTexto: naMemoria.notaTexto || '', notaPrivada: naMemoria.notaPrivada || '' };
     var p = salvar().then(function () {
-      if (p === promessaAutosaveAula && aulaEmEdicao && aulaEmEdicao.id === aula.id) {
-        // regra 5: o rascunho sai só quando o banco já tem o mesmo texto (senão fica)
+      if (aulaEmEdicao && aulaEmEdicao.id === aula.id) {
+        // regra 5: o disco agora tem este relato; o rascunho só fica se a tela já tiver mais que isso
+        baseDiscoRelatoAula = relatoGravado;
         var gravada = (db.aulas || []).filter(function (x) { return x.id === aula.id; })[0];
-        if (gravada) guardarRascunhoRelato(gravada, $('#campo-nota-texto'), $('#campo-nota-privada'));
+        if (gravada) guardarRascunhoRelato(gravada, $('#campo-nota-texto'), $('#campo-nota-privada'), baseDiscoRelatoAula);
+      }
+      if (p === promessaAutosaveAula && aulaEmEdicao && aulaEmEdicao.id === aula.id) {
         if (padraoPendenteNaSerie().length) {
           rotuloEstadoAutosaveAula('Esta aula se repete: toque em Concluir registro para escolher se a mudança vale só para ela ou também para as outras.');
         } else if (!aulaTemMudancasParaAutosave()) {
@@ -3533,6 +3550,7 @@
     snapshotAutosaveAula = null;
     baseBancoAutosaveAula = null;
     conflitoAutosaveAula = false;
+    baseDiscoRelatoAula = null;
     // nada foi salvo ainda nesta abertura: o rodapé só fala quando há o que dizer
     rotuloEstadoAutosaveAula('');
     if ($('#salvar-preparar-aula')) $('#salvar-preparar-aula').style.display = novo ? '' : 'none';
@@ -3930,7 +3948,7 @@
       campo.addEventListener('input', function () {
         clearTimeout(esperaRascunhoRelato);
         esperaRascunhoRelato = setTimeout(function () {
-          guardarRascunhoRelato(aulaDoRascunho, areaNota, areaPrivada);
+          guardarRascunhoRelato(aulaDoRascunho, areaNota, areaPrivada, baseDiscoRelatoAula);
         }, 600);
       });
     });
@@ -4024,6 +4042,7 @@
       });
       // a aula no banco como esta janela a viu ao abrir: a base da conferência antes de gravar
       baseBancoAutosaveAula = valoresDaAulaNoBanco(aulaEmEdicao.id);
+      baseDiscoRelatoAula = { notaTexto: aulaEmEdicao.notaTexto || '', notaPrivada: aulaEmEdicao.notaPrivada || '' };
     }
     atualizarPrevisao();
     abrirModal('modal-aula');

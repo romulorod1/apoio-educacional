@@ -73,6 +73,20 @@ async function escrever(pag, texto) {
     secao('1. Nunca por cima de versão mais nova');
     conf('(arranjo) a aula abriu', (await abrirAula(pag)).ok, true);
     const chegou = await pag.evaluate(async id => {
+      /* A aula já tinha subido para a nuvem: a fila de envio está vazia. Sem
+       * isso, o recebimento acha a edição local pendente e ela vence (é a regra
+       * do Store), e nada chegaria para a janela conferir. */
+      await new Promise((resolve, reject) => {
+        const req = indexedDB.open('apoio-educacional');
+        req.onsuccess = () => {
+          const b = req.result;
+          const t = b.transaction('saida', 'readwrite');
+          t.objectStore('saida').clear();
+          t.oncomplete = () => { b.close(); resolve(); };
+          t.onerror = () => { b.close(); reject(t.error); };
+        };
+        req.onerror = () => reject(req.error);
+      });
       const regs = await Store.lerRegistros();
       const local = regs.find(r => r.id === 'aula:' + id);
       const dados = Object.assign({}, local.dados, { notaTexto: 'Relato do outro aparelho' });
