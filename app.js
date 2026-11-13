@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.112';
+  var VERSAO = '1.42.118';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -84,6 +84,12 @@
    * Escrito para quem usa, não para quem programa: cada item diz o que ela
    * ganha, e onde encontrar. */
   var NOVIDADES = [
+    {
+      versao: '1.42.118',
+      itens: [
+        'Os livros em EPUB sem sumário, como os Fundamentos de Matemática Elementar, passam a mostrar os capítulos, e o Abrir no livro leva ao começo do capítulo certo.'
+      ]
+    },
     {
       versao: '1.42.112',
       itens: [

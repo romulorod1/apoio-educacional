@@ -168,8 +168,9 @@
  * O v186 traz a pinça e o duplo toque no livro aberto.
  * O v187 traz o conteúdo escrito no pedido do planejamento valendo como o do aviso.
  * O v192 traz a página do assunto na Biblioteca (B1).
+ * O v198 traz o mapa de capítulos dos livros em EPUB: o sumário do mapa e o "Abrir no livro" na parte e na âncora.
  */
-var CACHE = 'apoio-educacional-v192';
+var CACHE = 'apoio-educacional-v198';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
