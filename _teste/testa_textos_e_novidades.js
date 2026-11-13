@@ -116,8 +116,9 @@ function simularMostrarNovidades(dbSim, novidadesLista) {
     dbSim.ajustes.versaoVista = VERSAO;
     return { abriu: false, motivo: 'primeira_vez_silenciosa', versaoGravada: dbSim.ajustes.versaoVista };
   }
+  // 13f: todas as versoes depois da vista, ate a atual (o app usa Core.versaoAntes)
   var novas = (novidadesLista || []).filter(function (n) {
-    return n.versao === VERSAO && compararVersao(n.versao, vista) > 0;
+    return compararVersao(n.versao, vista) > 0 && compararVersao(n.versao, VERSAO) <= 0 && n.itens && n.itens.length > 0;
   });
   if (!novas.length) {
     dbSim.ajustes.versaoVista = VERSAO;
@@ -153,21 +154,30 @@ conf('modal contém apenas a versão mais recente', resComNovas.novas.length, 1)
 conf('modal exibe a versão correta', resComNovas.novas[0].versao, VERSAO);
 conf('modal NÃO contém a versão antiga de português 1.18.0', resComNovas.novas.some(n => n.versao === '1.18.0'), false);
 
-// Caso E: Perfil com versão antiga gravada (ex: 1.17.0) sem novidades cadastradas para a versão atual
+// Casos E e F (mudaram no 13f): a versao que ela NAO viu entra, mesmo intermediaria.
+// Ate o 13f so entrava a da versao atual, e quem pulava uma publicacao perdia a
+// novidade da pulada. A preocupacao antiga era o perfil parado na 1.17.0 receber
+// a de Portugues (1.18.0); hoje nenhum perfil esta tao atras, e a de Portugues
+// continua de fora para quem ja passou dela (caso D).
 const resAntigoSemNovas = simularMostrarNovidades({ ajustes: { versaoVista: '1.17.0' } }, [
   { versao: '1.18.0', itens: ['português histórico'] }
 ]);
-conf('perfil antigo (1.17.0) não abre novidade intermediária de português (1.18.0)', resAntigoSemNovas.abriu, false);
-conf('perfil antigo atualiza versaoVista silenciosamente para a versão atual', resAntigoSemNovas.versaoGravada, VERSAO);
-
-// Caso F: Perfil com versão antiga gravada (ex: 1.17.0) quando existe novidade para a versão atual
+conf('perfil em 1.17.0 ve a 1.18.0, que ele nao tinha visto', resAntigoSemNovas.abriu && resAntigoSemNovas.novas.map(n => n.versao).join(','), '1.18.0');
 const resAntigoComNovas = simularMostrarNovidades({ ajustes: { versaoVista: '1.17.0' } }, [
   { versao: VERSAO, itens: ['novidade ' + VERSAO] },
   { versao: '1.18.0', itens: ['português histórico'] }
 ]);
-conf('perfil antigo abre novidade apenas da versão atual', resAntigoComNovas.abriu, true);
-conf('perfil antigo não recebe notícias intermediárias antigas', resAntigoComNovas.novas.length, 1);
-conf('perfil antigo recebe estritamente a versão ' + VERSAO, resAntigoComNovas.novas[0].versao, VERSAO);
+conf('perfil em 1.17.0 ve a atual e a 1.18.0, a mais nova primeiro', resAntigoComNovas.novas.map(n => n.versao).join(','), VERSAO + ',1.18.0');
+
+// Caso G (13f): pulou duas versoes; as duas entram, na ordem, e a ja vista nao.
+const resPulou = simularMostrarNovidades({ ajustes: { versaoVista: '1.30.0' } }, [
+  { versao: VERSAO, itens: ['a atual'] },
+  { versao: '1.31.0', itens: ['a pulada'] },
+  { versao: '1.30.0', itens: ['a ja vista'] }
+]);
+conf('pulou duas versoes: abre com as duas, a mais nova primeiro', resPulou.abriu && resPulou.novas.map(n => n.versao).join(','), VERSAO + ',1.31.0');
+const resFutura = simularMostrarNovidades({ ajustes: { versaoVista: '1.30.0' } }, [{ versao: '99.0.0', itens: ['do futuro'] }]);
+conf('versao maior que a atual nao entra (controle do limite de cima)', resFutura.abriu, false);
 
 // ============================================================================
 secao('5. Preservação de dados e carga inicial (UX11)');
