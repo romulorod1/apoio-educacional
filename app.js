@@ -92,6 +92,12 @@
       ]
     },
     {
+      versao: '1.42.106',
+      itens: [
+        'No livro aberto, dá para ampliar com dois dedos, em volta do ponto que você está olhando. Dois toques rápidos ampliam o trecho tocado, e outros dois voltam à largura da tela. A caneta não muda o zoom, e os botões de zoom continuam lá.'
+      ]
+    },
+    {
       versao: '1.42.105',
       itens: [
         'Remarcar uma aula da repetição para o dia de outra aula da mesma repetição, num mês que ainda não abriu, não faz mais sumir a aula fixa daquele dia: quando o mês abre, as duas aparecem e entram no fechamento.'
@@ -3257,6 +3263,7 @@
       });
     }
     $('#corpo-modal-leitor-pdf').addEventListener('scroll', rolarLeitorContinuo, { passive: true });
+    ligarGestosDoLeitor($('#corpo-modal-leitor-pdf'));
     $('#leitor-slider-pagina').addEventListener('input', function () {
       // rolagem DIRETA: a suave atravessava as páginas do caminho, desenhava cada uma
       // e deixava o temporizador gravar posições intermediárias depois de soltar
@@ -24575,7 +24582,8 @@
 
   function desenharPaginaContinua(estado, registro) {
     if (registro.desenhando) return registro.promessa || Promise.resolve(false);
-    if (registro.caixa.querySelector('canvas')) return Promise.resolve(true);
+    // o canvas esticado depois de um gesto é provisório: a página se desenha de novo no tamanho certo
+    if (registro.caixa.querySelector('canvas') && !registro.esticado) return Promise.resolve(true);
     if (estado !== leitor) return Promise.resolve(false);
     registro.desenhando = true;
     var tarefaDaPagina = null;
@@ -24602,9 +24610,12 @@
       registro.tarefa = tarefa;
       return tarefa.promise.then(function () {
         if (estado !== leitor || !registro.visivel || registro.tarefa !== tarefa) { canvas.width = 0; canvas.height = 0; return false; }
+        var antigo = registro.caixa.querySelector('canvas');
+        if (antigo) { antigo.width = 0; antigo.height = 0; }
         registro.caixa.innerHTML = '';
         registro.caixa.appendChild(canvas);
         registro.temCanvas = true;
+        registro.esticado = false;
         return true;
       });
     }).catch(function (e) {
@@ -24627,6 +24638,7 @@
     registro.caixa.appendChild(el('div', { class: 'leitor-pdf-pagina-vazia', 'aria-hidden': 'true' }));
     registro.desenhando = false;
     registro.temCanvas = false;
+    registro.esticado = false;
   }
 
   /* QUEM FICA DESENHADO no leitor contínuo: a página do meio e as vizinhas
@@ -24701,8 +24713,13 @@
   }
 
   function paginaMaisProximaDoCentro(estado) {
-    var corpo = $('#corpo-modal-leitor-pdf'), caixas = estado.paginas || [];
-    var centro = corpo.getBoundingClientRect().top + corpo.clientHeight / 2, melhor = estado.pagina, distancia = Infinity;
+    var corpo = $('#corpo-modal-leitor-pdf');
+    return paginaMaisProximaDaAltura(estado, corpo.getBoundingClientRect().top + corpo.clientHeight / 2);
+  }
+
+  // a página cuja caixa contém a altura y da tela (ou a mais perto dela, no vão entre duas)
+  function paginaMaisProximaDaAltura(estado, centro) {
+    var caixas = estado.paginas || [], melhor = estado.pagina, distancia = Infinity;
     caixas.forEach(function (p) {
       var r = p.caixa.getBoundingClientRect(), d = centro < r.top ? r.top - centro : centro > r.bottom ? centro - r.bottom : 0;
       if (d < distancia) { distancia = d; melhor = p.n; }
@@ -24798,33 +24815,70 @@
     return ancoraDoLeitorContinuo(estado);
   }
 
+  /* A âncora num ponto qualquer da tela (x, y), e não no meio: a pinça cresce
+   * em volta dos dedos, e o duplo toque em volta do dedo. alvoX e alvoY dizem
+   * onde, na área de leitura, aquele ponto do conteúdo tem de ficar depois. */
+  function ancoraNoPontoDoLeitor(estado, x, y, alvoX, alvoY) {
+    var corpo = $('#corpo-modal-leitor-pdf');
+    var n = paginaMaisProximaDaAltura(estado, y), p = estado.paginas[n - 1];
+    if (!p) return null;
+    var rc = corpo.getBoundingClientRect(), r = p.caixa.getBoundingClientRect();
+    return { n: n, lc: corpo.clientWidth, ac: corpo.clientHeight,
+      fy: r.height ? Math.max(0, Math.min(1, (y - r.top) / r.height)) : 0,
+      fx: r.width ? Math.max(0, Math.min(1, (x - r.left) / r.width)) : 0.5,
+      alvoX: alvoX, alvoY: alvoY };
+  }
+
   function voltarParaAncoraDoLeitor(estado, ancora) {
     var corpo = $('#corpo-modal-leitor-pdf'), p = estado.paginas[ancora.n - 1];
     if (!p) return;
     var rc = corpo.getBoundingClientRect(), r = p.caixa.getBoundingClientRect();
     var topo = r.top - rc.top + corpo.scrollTop, esquerda = r.left - rc.left + corpo.scrollLeft;
-    corpo.scrollTop = Math.max(0, topo + ancora.fy * r.height - corpo.clientHeight / 2);
-    corpo.scrollLeft = Math.max(0, esquerda + ancora.fx * r.width - corpo.clientWidth / 2);
+    /* Sem alvo, o ponto volta ao meio da área (o zoom pelos botões e o giro).
+     * DERIVA NA BORDA: a rolagem não passa de 0 nem do máximo. Perto do
+     * começo ou do fim do livro, e de lado quando a página cabe na largura
+     * (zoom 1 ou menor, sem rolagem de lado), o ponto não alcança o alvo e
+     * fica deslocado exatamente o que faltou de rolagem. É o esperado: a
+     * página não sai do lugar para além da borda. */
+    var alvoY = typeof ancora.alvoY === 'number' ? ancora.alvoY : corpo.clientHeight / 2;
+    var alvoX = typeof ancora.alvoX === 'number' ? ancora.alvoX : corpo.clientWidth / 2;
+    corpo.scrollTop = Math.max(0, topo + ancora.fy * r.height - alvoY);
+    corpo.scrollLeft = Math.max(0, esquerda + ancora.fx * r.width - alvoX);
   }
 
-  function redimensionarLeitorContinuo(paraOAlto) {
+  /* ancoraDada: a do gesto (pinça ou duplo toque). esticar: a página que já
+   * tem canvas fica com ele, esticado por CSS até o desenho novo ficar
+   * pronto, em vez de piscar em branco logo depois de soltar os dedos. */
+  function redimensionarLeitorContinuo(paraOAlto, ancoraDada, esticar) {
     if (!leitor || !leitor.continuo) return Promise.resolve(false);
     var estado = leitor;
     var corpo = $('#corpo-modal-leitor-pdf'), largura = Math.max(160, corpo.clientWidth - 36) * estado.zoom;
-    var ancora = paraOAlto ? null : ancoraParaRedimensionar(estado);
+    var ancora = paraOAlto ? null : (ancoraDada || ancoraParaRedimensionar(estado));
     estado.paginas.forEach(function (p) {
-      liberarPaginaContinua(p);
+      var velho = esticar ? p.caixa.querySelector('canvas') : null;
+      if (velho && velho.width > 0) {
+        if (p.tarefa) { p.tarefa.cancel(); p.tarefa = null; }
+        p.desenhando = false;
+        velho.style.width = '100%';
+        velho.style.height = '100%';
+        p.esticado = true;
+      } else liberarPaginaContinua(p);
       p.caixa.style.width = Math.floor(largura) + 'px';
       // a página já lida guarda a proporção dela; as outras usam a da primeira
       p.caixa.style.height = Math.ceil(largura * (p.proporcao || estado.proporcaoPagina)) + 'px';
     });
     if (paraOAlto || !ancora) { irAProximaPaginaDoLeitor(estado.pagina, false); return Promise.resolve(true); }
     voltarParaAncoraDoLeitor(estado, ancora);
-    // o contador e a posição guardada seguem a página que está à vista
-    if (ancora.n !== estado.pagina) {
-      estado.pagina = ancora.n;
+    /* O contador e a posição guardada seguem a página que está à vista. No
+     * gesto, a âncora é a página sob os DEDOS, que pode não ser a do meio; e
+     * no começo ou no fim do livro a rolagem fica presa no limite, nenhum
+     * evento de rolagem corrige depois, e a página sob os dedos ficava gravada.
+     * Por isso, no gesto, vale a página do meio medida depois da rolagem. */
+    var vista = ancoraDada ? paginaMaisProximaDoCentro(estado) : ancora.n;
+    if (vista !== estado.pagina) {
+      estado.pagina = vista;
       if (typeof estado.opcoes.aoMudarPagina === 'function') {
-        try { estado.opcoes.aoMudarPagina(ancora.n); } catch (e) { /* posição é auxiliar */ }
+        try { estado.opcoes.aoMudarPagina(vista); } catch (e) { /* posição é auxiliar */ }
       }
     }
     corpo.dataset.paginaDesenhada = String(estado.pagina);
@@ -24849,6 +24903,146 @@
     var z = fator ? Math.round(leitor.zoom * fator * 100) / 100 : 1;
     leitor.zoom = Math.min(LEITOR_ZOOM_MAX, Math.max(LEITOR_ZOOM_MIN, z));
     desenharPaginaDoLeitor(false);
+  }
+
+  /* PINÇA E DUPLO TOQUE no livro (fatia 2 do leitor). Só o dedo: o ponteiro
+   * da S Pen (pen) e o do mouse passam direto, e a caneta nunca dá zoom.
+   *
+   * Durante a pinça, nada é desenhado de novo: as caixas à vista são
+   * esticadas por transform em volta do ponto médio dos dedos, na hora, e o
+   * ponto do conteúdo que estava sob os dedos acompanha o ponto médio. Ao
+   * soltar, o zoom entra com a âncora nesse ponto (a mesma conta da âncora
+   * do "+" e do giro), e o canvas esticado fica até o novo estar pronto.
+   *
+   * Duplo toque: na largura, vai ao dobro e leva o ponto tocado ao meio da
+   * área; fora da largura, volta a ela com o ponto tocado sob o dedo. Os
+   * botões de zoom continuam como o caminho equivalente (padrão 8). */
+  var LEITOR_ZOOM_DUPLO = 2;
+  var LEITOR_DUPLO_MS = 320, LEITOR_DUPLO_PX = 40, LEITOR_TOQUE_PARADO_PX = 12;
+  var gestoLeitor = { dedos: {}, pinca: null, semToque: false, ultimoToque: null };
+
+  function leitorAceitaGesto() { return !!(leitor && leitor.doc && leitor.continuo && leitor.paginas); }
+
+  function dedosDoGesto() {
+    return Object.keys(gestoLeitor.dedos).map(function (k) { return gestoLeitor.dedos[k]; });
+  }
+
+  function comecarPincaDoLeitor() {
+    var d = dedosDoGesto();
+    var corpo = $('#corpo-modal-leitor-pdf'), rc = corpo.getBoundingClientRect();
+    var mx = (d[0].x + d[1].x) / 2, my = (d[0].y + d[1].y) / 2;
+    var caixas = [];
+    leitor.paginas.forEach(function (p) {
+      var r = p.caixa.getBoundingClientRect();
+      if (r.bottom < rc.top || r.top > rc.bottom) return;
+      p.caixa.style.transformOrigin = (mx - r.left) + 'px ' + (my - r.top) + 'px';
+      caixas.push(p.caixa);
+    });
+    gestoLeitor.pinca = { distancia: Math.max(1, Math.hypot(d[0].x - d[1].x, d[0].y - d[1].y)),
+      mx: mx, my: my, x: mx, y: my, zoom: leitor.zoom, escala: 1, caixas: caixas };
+    gestoLeitor.semToque = true;
+    gestoLeitor.ultimoToque = null;
+  }
+
+  function moverPincaDoLeitor() {
+    var g = gestoLeitor.pinca, d = dedosDoGesto();
+    if (!g || d.length < 2) return;
+    var z = g.zoom * Math.hypot(d[0].x - d[1].x, d[0].y - d[1].y) / g.distancia;
+    z = Math.min(LEITOR_ZOOM_MAX, Math.max(LEITOR_ZOOM_MIN, z));
+    g.escala = z / g.zoom;
+    g.x = (d[0].x + d[1].x) / 2;
+    g.y = (d[0].y + d[1].y) / 2;
+    var t = 'translate(' + (g.x - g.mx) + 'px, ' + (g.y - g.my) + 'px) scale(' + g.escala + ')';
+    g.caixas.forEach(function (c) { c.style.transform = t; });
+  }
+
+  function terminarPincaDoLeitor() {
+    var g = gestoLeitor.pinca;
+    gestoLeitor.pinca = null;
+    if (!g) return;
+    g.caixas.forEach(function (c) { c.style.transform = ''; c.style.transformOrigin = ''; });
+    if (!leitorAceitaGesto()) return;
+    var z = Math.round(g.zoom * g.escala * 100) / 100;
+    z = Math.min(LEITOR_ZOOM_MAX, Math.max(LEITOR_ZOOM_MIN, z));
+    var corpo = $('#corpo-modal-leitor-pdf'), rc = corpo.getBoundingClientRect();
+    if (Math.abs(z - leitor.zoom) < 0.01) {
+      /* Dois dedos que só arrastaram (o zoom quase não mudou): o conteúdo
+       * acompanhou o ponto médio pelo transform, e a rolagem leva junto o
+       * deslocamento, em vez de a página voltar ao lugar ao soltar. */
+      corpo.scrollTop = Math.max(0, corpo.scrollTop - (g.y - g.my));
+      corpo.scrollLeft = Math.max(0, corpo.scrollLeft - (g.x - g.mx));
+      return;
+    }
+    // o ponto do conteúdo que estava sob os dedos fica sob o ponto médio de agora
+    aplicarZoomDoGesto(z, g.mx, g.my, g.x - rc.left, g.y - rc.top);
+  }
+
+  // o zoom do gesto, com a âncora no ponto (x, y) da tela levado a (alvoX, alvoY) da área
+  function aplicarZoomDoGesto(z, x, y, alvoX, alvoY) {
+    var estado = leitor;
+    var ancora = ancoraNoPontoDoLeitor(estado, x, y, alvoX, alvoY);
+    estado.zoom = z;
+    return redimensionarLeitorContinuo(false, ancora, true);
+  }
+
+  function duploToqueNoLeitor(x, y) {
+    var corpo = $('#corpo-modal-leitor-pdf'), rc = corpo.getBoundingClientRect();
+    if (Math.abs(leitor.zoom - 1) < 0.01) {
+      aplicarZoomDoGesto(LEITOR_ZOOM_DUPLO, x, y, corpo.clientWidth / 2, corpo.clientHeight / 2);
+    } else {
+      aplicarZoomDoGesto(1, x, y, x - rc.left, y - rc.top);
+    }
+  }
+
+  function ligarGestosDoLeitor(corpo) {
+    corpo.addEventListener('pointerdown', function (ev) {
+      if (ev.pointerType !== 'touch' || !leitorAceitaGesto()) return;
+      gestoLeitor.dedos[ev.pointerId] = { x: ev.clientX, y: ev.clientY, x0: ev.clientX, y0: ev.clientY, t0: Date.now() };
+      var n = dedosDoGesto().length;
+      if (n === 1) gestoLeitor.semToque = false;
+      if (n === 2) comecarPincaDoLeitor();
+      if (n > 2) gestoLeitor.semToque = true;
+    });
+    corpo.addEventListener('pointermove', function (ev) {
+      var dedo = gestoLeitor.dedos[ev.pointerId];
+      if (!dedo) return;
+      dedo.x = ev.clientX; dedo.y = ev.clientY;
+      if (gestoLeitor.pinca) moverPincaDoLeitor();
+    });
+    var soltar = function (ev) {
+      var dedo = gestoLeitor.dedos[ev.pointerId];
+      if (!dedo) return;
+      delete gestoLeitor.dedos[ev.pointerId];
+      var restam = dedosDoGesto().length;
+      if (gestoLeitor.pinca && restam < 2) { terminarPincaDoLeitor(); return; }
+      if (ev.type !== 'pointerup' || restam || gestoLeitor.semToque || !leitorAceitaGesto()) return;
+      var agora = Date.now();
+      // toque é dedo parado e rápido; o que rolou a página não conta
+      if (agora - dedo.t0 > LEITOR_DUPLO_MS || Math.hypot(ev.clientX - dedo.x0, ev.clientY - dedo.y0) > LEITOR_TOQUE_PARADO_PX) {
+        gestoLeitor.ultimoToque = null;
+        return;
+      }
+      var u = gestoLeitor.ultimoToque;
+      if (u && agora - u.t <= LEITOR_DUPLO_MS && Math.hypot(ev.clientX - u.x, ev.clientY - u.y) <= LEITOR_DUPLO_PX) {
+        gestoLeitor.ultimoToque = null;
+        duploToqueNoLeitor(ev.clientX, ev.clientY);
+        return;
+      }
+      gestoLeitor.ultimoToque = { x: ev.clientX, y: ev.clientY, t: agora };
+    };
+    corpo.addEventListener('pointerup', soltar);
+    corpo.addEventListener('pointercancel', soltar);
+    /* Com dois dedos, a pinça é do leitor: o navegador não rola junto (e não
+     * cancela os ponteiros no meio do gesto). Um dedo só continua rolando. */
+    corpo.addEventListener('touchmove', function (ev) {
+      if (gestoLeitor.pinca && ev.cancelable) ev.preventDefault();
+    }, { passive: false });
+  }
+
+  // o leitor fechou ou trocou de livro: nenhum dedo de antes fica contado
+  function zerarGestosDoLeitor() {
+    if (gestoLeitor.pinca) gestoLeitor.pinca.caixas.forEach(function (c) { c.style.transform = ''; c.style.transformOrigin = ''; });
+    gestoLeitor = { dedos: {}, pinca: null, semToque: false, ultimoToque: null };
   }
 
   /* A página num canvas do tamanho que a folha pede, com fundo branco: vai
@@ -24897,6 +25091,7 @@
     if (leitorTarefa) { leitorTarefa.cancel(); leitorTarefa = null; }
     clearTimeout(leitorRolarDestinoTimer);
     leitorRolarDestinoTimer = null;
+    zerarGestosDoLeitor();
     if (leitor && leitor.paginas) leitor.paginas.forEach(liberarPaginaContinua);
     leitor = null;
     fecharSumarioDoLeitor();

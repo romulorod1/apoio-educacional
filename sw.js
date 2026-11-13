@@ -165,6 +165,7 @@
  * O v171 traz a fase 1a da biblioteca na nuvem: a posição de leitura e a correção do
  * mapa sobrevivem à troca de meta e de arquivo do livro.
  * O v182 traz o Voltar sem entrada sobrando no histórico depois de recarregar com uma janela aberta.
+ * O v186 traz a pinça e o duplo toque no livro aberto.
  * O v189 traz a janela PDF pronto e as próximas aulas no Gerar material da Biblioteca.
  */
 var CACHE = 'apoio-educacional-v189';
