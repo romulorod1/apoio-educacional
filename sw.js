@@ -162,7 +162,7 @@
  * O v166 traz as aulas tiradas e postas só na folha do planejamento.
  * O v168 traz a correção dos módulos ligados a 14 assuntos no banco/topicos/matematica.json.
  */
-var CACHE = 'apoio-educacional-v168';
+var CACHE = 'apoio-educacional-v177';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

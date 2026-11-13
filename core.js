@@ -351,6 +351,37 @@
     })[0] || null;
   }
 
+  /* A DATA DE ORIGEM de uma aula de repetição: a `dataOriginal`, gravada na
+   * primeira remarcação desde a 1.42.97, ou a data do id determinístico
+   * `serieId@data` (desde o N1, 08/11/2026; o sufixo +r ou +N fica de fora).
+   * null quando não dá para saber: aula materializada antes do N1, com id
+   * aleatório, e nunca remarcada depois. */
+  function dataDeOrigem(a) {
+    if (a && typeof a.dataOriginal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.dataOriginal)) return a.dataOriginal;
+    var m = /@(\d{4}-\d{2}-\d{2})(?:\+[^@]*)?$/.exec(String((a && a.id) || ''));
+    return m ? m[1] : null;
+  }
+
+  /* A aula é a ocorrência ORIGINAL da série naquela data?
+   *
+   * O defeito (12/11/2026): remarcar a quinta 26/11 para a quinta 03/12, com
+   * dezembro ainda não lançado, levava a aula com o serieId para o 03/12; no
+   * lançamento de dezembro a série achava "já tem aula minha no dia 03" e não
+   * criava a fixa. A aula sumia calada, e o fechamento de dezembro caía de
+   * 1200 para 1080. Uma aula que VEIO de outro dia não ocupa a vaga da fixa.
+   *
+   * Sem data de origem conhecida (id aleatório, de antes do N1), decide o mês:
+   * num mês que a série ainda NÃO lançou (depois do materializadoAte) nenhuma
+   * ocorrência original foi criada, então a aula da série que está lá só pode
+   * ter vindo de outro dia: não é a original, e a fixa é gerada (na dúvida, a
+   * fixa aparece para ela decidir; nunca some calada). Num mês já lançado, vale
+   * a regra de antes: é a original. */
+  function ehOcorrenciaOriginal(a, serie, iso) {
+    var origem = dataDeOrigem(a);
+    if (origem) return origem === iso;
+    return !!(serie && serie.materializadoAte && mesDe(iso) <= serie.materializadoAte);
+  }
+
   /* Cria as ocorrências que faltam da série no mês.
    * Nunca duplica, e nunca ressuscita uma aula que a Nathália apagou:
    * as datas apagadas ficam registradas em serie.exclusoes. */
@@ -366,10 +397,13 @@
     var ids = {};
     (db.aulas || []).forEach(function (a) { ids[a.id] = true; });
     var reaberturas = serie.reaberturas || {};
+    // Mês já lançado: a regra de antes, sem mudança (qualquer aula da série no
+    // dia ocupa). Mês novo: só a ocorrência original do dia ocupa a vaga.
+    var lancado = !!(serie.materializadoAte && mesIso <= serie.materializadoAte);
     datasDaSerieNoMes(serie, mesIso).forEach(function (iso) {
       if (apagadas.indexOf(iso) >= 0) return;
       var jaTem = (db.aulas || []).some(function (a) {
-        return a.serieId === serie.id && a.data === iso;
+        return a.serieId === serie.id && a.data === iso && (lancado || ehOcorrenciaOriginal(a, serie, iso));
       });
       if (jaTem) return;
       var base = serie.id + '@' + iso + (reaberturas[iso] ? '+r' + reaberturas[iso] : '');
@@ -502,14 +536,24 @@
     if (mudancas.anexos !== undefined) aula.anexos = mudancas.anexos;
     if (mudancas.data !== undefined && mudancas.data !== aula.data) {
       var dataAntiga = aula.data;
+      var s2 = aula.serieId ? (db.series || []).filter(function (x) { return x.id === aula.serieId; })[0] : null;
+      // Decidido ANTES de mudar a data: ela saiu da ocorrência original daquele dia?
+      var saiuDaOriginal = !!aula.serieId && ehOcorrenciaOriginal(aula, s2, dataAntiga);
+      // A origem fica gravada na primeira remarcação (quando se sabe), para a
+      // próxima não confundir o dia de passagem com o dia de origem.
+      if (aula.serieId && !aula.dataOriginal) {
+        var origem = dataDeOrigem(aula) || (saiuDaOriginal ? dataAntiga : null);
+        if (origem) aula.dataOriginal = origem;
+      }
       aula.data = mudancas.data;
       if (aula.serieId) {
         aula.destacada = true;
         // A data de onde ela saiu fica registrada como apagada. Sem isso a
         // série recriaria uma aula ali na próxima vez que o mês fosse aberto,
-        // e a aula pareceria ter se duplicado.
-        var s2 = (db.series || []).filter(function (x) { return x.id === aula.serieId; })[0];
-        if (s2) {
+        // e a aula pareceria ter se duplicado. Mas SÓ se ela era a original do
+        // dia: uma aula que já tinha vindo de outro dia, saindo de novo, não
+        // apaga a vaga da fixa daquele dia (era o mesmo defeito por outra porta).
+        if (s2 && saiuDaOriginal) {
           s2.exclusoes = s2.exclusoes || [];
           if (s2.exclusoes.indexOf(dataAntiga) < 0) s2.exclusoes.push(dataAntiga);
         }
@@ -633,7 +677,10 @@
       if (s0) {
         s0.exclusoes = s0.exclusoes || [];
         alvos.forEach(function (a) {
-          if (a.serieId === s0.id && s0.exclusoes.indexOf(a.data) < 0) s0.exclusoes.push(a.data);
+          // Apagar a aula que VEIO remarcada de outro dia não apaga a fixa do
+          // dia em que ela está: a data de origem dela já foi excluída na
+          // remarcação. Na dúvida (id aleatório num mês lançado), exclui como antes.
+          if (a.serieId === s0.id && s0.exclusoes.indexOf(a.data) < 0 && ehOcorrenciaOriginal(a, s0, a.data)) s0.exclusoes.push(a.data);
         });
       }
     }
@@ -3012,7 +3059,12 @@
       if (s.inicio && dataIso < s.inicio) return;
       if (s.fim && dataIso > s.fim) return;
       if ((s.exclusoes || []).indexOf(dataIso) >= 0) return;
-      var jaTem = (db.aulas || []).some(function (a) { return a.serieId === s.id && a.data === dataIso; });
+      // Mês não lançado: só a ocorrência ORIGINAL do dia ocupa a vaga; a aula
+      // que veio remarcada de outro dia não esconde a fixa (mesma regra do
+      // materializarSerieNoMes).
+      var jaTem = (db.aulas || []).some(function (a) {
+        return a.serieId === s.id && a.data === dataIso && ehOcorrenciaOriginal(a, s, dataIso);
+      });
       if (jaTem) return;
       saida.push({
         id: s.id + '@' + dataIso, alunoId: s.alunoId, serieId: s.id, prevista: true,
