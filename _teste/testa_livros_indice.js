@@ -563,9 +563,10 @@ async function importar(pag, arquivo) {
       const setT = (f, ms) => { const x = { id: ++id, em: agora + ms, f }; timers.push(x); return x.id; };
       const clearT = n => { timers = timers.filter(x => x.id !== n); };
       const janela = { IndiceLivros: { aoMudar: fn => { ouvinte = fn; } } };
-      const fabrica = new Function('window', 'setTimeout', 'clearTimeout', 'buscarTextoNosLivros', 'buscaLivrosAtual', 'bibTermo',
+      // termoDosGrupos (B1): a busca dos grupos sem o ano; aqui, o próprio termo
+      const fabrica = new Function('window', 'setTimeout', 'clearTimeout', 'buscarTextoNosLivros', 'buscaLivrosAtual', 'bibTermo', 'termoDosGrupos',
         app.slice(ini, fim) + '\nreturn ligarBuscaAoIndice;');
-      fabrica(janela, setT, clearT, () => { buscas++; }, { termo: 'volume', caixa: { grupo: { isConnected: true } } }, 'volume')();
+      fabrica(janela, setT, clearT, () => { buscas++; }, { termo: 'volume', caixa: { grupo: { isConnected: true } } }, 'volume', t => String(t).trim())();
       for (agora = 0; agora <= duracaoMs + 1000; agora += 10) {
         if (agora <= duracaoMs && agora % intervaloMs === 0) {
           ouvinte({ prontos: Math.floor(agora / livroACadaMs), total: 4, rodando: agora < duracaoMs });
