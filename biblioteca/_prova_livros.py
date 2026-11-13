@@ -27,6 +27,10 @@ Travas:
                livros "stored" e o manifest primeiro. Um veneno por regra.
   sumario      a origem certa em cada livro da amostra: marcadores, mapa da
                orquestradora, nenhum (com a nota dizendo isso) e o nav do EPUB.
+               Item 12a: `"sumario": "mapa"` no livro do mapa vence os
+               marcadores lixo do PDF; sem o campo, com valor desconhecido ou
+               com o mapa fora das paginas, os marcadores continuam. Veneno: o
+               campo ignorado.
   mapa         (C15.2) o mapa capitulo para assunto de cada livro da amostra:
                o da orquestradora (com o id fora do indice tirado e dito na
                nota), o passe automatico no PDF e no EPUB (marcado auto), o
@@ -926,6 +930,66 @@ def amostra_rodada(temp, placar):
     numeracao_impressa(temp, placar)
 
 
+def sumario_explicito(temp, placar):
+    """Item 12a: `"sumario": "mapa"` no livro do mapa faz o sumario sair do
+    mapa mesmo com marcadores no PDF (o fme05, de marcadores "x, 1, gaba").
+    Sintetico: um PDF de 6 paginas com marcadores lixo, lido pelo caminho real
+    (ler_mapas de um mapa_*.json em disco, e ler_pdf)."""
+    pasta = os.path.join(temp, 'sumario-explicito')
+    os.makedirs(os.path.join(pasta, 'mapa'))
+    pdf = os.path.join(pasta, 'livro-marcadores-lixo.pdf')
+    doc = pymupdf.open()
+    for i in range(6):
+        doc.new_page().insert_text((72, 72), 'Página sintética %d' % (i + 1))
+    doc.set_toc([[1, 'x', 1], [1, '1', 2], [1, 'gaba', 4]])
+    doc.save(pdf)
+    doc.close()
+    capitulos = [{'n': 1, 'titulo': 'Análise combinatória', 'pag_arquivo_inicio': 1, 'pag_arquivo_fim': 3, 'assuntos': []},
+                 {'n': 2, 'titulo': 'Binômio de Newton', 'pag_arquivo_inicio': 4, 'pag_arquivo_fim': 6, 'assuntos': []}]
+
+    def ler(**extra):
+        livro = dict({'livro': 'fme-prova', 'arquivo': 'livro-marcadores-lixo.pdf', 'serie': 'em2', 'capitulos': capitulos}, **extra)
+        with open(os.path.join(pasta, 'mapa', 'mapa_capitulos_prova.json'), 'w', encoding='utf-8') as f:
+            json.dump([livro], f, ensure_ascii=False)
+        return livros.ler_pdf(pdf, livros.ler_mapas(os.path.join(pasta, 'mapa')))
+
+    def titulos(info):
+        return [(e['titulo'], e['pagina'], e['pagina_fim']) for e in info['sumario']]
+    do_mapa = [('Análise combinatória', 1, 3), ('Binômio de Newton', 4, 6)]
+    lixo = [('x', 1, 1), ('1', 2, 3), ('gaba', 4, 6)]
+
+    def regra():
+        erros = []
+        info = ler(sumario='mapa')
+        if (info['sumario_origem'], titulos(info)) != ('mapa', do_mapa) or '"sumario": "mapa"' not in info.get('sumario_nota', ''):
+            erros.append('com "sumario": "mapa": %r %r %r' % (info['sumario_origem'], titulos(info), info.get('sumario_nota')))
+        return erros
+    placar.conferir('livros: "sumario": "mapa" no mapa vence os marcadores lixo do PDF, e a nota diz', regra())
+    erros = []
+    info = ler()
+    if (info['sumario_origem'], titulos(info)) != ('marcadores', lixo) or info.get('sumario_nota'):
+        erros.append('sem o campo: %r %r %r' % (info['sumario_origem'], titulos(info), info.get('sumario_nota')))
+    info = ler(sumario='marcadores do PDF')
+    if (info['sumario_origem'], titulos(info)) != ('marcadores', lixo) or 'ignorado' not in info.get('sumario_nota', ''):
+        erros.append('com valor desconhecido: %r %r' % (info['sumario_origem'], info.get('sumario_nota')))
+    fora = [dict(c, pag_arquivo_inicio=90, pag_arquivo_fim=95) for c in capitulos]
+    livro = {'livro': 'fme-prova', 'arquivo': 'livro-marcadores-lixo.pdf', 'sumario': 'mapa', 'capitulos': fora}
+    with open(os.path.join(pasta, 'mapa', 'mapa_capitulos_prova.json'), 'w', encoding='utf-8') as f:
+        json.dump([livro], f, ensure_ascii=False)
+    info = livros.ler_pdf(pdf, livros.ler_mapas(os.path.join(pasta, 'mapa')))
+    if (info['sumario_origem'], titulos(info)) != ('marcadores', lixo) or 'valeram os marcadores' not in info.get('sumario_nota', ''):
+        erros.append('mapa fora das páginas: %r %r' % (info['sumario_origem'], info.get('sumario_nota')))
+    placar.conferir('livros: sem o campo, os marcadores continuam; valor desconhecido e mapa fora das páginas também, '
+                    'e a nota diz', erros)
+    guarda = livros.SUMARIO_DO_MAPA
+    livros.SUMARIO_DO_MAPA = 'nunca'
+    try:
+        rv = regra()
+    finally:
+        livros.SUMARIO_DO_MAPA = guarda
+    placar.conferir('livros: o campo "sumario" do mapa ignorado (os marcadores sempre na frente)', rv, deve_reprovar=True)
+
+
 def principal():
     ap = argparse.ArgumentParser()
     ap.add_argument('--zip')
@@ -943,6 +1007,7 @@ def principal():
                 placar.conferir('livros: nada de travessao ou meia-risca no manifest', trava_tracos(m))
         else:
             amostra_rodada(temp, placar)
+            sumario_explicito(temp, placar)
     finally:
         shutil.rmtree(temp, ignore_errors=True)
     print('%d verificacoes passaram, %d falharam' % (placar.ok, placar.falhas))
