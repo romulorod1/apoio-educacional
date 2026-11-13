@@ -157,9 +157,9 @@
  * lista. O endpoint de IA (/api/ia) só recebe POST, que o fetch abaixo já deixa
  * passar sem cache. O v148 traz o aviso de novidades do planejamento.
  * O v152 reorganiza a janela da aula em duas colunas no tablet.
- * O v158 traz o Voltar do aparelho dentro do aplicativo.
+ * O v153 traz o Voltar do aparelho dentro do aplicativo.
  */
-var CACHE = 'apoio-educacional-v158';
+var CACHE = 'apoio-educacional-v153';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
