@@ -427,7 +427,12 @@ const cliPlano = pasta => {
   } catch (e) { return { codigo: e.status, n: -1, out: String(e.stderr || '') + String(e.stdout || '') }; }
 };
 const cSem = cliPlano(null), cBoa = cliPlano(pBoa), cVazia = cliPlano(pVazia);
-conf('CLI: a pasta de verdade e a vazia dao o mesmo numero de provas para o app.js', cSem.codigo + '/' + cSem.n, '0/' + cVazia.n);
+// A pasta de verdade so acrescenta: o app.js ganha exatamente as provas que algum
+// arquivo dela liga ao app.js e o mapa geral nao liga. Com a pasta vazia na main a
+// conta da zero; o PR que cria o primeiro arquivo dela nao quebra esta prova.
+const geralApp = new Set([].concat(...leMapa(fs.readFileSync(MAPA, 'utf8')).filter(l => l.re.test('app.js')).map(l => l.provas)));
+const daPastaApp = new Set(leMapaPasta().filter(l => l.re.test('app.js')).map(l => l.provas[0]).filter(p => !geralApp.has(p)));
+conf('CLI: a pasta de verdade so acrescenta ao app.js as provas dela que o mapa geral nao liga', cSem.codigo + '/' + (cSem.n - cVazia.n), '0/' + daPastaApp.size);
 conf('CLI: o instrumento ve um numero', cSem.n > 5, true);
 conf('CLI: com a pasta boa, uma prova a mais (a dela)', cBoa.codigo + '/' + (cBoa.n - cVazia.n), '0/1');
 const cRuim = cliPlano(comPasta({ [nomeAlvo]: 'app.js\t' + alvo + ' _teste/e2e.js\n' }));
