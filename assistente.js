@@ -190,7 +190,7 @@
     '- "Remarca", "passa para", "muda para": remarcar, com nova_data e nova_hora (repita a data ou a hora que não muda). "A Marina vai faltar quinta, remarca para sexta": um item, remarcar.',
     '- "Vai ser de 1h30": mudar_duracao.',
     '- Cancelar: cobranca "com" só quando ela disser que cobra; "sem" só quando ela disser que não cobra ou que é sem cobrança. Em qualquer outro caso, "perguntar": o cartão pergunta a ela. Nunca deduza a cobrança de "avisou antes" ou "em cima da hora".',
-    '- "Faltou", "não veio": falta, só para aula de hoje ou que já passou; a falta é cobrada, a não ser que ela diga para não cobrar (aí cobranca "sem"). Aula que ainda vai acontecer e o aluno não vai: cancelar com "perguntar", ou remarcar se ela disse a data nova.',
+    '- "Faltou", "não veio": falta, só para aula de hoje ou que já passou. Na falta e na aula nova, cobranca "com" quando ela disser que cobra, "sem" quando disser que não cobra, "perguntar" se ficou em dúvida e "nao_disse" só quando ela não falou de cobrança (aí a falta e a aula nova são cobradas). Aula que ainda vai acontecer e o aluno não vai: cancelar com "perguntar", ou remarcar se ela disse a data nova.',
     '- "Não cobra essa aula", "foi cortesia": nao_cobrar.',
     '- "A falta foi engano", "a aula voltou", "não cancela mais": voltar_a_dada.',
     '- "Marca uma aula": criar_aula. "É a reposição", "marca a reposição": criar_reposicao. Duração 0 é 1h. Os campos que não se aplicam vão vazios (texto vazio, 0 ou nao_disse).',
@@ -264,6 +264,9 @@
    * vazio, o 0 ou "nao_disse", e o semNulo() abaixo os lê como null. */
   var ACOES = ['criar_aula', 'criar_reposicao', 'remarcar', 'mudar_duracao', 'cancelar', 'falta', 'nao_cobrar', 'voltar_a_dada'];
   var HORA_OU_NULO = { type: 'string', description: 'HH:MM, 24 horas; texto vazio quando ela não disse.' };
+  /* Os feedbacks recentes (o tom dela) só vão ao modelo quando a fala dela
+   * pede o feedback do mês (lente da romul-ac, 6). */
+  function pedeOFeedback(ctx) { return /\b(feedback|feedbacks|devolutiva|mensagem do mes|recado do mes)\b/.test(semAcento(soTexto(ctx && ctx.fala))); }
   function semNulo(v) { return v === '' || v === 0 || v === 'nao_disse' || v === undefined ? null : v; }
   var NOME_DITO = { type: 'string', description: 'O nome do aluno como ela falou, sem corrigir.' };
   function ferramentasDeProposta(Core) {
@@ -284,7 +287,7 @@
           nova_data: { type: 'string', description: 'Só em remarcar: a data nova, AAAA-MM-DD (repita a de hoje se só muda a hora); nos outros, texto vazio.' },
           nova_hora: { type: 'string', description: 'Só em remarcar: a hora nova, HH:MM (repita a de hoje se só muda a data); nos outros, texto vazio.' },
           duracao_min: { type: 'integer', description: 'Em mudar_duracao, a duração nova em minutos; em criar, a duração (0 é 1h); nos outros, 0.' },
-          cobranca: { type: 'string', enum: ['sem', 'com', 'perguntar', 'nao_disse'], description: 'Em cancelar: com, sem ou perguntar. Em falta: sem só se ela disse para não cobrar. Em criar: sem só se ela disse que não cobra. Nos outros, nao_disse.' }
+          cobranca: { type: 'string', enum: ['sem', 'com', 'perguntar', 'nao_disse'], description: 'Em cancelar: com, sem ou perguntar. Em falta e em criar: com se ela disse que cobra, sem se disse que não cobra, perguntar na dúvida, nao_disse se ela não falou de cobrança. Nos outros, nao_disse.' }
         }) } }),
       ferramenta('propor_relato', 'Propõe o registro de como foi a aula (o relato que vai para a família, a nota só dela, os assuntos e as áreas), um item por aula. NÃO grava: o cartão mostra o rascunho editável, e só ela grava.',
         { itens: { type: 'array', items: objeto({
@@ -534,7 +537,7 @@
       return {
         entendido: [nomes[aluno.id]],
         resultado: Object.assign({ aluno: nomes[aluno.id], ultimas_aulas: ultimas.length ? ultimas : 'nenhuma aula dada ainda', assuntos_ja_dados: assuntos.slice(-40) },
-          ctx.gravar === true ? { feedbacks_recentes: feedbacks } : {})
+          ctx.gravar === true && pedeOFeedback(ctx) ? { feedbacks_recentes: feedbacks } : {})
       };
     },
 
@@ -1057,7 +1060,9 @@
    * o último cartão confirmado ou trocado (ctx.fala). */
   var FORMAS_SEM = [['sem', 'cobrar'], ['sem', 'cobranca'], ['nao', 'cobra'], ['nao', 'precisa', 'cobrar'], ['cortesia'], ['de', 'graca']];
   var FORMAS_COM = [['pode', 'cobrar'], ['cobra'], ['cobrada']];
-  var NEGACAO = ['nao', 'nem', 'sem', 'nunca'];
+  /* Lente da romul-ac, 3: "nada de cortesia", "jamais cobra", "ninguém cobra",
+   * "chega de cortesia" e "acabou a cortesia" também negam. */
+  var NEGACAO = ['nao', 'nem', 'sem', 'nunca', 'nada', 'jamais', 'ninguem', 'nenhum', 'nenhuma', 'chega', 'acabou', 'acabaram'];
   function daFamilia(t) {
     return /^cobr/.test(t) || /^pag(o|a|ou|ar|amento|ando|ue|uei|aram|os|as)?$/.test(t) || /^gratu/.test(t) || /^isent/.test(t) ||
       ['cortesia', 'graca', 'gratis', 'custo', 'metade', 'conta'].indexOf(t) >= 0;
@@ -1070,12 +1075,14 @@
     var usado = T.map(function () { return false; });
     var casa = function (forma, i) { return forma.every(function (w, k) { return T[i + k] === w && !usado[i + k]; }); };
     var negadoAntes = function (i) { for (var k = i - 1; k >= 0 && k >= i - 3; k--) { if (T[k] === ',') return false; if (NEGACAO.indexOf(T[k]) >= 0 && !usado[k]) return true; } return false; };
+    /* A negação logo depois ("cobra ela não", "cobra dela não", "cobra nada"): até dois termos, a vírgula para. */
+    var negadoDepois = function (i) { for (var k = i; k < T.length && k < i + 2; k++) { if (T[k] === ',') return false; if (NEGACAO.indexOf(T[k]) >= 0 && !usado[k]) return true; } return false; };
     var sem = false, com = false, ruim = false;
     T.forEach(function (t, i) { if (daFamilia(t) && T.slice(Math.max(0, i - 3), i + 4).some(function (x) { return /\d/.test(x); })) ruim = true; });
     for (var i = 0; i < T.length; i++) {
       FORMAS_SEM.forEach(function (f) {
         if (!casa(f, i)) return;
-        if (negadoAntes(i)) ruim = true;
+        if (negadoAntes(i) || negadoDepois(i + f.length)) ruim = true;
         for (var k = 0; k < f.length; k++) usado[i + k] = true;
         sem = true;
       });
@@ -1083,7 +1090,7 @@
     for (var j = 0; j < T.length; j++) {
       FORMAS_COM.forEach(function (f) {
         if (!casa(f, j)) return;
-        if (negadoAntes(j) || NEGACAO.indexOf(T[j + f.length]) >= 0) ruim = true;
+        if (negadoAntes(j) || negadoDepois(j + f.length)) ruim = true;
         for (var k = 0; k < f.length; k++) usado[j + k] = true;
         com = true;
       });
@@ -1117,12 +1124,19 @@
   /* A decisão: 'com', 'sem', 'perguntar' ou null (a cobrança padrão).
    * perguntarSemFala: o cancelamento pergunta quando a fala não diz nada; a
    * falta e a aula nova ficam no padrão (cobradas). */
+  /* A REGEX SÓ CONFIRMA (lente da romul-ac, 3): ela nunca vence o "perguntar"
+   * nem o "nao_disse" do modelo. Decide "com" ou "sem" só quando o modelo
+   * diz isso E a fala diz o mesmo pela forma inequívoca. O "com" ou o "sem"
+   * do modelo que a fala não confirma pergunta. Só quando o modelo não disse
+   * nada E a fala não fala de cobrança, a falta e a aula nova ficam no padrão
+   * (cobradas); o cancelamento sempre pergunta. */
+  var COBRANCAS_VALIDAS = ['com', 'sem', 'perguntar', 'nao_disse'];
   function decidirCobranca(v, ctx, aluno, perguntarSemFala) {
+    if (v !== null && v !== undefined && COBRANCAS_VALIDAS.indexOf(v) < 0) falha('cobranca inválida: "' + v + '". Use com, sem, perguntar ou nao_disse.');
     var pol = polaridadeDaFala(ctx, aluno);
-    if (pol === 'ambigua') return 'perguntar';
-    if (!pol) return perguntarSemFala ? 'perguntar' : null;
-    if ((v === 'com' || v === 'sem') && v !== pol) return 'perguntar';
-    return pol;
+    if ((v === 'com' || v === 'sem') && pol === v) return v;
+    if (!perguntarSemFala && !pol && (v === null || v === undefined || v === 'nao_disse')) return null;
+    return 'perguntar';
   }
   /* Uma saída com o dinheiro do core, para a pergunta da cobrança. */
   function opcaoComDinheiro(ctx, id, rotulo, op) {
@@ -1159,7 +1173,8 @@
         titulo: 'Remarcar ' + nome + ', ' + quandoCurto(a.data, '', ctx.hoje) + ': de ' + (mesmoDia ? horaCurta(a.hora) + ' para ' + horaCurta(nh) : quandoCurto(a.data, a.hora, ctx.hoje) + ' para ' + quandoCurto(nd, nh, ctx.hoje)),
         antes: descricao(a, ctx), depois: quandoCurto(nd, nh, ctx.hoje) + ' (' + duracaoCurta(dur) + ')',
         avisos: [avisoDeChoque(choques(ctx, a, nd, nh, dur)), a.serieId ? 'É da repetição: muda só esta aula, e as outras continuam como estão.' : null,
-          nd === ctx.hoje && minutos(nh) !== null && minutos(nh) < ctx.agoraMin ? 'Esse horário de hoje já passou: a aula entra como dada.' : null],
+          nd === ctx.hoje && minutos(nh) !== null && minutos(nh) < ctx.agoraMin ? 'Esse horário de hoje já passou: a aula entra como dada.' : null,
+          jaAcabou(a, ctx) && ctx.Core.temConteudo(a) && (nd > ctx.hoje || (nd === ctx.hoje && minutos(nh) !== null && minutos(nh) >= ctx.agoraMin)) ? 'Esta aula já foi dada e tem registro: remarcada, ela volta a ser agendada, com o registro junto.' : null],
         op: opDeEdicao(a, { data: nd, hora: nh, duracaoMin: dur })
       };
     },
@@ -1348,6 +1363,13 @@
     var nome = nomesParaIA(ctx.db)[aluno.id];
     var texto = limparMensagem(soTexto(e.texto)).slice(0, MAX_FEEDBACK_NOVO).trim();
     if (!texto) falha('o texto do feedback está vazio.');
+    /* O mês do feedback tem de estar na janela das aulas dele: do mês da
+     * primeira aula (ou da repetição, ou do feedback que já existe) até o mês
+     * de hoje (lente da romul-ac, 9). */
+    var mesesDasAulas = ((ctx.db && ctx.db.aulas) || []).filter(function (a) { return a && a.alunoId === aluno.id && a.data; }).map(function (a) { return a.data.slice(0, 7); })
+      .concat(((ctx.db && ctx.db.series) || []).filter(function (x) { return x && x.alunoId === aluno.id && typeof x.inicio === 'string'; }).map(function (x) { return x.inicio.slice(0, 7); }))
+      .concat(((ctx.db && ctx.db.resumos) || []).filter(function (x) { return x && x.alunoId === aluno.id && typeof x.mes === 'string'; }).map(function (x) { return x.mes; })).sort();
+    if (!mesesDasAulas.length || e.mes < mesesDasAulas[0] || e.mes > String(ctx.hoje).slice(0, 7)) falha('o mês ' + rotuloDoMes(e.mes) + ' está fora das aulas de ' + nome + ' (de ' + (mesesDasAulas.length ? rotuloDoMes(mesesDasAulas[0]) : 'nenhuma aula') + ' até este mês): confira o mês com ela.');
     var antes = String(ctx.Core.textoDoMes(ctx.db, aluno.id, e.mes) || '');
     return {
       tipo: 'feedback', alunoId: aluno.id, nome: nome, entendido: rotuloDoMes(e.mes) + ', ' + nome,
@@ -1364,7 +1386,9 @@
    * que está no cartão (e que nada foi gravado). `jaNoCartao` são as linhas
    * já propostas nesta pergunta: a mesma aula duas vezes é recusada. */
   function resultadoDaProposta(linhas) {
+    var fora = linhas.length > 1 ? linhas.filter(function (l) { return l.poupada; }).map(function (l) { return l.titulo + ' (' + (l.poupada === 'registrada' ? 'já registrada' : 'mês com pagamento') + ')'; }) : [];
     return { cartao: 'mostrado na tela dela', linhas: linhas.map(function (l) { return l.titulo; }),
+      ficam_de_fora: fora.length ? fora : undefined,
       perguntas: linhas.filter(function (l) { return l.pergunta; }).length ? 'o cartão pergunta a ela com ou sem cobrança' : undefined,
       obs: 'NADA foi gravado: ela confere e toca em Confirmar. Diga em uma frase o que está no cartão.' };
   }
@@ -1384,6 +1408,20 @@
     var data = op.k === 'criar' ? op.campos.data : op.data;
     if (!data) return l;
     var mais = [];
+    /* A REGRA DO LOTE (lente da romul-ac, 1): a mesma do app, Core.motivoParaPoupar.
+     * A aula que já tem registro, ou a passada de um mês com pagamento
+     * marcado, fica marcada: num cartão de várias linhas ela fica de fora;
+     * num de uma linha só (ela pediu aquela aula), segue com o destaque. */
+    if (op.k === 'editar' && op.aulaId && ctx.Core.motivoParaPoupar) {
+      var aulaDaOp = ((ctx.db && ctx.db.aulas) || []).filter(function (x) { return x.id === op.aulaId; })[0];
+      var motivo = aulaDaOp ? ctx.Core.motivoParaPoupar(ctx.db, aulaDaOp, ctx.hoje, {}) : null;
+      if (motivo) {
+        l.poupada = motivo;
+        /* "o valor muda" só quando muda de fato: a linha ou alguma saída mexe nos reais. */
+        l.poupadaMuda = [l.op].concat((l.opcoes || []).map(function (o) { return o.op; })).filter(Boolean)
+          .some(function (o) { return simular(ctx, [o]).some(function (e) { return e.depois !== e.antes; }); });
+      }
+    }
     var homonimos = ativos(ctx.db).filter(function (a) { return a.id !== aluno.id && semAcento(primeiroNome(a.nome)) === semAcento(primeiroNome(aluno.nome)); });
     if (homonimos.some(function (a) { return aulasDoPeriodo(ctx, data, data, a.id).length; })) mais.push('Há outra ' + primeiroNome(aluno.nome) + ' com aula neste dia: confira o nome.');
     if (op.k !== 'criar' && (data.slice(0, 7) < String(ctx.hoje).slice(0, 7) || data < somaDias(ctx.hoje, -60))) {
@@ -1399,7 +1437,8 @@
       var linhas = e.itens.map(function (cru, i) {
         try {
           var it = cru && typeof cru === 'object' ? Object.assign({}, cru) : null;
-          if (it) ['hora', 'nova_data', 'nova_hora', 'duracao_min', 'cobranca'].forEach(function (k) { it[k] = semNulo(it[k]); });
+          if (it) ['hora', 'nova_data', 'nova_hora', 'duracao_min'].forEach(function (k) { it[k] = semNulo(it[k]); });
+          if (it && it.cobranca === '') it.cobranca = null;
           if (!it || ACOES.indexOf(it.acao) < 0) falha('acao desconhecida: ' + (it && it.acao));
           var aluno = alunoInequivoco(ctx, it.alunoId, it.nome_dito);
           var nome = nomesParaIA(ctx.db)[aluno.id];
@@ -1461,23 +1500,36 @@
   /* A assinatura do que o cartão mostra e grava: muda se a agenda mudou. */
   function assinatura(linhas) {
     return JSON.stringify(linhas.map(function (l) {
-      return [l.titulo, l.antes, l.depois, l.dinheiro, l.avisos || [], l.op || null, (l.opcoes || []).map(function (o) { return [o.id, o.dinheiro, o.avisos || [], o.op]; }), l.editavel || null];
+      return [l.titulo, l.antes, l.depois, l.dinheiro, l.avisos || [], l.poupada || null, !!l.poupadaMuda, l.op || null, (l.opcoes || []).map(function (o) { return [o.id, o.dinheiro, o.avisos || [], o.op]; }), l.editavel || null];
     }));
   }
 
   /* O que o Confirmar grava: as linhas marcadas, com a escolha de cobrança
    * (por linha, ou uma para o conjunto) e o que ela editou. Devolve
    * { ops } ou { falta: 'cobranca' | 'nada' }. */
+  /* O que o cartão diz da linha poupada (Core.motivoParaPoupar). Num cartão de
+   * várias linhas (o lote) ela fica de fora, com o motivo escrito como no app;
+   * num de uma linha só, segue, com o destaque antes do Confirmar. */
+  function situacaoDaLinha(linhas, i) {
+    var l = linhas && linhas[i];
+    if (!l || !l.poupada) return null;
+    if (linhas.length > 1) return { fora: true, texto: 'Fica de fora: ' + (l.poupada === 'registrada' ? 'já registrada' : 'de mês com pagamento') + '.' };
+    return { fora: false, texto: l.poupada === 'registrada' ? 'Esta aula já tem registro.' : 'Este mês já tem pagamento marcado' + (l.poupadaMuda ? ': o valor muda.' : '.') };
+  }
   function opsConfirmadas(linhas, estado) {
     var e = estado || {};
-    var marcadas = linhas.filter(function (l, i) { return !(e.semLinha && e.semLinha[i]); });
-    if (!marcadas.length) return { falta: 'nada' };
+    /* Cartão de várias linhas é um LOTE: as linhas poupadas (motivoParaPoupar)
+     * ficam de fora, como no app. Cartão de uma linha só, segue. */
+    var poupada = function (i) { var x = situacaoDaLinha(linhas, i); return !!(x && x.fora); };
+    var fora = function (l, i) { return (e.semLinha && e.semLinha[i]) || poupada(i); };
+    var marcadas = linhas.filter(function (l, i) { return !fora(l, i); });
+    if (!marcadas.length) return { falta: linhas.every(function (l, i) { return poupada(i); }) ? 'poupadas' : 'nada' };
     var ops = [];
     for (var i = 0; i < linhas.length; i++) {
-      if (e.semLinha && e.semLinha[i]) continue;
+      if (fora(linhas[i], i)) continue;
       var l = linhas[i];
       if (l.opcoes) {
-        var id = (e.escolha && e.escolha[i]) || e.escolhaDoConjunto;
+        var id = e.escolha && e.escolha[i];
         var o = l.opcoes.filter(function (x) { return x.id === id; })[0];
         if (!o) return { falta: 'cobranca' };
         ops.push(o.op);
@@ -1714,7 +1766,7 @@
     ferramentasPara: ferramentasPara,
     conferirDeNovo: conferirDeNovo,
     assinatura: assinatura,
-    opsConfirmadas: opsConfirmadas,
+    opsConfirmadas: opsConfirmadas, situacaoDaLinha: situacaoDaLinha,
     aplicarPlano: aplicarPlano,
     simular: simular,
     substituirCartoesAbertos: substituirCartoesAbertos,

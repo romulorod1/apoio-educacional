@@ -934,6 +934,7 @@ roda "assistente (fluxo, IA fase 3)"                node "_teste/testa_assistent
 roda "assistente que grava (fluxo, IA fase 4a)"      node "_teste/testa_assistente_grava_navegador.js"
 roda "assistente --envenenado-toque-duplo"          node "_teste/testa_assistente_grava_navegador.js" --envenenado-toque-duplo
 roda "assistente --envenenado-sem-acao"             node "_teste/testa_assistente_grava_navegador.js" --envenenado-sem-acao
+roda "assistente --envenenado-sem-conferencia"      node "_teste/testa_assistente_grava_navegador.js" --envenenado-sem-conferencia
 # N1: a volta depois do rollback. O codigo da 4 republicado com o numero novo abre
 # um banco nesse numero sem os depositos novos; o codigo novo, voltando, sonda o
 # banco, cria o que falta na versao mais um e migra. O veneno sem a deteccao TEM

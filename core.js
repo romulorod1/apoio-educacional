@@ -5900,7 +5900,7 @@
     datasDaSerieNoMes: datasDaSerieNoMes, materializarSerieNoMes: materializarSerieNoMes,
     garantirSeriesAte: garantirSeriesAte, aulasDaSerie: aulasDaSerie, alvosDoEscopo: alvosDoEscopo, escopoDaRepeticao: escopoDaRepeticao, encerrarSerie: encerrarSerie,
     aplicarEdicaoAula: aplicarEdicaoAula, excluirAulas: excluirAulas, achaAula: achaAula,
-    repetirParaTras: repetirParaTras, preverRetroativo: preverRetroativo, temConteudo: temConteudo,
+    repetirParaTras: repetirParaTras, preverRetroativo: preverRetroativo, temConteudo: temConteudo, motivoParaPoupar: motivoParaPoupar,
     calcularFechamento: calcularFechamento, calcularMesInteiro: calcularMesInteiro,
     totaisDoMes: totaisDoMes, panoramaDeValores: panoramaDeValores,
     lerReais: lerReais, valorACobrarDoMes: valorACobrarDoMes, pagamentoDe: pagamentoDe,

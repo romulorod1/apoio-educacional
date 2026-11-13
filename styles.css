@@ -4515,7 +4515,6 @@ body.modo-celular #modal-assistente .ass-modal { height: 100%; max-height: 100%;
 .ass-antes-depois dd { margin: 0; overflow-wrap: anywhere; }
 .ass-dinheiro { margin: 0; font-weight: 600; font-size: var(--letra-14); color: var(--navy); }
 .ass-aviso { margin: 0; display: flex; align-items: flex-start; gap: 6px; font-size: var(--letra-14); color: var(--aviso-texto); background: var(--aviso-fundo); border-radius: 6px; padding: 4px 8px; overflow-wrap: anywhere; }
-.ass-pergunta-conjunto { margin: 0; font-weight: 600; font-size: var(--letra-14); }
 .ass-opcoes { display: flex; flex-direction: column; gap: 6px; }
 .ass-opcao {
   min-height: 48px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px;
@@ -4551,3 +4550,10 @@ body.modo-celular #modal-assistente .ass-modal { height: 100%; max-height: 100%;
 .ass-aviso .ass-cartao-ico { color: var(--aviso-texto); }
 .ass-estado-erro .ass-cartao-ico { color: var(--vermelho); }
 /* ==================== assistente (fim) ==================== */
+
+/* Assistente: a linha que o lote poupa (já registrada ou de mês com pagamento) e o aviso da saída. */
+.ass-poupada { display: flex; gap: 6px; align-items: flex-start; margin: 0; padding: 4px 8px; border-radius: 6px; background: var(--aviso-fundo); border: 1px solid var(--aviso-borda); color: var(--texto); font-size: var(--letra-14); }
+.ass-poupada strong { font-weight: var(--peso-forte); }
+.ass-poupada-fora { background: var(--soft); border-color: var(--fio); }
+.ass-marca-fora { opacity: .4; }
+.ass-opcao-aviso { display: block; margin-top: 2px; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--aviso-texto); }

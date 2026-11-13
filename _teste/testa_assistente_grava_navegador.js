@@ -19,14 +19,20 @@
  *   4. o celular que só lê: o pedido vai com as 16 de leitura, e a proposta
  *      forjada pelo modelo falso não vira cartão nem grava; o observador
  *      não vê o assistente;
- *   5. o transbordo do cartão (várias linhas, a pergunta da cobrança para o
- *      conjunto e o relato editável) a 360, 390 e 412 px, letra normal e 130%.
+ *   5. o transbordo do cartão (várias linhas, a pergunta da cobrança de cada
+ *      linha e o relato editável) a 360, 390 e 412 px, letra normal e 130%;
+ *   6. as lentes da romul-ac: o aviso de cada saída no botão (não some na
+ *      escolha), a linha que o lote poupa, e a trava de concorrência do
+ *      Confirmar: a agenda muda pelo caminho de verdade (Store.aplicarRecebidos,
+ *      como chega do outro aparelho) com o cartão aberto, e o cartão vira "mudou".
  *
  * Venenos, que TÊM de reprovar:
  *   --envenenado-toque-duplo   o Confirmar sem a trava do estado e sem
  *                              desligar o botão (a parte 2);
  *   --envenenado-sem-acao      o Confirmar do celular fora do
- *                              comoAcaoDoCelular (a parte 3).
+ *                              comoAcaoDoCelular (a parte 3);
+ *   --envenenado-sem-conferencia  o Confirmar sem a comparação da
+ *                              assinatura (a parte 6).
  *
  * Porta 8975. O service worker é contornado.
  */
@@ -39,7 +45,8 @@ const { conf, secao, pausa, esperar } = H;
 const PORTA = 8975;
 const V_DUPLO = '--envenenado-toque-duplo';
 const V_ACAO = '--envenenado-sem-acao';
-const MODO = [V_DUPLO, V_ACAO].filter(v => process.argv.indexOf(v) >= 0)[0] || '';
+const V_CONF = '--envenenado-sem-conferencia';
+const MODO = [V_DUPLO, V_ACAO, V_CONF].filter(v => process.argv.indexOf(v) >= 0)[0] || '';
 function prop(rotulo, ok, veneno) {
   if (MODO && MODO === veneno) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
   return conf(rotulo, ok, true);
@@ -47,7 +54,8 @@ function prop(rotulo, ok, veneno) {
 const APP_N = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 const ANCORAS = {
   [V_DUPLO]: [['    if (!c || c.estado !== \'aberto\') return;\n', '    if (!c) return;\n'], ['    c.estado = \'gravando\';\n    if (botao) botao.disabled = true;\n', '']],
-  [V_ACAO]: [['      p = modoCelular ? comoAcaoDoCelular(fazer) : fazer();', '      p = fazer();']]
+  [V_ACAO]: [['      p = modoCelular ? comoAcaoDoCelular(fazer) : fazer();', '      p = fazer();']],
+  [V_CONF]: [['    if (!linhas || Assistente.assinatura(linhas) !== c.assinatura) { c.estado = \'mudou\';', '    if (!linhas) { c.estado = \'mudou\';']]
 };
 secao('0. As âncoras dos venenos');
 Object.keys(ANCORAS).forEach(v => ANCORAS[v].forEach(par => conf('âncora uma vez só no app.js (' + v + '): ' + par[0].trim().slice(0, 50), APP_N.split(par[0]).length, 2)));
@@ -376,9 +384,10 @@ async function transbordo(pag, raizSel) {
     ['propor_aulas', { itens: [item({ acao: 'cancelar', alunoId: 'al1', nome_dito: 'Zélia', data: '2026-11-26', cobranca: 'perguntar' }), item({ acao: 'cancelar', alunoId: 'al2', nome_dito: 'Bruno', data: '2026-11-20', cobranca: 'perguntar' }), item({ acao: 'mudar_duracao', alunoId: 'al1', nome_dito: 'Zélia', data: '2026-11-19', duracao_min: 90 })] }],
     ['propor_relato', { itens: [{ alunoId: 'al2', nome_dito: 'Bruno', data: HOJE, hora: null, relato_familia: 'Trabalhamos equações do primeiro grau com problemas de enunciado longo; foi muito bem e terminou a lista.', nota_so_minha: 'Combinar revisão antes da prova.', assuntos: [{ titulo: 'Equações do primeiro grau com problemas', ref: null }], areas: ['enunciado', 'ansiedade'] }] }]
   ]), texto('Confira o cartão.')]);
-  conf('um cartão só, com as quatro linhas, a pergunta da cobrança UMA vez para as duas canceladas, e "Confirmar tudo"', await pag.evaluate(s => {
-    const c = document.querySelector(s); return [c.querySelectorAll('.ass-linha').length, c.querySelectorAll('.ass-opcoes').length, c.querySelector('.ass-pergunta-conjunto').textContent, c.querySelector('[id^="ass-confirmar-"]').textContent]; }, ultimoCartao),
-    [4, 1, 'Cobrança das 2 aulas canceladas:', 'Confirmar tudo']);
+  /* Lente da romul-ac, 9: a escolha da cobrança é POR LINHA (não há mais a escolha do conjunto). */
+  conf('um cartão só, com as quatro linhas, a pergunta da cobrança em CADA uma das duas canceladas, e "Confirmar tudo"', await pag.evaluate(s => {
+    const c = document.querySelector(s); return [c.querySelectorAll('.ass-linha').length, c.querySelectorAll('.ass-opcoes').length, !!c.querySelector('.ass-pergunta-conjunto'), c.querySelector('[id^="ass-confirmar-"]').textContent]; }, ultimoCartao),
+    [4, 2, false, 'Confirmar tudo']);
   await clicar(pag, ultimoCartao + ' .ass-marca');
   conf('tirar o ✓ de uma linha muda o botão', await pag.evaluate(s => document.querySelector(s + ' [id^="ass-confirmar-"]').textContent, ultimoCartao), 'Confirmar 3 de 4');
   await clicar(pag, ultimoCartao + ' .ass-marca');
@@ -411,6 +420,64 @@ async function transbordo(pag, raizSel) {
   await pag.evaluate(() => { const d = document.createElement('div'); d.id = 'largo-de-prova'; d.style.width = '600px'; d.style.height = '10px'; document.querySelector('.ass-proposta').appendChild(d); });
   conf('CONTROLE: um elemento de 600 px no cartão é acusado', (await transbordo(pag, '#modal-assistente .modal')).some(f => /largo-de-prova|rola de lado|passa da borda/.test(f)), true);
   conf('o cartão aberto em todas as medidas: nada gravou', (await banco(pag)) === antesT, true);
+
+  // ================================================================
+  secao('6. Lentes da romul-ac: o aviso da saída, o lote que poupa e a trava de concorrência do Confirmar');
+  await pag.evaluate(() => { const f = document.querySelector('#modal-assistente .fechar'); if (f) f.click(); });
+  /* Novembro do Bruno com pagamento marcado: a aula de hoje (b1) passa a ser poupada pelo lote; a de 20/11 (b2), futura, não. */
+  await pag.evaluate(async d => { const b = JSON.parse(JSON.stringify(d)); b.pagamentos = [{ id: 'pgn', alunoId: 'al2', mes: '2026-11', pagoEm: '2026-11-10', valor: 300 }]; await Store.salvar(b); }, DB);
+  await modo(pag, 'dona-tablet', 1280, 900);
+  await clicar(pag, '#abrir-assistente');
+  await perguntar(pag, 'cancela a do Bruno do dia 20', [ferramentas([['propor_aulas', { itens: [item({ acao: 'cancelar', alunoId: 'al2', nome_dito: 'Bruno', data: '2026-11-20', hora: '17:30', cobranca: 'perguntar' })] }]]), texto('O cartão pergunta a cobrança.')]);
+  const avisoDaSaida = () => pag.evaluate(s => Array.from(document.querySelectorAll(s + ' .ass-opcao')).map(o => o.getAttribute('data-opcao') + '=' + Array.from(o.querySelectorAll('.ass-opcao-aviso')).map(x => x.textContent).join('/')), ultimoCartao);
+  conf('2: na pergunta, o aviso do mês pago está no botão da saída que muda o valor', await avisoDaSaida(),
+    ['sem=Novembro de 2026 já tem pagamento marcado: o selo do mês vai mudar.', 'com=']);
+  await clicar(pag, ultimoCartao + ' .ass-opcao[data-opcao="sem"]');
+  conf('2: escolhida a saída, o aviso do dinheiro continua à vista', await visivel(pag, ultimoCartao + ' .ass-opcao[data-opcao="sem"] .ass-opcao-aviso'), true);
+  /* 7: a trava de concorrência. Com o cartão aberto e a saída escolhida, o outro aparelho registra a aula de 20/11
+   * (ela passa a ter relato). Chega pelo caminho de verdade: Store.aplicarRecebidos, que avisa o app (registrosChegaram). */
+  const antesConc = await soBanco(pag);
+  const b2 = JSON.parse(antesConc).aulas.find(a => a.id === 'b2');
+  await pag.evaluate(async aula => {
+    const quando = new Date().toISOString();
+    await Store.aplicarRecebidos([{ id: 'aula:b2', tipo: 'aula', dados: Object.assign({}, aula, { notaTexto: 'Relato escrito no outro aparelho.' }), atualizadoEm: quando, apagadoEm: null,
+      aparelho: 'apOutroTablet', esquema: 1, servidorEm: quando, updateTime: quando, nome: 'x/registros/aula:b2' }]);
+  }, b2);
+  const chegou = await esperar('a mudança do outro aparelho chegou', () => soBanco(pag), v => JSON.parse(v).aulas.find(a => a.id === 'b2').notaTexto === 'Relato escrito no outro aparelho.', 8000);
+  conf('7: a mudança chegou pelo caminho de verdade (o relato do outro aparelho está no banco)', chegou.ok, true);
+  const depoisDaChegada = await soBanco(pag);
+  await clicar(pag, ultimoCartao + ' [id^="ass-confirmar-"]');
+  await pausa(800);
+  const estadoConc = await estadoDoCartao(pag, ultimoCartao);
+  const b2Depois = JSON.parse(await soBanco(pag)).aulas.find(a => a.id === 'b2');
+  prop('7: a agenda mudou com o cartão aberto: o cartão fica "mudou" (' + estadoConc + ') e a aula não foi cancelada (' + b2Depois.status + ')',
+    estadoConc === 'mudou' && b2Depois.status === 'realizada' && (await soBanco(pag)) === depoisDaChegada, V_CONF);
+  if (MODO === V_CONF) { await H.fim(amb)(); return; }
+  conf('7: o cartão diz que a agenda mudou e nada foi gravado', await pag.evaluate(s => document.querySelector(s).textContent.indexOf('A agenda mudou desde a proposta, e nada foi gravado.') >= 0, ultimoCartao), true);
+  /* 1: o lote. Hoje (b1, novembro pago) e 20/11 (b2, agora registrada) ficam de fora; a quinta da Zélia entra. */
+  await perguntar(pag, 'cancela as do Bruno de hoje e do dia 20 e a da Zélia de quinta, sem cobrar', [ferramentas([['propor_aulas', { itens: [
+    item({ acao: 'cancelar', alunoId: 'al2', nome_dito: 'Bruno', data: HOJE, hora: '08:00', cobranca: 'sem' }),
+    item({ acao: 'cancelar', alunoId: 'al2', nome_dito: 'Bruno', data: '2026-11-20', hora: '17:30', cobranca: 'sem' }),
+    item({ acao: 'cancelar', alunoId: 'al1', nome_dito: 'Zélia', data: '2026-11-19', hora: '15:30', cobranca: 'sem' })] }]]), texto('Confira.')]);
+  conf('1: no lote, as linhas poupadas ficam de fora com o motivo escrito, sem marca, e o botão conta só a que entra', await pag.evaluate(s => {
+    const c = document.querySelector(s);
+    return [Array.from(c.querySelectorAll('.ass-linha')).map(l => (l.getAttribute('data-poupada') || 'entra') + ':' + ((l.querySelector('.ass-poupada') || {}).textContent || '')),
+      c.querySelectorAll('.ass-marca[role="checkbox"]').length, c.querySelector('[id^="ass-confirmar-"]').textContent]; }, ultimoCartao),
+    [['fora:Fica de fora: de mês com pagamento.', 'fora:Fica de fora: já registrada.', 'entra:'], 1, 'Confirmar 1 de 3']);
+  const antesLote = await soBanco(pag);
+  await clicar(pag, ultimoCartao + ' [id^="ass-confirmar-"]');
+  const gravouLote = await esperar('o lote gravou', () => soBanco(pag), v => v !== antesLote, 8000);
+  const dLote = JSON.parse(await soBanco(pag)), aLote = JSON.parse(antesLote);
+  conf('1: confirmado, só a da Zélia foi cancelada; as do Bruno saem iguais byte a byte', [gravouLote.ok, dLote.aulas.find(a => a.id === 's1@2026-11-19').status,
+    ['b1', 'b2'].every(id => JSON.stringify(dLote.aulas.find(a => a.id === id)) === JSON.stringify(aLote.aulas.find(a => a.id === id)))], [true, 'cancelada', true]);
+  await desfazerPeloAviso(pag);
+  conf('o Desfazer volta o lote', (await soBanco(pag)) === antesLote, true);
+  /* 1: a linha só, de mês pago: segue, com o destaque antes do Confirmar. */
+  await perguntar(pag, 'o Bruno faltou hoje, pode cobrar', [ferramentas([['propor_aulas', { itens: [item({ acao: 'falta', alunoId: 'al2', nome_dito: 'Bruno', data: HOJE, hora: '08:00', cobranca: 'com' })] }]]), texto('Confira.')]);
+  conf('1: uma linha só, de mês com pagamento: o destaque, e o Confirmar ligado', await pag.evaluate(s => { const c = document.querySelector(s);
+    return [(c.querySelector('.ass-poupada') || {}).textContent, c.querySelector('.ass-linha').getAttribute('data-poupada'), c.querySelector('[id^="ass-confirmar-"]').disabled]; }, ultimoCartao),
+    ['Este mês já tem pagamento marcado.', 'destaque', false]);
+  await clicar(pag, ultimoCartao + ' [id^="ass-agora-nao-"]');
 
   conf('nenhum pedido saiu para fora do servidor da prova', paraFora.length, 0);
   conf('nenhum erro de página', pag.errosDePagina ? pag.errosDePagina.slice(0, 3).join(' | ') : '', '');

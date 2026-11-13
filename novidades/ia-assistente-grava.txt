@@ -1,8 +1,8 @@
 # Fase 4a: o assistente também propõe mudanças numa aula. Uma linha por item, escrita para ela.
 No Perguntar, agora você também pode pedir mudanças: "remarca a da quinta para sexta", "a de hoje vai ser de 1h30", "marca uma aula sábado às 10:00".
-Para cancelar, diga se cobra ou não. Se não disser, o cartão pergunta antes, com o valor que sai ou fica no mês.
+Para cancelar, diga se cobra ou não. Se não disser, ou se ficar em dúvida, o cartão pergunta antes, aula por aula, com o valor que sai ou fica no mês.
 Nada muda sozinho: aparece um cartão com o antes, o depois e o efeito no valor do mês, e só grava quando você toca em Confirmar.
 Depois de confirmar, o aviso de baixo traz o Desfazer por alguns segundos.
-Pedidos com várias aulas, como "cancela a semana que vem", viram um cartão só: tire o ✓ do que não quiser e toque em Confirmar tudo.
+Pedidos com várias aulas, como "cancela a semana que vem", viram um cartão só: tire o ✓ do que não quiser e toque em Confirmar tudo. Aulas já registradas e as de mês com pagamento ficam de fora, como na repetição.
 Dite como foi a aula: o assistente separa o que vai para a família do que é só seu, e você edita antes de gravar. O que já estava escrito fica como estava.
 Dite o feedback do mês e ele prepara o rascunho no seu jeito de escrever, para você ajustar antes de salvar.

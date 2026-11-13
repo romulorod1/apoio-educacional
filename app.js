@@ -31898,19 +31898,18 @@
     var c = h.proposta, linhas = c.linhas;
     var aberto = c.estado === 'aberto';
     var varias = linhas.length > 1;
-    var comPergunta = linhas.map(function (l, i) { return l.opcoes ? i : -1; }).filter(function (i) { return i >= 0; });
-    var doConjunto = comPergunta.length > 1;
     var caixa = el('div', { class: 'ass-cartao ass-proposta', 'data-tipo': 'proposta', 'data-estado': c.estado, id: 'ass-proposta-' + n });
     var botaoConfirmar = null;
     function atualizar() {
       if (!botaoConfirmar) return;
       var r = Assistente.opsConfirmadas(linhas, c);
-      var marcadas = linhas.filter(function (l, i) { return !c.semLinha[i]; }).length;
+      var marcadas = linhas.filter(function (l, i) { var x = Assistente.situacaoDaLinha(linhas, i); return !c.semLinha[i] && !(x && x.fora); }).length;
       var esperando = !!(fluxoAssistente && fluxoAssistente.pedindo);
       botaoConfirmar.disabled = !r.ops || c.estado !== 'aberto' || esperando;
       botaoConfirmar.textContent = !varias ? 'Confirmar' : marcadas === linhas.length ? 'Confirmar tudo' : 'Confirmar ' + marcadas + ' de ' + linhas.length;
       var dica = caixa.querySelector('.ass-falta-escolher');
-      var porque = esperando ? 'Espere a resposta.' : { cobranca: 'Escolha a cobrança para confirmar.', nada: 'Marque ao menos uma aula para confirmar.', texto: 'Escreva o texto para confirmar.' }[r.falta];
+      var porque = esperando ? 'Espere a resposta.' : { cobranca: 'Escolha a cobrança de cada aula para confirmar.', nada: 'Marque ao menos uma aula para confirmar.', texto: 'Escreva o texto para confirmar.',
+        poupadas: 'Todas ficam de fora: já registradas ou de mês com pagamento. Nada a confirmar.' }[r.falta];
       if (dica) { dica.hidden = !porque; dica.textContent = porque || ''; }
       if (porque) botaoConfirmar.setAttribute('aria-describedby', 'ass-dica-' + n); else botaoConfirmar.removeAttribute('aria-describedby');
     }
@@ -31922,7 +31921,9 @@
       opcoes.forEach(function (o, k) {
         var b = el('button', { type: 'button', class: 'ass-opcao' + (o.id === atual ? ' escolhida' : ''), role: 'radio', 'aria-checked': o.id === atual ? 'true' : 'false',
           tabindex: o.id === focavel ? '0' : '-1',
-          'data-opcao': o.id, disabled: aberto ? null : 'disabled' }, [el('span', { class: 'ass-opcao-nome', texto: o.rotulo }), el('span', { class: 'ass-opcao-dinheiro', texto: o.dinheiro })]);
+          'data-opcao': o.id, disabled: aberto ? null : 'disabled' }, [el('span', { class: 'ass-opcao-nome', texto: o.rotulo }), el('span', { class: 'ass-opcao-dinheiro', texto: o.dinheiro })]
+          /* Os avisos da saída (o selo do mês pago) ficam no próprio botão: não somem na hora da escolha. */
+          .concat((o.avisos || []).map(function (a) { return el('span', { class: 'ass-opcao-aviso', texto: a }); })));
         /* As setas andam entre as opções e escolhem (o padrão do radiogroup). */
         b.addEventListener('keydown', function (ev) {
           var passo = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[ev.key];
@@ -31946,21 +31947,15 @@
       return grupo;
     }
     if (varias) caixa.appendChild(el('div', { class: 'ass-cartao-titulo', texto: linhas.length + ' mudanças. Tire o ✓ do que não quiser.' }));
-    if (doConjunto) {
-      var base = linhas[comPergunta[0]].opcoes.filter(function (o) { return o.id !== 'falta'; });
-      caixa.appendChild(el('p', { class: 'ass-pergunta-conjunto', texto: 'Cobrança das ' + comPergunta.length + ' aulas canceladas:' }));
-      /* Os reais de cada escolha somam as saídas das linhas (o core, em
-       * centavos, de cada uma); não há meio de dizer "o valor" sem o número. */
-      var soma = function (id) { return comPergunta.reduce(function (t, k) { var o = linhas[k].opcoes.filter(function (x) { return x.id === id; })[0]; return t + (o ? o.centavos || 0 : 0); }, 0); };
-      var fraseDaSoma = function (id) { var v = soma(id); return !v ? 'O valor dos meses não muda.' : (v < 0 ? 'Saem ' : 'Entram ') + dinheiro(Math.abs(v) / 100) + ' do valor dos meses.'; };
-      caixa.appendChild(escolhas([{ id: 'sem', rotulo: 'Sem cobrança para todas', dinheiro: fraseDaSoma('sem') }, { id: 'com', rotulo: 'Cobrar todas', dinheiro: fraseDaSoma('com') }].filter(function (o) {
-        return base.some(function (b) { return b.id === o.id; });
-      }), c.escolhaDoConjunto, function (id) { c.escolhaDoConjunto = id; }, 'Cobrança das aulas canceladas'));
-    }
     linhas.forEach(function (l, i) {
-      var bloco = el('div', { class: 'ass-linha' + (c.semLinha[i] ? ' tirada' : ''), 'data-linha': String(i) });
+      var situacao = Assistente.situacaoDaLinha(linhas, i);
+      var deFora = !!(situacao && situacao.fora);
+      var bloco = el('div', { class: 'ass-linha' + (c.semLinha[i] || deFora ? ' tirada' : ''), 'data-linha': String(i), 'data-poupada': situacao ? (deFora ? 'fora' : 'destaque') : null });
       var cabeca = el('div', { class: 'ass-linha-cabeca' });
-      if (varias) {
+      if (varias && deFora) {
+        /* A regra do lote: a linha poupada não tem marca; ela fica de fora. */
+        cabeca.appendChild(el('span', { class: 'ass-marca ass-marca-fora', 'aria-hidden': 'true' }, [el('span', { class: 'ass-marca-caixa', texto: '' })]));
+      } else if (varias) {
         var marca = el('button', { type: 'button', class: 'ass-marca', role: 'checkbox', 'aria-checked': c.semLinha[i] ? 'false' : 'true',
           'aria-label': (c.semLinha[i] ? 'Incluir: ' : 'Tirar: ') + l.titulo, disabled: aberto ? null : 'disabled' },
           [el('span', { class: 'ass-marca-caixa', 'aria-hidden': 'true', texto: c.semLinha[i] ? '' : '✓' })]);
@@ -31985,10 +31980,10 @@
           l.depois ? el('dt', { texto: 'Depois' }) : null, l.depois ? el('dd', { texto: l.depois }) : null
         ].filter(Boolean)));
       }
+      if (situacao) bloco.appendChild(el('p', { class: 'ass-poupada' + (deFora ? ' ass-poupada-fora' : ''), 'data-motivo': l.poupada }, [icone('alerta', '', 'ass-cartao-ico'), el('strong', { texto: situacao.texto })]));
       if (l.dinheiro) bloco.appendChild(el('p', { class: 'ass-dinheiro', texto: l.dinheiro }));
       (l.avisos || []).forEach(function (a) { bloco.appendChild(el('p', { class: 'ass-aviso' }, [icone('alerta', '', 'ass-cartao-ico'), el('span', { texto: a })])); });
-      if (l.opcoes && !doConjunto) bloco.appendChild(escolhas(l.opcoes, c.escolha[i], function (id) { c.escolha[i] = id; }, 'Como fica a aula'));
-      if (l.opcoes && doConjunto) bloco.appendChild(el('p', { class: 'ass-dinheiro', texto: l.opcoes.filter(function (o) { return o.id !== 'falta'; }).map(function (o) { return o.rotulo + ': ' + o.dinheiro.replace(/\.$/, '').toLowerCase(); }).join('; ') + '.' }));
+      if (l.opcoes && !deFora) bloco.appendChild(escolhas(l.opcoes, c.escolha[i], function (id) { c.escolha[i] = id; }, 'Como fica a aula: ' + l.titulo));
       if (l.editavel) {
         var ed = c.edicao[i] = c.edicao[i] || {};
         /* O texto que já estava aparece à parte, só para ler (ele nunca muda);
@@ -32178,20 +32173,24 @@
   }
 
   /* A fala que decide a cobrança e o homônimo é a da conversa: as perguntas
-   * dela desde o último cartão confirmado ou trocado (lente do #213, B6).
-   * "A Marina faltou, não cobra", "qual aula?", "a das 8" decide SEM. */
-  var ESTADOS_QUE_FECHAM = ['feito', 'semPonto', 'pendente', 'guardado', 'desfeito', 'substituido'];
+   * dela desde o último cartão, QUALQUER que seja o estado dele (lente do
+   * #213, B6, restrita pela lente da romul-ac, 4): a fala de um cartão
+   * recusado, trocado, com erro ou ainda aberto não passa para o seguinte;
+   * só as do pedido atual. "A Marina faltou, não cobra", "qual aula?",
+   * "a das 8" decide SEM, porque ali ainda não houve cartão. */
   function falasDesdeOUltimoCartao() {
     var falas = [];
     for (var i = historicoAssistente.length - 1; i >= 0; i--) {
       var x = historicoAssistente[i];
-      if (x.proposta && ESTADOS_QUE_FECHAM.indexOf(x.proposta.estado) >= 0) break;
+      if (x.proposta) break;
       if (x.pergunta) falas.unshift(x.pergunta);
     }
     return falas;
   }
 
-  /* Para a próxima pergunta: o que aconteceu com os cartões desta sessão. */
+  /* Para a próxima pergunta: o que aconteceu com os cartões desta sessão.
+   * A nota "Só para mim" NUNCA sai do aparelho (lente da romul-ac, 5): do
+   * texto que ela deixou no cartão trocado, vão só o relato e o feedback. */
   function cartoesAnterioresDoAssistente() {
     var estado = { aberto: 'ainda aberto, não confirmado', gravando: 'gravando', feito: 'confirmado e gravado', desfeito: 'gravado e desfeito por ela',
       semPonto: 'confirmado e gravado, sem Desfazer', pendente: 'confirmado, ainda não guardado', guardado: 'confirmado e gravado', substituido: 'trocado por um cartão novo; nada gravado',
@@ -32199,7 +32198,7 @@
     return historicoAssistente.filter(function (x) { return x.proposta; }).slice(-3).map(function (x) {
       var p = x.proposta;
       var editado = p.estado !== 'substituido' ? '' : Object.keys(p.edicao || {}).map(function (i) {
-        var e = p.edicao[i] || {}, txt = [e.relato, e.nota, e.feedback].filter(function (t) { return typeof t === 'string' && t.trim(); });
+        var e = p.edicao[i] || {}, txt = [e.relato, e.feedback].filter(function (t) { return typeof t === 'string' && t.trim(); });
         return txt.length ? ' (o texto que ela deixou no cartão: "' + txt.join(' / ').slice(0, 800) + '")' : '';
       }).join('');
       return p.linhas.map(function (l) { return l.titulo; }).join('; ') + ': ' + (estado[p.estado] || p.estado) + editado;
@@ -32396,7 +32395,7 @@
       if (sessao !== sessaoAssistente) return; // "Nova conversa" ou troca de conta no meio
       /* A proposta vira o cartão de confirmação: aberto até ela tocar em
        * Confirmar ou em Agora não. Nada gravou até aqui. */
-      var proposta = r.proposta ? Object.assign(r.proposta, { estado: 'aberto', semLinha: {}, escolha: {}, escolhaDoConjunto: null, edicao: {} }) : null;
+      var proposta = r.proposta ? Object.assign(r.proposta, { estado: 'aberto', semLinha: {}, escolha: {}, edicao: {} }) : null;
       /* Só o último cartão confirma: os abertos de antes viram "trocado". */
       if (proposta) Assistente.substituirCartoesAbertos(historicoAssistente);
       historicoAssistente.push({ pergunta: pergunta, texto: r.texto, cartoes: r.cartoes, entendido: r.entendido.filter(function (t) {
