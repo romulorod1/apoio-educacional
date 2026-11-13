@@ -745,7 +745,13 @@ label.campo-checkbox {
    é pelo nome que ela reconhece o arquivo; os botões não encolhem. */
 #lista-anexos .item-lista .nome { overflow-wrap: break-word; word-break: normal; }
 #modal-bib-selecoes .item-lista.desligada { opacity: .55; cursor: default; }
-.bib-compartilhar-item { display: flex; flex-direction: column; gap: 4px; max-width: 100%; }
+/* A janela "PDF pronto" (D1): o nome do arquivo quebra onde for preciso e os
+   três botões de símbolo (compartilhar, baixar, ver) nunca encolhem; numa
+   tela estreita eles descem para a linha de baixo, inteiros. */
+.bib-pdf-item { flex-wrap: wrap; }
+.bib-pdf-item .cresce { min-width: 12em; }
+.bib-pdf-acoes { display: flex; gap: 8px; flex-shrink: 0; margin-left: auto; }
+.bib-pdf-acao { min-width: var(--alvo, 48px); padding: 0 12px; }
 .bib-compartilhar-nome { font-size: var(--letra-14); overflow-wrap: anywhere; }
 .bib-lp-ajuda-uso { margin: 0 0 10px; }
 .bib-lp-restam { font-weight: 600; color: var(--muted); }
@@ -2332,6 +2338,13 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-gerar-rotulo { display: block; font-size: var(--letra-14); font-weight: 600; color: var(--navy); margin-bottom: 5px; }
 .bib-gerar-caixas { display: flex; flex-direction: column; gap: 0; }
 #bib-gerar-aulas .item-lista.escolhida { border-color: var(--acao); background: var(--acao-clara); }
+/* "Nova aula hoje" fica no fim e discreta (D8 revista): as aulas nascem na
+   agenda, e criar uma pela Biblioteca é a exceção. Continua um alvo inteiro. */
+#bib-gerar-aulas .item-lista.bib-aula-nova:not(.escolhida) { border-style: dashed; background: transparent; }
+#bib-gerar-aulas .item-lista.bib-aula-nova .nome { color: var(--muted); font-weight: 600; }
+.bib-gerar-mais { margin: 0 0 8px; }
+#bib-gerar-aulas .item-lista[hidden] { display: none; }
+#bib-gerar-passadas > summary { min-height: var(--alvo, 48px); box-sizing: border-box; padding: 12px 0; cursor: pointer; font-weight: 600; color: var(--navy); }
 
 /* ---------- Minhas listas (C2a) ---------- */
 .bib-abas { margin-bottom: 12px; }
@@ -3899,6 +3912,30 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bib-busca-acoes .btn { max-width: 100%; }
 .bib-busca-paginas[hidden] { display: none; }
 .bib-busca-obra { margin: 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+/* B1: os assuntos no alto da busca e a página do assunto */
+.bib-assuntos-da-busca { margin: 0 0 12px; }
+.bib-assuntos-da-busca[hidden] { display: none; }
+.bib-assuntos-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
+.bib-assunto { min-width: 0; }
+.bib-assunto-caminho { margin: 8px 0 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+.bib-assunto-passo + .bib-assunto-passo { margin-left: 6px; }
+.bib-assunto-titulo { margin: 4px 0 8px; font-size: 1.25rem; color: var(--navy); overflow-wrap: anywhere; }
+.bib-assunto-tambem { margin: 0 0 8px; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+.bib-assunto-tambem-rotulo { font-weight: var(--peso-forte); }
+.bib-assunto-secao { margin-top: 12px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
+.bib-assunto-secao-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
+.bib-assunto-livros { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 8px; min-width: 0; }
+.bib-assunto-livro { display: flex; flex-direction: column; gap: 4px; padding: 10px; border: 1px solid var(--fio); border-radius: 8px; min-width: 0; overflow-wrap: anywhere; }
+.bib-assunto-livro .btn, .bib-assunto-ver-outros { min-height: var(--alvo); }
+.bib-assunto-ver-outros { justify-self: start; }
+.bib-assunto-vizinhos { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.bib-assunto-vizinho { min-height: var(--alvo); max-width: 100%; white-space: normal; text-align: left; }
+.bib-assunto-vazio { margin: 0; }
+/* com a página do assunto aberta, o topo dos exercícios e a faixa do material saem: a página começa no alto */
+#tela-biblioteca.com-pagina-do-assunto #bib-exercicios-cabeca,
+#tela-biblioteca.com-pagina-do-assunto #bib-contexto,
+#tela-biblioteca.com-pagina-do-assunto #bib-carrinho { display: none; }
+.bib-assuntos-mais { min-height: var(--alvo); margin-top: 4px; }
 /* "Melhores resultados" no alto do grupo "Nos livros", e o resto recolhido em "Mais resultados (N)" */
 .bib-busca-melhores { margin-top: 8px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
 .bib-busca-melhores-titulo { margin: 0; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }

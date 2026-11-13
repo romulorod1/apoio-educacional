@@ -166,10 +166,14 @@
  * mapa sobrevivem à troca de meta e de arquivo do livro.
  * O v182 traz o Voltar sem entrada sobrando no histórico depois de recarregar com uma janela aberta.
  * O v186 traz a pinça e o duplo toque no livro aberto.
+ * O v188 traz a ligação de assunto entre matérias nos mapas dos livros (biblioteca.js e app.js).
  * O v187 traz o conteúdo escrito no pedido do planejamento valendo como o do aviso.
- * O v193 traz o domínio marcado na linha do assunto, dentro da aula.
+ * O v192 traz a página do assunto na Biblioteca (B1).
+ * O v195 traz a ligação de assunto entre matérias com a versão 1.42.115.
+ * O v199 traz a janela PDF pronto e as próximas aulas no Gerar material da Biblioteca.
+ * O v(F10, a definir) traz o domínio marcado na linha do assunto, dentro da aula.
  */
-var CACHE = 'apoio-educacional-v193';
+var CACHE = 'apoio-educacional-v199';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

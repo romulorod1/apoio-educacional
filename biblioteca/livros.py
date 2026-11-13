@@ -653,12 +653,29 @@ def nivel_dos_capitulos(sumario):
     return niveis[0] if niveis else None
 
 
-def assuntos_do_mapa(lista, ids_validos):
-    """Os assuntos de uma entrada do mapa da orquestradora, so com id do indice. Devolve (assuntos, fora)."""
+def disciplinas_dos_ids(catalogo):
+    """{id do assunto: disciplina}, de TODAS as disciplinas do indice."""
+    return {a['id']: chave for chave, d in catalogo.items() for a in d['assuntos']}
+
+
+def assuntos_do_mapa(lista, disciplina_de):
+    """Os assuntos de uma entrada do mapa da orquestradora, so com id do indice. Devolve (assuntos, fora).
+
+    Item 12c (12/11/2026): o id vale em QUALQUER disciplina do indice
+    (`disciplina_de`, de disciplinas_dos_ids), e nao so na do livro: o
+    capitulo de quimica que trata de unidades do SI liga o FISEM1-T01. O id
+    que o indice nao tem fica de fora, como sempre. A entrada pode dizer a
+    disciplina (`"disciplina": "fisica"`); quando diz, tem de ser a do id no
+    indice, senao o assunto fica de fora (a disciplina escrita errada nao
+    liga o capitulo a um assunto que o mapa nao quis)."""
     saida, fora = [], 0
     for a in lista or []:
         aid = a.get('id') if isinstance(a, dict) else None
-        if aid not in ids_validos:
+        if not isinstance(aid, str) or aid not in disciplina_de:
+            fora += 1
+            continue
+        dita = a.get('disciplina')
+        if dita is not None and DISCIPLINA_DA_MATERIA.get(dita, dita) != disciplina_de[aid]:
             fora += 1
             continue
         if any(x['id'] == aid for x in saida):
@@ -670,6 +687,18 @@ def assuntos_do_mapa(lista, ids_validos):
     return saida, fora
 
 
+def nota_de_outra_materia(entradas, disciplina_id, disciplina_de):
+    """O pedaco da nota que conta as ligacoes a assunto de outra materia, com os ids."""
+    ids = []
+    for e in entradas:
+        for a in e.get('assuntos') or []:
+            if disciplina_de.get(a['id']) != disciplina_id and a['id'] not in ids:
+                ids.append(a['id'])
+    if not ids:
+        return ''
+    return ' %d assunto(s) de outra matéria: %s.' % (len(ids), ', '.join(ids))
+
+
 def montar_mapa(livro, info, achado, catalogo):
     """O mapa do livro (lista), a origem, o ano e a nota. Nao abre o livro:
     trabalha so com o sumario, as paginas e o mapa da orquestradora."""
@@ -677,7 +706,7 @@ def montar_mapa(livro, info, achado, catalogo):
     nome_mapa, do_mapa = achado if achado else (None, None)
     disciplina_id = DISCIPLINA_DA_MATERIA.get(livro.get('materia'), livro.get('materia'))
     disciplina = catalogo.get(disciplina_id)
-    ids_validos = {a['id'] for d in catalogo.values() for a in d['assuntos']}
+    ids_validos = disciplinas_dos_ids(catalogo)
     serie_mapa = str((do_mapa or {}).get('serie') or '').strip()
     if serie_mapa in ORDEM_DAS_SERIES:
         series, series_origem = [serie_mapa], 'mapa'
@@ -700,6 +729,7 @@ def montar_mapa(livro, info, achado, catalogo):
         nota = 'Assunto da obra inteira, do mapa de obras da orquestradora (%s).' % nome_mapa
         if fora:
             nota += ' %d assunto(s) fora do índice ficaram de fora.' % fora
+        nota += nota_de_outra_materia([e], disciplina_id, ids_validos)
         saida.update(mapa=[e], mapa_origem='mapa', mapa_nota=nota)
         return saida
 
@@ -727,6 +757,7 @@ def montar_mapa(livro, info, achado, catalogo):
             nota += ' %d capítulo(s) fora das páginas do arquivo ficaram de fora.' % fora_pag
         if fora_id:
             nota += ' %d assunto(s) fora do índice ficaram de fora.' % fora_id
+        nota += nota_de_outra_materia(entradas, disciplina_id, ids_validos)
         saida.update(mapa=[dict(n=i + 1, **e) for i, e in enumerate(entradas)], mapa_origem='mapa', mapa_nota=nota)
         return saida
 
@@ -954,8 +985,9 @@ def propor_gabaritos(textos, capitulos, formato='pdf'):
             onde = range(len(ls))
         for k in onde:
             if TITULO_DE_RESPOSTAS.match(ls[k]):
-                # o terceiro campo diz se o titulo so foi achado nas ultimas linhas (LINHAS_DO_FIM)
-                titulo_em[i + 1] = (k / max(1, len(ls)), ls[k], formato == 'pdf' and k >= LINHAS_DO_ALTO)
+                # o terceiro campo diz se o titulo so foi achado nas ultimas linhas
+                # (LINHAS_DO_FIM); o quarto e a linha do titulo (para o SO_IMPARES)
+                titulo_em[i + 1] = (k / max(1, len(ls)), ls[k], formato == 'pdf' and k >= LINHAS_DO_ALTO, k)
                 break
     manual = [i + 1 for i, t in enumerate(textos) if NO_MANUAL.search(' '.join(linhas[i]))]
 
@@ -1014,7 +1046,14 @@ def propor_gabaritos(textos, capitulos, formato='pdf'):
             if limpas and limpas[-1][1] == x[1]:
                 continue
             limpas.append(x)
-        impares = any(SO_IMPARES.search(l) for u in range(a, b + 1) for l in linhas[u - 1][:LINHAS_DO_ALTO + 2])
+        # "Só as ímpares" vale só no TÍTULO da seção, na página em que ela abre:
+        # a linha do título e a seguinte ("Respostas" / "dos exercícios ímpares"),
+        # esta só se não for resposta. Nas linhas do alto de todas as páginas, uma
+        # resposta casava: "e expoente impar tem o mesmo sinal" (mp1, p. 193)
+        # marcava os caps. 1 a 5 inteiros, e a p. 182 tem pares e ímpares.
+        ls_a, k_titulo = linhas[a - 1], titulo_em[a][3]
+        perto_do_titulo = [ls_a[k_titulo]] + [l for l in ls_a[k_titulo + 1:k_titulo + 2] if not PARECE_RESPOSTA.match(l)]
+        impares = any(SO_IMPARES.search(l) for l in perto_do_titulo)
         evidencia = '"%s" (%s %d)' % (titulo_em[a][1], nome, a)
         numeros = [x[1] for x in limpas]
         # sem texto perto da secao (dentro dela ou colada nela), pode faltar resposta: a certeza baixa

@@ -820,6 +820,58 @@
     });
   }
 
+  /* ------------------------- a ligação de assunto entre matérias (item 12c) */
+
+  /* O capítulo de química que trata de unidades do SI liga o assunto de
+   * física (FISEM1-T01): o mapa aceita o id de qualquer matéria do índice, e a
+   * tela diz de que matéria ele é ("Física: Unidades do SI e conversões").
+   * Quem decide a matéria do assunto é o índice (nomes.porId, com a
+   * `disciplina` de cada um), e não o prefixo do id: o id que o índice não tem
+   * aparece como veio, sem matéria nenhuma.
+   *
+   * disciplinaDoMapa(meta): a disciplina do índice do livro (o mapa_disciplina
+   *   do gerador; sem ele, a matéria da planilha, com filosofia e sociologia
+   *   na chave de lá).
+   * assuntoDeOutraMateria(meta, a): o assunto do índice é de outra matéria
+   *   que a do livro.
+   * nomeDoAssuntoNoLivro(meta, id, nomes, nomeDaMateria): o nome que a tela
+   *   mostra, com a matéria na frente quando é de outra; nomeDaMateria(id, a)
+   *   dá o rótulo da matéria (o do Core no app).
+   * opcoesDoCorrigir(meta, entrada, nomes): a lista do Corrigir: os assuntos
+   *   de outra matéria que o capítulo já tem (para ela ver e manter), e depois
+   *   os da matéria e do ano do livro, na ordem do índice. */
+  var DISCIPLINA_DA_MATERIA = { filosofia: 'filosofia-sociologia', sociologia: 'filosofia-sociologia' };
+  function disciplinaDoMapa(meta) {
+    var d = (meta && (meta.mapa_disciplina || meta.materia)) || '';
+    return DISCIPLINA_DA_MATERIA[d] || d;
+  }
+  function assuntoDeOutraMateria(meta, a) {
+    var d = disciplinaDoMapa(meta);
+    return !!(a && a.disciplina && d && a.disciplina !== d);
+  }
+  function nomeDoAssuntoNoLivro(meta, id, nomes, nomeDaMateria) {
+    var a = nomes && nomes.porId && nomes.porId[id];
+    if (!a) return String(id);
+    var titulo = a.titulo || String(id);
+    if (!assuntoDeOutraMateria(meta, a)) return titulo;
+    var materia = (typeof nomeDaMateria === 'function' && nomeDaMateria(a.disciplina, a)) || a.disciplinaNome || a.disciplina;
+    return materia + ': ' + titulo;
+  }
+  function opcoesDoCorrigir(meta, entrada, nomes) {
+    var series = Array.isArray(meta && meta.series) ? meta.series : [];
+    var disciplina = meta && meta.mapa_disciplina;
+    var porId = (nomes && nomes.porId) || {};
+    var deFora = [];
+    ((entrada && entrada.assuntos) || []).forEach(function (id) {
+      var a = porId[id];
+      if (a && assuntoDeOutraMateria(meta, a) && deFora.indexOf(a) < 0) deFora.push(a);
+    });
+    var daMateria = ((nomes && nomes.lista) || []).filter(function (a) {
+      return a.disciplina === disciplina && (a.eixo !== 'ano' || !series.length || series.indexOf(a.serie) >= 0);
+    });
+    return deFora.concat(daMateria);
+  }
+
   /* ------------------------- a busca pelos capítulos e assuntos (12/11/2026) */
 
   /* Pedido do dono: o livro escaneado (sem texto) não aparecia na busca da
@@ -1675,6 +1727,8 @@
     mapaDoLivro: mapaDoLivro, resolverCorrecoes: resolverCorrecoes, correcoesOrfas: correcoesOrfas,
     chaveParaGravarCorrecao: chaveParaGravarCorrecao, tituloNormalizado: tituloNormalizado, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
     indiceDeCapitulos: indiceDeCapitulos, procurarNosCapitulos: procurarNosCapitulos,
+    disciplinaDoMapa: disciplinaDoMapa, assuntoDeOutraMateria: assuntoDeOutraMateria,
+    nomeDoAssuntoNoLivro: nomeDoAssuntoNoLivro, opcoesDoCorrigir: opcoesDoCorrigir,
     marcadorSemSentido: marcadorSemSentido, sumarioDosMarcadoresInutil: sumarioDosMarcadoresInutil, sumarioDoLivro: sumarioDoLivro,
     coberturaDoMapa: coberturaDoMapa, COBERTURA_MINIMA_DO_MAPA: COBERTURA_MINIMA_DO_MAPA,
     TETO_DE_PAGINAS_EXPORTADAS: TETO_DE_PAGINAS_EXPORTADAS, livroTemGabarito: livroTemGabarito,

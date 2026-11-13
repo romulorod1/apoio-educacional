@@ -555,6 +555,9 @@ roda "biblioteca livros tela --envenenado-largura-vai-ao-alto" node "_teste/test
 roda "biblioteca livros tela --envenenado-vizinhas-sem-desenho" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-vizinhas-sem-desenho
 roda "biblioteca livros tela --envenenado-canvas-sem-soltar" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-canvas-sem-soltar
 roda "biblioteca livros tela --envenenado-sumario-dos-marcadores" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-sumario-dos-marcadores
+# B1 (revisao cega do #192): a navegacao sai da pagina do assunto; o veneno a
+# deixa presa, e ela volta no Limpar e no Voltar do modulo.
+roda "biblioteca livros tela --envenenado-pagina-presa" node "_teste/testa_biblioteca_livros_tela.js" --envenenado-pagina-presa
 # Fatia 2 do leitor: pinca e duplo toque no livro sintetico de 400 paginas,
 # com toques de verdade do Chrome. O ponto sob os dedos fica sob eles (24 px),
 # o duplo toque leva o ponto ao meio e volta, a caneta nao da zoom e um dedo
@@ -581,6 +584,12 @@ roda "biblioteca mirim --envenenado-equivalentes" node "_teste/testa_biblioteca_
 # e o "Diversos" das provas nao vira assunto da aula: o veneno trata todo modulo
 # de prova como assunto
 roda "biblioteca mirim --envenenado-diversos"   node "_teste/testa_biblioteca_mirim.js" --envenenado-diversos
+# C5: o pacote dos Cadernos de Apoio da SME-SP (campos novos tom, licenca,
+# atribuicao e dificuldade nula) importa sem mudar o app, os assuntos viram
+# modulos do 3o e do 7o ano e a atribuicao aparece em cada cartao. O veneno
+# serve o app.js sem a origem no cartao.
+roda "biblioteca cadernos sme"                 node "_teste/testa_biblioteca_cadernos_sme.js"
+roda "biblioteca cadernos sme --envenenado-sem-origem" node "_teste/testa_biblioteca_cadernos_sme.js" --envenenado-sem-origem
 # FRENTE B: selecionar e compor. Sem navegador, o compositor do pdf.js (lista
 # renumerada, gabarito separado, sem solucao escrito, quebra entre pedacos, marca
 # por cima so nesta folha e os outros documentos byte a byte iguais aos de main).
@@ -800,6 +809,17 @@ roda "minhas listas --envenenado-diario-antes"    node "_teste/testa_minhas_list
 roda "minhas listas --envenenado-memoria-velha"   node "_teste/testa_minhas_listas.js" --envenenado-memoria-velha
 roda "minhas listas --envenenado-uso-por-conteudo" node "_teste/testa_minhas_listas.js" --envenenado-uso-por-conteudo
 roda "minhas listas --envenenado-nomear-duplica"  node "_teste/testa_minhas_listas.js" --envenenado-nomear-duplica
+# L1 da nova montagem de listas (D1, D8 revista e D10, 12/11/2026): a janela
+# "PDF pronto" com compartilhar, baixar e ver (cancelar nao baixa nada), as
+# proximas aulas no "Gerar material" com a do aluno em contexto escolhida, e o
+# tutorial sem imprimir. Um veneno por regra.
+roda "pdf pronto"                                node "_teste/testa_biblioteca_pdf_pronto.js"
+roda "pdf pronto --envenenado-baixa-ao-cancelar" node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-baixa-ao-cancelar
+roda "pdf pronto --envenenado-so-hoje"           node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-so-hoje
+roda "pdf pronto --envenenado-sem-sugestao"      node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-sem-sugestao
+roda "pdf pronto --envenenado-sugere-depois"     node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-sugere-depois
+roda "pdf pronto --envenenado-filtro-fora"       node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-filtro-fora
+roda "pdf pronto --envenenado-voltar"            node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-voltar
 # C2a: o banco sobe de 2 para 3. A subida nao perde nada; codigo mais velho que
 # o banco diz o que fazer; a janela antiga larga o banco e avisa.
 roda "banco v3"                                   node "_teste/testa_banco_v3.js"
@@ -920,6 +940,16 @@ roda "livros nuvem posicao --envenenado-volta-sem-regra" node "_teste/testa_livr
 roda "livros nuvem posicao --envenenado-ajuste-sai-na-abertura" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-ajuste-sai-na-abertura
 roda "livros nuvem posicao --envenenado-troca-sem-perguntar" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-troca-sem-perguntar
 roda "livros nuvem posicao --envenenado-desfazer-tudo" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-desfazer-tudo
+# 12/11/2026, item 12c: a ligacao de assunto entre materias. O capitulo de
+# quimica ligado ao assunto de fisica diz "Fisica: ..." na tela do livro, na
+# busca, na faixa e no Corrigir; a correcao dela com o id de fisica vale; o id
+# fora do indice nao ganha materia pelo prefixo; o da propria materia fica
+# igual; o lado a lado diz "livro de Quimica". Quatro venenos. Porta 8993.
+roda "livros entre materias"                      node "_teste/testa_livros_entre_materias.js"
+roda "livros entre materias --envenenado-sem-materia-no-nome" node "_teste/testa_livros_entre_materias.js" --envenenado-sem-materia-no-nome
+roda "livros entre materias --envenenado-materia-pelo-prefixo" node "_teste/testa_livros_entre_materias.js" --envenenado-materia-pelo-prefixo
+roda "livros entre materias --envenenado-propria-materia-marcada" node "_teste/testa_livros_entre_materias.js" --envenenado-propria-materia-marcada
+roda "livros entre materias --envenenado-corrigir-sem-a-de-fora" node "_teste/testa_livros_entre_materias.js" --envenenado-corrigir-sem-a-de-fora
 # C15.4 e C15.5: "Exportar em PDF" do capitulo 2 com o gabarito dele no mesmo
 # arquivo, anexado na aula: o texto do capitulo e DEPOIS o do gabarito do 2 (e
 # nao o do 1), o rodape de fonte, nenhum travessao; sem o gabarito; paginas
@@ -1354,6 +1384,11 @@ roda "banco da biblioteca"                      python biblioteca/_prova_banco.p
 # C12: o tipo de fonte provas (OBMEP Mirim e ENEM), sobre provas sinteticas dos
 # dois formatos, com um veneno por regra do detector. A fidelidade e no Chrome.
 roda "provas da biblioteca"                     python biblioteca/_prova_provas.py
+# C5: o tipo de fonte cadernos-sme-sp (Cadernos de Apoio da SME-SP), sobre um
+# caderno sintetico: indice em duas colunas, atividade que atravessa a pagina,
+# foto com credito de terceiro (sai), duas colunas, revisao por questao. A
+# fidelidade e no Chrome.
+roda "cadernos sme da biblioteca"               python biblioteca/_prova_cadernos_sme.py
 # Daqui ate o fim da secao, nada abre Chrome (conferido com CHROME envenenado
 # em 26/10): o --rapido roda. O _prova_gerador e o _prova_banco acima ficam no
 # navegador porque a trava de fidelidade dos dois renderiza o SVG no Chrome
