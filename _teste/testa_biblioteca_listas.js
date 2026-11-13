@@ -2232,20 +2232,24 @@ async function cenarioPortas(pag) {
   const geracoes = await esperar('as gerações do Só gerar', () => pag.evaluate(() => (window.__geracoes || []).join(',')),
     v => (v || '').split(',').filter(Boolean).length >= 2, 30000);
   conf('Só gerar o arquivo sai em dois: a lista e o gabarito', geracoes.valor, 'lista,+gabarito');
-  const janelaComp = await esperar('a janela de compartilhar', () => pag.evaluate(() => {
+  /* A JANELA "PDF PRONTO" (L1, D1): uma linha por arquivo, com o nome e os
+   * botões de símbolo. O compartilhar só aparece onde o aparelho compartilha;
+   * baixar e ver estão sempre. O detalhe (cancelar não baixa, os avisos) é do
+   * testa_biblioteca_pdf_pronto. */
+  const janelaComp = await esperar('a janela PDF pronto', () => pag.evaluate(() => {
     const m = document.querySelector('#modal-bib-compartilhar');
-    return m && m.classList.contains('aberto') ? Array.from(m.querySelectorAll('button[id^="bib-compartilhar-"]')).map(b => b.textContent).join(' | ') : '';
+    return m && m.classList.contains('aberto') ? Array.from(m.querySelectorAll('.bib-pdf-item')).map(i => i.getAttribute('data-parte')).join(' | ') : '';
   }), v => !!v, 10000);
-  conf('e abre a janela com um botão para cada arquivo, com o verbo do aparelho', /^(Compartilhar|Baixar) a lista \| (Compartilhar|Baixar) o gabarito$/.test(janelaComp.valor || ''), true);
+  conf('e abre a janela com uma linha para cada arquivo', janelaComp.valor, 'lista | gabarito');
   const extras = await pag.evaluate(() => ({
-    podia: (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [new File(['x'], 'x.pdf', { type: 'application/pdf' })] })); } catch (e) { return false; } })(),
-    rotulo: (document.querySelector('#bib-compartilhar-lista') || {}).textContent || '',
+    podia: (() => { try { return !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File(['x'], 'x.pdf', { type: 'application/pdf' })] })); } catch (e) { return false; } })(),
+    acoes: Array.from(document.querySelectorAll('#modal-bib-compartilhar .bib-pdf-item[data-parte="lista"] button')).map(b => b.getAttribute('aria-label')).join('|'),
     nomes: Array.from(document.querySelectorAll('#modal-bib-compartilhar .bib-compartilhar-nome')).map(n => n.textContent),
     aviso: (document.querySelector('#aviso') || { classList: { contains: () => false } }).classList.contains('aberto')
   }));
-  console.log('   janela de compartilhar: ' + JSON.stringify(extras));
-  conf('o verbo segue o aparelho: sem compartilhamento, "Baixar"', extras.rotulo, (extras.podia ? 'Compartilhar' : 'Baixar') + ' a lista');
-  conf('e cada botão mostra o nome do arquivo embaixo', extras.nomes.length === 2 && /_lista_1_desafio\.pdf$/.test(extras.nomes[0]) && /_gabarito_1_desafio\.pdf$/.test(extras.nomes[1]), true);
+  console.log('   janela PDF pronto: ' + JSON.stringify(extras));
+  conf('os botões seguem o aparelho: sem compartilhamento, só baixar e ver', extras.acoes, (extras.podia ? 'Compartilhar a lista|' : '') + 'Baixar a lista|Ver a lista');
+  conf('e cada linha mostra o nome do arquivo', extras.nomes.length === 2 && /_lista_1_desafio\.pdf$/.test(extras.nomes[0]) && /_gabarito_1_desafio\.pdf$/.test(extras.nomes[1]), true);
   conf('e o "Montando o material" some quando a janela abre', extras.aviso, false);
   await pag.evaluate(() => document.querySelectorAll('.modal.aberto [data-fechar]').forEach(b => b.click()));
 

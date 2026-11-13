@@ -820,6 +820,17 @@ roda "minhas listas --envenenado-diario-antes"    node "_teste/testa_minhas_list
 roda "minhas listas --envenenado-memoria-velha"   node "_teste/testa_minhas_listas.js" --envenenado-memoria-velha
 roda "minhas listas --envenenado-uso-por-conteudo" node "_teste/testa_minhas_listas.js" --envenenado-uso-por-conteudo
 roda "minhas listas --envenenado-nomear-duplica"  node "_teste/testa_minhas_listas.js" --envenenado-nomear-duplica
+# L1 da nova montagem de listas (D1, D8 revista e D10, 12/11/2026): a janela
+# "PDF pronto" com compartilhar, baixar e ver (cancelar nao baixa nada), as
+# proximas aulas no "Gerar material" com a do aluno em contexto escolhida, e o
+# tutorial sem imprimir. Um veneno por regra.
+roda "pdf pronto"                                node "_teste/testa_biblioteca_pdf_pronto.js"
+roda "pdf pronto --envenenado-baixa-ao-cancelar" node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-baixa-ao-cancelar
+roda "pdf pronto --envenenado-so-hoje"           node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-so-hoje
+roda "pdf pronto --envenenado-sem-sugestao"      node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-sem-sugestao
+roda "pdf pronto --envenenado-sugere-depois"     node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-sugere-depois
+roda "pdf pronto --envenenado-filtro-fora"       node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-filtro-fora
+roda "pdf pronto --envenenado-voltar"            node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-voltar
 # C2a: o banco sobe de 2 para 3. A subida nao perde nada; codigo mais velho que
 # o banco diz o que fazer; a janela antiga larga o banco e avisa.
 roda "banco v3"                                   node "_teste/testa_banco_v3.js"
