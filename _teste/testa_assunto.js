@@ -375,20 +375,25 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     painelAssunto.legendaCoerente + '|' + painelAssunto.legendaSemObmep + '|' + painelAssunto.semSinalObmep + '|' + painelAssunto.sinaisSoEmMatematica, 'true|true|true|true');
 
   /* F5 (revisão): o Voltar do aparelho fecha SÓ o painel de assunto; a aula
-   * atrás continua aberta. O veneno --envenenado-voltar-fecha-aula serve o
-   * app.js sem o modal-tema no MODAIS_HISTORICO, e a prova tem de cair. */
+   * atrás continua aberta E com a entrada dela no histórico, para o Voltar
+   * seguinte fechar a aula, e não sair do aplicativo. Sem o modal-tema no
+   * MODAIS_HISTORICO, o primeiro Voltar gasta a entrada da aula: o painel
+   * fecha e a aula fica, mas sem proteção (o veneno
+   * --envenenado-voltar-fecha-aula serve o app.js assim, e a prova tem de cair). */
   await pag.evaluate(() => history.back());
   await espera(700);
   const depoisDoVoltar = await pag.evaluate(() => ({
     tema: document.querySelector('#modal-tema').classList.contains('aberto'),
-    aula: document.querySelector('#modal-aula').classList.contains('aberto')
+    aula: document.querySelector('#modal-aula').classList.contains('aberto'),
+    aulaNoHistorico: !!(history.state && history.state.apoioModal)
   }));
   if (VENENO === '--envenenado-voltar-fecha-aula') {
-    conf('VENENO visto: o Voltar fecha só o painel e a aula fica, e quebrou', !depoisDoVoltar.tema && depoisDoVoltar.aula, false);
+    conf('VENENO visto: o Voltar fecha só o painel, a aula fica com a entrada dela no histórico, e quebrou (' +
+      JSON.stringify(depoisDoVoltar) + ')', !depoisDoVoltar.tema && depoisDoVoltar.aula && depoisDoVoltar.aulaNoHistorico, false);
     return terminarCedo();
   }
-  conf('o Voltar do aparelho fecha só o painel de assunto, e a aula continua aberta',
-    depoisDoVoltar.tema + '|' + depoisDoVoltar.aula, 'false|true');
+  conf('o Voltar do aparelho fecha só o painel de assunto, e a aula continua aberta com a entrada dela no histórico',
+    depoisDoVoltar.tema + '|' + depoisDoVoltar.aula + '|' + depoisDoVoltar.aulaNoHistorico, 'false|true|true');
   await tocarNaAula('Escolher o assunto da aula');
   await espera(1800);
   conf('o painel de assunto reabre depois do Voltar', await visivel('#modal-tema'), true);
@@ -426,20 +431,28 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
    * assunto. A lista de temas (a mesma da trilha) usa o mesmo corpo e tem de
    * rolar no tablet deitado. O veneno --envenenado-corpo-sem-escopo devolve a
    * regra sem escopo, e a prova tem de cair. */
+  /* "Rola" é rolar com o dedo: algum ancestral da lista, dentro da janela,
+   * com overflow-y auto ou scroll e conteúdo maior que a caixa. scrollTop por
+   * script não serve, porque também anda numa caixa com overflow hidden. */
   const rolagemDosTemas = await pag.evaluate(() => {
-    const c = document.querySelector('#corpo-modal-tema');
-    const antes = c.scrollTop;
-    c.scrollTop = antes + 300;
-    const r = { maior: c.scrollHeight > c.clientHeight + 1, rolou: c.scrollTop > antes, semEscopo: !c.classList.contains('seletor-assunto') };
-    c.scrollTop = antes;
-    return r;
+    const lista = document.querySelector('#lista-temas');
+    const janela = document.querySelector('#modal-tema .modal');
+    let rolavel = null;
+    for (let e = lista; e && e !== janela.parentElement; e = e.parentElement) {
+      const oy = getComputedStyle(e).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && e.scrollHeight > e.clientHeight + 1) { rolavel = e; break; }
+    }
+    const corpo = document.querySelector('#corpo-modal-tema');
+    return { rolavel: rolavel ? (rolavel.id || rolavel.className) : '', maior: corpo.scrollHeight > corpo.clientHeight + 1,
+      semEscopo: !corpo.classList.contains('seletor-assunto') };
   });
   if (VENENO === '--envenenado-corpo-sem-escopo') {
-    conf('VENENO visto: a lista de temas rola no tablet deitado, e quebrou', rolagemDosTemas.maior && rolagemDosTemas.rolou, false);
+    conf('VENENO visto: a lista de temas rola com o dedo no tablet deitado, e quebrou (' + JSON.stringify(rolagemDosTemas) + ')',
+      !!rolagemDosTemas.rolavel, false);
     return terminarCedo();
   }
-  conf('a lista de temas rola no tablet deitado (o corpo não herda a regra do seletor de assunto)',
-    rolagemDosTemas.maior + '|' + rolagemDosTemas.rolou + '|' + rolagemDosTemas.semEscopo, 'true|true|true');
+  conf('a lista de temas rola com o dedo no tablet deitado (o corpo não herda a regra do seletor de assunto)',
+    (!!rolagemDosTemas.rolavel) + '|' + rolagemDosTemas.maior + '|' + rolagemDosTemas.semEscopo, 'true|true|true');
 
   const tituloMat = await pag.$eval('#lista-temas .item-tema .nome',
     e => (e.firstChild ? e.firstChild.textContent : e.textContent).trim());
