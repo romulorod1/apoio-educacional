@@ -89,13 +89,17 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   if (VENENO === '--envenenado-voltar-fecha-aula') {
     // serve o app.js sem o modal-tema no MODAIS_HISTORICO (o Voltar fechava a aula)
     const appOriginal = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
-    const appEnvenenado = appOriginal.replace(/\n\s*\/\/ F5: o Voltar do aparelho fecha só o painel[^\n]*\n\s*'modal-tema': true/, '');
-    conf('(veneno) o app.js servido perdeu o modal-tema do histórico', appEnvenenado !== appOriginal, true);
+    // a marca no fim prova que a página rodou ESTE app.js, e não o do cache do service worker
+    const appEnvenenado = appOriginal.replace(/\n\s*\/\/ F5: o Voltar do aparelho fecha só o painel[^\n]*\n\s*'modal-tema': true/, '') +
+      '\n;window.__appEnvenenado = true;\n';
+    conf('(veneno) o app.js servido perdeu o modal-tema do histórico', appEnvenenado.indexOf("'modal-tema': true") < 0, true);
     await pag.setRequestInterception(true);
     pag.on('request', r => {
       let caminho = '';
       try { caminho = new URL(r.url()).pathname; } catch (e) { /* ok */ }
       if (caminho.endsWith('/app.js')) r.respond({ status: 200, contentType: 'application/javascript; charset=utf-8', body: appEnvenenado });
+      // sem service worker no veneno: ele guardaria o app.js verdadeiro e o serviria no recarregar
+      else if (caminho.endsWith('/sw.js')) r.respond({ status: 404, contentType: 'text/plain', body: '' });
       else r.continue();
     });
   }
@@ -388,6 +392,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     aulaNoHistorico: !!(history.state && history.state.apoioModal)
   }));
   if (VENENO === '--envenenado-voltar-fecha-aula') {
+    conf('(veneno) a página rodou o app.js envenenado', await pag.evaluate(() => window.__appEnvenenado === true), true);
     conf('VENENO visto: o Voltar fecha só o painel, a aula fica com a entrada dela no histórico, e quebrou (' +
       JSON.stringify(depoisDoVoltar) + ')', !depoisDoVoltar.tema && depoisDoVoltar.aula && depoisDoVoltar.aulaNoHistorico, false);
     return terminarCedo();
