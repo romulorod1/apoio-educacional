@@ -160,7 +160,7 @@
  * O v156 traz os 6 assuntos novos de química da revisão dos mapas dos livros no banco/topicos/quimica.json.
  * O v166 traz o assistente só de leitura com IA: './assistente.js' entra na lista.
  */
-var CACHE = 'apoio-educacional-v166';
+var CACHE = 'apoio-educacional-v167';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

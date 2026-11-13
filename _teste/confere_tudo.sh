@@ -336,6 +336,11 @@ roda "planejamento --envenenado-zera-sem-comparar" node _teste/testa_planejament
 # sintetico CONGELADO (nada grava, byte a byte), o laco com o content intacto,
 # o teto de 5 voltas e as 20 frases de datas relativas.
 roda "assistente com IA (fase 3)" node _teste/testa_assistente.js
+# O assistente que GRAVA uma aula (fase 4a): cada proposta conferida contra o
+# banco nos dois lados, o efeito igual ao da funcao da tela, as tres saidas do
+# cancelamento com o dinheiro, o K2 aula por aula (veneno: 'seguintes') e nada
+# grava sem Confirmar (banco congelado).
+roda "assistente que grava (fase 4a)" node _teste/testa_assistente_grava.js
 # Politica de testes por checkpoint (09/11/2026): o nivel 1 (quais provas de
 # navegador rodam pelos arquivos tocados, com o mapa em mapa_provas.tsv) e o
 # nivel 3 (a main reaproveita a bateria inteira se o tree for igual ao da cabeca
@@ -815,6 +820,12 @@ roda "planejamento --envenenado-cascata-deixa-plano" node "_teste/testa_planejam
 # de tool_use: quem ve o botao, os cartoes que so abrem com o toque, o teto de 5
 # voltas, os erros, nada grava e o transbordo a 360, 390 e 412 px e 130%.
 roda "assistente (fluxo, IA fase 3)"                node "_teste/testa_assistente_navegador.js"
+# IA, fase 4a: o cartao de confirmacao (tablet e celular): nada grava sem o
+# Confirmar, o registro igual ao da tela do celular, o Desfazer, a acao declarada
+# (D6b), quem so le, o toque duplo e o transbordo. Os venenos TEM de reprovar.
+roda "assistente que grava (fluxo, IA fase 4a)"      node "_teste/testa_assistente_grava_navegador.js"
+roda "assistente --envenenado-toque-duplo"          node "_teste/testa_assistente_grava_navegador.js" --envenenado-toque-duplo
+roda "assistente --envenenado-sem-acao"             node "_teste/testa_assistente_grava_navegador.js" --envenenado-sem-acao
 # N1: a volta depois do rollback. O codigo da 4 republicado com o numero novo abre
 # um banco nesse numero sem os depositos novos; o codigo novo, voltando, sonda o
 # banco, cria o que falta na versao mais um e migra. O veneno sem a deteccao TEM

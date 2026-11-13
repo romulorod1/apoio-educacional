@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.86';
+  var VERSAO = '1.42.87';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -2158,7 +2158,10 @@
    * aviso sai sem o Desfazer, porque não há para onde voltar. Antes, essa
    * falha pulava a gravação da mudança e caía no ouvinte global, com a memória
    * já alterada e nenhuma faixa. */
-  function comDesfazer(rotulo, acao) {
+  /* `aoDesfazer` (opcional, do assistente, fase 4a): roda quando ela toca no
+   * Desfazer do aviso, para o cartão dizer que voltou. Os outros chamadores
+   * não passam. */
+  function comDesfazer(rotulo, acao, aoDesfazer) {
     var antes = JSON.parse(JSON.stringify(dbParaGravar()));
     /* A ação do celular da dona (D6b) grava depois, fora do toque: a permissão
      * é guardada aqui e vale para a gravação e para o Desfazer dela. */
@@ -2172,6 +2175,7 @@
           if (!comPonto) { avisar(texto); return resultado; }
           avisar(texto, 'Desfazer', function () {
             db = antes;
+            if (aoDesfazer) { try { aoDesfazer(); } catch (e) { /* só o cartão: o Desfazer segue */ } }
             // Um painel aberto ainda aponta para o registro antigo, que sai do ar
             // ao voltar o estado. Fecha tudo e limpa as referências.
             mapeamentoEmEdicao = null;
@@ -12868,9 +12872,12 @@
   function alterarAulaComDesfazer(aulaId, alunoId, mudancas, mensagem) {
     var trilha = null;
     return comDesfazer(function () { return mensagem + textoDeTrilha(trilha); }, function () {
-      Core.aplicarEdicaoAula(db, aulaId, mudancas, 'esta');
-      trilha = revisarTrilhasDoAluno(alunoId);
+      trilha = mudarSoEstaAula(aulaId, alunoId, mudancas);
     });
+  }
+  function mudarSoEstaAula(aulaId, alunoId, mudancas) {
+    Core.aplicarEdicaoAula(db, aulaId, mudancas, 'esta');
+    return revisarTrilhasDoAluno(alunoId);
   }
 
   // ================= pago em (C4) =================
@@ -28482,9 +28489,14 @@
 
   /* Ela pergunta, falando ou escrevendo; o modelo responde chamando as
    * ferramentas do assistente.js, que ESTE aparelho executa sobre o banco
-   * local, e os atalhos viram cartões que ela toca. NADA GRAVA: nenhuma
-   * função daqui chama salvar(), comDesfazer ou comoAcaoDoCelular, e as
-   * ferramentas só leem (testa_assistente.js congela o banco e confere).
+   * local, e os atalhos viram cartões que ela toca. As ferramentas só leem
+   * (testa_assistente.js congela o banco e confere).
+   *
+   * FASE 4a: no tablet e no celular da dona, o modelo também PROPÕE mudanças
+   * numa aula, o relato e o feedback. A proposta vira o cartão de
+   * confirmação (cartaoDaProposta), e só o toque dela em Confirmar grava
+   * (confirmarProposta): pelas funções da tela, dentro de UM comDesfazer e,
+   * no celular, da ação declarada. Fora do Confirmar, nada daqui grava.
    *
    * A conversa e o histórico da tela ficam só na memória da sessão: fechar a
    * janela guarda; recarregar o app apaga.
@@ -28518,6 +28530,7 @@
   function contextoDoAssistente() {
     return {
       db: db, Core: Core, hoje: Core.hojeIso(), agoraMin: minutosAgoraCelular(),
+      gravar: podeGravarPeloAssistente(), catalogo: catalogoDoAssistente(),
       links: {
         contato: function (a) {
           return { responsavel: String(a.responsavel || '').trim(), telefone: telefoneDoCampo(a) || telefoneDoAluno(a),
@@ -28532,8 +28545,57 @@
     };
   }
 
+  /* QUEM GRAVA PELO ASSISTENTE (fase 4a): o tablet da dona e o celular da
+   * dona (celularEdita). O celular que só lê pergunta, mas o pedido dele nem
+   * leva as ferramentas de proposta; o observador nem vê o assistente. */
+  function podeGravarPeloAssistente() {
+    if (!podeUsarAssistente()) return false;
+    return modoCelular ? celularEdita() : !aparelhoSoLe();
+  }
+
+  /* O catálogo de assuntos para o buscar_assunto: a matemática (o índice da
+   * busca do seletor de assunto) e as outras matérias (banco/topicos), com o
+   * MESMO item que o seletor grava na aula. Carrega ao abrir o assistente; se
+   * não veio, o assistente propõe o texto dela. */
+  var refsDoCatalogo = {};
+  function carregarCatalogoDoAssistente() {
+    try {
+      carregarIndice().then(function () { return carregarIndiceDeBusca(); }).catch(function () { /* sem o índice, só os tópicos */ });
+      carregarTopicos().catch(function () { /* sem os tópicos, só a matemática */ });
+    } catch (e) { /* o catálogo é opcional */ }
+  }
+  function catalogoDoAssistente() {
+    if (!indiceTemas && !(topicosPlanos || topicosParciais)) return null;
+    return {
+      buscar: function (termo) {
+        var achados = [];
+        var palavras = Core.chaveDeBusca(termo).split(/\s+/).filter(Boolean);
+        if (indiceTemas && indiceDeBusca && typeof Busca !== 'undefined') {
+          var porId = {};
+          indiceTemas.forEach(function (t) { porId[t.id] = t; });
+          ((Busca.procurar(indiceDeBusca, termo) || {}).itens || []).slice(0, 6).forEach(function (x) {
+            var t = porId[x.id];
+            if (!t) return;
+            var ref = 'b:' + t.id;
+            refsDoCatalogo[ref] = { id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id) };
+            achados.push({ ref: ref, assunto: t.pt.titulo, onde: rotuloDisciplina(materiaDoTemaId(t.id)) + ', ' + nomeDoAno(t.serie) });
+          });
+        }
+        (topicosPlanos || topicosParciais || []).forEach(function (p, i) {
+          if (achados.length >= 8 || !palavras.length || !casaTopico(p.chave, palavras)) return;
+          var ref = 't:' + (p.id || i);
+          refsDoCatalogo[ref] = itemDeTopico(p);
+          achados.push({ ref: ref, assunto: p.titulo, onde: p.disciplinaNome + ', ' + p.grupoRotulo });
+        });
+        return achados;
+      },
+      item: function (ref) { return refsDoCatalogo[ref] ? Object.assign({}, refsDoCatalogo[ref]) : null; }
+    };
+  }
+
   function abrirAssistente(origem) {
     if (!podeUsarAssistente()) return;
+    if (podeGravarPeloAssistente()) carregarCatalogoDoAssistente();
     if (!sessaoAssistente) sessaoAssistente = Assistente.novaSessao();
     vezDoAssistente++;
     fluxoAssistente = { vez: vezDoAssistente, texto: fluxoAssistente ? fluxoAssistente.texto : '', pedindo: false, controle: null, erro: null,
@@ -28585,6 +28647,238 @@
     return el('div', { class: 'ass-cartao', 'data-tipo': c.tipo }, filhos);
   }
 
+  // ---------- o cartão de confirmação (fase 4a) ----------
+
+  /* O cartão de uma proposta do assistente: o que muda, em linguagem dela,
+   * o antes e o depois, o efeito no dinheiro (do core) e os avisos. Com
+   * várias linhas, cada uma tem o seu ✓ (ela tira a que não quer) e o botão
+   * vira "Confirmar tudo". A cobrança que a fala não disse é perguntada no
+   * cartão, uma vez (ou uma para o conjunto). NADA grava antes do Confirmar,
+   * que no celular é ação declarada (D6b). Estados: aberto, gravando, feito,
+   * desfeito, recusado (Agora não), mudou (a agenda mudou desde a proposta). */
+  var FRASE_DO_ESTADO = {
+    feito: 'Gravado. Para voltar, toque em Desfazer no aviso.',
+    desfeito: 'Desfeito: ficou como estava antes.',
+    recusado: 'Nada foi gravado.',
+    mudou: 'A agenda mudou desde a proposta, e nada foi gravado. Pergunte de novo.',
+    erro: 'Não gravei: a aula não está mais como estava. Pergunte de novo.'
+  };
+  function cartaoDaProposta(h, n) {
+    var c = h.proposta, linhas = c.linhas;
+    var aberto = c.estado === 'aberto';
+    var varias = linhas.length > 1;
+    var comPergunta = linhas.map(function (l, i) { return l.opcoes ? i : -1; }).filter(function (i) { return i >= 0; });
+    var doConjunto = comPergunta.length > 1;
+    var caixa = el('div', { class: 'ass-cartao ass-proposta', 'data-tipo': 'proposta', 'data-estado': c.estado, id: 'ass-proposta-' + n });
+    var botaoConfirmar = null;
+    function atualizar() {
+      if (!botaoConfirmar) return;
+      var r = Assistente.opsConfirmadas(linhas, c);
+      var marcadas = linhas.filter(function (l, i) { return !c.semLinha[i]; }).length;
+      botaoConfirmar.disabled = !r.ops || c.estado !== 'aberto';
+      botaoConfirmar.textContent = !varias ? 'Confirmar' : marcadas === linhas.length ? 'Confirmar tudo' : 'Confirmar ' + marcadas + ' de ' + linhas.length;
+      var dica = caixa.querySelector('.ass-falta-escolher');
+      if (dica) dica.hidden = r.falta !== 'cobranca';
+    }
+    /* A pergunta da cobrança: botões de uma escolha só (radio), cada um com
+     * o nome que sai no PDF e o que acontece com o valor do mês. */
+    function escolhas(opcoes, atual, aoEscolher, rotulo) {
+      var grupo = el('div', { class: 'ass-opcoes', role: 'radiogroup', 'aria-label': rotulo });
+      opcoes.forEach(function (o) {
+        var b = el('button', { type: 'button', class: 'ass-opcao' + (o.id === atual ? ' escolhida' : ''), role: 'radio', 'aria-checked': o.id === atual ? 'true' : 'false',
+          'data-opcao': o.id, disabled: aberto ? null : 'disabled' }, [el('span', { class: 'ass-opcao-nome', texto: o.rotulo }), el('span', { class: 'ass-opcao-dinheiro', texto: o.dinheiro })]);
+        b.addEventListener('click', function () {
+          if (c.estado !== 'aberto') return;
+          aoEscolher(o.id);
+          Array.prototype.forEach.call(grupo.querySelectorAll('.ass-opcao'), function (x) {
+            var sim = x.getAttribute('data-opcao') === o.id;
+            x.classList.toggle('escolhida', sim); x.setAttribute('aria-checked', sim ? 'true' : 'false');
+          });
+          atualizar();
+        });
+        grupo.appendChild(b);
+      });
+      return grupo;
+    }
+    if (varias) caixa.appendChild(el('div', { class: 'ass-cartao-titulo', texto: linhas.length + ' mudanças. Tire o ✓ do que não quiser.' }));
+    if (doConjunto) {
+      var base = linhas[comPergunta[0]].opcoes.filter(function (o) { return o.id !== 'falta'; });
+      caixa.appendChild(el('p', { class: 'ass-pergunta-conjunto', texto: 'Cobrança das ' + comPergunta.length + ' aulas canceladas:' }));
+      caixa.appendChild(escolhas([{ id: 'sem', rotulo: 'Sem cobrança para todas', dinheiro: 'saem do valor do mês' }, { id: 'com', rotulo: 'Cobrar todas', dinheiro: 'ficam no valor do mês' }].filter(function (o) {
+        return base.some(function (b) { return b.id === o.id; });
+      }), c.escolhaDoConjunto, function (id) { c.escolhaDoConjunto = id; }, 'Cobrança das aulas canceladas'));
+    }
+    linhas.forEach(function (l, i) {
+      var bloco = el('div', { class: 'ass-linha' + (c.semLinha[i] ? ' tirada' : ''), 'data-linha': String(i) });
+      var cabeca = el('div', { class: 'ass-linha-cabeca' });
+      if (varias) {
+        var marca = el('button', { type: 'button', class: 'ass-marca', role: 'checkbox', 'aria-checked': c.semLinha[i] ? 'false' : 'true',
+          'aria-label': (c.semLinha[i] ? 'Incluir: ' : 'Tirar: ') + l.titulo, disabled: aberto ? null : 'disabled' },
+          [el('span', { class: 'ass-marca-caixa', 'aria-hidden': 'true', texto: c.semLinha[i] ? '' : '✓' })]);
+        marca.addEventListener('click', function () {
+          if (c.estado !== 'aberto') return;
+          c.semLinha[i] = !c.semLinha[i];
+          marca.setAttribute('aria-checked', c.semLinha[i] ? 'false' : 'true');
+          marca.setAttribute('aria-label', (c.semLinha[i] ? 'Incluir: ' : 'Tirar: ') + l.titulo);
+          marca.firstChild.textContent = c.semLinha[i] ? '' : '✓';
+          bloco.classList.toggle('tirada', !!c.semLinha[i]);
+          atualizar();
+        });
+        cabeca.appendChild(marca);
+      }
+      cabeca.appendChild(el('strong', { class: 'ass-linha-titulo', texto: l.titulo }));
+      bloco.appendChild(cabeca);
+      bloco.appendChild(el('p', { class: 'ass-entendido', texto: 'Entendi: ' + l.entendido + (l.nome ? ', ' + l.nome : '') + '.' }));
+      if (l.antes || l.depois) {
+        bloco.appendChild(el('dl', { class: 'ass-antes-depois' }, [
+          l.antes ? el('dt', { texto: 'Antes' }) : null, l.antes ? el('dd', { texto: l.antes }) : null,
+          l.depois ? el('dt', { texto: 'Depois' }) : null, l.depois ? el('dd', { texto: l.depois }) : null
+        ].filter(Boolean)));
+      }
+      if (l.dinheiro) bloco.appendChild(el('p', { class: 'ass-dinheiro', texto: l.dinheiro }));
+      (l.avisos || []).forEach(function (a) { bloco.appendChild(el('p', { class: 'ass-aviso', texto: a })); });
+      if (l.opcoes && !doConjunto) bloco.appendChild(escolhas(l.opcoes, c.escolha[i], function (id) { c.escolha[i] = id; }, 'Como fica a aula'));
+      if (l.editavel) {
+        var ed = c.edicao[i] = c.edicao[i] || {};
+        var area = function (chave, rotulo, id) {
+          var t = el('textarea', { class: 'ass-rascunho', id: id, rows: '3', 'aria-label': rotulo, disabled: aberto ? null : 'disabled' });
+          t.value = typeof ed[chave] === 'string' ? ed[chave] : l.editavel[chave];
+          t.addEventListener('input', function () { ed[chave] = t.value; atualizar(); });
+          return el('label', { class: 'campo ass-campo-rascunho' }, [el('span', { texto: rotulo }), t]);
+        };
+        if (l.op.k === 'feedback') bloco.appendChild(area('feedback', 'Feedback para a família (pode editar)', 'ass-feedback-' + n + '-' + i));
+        else {
+          bloco.appendChild(area('relato', 'Para a família (pode editar)', 'ass-relato-' + n + '-' + i));
+          bloco.appendChild(area('nota', 'Só para mim (a família não vê)', 'ass-nota-' + n + '-' + i));
+          var fichas = function (lista, chave, rotulo) {
+            if (!lista.length) return;
+            ed[chave] = ed[chave] || {};
+            bloco.appendChild(el('p', { class: 'ass-fichas-rotulo', texto: rotulo }));
+            bloco.appendChild(el('div', { class: 'ass-fichas' }, lista.map(function (x, k) {
+              var b = el('button', { type: 'button', class: 'chip-filtro ass-ficha' + (ed[chave][k] ? '' : ' ativo'), 'aria-pressed': ed[chave][k] ? 'false' : 'true',
+                texto: (ed[chave][k] ? '' : '✓ ') + (x.titulo || x.rotulo), disabled: aberto ? null : 'disabled' });
+              b.addEventListener('click', function () {
+                if (c.estado !== 'aberto') return;
+                ed[chave][k] = !ed[chave][k];
+                b.setAttribute('aria-pressed', ed[chave][k] ? 'false' : 'true');
+                b.classList.toggle('ativo', !ed[chave][k]);
+                b.textContent = (ed[chave][k] ? '' : '✓ ') + (x.titulo || x.rotulo);
+              });
+              return b;
+            })));
+          };
+          fichas(l.editavel.assuntos, 'semAssunto', 'Assunto:');
+          fichas(l.editavel.areas, 'semArea', 'Áreas trabalhadas:');
+        }
+      }
+      caixa.appendChild(bloco);
+    });
+    if (aberto || c.estado === 'gravando') {
+      if (comPergunta.length) caixa.appendChild(el('p', { class: 'ajuda u-margem-0 ass-falta-escolher', texto: 'Escolha a cobrança para confirmar.' }));
+      botaoConfirmar = botaoDeAcaoCelular('assistente-confirmar', { class: 'btn principal', id: 'ass-confirmar-' + n, texto: 'Confirmar',
+        aoClick: function (ev) { confirmarProposta(h, ev.currentTarget); } });
+      caixa.appendChild(el('div', { class: 'ass-cartao-botoes ass-confirmar' }, [
+        el('button', { type: 'button', class: 'btn', id: 'ass-agora-nao-' + n, texto: 'Agora não', aoClick: function () {
+          if (c.estado !== 'aberto') return;
+          c.estado = 'recusado'; desenharAssistente(); anunciar(FRASE_DO_ESTADO.recusado);
+        } }),
+        botaoConfirmar
+      ]));
+      atualizar();
+      if (c.estado === 'gravando') botaoConfirmar.disabled = true;
+    } else {
+      caixa.appendChild(el('p', { class: 'ass-estado', role: 'status', texto: FRASE_DO_ESTADO[c.estado] || '' }));
+    }
+    return caixa;
+  }
+
+  /* O que o aviso diz depois de gravar. */
+  function fraseDaGravacao(linhas, ops) {
+    if (ops.length > 1) return ops.length + ' mudanças gravadas.';
+    var l = linhas.filter(function (x) { return x.op === ops[0] || (x.opcoes && x.opcoes.some(function (o) { return o.op === ops[0]; })) || (x.op && x.op.k === ops[0].k && x.op.k !== 'editar' && x.op.k !== 'criar'); })[0] || linhas[0];
+    var o = ops[0], nome = l.nome;
+    if (o.k === 'relato') return 'Registro da aula de ' + nome + ' salvo.';
+    if (o.k === 'feedback') return 'Feedback de ' + nome + ' salvo.';
+    if (o.k === 'criar') return (o.campos.status === 'reposicao' ? 'Reposição de ' : 'Aula de ') + nome + ' marcada: ' + l.depois + '.';
+    var m = o.mudancas;
+    if (l.tipo === 'remarcar') return 'Aula de ' + nome + ' remarcada para ' + l.depois + '.';
+    if (l.tipo === 'mudar_duracao') return 'Duração da aula de ' + nome + ' alterada: ' + l.depois + '.';
+    if (m.status === 'falta') return 'Falta de ' + nome + ' registrada' + (m.cobravel ? ', cobrada.' : ', sem cobrança.');
+    if (m.status === 'cancelada') return 'Aula de ' + nome + ': ' + Core.rotuloDoCancelamento(m.cobravel).toLowerCase() + '.';
+    if (m.status === 'realizada') return 'A aula de ' + nome + ' voltou para a agenda.';
+    return 'A aula de ' + nome + ' ficou sem cobrança.';
+  }
+
+  /* As funções da TELA que o Confirmar usa (Assistente.aplicarPlano):
+   * a edição de uma aula é a do Fechamento e do celular (mudarSoEstaAula,
+   * o miolo do alterarAulaComDesfazer); o relato é o "Registrar como foi" do
+   * celular (Core.aplicarEdicaoAula nesta aula, incluirAssuntoNaAula e a
+   * revisão das trilhas); a aula nova é a novaAulaAvulsa; o feedback, o
+   * Core.gravarTextoDoMes do editor do celular e do tablet. */
+  function funcoesDaTela() {
+    return {
+      editarAula: mudarSoEstaAula,
+      aplicarSo: function (id, m) { Core.aplicarEdicaoAula(db, id, m, 'esta'); },
+      assunto: incluirAssuntoNaAula,
+      trilhas: revisarTrilhasDoAluno,
+      criar: function (campos) { db.aulas.push(novaAulaAvulsa(campos)); },
+      feedback: function (alunoId, mes, texto) { Core.gravarTextoDoMes(db, alunoId, mes, texto); }
+    };
+  }
+  function somaDasTrilhas(lista) {
+    return lista.reduce(function (s, r) { return { soltos: s.soltos + ((r && r.soltos) || 0), remarcados: s.remarcados + ((r && r.remarcados) || 0) }; }, { soltos: 0, remarcados: 0 });
+  }
+
+  /* O toque em Confirmar. Uma gravação só, mesmo com toque duplo: o estado
+   * sai de "aberto" e o botão desliga ANTES de qualquer outra coisa. Confere
+   * de novo contra o banco de agora (a mesma assinatura do que o cartão
+   * mostrou), grava tudo dentro de UM comDesfazer (um Desfazer volta o
+   * conjunto) e, no celular, dentro da ação declarada (comoAcaoDoCelular). */
+  function confirmarProposta(h, botao) {
+    var c = h.proposta;
+    if (!c || c.estado !== 'aberto') return;
+    if (!podeGravarPeloAssistente()) { avisar('Este aparelho só lê. Para mudar alguma coisa, use o tablet.'); return; }
+    c.estado = 'gravando';
+    if (botao) botao.disabled = true;
+    var linhas = null;
+    try { linhas = Assistente.conferirDeNovo(c.chamadas, contextoDoAssistente()); } catch (e) { linhas = null; }
+    if (!linhas || Assistente.assinatura(linhas) !== c.assinatura) { c.estado = 'mudou'; desenharAssistente(); anunciar(FRASE_DO_ESTADO.mudou); return; }
+    var r = Assistente.opsConfirmadas(linhas, c);
+    if (!r.ops) { c.estado = 'aberto'; desenharAssistente(); return; }
+    var frase = fraseDaGravacao(linhas, r.ops);
+    var trilhas = [];
+    var retrato = JSON.parse(JSON.stringify(db));
+    var fazer = function () {
+      return comDesfazer(function () { return frase + textoDeTrilha(somaDasTrilhas(trilhas)); }, function () {
+        trilhas = Assistente.aplicarPlano(db, r.ops, Core, funcoesDaTela());
+      }, function () { c.estado = 'desfeito'; });
+    };
+    var p;
+    try {
+      p = modoCelular ? comoAcaoDoCelular(fazer) : fazer();
+    } catch (e) {
+      // nada foi guardado: a falha veio antes da gravação; a memória volta ao retrato
+      db = retrato;
+      c.estado = 'erro';
+      desenharAssistente();
+      anunciar(FRASE_DO_ESTADO.erro);
+      return;
+    }
+    c.estado = 'feito';
+    desenharAssistente();
+    // a agenda por baixo mostra a mudança (a janela do assistente fica aberta)
+    p.then(desenharTudo, desenharTudo);
+  }
+
+  /* Para a próxima pergunta: o que aconteceu com os cartões desta sessão. */
+  function cartoesAnterioresDoAssistente() {
+    var estado = { aberto: 'ainda aberto, não confirmado', gravando: 'gravado', feito: 'confirmado e gravado', desfeito: 'gravado e desfeito por ela',
+      recusado: 'ela tocou em Agora não; nada gravado', mudou: 'não gravado (a agenda mudou)', erro: 'não gravado' };
+    return historicoAssistente.filter(function (x) { return x.proposta; }).slice(-3).map(function (x) {
+      return x.proposta.linhas.map(function (l) { return l.titulo; }).join('; ') + ': ' + (estado[x.proposta.estado] || x.proposta.estado);
+    }).join(' | ');
+  }
+
   function desenharAssistente() {
     var f = fluxoAssistente;
     var corpo = $('#corpo-modal-assistente'), rodape = $('#rodape-modal-assistente');
@@ -28609,6 +28903,7 @@
         vez.appendChild(el('div', { class: 'ass-resposta' }, String(h.texto || '').split(/\n+/).map(function (linha) { return el('p', { texto: linha }); })));
         if (h.entendido && h.entendido.length) vez.appendChild(el('p', { class: 'ass-entendido', texto: 'Entendi: ' + h.entendido.join('; ') + '.' }));
         (h.cartoes || []).forEach(function (c) { vez.appendChild(cartaoDoAssistente(c)); });
+        if (h.proposta) vez.appendChild(cartaoDaProposta(h, i));
       }
       conversa.appendChild(vez);
     });
@@ -28664,6 +28959,7 @@
       ctx: contextoDoAssistente(),
       hora: horaDeMinutosCelular(agoraMin),
       hojeBrasilia: typeof Planejamento !== 'undefined' ? Planejamento.hojeEmSaoPaulo() : null,
+      cartoesAnteriores: cartoesAnterioresDoAssistente(),
       cancelado: cancelou,
       chamar: function (corpoDoPedido) {
         return chamarIA(corpoDoPedido, controle ? controle.signal : undefined);
@@ -28681,7 +28977,12 @@
         var c1 = $('#ass-texto'); if (c1) c1.focus();
         return;
       }
-      historicoAssistente.push({ pergunta: pergunta, texto: r.texto, cartoes: r.cartoes, entendido: r.entendido });
+      /* A proposta vira o cartão de confirmação: aberto até ela tocar em
+       * Confirmar ou em Agora não. Nada gravou até aqui. */
+      var proposta = r.proposta ? Object.assign(r.proposta, { estado: 'aberto', semLinha: {}, escolha: {}, escolhaDoConjunto: null, edicao: {} }) : null;
+      historicoAssistente.push({ pergunta: pergunta, texto: r.texto, cartoes: r.cartoes, entendido: r.entendido.filter(function (t) {
+        return !proposta || !proposta.linhas.some(function (l) { return l.entendido === t; });
+      }), proposta: proposta });
       if (historicoAssistente.length > 12) historicoAssistente.shift();
       desenharAssistente();
       anunciar(r.texto + (r.entendido.length ? ' Entendi: ' + r.entendido.join('; ') + '.' : ''));
