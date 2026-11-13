@@ -938,6 +938,16 @@ roda "livros nuvem posicao --envenenado-volta-sem-regra" node "_teste/testa_livr
 roda "livros nuvem posicao --envenenado-ajuste-sai-na-abertura" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-ajuste-sai-na-abertura
 roda "livros nuvem posicao --envenenado-troca-sem-perguntar" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-troca-sem-perguntar
 roda "livros nuvem posicao --envenenado-desfazer-tudo" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-desfazer-tudo
+# 12/11/2026, item 12c: a ligacao de assunto entre materias. O capitulo de
+# quimica ligado ao assunto de fisica diz "Fisica: ..." na tela do livro, na
+# busca, na faixa e no Corrigir; a correcao dela com o id de fisica vale; o id
+# fora do indice nao ganha materia pelo prefixo; o da propria materia fica
+# igual; o lado a lado diz "livro de Quimica". Quatro venenos. Porta 8993.
+roda "livros entre materias"                      node "_teste/testa_livros_entre_materias.js"
+roda "livros entre materias --envenenado-sem-materia-no-nome" node "_teste/testa_livros_entre_materias.js" --envenenado-sem-materia-no-nome
+roda "livros entre materias --envenenado-materia-pelo-prefixo" node "_teste/testa_livros_entre_materias.js" --envenenado-materia-pelo-prefixo
+roda "livros entre materias --envenenado-propria-materia-marcada" node "_teste/testa_livros_entre_materias.js" --envenenado-propria-materia-marcada
+roda "livros entre materias --envenenado-corrigir-sem-a-de-fora" node "_teste/testa_livros_entre_materias.js" --envenenado-corrigir-sem-a-de-fora
 # C15.4 e C15.5: "Exportar em PDF" do capitulo 2 com o gabarito dele no mesmo
 # arquivo, anexado na aula: o texto do capitulo e DEPOIS o do gabarito do 2 (e
 # nao o do 1), o rodape de fonte, nenhum travessao; sem o gabarito; paginas
