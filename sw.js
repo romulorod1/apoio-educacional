@@ -159,9 +159,10 @@
  * O v152 reorganiza a janela da aula em duas colunas no tablet.
  * O v156 traz os 6 assuntos novos de química da revisão dos mapas dos livros no banco/topicos/quimica.json.
  * O v158 traz a busca da Biblioteca nos capítulos e assuntos do mapa, com todas as palavras e os melhores resultados.
- * O v163 traz a pinça e o duplo toque no livro aberto.
+ * O v166 traz as aulas tiradas e postas só na folha do planejamento.
+ * O v170 traz a pinça e o duplo toque no livro aberto.
  */
-var CACHE = 'apoio-educacional-v163';
+var CACHE = 'apoio-educacional-v170';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
