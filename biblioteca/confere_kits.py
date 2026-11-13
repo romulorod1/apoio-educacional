@@ -80,7 +80,16 @@ def altura_da_solucao(item):
     sol = medidas.get('solucao')
     if not sol or sol.get('altura_pt') is None:
         return MEDIANA_SOLUCAO_PT
-    return sol['altura_pt']
+    # Sem o comentario ao professor (L2, decisao D2): ele vai no fim da solucao,
+    # marcado em origem.solucao.pedacos, e nao e tempo de resolver. A altura que
+    # sobra e a soma dos pedacos sem marca, com 6 pt entre eles, contada aqui
+    # pelos pedacos e nao pela subtracao do gerador.
+    origem = (item.get('origem') or {}).get('solucao') or {}
+    pedacos = origem.get('pedacos') or []
+    if not any(p.get('comentario') for p in pedacos):
+        return sol['altura_pt']
+    proprios = [p['bbox'][3] - p['bbox'][1] for p in pedacos if not p.get('comentario')]
+    return round(sum(proprios) + 6 * (len(proprios) - 1), 1)
 
 
 def minutos_do_item(item):

@@ -228,7 +228,13 @@ def altura_da_solucao(item):
     sol = (item.get('medidas') or {}).get('solucao')
     if not sol or sol.get('altura_pt') is None:
         return MEDIANA_SOLUCAO_PT
-    return sol['altura_pt']
+    # o comentario ao professor que o gerador leva do enunciado para o fim da
+    # solucao (L2, decisao D2) e leitura da professora, e nao tempo da aluna: a
+    # tempo-v1 mede a solucao sem ele, como media antes, quando ele estava no
+    # enunciado. Sai a altura de cada pedaco marcado e a folga de 6 pt da pilha
+    pedacos = ((item.get('origem') or {}).get('solucao') or {}).get('pedacos') or []
+    tira = sum(p['bbox'][3] - p['bbox'][1] + 6 for p in pedacos if p.get('comentario'))
+    return round(sol['altura_pt'] - tira, 1) if tira else sol['altura_pt']
 
 
 def minutos_do_item(item):
