@@ -24,22 +24,23 @@
  *   4. mais dois saltos, cada um depois de uma rolagem dentro da página: o
  *      "Ir p. 120" ("Voltar à p. 281") e a barra até a p. 350 ("Voltar à
  *      p. 120");
- *   5. três voltas refazem o caminho: p. 120, p. 281 e p. 45, cada uma com o
- *      MESMO trecho no meio da área (o ponto do conteúdo que estava no meio
- *      antes do salto volta ao meio a menos de 24 px), e depois de cada volta o
- *      botão já oferece a anterior da pilha (a última oferece a p. 3); a
- *      posição gravada depois da última volta é a p. 45, a da leitura;
+ *   5. o toque volta à p. 120 com o MESMO trecho no meio da área (o ponto do
+ *      conteúdo que estava no meio antes do salto volta ao meio a menos de
+ *      24 px), e a pílula SOME: não oferece o salto anterior da pilha (a
+ *      p. 281), um destino que ela não reconhece naquele momento. Um salto
+ *      novo (Ir p. 300) traz a pílula com a volta DELE, "Voltar à p. 120", e o
+ *      toque volta e some de novo; a posição gravada é a p. 120, a da leitura;
  *   6. a pilha vive só no leitor aberto: fechado e reaberto o livro, o botão
- *      não está lá, e depois de um salto novo e uma volta a pilha acaba (a
- *      p. 3 de antes foi esquecida);
+ *      não está lá, e um salto novo oferece a volta dele, que some no toque;
  *   7. nenhum erro de página.
  *
  * Venenos (o app.js servido muda numa linha; cada um TEM de falhar pelo
  * critério dele, e a prova diz "VENENO visto" com o valor):
  *   --envenenado-volta-no-topo      a volta leva à página certa, mas ao alto
  *                                   dela: o trecho no meio fica longe (seção 5)
- *   --envenenado-pilha-de-um        a pilha guarda só o último salto: depois
- *                                   da primeira volta não há a segunda (seção 5)
+ *   --envenenado-continua-depois-do-toque
+ *                                   depois do toque a pílula segue à vista com
+ *                                   o salto anterior da pilha (seção 5)
  *   --envenenado-nao-some           o botão não some depois de 10 s (seção 2)
  *   --envenenado-aparece-na-rolagem a rolagem que troca a página do meio conta
  *                                   como salto e mostra o botão (seção 1)
@@ -65,7 +66,7 @@ const PAI = 'a39e13f';
 const VENENOS = {
   'volta-no-topo': ['var estado = leitor, ponto = estado.saltos.pop();',
     'var estado = leitor, ponto = estado.saltos.pop(); ponto = { n: ponto.n, fy: 0, fx: 0.5, alvoY: 0 };'],
-  'pilha-de-um': ['leitor.saltos.push(origem);', 'leitor.saltos = [origem];'],
+  'continua-depois-do-toque': ['esconderVoltaDoLeitor(); // a volta feita, a pílula some', 'mostrarVoltaDoLeitor();'],
   'nao-some': ['leitorVoltaTimer = setTimeout(esconderVoltaDoLeitor, LEITOR_VOLTA_MS);', 'leitorVoltaTimer = null;'],
   'aparece-na-rolagem': ['leitor.ancora = ancoraDoLeitorContinuo(leitor, n);',
     'var antesDaRolagem = leitor.ancora; leitor.ancora = ancoraDoLeitorContinuo(leitor, n); if (antesDaRolagem && antesDaRolagem.n !== n) guardarSaltoDoLeitor(antesDaRolagem, n);']
@@ -302,7 +303,6 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   checa('e a rolagem não traz o botão de volta', textoDoBotao(e3), '(sem botão)', ['nao-some']);
   const p45 = await pontoNoMeio();
   console.log('   o trecho no meio: p. ' + p45.n + ', a ' + Math.round(p45.fy * 100) + '% da altura da página');
-  if (PRINTS) await pag.screenshot({ path: path.join(PRINTS, '1_antes_do_salto_p45.png'), captureBeyondViewport: false });
   await clicar(pag, '#leitor-sumario');
   const s3 = await esperar('o sumário aberto', () => pag.evaluate(() => {
     const l = document.querySelector('#leitor-sumario-lista');
@@ -316,7 +316,6 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   const e3b = await naPagina('o Sumário até o capítulo 8', 281);
   conf('o Sumário levou ao capítulo 8, na p. 281', e3b.ok, true);
   checa('depois do Sumário, o botão diz "Voltar à p. 45"', textoDoBotao(await estadoDoLeitor()), 'Voltar à p. 45', []);
-  if (PRINTS) await pag.screenshot({ path: path.join(PRINTS, '2_logo_depois_do_salto_cap8.png'), captureBeyondViewport: false });
 
   // ================================================================
   secao('4. Mais dois saltos: o Ir p. 120 e a barra até a p. 350');
@@ -329,6 +328,7 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   await rolar('150 px dentro da p. 120', 150);
   const p120 = await pontoNoMeio();
   conf('o trecho guardado está na p. 120', p120 && p120.n, 120);
+  if (PRINTS) await pag.screenshot({ path: path.join(PRINTS, '1_antes_do_salto_p120.png'), captureBeyondViewport: false });
   // a barra de página: o dedo arrasta (três movimentos) e solta
   await pag.evaluate(() => {
     const s = document.querySelector('#leitor-slider-pagina');
@@ -338,32 +338,41 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   conf('a barra levou à p. 350', (await naPagina('a barra até a p. 350', 350)).ok, true);
   checa('depois da barra, o botão diz "Voltar à p. 120" (a origem do arrasto, e não uma página do caminho)',
     textoDoBotao(await estadoDoLeitor()), 'Voltar à p. 120', []);
+  if (PRINTS) await pag.screenshot({ path: path.join(PRINTS, '2_logo_depois_do_salto_p350.png'), captureBeyondViewport: false });
 
   // ================================================================
-  secao('5. Três voltas refazem o caminho, com o mesmo trecho no meio');
+  secao('5. O toque volta ao mesmo trecho e a pílula some; o salto novo traz a volta dele');
   const antesDasVoltas = await pag.evaluate(() => window.__gravadas || 0);
-  const caminho = [[120, p120, 'Voltar à p. 281', ['volta-no-topo']], [281, p281, 'Voltar à p. 45', ['volta-no-topo', 'pilha-de-um']],
-    [45, p45, 'Voltar à p. 3', ['volta-no-topo', 'pilha-de-um']]];
-  for (const [n, ponto, depois, deQuem] of caminho) {
+  // uma volta: o toque, a página, o trecho no meio e a pílula fora da tela
+  const voltaUma = async (n, ponto, rotulo) => {
     const e = await estadoDoLeitor();
     const tem = !!e.botao && e.botao.texto === 'Voltar à p. ' + n;
-    checa('antes de voltar, o botão oferece a p. ' + n, textoDoBotao(e), 'Voltar à p. ' + n, ['pilha-de-um']);
+    checa(rotulo + ': antes do toque, o botão oferece a p. ' + n, textoDoBotao(e), 'Voltar à p. ' + n, []);
     if (tem) await pag.tap('#leitor-voltar-salto');
     const r = tem ? await naPagina('a volta à p. ' + n, n) : { ok: false };
     const d = r.ok ? await longeDoMeio(ponto) : null;
-    console.log('   volta à p. ' + n + ': ' + (r.ok ? 'o trecho guardado ficou a ' + d.toFixed(1) + ' px do meio' : 'não voltou'));
-    checa('a volta leva à p. ' + n, r.ok, true, ['pilha-de-um']);
-    checa('com o mesmo trecho no meio, a menos de ' + TOLERANCIA_PX + ' px (ficou a ' + (d === null ? '?' : d.toFixed(1)) + ' px)',
-      d !== null && d < TOLERANCIA_PX, true, deQuem);
-    if (n === 45 && PRINTS) await pag.screenshot({ path: path.join(PRINTS, '3_depois_de_voltar_p45.png'), captureBeyondViewport: false });
-    checa('depois da volta à p. ' + n + ', o botão oferece a anterior da pilha ("' + depois + '")',
-      textoDoBotao(await estadoDoLeitor()), depois, ['pilha-de-um']);
-  }
-  // a posição gravada é a da leitura: a p. 45, onde ela chegou
+    console.log('   ' + rotulo + ', volta à p. ' + n + ': ' + (r.ok ? 'o trecho guardado ficou a ' + d.toFixed(1) + ' px do meio' : 'não voltou'));
+    checa(rotulo + ': a volta leva à p. ' + n, r.ok, true, []);
+    checa(rotulo + ': com o mesmo trecho no meio, a menos de ' + TOLERANCIA_PX + ' px (ficou a ' + (d === null ? '?' : d.toFixed(1)) + ' px)',
+      d !== null && d < TOLERANCIA_PX, true, ['volta-no-topo']);
+    return r.ok;
+  };
+  await voltaUma(120, p120, 'o primeiro toque');
+  if (PRINTS) await pag.screenshot({ path: path.join(PRINTS, '3_depois_de_voltar_p120.png'), captureBeyondViewport: false });
+  checa('depois do toque, a pílula some (e não oferece a p. 281, o salto anterior da pilha)',
+    textoDoBotao(await estadoDoLeitor()), '(sem botão)', ['continua-depois-do-toque']);
+  // o trecho da p. 120 de novo, porque o toque o refez: é a origem do salto novo
+  const p120b = await pontoNoMeio();
+  await irP(300);
+  conf('o Ir p. levou à p. 300', (await naPagina('o Ir p. 300', 300)).ok, true);
+  checa('o salto novo traz a pílula com a volta dele, "Voltar à p. 120"', textoDoBotao(await estadoDoLeitor()), 'Voltar à p. 120', []);
+  await voltaUma(120, p120b, 'o toque depois do salto novo');
+  checa('e depois desse toque a pílula some de novo', textoDoBotao(await estadoDoLeitor()), '(sem botão)', ['continua-depois-do-toque']);
+  // a posição gravada é a da leitura: a p. 120, onde ela chegou
   const g5 = await esperar('a gravação da posição depois das voltas', () => pag.evaluate(() => ({ c: window.__gravadas || 0, p: window.__gravando || 0 })),
     v => v.c > antesDasVoltas && v.p === 0, 5000);
   const gravada = g5.ok ? await pag.evaluate(() => window.__idLivro ? Store.lerPosicaoLivro(window.__idLivro).then(r => r ? r.pagina : null) : null) : null;
-  checa('a posição gravada depois das voltas é a p. 45, a da leitura', gravada, 45, []);
+  checa('a posição gravada depois das voltas é a p. 120, a da leitura', gravada, 120, []);
 
   // ================================================================
   secao('6. A pilha vive só no leitor aberto');
@@ -371,17 +380,17 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
   await esperar('o leitor fechado', () => pag.evaluate(() => !document.querySelector('#modal-leitor-pdf.aberto')), v => v, 5000);
   const reaberto = await abrirOLivro('o leitor reaberto', null);
   conf('o livro reabriu', reaberto.ok, true);
-  checa('o livro reabre na p. 45 (a posição gravada)', reaberto.valor, '45', ['pilha-de-um']);
+  checa('o livro reabre na p. 120 (a posição gravada)', reaberto.valor, '120', []);
   await estavel('a reabertura');
   checa('reaberto o livro, o botão não está lá', textoDoBotao(await estadoDoLeitor()), '(sem botão)', ['nao-some']);
   await irP(60);
   await naPagina('o Ir p. 60', 60);
-  checa('um salto novo oferece a p. 45', textoDoBotao(await estadoDoLeitor()), 'Voltar à p. 45', []);
+  checa('um salto novo oferece a p. 120', textoDoBotao(await estadoDoLeitor()), 'Voltar à p. 120', []);
   if ((await estadoDoLeitor()).botao) {
     await pag.tap('#leitor-voltar-salto');
-    await naPagina('a volta à p. 45', 45);
+    await naPagina('a volta à p. 120', 120);
   }
-  checa('e depois dessa volta a pilha acaba: a p. 3 de antes foi esquecida', textoDoBotao(await estadoDoLeitor()), '(sem botão)', []);
+  checa('e depois dessa volta a pílula some', textoDoBotao(await estadoDoLeitor()), '(sem botão)', ['continua-depois-do-toque']);
 
   if (VENENO) {
     secao(VENENO === 'controle-pai' ? 'CONTROLE no commit pai ' + PAI : 'VENENO: ' + VENENO);
@@ -389,7 +398,7 @@ const clicar = (pag, sel) => pag.evaluate(s => { const b = document.querySelecto
     if (VENENO === 'controle-pai') {
       // sem a fatia, os critérios centrais falham todos: o botão e as voltas
       conf('controle: sem a fatia, o botão não aparece depois do salto', visto.some(v => /^depois do Ir p\. 45/.test(v)), true);
-      conf('controle: sem a fatia, a volta à p. 45 não acontece', visto.some(v => /^a volta leva à p\. 45/.test(v)), true);
+      conf('controle: sem a fatia, a volta à p. 120 não acontece', visto.some(v => /^o primeiro toque: a volta leva à p\. 120/.test(v)), true);
     } else {
       conf('envenenado-' + VENENO + ': a prova viu o critério dele falhar', visto.length > 0, true);
     }

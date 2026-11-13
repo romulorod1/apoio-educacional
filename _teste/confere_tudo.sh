@@ -630,7 +630,7 @@ roda "leitor nitidez --envenenado-sem-meia-densidade" node "_teste/testa_leitor_
 # controle no commit pai (a39e13f), onde os criterios tem de falhar.
 roda "leitor voltar"                               node "_teste/testa_leitor_voltar.js"
 roda "leitor voltar --envenenado-volta-no-topo"    node "_teste/testa_leitor_voltar.js" --envenenado-volta-no-topo
-roda "leitor voltar --envenenado-pilha-de-um"      node "_teste/testa_leitor_voltar.js" --envenenado-pilha-de-um
+roda "leitor voltar --envenenado-continua-depois-do-toque" node "_teste/testa_leitor_voltar.js" --envenenado-continua-depois-do-toque
 roda "leitor voltar --envenenado-nao-some"         node "_teste/testa_leitor_voltar.js" --envenenado-nao-some
 roda "leitor voltar --envenenado-aparece-na-rolagem" node "_teste/testa_leitor_voltar.js" --envenenado-aparece-na-rolagem
 roda "leitor voltar --controle-pai"                node "_teste/testa_leitor_voltar.js" --controle-pai

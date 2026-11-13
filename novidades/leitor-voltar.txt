@@ -1,1 +1,1 @@
-No livro aberto, depois de pular pelo Sumário, pelo "Ir p." ou pela barra de baixo, aparece por 10 segundos o botão "Voltar à p. 45": um toque e você volta ao mesmo trecho onde estava, e se pulou várias vezes, cada toque volta um passo.
+No livro aberto, depois de pular pelo Sumário, pelo "Ir p." ou pela barra de baixo, aparece por 10 segundos o botão "Voltar à p. 45": um toque e você volta ao trecho onde estava.

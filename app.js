@@ -26106,8 +26106,10 @@
    * (o Sumário, o "Ir p." e a barra de página) guarda o ponto de onde ela
    * saiu: a página do meio da tela e o lugar dentro dela, a mesma âncora do
    * zoom e do giro. Por 10 s aparece "Voltar à p. 45"; o toque leva de volta
-   * ao mesmo trecho, e vários saltos formam uma pilha, desfeita de trás para
-   * a frente. Rolar, a pinça, o zoom, o giro e o Anterior e Próxima não são
+   * ao mesmo trecho, e a pílula SOME: oferecer em seguida o salto anterior
+   * ("Voltar à p. 10") mostraria um destino que ela não reconhece naquele
+   * momento. A pilha continua guardada e a pílula só reaparece no próximo
+   * salto, com a volta desse salto novo. Rolar, a pinça, o zoom, o giro e o Anterior e Próxima não são
    * salto: são leitura, e não mexem na pilha.
    * A pilha vive só no leitor aberto (memória da sessão): fechar o livro a
    * esquece, nada vai para o banco, e a posição gravada continua a da leitura
@@ -26197,7 +26199,7 @@
         estado.ultimoTopo = corpo.scrollTop;
       }
     });
-    mostrarVoltaDoLeitor();
+    esconderVoltaDoLeitor(); // a volta feita, a pílula some
   }
 
   function fecharSumarioDoLeitor() {
