@@ -4,7 +4,7 @@
 (function () {
   'use strict';
 
-  var VERSAO = '1.42.106';
+  var VERSAO = '1.42.107';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
@@ -28756,7 +28756,7 @@
     if (o.salvo ? !podeVerPlanejamentos() : !podeChamarIA()) return;
     vezDoPlanejamento++;
     fluxoPlano = { vez: vezDoPlanejamento, alunoFixoId: o.alunoFixoId || null, estado: 'pedido', texto: '', imagens: [], preparando: null,
-      conversa: null, plano: null, planoAnterior: null, mudou: '', bytes: null, erro: null, erroAjuste: null, textoAjuste: '',
+      conversa: null, plano: null, planoAnterior: null, mudou: '', bytes: null, erro: null, erroAjuste: null, textoAjuste: '', textosDosAjustes: [],
       salvoId: null, idParaSalvar: null, salvando: false, compartilhando: false, mudouDesdeSalvar: false, parar: null, uso: [],
       conferirAberto: false, rodapeLivreEm: 0, origem: origem || document.activeElement, focarTitulo: false };
     if (o.salvo) {
@@ -29174,6 +29174,9 @@
       }
       if (tipo === 'ajuste') {
         p.planoAnterior = p.plano;
+        // o que ela disse no ajuste vem depois do pedido na conferência do conteúdo ("ainda não tem conteúdo" desfaz o aviso)
+        // um item por ajuste, mesmo vazio, para o "Desfazer ajuste" tirar o dele
+        p.textosDosAjustes.push(textoDoAjuste || '');
         p.mudou = Planejamento.resumoDaMudanca(p.plano, lido.plano);
         p.ajustando = false;
         p.textoAjuste = '';
@@ -29251,7 +29254,10 @@
      * aparece com o aluno escolhido. Cada item é tocável e ACRESCENTA o dia ao
      * que já está no campo do ajuste. */
     var campoAjuste = null;
-    var conferir = escolhido ? Planejamento.itensIncertos(pl, { semAjuste: !chamaIA }) : [];
+    /* o texto do pedido (só existe no plano montado nesta janela; o salvo abre
+     * sem ele), seguido do que ela disse nos ajustes, deixa o app conferir o
+     * conteúdo que ela escreveu */
+    var conferir = escolhido ? Planejamento.itensIncertos(pl, { semAjuste: !chamaIA, texto: [p.texto || ''].concat(p.textosDosAjustes || []).join('\n') }) : [];
     var linhaAcoes = el('div', { class: 'plan-linha plan-acoes', id: 'plan-acoes' });
     if (conferir.length) {
       linhaAcoes.appendChild(el('button', { type: 'button', class: 'plan-selo', id: 'plan-conferir', 'aria-expanded': p.conferirAberto ? 'true' : 'false',
@@ -29291,6 +29297,8 @@
              * Aluno escolhidos DEPOIS continuam */
             var agora = p.plano;
             p.plano = p.planoAnterior;
+            /* o que ela disse no ajuste desfeito deixa de valer na conferência */
+            if (p.textosDosAjustes && p.textosDosAjustes.length) p.textosDosAjustes.pop();
             p.plano.alunoId = agora.alunoId;
             p.plano.confiancaAluno = agora.confiancaAluno;
             p.plano.tratamento = agora.tratamento;
