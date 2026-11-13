@@ -202,6 +202,18 @@ service cloud.firestore {
         allow read: if podeLer(uid);
         allow write: if dona(uid);
       }
+      // o catálogo da biblioteca na nuvem (fase 1b): quem lê é quem lê o resto
+      // (a dona e os leitores); ninguém escreve pelo aplicativo. Só o publicador
+      // do dono grava, pela credencial dele (o SDK de administrador passa por cima
+      // das regras). Caminho irmão do config/leitores: NÃO herda a escrita da dona.
+      match /config/catalogo {
+        allow read: if podeLer(uid);
+        allow write: if false;
+      }
+      match /catalogo/{livro} {
+        allow read: if podeLer(uid);
+        allow write: if false;
+      }
       // registros (N1): um documento por registro, com a forma conferida
       match /registros/{registro} {
         allow read: if podeLer(uid);
