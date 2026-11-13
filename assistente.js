@@ -157,6 +157,7 @@
     'Ferramentas:',
     '- Agenda de um dia ou de um período: listar_aulas. Horário livre para uma aula: horarios_livres. "Já tenho algo quinta às 15h?": tenho_algo.',
     '- Próxima aula e horários fixos de um aluno: proximas_aulas. O que fez na última aula e os assuntos já dados: historico_aluno. Quantas aulas, faltas e canceladas num período: contagem.',
+    '- Comparar, ordenar ou somar alunos ("quem mais rende", "os cinco com mais aulas", "o projetado do mês"): UMA chamada para todos (resumo_financeiro ou contagem com alunoId null), nunca um aluno por vez. Lista, ranking ou total só com todos os alunos dentro; se faltar algum, diga isso ANTES da lista, nunca depois.',
     '- Dinheiro do mês (a receber, o mês de um aluno): resumo_financeiro. Meses sem pagamento marcado e quanto está em aberto ("quem não pagou?"): pendencias_pagamento. Quanto ela cobra por hora e desde quando: valor_hora.',
     '- Aulas sem registro de como foi: sem_registro. Feedbacks do mês que faltam escrever: feedbacks_pendentes.',
     '- Telefone ou endereço: contato. O telefone e o endereço NÃO chegam a você: o aplicativo mostra o cartão com eles na tela dela. Diga só que o contato está no cartão abaixo.',
@@ -190,7 +191,7 @@
       { alunoId: ALUNO, n: { type: 'integer', description: 'Quantas aulas, de 1 a 10.' } }),
     ferramenta('contagem', 'Conta as aulas de um período (no máximo 366 dias): dadas, agendadas, faltas, canceladas (cobradas ou não) e reposições. Por aluno ou de todos.',
       { alunoId: ALUNO_OU_NULO, inicio: DATA, fim: DATA }),
-    ferramenta('resumo_financeiro', 'O dinheiro de um mês, como o Fechamento mostra: o que já foi dado, o que falta receber, o que ainda não foi dado e a situação do pagamento. De um aluno ou de todos.',
+    ferramenta('resumo_financeiro', 'O dinheiro de um mês, como o Fechamento mostra: o que já foi dado, o que falta receber, o que ainda não foi dado e a situação do pagamento. De um aluno, ou de todos de uma vez (alunoId null): aí vem, por aluno, o já dado, o ainda não dado e o mês inteiro.',
       { mes: MES, alunoId: ALUNO_OU_NULO }),
     ferramenta('pendencias_pagamento', 'Os meses já terminados sem pagamento marcado no app (ou marcado a menos), com quanto falta, e o total em aberto. Só o que ela marcou: confira no Pix. O mês corrente ainda não fecha.',
       { mes: { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'AAAA-MM para um mês só; null para todos.' } }),
@@ -476,7 +477,9 @@
       var alunos = fechs.map(function (f) {
         var s = Core.seloDoPagamento(db, f);
         faltaCent += Math.round(s.falta * 100);
-        return { aluno: nomes[f.aluno.id] || 'aluno inativo', valor_ja_dado: din(f.valorFeito), pagamento: seloEmTexto[s.selo] || s.selo, falta: din(s.falta) };
+        return { aluno: nomes[f.aluno.id] || 'aluno inativo', aulas_dadas: f.qtdEncontrosFeitos, aulas_a_dar: f.qtdEncontrosPrevistos,
+          valor_ja_dado: din(f.valorFeito), valor_ainda_nao_dado: din(f.valorPrevisto), valor_do_mes_inteiro: din(f.totalValor),
+          pagamento: seloEmTexto[s.selo] || s.selo, falta: din(s.falta) };
       });
       var anteriores = Core.somaDosPendentes(Core.pendentesDePagamento(db, ctx.hoje).filter(function (p) { return p.mes < e.mes; }));
       return {
@@ -733,6 +736,26 @@
    * ela pode perguntar de novo. O content do modelo vai INTACTO de volta
    * (com os blocos de thinking), nunca reescrito. No máximo MAX_VOLTAS
    * chamadas por pergunta, contando o recomeço. */
+  /* "Entendi" curto: tres ou mais itens que so mudam o aluno ("aulas de
+   * novembro de 2026, <nome>") viram um so ("aulas de novembro de 2026, 15
+   * alunos"). Os outros ficam como estao, na ordem. */
+  function resumirEntendido(lista) {
+    var porPrefixo = {};
+    lista.forEach(function (t) {
+      var i = t.lastIndexOf(', ');
+      if (i > 0) { var k = t.slice(0, i); porPrefixo[k] = (porPrefixo[k] || 0) + 1; }
+    });
+    var saida = [], feitos = {};
+    lista.forEach(function (t) {
+      var i = t.lastIndexOf(', ');
+      var k = i > 0 ? t.slice(0, i) : null;
+      if (k !== null && porPrefixo[k] >= 3) {
+        if (!feitos[k]) { feitos[k] = true; saida.push(k + ', ' + porPrefixo[k] + ' alunos'); }
+      } else saida.push(t);
+    });
+    return saida;
+  }
+
   function perguntar(sessao, texto, o, jaGastas, recomecou) {
     var ctx = o.ctx;
     var pergunta = String(texto || '').trim();
@@ -771,7 +794,7 @@
         if (lido.uso) usos.push(lido.uso);
         lista.push({ role: 'assistant', content: lido.conteudo });
         if (lido.stop !== 'tool_use') {
-          return fim({ texto: lido.texto || 'Não encontrei uma resposta para isso.', cartoes: cartoes, entendido: entendido, recomecou: !!recomecou });
+          return fim({ texto: lido.texto || 'Não encontrei uma resposta para isso.', cartoes: cartoes, entendido: resumirEntendido(entendido), recomecou: !!recomecou });
         }
         if (gastas + voltas >= MAX_VOLTAS) { desfazer(); return fim({ erro: 'voltas' }); }
         var resultados = lido.chamadas.map(function (c, i) {
@@ -807,6 +830,7 @@
     novaSessao: novaSessao,
     sessaoValida: sessaoValida,
     perguntar: perguntar,
+    resumirEntendido: resumirEntendido,
     executar: executar,
     lerResposta: lerResposta,
     corpo: corpo,

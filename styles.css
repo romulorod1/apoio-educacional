@@ -2451,6 +2451,11 @@ button.alvo-rascunho:hover { background: var(--soft); }
   max-width: 300px;
   text-align: left;
 }
+.estado-salvamento-aula {
+  font-size: var(--letra-12);
+  color: var(--muted);
+  margin-right: auto;
+}
 
 .ajuda-exemplo-curto {
   font-size: var(--letra-14);
@@ -3876,6 +3881,11 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bib-grupo-busca { margin: 0 0 12px; min-width: 0; }
 .bib-grupo-cabeca { display: flex; align-items: center; gap: 8px; min-height: var(--alvo); padding: 0 4px; cursor: pointer; border-bottom: 1px solid var(--fio); }
 .bib-grupo-titulo { font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
+/* P2 (revisão cega): no celular, "Capítulos nos livros" e a contagem quebravam cada um em duas linhas, com a seta
+ * entre elas; o título fica inteiro numa linha e a contagem desce inteira para a de baixo, alinhada ao título */
+.bib-grupo-cabeca { flex-wrap: wrap; row-gap: 0; }
+.bib-grupo-contagem { white-space: nowrap; }
+@media (max-width: 480px) { .bib-grupo-cabeca .bib-grupo-contagem { flex-basis: 100%; padding-left: 28px; padding-bottom: 6px; } }
 .bib-grupo-contagem { font-size: var(--letra-14); color: var(--muted); }
 .bib-grupo-corpo { padding-top: 4px; min-width: 0; }
 .bib-grupo-vazio { margin: 8px 0; }
@@ -3886,22 +3896,13 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bib-grupo-busca > summary::-webkit-details-marker, .bib-busca-livros-sem-texto > summary::-webkit-details-marker { display: none; }
 .bib-grupo-seta { display: inline-flex; color: var(--muted); transition: transform .15s; }
 .bib-grupo-busca[open] > summary .bib-grupo-seta, .bib-busca-livros-sem-texto[open] > summary .bib-grupo-seta { transform: rotate(90deg); }
-/* a linha-resumo no alto do resultado: cada parte leva ao grupo */
-.bib-busca-resumo { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0 0 8px; min-width: 0; }
-.bib-busca-resumo-parte { display: inline-flex; align-items: baseline; gap: 6px; min-height: var(--alvo); padding: 0 8px; border: 0; border-radius: var(--raio); background: transparent; color: var(--texto); font: inherit; cursor: pointer; }
-.bib-busca-resumo-titulo { font-weight: var(--peso-forte); color: var(--navy); }
-.bib-busca-resumo-valor { font-size: var(--letra-14); color: var(--muted); }
-.bib-busca-resumo-ponto { color: var(--muted); }
 /* as páginas encontradas: cada uma abre o leitor nela */
 .bib-busca-paginas { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .bib-busca-pagina { min-width: var(--alvo); min-height: var(--alvo); padding: 0 8px; border: 1px solid var(--fio); border-radius: 8px; background: var(--branco); color: var(--navy); font: inherit; cursor: pointer; }
 .bib-busca-livro-quantas { display: block; font-size: var(--letra-14); color: var(--muted); }
 .bib-busca-livros-dispensar { margin-top: 4px; }
-.bib-grupo-ver-todos, .bib-busca-livros-mais { margin-top: 8px; min-height: var(--alvo); }
+.bib-grupo-ver-todos { margin-top: 8px; min-height: var(--alvo); }
 .bib-busca-livros-sem-texto-lista { margin: 4px 0 0; padding-left: 20px; overflow-wrap: anywhere; }
-.bib-busca-livro { margin-top: 8px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
-.bib-busca-livro-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); overflow-wrap: anywhere; }
-.bib-busca-livro-volume { margin: 0 0 8px; font-size: var(--letra-14); color: var(--muted); }
 .bib-busca-livro-grupo { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; margin-top: 8px; border-top: 1px solid var(--fio); min-width: 0; }
 .bib-busca-livro-paginas { flex: 0 0 auto; min-width: 0; font-size: var(--letra-14); overflow-wrap: anywhere; }
 .bib-busca-livro-grupo .btn { min-height: var(--alvo); }
@@ -3913,9 +3914,7 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bib-busca-paginas[hidden] { display: none; }
 .bib-busca-obra { margin: 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
 /* B1: os assuntos no alto da busca e a página do assunto */
-.bib-assuntos-da-busca { margin: 0 0 12px; }
 .bib-assuntos-da-busca[hidden] { display: none; }
-.bib-assuntos-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
 .bib-assunto { min-width: 0; }
 .bib-assunto-caminho { margin: 8px 0 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
 .bib-assunto-passo + .bib-assunto-passo { margin-left: 6px; }
@@ -3936,14 +3935,14 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 #tela-biblioteca.com-pagina-do-assunto #bib-contexto,
 #tela-biblioteca.com-pagina-do-assunto #bib-carrinho { display: none; }
 .bib-assuntos-mais { min-height: var(--alvo); margin-top: 4px; }
-/* "Melhores resultados" no alto do grupo "Nos livros", e o resto recolhido em "Mais resultados (N)" */
-.bib-busca-melhores { margin-top: 8px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
-.bib-busca-melhores-titulo { margin: 0; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
-.bib-busca-mais { margin-top: 8px; }
-.bib-busca-mais > summary { list-style: none; cursor: pointer; min-height: var(--alvo); display: flex; align-items: center; gap: 4px;
-  font-weight: var(--peso-forte); color: var(--navy); }
-.bib-busca-mais > summary::-webkit-details-marker { display: none; }
-.bib-busca-mais[open] > summary .bib-grupo-seta { transform: rotate(90deg); }
+/* P2: os capítulos do resultado, uma linha por capítulo (com o livro nela), num cartão só */
+.bib-busca-capitulos { margin-top: 8px; padding: 0 12px 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
+.bib-busca-capitulos > .bib-busca-livro-grupo:first-child { border-top: 0; margin-top: 0; }
+.bib-busca-capitulos-mais, .bib-assuntos-outros-anos-ver { min-height: var(--alvo); margin-top: 8px; }
+.bib-assuntos-outros-anos .bloco-exercicios { margin-top: 8px; }
+/* a busca sem resultado: a frase e, logo abaixo, o que fazer */
+.bib-busca-vazia p { margin: 0; }
+.bib-busca-vazia .bib-busca-vazia-dica { margin-top: 8px; font-size: var(--letra-14); }
 /* a faixa do material marcado vazia não gruda no alto durante a busca: rola junto */
 .bib-carrinho.vazia.na-busca { position: static; }
 .bib-busca-livros-aviso { margin-top: 8px; }
