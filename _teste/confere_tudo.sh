@@ -669,6 +669,14 @@ roda "biblioteca credito da licenca --envenenado-link" node "_teste/testa_biblio
 roda "biblioteca credito da licenca --envenenado-abrir" node "_teste/testa_biblioteca_credito.js" --envenenado-abrir
 roda "biblioteca credito da licenca --envenenado-listafolha" node "_teste/testa_biblioteca_credito.js" --envenenado-listafolha
 roda "biblioteca credito da licenca --envenenado-pdf" node "_teste/testa_biblioteca_credito.js" --envenenado-pdf
+# O gabarito resolvido por agente e conferido: o item sem solucao que traz
+# gabarito (origem agente-conferido) mostra as respostas e, sempre, a marca
+# "Resposta conferida por duas IAs" na tela cheia e no gabarito do PDF, sem
+# depender da caixa "origem"; item sem o campo nao ganha nada. Um veneno por
+# superficie.
+roda "gabarito do agente"                     node "_teste/testa_gabarito_agente.js"
+roda "gabarito do agente --envenenado-sem-marca-visor" node "_teste/testa_gabarito_agente.js" --envenenado-sem-marca-visor
+roda "gabarito do agente --envenenado-sem-marca-pdf" node "_teste/testa_gabarito_agente.js" --envenenado-sem-marca-pdf
 # FRENTE B: selecionar e compor. Sem navegador, o compositor do pdf.js (lista
 # renumerada, gabarito separado, sem solucao escrito, quebra entre pedacos, marca
 # por cima so nesta folha e os outros documentos byte a byte iguais aos de main).
