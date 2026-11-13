@@ -3958,7 +3958,7 @@
     var trilhasAntes = alunoAntes ? copia(alunoAntes.trilhas) : undefined;
     acao();
     var texto = (typeof rotulo === 'function') ? rotulo() : rotulo;
-    return Store.registrarHistorico(texto, antesDoBanco).then(function () { return true; }, function () { return false; })
+    return Store.registrarHistorico(texto, antesDoBanco).then(function () { return true; }, function () { return false; /* sem ponto, sem Desfazer */ })
       .then(function (comPonto) {
         return gravar(salvar).then(function () {
           if (!comPonto || !copiaAula) { avisar(texto); return; }
@@ -4047,18 +4047,13 @@
     /* B2: o banco voltou a um valor que esta janela já tinha coberto (a
      * gravação daqui não chegou ao disco antes de a memória ser trocada). Não
      * é mudança do outro aparelho: a caixa fica com o texto dela, o rascunho
-     * fica, e a janela entra em conflito (fechar pergunta). */
+     * fica (com a base do disco novo, para voltar ao reabrir), e a janela
+     * entra em conflito: nada grava, e fechar pergunta. O resto que chegou
+     * entra na janela como sempre. */
     var voltouAtras = mudaram.filter(function (k) {
       return (sobrescritosPelaJanela[k] || []).indexOf(noBanco[k]) >= 0;
     });
-    if (voltouAtras.length) {
-      var sv = Object.assign({}, snapshotAutosaveAula || {});
-      voltouAtras.forEach(function (k) { sv[k] = noBanco[k]; }); // a caixa difere do banco: é dela, pendente
-      snapshotAutosaveAula = sv;
-      conflitoAutosaveAula = true;
-      rotuloEstadoAutosaveAula('A gravação daqui não chegou ao tablet antes de uma mudança de outro aparelho. O seu texto continua na caixa e no rascunho, e nada foi gravado por cima: feche e abra de novo.');
-      return;
-    }
+    mudaram = mudaram.filter(function (k) { return voltouAtras.indexOf(k) < 0; });
     // o que ela não mexeu: o formulário passa a mostrar a versão nova
     var CAMPO = { data: '#campo-data', hora: '#campo-hora', duracaoMin: '#campo-duracao', status: '#campo-status',
       cobravel: '#campo-cobrar', notaTexto: '#campo-nota-texto', notaPrivada: '#campo-nota-privada' };
@@ -4080,10 +4075,17 @@
         else delete aberturaDaAula.registro[k];
       }
     });
+    voltouAtras.forEach(function (k) { s[k] = noBanco[k]; }); // a caixa difere do banco: é dela, pendente
     snapshotAutosaveAula = s;
     baseBancoAutosaveAula = noBanco;
-    if (mudaram.some(function (k) { return CAMPOS_RELATO_AULA.indexOf(k) >= 0; })) {
+    if (mudaram.concat(voltouAtras).some(function (k) { return CAMPOS_RELATO_AULA.indexOf(k) >= 0; })) {
       baseDiscoRelatoAula = { notaTexto: noBanco.notaTexto, notaPrivada: noBanco.notaPrivada };
+      guardarRascunhoRelato(aulaEmEdicao, $('#campo-nota-texto'), $('#campo-nota-privada'), baseDiscoRelatoAula);
+    }
+    if (voltouAtras.length) {
+      conflitoAutosaveAula = true;
+      rotuloEstadoAutosaveAula('A gravação daqui não chegou ao tablet antes de uma mudança de outro aparelho. O seu texto continua na caixa e no rascunho, e nada foi gravado por cima: feche e abra de novo.');
+      return;
     }
     rotuloEstadoAutosaveAula('Chegou uma mudança desta aula do outro aparelho; a janela já mostra a versão nova.');
     if (typeof tirarFotoDaJanela === 'function' && !aulaTemMudancasParaAutosave()) tirarFotoDaJanela('modal-aula');
