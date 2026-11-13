@@ -1170,6 +1170,7 @@ roda "biblioteca na nuvem, metas --envenenado-aceita-mapa-texto" node "_teste/te
 roda "biblioteca na nuvem, metas --envenenado-um-lote-so" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-um-lote-so
 roda "biblioteca na nuvem, metas --envenenado-app-aceita-outro-id" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-app-aceita-outro-id
 roda "biblioteca na nuvem, metas --envenenado-vencida-pede-tente" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-vencida-pede-tente
+roda "biblioteca na nuvem, metas --envenenado-junta-as-contas" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-junta-as-contas
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
