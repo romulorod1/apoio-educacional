@@ -41,6 +41,7 @@ _teste/provas_tocadas.js	-
 _teste/versao_publicada.js	-
 novidades/*	-
 _teste/testa_livros_impressa.js	-
+_teste/testa_chaves_capitulos.py	-
 _teste/testa_*.js	-
 # Mexe em como o portao roda tudo: a bateria inteira.
 _teste/confere_tudo.sh	*

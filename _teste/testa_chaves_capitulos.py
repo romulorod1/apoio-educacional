@@ -1,6 +1,6 @@
 """Prova da chave estável do capítulo (fase 1b, biblioteca/chaves.py), sem rede e sem livro.
 
-    python -X utf8 biblioteca/_prova_chaves.py [--envenenado-chave-pela-pagina | --envenenado-sem-heranca]
+    python _teste/testa_chaves_capitulos.py [--envenenado-chave-pela-pagina | --envenenado-sem-heranca]
 
 O que se prova, com mapas sintéticos:
   1. gerar duas vezes o mesmo mapa dá as mesmas chaves, e a chave nova é
@@ -31,7 +31,7 @@ import os
 import sys
 import types
 
-AQUI = os.path.dirname(os.path.abspath(__file__))
+AQUI = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'biblioteca')
 TROCAS = {
     '--envenenado-chave-pela-pagina': ['(semelhanca(a.get(\'titulo\'), e.get(\'titulo\')) >= SEMELHANCA_MINIMA or herda(a, e))', 'True'],
     '--envenenado-sem-heranca': ['    pares = pares_da_heranca(heranca)\n', '    pares = set()\n'],
