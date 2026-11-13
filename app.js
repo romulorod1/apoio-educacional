@@ -25449,11 +25449,7 @@
      * (a medida da auditoria de 09/11: a semana inteira presa, com os
      * avisos, eram 295 px, 35% de 390 x 844). */
     return {
-      /* IA, fase 3 (lentes do #191): o assistente tem porta própria, numa
-       * segunda linha presa logo abaixo da linha do dia, que fica como era.
-       * Também no celular que só lê: perguntar é ler. */
-      faixa: el('div', { class: 'cel-semana', id: 'cel-semana' }, [el('div', { class: 'barra cel-semana-topo' }, topo),
-        podeUsarAssistente() ? el('div', { class: 'cel-assistente-linha', id: 'cel-assistente-linha' }, [botaoDoAssistente('cel-assistente', 'btn cel-perguntar')]) : null]),
+      faixa: el('div', { class: 'cel-semana', id: 'cel-semana' }, [el('div', { class: 'barra cel-semana-topo' }, topo)]),
       dias: el('div', { class: 'cel-semana-dias', id: 'cel-semana-dias' }, botoes)
     };
   }
@@ -26121,6 +26117,13 @@
           aoClick: function () { abrirFormularioCelular({ tipo: 'aluno' }); } })
       ]));
     }
+    /* IA, fase 3 (lentes do #191): a porta do assistente, a pílula
+     * "Perguntar", fica no pé de Hoje, presa acima das abas, à direita (perto
+     * do polegar). Nada no alto: a linha do dia fica como era, e o alto preso
+     * continua dentro dos 20% (uma segunda linha lá em cima passava disso a
+     * 130%). No fim da rolagem ela ocupa o próprio lugar e não cobre a última
+     * aula. Também no celular que só lê: perguntar é ler. */
+    if (podeUsarAssistente()) caixa.appendChild(el('div', { class: 'cel-assistente-pe', id: 'cel-assistente-pe' }, [botaoDoAssistente('cel-assistente', 'btn cel-perguntar')]));
     if (folhaCelular) desenharFolhaCelular();
     hojeVistoCelular = hoje; // o dia em que esta linha do tempo foi desenhada (a virada da meia-noite)
     rolarHojeCelular(dia);

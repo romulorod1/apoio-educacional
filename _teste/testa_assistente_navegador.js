@@ -9,9 +9,9 @@
  *
  * O que prova (com as lentes do #191):
  *   0. a porta: sem conta, ninguém; o observador, não; o celular que só lê,
- *      a dona no celular (a pílula "Perguntar" numa segunda linha, abaixo da
- *      linha do dia, que fica como a da main) e no tablet (a pílula vizinha
- *      do olho);
+ *      a dona no celular (a pílula "Perguntar" presa no pé de Hoje, acima
+ *      das abas, e nada no alto: a linha do dia fica como a da main) e no
+ *      tablet (a pílula vizinha do olho);
  *   1. no tablet: o foco no título ao abrir, os exemplos com o nome de um
  *      aluno dela e o mês passado, tocar num exemplo pergunta, o laço com
  *      duas ferramentas e o content intacto, o "Entendi:", o cartão do
@@ -26,9 +26,9 @@
  *   6. NADA GRAVOU: o banco do aparelho e a fila de registros iguais antes e
  *      depois de tudo;
  *   7. no celular: o fluxo, a linha do dia igual à da main (a palavra Vagos,
- *      o "1 dia" e o dia da semana à vista), a altura da linha nova, e a
- *      trava de transbordo da janela e das duas linhas a 360, 390 e 412 px,
- *      letra normal e 130%, com controle.
+ *      o "1 dia" e o dia da semana à vista), a pílula no pé, acima das abas,
+ *      sem nada a mais no alto, e a trava de transbordo da janela, do alto e
+ *      da pílula a 360, 390 e 412 px, letra normal e 130%, com controle.
  *
  * Porta 8974. O service worker é contornado.
  */
@@ -170,12 +170,12 @@ async function transbordo(pag, raizSel) {
   conf('o celular que só lê, com a conta: tem a porta (perguntar é ler)', await visivel(pag, '#cel-assistente'), true);
   await modo(pag, 'dona-celular', 390, 844);
   const porta = await pag.evaluate(() => {
-    const b = document.querySelector('#cel-assistente'), linha = document.querySelector('.cel-semana-topo'), r = b.getBoundingClientRect(), rl = linha.getBoundingClientRect();
-    return { texto: b.textContent.trim(), icone: (b.querySelector('svg') || { getAttribute: () => '' }).getAttribute('data-icone-nome'), naLinhaDoDia: !!b.closest('.cel-semana-topo'),
-      abaixo: r.top >= rl.bottom - 1, presa: !!b.closest('#cel-semana'), alvo: r.height >= 48 && r.width >= 48 };
+    const b = document.querySelector('#cel-assistente'), r = b.getBoundingClientRect(), abas = document.querySelector('#cel-abas').getBoundingClientRect();
+    return { texto: b.textContent.trim(), icone: (b.querySelector('svg') || { getAttribute: () => '' }).getAttribute('data-icone-nome'), noAlto: !!b.closest('#cel-semana'),
+      acimaDasAbas: r.bottom <= abas.top + 1 && abas.top - r.bottom <= 24, aDireita: window.innerWidth - r.right <= 24, alvo: r.height >= 48 && r.width >= 48 };
   });
-  conf('no celular da dona: a pílula "Perguntar" com o balão, numa segunda linha presa abaixo da linha do dia (fora dela), alvo de 48 px', porta,
-    { texto: 'Perguntar', icone: 'perguntar', naLinhaDoDia: false, abaixo: true, presa: true, alvo: true });
+  conf('no celular da dona: a pílula "Perguntar" com o balão, presa no pé de Hoje, logo acima das abas, à direita, fora do alto, alvo de 48 px', porta,
+    { texto: 'Perguntar', icone: 'perguntar', noAlto: false, acimaDasAbas: true, aDireita: true, alvo: true });
   conf('a linha do dia é a da main: "Hoje, seg 16/11", o Vagos com a palavra e o "1 dia" à vista', await pag.evaluate(() => {
     const t = document.querySelector('#cel-dia-titulo'), v = document.querySelector('#cel-abrir-vagos'), p = document.querySelector('#cel-dia-anterior');
     return [t.textContent, t.children.length, v.textContent, !v.querySelector('svg'), getComputedStyle(p).fontSize !== '0px', p.textContent.trim()];
@@ -340,20 +340,24 @@ async function transbordo(pag, raizSel) {
       await pag.evaluate(l => { document.documentElement.style.fontSize = l; }, letra);
       await pausa(300);
       (await transbordo(pag, '#cel-semana')).forEach(f => falhas.push(largura + '/' + letra + ' alto: ' + f));
+      (await transbordo(pag, '#cel-assistente-pe')).forEach(f => falhas.push(largura + '/' + letra + ' pílula: ' + f));
       const m = await pag.evaluate(() => {
         const t = document.querySelector('#cel-dia-titulo'), lh = parseFloat(getComputedStyle(t).lineHeight) || 20;
-        const dia = document.querySelector('.cel-semana-topo').getBoundingClientRect(), nova = document.querySelector('#cel-assistente-linha').getBoundingClientRect();
-        const cortado = Array.from(document.querySelectorAll('#cel-semana *')).filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (e.scrollHeight > e.clientHeight + 1 && getComputedStyle(e).overflowY === 'hidden'); }).map(e => e.id || e.className);
-        return { linhas: Math.round(t.getBoundingClientRect().height / lh), dia: Math.round(dia.height), nova: Math.round(nova.height), cortado };
+        const alto = document.querySelector('#cel-semana').getBoundingClientRect(), dia = document.querySelector('.cel-semana-topo').getBoundingClientRect();
+        const b = document.querySelector('#cel-assistente').getBoundingClientRect(), abas = document.querySelector('#cel-abas').getBoundingClientRect();
+        const cortado = Array.from(document.querySelectorAll('#cel-semana *, #cel-assistente-pe *')).filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (e.scrollHeight > e.clientHeight + 1 && getComputedStyle(e).overflowY === 'hidden'); }).map(e => e.id || e.className);
+        return { linhas: Math.round(t.getBoundingClientRect().height / lh), alto: Math.round(alto.height), dia: Math.round(dia.height), so: !document.querySelector('#cel-semana #cel-assistente') && Array.from(document.querySelector('#cel-semana').children).every(c => c.classList.contains('cel-semana-topo') || /^cel-avisos/.test(c.id)),
+          pilula: b.bottom <= abas.top + 1 && b.height >= 48, cortado };
       });
-      linhas.push(largura + '/' + letra + ': título em ' + m.linhas + ' linha(s); linha do dia ' + m.dia + ' px; linha do "Perguntar" ' + m.nova + ' px');
-      if (m.nova > 56) falhas.push(largura + '/' + letra + ' a linha do "Perguntar" tem ' + m.nova + ' px');
+      linhas.push(largura + '/' + letra + ': título em ' + m.linhas + ' linha(s); o alto ' + m.alto + ' px, só a linha do dia (' + m.dia + ' px): ' + m.so + '; a pílula acima das abas: ' + m.pilula);
+      if (!m.so) falhas.push(largura + '/' + letra + ' o alto tem mais que a linha do dia (' + m.alto + ' contra ' + m.dia + ' px)');
+      if (!m.pilula) falhas.push(largura + '/' + letra + ' a pílula não está inteira acima das abas');
       if (m.cortado.length) falhas.push(largura + '/' + letra + ' cortado: ' + m.cortado.join(', '));
     }
   }
   linhas.forEach(l => console.log('   ' + l));
   await pag.evaluate(() => { document.documentElement.style.fontSize = ''; });
-  conf('a 360, 390 e 412 px, letra normal e 130%: nada passa da borda, nada cortado, alvos de 48 px, a linha nova até 56 px e o rodapé contido (' + (falhas.slice(0, 6).join(' | ') || 'nenhuma falha') + ')', falhas.length, 0);
+  conf('a 360, 390 e 412 px, letra normal e 130%: nada passa da borda, nada cortado, alvos de 48 px, o alto só com a linha do dia, a pílula acima das abas e o rodapé contido (' + (falhas.slice(0, 6).join(' | ') || 'nenhuma falha') + ')', falhas.length, 0);
   /* Controle: um elemento largo na janela é acusado pela varredura. */
   await pag.setViewport({ width: 360, height: 800, hasTouch: true });
   await clicar(pag, '#cel-assistente');

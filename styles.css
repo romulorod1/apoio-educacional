@@ -4275,15 +4275,16 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 @media (max-width: 720px) {
   .pilula-perguntar { position: absolute; top: 8px; right: 64px; }
 }
-/* A porta do celular: a mesma pílula, numa segunda linha presa logo abaixo
-   da linha do dia (que fica como era), à direita, perto do polegar. */
-.cel-assistente-linha { display: flex; justify-content: flex-end; padding: 0 0 6px; }
-.cel-assistente-linha .cel-perguntar {
+/* A porta do celular: a mesma pílula, presa no pé de Hoje, acima das abas,
+   à direita (perto do polegar). O alto (a linha do dia) fica como era. */
+.cel-assistente-pe { position: sticky; bottom: 12px; display: flex; justify-content: flex-end; margin-top: 8px; pointer-events: none; z-index: 3; }
+.cel-assistente-pe .cel-perguntar {
+  pointer-events: auto; box-shadow: var(--sombra-forte); background: var(--branco); border: 1px solid var(--fio);
   display: inline-flex; align-items: center; gap: 6px;
   min-height: var(--alvo-celular); padding: 0 16px 0 12px;
   border-radius: 999px; color: var(--navy); font-weight: 600;
 }
-.cel-assistente-linha .cel-perguntar .ico { width: 20px; height: 20px; }
+.cel-assistente-pe .cel-perguntar .ico { width: 20px; height: 20px; }
 
 .ass-modal { max-width: 640px; height: 88vh; }
 body.modo-celular #modal-assistente .ass-modal { height: 100%; max-height: 100%; }
