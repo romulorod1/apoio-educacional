@@ -87,6 +87,26 @@ async function abrir(pag, id) {
   return esperar('aula aberta', () => pag.evaluate(() => document.querySelector('#modal-aula').classList.contains('aberto')), Boolean, 5000);
 }
 const aberta = pag => pag.evaluate(() => document.querySelector('#modal-aula').classList.contains('aberto'));
+/* O aviso entra deslizando: tocar no botão antes de ele assentar na tela dá
+ * "Node is either not clickable". Espera o aviso aberto e o botão parado dentro
+ * da tela (duas leituras iguais), e só então toca, como o dedo dela. */
+async function tocarAcaoDoAviso(pag) {
+  let antes = '';
+  const pronto = await esperar('o botão do aviso parado na tela', async () => {
+    const r = await pag.evaluate(() => {
+      const caixa = document.querySelector('#aviso'), b = document.querySelector('#aviso-acao');
+      if (!caixa || !b || !caixa.classList.contains('aberto') || getComputedStyle(b).display === 'none') return '';
+      const q = b.getBoundingClientRect();
+      if (!q.width || !q.height || q.top < 0 || q.bottom > innerHeight) return '';
+      return [q.left, q.top, q.width, q.height].map(Math.round).join(',');
+    });
+    const parado = r && r === antes;
+    antes = r;
+    return parado;
+  }, Boolean, 5000);
+  if (!pronto.ok) throw new Error('arranjo: o botão do aviso não assentou na tela');
+  await pag.click('#aviso-acao');
+}
 const rodape = pag => pag.$eval('#estado-salvamento-aula', e => e.textContent);
 async function escolher(pag, sel, valor) {
   await pag.$eval(sel, (e, v) => { e.value = v; e.dispatchEvent(new Event('change', { bubbles: true })); }, valor);
@@ -161,7 +181,7 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
     const aviso = await pag.evaluate(() => ({ texto: document.querySelector('#aviso-texto').textContent,
       acao: (document.querySelector('#aviso-acao') || {}).textContent || '' }));
     conf('o aviso diz o que mudou e oferece Desfazer (' + aviso.texto + ')', /^Aula atualizada: cancelada/.test(aviso.texto) && /Desfazer/.test(aviso.acao), true);
-    await pag.click('#aviso-acao');
+    await tocarAcaoDoAviso(pag);
     const desfeito = await esperar('o Desfazer volta', () => lerAula(pag, AVULSA), a => a && a.status === antes.status, 5000);
     const CAMPOS = ['data', 'hora', 'duracaoMin', 'status', 'cobravel', 'notaTexto', 'notaPrivada', 'destacada', 'serieId'];
     const diferentes = desfeito.ok ? CAMPOS.filter(k => JSON.stringify(desfeito.valor[k]) !== JSON.stringify(antes[k])) : ['(não voltou)'];
@@ -371,7 +391,7 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
     const av11 = await avisoAgora(pag);
     conf('o aviso é o da exclusão, com Desfazer, sem falar do que não gravou (' + av11.texto + ')',
       /^Aula excluída/.test(av11.texto) && !/não foi gravada/.test(av11.texto) && /Desfazer/.test(av11.acao), true);
-    await pag.click('#aviso-acao');
+    await tocarAcaoDoAviso(pag);
     await esperar('a exclusão desfeita', () => lerAula(pag, EXCLUI), a => !!a, 5000);
     conf('(arranjo) a aula a dividir abriu', (await abrir(pag, DIVIDE)).ok, true);
     await escolher(pag, '#campo-hora', '08:30');
@@ -420,7 +440,7 @@ const chegaDaNuvem = (pag, id, mudanca) => pag.evaluate(async (id, mudanca, n) =
     await pausa(300);
     const av13 = await avisoAgora(pag);
     conf('(arranjo) o aviso de Desfazer continua (' + av13.texto + ')', /^Aula atualizada/.test(av13.texto) && /Desfazer/.test(av13.acao), true);
-    await pag.click('#aviso-acao');
+    await tocarAcaoDoAviso(pag);
     await esperar('o Desfazer voltou a situação', () => lerAula(pag, AVULSA), a => a && a.status === antes13.status, 5000);
     const outra13 = await lerAula(pag, OUTRA);
     if (MODO === MODOS[5]) {
