@@ -4287,7 +4287,7 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 /* Uma coluna só, no tablet e no celular (D5 e a parte A do 12b). O teto é de
    leitura: a página do assunto decide onde o bloco fica. */
 .bte { min-width: 0; max-width: 46rem; margin: 0 0 24px; }
-.bte-titulo { margin: 6px 0 2px; font-size: var(--letra-20); }
+h3.subtitulo.bte-titulo { margin: 6px 0 0; padding-bottom: 0; border-bottom: 0; font-size: var(--letra-20); }
 .bte-vazio { margin: 10px 0 0; }
 .bte-secao { min-width: 0; }
 .bte-secao .bloco-exercicios { margin-top: 18px; }
