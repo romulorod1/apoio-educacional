@@ -878,6 +878,29 @@ roda "livros mapa --envenenado-faixa-refeita"     node "_teste/testa_livros_mapa
 # o v1 depois do v2 nao rebaixa. O veneno deixa de trocar o meta. Porta 8887.
 roda "livros reimportar mapa"                     node "_teste/testa_livros_reimportar_mapa.js"
 roda "livros reimportar mapa --envenenado-meta-nao-troca" node "_teste/testa_livros_reimportar_mapa.js" --envenenado-meta-nao-troca
+# Fase 1a da biblioteca na nuvem (12/11/2026): a posicao de leitura fica quando
+# o meta ou o arquivo do livro muda (o sumario novo nao a solta mais); a pagina
+# que nao existe no arquivo novo vai para a ultima, com o aviso "voce estava na
+# p. X" na tela do livro e no leitor; o EPUB do FME remontado em PDF vai pela
+# ancora page_N para a pagina N; o livro que sai do pacote nao leva a posicao; o
+# ajuste fica ate ela mudar de pagina; a correcao orfa aparece na tela do livro,
+# com a sugestao de um toque, Ligar (que pergunta antes de trocar) e Descartar, e
+# o Desfazer devolve so o que a acao mexeu; o Confirmar num numero que guarda
+# outra correcao nao a apaga. Cada veneno tira uma regra. Porta 8972.
+roda "livros nuvem posicao"                       node "_teste/testa_livros_nuvem_posicao.js"
+roda "livros nuvem posicao --envenenado-solta-no-meta" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-solta-no-meta
+roda "livros nuvem posicao --envenenado-solta-no-sumario" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-solta-no-sumario
+roda "livros nuvem posicao --envenenado-solta-na-troca" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-solta-na-troca
+roda "livros nuvem posicao --envenenado-nao-ajusta" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-nao-ajusta
+roda "livros nuvem posicao --envenenado-sem-traducao" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-sem-traducao
+roda "livros nuvem posicao --envenenado-sem-aviso" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-sem-aviso
+roda "livros nuvem posicao --envenenado-orfa-some-da-tela" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-orfa-some-da-tela
+roda "livros nuvem posicao --envenenado-grava-por-cima-na-tela" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-grava-por-cima-na-tela
+roda "livros nuvem posicao --envenenado-solta-no-removido" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-solta-no-removido
+roda "livros nuvem posicao --envenenado-volta-sem-regra" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-volta-sem-regra
+roda "livros nuvem posicao --envenenado-ajuste-sai-na-abertura" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-ajuste-sai-na-abertura
+roda "livros nuvem posicao --envenenado-troca-sem-perguntar" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-troca-sem-perguntar
+roda "livros nuvem posicao --envenenado-desfazer-tudo" node "_teste/testa_livros_nuvem_posicao.js" --envenenado-desfazer-tudo
 # C15.4 e C15.5: "Exportar em PDF" do capitulo 2 com o gabarito dele no mesmo
 # arquivo, anexado na aula: o texto do capitulo e DEPOIS o do gabarito do 2 (e
 # nao o do 1), o rodape de fonte, nenhum travessao; sem o gabarito; paginas
@@ -1337,6 +1360,22 @@ roda "livros (regras) --envenenado-teto-antigo" node "_teste/testa_livros_regras
 roda "livros (regras) --envenenado-sem-ano"     node "_teste/testa_livros_regras.js" --envenenado-sem-ano
 roda "livros (regras) --envenenado-correcao-ignorada" node "_teste/testa_livros_regras.js" --envenenado-correcao-ignorada
 roda "livros (regras) --envenenado-correcao-sem-titulo" node "_teste/testa_livros_regras.js" --envenenado-correcao-sem-titulo
+# Fase 1a da biblioteca na nuvem (12/11/2026): a correcao dela casa pela chave
+# estavel do capitulo, pelo numero e titulo, pelo titulo normalizado unico e
+# pela heranca de titulos (o caso da unidade 8 do ga7 e do ga9); o titulo unico
+# so sugere, nunca aplica calado; a mais recente vence no mesmo capitulo; o
+# Praticando 9 renumerado; a orfa listada e nunca no vizinho; a palavra nova nunca apaga a
+# de outro capitulo; o tablet na versao antiga lendo as correcoes novas. Um
+# veneno por regra. Sem Chrome.
+roda "livros mapa correcao"                       node "_teste/testa_livros_mapa_correcao.js"
+roda "livros mapa correcao --envenenado-so-numero-e-titulo" node "_teste/testa_livros_mapa_correcao.js" --envenenado-so-numero-e-titulo
+roda "livros mapa correcao --envenenado-chave-sem-titulo" node "_teste/testa_livros_mapa_correcao.js" --envenenado-chave-sem-titulo
+roda "livros mapa correcao --envenenado-chave-herda-sem-assunto" node "_teste/testa_livros_mapa_correcao.js" --envenenado-chave-herda-sem-assunto
+roda "livros mapa correcao --envenenado-titulo-aplica-calado" node "_teste/testa_livros_mapa_correcao.js" --envenenado-titulo-aplica-calado
+roda "livros mapa correcao --envenenado-mais-forte-vence" node "_teste/testa_livros_mapa_correcao.js" --envenenado-mais-forte-vence
+roda "livros mapa correcao --envenenado-heranca-pelo-inicio" node "_teste/testa_livros_mapa_correcao.js" --envenenado-heranca-pelo-inicio
+roda "livros mapa correcao --envenenado-orfa-some" node "_teste/testa_livros_mapa_correcao.js" --envenenado-orfa-some
+roda "livros mapa correcao --envenenado-grava-por-cima" node "_teste/testa_livros_mapa_correcao.js" --envenenado-grava-por-cima
 # C15.4 e C15.5: o que vai no PDF exportado (o capitulo sem as respostas do
 # livro, e o gabarito daquele capitulo depois, so quando pedido), as paginas
 # escolhidas e o rodape de fonte. O veneno deixa as respostas no capitulo.
