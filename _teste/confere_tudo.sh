@@ -303,6 +303,14 @@ roda "virada anual"          node _teste/testa_virada_anual.js
 # A regra do merge na main (_teste/merge_seguro.sh), que segura o processo
 # quando a protecao de branch do GitHub sumir com o repositorio privado.
 roda "merge seguro"          node _teste/testa_merge_seguro.js
+# O guarda de merge no CI (item 13c): o guarda_merge.js julga pelo merge_seguro
+# e publica o status portao-merge na cabeca que julgou. Com gh e git falsos:
+# pending no comeco, success ou failure com o motivo, cabeca que andou nao
+# publica, fork e pulado, e o merge nunca e chamado; quando a main anda, todos os
+# PRs abertos sao rejulgados (o caso dos dois PRs com a mesma versao); o guarda
+# nao julga a si mesmo (com controle sem a regra); e o workflow so roda codigo da
+# main, sem checkout da cabeca do PR, com so a escrita de status e sem strict.
+roda "guarda de merge"       node _teste/testa_guarda_merge.js
 # CACHE do sw.js e VERSAO do app.js do PR MAIORES que os da main atual, e nao so
 # diferentes da base do merge (12/11/2026: um ramo em v130 integrado com a main
 # em v134 passava verde). A regra e a do merge_seguro; a prova a exercita dos dois
@@ -846,6 +854,13 @@ roda "livros indice --envenenado-erro-vira-pronto"    node "_teste/testa_livros_
 roda "livros indice --envenenado-apagar-espera-indice" node "_teste/testa_livros_indice.js" --envenenado-apagar-espera-indice
 # A pagina que sempre falha (de forma passageira) sai sozinha; o livro fica na busca.
 roda "livros indice --envenenado-pagina-ruim-derruba-livro" node "_teste/testa_livros_indice.js" --envenenado-pagina-ruim-derruba-livro
+# 12/11/2026: a busca tambem acha os capitulos pelo titulo e pelos assuntos do
+# mapa, inclusive no livro escaneado (sem texto). O veneno desliga a busca por
+# capitulo, e o livro escaneado some do resultado.
+roda "livros indice --envenenado-busca-sem-capitulos" node "_teste/testa_livros_indice.js" --envenenado-busca-sem-capitulos
+# A revisao do #181: com o resultado todo em "Outras paginas do livro", elas
+# disputam o topo; o veneno deixa os "Melhores resultados" vazios.
+roda "livros indice --envenenado-topo-vazio" node "_teste/testa_livros_indice.js" --envenenado-topo-vazio
 # C15.2 e C15.3: "Este capitulo cobre" no leitor, Confirmar e Corrigir (so a
 # materia e o ano do livro), a correcao depois de recarregar e na copia de
 # seguranca (os livros nao), e o "Abrir no livro" da aula na pagina do PDF e no
@@ -934,6 +949,15 @@ roda "alerta da copia --envenenado-alerta-so-local" node "_teste/testa_alerta_co
 roda "alerta da copia --envenenado-idade-do-envio" node "_teste/testa_alerta_copia_nuvem.js" --envenenado-idade-do-envio
 roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_aluno_cascata.js"
 roda "relato e Voltar"                            node "_teste/testa_relato_voltar.js"
+roda "Voltar do aparelho nas telas"              node "_teste/testa_voltar_android.js"
+roda "Voltar do aparelho --envenenado-voltar-sem-tela" node "_teste/testa_voltar_android.js" --envenenado-voltar-sem-tela
+roda "Voltar do aparelho --envenenado-volta-dois-passos" node "_teste/testa_voltar_android.js" --envenenado-volta-dois-passos
+roda "Voltar do aparelho --envenenado-seta-nao-tira" node "_teste/testa_voltar_android.js" --envenenado-seta-nao-tira
+roda "Voltar do aparelho --envenenado-pergunta-da-lista-some" node "_teste/testa_voltar_android.js" --envenenado-pergunta-da-lista-some
+roda "Voltar do aparelho --envenenado-folha-fora-do-historico" node "_teste/testa_voltar_android.js" --envenenado-folha-fora-do-historico
+roda "Voltar do aparelho --envenenado-pergunta-do-formulario-some" node "_teste/testa_voltar_android.js" --envenenado-pergunta-do-formulario-some
+roda "Voltar do aparelho --envenenado-guarda-depois-da-janela" node "_teste/testa_voltar_android.js" --envenenado-guarda-depois-da-janela
+roda "Voltar do aparelho --envenenado-sem-ramo-bib" node "_teste/testa_voltar_android.js" --envenenado-sem-ramo-bib
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
 # N0: a copia na nuvem contra o Firebase Emulator Suite: as regras nos tres
 # casos (dona, observador, estranho), a ida e volta entre dois aparelhos pela

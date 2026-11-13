@@ -1,0 +1,76 @@
+# O guarda de merge no CI (item 13c da FILA, aprovado pelo dono em 12/11).
+#
+# Refaz as conferências do _teste/merge_seguro.js e publica o veredito como
+# STATUS de commit, contexto portao-merge, na cabeça que julgou. Quem faz o
+# trabalho é o _teste/guarda_merge.js.
+#
+# TODOS OS EVENTOS RODAM O CÓDIGO DA MAIN, e nenhum faz checkout do PR:
+#   pull_request_target  cabeça nova (o veredito antigo não vale para ela),
+#                        rótulo posto ou tirado (o risco muda a regra);
+#   issue_comment        a revisão chega como comentário;
+#   workflow_run         a bateria (workflow portao) de um PR terminou;
+#   push na main         a main andou: rejulga todos os PRs abertos, porque
+#                        VERSAO e CACHE maiores, ramo em dia (risco) e merge sem
+#                        conflito dependem da main atual.
+# É pull_request_target, e não pull_request, de propósito: no pull_request o
+# workflow e o código são os do PR, e um PR que mexesse neste arquivo ou no
+# merge_seguro se julgaria com a própria regra. O checkout aqui é sempre o
+# padrão do evento, que nos quatro é a main. Nunca ponha ref: com a cabeça do PR.
+#
+# NÃO É strict: true, e não exige o portao-navegador (decisão de 09/11: PR sem
+# risco entra atrás da main; e o juntador pulado conta como aprovado na
+# proteção). A exigência do portao-merge na proteção fica com a orquestradora,
+# depois de ver este guarda verde num PR real.
+name: guarda-merge
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  issue_comment:
+    types: [created, edited, deleted]
+  workflow_run:
+    workflows: [portao]
+    types: [completed]
+  push:
+    branches: [main]
+
+# Um veredito por PR por vez, com o MESMO grupo para os três eventos de PR: o
+# mais novo cancela o que estava julgando, e um failure julgado antes da
+# bateria terminar não sai depois do success. O push na main tem grupo próprio.
+concurrency:
+  group: guarda-merge-${{ github.event_name == 'push' && 'main' || github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_branch || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  statuses: write
+
+jobs:
+  guarda-merge:
+    # comentário só de PR; workflow_run só da bateria de PR; PR de fork fica de fora
+    if: >-
+      (github.event_name == 'push') ||
+      (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.1'
+      - name: Julga e publica o status portao-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_MERGE_SEGURO: ${{ github.repository }}
+          MODO: ${{ github.event_name == 'push' && 'todos' || 'um' }}
+          PR_NUM: ${{ github.event.pull_request.number || github.event.issue.number || github.event.workflow_run.pull_requests[0].number || '' }}
+          SHA_DO_EVENTO: ${{ github.event.workflow_run.head_sha || '' }}
+          URL_DA_RODADA: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node _teste/guarda_merge.js
