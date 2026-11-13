@@ -59,7 +59,7 @@ const VENENOS = {
     NL("          etiquetaDesafio(it)\n        ]),\n        null")]] },
   edicao: { arq: '/app.js', trocas: [[NL("etiquetaDesafio(it) : null\n        ]),\n        linhaDeCredito(it)"),
     NL("etiquetaDesafio(it) : null\n        ]),\n        null")]] },
-  link: { arq: '/app.js', trocas: [['if (/^https?:\\/\\/\\S+$/.test(link)) partes.push(link);', '']] },
+  link: { arq: '/app.js', trocas: [['    if (link) partes.push(link);', '']] },
   abrir: { arq: '/app.js', trocas: [['credito: peca.item ? creditoDaLicenca(peca.item) : null });', 'credito: null });']] },
   listafolha: { arq: '/app.js', trocas: [['imagemNumerada(p.enunciado, i + 1, 0, p.credito)', 'imagemNumerada(p.enunciado, i + 1, 0, null)']] },
   pdf: { arq: '/pdf.js', trocas: [[NLP("      creditos('lista');\n"), ''], [NLP("      creditos('gabarito');\n"), '']] }
@@ -246,7 +246,13 @@ const imagensDaFolha = (pag, aulaId) => pag.evaluate(a => Store.lerNota(a).then(
   const LISTA = Sintetico.LISTAS.filter(l => l.nivel === 2 && l.modulo.indexOf('equacoes') >= 0)[0];
   const ID_ABERTO = LISTA.degraus[1].item;   // o 2º da lista pronta ganha os campos
   const ABERTO = { atribuicao: 'Fonte aberta sintética, exercício de teste (Autoria Sintética, 2026).',
-    licenca: 'Licença aberta sintética, com atribuição (equivale a CC BY-NC-SA).', link: 'https://example.invalid/fonte-aberta' };
+    /* o endereço é UMA palavra muito mais larga que o recorte de 262 pt: no
+     * crédito queimado ela tem de quebrar por caractere, e não sair cortada na borda */
+    licenca: 'Licença aberta sintética, com atribuição (equivale a CC BY-NC-SA).', link: 'https://example.invalid/fonte-aberta/' + 'x'.repeat(600) };
+  /* O 2º item dos Cadernos fica SEM `link`, como num pacote importado antes do
+   * campo: o crédito usa o fonte.url do manifest do pacote. */
+  const SEM_LINK = cadernos.itens.filter(i => i.tema_app === 'MAT03-02')[1];
+  const URL_DO_MANIFEST = cadernos.manifest.fonte.url;
 
   await amb.subir();
   const pag = await amb.pagina();
@@ -269,6 +275,18 @@ const imagensDaFolha = (pag, aulaId) => pag.evaluate(a => Store.lerNota(a).then(
     };
   }), ID_ABERTO, ABERTO);
   conf('o item aberto da lista pronta ganhou os campos', escreveu, true);
+  const tirou = await pag.evaluate(id => new Promise(r => {
+    const q = indexedDB.open('apoio-educacional');
+    q.onsuccess = () => {
+      const t = q.result.transaction('biblioteca_itens', 'readwrite');
+      const s = t.objectStore('biblioteca_itens');
+      const g = s.get(id);
+      g.onsuccess = () => { if (g.result) { delete g.result.link; s.put(g.result); } };
+      t.oncomplete = () => { q.result.close(); r(!!g.result); };
+      t.onerror = () => r(false);
+    };
+  }), SEM_LINK.id);
+  conf('o 2º item dos Cadernos ficou sem link, e o manifest tem url', tirou && /^https:\/\//.test(URL_DO_MANIFEST), true);
   await pag.evaluate(async h => {
     const d = await Store.carregar();
     d.aulas.push({ id: 'aula-credito', alunoId: d.alunos[0].id, serieId: null, destacada: false, data: h, hora: '10:00',
@@ -279,6 +297,7 @@ const imagensDaFolha = (pag, aulaId) => pag.evaluate(a => Store.lerNota(a).then(
   const porId = {};
   cadernos.itens.forEach(i => { porId[i.id] = i; });
   porId[ID_ABERTO] = ABERTO;
+  porId[SEM_LINK.id] = Object.assign({}, SEM_LINK, { link: URL_DO_MANIFEST });
 
   // ================================================================
   secao('1. Cartões e tela cheia dos Cadernos (cartao, visor, link)');
@@ -292,6 +311,10 @@ const imagensDaFolha = (pag, aulaId) => pag.evaluate(a => Store.lerNota(a).then(
     deCadernos.map(c => c.creditos.length === 1 && semLink(c.creditos[0]) === semLink(creditoDe(porId[c.id]))).join(','), 'true,true');
   if (VENENO !== 'cartao') {
     deve('link', 'o crédito do cartão termina no endereço do item', deCadernos.map(c => c.creditos[0] === creditoDe(porId[c.id])).join(','), 'true,true');
+  }
+  if (VENENO !== 'cartao') {
+    deve('link', 'o item sem link mostra o endereço do manifest do pacote',
+      (deCadernos.filter(c => c.id === SEM_LINK.id)[0] || { creditos: [] }).creditos[0], creditoDe(porId[SEM_LINK.id]));
   }
   conf('o crédito não tem travessão nem " - "', deCadernos.some(c => /[–—]| - /.test(c.creditos.join(' '))), false);
   const visores = [];
@@ -372,6 +395,16 @@ const imagensDaFolha = (pag, aulaId) => pag.evaluate(a => Store.lerNota(a).then(
   const imgPor = colPor ? await analisarMidia(pag, colPor.ref, por1.medidas.enunciado.altura_pt / por1.medidas.enunciado.largura_pt) : null;
   console.log('   recorte do Portal colado: ' + JSON.stringify(imgPor));
   conf('o recorte do Portal (sem crédito) entra do tamanho de sempre', !!imgPor && Math.abs(imgPor.sobra) <= 2 && imgPor.cinza === 0, true);
+  /* O endereço longo do item aberto, num recorte de 262 pt: quebrado por
+   * caractere, ele toma várias linhas (cortado na borda, tomaria uma só). */
+  const ab = portal.itens.filter(i => i.id === ID_ABERTO)[0];
+  const colAb = await abrirComoFolha('9º ano', 'Equações do Segundo Grau', 'Soma e Produto', false, 0);
+  const imgAb = colAb ? await analisarMidia(pag, colAb.ref, ab.medidas.enunciado.altura_pt / ab.medidas.enunciado.largura_pt) : null;
+  const linhaPx = imgAb ? Math.ceil(6.5 * (imgAb.w / ab.medidas.enunciado.largura_pt) * 1.35) : 1;
+  console.log('   recorte do item aberto colado: ' + JSON.stringify(imgAb) + ', linha de ' + linhaPx + ' px');
+  // sem o endereço (veneno link) não há palavra larga para quebrar
+  if (VENENO !== 'link') deve('abrir', 'o endereço mais largo que o recorte quebra por caractere (mais de 8 linhas de crédito)',
+    !!imgAb && imgAb.sobra > 8 * linhaPx && imgAb.cinza > 200, true);
 
   // ================================================================
   secao('5. Material: lista e gabarito em PDF, e a lista como folha (pdf, listafolha)');

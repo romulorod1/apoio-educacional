@@ -22795,8 +22795,11 @@
     var partes = [];
     if (atrib) partes.push('Fonte: ' + ponto(atrib));
     if (lic) partes.push('Licença: ' + ponto(lic));
-    var link = limpo(it.link) || limpo(it.url);
-    if (/^https?:\/\/\S+$/.test(link)) partes.push(link);
+    /* O endereço: o do item e, na falta dele, o fonte.url do manifest do
+     * pacote (pacote importado antes do campo `link` também mostra). */
+    var ehLink = function (t) { return /^https?:\/\/\S+$/.test(t); };
+    var link = [limpo(it.link), limpo(it.url), limpo((fonteDoPacote(it) || {}).url)].filter(ehLink)[0];
+    if (link) partes.push(link);
     return partes.join(' ');
   }
 
@@ -22809,11 +22812,15 @@
   /* O nome da fonte para gente ler: os dois da OBMEP pelo nome de sempre; os
    * outros pelo fonte.nome do manifest do pacote do item; o id cru
    * ("cadernos-sme-sp") só quando o pacote não diz o nome. */
+  function fonteDoPacote(it) {
+    var p = ((bib && bib.pacotes) || []).filter(function (x) { return x.pacote === it.pacote; })[0];
+    return (p && p.manifest && p.manifest.fonte) || null;
+  }
+
   function nomeDaFonte(it) {
     if (it.fonte === 'obmep-portal') return 'Portal da OBMEP';
     if (it.fonte === 'obmep-banco') return 'Banco de Questões da OBMEP';
-    var p = ((bib && bib.pacotes) || []).filter(function (x) { return x.pacote === it.pacote; })[0];
-    var f = p && p.manifest && p.manifest.fonte;
+    var f = fonteDoPacote(it);
     return (f && typeof f.nome === 'string' && f.nome.trim()) || it.fonte || '';
   }
 
@@ -23297,8 +23304,13 @@
     var linhas = [], atual = '';
     String(credito).split(/\s+/).filter(Boolean).forEach(function (p) {
       var tenta = atual ? atual + ' ' + p : p;
-      if (!atual || cx0.measureText(tenta).width <= cv.width) atual = tenta;
-      else { linhas.push(atual); atual = p; }
+      if (cx0.measureText(tenta).width <= cv.width) { atual = tenta; return; }
+      if (atual) { linhas.push(atual); atual = ''; }
+      // palavra mais larga que o recorte (o endereço, num recorte estreito): quebra por caractere
+      Array.from(p).forEach(function (ch) {
+        if (atual && cx0.measureText(atual + ch).width > cv.width) { linhas.push(atual); atual = ''; }
+        atual += ch;
+      });
     });
     if (atual) linhas.push(atual);
     var nv = document.createElement('canvas');
