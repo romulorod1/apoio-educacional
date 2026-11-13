@@ -164,9 +164,10 @@
  * O v169 traz o Voltar do aparelho dentro do aplicativo.
  * O v171 traz a fase 1a da biblioteca na nuvem: a posição de leitura e a correção do
  * mapa sobrevivem à troca de meta e de arquivo do livro.
- * O v174 traz a aula que salva sozinha o relato, sem gravar por cima de versão mais nova.
+ * O v182 traz o Voltar sem entrada sobrando no histórico depois de recarregar com uma janela aberta.
+ * O v190 traz a aula que salva sozinha o relato, sem gravar por cima de versão mais nova.
  */
-var CACHE = 'apoio-educacional-v174';
+var CACHE = 'apoio-educacional-v190';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

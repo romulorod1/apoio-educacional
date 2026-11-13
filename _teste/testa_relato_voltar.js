@@ -84,7 +84,7 @@ const { conf, secao, esperar } = H;
   conf('segundo Voltar fecha só a ficha', nenhuma.ok, true);
   await abrirFichaEConfirmacao();
   await pag.click('#modal-excluir-aluno [data-fechar]');
-  await new Promise(r => setTimeout(r, 120));
+  await esperar('confirmação de exclusão fechada à mão', () => pag.$eval('#modal-excluir-aluno', e => !e.classList.contains('aberto')), Boolean, 5000);
   await pag.evaluate(() => history.back());
   const fichaManual = await esperar('Voltar após fechar filha manualmente', () => pag.$eval('#modal-aluno', e => !e.classList.contains('aberto')), Boolean, 5000);
   conf('fechamento manual não deixa histórico fantasma', fichaManual.ok, true);
@@ -159,6 +159,10 @@ const { conf, secao, esperar } = H;
   conf('Voltar fecha a nova janela sem sair da página', voltouAgenda.ok && (await pag.url()).startsWith(amb.ORIGEM), true);
 
   secao('exclusão de aluno limpa rascunho e histórico das janelas');
+  /* o Voltar anterior fecha a janela na hora, mas o histórico só assenta depois do popstate: ler o estado
+     antes disso guarda o valor da janela que acabou de fechar e a comparação final nunca fecha */
+  const assentou = await esperar('histórico sem janela aberta', () => pag.evaluate(() => !(history.state && history.state.apoioModal)), Boolean, 5000);
+  conf('Voltar deixa o histórico sem janela aberta', assentou.ok, true);
   const estadoAntes = await pag.evaluate(() => history.state && history.state.apoioModal);
   await pag.evaluate(() => localStorage.setItem('rascunho-relato-aula:a5_aula',
     JSON.stringify({ notaTexto: 'rascunho do aluno apagado', quando: Date.now() })));
@@ -168,11 +172,17 @@ const { conf, secao, esperar } = H;
     document.querySelector('#excluir-aluno').click();
   });
   await pag.click('#confirmar-excluir-aluno');
-  const saiuAluno = await esperar('aluno excluído', () => pag.evaluate(async () =>
+  const saiuAluno = await esperar('aluno excluído e histórico no estado anterior', () => pag.evaluate(async antes =>
     (await Store.carregar()).alunos.length === 0 &&
     !document.querySelector('#modal-excluir-aluno').classList.contains('aberto') &&
-    !document.querySelector('#modal-aluno').classList.contains('aberto')), Boolean, 8000);
-  await new Promise(r => setTimeout(r, 120));
+    !document.querySelector('#modal-aluno').classList.contains('aberto') &&
+    (history.state && history.state.apoioModal) === antes, estadoAntes), Boolean, 8000);
+  if (!saiuAluno.ok) console.log('   DIAG ' + JSON.stringify(await pag.evaluate(async antes => ({
+    alunos: (await Store.carregar()).alunos.length,
+    excluirAberto: document.querySelector('#modal-excluir-aluno').classList.contains('aberto'),
+    alunoAberto: document.querySelector('#modal-aluno').classList.contains('aberto'),
+    estado: history.state && history.state.apoioModal, antes
+  }), estadoAntes)));
   conf('excluir aluno remove rascunho e volta ao estado anterior', saiuAluno.ok && await pag.evaluate(antes =>
     !localStorage.getItem('rascunho-relato-aula:a5_aula') &&
     (history.state && history.state.apoioModal) === antes, estadoAntes), true);

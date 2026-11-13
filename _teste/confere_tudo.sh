@@ -298,6 +298,18 @@ roda "biblioteca (zip)" node _teste/testa_biblioteca_zip.js
 roda "fechamento em ordem"   node _teste/testa_fechamento_ordem_alfabetica.js
 roda "rotulos da aula"       node _teste/testa_rotulos_aula.js
 roda "vagos e repeticoes (F3)" node _teste/testa_vagos_repeticao.js
+# Remarcar aula de repeticao para um dia da PROPRIA serie, em mes nao lancado,
+# nao apaga a fixa daquele dia (12/11/2026: dezembro dava 1080 em vez de 1200).
+# So a ocorrencia original do dia ocupa a vaga; a aula vinda de outro dia, ao
+# sair de novo ou ser apagada, nao exclui o dia. E o lado da SOBRA: dado antigo
+# (id aleatorio) com o mes relancado (editarSerie, materializadoAte nulo ou
+# recuado) nao dobra. Tres venenos, um de cada lado: a regra antiga erra a
+# falta; "nunca e original" erra a sobra (o dia apagado volta); "lancado so
+# pelo campo" da gemea a aula antiga que so mudou de horario.
+roda "remarcar na repeticao" node _teste/testa_remarcar_repeticao.js
+roda "remarcar na repeticao --envenenado-regra-antiga" node _teste/testa_remarcar_repeticao.js --envenenado-regra-antiga
+roda "remarcar na repeticao --envenenado-nunca-original" node _teste/testa_remarcar_repeticao.js --envenenado-nunca-original
+roda "remarcar na repeticao --envenenado-lancado-so-pelo-campo" node _teste/testa_remarcar_repeticao.js --envenenado-lancado-so-pelo-campo
 roda "sugestoes matematica"  node _teste/testa_sugestoes_matematica.js
 roda "virada anual"          node _teste/testa_virada_anual.js
 # A regra do merge na main (_teste/merge_seguro.sh), que segura o processo
@@ -953,6 +965,10 @@ roda "alerta da copia --envenenado-alerta-so-local" node "_teste/testa_alerta_co
 roda "alerta da copia --envenenado-idade-do-envio" node "_teste/testa_alerta_copia_nuvem.js" --envenenado-idade-do-envio
 roda "exclusao de aluno em cascata"                node "_teste/testa_exclusao_aluno_cascata.js"
 roda "relato e Voltar"                            node "_teste/testa_relato_voltar.js"
+# a entrada de janela que veio da recarga vira a da tela: o veneno a deixa
+# como estava e o historico nunca mais fica sem janela
+roda "Voltar sem entrada velha"                  node "_teste/testa_voltar_entrada_velha.js"
+roda "Voltar sem entrada velha --envenenado-entrada-velha" node "_teste/testa_voltar_entrada_velha.js" --envenenado-entrada-velha
 # F7 (#159): na aula que ja existe, o relato salva sozinho e data, horario, duracao,
 # situacao e cobranca gravam so ao Fechar ou Concluir (com Desfazer); nunca por cima de
 # versao mais nova, mesmo campo ou outro; Descartar volta ao que havia; a repeticao pede
