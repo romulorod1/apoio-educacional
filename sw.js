@@ -167,7 +167,7 @@
  * recusa) e não acrescente linha neste comentário: era ele, junto com a VERSAO
  * e as NOVIDADES, que fazia todo PR do app conflitar com o anterior.
  */
-var CACHE = 'apoio-educacional-v154';
+var CACHE = 'apoio-educacional-v165';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [

@@ -9,7 +9,7 @@
    * FIXA no valor de desenvolvimento, que é o último escrito à mão e o piso da
    * publicação. Não mude no PR: o merge_seguro recusa. O que ela ganha vai num
    * arquivo novidades/<nome>.txt, e não no NOVIDADES abaixo. */
-  var VERSAO = '1.42.74';
+  var VERSAO = '1.42.85';
   /* Mínimo conservador adotado para compatibilidade da mensagem do mês.
    * Versões posteriores do app podem trazer apenas ajustes de interface. */
   var VERSAO_MINIMA_PROTOCOLO_MENSAGEM = '1.42.40';
