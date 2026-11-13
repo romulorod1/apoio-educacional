@@ -515,8 +515,44 @@
 
   /* Alvos de uma edição em massa, respeitando o escopo escolhido.
    * escopo: 'esta' | 'seguintes' | 'todas' */
-  function alvosDoEscopo(db, aula, escopo) {
-    if (escopo === 'esta' || !aula.serieId) return [aula];
+  /* AS AULAS QUE NENHUMA AÇÃO EM LOTE DA REPETIÇÃO ALCANÇA, por regra
+   * declarada (F7; decisões do dono e da orquestradora, 13/11/2026). Vale para
+   * todo caminho de lote: o "todas" e o "desta em diante" da edição e do
+   * excluir (escopoDaRepeticao), o Encerrar da ficha do aluno (encerrarSerie) e
+   * a mudança de padrão (editarSerie).
+   * - 'registrada': a aula com QUALQUER conteúdo registrado (temConteudo:
+   *   relato, nota só dela, folha, anexo, assunto ou área). Dado registrado
+   *   não some nem muda num lote. Antes isso vinha de carona no "destacada",
+   *   que todo Salvar marcava; desde o F7 o relato e o Concluir gravam direto,
+   *   sem destacar.
+   * - 'paga': a aula PASSADA de um mês COM PAGAMENTO REGISTRADO, mesmo vazia:
+   *   mudar ou apagar uma aula dessas muda o que a família pagou, ou o que falta
+   *   receber de um mês que ela já está cobrando. Qualquer pagamento do mês
+   *   (pagamentoDe), inteiro ou a menos: na dúvida com dinheiro, protege.
+   *   "Passada" é a regra do Fechamento (a aula de hoje conta como dada).
+   * Devolve null quando a aula pode entrar no lote. `cache` guarda, por aluno e
+   * mês, se o mês tem pagamento. Uma aula registrada e paga conta como
+   * registrada (um motivo só por aula). */
+  function motivoParaPoupar(db, a, hoje, cache) {
+    if (temConteudo(a)) return 'registrada';
+    if (!a.data || a.data > hoje) return null;
+    var chave = a.alunoId + '|' + mesDe(a.data);
+    if (!(chave in cache)) {
+      cache[chave] = !!pagamentoDe(db, a.alunoId, mesDe(a.data));
+    }
+    return cache[chave] ? 'paga' : null;
+  }
+
+  /* As aulas da repetição que o "todas", o "desta em diante", o "excluir
+   * todas" e o "excluir desta em diante" alcançam, e as que ficam de fora por
+   * cada motivo (motivoParaPoupar). A aula destacada continua fora, como
+   * sempre. A própria aula editada sempre entra. `hojeRef` existe para a prova
+   * fixar o dia.
+   * Devolve { alvos, registradas, pagas }: as duas listas são as irmãs do mesmo
+   * trecho que ficaram de fora, para a tela dizer quantas e por quê. */
+  function escopoDaRepeticao(db, aula, escopo, hojeRef) {
+    if (escopo === 'esta' || !aula.serieId) return { alvos: [aula], registradas: [], pagas: [] };
+    var hoje = hojeRef || hojeIso();
     var s = (db.series || []).filter(function (x) { return x.id === aula.serieId; })[0];
     var raizId = s ? (s.serieOrigemId || s.id) : aula.serieId;
     var seriesIds = {};
@@ -524,18 +560,53 @@
       if (x.id === raizId || x.serieOrigemId === raizId) seriesIds[x.id] = true;
     });
     seriesIds[aula.serieId] = true;
-    var irmas = (db.aulas || []).filter(function (a) {
-      return seriesIds[a.serieId] && (a.id === aula.id || !a.destacada);
+    var cache = {};
+    var saida = { alvos: [], registradas: [], pagas: [] };
+    (db.aulas || []).forEach(function (a) {
+      if (!seriesIds[a.serieId]) return;
+      if (escopo === 'seguintes' && a.data < aula.data && a.id !== aula.id) return;
+      if (a.id === aula.id) { saida.alvos.push(a); return; }
+      if (a.destacada) return;
+      var motivo = motivoParaPoupar(db, a, hoje, cache);
+      if (motivo === 'registrada') { saida.registradas.push(a); return; }
+      if (motivo === 'paga') { saida.pagas.push(a); return; }
+      saida.alvos.push(a);
     });
-    if (escopo === 'seguintes') {
-      return irmas.filter(function (a) { return a.data >= aula.data; });
-    }
-    return irmas;
+    return saida;
+  }
+
+  function alvosDoEscopo(db, aula, escopo, hojeRef) {
+    return escopoDaRepeticao(db, aula, escopo, hojeRef).alvos;
+  }
+
+  /* O "Encerrar" da repetição (ficha do aluno): a série para na véspera de
+   * `quando`, e as aulas dela dali em diante saem, MENOS as que a regra poupa
+   * (motivoParaPoupar) e as destacadas, como antes. As poupadas ficam com o
+   * serieId da série (que pode ter sido apagada, se o fim ficou antes do
+   * início) e depois do fim dela. Devolve { removidas, registradas, pagas }. */
+  function encerrarSerie(db, serieId, quando, hojeRef) {
+    var se = (db.series || []).filter(function (x) { return x.id === serieId; })[0];
+    var saida = { removidas: 0, registradas: 0, pagas: 0 };
+    if (!se || !quando) return saida;
+    var hoje = hojeRef || hojeIso();
+    var cache = {};
+    db.aulas = (db.aulas || []).filter(function (a) {
+      if (a.serieId !== se.id || a.data < quando || a.destacada) return true;
+      var motivo = motivoParaPoupar(db, a, hoje, cache);
+      if (motivo === 'registrada') { saida.registradas++; return true; }
+      if (motivo === 'paga') { saida.pagas++; return true; }
+      saida.removidas++;
+      return false;
+    });
+    var dt = dataLocal(quando); dt.setDate(dt.getDate() - 1);
+    se.fim = isoDe(dt);
+    if (se.fim < se.inicio) db.series = db.series.filter(function (x) { return x.id !== se.id; });
+    return saida;
   }
 
   /* Aplica mudanças de horário, duração, situação ou cobrança.
    * Devolve quantas aulas foram alteradas. */
-  function aplicarEdicaoAula(db, aulaId, mudancas, escopo) {
+  function aplicarEdicaoAula(db, aulaId, mudancas, escopo, hojeRef) {
     var aula = (db.aulas || []).filter(function (a) { return a.id === aulaId; })[0];
     if (!aula) return 0;
     /* Decidido ANTES de tudo, com a aula como ela estava: o laço abaixo marca
@@ -551,7 +622,7 @@
      * o dia em que ela está é de passagem, e gravá-lo como origem mentiria. */
     var origemConhecida = vaiMudarDeData && aula.serieId && !aula.dataOriginal
       ? (dataDeOrigem(aula) || (!aula.destacada ? aula.data : null)) : null;
-    var alvos = alvosDoEscopo(db, aula, escopo);
+    var alvos = alvosDoEscopo(db, aula, escopo, hojeRef);
     var campos = ['hora', 'duracaoMin', 'status', 'cobravel'];
     alvos.forEach(function (a) {
       campos.forEach(function (c) {
@@ -612,7 +683,11 @@
             }
           });
           var fimAntigo = temSemFim ? null : maiorFim;
-          if (aula.data <= s.inicio) {
+          if (fimAntigo && fimAntigo < aula.data) {
+            /* A aula está depois do fim da repetição (uma poupada pelo
+             * Encerrar): não há padrão a mudar dali em diante, e uma série nova
+             * nasceria com o fim antes do início. Só as aulas mudam. */
+          } else if (aula.data <= s.inicio) {
             if (mudancas.hora !== undefined) s.hora = mudancas.hora;
             if (mudancas.duracaoMin !== undefined) s.duracaoMin = mudancas.duracaoMin;
             if (mudancas.status !== undefined) s.status = mudancas.status;
@@ -690,10 +765,10 @@
     return alvos.length;
   }
 
-  function excluirAulas(db, aulaId, escopo) {
+  function excluirAulas(db, aulaId, escopo, hojeRef) {
     var aula = (db.aulas || []).filter(function (a) { return a.id === aulaId; })[0];
     if (!aula) return 0;
-    var alvos = alvosDoEscopo(db, aula, escopo);
+    var alvos = alvosDoEscopo(db, aula, escopo, hojeRef);
     var ids = {};
     alvos.forEach(function (a) { ids[a.id] = true; });
 
@@ -753,6 +828,14 @@
       (aula.areas && aula.areas.length)));
   }
 
+  /* ATENÇÃO, PARA QUEM FOR LIGAR ISTO NO APP (F7, rodada 6): hoje o editarSerie
+   * não tem chamador no app, só nas provas. Ele poupa a aula registrada e a
+   * passada de mês com pagamento (motivoParaPoupar), mas CRIA as datas novas do
+   * padrão também no passado. Trocar quinta por terça com corte em 01/10 e
+   * outubro pago deixa as quintas pagas e cria as terças: outubro vai de
+   * R$ 600 para R$ 1.080 e o selo vira "parcial". Antes de ligar, decida o que
+   * acontece com o mês já pago (não criar data nova em mês com pagamento, por
+   * exemplo) e prove. */
   function editarSerie(db, serieId, novoPadrao, aPartirDe) {
     var s = (db.series || []).filter(function (x) { return x.id === serieId; })[0];
     if (!s) return 0;
@@ -776,10 +859,18 @@
     }
 
     var preservadas = 0;
+    /* A regra do lote (motivoParaPoupar): a aula registrada ou passada de mês
+     * com pagamento fica como está, nem sai nem muda de horário. */
+    var cachePoupa = {}, poupadas = {};
+    var hojePoupa = hojeIso();
+    (db.aulas || []).forEach(function (a) {
+      if (a.serieId === serieId && a.data >= corte && !a.destacada && motivoParaPoupar(db, a, hojePoupa, cachePoupa)) poupadas[a.id] = true;
+    });
     db.aulas = (db.aulas || []).filter(function (a) {
       if (a.serieId !== serieId || a.data < corte || a.destacada) return true;
       if (datasNovas[a.data]) return true;          // a data continua no padrão
       if (temConteudo(a)) { a.destacada = true; preservadas++; return true; }
+      if (poupadas[a.id]) return true;               // passada de mês com pagamento: fica
       return false;                                  // vazia e fora do padrão: sai
     });
     db._preservadasNaEdicao = preservadas;
@@ -809,7 +900,7 @@
     // As aulas que sobreviveram ao corte passam a seguir o horário e a duração
     // novos, sem trocar de registro: assim a folha de aula continua com a aula.
     (db.aulas || []).forEach(function (a) {
-      if (a.serieId !== serieId || a.data < corte || a.destacada) return;
+      if (a.serieId !== serieId || a.data < corte || a.destacada || poupadas[a.id]) return;
       if (novoPadrao.hora !== undefined) a.hora = s.hora;
       if (novoPadrao.duracaoMin !== undefined) a.duracaoMin = s.duracaoMin;
     });
@@ -5807,7 +5898,7 @@
     feriadoEm: feriadoEm, feriadosDoMes: feriadosDoMes, deBR: deBR,
     criarSerie: criarSerie, editarSerie: editarSerie, serieDe: serieDe, descreveSerie: descreveSerie,
     datasDaSerieNoMes: datasDaSerieNoMes, materializarSerieNoMes: materializarSerieNoMes,
-    garantirSeriesAte: garantirSeriesAte, aulasDaSerie: aulasDaSerie, alvosDoEscopo: alvosDoEscopo,
+    garantirSeriesAte: garantirSeriesAte, aulasDaSerie: aulasDaSerie, alvosDoEscopo: alvosDoEscopo, escopoDaRepeticao: escopoDaRepeticao, encerrarSerie: encerrarSerie,
     aplicarEdicaoAula: aplicarEdicaoAula, excluirAulas: excluirAulas, achaAula: achaAula,
     repetirParaTras: repetirParaTras, preverRetroativo: preverRetroativo, temConteudo: temConteudo,
     calcularFechamento: calcularFechamento, calcularMesInteiro: calcularMesInteiro,

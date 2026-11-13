@@ -10,8 +10,9 @@
 #                      privacidade). O que ele pula sai na saida, uma linha
 #                      "pulado" por prova. E o check que a protecao da main exige.
 #     portao-tocadas   so as provas de NAVEGADOR que o mapa liga aos arquivos
-#                      tocados pelo PR (_teste/mapa_provas.tsv, decidido por
-#                      _teste/provas_tocadas.js). Prova de navegador tocada roda
+#                      tocados pelo PR (_teste/mapa_provas.tsv somado a
+#                      _teste/mapa_provas.d/, um arquivo por prova nova, decidido
+#                      por _teste/provas_tocadas.js). Prova de navegador tocada roda
 #                      ela mesma; arquivo que nao esta no mapa leva a bateria
 #                      inteira (na duvida, mais, nunca menos). Da prova que
 #                      entrou pelo mapa (e nao foi tocada) rodam so os nomes sem

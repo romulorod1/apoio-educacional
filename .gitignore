@@ -34,3 +34,19 @@ __pycache__/
 _falhas_do_portao/
 # copia de controle da prova das fatias; o finally apaga, mas morte dura deixa
 _teste/_confere_tudo_controle_tmp.sh
+
+# A fonte privada de anos iniciais (os cadernos estaduais de matemática): a
+# licença só permite o uso pessoal de professor e aluno, e os PDFs, o texto
+# extraído e os pacotes moram numa pasta privada do Drive. A sigla vai em
+# classes de caractere ([Ee]...) por dois motivos: casa maiúscula e minúscula
+# também no Linux, e o próprio .gitignore passa limpo pela trava
+# _teste/testa_sem_fonte_privada.js, que acusa a sigla escrita por extenso.
+# Padrão largo como "*sigla*" é proibido: ignoraria arquivos que não são da
+# fonte (um email.pdf), e a prova confere com git check-ignore que ela mesma e
+# o email.pdf não são ignorados. A sigla só conta com separador dos dois lados
+# (ou no começo do nome). PDF, zip e companhia já reprovam pelo tipo na trava;
+# estas linhas só evitam o "git add" por engano.
+privado/
+[Ee][Mm][Aa][Ii][_.-]*.pdf
+*[_-][Ee][Mm][Aa][Ii][_.-]*.pdf
+[Ee][Mm][Aa][Ii][_-]*/

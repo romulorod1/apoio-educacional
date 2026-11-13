@@ -1,0 +1,1 @@
+# Fase 1b da biblioteca na nuvem: o publicador do catálogo e as regras dele. Para ela não há novidade até a fase 1c.

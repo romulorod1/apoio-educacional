@@ -1,0 +1,1 @@
+Os livros em EPUB sem sumário, como os Fundamentos de Matemática Elementar, passam a mostrar os capítulos, e o Abrir no livro leva ao começo do capítulo certo.
