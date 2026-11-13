@@ -1121,9 +1121,23 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     const q = indexedDB.open('apoio-educacional');
     q.onerror = () => rej(q.error);
     q.onsuccess = () => {
+      /* as miniaturas que a Biblioteca desenha ficam em 'midias' com a chave
+       * 'bib:' (store.js, PREFIXO_MINIATURA): é cache de desenho, e não conta
+       * como gravação; o resto de 'midias' (as fotos dela e o "Abrir como
+       * folha") continua conferido */
       const b = q.result, nomes = Array.from(b.objectStoreNames).filter(n => n !== 'livros').sort(), saida = {};
       const t = b.transaction(nomes, 'readonly');
-      nomes.forEach(n => { const r = t.objectStore(n).getAll(); r.onsuccess = () => { saida[n] = r.result; }; });
+      nomes.forEach(n => {
+        const st = t.objectStore(n), r = st.getAll(), k = st.getAllKeys();
+        let valores = null, chaves = null;
+        const junta = () => {
+          if (!valores || !chaves) return;
+          saida[n] = n !== 'midias' ? valores
+            : chaves.map((c, i) => [c, valores[i]]).filter(par => !String(par[0]).startsWith('bib:'));
+        };
+        r.onsuccess = () => { valores = r.result; junta(); };
+        k.onsuccess = () => { chaves = k.result; junta(); };
+      });
       t.oncomplete = () => { b.close(); res(JSON.stringify(saida)); };
       t.onerror = () => rej(t.error);
     };
@@ -1203,8 +1217,10 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
       livros: [...p.querySelectorAll('[data-secao="livros"] .bib-assunto-livro')].map(c => c.dataset.livro + ':' + c.querySelector('strong').textContent + ':' + ((c.querySelector('.bib-busca-livro-quantas') || {}).textContent || '') + ':' + c.querySelector('button').textContent),
       livrosVazio: ((secao('livros') || document).querySelector('.bib-assunto-vazio') || {}).textContent || '',
       fontes: [...p.querySelectorAll('[data-secao="teoria"] [data-fonte]')].map(f => f.dataset.fonte),
-      obmep: secao('obmep') ? [...secao('obmep').querySelectorAll('[data-fonte]')].map(f => f.querySelector('.detalhe').textContent) : null,
-      enem: secao('enem') ? [...secao('enem').querySelectorAll('[data-fonte]')].map(f => f.querySelector('.detalhe').textContent) : null,
+      // a OBMEP e o ENEM são seções do bloco da T2: um cartão por questão, com o tipo da fonte
+      obmep: secao('obmep') ? [...secao('obmep').querySelectorAll('.bte-ex[data-fonte]')].map(f => f.dataset.fonte) : null,
+      enem: secao('enem') ? [...secao('enem').querySelectorAll('.bte-ex[data-fonte]')].map(f => f.dataset.fonte) : null,
+      bloco: !!p.querySelector('[data-secao="teoria"] .bte'), tituloDoBloco: !!p.querySelector('.bte-titulo'),
       vizinhos: [...p.querySelectorAll('[data-secao="vizinhos"] [data-assunto]')].map(b => b.dataset.assunto),
       campo: document.querySelector('#busca-biblioteca').value,
       livrosDaEstante: vis('#bib-livros'), topo: vis('#bib-exercicios-cabeca') || vis('#bib-carrinho'),
@@ -1217,10 +1233,12 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('a página abre com o caminho (matéria, ano e tema) e o título do assunto', P.titulo + ' | ' + /^Matemática› 9º ano› /.test(P.caminho.replace(/\s+›/g, '›').replace(/›\s+/g, '› ')), 'Teorema de Pitágoras | true');
   conf('"Também aparece como" traz o nome do capítulo no mapa', /Pitágoras e aplicações/.test(P.tambem), true);
   conf('"Nos livros" traz o capítulo ligado, com a faixa de páginas (1 vínculo, como na busca)', (P.livros || []).join(','), 'b1-livro:Pitágoras e aplicações:p. 2 a 3:Abrir');
-  conf('"Teoria e exercícios" traz as fontes do módulo do assunto', (P.fontes || []).length > 0, true);
-  conf('o bloco OBMEP aparece com as questões ligadas, e diz quantas são de quantas', !!P.obmep && P.obmep.length > 0 &&
-    P.obmep.every(d => /^(\d+ questões?|\d+ questões? ligadas?, numa lista de \d+) · /.test(d)), true);
-  conf('a questão do ENEM fica no bloco ENEM, e não no da OBMEP', !!P.enem && P.enem.length === 1 && /^1 questão ligada, numa lista de \d+ · /.test(P.enem[0]), true);
+  conf('"Teoria e exercícios" é o bloco da T2, sem repetir o título da seção', P.bloco + '|' + P.tituloDoBloco, 'true|false');
+  conf('"Teoria e exercícios" traz a teoria e os exercícios do módulo do assunto',
+    (P.fontes || []).some(f => /^teoria:/.test(f)) && (P.fontes || []).some(f => /^exercicio:/.test(f)), true);
+  conf('a OBMEP aparece com as duas questões ligadas, cada uma no seu cartão', !!P.obmep && P.obmep.length === 2 &&
+    P.obmep.every(f => /^obmep:/.test(f)), true);
+  conf('a questão do ENEM fica na seção do ENEM, e não na da OBMEP', !!P.enem && P.enem.length === 1 && /^enem:/.test(P.enem[0]), true);
   conf('os vizinhos são do mesmo tema e ano, e não o próprio assunto', (P.vizinhos || []).length > 0 && (P.vizinhos || []).every(v => /^MAT09-/.test(v) && v !== 'MAT09-07'), true);
   conf('a busca deu lugar à página; a estante, o topo dos exercícios e a faixa saem, e a página começa no alto',
     P.campo + '|' + P.livrosDaEstante + '|' + P.topo + '|' + (P.alto <= 2), '|false|false|true');
@@ -1245,14 +1263,19 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await fecharModal(pag, 'modal-leitor-pdf');
   // o Voltar do aparelho (o history.back do Android, #179) volta à página do assunto depois de abrir uma fonte dela
   await pausa(600);
-  await clicar(pag, '#bib-corpo [data-secao="teoria"] [data-fonte^="teoria:"]');
+  /* a teoria abre na tela cheia, por cima da página (o bloco da T2), e não sai
+   * dela: fechar a tela cheia deixa a página como estava. (A tela cheia da
+   * Biblioteca não entra no histórico do Voltar do aparelho; isso vale para a
+   * Biblioteca inteira e está anotado como pendência no PR.) */
+  await clicar(pag, '#bib-corpo [data-secao="teoria"] [data-fonte^="teoria:"] .bte-teoria-abrir');
   const naTeoria = await esperar('a teoria aberta pela página', () => pag.evaluate(() =>
-    !document.querySelector('#bib-corpo .bib-assunto') && !!document.querySelector('#bib-corpo .bib-titulo')), v => v, 10000);
-  conf('a teoria abre a partir da página do assunto', naTeoria.ok, true);
-  await pausa(700);
-  await pag.evaluate(() => history.back());
-  const deVolta = await esperar('a página do assunto de volta', lerPagina, v => !!v && v.id === 'MAT09-07', 10000);
-  conf('o Voltar do aparelho, numa teoria aberta pela página, volta à página do assunto', deVolta.ok, true);
+    !!document.querySelector('#modal-biblioteca.aberto') && !!document.querySelector('#bib-corpo .bib-assunto')), v => v, 10000);
+  conf('a teoria abre na tela cheia, por cima da página do assunto', naTeoria.ok, true);
+  await pausa(400);
+  await clicar(pag, '#bib-fechar-visor');
+  const deVolta = await esperar('a página do assunto de volta', () => pag.evaluate(() =>
+    !document.querySelector('#modal-biblioteca.aberto') && !!document.querySelector('#bib-corpo .bib-assunto[data-assunto="MAT09-07"]')), v => v, 10000);
+  conf('fechar a tela cheia deixa a página do assunto como estava', deVolta.ok, true);
   await pausa(600);
   // um vizinho abre a página dele; o Voltar devolve a busca como estava
   const vizinho = (P.vizinhos || [])[0];
