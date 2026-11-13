@@ -1171,7 +1171,8 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
       vizinhos: [...p.querySelectorAll('[data-secao="vizinhos"] [data-assunto]')].map(b => b.dataset.assunto),
       campo: document.querySelector('#busca-biblioteca').value,
       livrosDaEstante: vis('#bib-livros'), topo: vis('#bib-exercicios-cabeca') || vis('#bib-carrinho'),
-      alto: Math.round(p.getBoundingClientRect().top - document.querySelector('.bibl-topo').getBoundingClientRect().bottom) };
+      // a página é o começo do miolo (a linha de andamento do índice, se aparecer, fica acima e não conta)
+      alto: Math.round(p.getBoundingClientRect().top - document.querySelector('#bib-corpo').getBoundingClientRect().top) };
   });
   const pg = await esperar('a página do assunto', lerPagina, v => !!v && v.id === 'MAT09-07', 10000);
   const P = pg.valor || {};
@@ -1185,7 +1186,7 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('a questão do ENEM fica no bloco ENEM, e não no da OBMEP', !!P.enem && P.enem.length === 1 && /^1 questão ligada, numa lista de \d+ · /.test(P.enem[0]), true);
   conf('os vizinhos são do mesmo tema e ano, e não o próprio assunto', (P.vizinhos || []).length > 0 && (P.vizinhos || []).every(v => /^MAT09-/.test(v) && v !== 'MAT09-07'), true);
   conf('a busca deu lugar à página; a estante, o topo dos exercícios e a faixa saem, e a página começa no alto',
-    P.campo + '|' + P.livrosDaEstante + '|' + P.topo + '|' + (P.alto <= 24), '|false|false|true');
+    P.campo + '|' + P.livrosDaEstante + '|' + P.topo + '|' + (P.alto <= 2), '|false|false|true');
   // a trava de transbordo da página: tablet de pé e deitado, celular, e a letra a 130% a 360 px
   for (const [w, h, css] of [[1280, 800, ''], [800, 1280, ''], [412, 915, ''], [360, 800, LETRA_130]]) {
     await pag.setViewport({ width: w, height: h, hasTouch: true, deviceScaleFactor: 1 });
