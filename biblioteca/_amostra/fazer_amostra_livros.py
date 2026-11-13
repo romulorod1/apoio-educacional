@@ -409,6 +409,42 @@ def fazer_leitor(pasta):
     return {'livros': raiz, 'planilha': planilha}
 
 
+def pdf_escaneado(caminho, paginas=12, dpi=150):
+    """Livro 'escaneado' para a fatia 3 do leitor: cada pagina e uma imagem
+    JPEG cinza da pagina inteira, sem texto selecionavel (como o livro
+    escaneado sem OCR). A imagem diz o numero da pagina em letra grande."""
+    fonte = pymupdf.open()
+    saida = pymupdf.open()
+    for n in range(1, paginas + 1):
+        pg = fonte.new_page(width=W, height=H)
+        pg.insert_text((72, 90), 'Página %d escaneada.' % n, fontname='helv', fontsize=20)
+        for i in range(30):
+            pg.insert_text((72, 130 + 14 * i), 'Linha %d de texto da página escaneada %d, só imagem.' % (i + 1, n),
+                           fontname='helv', fontsize=10)
+        pg.draw_rect(pymupdf.Rect(72, 600, 300, 760), color=(0.3, 0.3, 0.3), fill=(0.6, 0.6, 0.6))
+        pix = pg.get_pixmap(dpi=dpi, colorspace=pymupdf.csGRAY)
+        jpg = pix.tobytes('jpg', jpg_quality=70)
+        nova = saida.new_page(width=W, height=H)
+        nova.insert_image(nova.rect, stream=jpg)
+    saida.set_toc([[1, 'Capítulo 1: Escaneado', 1]])
+    fonte.close()
+    return salvar(saida, caminho)
+
+
+def fazer_nitidez(pasta):
+    """O livro de 400 paginas do leitor e um escaneado de 12, num pacote so."""
+    raiz = os.path.join(pasta, 'Nitidez')
+    pdf_leitor_400(os.path.join(raiz, 'matematica', 'livro-leitor-400.pdf'))
+    pdf_escaneado(os.path.join(raiz, 'matematica', 'livro-escaneado-12.pdf'))
+    planilha = os.path.join(raiz, 'livros_nitidez.csv')
+    with open(planilha, 'w', encoding='utf-8-sig', newline='') as f:
+        w = csv.DictWriter(f, fieldnames=CABECALHO)
+        w.writeheader()
+        w.writerows([linha('matematica', 'Livro do leitor', 'matematica/livro-leitor-400.pdf'),
+                     linha('matematica', 'Livro escaneado', 'matematica/livro-escaneado-12.pdf')])
+    return {'livros': raiz, 'planilha': planilha}
+
+
 def fazer_indice(pasta):
     raiz = os.path.join(pasta, 'Indice')
     pdf_indice_curto(os.path.join(raiz, 'matematica', 'indice-curto.pdf'))
@@ -457,6 +493,15 @@ def principal():
                                         trabalho=os.path.join(pasta, 'trabalho-leitor'),
                                         gerado_em='2026-11-12T10:00:00-03:00', commit='prova')
         print('%d livros no pacote do leitor' % manifest['contagens']['livros'])
+        print(rel['zip']['caminho'])
+        return
+    if '--nitidez' in sys.argv:
+        import livros
+        c = fazer_nitidez(pasta)
+        manifest, rel, _ = livros.gerar(c['planilha'], 'prova-nitidez', 1, os.path.join(pasta, 'pacotes'),
+                                        trabalho=os.path.join(pasta, 'trabalho-nitidez'),
+                                        gerado_em='2026-11-13T10:00:00-03:00', commit='prova')
+        print('%d livros no pacote da nitidez' % manifest['contagens']['livros'])
         print(rel['zip']['caminho'])
         return
     if '--indice' in sys.argv:

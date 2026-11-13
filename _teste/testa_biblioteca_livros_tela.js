@@ -886,7 +886,8 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     return { meio: caixa ? +caixa.dataset.paginaArquivo : null, contador: document.querySelector('#leitor-contador').textContent,
       fy: rc ? (y - rc.top) / rc.height : null, altura: rc ? rc.height : null, largura: rc ? Math.round(rc.width) : null,
       canvas: !!(caixa && caixa.querySelector('canvas')), vazias: vazias.join(','),
-      vivos: Array.from(c.querySelectorAll('canvas')).filter(k => k.width > 0).length };
+      vivos: Array.from(c.querySelectorAll('canvas')).filter(k => k.width > 0).length,
+      pixels: Array.from(c.querySelectorAll('canvas')).reduce((s, k) => s + k.width * k.height, 0) };
   });
   const irParaPagina = async n => {
     await pag.evaluate(v => { const i = document.querySelector('#leitor-ir-pagina'); i.value = String(v); i.dispatchEvent(new Event('change')); }, n);
@@ -1040,14 +1041,21 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   // no zoom 4 a página é muito maior que a tela: a vizinha longe não fica viva
   for (let i = 0; i < 5; i++) { await clicar(pag, '#leitor-mais'); await pausa(400); }
   await pausa(800);
-  let picoZ4 = 0;
+  /* Desde a fatia 3 do leitor, o que se conta no zoom 4 são os PIXELS, e não
+   * os canvases: há o canvas de detalhe por cima da página à vista e a página
+   * seguinte pré-desenhada na direção da rolagem, e o leitor segura o total no
+   * orçamento de 16 milhões. A vizinha longe, do lado de trás, continua solta. */
+  let picoZ4 = 0, picoPx = 0;
   for (let i = 0; i < 12; i++) {
     await pag.evaluate(() => { document.querySelector('#corpo-modal-leitor-pdf').scrollTop += 300; });
     await pausa(250);
-    picoZ4 = Math.max(picoZ4, (await meioDoLeitor()).vivos);
+    const m = await meioDoLeitor();
+    picoZ4 = Math.max(picoZ4, m.vivos);
+    picoPx = Math.max(picoPx, m.pixels);
   }
-  console.log('   zoom 4: pico de ' + picoZ4 + ' canvases vivos rolando de 300 em 300 px');
-  conf('no zoom 4, o pico fica em no máximo 2 canvases vivos', picoZ4 <= 2, true);
+  console.log('   zoom 4: pico de ' + picoZ4 + ' canvases vivos e ' + (picoPx / 1e6).toFixed(2) + ' milhões de pixels rolando de 300 em 300 px');
+  conf('no zoom 4, o pico fica em no máximo 16 milhões de pixels de canvas vivos', picoPx <= 16000000, true);
+  conf('e em no máximo 5 canvases (as à vista, os detalhes delas e a pré-desenhada)', picoZ4 <= 5, true);
   conf('e a página à vista segue desenhada', (await esperar('o zoom 4: a página à vista desenhada', meioDoLeitor, v => v.vazias === '', 8000)).ok, true);
   await clicar(pag, '#leitor-largura');
   await pausa(400);
