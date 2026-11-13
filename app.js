@@ -23373,13 +23373,25 @@
     return { serie: serie, resto: t.replace(/\s+/g, ' ').trim() };
   }
 
-  /* O termo que os grupos de exercícios e de livros procuram: a busca sem o
-   * ano ("volume 8" procura "volume"), porque o ano escolhe o assunto, e não
-   * é palavra do exercício nem do livro. A busca só de ano fica como veio. */
+  /* O termo que os grupos de exercícios e de livros procuram e mostram: a
+   * busca sem o ano ("volume 8" procura "volume"), porque o ano escolhe o
+   * assunto, e não é palavra do exercício nem do livro. São as PALAVRAS QUE
+   * ELA DIGITOU, com acento ("frações 6" vira "frações", e não "fracoes"): a
+   * busca normaliza por conta própria, e a tela mostra o que ela escreveu. A
+   * busca só de ano fica como veio. */
   function termoDosGrupos(termo) {
+    var original = String(termo || '').trim();
     var norm = normalizadorDaBusca() || function (x) { return Busca.semAcento(String(x || '')); };
-    var ano = anoDaBusca(norm(termo));
-    return ano.serie && ano.resto ? ano.resto : String(termo || '').trim();
+    var ano = anoDaBusca(norm(original));
+    if (!ano.serie || !ano.resto) return original;
+    var resto = ano.resto.split(' '), saida = [], i = 0;
+    original.split(/\s+/).forEach(function (w) {
+      var partes = norm(w).replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
+      if (!partes.length) return;
+      // a palavra fica se for a próxima do termo sem o ano; as do ano ("do", "8º", "ano") saem
+      if (partes.every(function (p, k) { return resto[i + k] === p; })) { saida.push(w); i += partes.length; }
+    });
+    return i === resto.length && saida.length ? saida.join(' ') : ano.resto;
   }
 
   // a mesma regra da busca no texto (todas as palavras significativas), no título ou nas palavras-chave do assunto

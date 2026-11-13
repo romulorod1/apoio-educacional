@@ -1158,6 +1158,16 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   console.log('   "equação do 2º grau": ' + JSON.stringify(grau.valor));
   conf('"equação do 2º grau" não vira o 2º ano: o assunto do 9º ano vem primeiro, e os exercícios aparecem',
     !!grau.valor && /^MAT09-0[45]$/.test(grau.valor.primeiro) && grau.valor.exercicios !== '0', true);
+  // os grupos de baixo mostram as palavras dela, com acento e sem o ano: "frações 6" vira "frações", e nunca "fracoes"
+  await digitarB1('frações 6');
+  const acento = await esperar('os grupos de "frações 6"', () => pag.evaluate(() => {
+    const g = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status');
+    const ex = document.querySelector('#bib-corpo [data-grupo="exercicios"]');
+    return g && ex && !/Buscando/.test(g.textContent)
+      ? [...document.querySelectorAll('#bib-corpo [data-grupo], #bib-corpo > .vazio')].map(x => x.innerText).join(' | ') : null;
+  }), x => !!x && !/equa/i.test(x), 10000);
+  console.log('   "frações 6": ' + String(acento.valor || '').slice(0, 300).replace(/\s+/g, ' '));
+  conf('com "frações 6", os grupos de baixo não mostram "fracoes" nem o ano', /fracoes|frações 6/.test(acento.valor || ''), false);
   /* "volume" casa 8 assuntos (4 pelo título em Matemática, 1 em Química e 3 pelas palavras-chave): com
    * mais de 5, três no alto, os do título primeiro, e "Ver os outros N" mostra o resto; "volume 8" escolhe o ano */
   await digitarB1('volume');
