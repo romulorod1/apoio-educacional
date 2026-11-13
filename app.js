@@ -23268,14 +23268,12 @@
    * dizem numa linha quando não há nada. A contagem da busca e a da página
    * saem da mesma conta (vinculosDoAssunto), com os mesmos livros.
    *
-   * A FRONTEIRA COM A T2 (frente Listas, máquina 2): as fontes vêm de
-   * Biblioteca.fontesDoAssunto(assuntoId, opcoes), que devolve
-   * { teoria:[], listaBase, exercicios:[], obmep:[] }, cada item com
-   * { tipo, id, titulo, serie, quantidade, abrir }. Enquanto a T2 não entra,
-   * fontesDoAssuntoMinimas faz o mesmo contrato (e acrescenta enem:[]) a
-   * partir do módulo ligado ao assunto, de bib.listasPorModulo e dos itens de
-   * prova com tema_app. Quando a T2 trouxer Biblioteca.fontesDoAssunto (e
-   * desenharBlocoTeoriaExercicios), a tela passa a usá-las sem mudar. */
+   * TEORIA, EXERCÍCIOS, OBMEP E ENEM SÃO O BLOCO DA T2 (frente Listas): as
+   * fontes vêm do fontesDoAssuntoNoApp (Biblioteca.fontesDoAssunto com o que
+   * o app tem carregado), e o desenho é o desenharBlocoTeoriaExercicios, com
+   * a teoria, a lista de base, os exercícios, a OBMEP e o ENEM, cada exercício
+   * grande, com a caixa "No material" e a tela cheia de sempre. A versão
+   * mínima que a página trazia antes da T2 saiu. */
   var bibAssuntoTermo = '';  // a busca para onde o Voltar da página devolve
   var bibAssuntoVez = 0;
   var ASSUNTOS_NA_BUSCA = 3;         // com mais de 5, três no alto e "Ver os outros N"
@@ -23292,81 +23290,6 @@
   function marcarPaginaDoAssunto(sim) {
     var tela = $('#tela-biblioteca');
     if (tela) tela.classList.toggle('com-pagina-do-assunto', !!sim);
-  }
-
-  function fontesDoAssunto(assuntoId, opcoes) {
-    if (typeof Biblioteca.fontesDoAssunto === 'function') return Biblioteca.fontesDoAssunto(assuntoId, opcoes);
-    return fontesDoAssuntoMinimas(assuntoId, opcoes);
-  }
-
-  // as fontes de prova que viram bloco próprio: a OBMEP (provas e Banco) e o ENEM; as outras ficam fora
-  function blocoDaFonte(fonte, banco) {
-    if (banco || /^obmep/.test(String(fonte || ''))) return 'obmep';
-    if (fonte === 'enem') return 'enem';
-    return null;
-  }
-
-  function fontesDoAssuntoMinimas(assuntoId, opcoes) {
-    var saida = { teoria: [], listaBase: null, exercicios: [], obmep: [], enem: [] };
-    var a = opcoes && opcoes.assunto;
-    if (!bib || !a || (a.disciplina && a.disciplina !== Core.MATERIA_PADRAO)) return saida;
-    var achado = moduloDoAssunto({ id: a.id, titulo: a.titulo });
-    var mod = achado ? bib.modulos[achado.chave] : null;
-    var serieDoAssuntoNosExercicios = serieDosExercicios(a.serie);
-    var deOutroAno = function (m) { return !!serieDoAssuntoNosExercicios && !m.series[serieDoAssuntoNosExercicios]; };
-    var vistos = Object.create(null);
-    function poe(lista, item) {
-      var chave = item.tipo + '|' + (item.bloco || '') + '|' + item.id;
-      if (vistos[chave]) return;
-      vistos[chave] = true;
-      lista.push(item);
-    }
-    function listasDoModulo(m, destino) {
-      m.ordemListas.forEach(function (l) {
-        poe(destino, { tipo: 'lista', id: m.chave + '#' + l.slug, titulo: l.titulo, serie: m.serie, quantidade: l.itens.length,
-          total: l.itens.length, modulo: m.titulo, outroAno: deOutroAno(m), abrir: { modulo: m.chave, aula: { tipo: 'exercicios', slug: l.slug } } });
-      });
-    }
-    if (mod) {
-      mod.teorias.forEach(function (t) {
-        poe(saida.teoria, { tipo: 'teoria', id: t.id, titulo: (t.aula && t.aula.titulo) || mod.titulo, serie: mod.serie, quantidade: 1,
-          modulo: mod.titulo, outroAno: deOutroAno(mod), abrir: { modulo: mod.chave, aula: { tipo: 'teoria', id: t.id } } });
-      });
-      var lp = ((bib.listasPorModulo && bib.listasPorModulo[mod.chave]) || [])[0];
-      if (lp) {
-        saida.listaBase = { tipo: 'lista-pronta', id: lp.id, titulo: 'Lista de base', serie: mod.serie, quantidade: lp.itens.length,
-          modulo: mod.titulo, outroAno: deOutroAno(mod), abrir: { modulo: mod.chave, aula: { tipo: 'lista-pronta', id: lp.id, ver: true } } };
-      }
-      listasDoModulo(mod, mod.banco ? saida.obmep : saida.exercicios);
-      // o Banco da OBMEP do mesmo assunto: o módulo do Banco de mesmo título
-      var nome = chaveDoAssunto(mod.titulo);
-      Object.keys(bib.modulos).forEach(function (k) {
-        var m = bib.modulos[k];
-        if (m !== mod && m.banco && nome && chaveDoAssunto(m.titulo) === nome) listasDoModulo(m, saida.obmep);
-      });
-    }
-    // as questões das provas ligadas ao assunto pelo tema_app, por lista, cada fonte no seu bloco
-    var porLista = Object.create(null), ordem = [];
-    Object.keys(bib.itemPorId).forEach(function (id) {
-      var it = bib.itemPorId[id];
-      if (!it || it.tema_app !== assuntoId || !it.modulo || !it.aula) return;
-      var chave = it.serie + ':' + it.modulo.slug;
-      if (mod && chave === mod.chave) return;
-      var bloco = blocoDaFonte(it.fonte, eDoBanco(it));
-      if (!bloco) return;
-      // a lista em cada bloco: as da OBMEP e as do ENEM de uma mesma lista contam cada uma no seu
-      var k = bloco + '|' + chave + '#' + it.aula.slug;
-      if (!porLista[k]) {
-        var m = bib.modulos[chave], lista = m && m.listas[it.aula.slug];
-        porLista[k] = { tipo: 'lista', id: chave + '#' + it.aula.slug, titulo: it.aula.titulo, serie: it.serie, quantidade: 0, total: lista ? lista.itens.length : 0,
-          modulo: it.modulo.titulo, bloco: bloco, outroAno: m ? deOutroAno(m) : false,
-          abrir: { modulo: chave, aula: { tipo: 'exercicios', slug: it.aula.slug } } };
-        ordem.push(k);
-      }
-      porLista[k].quantidade++;
-    });
-    ordem.forEach(function (k) { poe(saida[porLista[k].bloco], porLista[k]); });
-    return saida;
   }
 
   /* O ANO ESCRITO NA BUSCA: "8", "8º", "8 ano", "oitavo", "1ª série", "1 em",
@@ -23564,7 +23487,9 @@
     corpo.appendChild(pagina);
     pagina.appendChild(el('p', { class: 'ajuda', texto: 'Abrindo o assunto...' }));
     return Promise.all([carregarAssuntosDosLivros(), Store.listarLivros().catch(function () { return []; }),
-      bib ? Promise.resolve(bib) : carregarBiblioteca().catch(function () { return null; })]).then(function (r) {
+      bib ? Promise.resolve(bib) : carregarBiblioteca().catch(function () { return null; }),
+      // o índice de assuntos de matemática: é nele que o assunto diz o módulo dele
+      carregarIndice().catch(function () { indiceTemasFalhou = true; return null; })]).then(function (r) {
       if (vez !== bibAssuntoVez || bibNav.assunto !== id || !pagina.isConnected) return;
       var nomes = r[0], a = nomes && nomes.porId[id];
       pagina.innerHTML = '';
@@ -23658,53 +23583,12 @@
     }
     pagina.appendChild(secaoDoAssunto('livros', 'Nos livros', [cartoes]));
 
-    // Teoria e exercícios, a OBMEP e o ENEM, pelo contrato da T2
-    var fontes = fontesDoAssunto(a.id, { assunto: a }) || {};
-    var deOutroAno = function (f) { return f.outroAno ? ', de outro ano' : ''; };
-    var itemDaFonte = function (f, detalhe) {
-      var linha = linhaBib(f.titulo, detalhe, function () {
-        var mod = bib && bib.modulos[f.abrir.modulo];
-        var serieDoMod = mod ? ((bib.listaSeries || []).filter(function (s) { return mod.series[s]; })[0] || mod.serie) : null;
-        // entrar no módulo sai da página (o Voltar do aparelho volta a ela)
-        irNaBiblioteca({ modulo: f.abrir.modulo, aula: f.abrir.aula, serie: serieDoMod || undefined });
-      });
-      linha.setAttribute('data-fonte', f.tipo + ':' + f.id);
-      return linha;
-    };
-    // "6 questões", ou "2 questões ligadas, numa lista de 6": o toque abre a lista inteira
-    var quantasQuestoes = function (f) {
-      return !f.total || f.quantidade === f.total ? plural(f.quantidade, 'questão', 'questões')
-        : plural(f.quantidade, 'questão ligada', 'questões ligadas') + ', numa lista de ' + f.total;
-    };
-    var teoriaEExercicios = [];
-    if (typeof desenharBlocoTeoriaExercicios === 'function') {
-      var caixaT2 = el('div', { class: 'bib-assunto-teoria' });
-      desenharBlocoTeoriaExercicios(caixaT2, a.id, { assunto: a });
-      teoriaEExercicios.push(caixaT2);
-    } else {
-      (fontes.teoria || []).forEach(function (f) { teoriaEExercicios.push(itemDaFonte(f, 'Teoria · ' + f.modulo + deOutroAno(f))); });
-      if (fontes.listaBase) teoriaEExercicios.push(itemDaFonte(fontes.listaBase,
-        plural(fontes.listaBase.quantidade, 'exercício', 'exercícios') + ' do começo de cada lista, para uma aula' + deOutroAno(fontes.listaBase)));
-      (fontes.exercicios || []).forEach(function (f) {
-        teoriaEExercicios.push(itemDaFonte(f, plural(f.quantidade, 'exercício', 'exercícios') + ' · ' + f.modulo + deOutroAno(f)));
-      });
-      if (!teoriaEExercicios.length) {
-        teoriaEExercicios.push(el('p', { class: 'ajuda bib-assunto-vazio', texto: !bib || !(bib.pacotes || []).length
-          ? 'Nenhum pacote de exercícios neste tablet.' : 'Ainda sem teoria e exercícios para este assunto no tablet.' }));
-      }
-    }
-    pagina.appendChild(secaoDoAssunto('teoria', 'Teoria e exercícios', teoriaEExercicios));
-    // a OBMEP e o ENEM só aparecem quando há questão ligada ao assunto
-    if ((fontes.obmep || []).length) {
-      pagina.appendChild(secaoDoAssunto('obmep', 'OBMEP', fontes.obmep.map(function (f) {
-        return itemDaFonte(f, quantasQuestoes(f) + ' · ' + f.modulo + deOutroAno(f));
-      })));
-    }
-    if ((fontes.enem || []).length) {
-      pagina.appendChild(secaoDoAssunto('enem', 'ENEM', fontes.enem.map(function (f) {
-        return itemDaFonte(f, quantasQuestoes(f) + ' · ' + f.modulo + deOutroAno(f));
-      })));
-    }
+    /* Teoria e exercícios, a OBMEP e o ENEM: o bloco da T2, dentro da seção da
+     * página (o título da seção é o da página; o bloco não repete o dele). */
+    var caixaT2 = el('div', { class: 'bib-assunto-teoria' });
+    if (bib) desenharBlocoTeoriaExercicios(caixaT2, fontesDoAssuntoNoApp(a.id), { semTitulo: true });
+    else caixaT2.appendChild(el('p', { class: 'ajuda bib-assunto-vazio', texto: 'Não consegui abrir os exercícios agora. Tente de novo daqui a pouco.' }));
+    pagina.appendChild(secaoDoAssunto('teoria', 'Teoria e exercícios', [caixaT2]));
 
     // os vizinhos: o mesmo tema, a mesma matéria e o mesmo ano
     var vizinhos = a.tema ? nomes.lista.filter(function (x) {
@@ -24119,7 +24003,18 @@
      * caminho pela busca, que é aproximado, não entra. */
     var achado = bib && indiceTemas ? moduloDoAssunto({ id: assuntoId }) : false;
     opcoes.modulosEquivalentes = achado && achado.chave && !achado.direto ? [achado.chave] : [];
-    return Biblioteca.fontesDoAssunto(assuntoId, opcoes);
+    var fontes = Biblioteca.fontesDoAssunto(assuntoId, opcoes);
+    /* DE OUTRO ANO: o módulo da fonte não serve ao ano do assunto (a teoria do
+     * 8º ano ligada a um assunto do 6º). A conta é a de antes da página do
+     * assunto: as séries do módulo no aparelho contra o ano do assunto. */
+    var anoDoAssunto = serieDosExercicios(fontes.serie);
+    var marcar = function (f) {
+      var m = f && f.modulo && f.modulo.chave && bib && temChave(bib.modulos, f.modulo.chave) ? bib.modulos[f.modulo.chave] : null;
+      f.outroAno = !!(anoDoAssunto && m && !m.series[anoDoAssunto]);
+    };
+    ['teoria', 'exercicios', 'obmep', 'enem'].forEach(function (k) { (fontes[k] || []).forEach(marcar); });
+    if (fontes.listaBase) marcar(fontes.listaBase);
+    return fontes;
   }
   function carregarFontesDoAssunto(assuntoId, vinculos) {
     return Promise.all([
@@ -24248,8 +24143,10 @@
    *   elemento  a caixa onde o bloco é desenhado (o conteúdo dela é trocado);
    *   fontes    o que a Biblioteca.fontesDoAssunto devolveu;
    *   contexto  opcional: { abrir(fonte), anexar(fonte, marcado),
-   *             noMaterial(fonte), etiqueta(itemId) }. Sem ele, valem os
-   *             caminhos do app (a tela cheia, o carrinho e o "Para mim").
+   *             noMaterial(fonte), etiqueta(itemId), semTitulo }. Sem ele,
+   *             valem os caminhos do app (a tela cheia, o carrinho e o "Para
+   *             mim"); semTitulo tira o título do bloco, quando a página que
+   *             o recebe já tem o dela (a página do assunto).
    * Devolve o bloco desenhado. */
   function desenharBlocoTeoriaExercicios(elemento, fontes, contexto) {
     if (!elemento) return null;
@@ -24271,7 +24168,7 @@
     elemento.innerHTML = '';
     var bloco = el('section', { class: 'bte', 'aria-label': 'Teoria e exercícios' });
     elemento.appendChild(bloco);
-    bloco.appendChild(el('h3', { class: 'subtitulo bte-titulo', texto: 'Teoria e exercícios' }));
+    if (!cx.semTitulo) bloco.appendChild(el('h3', { class: 'subtitulo bte-titulo', texto: 'Teoria e exercícios' }));
 
     if (!teoria.length && !base && !exercicios.length && !obmep.length && !enem.length) {
       // o vazio numa linha, e com o porquê
@@ -24346,7 +24243,7 @@
       var img = miniatura(e.imagem, Math.min(1200, largura * 2));
       if (img) img.style.maxWidth = largura + 'px';
       var de = deDoExercicio(e);
-      return el('article', { class: 'bte-ex', 'data-id': e.id, 'data-tipo': e.tipo }, [
+      return el('article', { class: 'bte-ex', 'data-id': e.id, 'data-tipo': e.tipo, 'data-fonte': e.tipo + ':' + e.id }, [
         de && de !== deAnterior ? el('div', { class: 'bte-ex-de', texto: de }) : null,
         el('div', { class: 'bte-ex-cabeca' }, [
           el('span', { class: 'bte-ex-nome', texto: e.titulo }),
@@ -24362,7 +24259,8 @@
       ]);
     }
     function deDoExercicio(e) {
-      return e.fonte === 'obmep-banco' ? [e.modulo.titulo, e.lista.titulo].filter(Boolean).join(', ') : e.lista.titulo;
+      var de = e.fonte === 'obmep-banco' ? [e.modulo.titulo, e.lista.titulo].filter(Boolean).join(', ') : e.lista.titulo;
+      return de && e.outroAno ? de + ', de outro ano' : de;
     }
 
     function secao(chave, titulo, quantos) {
@@ -24420,7 +24318,7 @@
         'aula de teoria', 'aulas de teoria', function (t) {
           var capa = miniatura(t.imagem, 160);
           if (capa) capa.classList.add('bte-teoria-capa');
-          return el('div', { class: 'bte-teoria', 'data-id': t.id }, [
+          return el('div', { class: 'bte-teoria', 'data-id': t.id, 'data-fonte': 'teoria:' + t.id }, [
             el('button', {
               type: 'button', class: 'bte-teoria-abrir', 'aria-label': 'Abrir a teoria ' + t.titulo,
               aoClick: function () { abrir(t); }
@@ -24429,7 +24327,7 @@
               el('span', { class: 'bte-teoria-texto' }, [
                 el('span', { class: 'nome', texto: t.titulo }),
                 el('span', { class: 'detalhe', texto: plural(t.quantidade, 'página', 'páginas') +
-                  (variosModulos && t.modulo.titulo ? ' · ' + t.modulo.titulo : '') })
+                  (variosModulos && t.modulo.titulo ? ' · ' + t.modulo.titulo : '') + (t.outroAno ? ' · de outro ano' : '') })
               ]),
               icone('chr')
             ]),
@@ -24440,9 +24338,9 @@
 
     if (base) {
       var sBase = secao('lista-base', 'Lista de base');
-      sBase.appendChild(el('div', { class: 'bte-lista', 'data-id': base.id }, [
+      sBase.appendChild(el('div', { class: 'bte-lista', 'data-id': base.id, 'data-fonte': 'lista-base:' + base.id }, [
         el('div', { class: 'bte-lista-texto' }, [
-          el('div', { class: 'nome', texto: plural(base.quantidade, 'exercício', 'exercícios') }),
+          el('div', { class: 'nome', texto: plural(base.quantidade, 'exercício', 'exercícios') + (base.outroAno ? ', de outro ano' : '') }),
           base.minutos !== null && base.minutos !== undefined
             ? el('div', { class: 'detalhe', texto: minutosEstimados(base.minutos, true, true) }) : null
         ]),
