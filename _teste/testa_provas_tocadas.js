@@ -11,14 +11,16 @@
  *   - as fatias do nivel 1 particionam a selecao (nenhuma prova em duas, nenhuma
  *     perdida);
  * e os controles que reprovam (arquivo fora do mapa, linha apagada, prova que
- * nao existe).
+ * nao existe). Secao 9: a pasta _teste/mapa_provas.d (um arquivo por prova
+ * nova), puxando quando casa e so quando casa, gritando com arquivo mal formado,
+ * e sem mudar nada para quem nao a usa.
  */
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const PORTAO_REL_T = '_teste/confere_tudo.sh';
-const { leMapa, listaDoPortao, provasTocadas, rodaDoDiff, nomesDaSelecao, fatiasDoPlano, daFatia, MAPA, ALVO_POR_FATIA } = require('./provas_tocadas.js');
+const { leMapa, leMapaPasta, leMapaTodo, confereMapa, PASTA, listaDoPortao, provasTocadas, rodaDoDiff, nomesDaSelecao, fatiasDoPlano, daFatia, MAPA, ALVO_POR_FATIA } = require('./provas_tocadas.js');
 
 let passes = 0, falhas = 0;
 function conf(rotulo, obtido, esperado) {
@@ -32,7 +34,8 @@ console.log('\n=== 1. O instrumento ve ===');
 const nav = listaDoPortao();
 conf('o portao lista mais de 50 arquivos de prova de navegador', nav.arquivos.length > 50, true);
 conf('e todos existem em disco', nav.arquivos.filter(a => !fs.existsSync(path.join(RAIZ, a))).length, 0);
-const mapa = leMapa(fs.readFileSync(MAPA, 'utf8'));
+// o mapa que o CLI usa: o geral somado a _teste/mapa_provas.d (secao 9)
+const mapa = leMapaTodo();
 conf('o mapa tem linhas', mapa.length > 20, true);
 const rastreados = execFileSync('git', ['ls-files'], { cwd: RAIZ, encoding: 'utf8' }).split(/\r?\n/).filter(Boolean);
 conf('o git lista os arquivos do repositorio', rastreados.length > 100, true);
@@ -287,6 +290,156 @@ let codigo = 0;
 try { execFileSync('sh', [path.join(__dirname, 'confere_tudo.sh'), '--provas', lista], { cwd: RAIZ, encoding: 'utf8', stdio: 'pipe' }); } catch (e) { codigo = e.status; }
 conf('lista vazia sai com 2, e nao vira a bateria inteira calada', codigo, 2);
 fs.rmSync(lista, { force: true });
+
+console.log('\n=== 9. A pasta mapa_provas.d: um arquivo por prova nova ===');
+const os = require('os');
+const geral = leMapa(fs.readFileSync(MAPA, 'utf8'));
+const deGeral = new Set();
+geral.forEach(l => l.provas.forEach(p => deGeral.add(p)));
+// a prova das fixturas: de navegador e que o mapa geral nao cita (assim o que ela
+// ganha vem so da pasta)
+const alvo = nav.arquivos.filter(p => !deGeral.has(p) && /^_teste\/testa_[a-z0-9_]+\.js$/.test(p))[0];
+conf('o instrumento ve: ha prova de navegador que o mapa geral nao cita (' + alvo + ')', !!alvo, true);
+const nomeAlvo = alvo ? path.posix.basename(alvo, '.js') + '.tsv' : 'x.tsv';
+let nPasta = 0;
+const pastaCom = arquivos => {
+  const d = path.join(os.tmpdir(), 'mapa_provas_d_' + process.pid + '_' + (nPasta++));
+  fs.mkdirSync(d, { recursive: true });
+  Object.keys(arquivos).forEach(n => {
+    if (arquivos[n] === null) fs.mkdirSync(path.join(d, n));
+    else fs.writeFileSync(path.join(d, n), arquivos[n]);
+  });
+  return d;
+};
+const pastas = [];
+const comPasta = arquivos => { const d = pastaCom(arquivos); pastas.push(d); return d; };
+const pVazia = comPasta({});
+const pBoa = comPasta({ [nomeAlvo]: '# prova nova: puxada pelo app.js e pela biblioteca\napp.js\t' + alvo + '\nbiblioteca/*\t' + alvo + '\n' });
+const mapaBoa = leMapaTodo(MAPA, pBoa);
+conf('a pasta boa e lida: duas linhas a mais que o geral, com origem pasta',
+  (mapaBoa.length - geral.length) + '/' + mapaBoa.filter(l => l.origem === 'pasta').length, '2/2');
+conf('pasta que nao existe: nenhuma linha', leMapaPasta(path.join(pVazia, 'nao_existe')).length, 0);
+conf('a pasta de verdade e _teste/mapa_provas.d', path.relative(RAIZ, PASTA).replace(/\\/g, '/'), '_teste/mapa_provas.d');
+
+// puxada quando casa
+let rp = provasTocadas(['app.js'], mapaBoa, nav);
+conf('padrao da pasta casa (app.js): a prova dela entra', rp.provas.indexOf(alvo) >= 0, true);
+conf('controle: sem a pasta, o app.js nao a puxa', provasTocadas(['app.js'], geral, nav).provas.indexOf(alvo), -1);
+conf('com glob da pasta (biblioteca/*): entra', provasTocadas(['biblioteca/qualquer/coisa.json'], mapaBoa, nav).provas.indexOf(alvo) >= 0, true);
+conf('a prova que entrou pela pasta roda so os nomes base (como a do mapa geral)',
+  nomesDaSelecao(rp, ['app.js'], nav).filter(n => /--envenenado/.test(n) && (nav.nomes[alvo] || []).indexOf(n) >= 0).length, 0);
+conf('o motivo diz de qual arquivo da pasta veio', rp.motivos.some(m => m.indexOf('mapa_provas.d/' + nomeAlvo) >= 0), true);
+// e nao puxada quando nao casa
+['store.js', 'busca.js', 'README.md', 'banco/topicos/indice.json'].forEach(f => {
+  const com = provasTocadas([f], mapaBoa, nav), sem = provasTocadas([f], geral, nav);
+  conf('padrao da pasta nao casa (' + f + '): a prova dela fica fora e o resto e igual',
+    com.provas.indexOf(alvo) + '/' + com.modo + '/' + com.provas.join(' '), '-1/' + sem.modo + '/' + sem.provas.join(' '));
+});
+// a pasta so acrescenta: nao tira arquivo da bateria inteira (item 3 pelo mapa geral)
+const pNovo = comPasta({ [nomeAlvo]: 'modulo_novo/*\t' + alvo + '\n' });
+conf('arquivo so citado pela pasta: segue na bateria inteira', provasTocadas(['modulo_novo/x.js'], leMapaTodo(MAPA, pNovo), nav).modo, 'inteira');
+const geralComNovo = leMapa(fs.readFileSync(MAPA, 'utf8') + 'modulo_novo/*\t_teste/e2e.js\n').concat(leMapaPasta(pNovo));
+rp = provasTocadas(['modulo_novo/x.js'], geralComNovo, nav);
+conf('o outro lado: com linha no mapa geral, sai da bateria e leva a prova da pasta junto',
+  rp.modo + '/' + rp.provas.slice().sort().join(' '), 'lista/' + ['_teste/e2e.js', alvo].sort().join(' '));
+
+// mal formado grita (cada um com a sua mensagem), e o controle bom nao grita
+const tenta = d => { try { leMapaPasta(d); return ''; } catch (e) { return e.message; } };
+conf('controle: a pasta boa nao grita', tenta(pBoa), '');
+conf('controle: padrao com pasta antes do "*" (_teste/testa_*.js) vale', tenta(comPasta({ [nomeAlvo]: '_teste/testa_*.js\t' + alvo + '\n' })), '');
+const malFormados = [
+  ['linha sem tabulacao', { [nomeAlvo]: 'app.js ' + alvo + '\n' }, /sem tabulacao/],
+  ['duas provas na linha (token a mais)', { [nomeAlvo]: 'app.js\t' + alvo + ' _teste/e2e.js\n' }, /uma prova so por linha/],
+  ['"-" na pasta', { [nomeAlvo]: 'app.js\t-\n' }, /moram no mapa geral/],
+  ['"*" na pasta', { [nomeAlvo]: 'app.js\t*\n' }, /moram no mapa geral/],
+  ['duas provas no mesmo arquivo', { [nomeAlvo]: 'app.js\t' + alvo + '\nstore.js\t_teste/e2e.js\n' }, /de uma prova so/],
+  ['nome do arquivo diferente do da prova', { 'outro_nome.tsv': 'app.js\t' + alvo + '\n' }, /o nome do arquivo tem de ser o da prova/],
+  ['padrao "*" sozinho', { [nomeAlvo]: '*\t' + alvo + '\n' }, /fixar uma pasta/],
+  ['padrao "*.js"', { [nomeAlvo]: '*.js\t' + alvo + '\n' }, /fixar uma pasta/],
+  ['padrao "app*"', { [nomeAlvo]: 'app*\t' + alvo + '\n' }, /fixar uma pasta/],
+  ['arquivo vazio', { [nomeAlvo]: '' }, /nenhuma linha/],
+  ['so comentario', { [nomeAlvo]: '# nada\n' }, /nenhuma linha/],
+  ['arquivo que nao e .tsv', { [nomeAlvo]: 'app.js\t' + alvo + '\n', 'LEIA.md': 'oi\n' }, /so arquivos \.tsv/],
+  ['tsv sem a extensao certa (.tsv.txt)', { [nomeAlvo + '.txt']: 'app.js\t' + alvo + '\n' }, /so arquivos \.tsv/],
+  ['subpasta', { 'sub.tsv': null }, /so arquivos \.tsv/],
+];
+malFormados.forEach(([rot, arqs, re]) => {
+  const msg = tenta(comPasta(arqs));
+  conf('mal formado (' + rot + '): grita com o motivo e o arquivo', re.test(msg) && /mapa_provas\.d\//.test(msg), true);
+});
+// prova que nao e de navegador: o confereMapa grita; o geral de hoje passa
+const naoNav = '_teste/testa_merge_seguro.js';
+conf('o instrumento ve: ' + naoNav + ' existe e nao e prova de navegador', fs.existsSync(path.join(RAIZ, naoNav)) && nav.arquivos.indexOf(naoNav) < 0, true);
+const tentaConf = m => { try { confereMapa(m, nav); return ''; } catch (e) { return e.message; } };
+conf('pasta citando prova que nao e de navegador: grita com o arquivo',
+  /nao e prova de navegador.*mapa_provas\.d\/testa_merge_seguro\.tsv/.test(tentaConf(leMapaTodo(MAPA, comPasta({ 'testa_merge_seguro.tsv': 'app.js\t' + naoNav + '\n' })))), true);
+conf('pasta citando prova que nao existe: grita',
+  /nao e prova de navegador/.test(tentaConf(leMapaTodo(MAPA, comPasta({ 'testa_nao_existe.tsv': 'app.js\t_teste/testa_nao_existe.js\n' })))), true);
+conf('controle: o mapa de hoje (geral e pasta) passa no confereMapa', tentaConf(mapa), '');
+conf('controle: a pasta boa passa no confereMapa', tentaConf(mapaBoa), '');
+
+// a pasta de verdade: nenhuma linha morta, nenhum nome parecido
+const linhasMortas = m => m.filter(l => l.origem === 'pasta' &&
+  !rastreados.some(f => l.re.test(f) && m.some(g => g.origem !== 'pasta' && g.re.test(f)))).map(l => l.arquivo + ': ' + l.padrao);
+conf('toda linha da pasta de verdade casa arquivo rastreado que o mapa geral decide', linhasMortas(mapa).join(' | '), '');
+conf('controle: linha que nao casa nada e pega como morta', linhasMortas(leMapaTodo(MAPA, pNovo)).length, 1);
+conf('nenhuma pasta de nome parecido (mapa_provas.d com erro de digitacao)',
+  rastreados.filter(f => /^_teste\/[^/]*mapa_prova[^/]*\//.test(f) && f.indexOf('_teste/mapa_provas.d/') !== 0).join(' '), '');
+conf('mexer so na pasta nao pede prova de navegador', provasTocadas(['_teste/mapa_provas.d/' + nomeAlvo], mapa, nav).modo, 'nenhuma');
+
+// nada muda para quem nao usa a pasta: com a pasta vazia, a decisao inteira
+// (modo, provas, diretas, motivos e nomes) e a do mapa geral sozinho
+const amostra = [
+  ['README.md'], ['.github/workflows/portao.yml', '_teste/mapa_provas.tsv'], ['_teste/testa_merge_seguro.js'],
+  ['_teste/confere_tudo.sh'], ['_teste/testa_busca.js'], [], ['busca.js'], ['app.js', 'arquivo_novo_que_ninguem_mapeou.js'],
+  ['.\\busca.js'], ['biblioteca.js'], ['sw.js'], ['_teste/testa_biblioteca_listas.js', 'biblioteca.js'],
+  ['app.js'], ['store.js'], ['nuvem.js'], ['core.js'], ['index.html'], ['styles.css'],
+  ['banco/topicos/indice.json'], ['biblioteca/_prova_banco.py'], ['novidades/x.txt'], ['vendor/x.js'], ['pdf.js', 'zip.js'],
+  ['firestore.rules', 'manifest.webmanifest'], ['functions/index.js', 'servidor/x.js'], ['_teste/mapa_provas.d/testa_x.tsv'],
+  ['app.js', 'index.html', 'styles.css', 'novidades/x.txt', '_teste/testa_bloco_teoria_exercicios_navegador.js'],
+];
+const decide = (lista, m, diffs) => { const r2 = provasTocadas(lista, m, nav, diffs); return JSON.stringify([r2, nomesDaSelecao(r2, lista, nav)]); };
+const mapaVazia = leMapaTodo(MAPA, pVazia);
+const difere = amostra.filter(l => decide(l, geral) !== decide(l, mapaVazia)).map(l => l.join(','));
+const dSoRoda = { [PORTAO_REL_T]: cab + ' contexto\n' + linhaRoda + '\n' };
+if (decide([PORTAO_REL_T, 'app.js'], geral, dSoRoda) !== decide([PORTAO_REL_T, 'app.js'], mapaVazia, dSoRoda)) difere.push('confere_tudo.sh com diff so de roda');
+conf('controle: a comparacao ve diferenca (app.js com a pasta boa decide diferente)', decide(['app.js'], geral) !== decide(['app.js'], mapaBoa), true);
+conf('com a pasta vazia, as ' + (amostra.length + 1) + ' listas da amostra decidem igual ao mapa geral sozinho', difere.join(' | '), '');
+// e com a pasta boa, so a prova dela se acrescenta, e so onde casa
+const alem = amostra.map(l => {
+  const a = provasTocadas(l, geral, nav), b = provasTocadas(l, mapaBoa, nav);
+  const extra = b.provas.filter(p => a.provas.indexOf(p) < 0), falta = a.provas.filter(p => b.provas.indexOf(p) < 0);
+  return { l, extra, falta };
+});
+conf('com a pasta boa, nenhuma prova some de nenhuma lista', alem.filter(x => x.falta.length).map(x => x.l.join(',')).join(' | '), '');
+conf('com a pasta boa, o que se acrescenta e so a prova dela', alem.filter(x => x.extra.some(p => p !== alvo)).map(x => x.l.join(',')).join(' | '), '');
+conf('controle: ha lista da amostra em que ela se acrescenta', alem.filter(x => x.extra.length).length > 0, true);
+
+// o CLI le a pasta (o mesmo caminho do CI, com a pasta trocada pela variavel de teste)
+const cliPlano = pasta => {
+  const env = Object.assign({}, process.env);
+  delete env.GITHUB_OUTPUT;
+  if (pasta) env.MAPA_PROVAS_PASTA_TESTE = pasta; else delete env.MAPA_PROVAS_PASTA_TESTE;
+  try {
+    const out = execFileSync('node', [path.join(__dirname, 'provas_tocadas.js'), '--plano', 'app.js'], { cwd: RAIZ, encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const m = /modo: (\w+); (\d+) de/.exec(out);
+    return { codigo: 0, n: m ? Number(m[2]) : -1, out };
+  } catch (e) { return { codigo: e.status, n: -1, out: String(e.stderr || '') + String(e.stdout || '') }; }
+};
+const cSem = cliPlano(null), cBoa = cliPlano(pBoa), cVazia = cliPlano(pVazia);
+// a pasta de verdade so acrescenta: o CLI da para o app.js a uniao do mapa geral com a pasta de verdade
+// (com a pasta vazia, isto e o mesmo numero da vazia; com prova migrada para la, e o que ela acrescenta)
+const naPastaReal = provasTocadas(['app.js'], leMapaTodo(), nav).provas.length;
+conf('CLI: a pasta de verdade da para o app.js a uniao do geral com ela', cSem.codigo + '/' + cSem.n, '0/' + naPastaReal);
+conf('CLI: a pasta de verdade nunca tira prova do app.js (nao menos que a vazia)', cSem.n >= cVazia.n, true);
+conf('CLI: o instrumento ve um numero', cSem.n > 5, true);
+conf('CLI: com a pasta boa, uma prova a mais (a dela)', cBoa.codigo + '/' + (cBoa.n - cVazia.n), '0/1');
+const cRuim = cliPlano(comPasta({ [nomeAlvo]: 'app.js\t' + alvo + ' _teste/e2e.js\n' }));
+conf('CLI: pasta mal formada sai com erro e diz por que', cRuim.codigo !== 0 && /uma prova so por linha/.test(cRuim.out), true);
+const cNaoNav = cliPlano(comPasta({ 'testa_merge_seguro.tsv': 'firestore.rules\t' + naoNav + '\n' }));
+conf('CLI: prova que nao e de navegador na pasta sai com erro, mesmo sem casar arquivo tocado',
+  cNaoNav.codigo !== 0 && /nao e prova de navegador/.test(cNaoNav.out), true);
+pastas.forEach(d => fs.rmSync(d, { recursive: true, force: true }));
 
 console.log('\n' + passes + ' passaram, ' + falhas + ' falharam.');
 process.exit(falhas ? 1 : 0);

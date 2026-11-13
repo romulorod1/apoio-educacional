@@ -250,6 +250,32 @@ r = ex('resumo_financeiro', { mes: '2026-10', alunoId: null });
 conf('outubro de todos: Bruno 2h a 150 + cancelada e cobrada 1h = R$ 450, pagou 300; falta receber 350 + 150', [r.resultado.total_ja_dado, r.resultado.falta_receber_do_mes, r.resultado.por_aluno.map(p => p.aluno + ' ' + p.pagamento)], ['R$ 800,00', 'R$ 500,00', ['Ana S. sem pagamento marcado no app', 'Bruno pagamento marcado a menos']]);
 r = ex('resumo_financeiro', { mes: '2026-11', alunoId: null });
 conf('novembro de todos: os meses anteriores em aberto (outubro) aparecem à parte', r.resultado.meses_anteriores_em_aberto, 'R$ 500,00');
+/* Ranking e projetado numa chamada só: o "de todos" traz, por aluno, o mesmo
+ * já dado, ainda não dado e mês inteiro que a chamada de um aluno traz.
+ * (Num teste real ela pediu "os cinco que mais rendem, projetado" e o modelo
+ * consultou um aluno por vez, bateu no teto de 8 por volta e deixou 3 de fora.) */
+const todosNov = r.resultado.por_aluno;
+conf('novembro de todos: cada aluno com já dado, ainda não dado e mês inteiro', todosNov.every(p => p.valor_ja_dado && p.valor_ainda_nao_dado && p.valor_do_mes_inteiro), true);
+['al1', 'al2'].forEach(function (id) {
+  const um = ex('resumo_financeiro', { mes: '2026-11', alunoId: id }).resultado;
+  const doTodos = todosNov.filter(p => p.aluno === um.aluno)[0] || {};
+  conf('novembro: ' + um.aluno + ' no "de todos" igual à chamada só dele',
+    [doTodos.valor_ja_dado, doTodos.valor_ainda_nao_dado, doTodos.valor_do_mes_inteiro, doTodos.aulas_dadas, doTodos.aulas_a_dar],
+    [um.valor_ja_dado, um.valor_ainda_nao_dado, um.valor_do_mes_inteiro, um.aulas_dadas, um.aulas_a_dar]);
+});
+conf('o system manda comparar e ordenar alunos com UMA chamada para todos e nunca listar com aluno faltando',
+  /UMA chamada para todos/.test(A.SISTEMA) && /se faltar algum, diga isso ANTES da lista/.test(A.SISTEMA), true);
+conf('a descrição do resumo_financeiro diz que o "de todos" traz o mês inteiro por aluno',
+  /todos de uma vez[^']*mês inteiro/.test(JSON.stringify(A.FERRAMENTAS.filter(f => f.name === 'resumo_financeiro')[0])), true);
+/* "Entendi" curto: 3 ou mais iguais menos o aluno viram uma linha com a contagem;
+ * 2 ficam como estão; o resto fica na ordem. */
+conf('Entendi: 15 consultas de alunos viram "aulas de novembro de 2026, 15 alunos"',
+  A.resumirEntendido(Array.from({ length: 15 }, (_, i) => 'aulas de novembro de 2026, Aluno' + i)), ['aulas de novembro de 2026, 15 alunos']);
+conf('Entendi: dois alunos ficam com o nome (abaixo de 3 não resume)',
+  A.resumirEntendido(['aulas de novembro de 2026, Ana S.', 'aulas de novembro de 2026, Bruno']), ['aulas de novembro de 2026, Ana S.', 'aulas de novembro de 2026, Bruno']);
+conf('Entendi: o que não é do grupo fica, na ordem',
+  A.resumirEntendido(['pagamentos marcados no app, aulas de outubro de 2026', 'aulas de novembro de 2026, A', 'Bruno', 'aulas de novembro de 2026, B', 'aulas de novembro de 2026, C']),
+  ['pagamentos marcados no app, aulas de outubro de 2026', 'aulas de novembro de 2026, 3 alunos', 'Bruno']);
 r = ex('resumo_financeiro', { mes: '2026-08', alunoId: 'al1' });
 conf('mês sem aula', r.resultado.obs, 'nenhuma aula neste mês');
 conf('recusa: mês "outubro"', ex('resumo_financeiro', { mes: 'outubro', alunoId: null }).erro, true);
