@@ -14,9 +14,10 @@ borda sao os das provas (provas.py).
 Licenca. O Decreto municipal 52.681/2011 (Sao Paulo), art. 1o, manda licenciar
 as obras da SME para copia, distribuicao e obra derivada, com atribuicao, sem
 fins comerciais e sob a mesma licenca: o equivalente da CC BY-NC-SA. Por isso
-cada item leva `licenca` e `atribuicao` (campos aditivos), e a atribuicao
-curta vai tambem em `origem_citada`, que e o texto de origem que o aplicativo
-ja desenha no cartao, na tela cheia e na folha.
+cada item leva `licenca`, `atribuicao` e `link` (o endereco do acervo da SME),
+campos aditivos que o aplicativo junta no credito do cartao, da tela cheia e
+da folha (L6). A atribuicao curta vai tambem em `origem_citada`, o texto de
+origem que o aplicativo ja desenhava.
 
 Fotos e ilustracoes de terceiros nao entram (decisao da orquestradora,
 13/11/2026): so o texto e os desenhos proprios do caderno. O caderno credita
@@ -1051,6 +1052,8 @@ def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=Non
                 'tom': tom_do_item(serie, u['tipo']),
                 'licenca': LICENCA_ITEM,
                 'atribuicao': atribuicao(serie, paginas, u['atividade'], questao),
+                # o endereco do acervo, que o aplicativo poe no credito (L6, aditivo)
+                'link': FONTE['url'],
                 'origem_detalhe': {'caderno': NOME_CADERNO, 'ano': NOME_SERIE[serie], 'volume': 'único',
                                    'edicao': EDICAO, 'paginas': paginas, 'unidade': u['unidade'],
                                    'atividade': u['atividade'], 'questao': questao},

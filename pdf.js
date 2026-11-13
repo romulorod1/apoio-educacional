@@ -4105,9 +4105,15 @@
         { tam: corpoDoRotulo(texto, r, k), bold: true, cor: COR.navy });
     }
 
+    /* A origem em letra pequena, quebrada na largura útil: a dos Cadernos da
+     * SME-SP passa de uma linha e estourava a margem direita. A de uma linha
+     * sai como sempre saiu. */
+    function linhasDeOrigem(origem) { return origem ? doc.quebrar(origem, UTIL, 6.5, false) : []; }
     function linhaDeOrigem(origem) {
-      doc.y -= 9;
-      doc.texto(origem, MARG_E, doc.y, { tam: 6.5, cor: COR.muted });
+      linhasDeOrigem(origem).forEach(function (l) {
+        doc.y -= 9;
+        doc.texto(l, MARG_E, doc.y, { tam: 6.5, cor: COR.muted });
+      });
     }
 
     /* Um recorte. Se ele inteiro não cabe numa folha e vem em pedaços (8a do
@@ -4116,7 +4122,8 @@
      * escala do item diminui. Nunca se corta recorte por altura fixa. */
     function recorte(parte, n, peca, extra, origem) {
       var rotuloNovo = (parte === 'lista' ? 'Exercício ' : '') + n + '.';
-      var cauda = extra + (origem ? 11 : 0) + 12;     // espaço para resposta, origem e folga
+      var nOrigem = linhasDeOrigem(origem).length;
+      var cauda = extra + (nOrigem ? 11 + 9 * (nOrigem - 1) : 0) + 12;     // espaço para resposta, origem e folga
       var pedacos = peca.pedacos && peca.pedacos.length ? peca.pedacos
         : [{ img: peca.img, alturaPt: peca.alturaPt }];
       var k = Math.min(1, UTIL / peca.larguraPt);
