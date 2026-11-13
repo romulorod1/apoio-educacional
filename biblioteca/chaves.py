@@ -12,16 +12,25 @@ Registro por livro, guardado pelo publicador em Livros/mapa/_chaves/<id>.json:
     {"livro": "<id>", "entradas": [{"chave", "titulo", "pagina", "capitulo", "ancora"}]}
 
 A entrada nova herda a chave de uma entrada antiga, nesta ordem, cada passo só
-com UMA candidata ainda livre:
-  1. o mesmo título normalizado (sem acento, sem caixa, sem espaço duplo);
-  2. o par da tabela de herança (meta.heranca_titulos): o título antigo da
+quando a candidata é ÚNICA dos dois lados (uma antiga e uma nova):
+  1. o mesmo título normalizado (sem acento, sem caixa, sem espaço duplo) E o
+     mesmo começo (página no PDF; capítulo e âncora no EPUB), em grupos do
+     mesmo tamanho dos dois lados, casados em ordem: o título repetido no
+     mesmo começo, ou sem começo, fica estável de uma rodada para a outra;
+  2. o mesmo título normalizado, só quando ele é ÚNICO no mapa antigo E no
+     novo: um segundo "Exercícios" que nasce em outra página não leva a chave
+     do primeiro, que mudaria de capítulo a correção dela;
+  3. o par da tabela de herança (meta.heranca_titulos): o título antigo da
      entrada velha e o título novo da entrada nova;
-  3. o mesmo começo (página no PDF; capítulo e âncora no EPUB) E título
-     parecido (semelhança das palavras de pelo menos SEMELHANCA_MINIMA) ou o
-     par da herança. O mesmo começo sozinho NÃO basta: um capítulo trocado
-     que começa na mesma página ganha chave nova.
-Sem candidata, chave nova. A chave nova é curta e determinística (o mesmo
-livro e a mesma entrada dão a mesma chave), e nunca repete uma do registro.
+  4. o mesmo começo E título parecido (semelhança das palavras de pelo menos
+     SEMELHANCA_MINIMA) ou o par da herança. O mesmo começo sozinho NÃO
+     basta: um capítulo trocado que começa na mesma página ganha chave nova.
+     (Limite conhecido: no limite de 0,50, "Unidade 3: Frações" e "Unidade 3:
+     Geometria" herdam; o aplicativo só segue a chave com o título igual ou
+     com o par da herança, então ali a correção vira sugestão.)
+Sem candidata, chave nova, listada no relatório. A chave nova é curta e
+determinística (o mesmo livro e a mesma entrada dão a mesma chave), e nunca
+repete uma do registro.
 
 Nada aqui lê ou grava arquivo: quem lê e grava o registro é o publicador.
 """
@@ -79,33 +88,71 @@ def estabilizar(livro_id, mapa, registro_antigo=None, heranca=None):
     """Dá a `chave` a cada entrada do mapa (uma cópia; o mapa de entrada não
     muda). Devolve (mapa_com_chave, registro_novo, novas): `novas` são os
     títulos que ganharam chave nova num livro que já tinha registro (o
-    relatório do publicador os lista para a orquestradora conferir)."""
+    relatório do publicador os lista para a orquestradora conferir).
+
+    Os passos, cada um só quando a candidata é ÚNICA dos dois lados (uma
+    entrada antiga e uma nova; com mais de uma, o passo não decide):
+      1. o mesmo título E o mesmo começo: as entradas de cada par (título,
+         começo) se casam em ordem, quando o antigo e o novo têm o mesmo
+         número delas (o título repetido no mesmo começo, ou sem começo, fica
+         estável de uma rodada para a outra);
+      2. o mesmo título, quando ele é único no mapa antigo E no novo (um
+         segundo "Exercícios" que nasce em outra página não leva a chave do
+         primeiro);
+      3. o par da tabela de herança;
+      4. o mesmo começo com título parecido (ou o par da herança).
+    O que sobra ganha chave nova, determinística, e é listado."""
     antigas = [dict(a) for a in ((registro_antigo or {}).get('entradas') or []) if a.get('chave')]
     usadas = {a['chave'] for a in antigas}
-    livres = list(antigas)
     pares = pares_da_heranca(heranca)
     saida = [dict(e) for e in mapa or []]
-    sem = list(range(len(saida)))
+    tn = lambda x: titulo_normalizado(x.get('titulo'))
+    livres = list(range(len(antigas)))     # índices das antigas ainda sem dono
+    sem = list(range(len(saida)))          # índices das novas ainda sem chave
 
-    def tomar(i, a):
-        saida[i]['chave'] = a['chave']
-        livres.remove(a)
+    def tomar(i, j):
+        saida[i]['chave'] = antigas[j]['chave']
+        livres.remove(j)
+        sem.remove(i)
+
+    # 1. o mesmo título e o mesmo começo, em grupos do mesmo tamanho, em ordem
+    grupos_n, grupos_a = {}, {}
+    for i in sem:
+        grupos_n.setdefault((tn(saida[i]), comeco(saida[i])), []).append(i)
+    for j in livres:
+        grupos_a.setdefault((tn(antigas[j]), comeco(antigas[j])), []).append(j)
+    for k, novos in grupos_n.items():
+        velhos = grupos_a.get(k) or []
+        if velhos and len(velhos) == len(novos):
+            for i, j in zip(list(novos), list(velhos)):
+                tomar(i, j)
 
     def passo(criterio):
         for i in list(sem):
-            e = saida[i]
-            cands = [a for a in livres if criterio(a, e)]
-            if len(cands) == 1:
-                tomar(i, cands[0])
-                sem.remove(i)
+            cands = [j for j in livres if criterio(antigas[j], saida[i])]
+            if len(cands) != 1:
+                continue
+            j = cands[0]
+            # e a antiga também só serve a esta nova
+            if sum(1 for i2 in sem if criterio(antigas[j], saida[i2])) != 1:
+                continue
+            tomar(i, j)
 
-    herda = lambda a, e: (titulo_normalizado(a.get('titulo')), titulo_normalizado(e.get('titulo'))) in pares
-    passo(lambda a, e: titulo_normalizado(a.get('titulo')) == titulo_normalizado(e.get('titulo')))
+    conta_a, conta_n = {}, {}
+    for a in antigas:
+        conta_a[tn(a)] = conta_a.get(tn(a), 0) + 1
+    for e in saida:
+        conta_n[tn(e)] = conta_n.get(tn(e), 0) + 1
+    herda = lambda a, e: (tn(a), tn(e)) in pares
+    # 2. o mesmo título, único no antigo e no novo
+    passo(lambda a, e: tn(a) == tn(e) and conta_a.get(tn(a)) == 1 and conta_n.get(tn(e)) == 1)
+    # 3. o par da herança
     passo(herda)
+    # 4. o mesmo começo, com título parecido ou o par da herança
     passo(lambda a, e: comeco(a) is not None and comeco(a) == comeco(e) and
           (semelhanca(a.get('titulo'), e.get('titulo')) >= SEMELHANCA_MINIMA or herda(a, e)))
     novas = []
-    for i in sem:
+    for i in sorted(sem):
         c = chave_nova(livro_id, saida[i], usadas)
         usadas.add(c)
         saida[i]['chave'] = c

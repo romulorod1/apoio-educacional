@@ -358,6 +358,10 @@ roda "planejamento com IA (fase 2)" node _teste/testa_planejamento.js
 # o salvar com a gravacao pendente: a mudanca no meio grava de novo, com o mesmo id
 roda "planejamento (salvar pendente)" node _teste/testa_planejamento_salvar.js
 roda "planejamento --envenenado-zera-sem-comparar" node _teste/testa_planejamento_salvar.js --envenenado-zera-sem-comparar
+# O assistente so de leitura com IA (fase 3): cada ferramenta sobre um banco
+# sintetico CONGELADO (nada grava, byte a byte), o laco com o content intacto,
+# o teto de 5 voltas e as 20 frases de datas relativas.
+roda "assistente com IA (fase 3)" node _teste/testa_assistente.js
 # Politica de testes por checkpoint (09/11/2026): o nivel 1 (quais provas de
 # navegador rodam pelos arquivos tocados, com o mapa em mapa_provas.tsv) e o
 # nivel 3 (a main reaproveita a bateria inteira se o tree for igual ao da cabeca
@@ -870,6 +874,10 @@ roda "planejamento (fluxo, IA fase 2)"              node "_teste/testa_planejame
 roda "planejamento --envenenado-salva-duplo"       node "_teste/testa_planejamento_navegador.js" --envenenado-salva-duplo
 roda "planejamento (registro e versao antiga)"      node "_teste/testa_planejamento_registro_navegador.js"
 roda "planejamento --envenenado-cascata-deixa-plano" node "_teste/testa_planejamento_registro_navegador.js" --envenenado-cascata-deixa-plano
+# IA, fase 3: o assistente no app (tablet e celular), com o /api/ia falso num roteiro
+# de tool_use: quem ve o botao, os cartoes que so abrem com o toque, o teto de 5
+# voltas, os erros, nada grava e o transbordo a 360, 390 e 412 px e 130%.
+roda "assistente (fluxo, IA fase 3)"                node "_teste/testa_assistente_navegador.js"
 # N1: a volta depois do rollback. O codigo da 4 republicado com o numero novo abre
 # um banco nesse numero sem os depositos novos; o codigo novo, voltando, sonda o
 # banco, cria o que falta na versao mais um e migra. O veneno sem a deteccao TEM
@@ -1042,23 +1050,27 @@ roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip
 # commit so; republicar igual nao escreve; a falha no meio do lote deixa a
 # versao anterior; as recusas (id trocado, livro que some, formato, assunto
 # fora do banco, caminho fora da lista); a classificacao do acervo; e as
-# regras do catalogo (a dona le e nao escreve). Portas 8986 a 8990.
-# Fase 1c (13/11/2026): o mapa novo chega ao tablet pelo catalogo, de ponta a
-# ponta no emulador: o publicador da 1b publica os metas vivos; o "Atualizar a
-# biblioteca" troca so o meta dos livros de mesmo arquivo; a defasagem da
-# romul-c0 vai a zero nos que ficam; Blob, posicao e correcoes byte a byte; o
-# SAI, o de outro arquivo e o de meta invalido intocados; nada na abertura.
-# Portas 8991 a 8996.
-roda "biblioteca na nuvem, metas"                   node "_teste/testa_biblioteca_nuvem_metas.js"
-roda "biblioteca na nuvem, metas --envenenado-troca-o-blob" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-troca-o-blob
-roda "biblioteca na nuvem, metas --envenenado-solta-a-posicao" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-solta-a-posicao
-roda "biblioteca na nuvem, metas --envenenado-aceita-meta-invalido" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-aceita-meta-invalido
-roda "biblioteca na nuvem, metas --envenenado-liga-na-abertura" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-liga-na-abertura
+# regras do catalogo (a dona le e nao escreve); os registros que somem sao recusa
+# e o que ficou para tras e refeito pelo indice da nuvem. Portas 9031 a 9035.
 roda "publicador do catalogo"                       node "_teste/testa_publicador_catalogo.js"
 roda "publicador do catalogo --envenenado-aceita-id-trocado" node "_teste/testa_publicador_catalogo.js" --envenenado-aceita-id-trocado
 roda "publicador do catalogo --envenenado-escreve-fora-da-lista" node "_teste/testa_publicador_catalogo.js" --envenenado-escreve-fora-da-lista
 roda "publicador do catalogo --envenenado-dois-lotes" node "_teste/testa_publicador_catalogo.js" --envenenado-dois-lotes
 roda "publicador do catalogo --envenenado-regra-herda-escrita" node "_teste/testa_publicador_catalogo.js" --envenenado-regra-herda-escrita
+roda "publicador do catalogo --envenenado-repetido-ultima-vence" node "_teste/testa_publicador_catalogo.js" --envenenado-repetido-ultima-vence
+roda "publicador do catalogo --envenenado-nome-cortado" node "_teste/testa_publicador_catalogo.js" --envenenado-nome-cortado
+roda "publicador do catalogo --envenenado-registro-vazio-passa" node "_teste/testa_publicador_catalogo.js" --envenenado-registro-vazio-passa
+# Fase 1c (13/11/2026): o mapa novo chega ao tablet pelo catalogo, de ponta a
+# ponta no emulador: o publicador da 1b publica os metas vivos; o "Atualizar a
+# biblioteca" troca so o meta dos livros de mesmo arquivo; a defasagem da
+# romul-c0 vai a zero nos que ficam; Blob, posicao e correcoes byte a byte; o
+# SAI, o de outro arquivo e o de meta invalido intocados; nada na abertura.
+# Portas 9041 a 9046.
+roda "biblioteca na nuvem, metas"                   node "_teste/testa_biblioteca_nuvem_metas.js"
+roda "biblioteca na nuvem, metas --envenenado-troca-o-blob" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-troca-o-blob
+roda "biblioteca na nuvem, metas --envenenado-solta-a-posicao" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-solta-a-posicao
+roda "biblioteca na nuvem, metas --envenenado-aceita-meta-invalido" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-aceita-meta-invalido
+roda "biblioteca na nuvem, metas --envenenado-liga-na-abertura" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-liga-na-abertura
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
@@ -1452,6 +1464,8 @@ roda "livros (gerador)"                         python biblioteca/_prova_livros.
 roda "chaves dos capitulos"                     python _teste/testa_chaves_capitulos.py
 roda "chaves dos capitulos --envenenado-chave-pela-pagina" python _teste/testa_chaves_capitulos.py --envenenado-chave-pela-pagina
 roda "chaves dos capitulos --envenenado-sem-heranca" python _teste/testa_chaves_capitulos.py --envenenado-sem-heranca
+roda "chaves dos capitulos --envenenado-titulo-sem-unicidade" python _teste/testa_chaves_capitulos.py --envenenado-titulo-sem-unicidade
+roda "chaves dos capitulos --envenenado-repetido-sem-ordem" python _teste/testa_chaves_capitulos.py --envenenado-repetido-sem-ordem
 # A revisao do C15.1: o pacote cortado recusado ja na espiada, sem ler o
 # arquivo inteiro, e o teto de 160 MB do aplicativo. Sem Chrome.
 roda "livros (regras)"                          node "_teste/testa_livros_regras.js"

@@ -1,0 +1,7 @@
+# PR 191: assistente só de leitura com IA. Uma linha por item, escrita para ela.
+Novo botão Perguntar: no celular fica no pé da tela Hoje; no tablet, ao lado do olho, no alto. Você digita ou dita a pergunta.
+Pergunte sobre a agenda, como "o que eu tenho amanhã?" ou "que horários tenho livres na quinta?", e a resposta vem com os horários do app.
+Pergunte quem está sem pagamento marcado no app num mês. A resposta diz de onde vem o número; confira no Pix antes de cobrar.
+Peça o contato de um responsável e aparece um cartão com WhatsApp, Ligar e Abrir no mapa.
+Peça "avisa a família de um aluno que vou atrasar" e o app prepara a mensagem do WhatsApp. Você pode editar antes de enviar, e nada é enviado sem você tocar.
+O assistente só consulta: ele não muda aulas nem pagamentos. Nova conversa, no alto da janela, começa do zero.

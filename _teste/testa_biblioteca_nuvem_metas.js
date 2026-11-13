@@ -38,8 +38,8 @@
  *   --envenenado-liga-na-abertura  a conferência roda sozinha na abertura (1).
  *
  * Precisa do firebase-tools (FIREBASE_TOOLS) e de um JDK 21 em JAVA_HOME,
- * como o testa_nuvem.js. Portas: 8991 (app), 8992 (auth), 8993 (firestore),
- * 8994 (hub), 8995 (log), 8996 (websocket).
+ * como o testa_nuvem.js. Portas: 9041 (app), 9042 (auth), 9043 (firestore),
+ * 9044 (hub), 9045 (log), 9046 (websocket).
  */
 'use strict';
 const fs = require('fs');
@@ -50,7 +50,7 @@ const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, esperar, pausa } = H;
 
-const PORTA_APP = 8991, PORTA_AUTH = 8992, PORTA_FS = 8993, PORTA_HUB = 8994, PORTA_LOG = 8995, PORTA_WS = 8996;
+const PORTA_APP = 9041, PORTA_AUTH = 9042, PORTA_FS = 9043, PORTA_HUB = 9044, PORTA_LOG = 9045, PORTA_WS = 9046;
 const PROJETO = 'demo-nath-metas';
 const AUTH = 'http://127.0.0.1:' + PORTA_AUTH;
 const FS = 'http://127.0.0.1:' + PORTA_FS;
@@ -90,6 +90,10 @@ function meta(id, extra) {
     titulo: 'Livro de prova ' + id, materia: 'matematica', materia_nome: 'Matemática', segmento: 'Fundamental II', series: ['08'],
     series_origem: 'mapa', mapa_disciplina: 'matematica', paginas: 10, sumario: [], sumario_origem: 'nenhum', mapa: [], mapa_origem: 'nenhum',
     mapa_nota: 'Sem mapa de capítulos.' }, extra || {});
+}
+// o caminho do arquivo na planilha, só para o publicador casar a classificação (não vai para a nuvem)
+function comOrigem(m) {
+  return Object.assign({}, m, { arquivo_origem: 'Matematica/' + m.id + '.pdf' });
 }
 const VELHOS = [
   meta('fica-a', { mapa: [cap(1, 'Proporcionalidade', 1, 5, ['MAT08-07']), cap(2, 'Volume', 6, 10, [])], mapa_origem: 'mapa', mapa_nota: 'Do mapa de 07/11.' }),
@@ -152,8 +156,9 @@ function publicar(uid) {
   const classif = escrever('classificacao.csv', 'arquivo;resultado;motivo\nfica-a.pdf;FICA;teoria\nfica-b.pdf;FICA;teoria\nteoria-e.pdf;SO_TEORIA;livro do professor\n' +
     'sai-c.pdf;SAI;roteiro de sala\noutro-d.pdf;FICA;teoria\ninvalido-f.pdf;FICA;teoria\n');
   const env = Object.assign({}, process.env, { FIRESTORE_EMULATOR_HOST: '127.0.0.1:' + PORTA_FS, PYTHONIOENCODING: 'utf-8' });
-  return spawnSync(PYTHON, ['-X', 'utf8', path.join(H.RAIZ, 'biblioteca', 'publicar_catalogo.py'), '--projeto', PROJETO, '--uid', uid,
-    '--manifesto', escrever('vivos.json', { livros: VIVOS }), '--classificacao', classif, '--agora', '2026-11-13T10:00:00-03:00', '--publicar'],
+  return spawnSync(PYTHON, ['-X', 'utf8', path.join(H.RAIZ, 'biblioteca', 'publicar_catalogo.py'), '--projeto', PROJETO, '--emulador', '--uid', uid,
+    '--manifesto', escrever('vivos.json', { livros: VIVOS.map(comOrigem) }), '--classificacao', classif, '--agora', '2026-11-13T10:00:00-03:00',
+    '--registro-ids', path.join(TMP, '_ids.json'), '--chaves', path.join(TMP, '_chaves'), '--primeira-publicacao', '--publicar'],
   { encoding: 'utf8', env, timeout: 120000 });
 }
 
