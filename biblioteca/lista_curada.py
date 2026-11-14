@@ -51,16 +51,23 @@ O json (todo campo desconhecido e recusado, em qualquer nivel):
   "rect": [...]}, {"pagina": 13, "rect": [...]}]} no lugar de pagina e rect;
   os pedacos saem empilhados num SVG so, na ordem do json.
 - pedaco sem texto e sem tinta (regiao em branco, ou caixa menor que
-  RECT_MIN pt) e recusado. Tinta e qualquer pixel abaixo de BRANCO em algum
-  canal (RGB), medido contra o branco: a figura clara (cinza 0.85, amarelo
-  palido) sem texto vale; so a caixa toda branca e recusada.
+  RECT_MIN pt) e recusado. Tinta e medida contra a cor do papel, a cor mais
+  comum da pagina desenhada (o branco, o creme, o fundo do escaneado), e nao
+  contra o branco: e tinta o pixel que se afasta dela mais de TINTA_TOL em
+  algum canal (RGB), e o pedaco precisa de pelo menos TINTA_MIN da caixa (e
+  nunca menos de TINTA_MIN_PX pixels) assim. A figura clara (cinza 0.85,
+  amarelo palido) sem texto vale; a caixa toda da cor do papel, branca ou
+  creme, e recusada.
 - confere: o texto do recorte, sem acento, sem pontuacao e sem espaco (o
   espaco e a quebra de linha nao contam), tem de comecar pelo confere escrito
-  do mesmo jeito. Vale o comeco do texto na ordem natural do PDF ou o comeco
-  de qualquer bloco de texto do recorte, com os blocos do primeiro pedaco
-  postos de cima para baixo e o texto dos pedacos seguintes depois: um
-  cabecalho acima do item, que o PDF le primeiro, nao reprova o item certo.
-  Pega a pagina trocada por uma.
+  do mesmo jeito, na ordem natural do PDF. Uma folga so: o primeiro bloco de
+  texto do primeiro pedaco (de cima para baixo) pode ser pulado quando e uma
+  linha so, inteira na faixa de CABECALHO_PT pt do alto da caixa (o cabecalho
+  da pagina que a caixa pegou de raspao e que o PDF le primeiro); ai vale
+  tambem o texto do segundo bloco em diante. Nunca mais que um bloco: a caixa
+  alta demais, que comeca por um item inteiro de antes, e a pagina que so
+  cita o texto num bloco mais abaixo continuam recusadas. Pega a pagina
+  trocada por uma.
 - atribuicao: modelo com {fonte} (o nome), {serie} ("3º ano"), {paginas}
   ("p. 12", "p. 12 a 13" ou "p. 12 e 15", as do PDF), {titulo}, {id} e
   {arquivo} (o nome do PDF). Outro nome entre chaves, formato ({fonte:>30})
@@ -118,7 +125,10 @@ SERIE = re.compile(r'^(?:([1-9])ano|([1-3])em)$')
 TRACOS = ('–', '—', '−')
 TOLERANCIA = 0.01  # pt: arredondamento de quem escreveu a caixa
 RECT_MIN = 5.0     # pt: caixa mais estreita ou mais baixa que isto nao e recorte
-BRANCO = 250       # canal (0 a 255) abaixo disto e tinta, na conferencia da caixa vazia
+TINTA_TOL = 16     # canal (0 a 255) mais longe que isto da cor do papel e tinta, na conferencia da caixa vazia
+TINTA_MIN = 0.002  # fracao minima de pixels de tinta no pedaco (0,2%)
+TINTA_MIN_PX = 3   # e nunca menos que isto de pixels
+CABECALHO_PT = 18  # pt: faixa do alto da caixa onde a linha de cabecalho pode ser pulada pelo confere
 sem_tracos = portal.sem_tracos  # um nome so, para a prova poder desliga-lo (veneno)
 
 
@@ -271,26 +281,48 @@ def acertar_cropbox(doc, pno, notas):
 
 # ------------------------------------------------------------------ leitura
 
+def cor_do_papel(doc, pno):
+    """A cor mais comum da pagina desenhada a 36 dpi, em RGB: o papel."""
+    pix = doc[pno].get_pixmap(dpi=36, colorspace=pymupdf.csRGB, alpha=False)
+    s = pix.samples
+    return collections.Counter(s[i:i + 3] for i in range(0, len(s), 3)).most_common(1)[0][0]
+
+
 def tem_conteudo(doc, pno, rect):
-    """O retangulo tem texto ou tinta: algum pixel, em algum canal, abaixo de
-    BRANCO (a figura clara sem texto vale; so a caixa toda branca nao)."""
+    """O retangulo tem texto ou tinta: pixels que se afastam da cor do papel
+    mais de TINTA_TOL em algum canal, pelo menos TINTA_MIN da caixa (e
+    TINTA_MIN_PX). A figura clara sem texto vale; a caixa da cor do papel, nao."""
     if doc[pno].get_text('text', clip=pymupdf.Rect(rect)).strip():
         return True
+    papel = cor_do_papel(doc, pno)
     pix = doc[pno].get_pixmap(dpi=72, colorspace=pymupdf.csRGB, clip=pymupdf.Rect(rect), alpha=False)
-    return any(b < BRANCO for b in pix.samples)
+    s = pix.samples
+    n = len(s) // 3
+    tinta = sum(1 for i in range(0, len(s), 3)
+                if abs(s[i] - papel[0]) > TINTA_TOL or abs(s[i + 1] - papel[1]) > TINTA_TOL
+                or abs(s[i + 2] - papel[2]) > TINTA_TOL)
+    return tinta >= max(TINTA_MIN_PX, TINTA_MIN * n)
 
 
 def comecos_do_recorte(docs, ps):
     """Os textos com que o recorte pode comecar, para o confere: o da ordem
-    natural do PDF e, para cada bloco de texto do primeiro pedaco (de cima para
-    baixo), o texto dele em diante mais o dos pedacos seguintes."""
+    natural do PDF e, so quando o primeiro bloco de texto do primeiro pedaco
+    (de cima para baixo) e uma linha so dentro da faixa de CABECALHO_PT do alto
+    da caixa, o texto do segundo bloco em diante mais o dos pedacos seguintes."""
     resto = ''.join(gerar_pacote.texto_do_retangulo(docs[c], pno, r) for c, pno, r in ps[1:])
     c0, pno0, r0 = ps[0]
     out = [gerar_pacote.texto_do_retangulo(docs[c0], pno0, r0) + resto]
-    blocos = [b for b in docs[c0][pno0].get_text('blocks', clip=pymupdf.Rect(r0)) if b[6] == 0 and b[4].strip()]
-    blocos.sort(key=lambda b: (b[1], b[0]))
-    for k in range(len(blocos)):
-        out.append(''.join(b[4] for b in blocos[k:]) + resto)
+    blocos = []
+    for b in docs[c0][pno0].get_text('dict', clip=pymupdf.Rect(r0))['blocks']:
+        if b.get('type') != 0:
+            continue
+        linhas_b = [ln for ln in b['lines'] if ''.join(sp['text'] for sp in ln['spans']).strip()]
+        if linhas_b:
+            blocos.append((b['bbox'], linhas_b))
+    blocos.sort(key=lambda b: (b[0][1], b[0][0]))
+    if len(blocos) >= 2 and len(blocos[0][1]) == 1 and blocos[0][0][3] <= r0[1] + CABECALHO_PT:
+        out.append('\n'.join(''.join(sp['text'] for sp in ln['spans']) for _, lns in blocos[1:] for ln in lns)
+                   + '\n' + resto)
     return out
 
 
@@ -479,8 +511,9 @@ def gerar(itens_curados, versao, saida, curadoria=None, trabalho=None, gerado_em
         dentro = [(o, dentro_do_repositorio(c)) for o, c in (('--saida', saida), ('a pasta de trabalho', trabalho))]
         dentro = [(o, r) for o, r in dentro if r]
         if dentro:
-            raise SystemExit('erro: --itens-curados: a fonte é privada, e %s %s dentro do repositório git (%s). '
-                             'Gere fora de qualquer checkout git.'
+            raise SystemExit('erro: --itens-curados: a fonte é privada, e %s %s dentro do repositório git com '
+                             'raiz em %s (a raiz achada pode estar bem acima do destino: o .git pode ser de uma '
+                             'pasta pai). Gere fora de qualquer checkout git.'
                              % (' e '.join(o for o, _ in dentro), 'ficam' if len(dentro) > 1 else 'fica',
                                 ', '.join(sorted(set(r for _, r in dentro)))))
     if curadoria:

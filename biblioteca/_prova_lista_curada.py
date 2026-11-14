@@ -59,10 +59,14 @@ Travas:
                   a trava que so olha este repositorio deixa passar)
   tinta clara     o recorte so com figura cinza clara (0.85) ou amarelo palido,
                   sem texto, vale; a caixa sobre um preenchimento branco puro e
-                  recusada como em branco (veneno: o limite antigo, cinza 200,
-                  recusa as figuras claras)
-  confere         o cabecalho acima do texto esperado, que o PDF le primeiro,
-                  nao reprova o item (veneno: so a ordem natural do PDF reprova)
+                  a area vazia de uma pagina creme sao recusadas como em branco
+                  (venenos: a tolerancia larga, como o cinza 200 de antes,
+                  recusa as figuras claras; medir contra o branco aceita o creme)
+  confere         o cabecalho de uma linha no alto da caixa, que o PDF le
+                  primeiro, nao reprova o item (veneno: so a ordem natural do
+                  PDF reprova); a caixa alta demais, com o item de antes
+                  inteiro e o confere do item, e a pagina errada que so tem o
+                  texto num bloco mais abaixo continuam recusadas
   gabarito        --gabarito-externo com --so-com-resposta pela linha de
                   comando: so fica item com gabarito, o numero e o de sem a
                   opcao, as contagens e o relatorio batem, a busca esquece o
@@ -765,6 +769,18 @@ def tinta_clara_e_cabecalho(temp, pdfs, placar):
     p = doc.new_page(width=W, height=H)
     linhas(p, 60, 60, ['Caderno de exercicios, unidade 7'])
     linhas(p, 60, 100, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
+    # p. 5: a caixa alta demais pega o item de antes inteiro e depois o certo
+    p = doc.new_page(width=W, height=H)
+    linhas(p, 60, 60, ['Atividade 7.0', 'Quanto e 2 + 2?'])
+    linhas(p, 60, 110, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
+    # p. 6: a pagina errada, com um paragrafo no alto e o texto so mais abaixo
+    p = doc.new_page(width=W, height=H)
+    linhas(p, 60, 60, ['Leia com atencao antes de comecar.', 'Use lapis e borracha.'])
+    linhas(p, 60, 110, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
+    # p. 7: pagina creme inteira, com uma figura longe da caixa
+    p = doc.new_page(width=W, height=H)
+    p.draw_rect(p.rect, color=None, fill=(0.97, 0.96, 0.92))
+    p.draw_rect(pymupdf.Rect(80, 600, 400, 700), color=None, fill=(0.2, 0.2, 0.2))
     salvar(doc, os.path.join(pdfs, 'caderno-f.pdf'))
 
     def item(k, rect, **extra):
@@ -780,16 +796,27 @@ def tinta_clara_e_cabecalho(temp, pdfs, placar):
     c = item(3, [100, 120, 380, 280])
     r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_branca'), gravar_zip=False))
     placar.conferir('tinta clara: caixa sobre branco puro', [r] if r else [], True, 'caixa em branco')
-    antes = lista_curada.BRANCO
-    lista_curada.BRANCO = 200
+    c = item(7, [100, 120, 380, 280])
+    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_creme'), gravar_zip=False))
+    placar.conferir('tinta clara: area vazia de pagina creme', [r] if r else [], True, 'caixa em branco')
+    antes = lista_curada.cor_do_papel
+    lista_curada.cor_do_papel = lambda doc, pno: (255, 255, 255)
+    try:
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_v_creme'), gravar_zip=False))
+    finally:
+        lista_curada.cor_do_papel = antes
+    placar.conferir('tinta clara: medir contra o branco, na pagina creme', [] if r else ['a area creme passou'],
+                    True, 'passou')
+    antes = lista_curada.TINTA_TOL
+    lista_curada.TINTA_TOL = 55
     try:
         for nome, c in clara:
             r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_v_' + nome.split()[0]), gravar_zip=False))
-            placar.conferir('tinta clara: o limite antigo (200) com figura %s' % nome, [r] if r else [], True,
-                            'caixa em branco')
+            placar.conferir('tinta clara: a tolerancia larga (55, como o cinza 200) com figura %s' % nome,
+                            [r] if r else [], True, 'caixa em branco')
     finally:
-        lista_curada.BRANCO = antes
-    c = item(4, [50, 45, 400, 140], confere='Atividade 7.1 Quanto e 6')
+        lista_curada.TINTA_TOL = antes
+    c = item(4, [50, 48, 400, 140], confere='Atividade 7.1 Quanto e 6')
     r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cabecalho'), gravar_zip=False))
     placar.conferir('confere: cabecalho acima do texto esperado vale', [r] if r else [])
     antes = lista_curada.comecos_do_recorte
@@ -800,9 +827,28 @@ def tinta_clara_e_cabecalho(temp, pdfs, placar):
         lista_curada.comecos_do_recorte = antes
     placar.conferir('confere: so a ordem natural do PDF, com o cabecalho', [r] if r else [], True,
                     'não começa por confere')
-    c = item(4, [50, 45, 400, 140], confere='Atividade 7.2 Quanto e 6')
+    c = item(4, [50, 48, 400, 140], confere='Atividade 7.2 Quanto e 6')
     r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cabecalho_errado'), gravar_zip=False))
     placar.conferir('confere: com o cabecalho, outro texto esperado', [r] if r else [], True, 'não começa por confere')
+    for k, nome in ((5, 'caixa alta demais com o item de antes e o confere do item'),
+                    (6, 'pagina errada com o texto so num bloco mais abaixo')):
+        c = item(k, [50, 48, 400, 140], confere='Atividade 7.1 Quanto e 6')
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'confere_%d' % k), gravar_zip=False))
+        placar.conferir('confere: %s' % nome, [r] if r else [], True, 'não começa por confere')
+        # e as duas caixas sao de verdade o defeito: o comeco de qualquer bloco as aceitaria
+
+        def qualquer_bloco(docs, ps):
+            c0, pno0, r0 = ps[0]
+            bl = sorted((b for b in docs[c0][pno0].get_text('blocks', clip=pymupdf.Rect(r0)) if b[6] == 0),
+                        key=lambda b: (b[1], b[0]))
+            return antes(docs, ps) + [''.join(b[4] for b in bl[k:]) for k in range(len(bl))]
+        lista_curada.comecos_do_recorte = qualquer_bloco
+        try:
+            r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'confere_v%d' % k), gravar_zip=False))
+        finally:
+            lista_curada.comecos_do_recorte = antes
+        placar.conferir('confere: o comeco de qualquer bloco, na %s' % nome, [] if r else ['a caixa passou'], True,
+                        'passou')
 
 
 def pilha_trocada(temp, pdfs, c, placar):
