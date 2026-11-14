@@ -2886,6 +2886,53 @@
     }).then(function () { return contas; });
   }
 
+  /* O LIVRO QUE CHEGOU DA NUVEM (nuvem da biblioteca, PR 3): ela tocou no
+   * livro "na nuvem" da Estante, o arquivo baixou INTEIRO e o sha256 dele já
+   * foi conferido contra o do catálogo (app.js). Só então chega aqui, e entra
+   * numa transação só, com o Blob montado: o IndexedDB não grava metade de um
+   * registro, e a falha (a falta de espaço chega como a transação abortada)
+   * não deixa registro nenhum.
+   * item: { meta, blob, sha256, metaHash, metaVersao }. O registro fica como
+   * o de um livro importado, com pacote 'nuvem', a versão do meta e a marca
+   * `nuvem` (o meta aplicado), como o DESENHO, seção 5, pede.
+   * Nunca troca o que já está: o livro de mesmo id que entrou enquanto baixava
+   * (por um pacote, ou por outra aba) fica, e a resposta diz `jaEstava`. A
+   * posição de leitura que ficou de quando o livro saiu do tablet volta pela
+   * mesma regra da troca de arquivo (posicaoNoArquivoNovo).
+   * Devolve { entrou, jaEstava, bytes }. */
+  function gravarLivroDaNuvem(item) {
+    var meta = item && item.meta;
+    if (!meta || typeof meta.id !== 'string' || !item.blob || typeof item.sha256 !== 'string' ||
+      meta.hash !== 'sha256:' + item.sha256 || item.blob.size !== meta.bytes) {
+      return Promise.reject(new Error('O livro da nuvem não confere com o catálogo.'));
+    }
+    var agora = new Date().toISOString();
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, ['livros', 'livros_posicoes'], 'readwrite');
+        var dep = t.objectStore('livros');
+        var r = { entrou: false, jaEstava: false, bytes: item.blob.size };
+        var req = dep.get(meta.id);
+        req.onsuccess = function () {
+          if (req.result) { r.jaEstava = true; return; }
+          var ps = t.objectStore('livros_posicoes');
+          var rv = ps.get(meta.id);
+          rv.onsuccess = function () {
+            var velha = rv.result;
+            if (!velha || typeof velha.sha !== 'string' || !velha.sha || velha.sha === meta.hash) return;
+            var voltou = posicaoNoArquivoNovo(velha, null, meta);
+            if (voltou) ps.put(voltou);
+          };
+          dep.put({ id: meta.id, pacote: 'nuvem', versao: item.metaVersao || 1, meta: meta, blob: item.blob,
+            bytes: item.blob.size, importadoEm: agora, nuvem: { metaHash: item.metaHash || null, metaVersao: item.metaVersao || 1 } });
+          r.entrou = true;
+        };
+        t.oncomplete = function () { resolve(r); };
+        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+
   /* Os livros guardados, em ordem de título. O registro traz o Blob, mas o
    * Blob do IndexedDB é só uma referência: listar não lê os livros. */
   function listarLivros() {
@@ -3652,7 +3699,7 @@
     gravarEtiquetaBiblioteca: gravarEtiquetaBiblioteca, etiquetasDaBiblioteca: etiquetasDaBiblioteca,
     gravarListaBiblioteca: gravarListaBiblioteca, apagarListaBiblioteca: apagarListaBiblioteca,
     listasDaBiblioteca: listasDaBiblioteca,
-    gravarLivros: gravarLivros, listarLivros: listarLivros, lerLivro: lerLivro, removerLivro: removerLivro,
+    gravarLivros: gravarLivros, gravarLivroDaNuvem: gravarLivroDaNuvem, listarLivros: listarLivros, lerLivro: lerLivro, removerLivro: removerLivro,
     lerPosicaoLivro: lerPosicaoLivro, gravarPosicaoLivro: gravarPosicaoLivro, posicaoNoArquivoNovo: posicaoNoArquivoNovo,
     trocarMetaDaNuvem: trocarMetaDaNuvem, canonicoDoMeta: canonicoDoMeta,
     aoMudar: aoMudar, somenteLeitura: somenteLeitura, celularQueEdita: celularQueEdita,

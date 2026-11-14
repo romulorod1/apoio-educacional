@@ -1,0 +1,2 @@
+# Nuvem da biblioteca, PR 3: o livro que está na nuvem dela e não no tablet aparece na Estante, com o sinal "Na nuvem", e baixa com um toque, um por vez, conferido pelo sha256 do catálogo antes de ser guardado.
+Os livros que estão na sua nuvem aparecem na Estante e baixam com um toque.

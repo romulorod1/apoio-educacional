@@ -17685,6 +17685,269 @@
     return atualizandoBiblioteca;
   }
 
+  /* ---- a biblioteca na nuvem, PR 3: o livro da nuvem aparece na Estante e baixa com um toque ----
+   *
+   * O livro que está no catálogo (config/catalogo) com o arquivo no Storage
+   * (caminhoNuvem, gravado pelo publicador do dono) e NÃO está no tablet
+   * aparece na Estante, no lugar dele (disciplina, ano, tipo), com um sinal
+   * pequeno: "Na nuvem". Ela toca, ele baixa com o andamento à vista, o
+   * sha256 do arquivo inteiro é conferido contra o do catálogo, e só então o
+   * livro é guardado (Store.gravarLivroDaNuvem), como um livro importado: o
+   * toque seguinte abre a tela dele.
+   *
+   * Um livro por vez, sempre pelo toque dela: nada baixa sozinho, e não há
+   * "baixar todos". O toque repetido enquanto baixa não começa outra baixa. O
+   * arquivo pela metade nunca vira livro: o nuvem.js só devolve os bytes
+   * inteiros, do tamanho do catálogo, e o que não confere no sha256 não é
+   * guardado; a falha não deixa registro, e o toque seguinte tenta de novo.
+   * Sem internet, o cartão diz isso e o toque não pede nada à rede. Sem
+   * espaço no tablet (navigator.storage.estimate), diz quanto falta.
+   *
+   * Só no tablet, com a conta dela: o celular e o observador (D7) não veem
+   * os livros da nuvem, porque as regras do Storage não deixam o observador
+   * baixar (storage.rules), e o celular não tem a Estante.
+   *
+   * A LISTA (o meta conferido de cada livro da nuvem) mora no banco próprio
+   * do nuvem.js, para a Estante abrir sem rede. Ela é refeita ao abrir a
+   * Biblioteca, no máximo a cada dez minutos: lê o índice do catálogo e,
+   * para cada livro novo ou trocado que não está no tablet, o documento dele,
+   * conferido como na fase 1c (Biblioteca.conferirMetaDaNuvem). Só leitura:
+   * nada no tablet muda por ela. */
+  var LIVROS_NA_NUVEM_INTERVALO_MS = 10 * 60 * 1000;
+  var livrosNaNuvem = null;          // { uid, quando, livros: { id: { id, sha256, tamanho, formato, caminhoNuvem, metaHash, metaVersao, meta } } }
+  var livrosNaNuvemLidos = null;     // a leitura da lista guardada, uma vez por abertura
+  var conferindoNaNuvem = null;
+  var baixaDaNuvem = null;           // a baixa em curso: { id, recebidos, total, fase, promessa }
+  var falhasDaBaixa = Object.create(null);   // id -> o motivo da última tentativa que não deu certo
+  // além do livro: os bytes na memória, o Blob montado e o registro convivem até a gravação
+  var FOLGA_DA_BAIXA = 50 * 1024 * 1024;
+
+  function podeBaixarDaNuvem() {
+    // o observador (D7) sempre tem a marca de celular, com a conta de outra pessoa: aparelhoSoLe e est.observador o pegam
+    if (modoCelular || aparelhoSoLe() || !temNuvem()) return false;
+    if (typeof Nuvem.baixarLivroDaNuvem !== 'function') return false;
+    var est = Nuvem.estado();
+    return !!(est.entrada && est.entrada.uid && !est.observador);
+  }
+  function carregarLivrosNaNuvem() {
+    if (!livrosNaNuvemLidos) {
+      var ler = temNuvem() && typeof Nuvem.lerLivrosNaNuvem === 'function' ? Nuvem.lerLivrosNaNuvem() : Promise.resolve(null);
+      livrosNaNuvemLidos = ler.then(function (v) { if (v && !livrosNaNuvem) livrosNaNuvem = v; },
+        function () { /* sem a lista guardada, a Estante espera a conferência */ });
+    }
+    return livrosNaNuvemLidos;
+  }
+  // os livros da nuvem que a Estante mostra: com o arquivo na nuvem, desta conta, e que não estão no tablet
+  function livrosNaNuvemDaEstante(locais) {
+    if (!livrosNaNuvem || !podeBaixarDaNuvem() || livrosNaNuvem.uid !== Nuvem.estado().entrada.uid) return [];
+    var aqui = Object.create(null);
+    locais.forEach(function (l) { aqui[l.id] = true; });
+    var todos = livrosNaNuvem.livros || {};
+    return Object.keys(todos).filter(function (id) { return !aqui[id] && todos[id] && todos[id].meta; }).sort(function (a, b) {
+      return String(todos[a].meta.titulo || a).localeCompare(String(todos[b].meta.titulo || b), 'pt-BR') || (a < b ? -1 : 1);
+    }).map(function (id, i) {
+      return { id: id, meta: todos[id].meta, pos: null, naNuvem: todos[id], cor: CORES_DAS_CAPAS[(locais.length + i) % CORES_DAS_CAPAS.length] };
+    });
+  }
+  function assinaturaDosLivrosNaNuvem(livros) {
+    return Object.keys(livros || {}).sort().map(function (id) { return id + ':' + livros[id].sha256 + ':' + livros[id].metaHash; }).join('|');
+  }
+
+  function conferirLivrosNaNuvem(forcar) {
+    if (conferindoNaNuvem) return conferindoNaNuvem;
+    if (!podeBaixarDaNuvem() || navigator.onLine === false || typeof Nuvem.lerCatalogo !== 'function') return Promise.resolve(false);
+    var uid = Nuvem.estado().entrada.uid;
+    var daConta = livrosNaNuvem && livrosNaNuvem.uid === uid ? livrosNaNuvem : null;
+    if (!forcar && daConta && daConta.quando && Date.now() - daConta.quando < LIVROS_NA_NUVEM_INTERVALO_MS) return Promise.resolve(false);
+    var antes = daConta ? daConta.livros || {} : {};
+    var novos = {};
+    conferindoNaNuvem = Promise.all([Nuvem.lerCatalogo(), Store.listarLivros()]).then(function (r) {
+      var indice = r[0], locais = Object.create(null);
+      (r[1] || []).forEach(function (l) { locais[l.id] = true; });
+      var doIndice = indice && indice.livros && typeof indice.livros === 'object' ? indice.livros : {};
+      var pedidos = [];
+      Object.keys(doIndice).forEach(function (id) {
+        var e = doIndice[id];
+        if (!e || e.retiradoEm || typeof e.caminhoNuvem !== 'string' || !e.caminhoNuvem || (e.formato !== 'pdf' && e.formato !== 'epub')) return;
+        if (!/^[0-9a-f]{64}$/.test(String(e.sha256 || '')) || typeof e.tamanho !== 'number' || !(e.tamanho > 0)) return;
+        var a = antes[id];
+        if (a && a.sha256 === e.sha256 && a.metaHash === e.metaHash && a.caminhoNuvem === e.caminhoNuvem && a.tamanho === e.tamanho) { novos[id] = a; return; }
+        if (locais[id]) return;   // o livro que já está no tablet não precisa do documento agora
+        pedidos.push({ id: id, e: e });
+      });
+      // um documento por vez: são poucos KB cada, e a rede do tablet é a da aula
+      return pedidos.reduce(function (p, ped) {
+        return p.then(function () {
+          return Nuvem.lerLivroDoCatalogo(ped.id).then(function (doc) {
+            var e = ped.e;
+            if (!doc || doc.id !== ped.id || doc.sha256 !== e.sha256 || doc.metaHash !== e.metaHash ||
+              doc.caminhoNuvem !== e.caminhoNuvem || doc.tamanho !== e.tamanho) return;
+            return Store.sha256Hex(doc.metaJson).then(function (h) {
+              var c = Biblioteca.conferirMetaDaNuvem(doc, h);
+              if (!c.meta || c.meta.formato !== e.formato) return;
+              novos[ped.id] = { id: ped.id, sha256: e.sha256, tamanho: e.tamanho, formato: e.formato, caminhoNuvem: e.caminhoNuvem,
+                metaHash: e.metaHash, metaVersao: doc.metaVersao || e.metaVersao || 1, meta: c.meta };
+            });
+          });
+        });
+      }, Promise.resolve());
+    }).then(function () {
+      var mudou = assinaturaDosLivrosNaNuvem(novos) !== assinaturaDosLivrosNaNuvem(antes);
+      livrosNaNuvem = { uid: uid, quando: Date.now(), livros: novos };
+      return Nuvem.guardarLivrosNaNuvem(livrosNaNuvem).catch(function () { /* fica só na memória até a próxima */ }).then(function () { return mudou; });
+    }).then(function (mudou) {
+      conferindoNaNuvem = null;
+      if (mudou) desenharLivrosDaBiblioteca();
+      return mudou;
+    }, function () {
+      // sem rede no meio, ou a nuvem recusou: a lista de antes continua valendo
+      conferindoNaNuvem = null;
+      return false;
+    });
+    return conferindoNaNuvem;
+  }
+
+  // o toque num livro da nuvem: baixa, confere e guarda; um por vez
+  function outraBaixaEmCurso(id) {
+    if (baixaDaNuvem.id !== id) avisar('Um livro por vez: espere o que está baixando terminar.');
+    return baixaDaNuvem.promessa;
+  }
+  function baixarDaNuvemPeloToque(id) {
+    if (baixaDaNuvem) return outraBaixaEmCurso(id);
+    var e = livrosNaNuvem && livrosNaNuvem.livros ? livrosNaNuvem.livros[id] : null;
+    if (!e || !podeBaixarDaNuvem()) return Promise.resolve(false);
+    if (navigator.onLine === false) {
+      falhasDaBaixa[id] = 'sem-rede';
+      atualizarCartoesDaNuvem();
+      return Promise.resolve(false);
+    }
+    delete falhasDaBaixa[id];
+    var baixa = baixaDaNuvem = { id: id, recebidos: 0, total: e.tamanho, fase: 'baixando', promessa: null };
+    atualizarCartoesDaNuvem();
+    baixa.promessa = Store.estimarEspaco().catch(function () { return null; }).then(function (espaco) {
+      if (espaco && espaco.quota) {
+        var livre = espaco.quota - (espaco.usage || 0);
+        var precisa = e.tamanho * 2 + FOLGA_DA_BAIXA;
+        if (livre < precisa) throw Object.assign(new Error('sem espaço'), { codigo: 'SEM_ESPACO', precisa: precisa, livre: Math.max(0, livre) });
+      }
+      return Store.tornarPersistente().catch(function () { return false; });
+    }).then(function () {
+      return Nuvem.baixarLivroDaNuvem(e.caminhoNuvem, { tamanho: e.tamanho, aoProgresso: function (n) {
+        baixa.recebidos = n;
+        atualizarCartoesDaNuvem();
+      } });
+    }).then(function (bytes) {
+      baixa.fase = 'conferindo';
+      atualizarCartoesDaNuvem();
+      return conferirLivroBaixado(bytes, e).then(function () { return guardarLivroBaixado(bytes, e); });
+    }).then(function () {
+      baixaDaNuvem = null;
+      avisar(tituloDoLivro(e.meta) + ' está no tablet. Toque nele para abrir.');
+      return Promise.resolve(desenharLivrosAjustes()).catch(function () { /* a lista de Ajustes se refaz ao abrir */ })
+        .then(desenharLivrosDaBiblioteca).then(function () { return true; });
+    }, function (err) {
+      baixaDaNuvem = null;
+      var motivo = motivoDaFalhaDaBaixa(err);
+      falhasDaBaixa[id] = motivo;
+      if (motivo === 'sem-espaco') {
+        avisar('O tablet está sem espaço para este livro: ele precisa de ' + Biblioteca.mb(err && err.precisa || e.tamanho * 2) +
+          (err && typeof err.livre === 'number' ? ' e há ' + Biblioteca.mb(err.livre) + ' livres' : '') +
+          '. Libere espaço no tablet (ou remova livros que não usa, em Ajustes) e toque de novo.');
+      }
+      atualizarCartoesDaNuvem();
+      return false;
+    });
+    return baixa.promessa;
+  }
+  // o sha256 do arquivo inteiro contra o do catálogo; o que não confere não é guardado
+  function conferirLivroBaixado(bytes, e) {
+    return Store.sha256Hex(bytes).then(function (h) {
+      if (h !== e.sha256) throw Object.assign(new Error('O arquivo baixado não confere com o catálogo.'), { codigo: 'HASH_DIFERENTE' });
+    });
+  }
+  function guardarLivroBaixado(bytes, e) {
+    var blob = new Blob([bytes], { type: e.formato === 'epub' ? 'application/epub+zip' : 'application/pdf' });
+    return Store.gravarLivroDaNuvem({ meta: e.meta, blob: blob, sha256: e.sha256, metaHash: e.metaHash, metaVersao: e.metaVersao });
+  }
+  function motivoDaFalhaDaBaixa(err) {
+    var c = err && err.codigo;
+    if (c === 'SEM_ESPACO' || (err && err.name === 'QuotaExceededError')) return 'sem-espaco';
+    if (c === 'HASH_DIFERENTE' || c === 'TAMANHO_DIFERENTE') return 'conferencia';
+    if (c === 'SEM_REDE' || c === 'INCOMPLETO') return navigator.onLine === false ? 'sem-rede' : 'rede';
+    if (PEDE_ENTRAR_DE_NOVO[c]) return 'entrar';
+    if (c === 'PERMISSION_DENIED' || c === 'CAMINHO_INVALIDO') return 'permissao';
+    if (c === 'NAO_ESTA_NA_NUVEM') return 'ausente';
+    return 'outro';
+  }
+  var FRASES_DA_BAIXA = {
+    'sem-rede': 'Sem internet agora; toque de novo quando ela voltar.',
+    rede: 'A internet caiu no meio. Toque para tentar de novo.',
+    conferencia: 'O arquivo veio diferente do catálogo e não foi guardado. Toque para tentar de novo.',
+    'sem-espaco': 'Falta espaço no tablet para este livro.',
+    entrar: 'A entrada na nuvem venceu. Entre de novo em Ajustes.',
+    permissao: 'A nuvem não deixou baixar este livro.',
+    ausente: 'Este livro ainda não está na nuvem.',
+    outro: 'Não baixou agora. Toque para tentar de novo.'
+  };
+  // o que o cartão de um livro da nuvem diz agora: { chave, texto, pct }
+  function estadoDoLivroNaNuvem(id) {
+    if (baixaDaNuvem && baixaDaNuvem.id === id) {
+      if (baixaDaNuvem.fase === 'conferindo') return { chave: 'conferindo', texto: 'Conferindo o arquivo...', pct: 100 };
+      var pct = baixaDaNuvem.total ? Math.min(100, Math.floor(baixaDaNuvem.recebidos * 100 / baixaDaNuvem.total)) : 0;
+      return { chave: 'baixando', texto: 'Baixando · ' + pct + '%', pct: pct };
+    }
+    var falha = falhasDaBaixa[id];
+    if (!falha && navigator.onLine === false) falha = 'sem-rede';
+    if (falha) return { chave: falha, texto: FRASES_DA_BAIXA[falha] || FRASES_DA_BAIXA.outro, pct: null };
+    return { chave: 'na-nuvem', texto: 'Na nuvem · toque para baixar', pct: null };
+  }
+  function linhaDoLivroNaNuvem(id) {
+    var est = estadoDoLivroNaNuvem(id);
+    var caixa = el('span', { class: 'bibl-nuvem-estado', 'data-nuvem-estado': est.chave, role: 'status' }, [
+      el('span', { class: 'bibl-pequena' + (est.chave === 'na-nuvem' || est.chave === 'baixando' || est.chave === 'conferindo' ? '' : ' bibl-nuvem-falha') },
+        [icone('cloud'), est.texto])
+    ]);
+    if (est.pct !== null) {
+      var barra = el('span', { class: 'bibl-progresso', 'aria-hidden': 'true' }, [el('i')]);
+      barra.firstChild.style.width = est.pct + '%';
+      caixa.appendChild(barra);
+    }
+    return caixa;
+  }
+  function atualizarCartoesDaNuvem() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-nuvem]'), function (c) {
+      var id = c.getAttribute('data-nuvem');
+      var velha = c.querySelector('.bibl-nuvem-estado');
+      var nova = linhaDoLivroNaNuvem(id);
+      if (velha && velha.getAttribute('data-nuvem-estado') === nova.getAttribute('data-nuvem-estado') &&
+        velha.textContent === nova.textContent) return;
+      if (velha) velha.parentNode.replaceChild(nova, velha);
+      c.setAttribute('aria-busy', baixaDaNuvem && baixaDaNuvem.id === id ? 'true' : 'false');
+    });
+  }
+  function cartaoDoLivroNaNuvem(l) {
+    var tipo = tipoDoMaterial(l.meta);
+    var capa = capaDoLivro(l);
+    capa.classList.add('na-nuvem');
+    return el('button', { type: 'button', class: 'bibl-livro-cartao bibl-na-nuvem', 'data-nuvem': l.id,
+      'aria-label': 'Baixar ' + tituloDoLivro(l.meta) + ' da nuvem para o tablet',
+      aoClick: function () { baixarDaNuvemPeloToque(l.id); } }, [
+      capa,
+      el('span', { class: 'bibl-livro-meta' }, [
+        tipo === 'complementar' ? null : el('span', { class: 'bibl-tipo-selo' + (tipo === 'pratica' ? ' pratica' : ''), texto: rotuloDoTipo(tipo, false) }),
+        el('span', { class: 'bibl-forte', texto: tituloDoLivro(l.meta) }),
+        el('span', { class: 'bibl-apoio', texto: [tamanhoDoLivro(l.meta), Biblioteca.mb(l.naNuvem.tamanho)].filter(Boolean).join(' · ') }),
+        linhaDoLivroNaNuvem(l.id)
+      ])
+    ]);
+  }
+  // a internet voltou ou caiu: o cartão diz, e o "sem internet" de antes deixa de valer
+  window.addEventListener('online', function () {
+    Object.keys(falhasDaBaixa).forEach(function (id) { if (falhasDaBaixa[id] === 'sem-rede') delete falhasDaBaixa[id]; });
+    atualizarCartoesDaNuvem();
+  });
+  window.addEventListener('offline', atualizarCartoesDaNuvem);
+
   // na abertura, no máximo uma vez por hora, e só com a constante ligada
   function atualizarBibliotecaNaAbertura() {
     if (!ATUALIZAR_BIBLIOTECA_NA_ABERTURA) return Promise.resolve(null);
@@ -20020,7 +20283,8 @@
     var caixa = $('#bib-livros');
     if (!caixa) return Promise.resolve();
     var vez = ++bibLivrosVez;
-    return Store.listarLivros().then(function (lista) {
+    return Promise.all([Store.listarLivros(), carregarLivrosNaNuvem()]).then(function (r0) {
+      var lista = r0[0];
       return Promise.all(lista.map(function (l) {
         return Store.lerPosicaoLivro(l.id).catch(function () { return null; });
       })).then(function (posicoes) {
@@ -20036,11 +20300,14 @@
         var tinhaLivros = temLivrosNoTablet;
         temLivrosNoTablet = !!livros.length;
         campoDaBuscaDaBiblioteca();
-        if (!livros.length) {
+        // os livros da nuvem que não estão no tablet (PR 3): a Estante os mostra, e a lista se confere ao fundo
+        var naNuvem = livrosNaNuvemDaEstante(livros);
+        if (podeBaixarDaNuvem()) conferirLivrosNaNuvem();
+        if (!livros.length && !naNuvem.length) {
           caixa.innerHTML = '';
           mostrarSecaoDeLivros(false);
         } else {
-          montarSecaoDeLivros(caixa, livros);
+          montarSecaoDeLivros(caixa, livros, naNuvem);
           mostrarSecaoDeLivros(true);
           livrosNaBusca(!!bibTermo.trim());
         }
@@ -20058,10 +20325,10 @@
     });
   }
 
-  function disciplinasDaBiblioteca(livros) {
+  function disciplinasDaBiblioteca(livros, naNuvem) {
     var porId = Object.create(null), lista = [];
     function disciplina(id, nome) {
-      if (!porId[id]) { porId[id] = { id: id, nome: nome, livros: [], temMapa: false, anos: {} }; lista.push(porId[id]); }
+      if (!porId[id]) { porId[id] = { id: id, nome: nome, livros: [], nuvem: [], temMapa: false, anos: {} }; lista.push(porId[id]); }
       return porId[id];
     }
     livros.forEach(function (l) {
@@ -20069,6 +20336,13 @@
       var reg = disciplina(d.id, d.nome);
       reg.livros.push(l);
       if (mapaComAssuntos(l)) reg.temMapa = true;
+      anosDoLivro(l.meta).forEach(function (a) { reg.anos[a] = true; });
+    });
+    // os livros da nuvem ficam na Estante da disciplina e do ano deles, à parte dos do tablet
+    (naNuvem || []).forEach(function (l) {
+      var d = disciplinaDoLivro(l.meta);
+      var reg = disciplina(d.id, d.nome);
+      reg.nuvem.push(l);
       anosDoLivro(l.meta).forEach(function (a) { reg.anos[a] = true; });
     });
     // os exercícios do tablet são de Matemática: os anos deles entram nos chips
@@ -20090,6 +20364,9 @@
 
   function livrosDoAno(disc, ano) {
     return disc.livros.filter(function (l) { return anosDoLivro(l.meta).indexOf(ano) >= 0; });
+  }
+  function livrosDaNuvemDoAno(disc, ano) {
+    return (disc.nuvem || []).filter(function (l) { return anosDoLivro(l.meta).indexOf(ano) >= 0; });
   }
 
   /* ---------- P3: a tela principal por assunto (formato B, decisão do dono de 12/11/2026) ----------
@@ -20252,11 +20529,15 @@
     painel.appendChild(lista);
   }
 
-  function montarSecaoDeLivros(caixa, livros) {
-    var disciplinas = disciplinasDaBiblioteca(livros);
+  function montarSecaoDeLivros(caixa, livros, naNuvem) {
+    naNuvem = naNuvem || [];
+    var disciplinas = disciplinasDaBiblioteca(livros, naNuvem);
     var comLivro = disciplinas.filter(function (d) { return d.livros.length; }).length;
     var cont = $('#bib-livros-contagem');
-    if (cont) cont.textContent = plural(livros.length, 'material', 'materiais') + ', ' + plural(comLivro, 'disciplina', 'disciplinas');
+    if (cont) {
+      cont.textContent = (livros.length ? plural(livros.length, 'material', 'materiais') + ', ' + plural(comLivro, 'disciplina', 'disciplinas') : '') +
+        (naNuvem.length ? (livros.length ? ' · ' : '') + plural(naNuvem.length, 'livro', 'livros') + ' na nuvem' : '');
+    }
 
     var recentes = livros.filter(function (l) { return l.pos && l.pos.quando; })
       .sort(function (a, b) { return b.pos.quando - a.pos.quando; }).slice(0, 3);
@@ -20275,10 +20556,10 @@
       // a estante: o ano do livro lido por último nesta disciplina; senão, o primeiro ano com livro
       var lidoAqui = recentes.filter(function (l) { return disciplinaDoLivro(l.meta).id === disc.id; })[0];
       var anoLido = lidoAqui ? anosDoLivro(lidoAqui.meta)[0] : null;
-      var comLivroNoAno = disc.listaAnos.filter(function (a) { return livrosDoAno(disc, a).length; });
+      var comLivroNoAno = disc.listaAnos.filter(function (a) { return livrosDoAno(disc, a).length || livrosDaNuvemDoAno(disc, a).length; });
       bibLivrosNav.ano = disc.listaAnos.indexOf(anoLido) >= 0 ? anoLido : comLivroNoAno[0] || disc.listaAnos[0] || null;
     }
-    var redesenhar = function () { montarSecaoDeLivros(caixa, livros); };
+    var redesenhar = function () { montarSecaoDeLivros(caixa, livros, naNuvem); };
 
     caixa.innerHTML = '';
     var lista = el('nav', { class: 'bibl-disciplinas', 'aria-label': 'Disciplinas' });
@@ -20297,7 +20578,7 @@
         } }, [
         el('span', { class: 'cresce', texto: d.nome }),
         d.temMapa ? el('span', { class: 'bibl-sinal-mapa' }, [icone('mapa', 'com mapa de assuntos')]) : null,
-        el('span', { class: 'bibl-apoio', texto: String(d.livros.length) })
+        el('span', { class: 'bibl-apoio', texto: String(d.livros.length + d.nuvem.length) })
       ]));
     });
 
@@ -20330,7 +20611,8 @@
     }
     painel.appendChild(el('div', { class: 'bibl-painel-cabeca' }, [
       el('h3', { class: 'bibl-titulo', texto: daMatematica ? 'Estante de ' + disc.nome : disc.nome }),
-      el('span', { class: 'bibl-apoio', texto: disc.livros.length ? plural(disc.livros.length, 'material', 'materiais') + faixa : 'nenhum material no tablet' })
+      el('span', { class: 'bibl-apoio', texto: (disc.livros.length ? plural(disc.livros.length, 'material', 'materiais') + faixa : 'nenhum material no tablet') +
+        (disc.nuvem.length ? ' · ' + plural(disc.nuvem.length, 'livro', 'livros') + ' na nuvem' : '') })
     ]));
     if (disc.id !== Core.MATERIA_PADRAO) {
       painel.appendChild(el('p', { class: 'bibl-apoio bibl-so-matematica', id: 'bib-so-matematica',
@@ -20367,14 +20649,15 @@
       }));
     }
     var livrosDoRecorte = livrosDoAno(disc, bibLivrosNav.ano);
+    var nuvemDoRecorte = livrosDaNuvemDoAno(disc, bibLivrosNav.ano);
     var tipos = TIPOS_DE_MATERIAL.map(function (t) {
-      return { id: t[0], nome: t[1], qtd: livrosDoRecorte.filter(function (l) { return tipoDoMaterial(l.meta) === t[0]; }).length };
+      return { id: t[0], nome: t[1], qtd: livrosDoRecorte.concat(nuvemDoRecorte).filter(function (l) { return tipoDoMaterial(l.meta) === t[0]; }).length };
     }).filter(function (t) { return t.qtd; });
     if (bibLivrosNav.tipo !== 'todos' && !tipos.some(function (t) { return t.id === bibLivrosNav.tipo; })) bibLivrosNav.tipo = 'todos';
     if (tipos.length > 1) {
       var escolherTipo = function (tipo) { bibLivrosNav.tipo = tipo; redesenhar(); };
       var filtros = el('div', { class: 'bibl-tipos', role: 'group', 'aria-label': 'Filtrar por tipo de material' });
-      [{ id: 'todos', nome: 'Todos', qtd: livrosDoRecorte.length }].concat(tipos).forEach(function (t) {
+      [{ id: 'todos', nome: 'Todos', qtd: livrosDoRecorte.length + nuvemDoRecorte.length }].concat(tipos).forEach(function (t) {
         var on = bibLivrosNav.tipo === t.id;
         filtros.appendChild(el('button', { type: 'button', class: 'bibl-tipo' + (on ? ' ativo' : ''),
           'aria-pressed': on ? 'true' : 'false', 'data-tipo': t.id,
@@ -20400,6 +20683,10 @@
               el('span', { class: 'bibl-falta', 'data-falta': 'mapa', texto: 'sem mapa de assuntos' })
         ])
       ]));
+    });
+    // os livros da nuvem do recorte, depois dos do tablet: o cartão "Na nuvem" baixa com um toque
+    nuvemDoRecorte.filter(function (l) { return bibLivrosNav.tipo === 'todos' || tipoDoMaterial(l.meta) === bibLivrosNav.tipo; }).forEach(function (l) {
+      grade.appendChild(cartaoDoLivroNaNuvem(l));
     });
     // os exercícios do ano (Portal e Banco da OBMEP, Mirim): o cartão leva a eles, logo abaixo
     var serie = disc.id === Core.MATERIA_PADRAO ? serieDosExercicios(bibLivrosNav.ano) : null;
