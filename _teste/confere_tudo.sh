@@ -519,6 +519,9 @@ roda "relogio padrao --envenenado-sem-padrao"   node "_teste/testa_relogio_padra
 # com rolagem propria, o "Escrever a mao" cortado). A prova de rolagem e da
 # primeira dobra tem de ve-la ("VENENO visto").
 roda "modal aula --envenenado-grade-antiga"     node "_teste/testa_modal_aula_navegador.js" --envenenado-grade-antiga
+# O PDF da folha sai depois de gravar a folha: abre a janela PDF pronto. O
+# veneno manda direto ao entregarArquivo, como antes ("VENENO visto").
+roda "folha --envenenado-folha-direto"          node "_teste/testa_folha_navegador.js" --envenenado-folha-direto
 
 # D2: o service worker com cache primeiro. Fechar o aplicativo sem tocar no
 # aviso nao troca a versao (o navegador ativa o worker em espera sozinho, e a
@@ -1122,6 +1125,13 @@ roda "livros exportar --envenenado-pdf-na-copia"  node "_teste/testa_livros_expo
 # Cancelar o compartilhar (AbortError) nao baixa o arquivo no entregarArquivo:
 # o veneno volta ao catch antigo, que baixava em qualquer falha.
 roda "livros exportar --envenenado-cancelar-baixa" node "_teste/testa_livros_exportar.js" --envenenado-cancelar-baixa
+# "So gerar PDF" abre a janela PDF pronto: o compartilhar nasce de um toque novo,
+# e nao do fim da montagem (o prazo do toque vencia e o compartilhar virava
+# download). O veneno manda o PDF direto ao entregarArquivo, como antes.
+roda "livros exportar --envenenado-exportar-direto" node "_teste/testa_livros_exportar.js" --envenenado-exportar-direto
+# Com o leitor de PDF aberto embaixo (o livro), a janela PDF pronto nao tem o
+# "ver": o leitor e um so e o ver trocaria o livro. O veneno devolve o ver.
+roda "livros exportar --envenenado-ver-troca-livro" node "_teste/testa_livros_exportar.js" --envenenado-ver-troca-livro
 # C2b: a lista de base (base-v1) importa, vem primeiro com o nome dela e a
 # frase de posicao na fonte; as tres listas com a etiqueta de nivel. A regra
 # em si e do biblioteca/_prova_kits.py (sem navegador).
@@ -1132,6 +1142,9 @@ roda "titulos e roteiro do fechamento"            node "_teste/testa_titulos_e_r
 # C10b: um botao principal por aluno no Fechamento, os formatos em "Mais formatos"
 # (cada um entrega o arquivo) e o envio as familias em sequencia, sem gravar nada.
 roda "preparar e enviar"                          node "_teste/testa_preparar_e_enviar.js"
+# O PDF com as folhas le as folhas no tablet antes de existir: abre a janela PDF
+# pronto. O veneno manda direto ao entregarArquivo, como antes.
+roda "preparar e enviar --envenenado-folhas-direto" node "_teste/testa_preparar_e_enviar.js" --envenenado-folhas-direto
 # C14: o PDF anexado abre no leitor do aplicativo (PDF.js em vendor/, fora do
 # pre-cache), pagina e zoom, a pagina vira folha com o traco salvo, e a segunda
 # abertura funciona com a rede cortada.

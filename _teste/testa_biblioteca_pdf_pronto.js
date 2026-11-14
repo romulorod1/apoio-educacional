@@ -122,13 +122,14 @@ const I_ENTREGAR = APP.indexOf('  function entregarArquivo(');
 const FIM_ENTREGAR = I_ENTREGAR < 0 ? -1 : APP.slice(I_ENTREGAR).search(/\r?\n  \}\r?\n/);
 const FONTE_ENTREGAR = I_ENTREGAR < 0 || FIM_ENTREGAR < 0 ? '' : APP.slice(I_ENTREGAR, I_ENTREGAR + FIM_ENTREGAR) + '\n  }';
 conf('o entregarArquivo do resto do app existe, e é um só', FONTE_ENTREGAR.length > 100 && APP.split('function entregarArquivo(').length === 2, true);
+// recusa: o nome do erro do compartilhar; 'ok' compartilha; 'sem' é o aparelho sem compartilhar
 async function entregarForaDaBiblioteca(recusa) {
   const saidas = [];
   const caixa = {
     File: function (partes, nome) { this.name = nome; },
-    navigator: {
+    navigator: recusa === 'sem' ? {} : {
       canShare: () => true,
-      share: d => { saidas.push('share:' + d.files[0].name); return Promise.reject({ name: recusa }); }
+      share: d => { saidas.push('share:' + d.files[0].name); return recusa === 'ok' ? Promise.resolve() : Promise.reject({ name: recusa }); }
     },
     baixar: nome => saidas.push('download:' + nome),
     avisar: texto => saidas.push('aviso:' + texto)
@@ -212,11 +213,15 @@ async function print(pag, nome) {
 const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
 
 (async () => {
-  secao('0b. Fora da Biblioteca, o entregarArquivo: cancelar não baixa, outra recusa baixa');
+  secao('0b. Fora da Biblioteca, o entregarArquivo: cancelar não baixa, outra recusa baixa, compartilhado não baixa, sem compartilhar baixa');
   conf('AbortError (ela cancelou): não baixa e avisa "Envio cancelado."', await entregarForaDaBiblioteca('AbortError'),
     'share:Fechamento_teste.pdf | aviso:Envio cancelado.');
   conf('NotAllowedError (outra recusa): baixa, sem o aviso de cancelado', await entregarForaDaBiblioteca('NotAllowedError'),
     'share:Fechamento_teste.pdf | download:Fechamento_teste.pdf');
+  conf('compartilhado: só o compartilhar, nenhum download nem aviso', await entregarForaDaBiblioteca('ok'),
+    'share:Fechamento_teste.pdf');
+  conf('sem o compartilhar no aparelho: baixa direto', await entregarForaDaBiblioteca('sem'),
+    'download:Fechamento_teste.pdf');
   if (MODO) {
     secao('O veneno é de verdade');
     conf('o app.js servido ficou diferente do repositório (' + MODO + ')', trocas['/app.js'] !== APP, true);
