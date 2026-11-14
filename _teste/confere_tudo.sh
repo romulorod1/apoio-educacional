@@ -1129,6 +1129,9 @@ roda "livros exportar --envenenado-cancelar-baixa" node "_teste/testa_livros_exp
 # e nao do fim da montagem (o prazo do toque vencia e o compartilhar virava
 # download). O veneno manda o PDF direto ao entregarArquivo, como antes.
 roda "livros exportar --envenenado-exportar-direto" node "_teste/testa_livros_exportar.js" --envenenado-exportar-direto
+# Com o leitor de PDF aberto embaixo (o livro), a janela PDF pronto nao tem o
+# "ver": o leitor e um so e o ver trocaria o livro. O veneno devolve o ver.
+roda "livros exportar --envenenado-ver-troca-livro" node "_teste/testa_livros_exportar.js" --envenenado-ver-troca-livro
 # C2b: a lista de base (base-v1) importa, vem primeiro com o nome dela e a
 # frase de posicao na fonte; as tres listas com a etiqueta de nivel. A regra
 # em si e do biblioteca/_prova_kits.py (sem navegador).

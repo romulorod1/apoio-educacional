@@ -2764,7 +2764,12 @@
    * textos e os outros).
    *
    * Sem compartilhamento no aparelho (o computador), o botão de compartilhar
-   * não aparece, e ficam baixar e ver. */
+   * não aparece, e ficam baixar e ver.
+   *
+   * Com o leitor de PDF aberto embaixo (o livro de onde ela exportou as
+   * páginas), o ver não aparece: o leitor é um só, e ver trocaria o livro
+   * dela pelo PDF exportado e soltaria o livro da memória, atrás desta
+   * janela. Ela já está com o livro aberto; ficam compartilhar e baixar. */
   var PARTES_DO_PDF = {
     lista: { artigo: 'a lista' },
     gabarito: { artigo: 'o gabarito' },
@@ -2817,6 +2822,7 @@
     corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', id: 'bib-pdf-ajuda', texto: (opcoes && opcoes.ajuda) || (arquivos.length > 1
       ? 'Mande a lista ao aluno e guarde o gabarito no tablet.'
       : 'Mande ao aluno ou guarde no tablet.') }));
+    var verNoLeitor = !$('#modal-leitor-pdf').classList.contains('aberto');
     arquivos.forEach(function (a, k) {
       var parte = PARTES_DO_PDF[a.parte] ? a.parte : 'material';
       var artigo = PARTES_DO_PDF[parte].artigo;
@@ -2834,7 +2840,7 @@
         baixar(a.nome, a.blob);
         avisar('O PDF foi para a pasta Downloads.');
       }));
-      acoes.push(botao('ver', 'olho', 'Ver ' + artigo, function () {
+      if (verNoLeitor) acoes.push(botao('ver', 'olho', 'Ver ' + artigo, function () {
         abrirLeitorPdf(a.blob, { titulo: a.nome, nome: a.nome, comoFolha: false,
           /* o "Abrir fora do aplicativo" do leitor que não abriu volta a esta
            * janela, que continua aberta embaixo, em vez de baixar sozinho */

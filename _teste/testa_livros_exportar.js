@@ -40,6 +40,10 @@
  *                                   entregarArquivo: cancelar o compartilhar
  *                                   (AbortError) baixa o arquivo mesmo assim
  *                                   (visto no "Abrir fora", seção 4c).
+ *   --envenenado-ver-troca-livro    o app.js servido mostra o "ver" da janela
+ *                                   PDF pronto mesmo com o leitor de PDF aberto
+ *                                   embaixo: o ver troca o livro dela pelo PDF
+ *                                   exportado (e solta o livro).
  *   --envenenado-exportar-direto    o app.js servido volta a mandar o PDF do
  *                                   "Só gerar PDF" direto ao entregarArquivo:
  *                                   o compartilhar abre sozinho, no fim da
@@ -60,7 +64,10 @@
  *      com o nome do arquivo e os botões de compartilhar, baixar e ver; o
  *      compartilhar chama o navigator.share com o PDF; cancelar ali
  *      (AbortError) não baixa e a janela continua aberta; o baixar baixa;
- *      sem o compartilhar no aparelho, só baixar e ver;
+ *      sem o compartilhar no aparelho, só baixar; o "ver" não aparece com o
+ *      livro em PDF aberto no leitor (o leitor é um só, e ver trocaria o
+ *      livro dela), e o livro continua no leitor, no título e na página dele;
+ *  6b. do EPUB (outro leitor), a janela PDF pronto tem o "ver";
  *  4c. cancelar o compartilhar no "Abrir fora do aplicativo" do leitor de
  *      PDF, que segue no entregarArquivo: nada baixa, e o aviso diz "Envio
  *      cancelado.".
@@ -84,7 +91,7 @@ const { conf, secao, esperar, pausa } = H;
 
 const PORTA = 8864;
 const VENENOS = ['--envenenado-gabarito-do-outro', '--envenenado-sem-fonte', '--envenenado-travessao', '--envenenado-pdf-na-copia',
-  '--envenenado-cancelar-baixa', '--envenenado-exportar-direto'];
+  '--envenenado-cancelar-baixa', '--envenenado-exportar-direto', '--envenenado-ver-troca-livro'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
@@ -108,6 +115,9 @@ if (MODO === '--envenenado-cancelar-baixa') trocas['/app.js'] = APP.split(CANCEL
 // o "Só gerar PDF" de antes: o PDF montado vai direto ao entregarArquivo, sem a janela PDF pronto
 const EXPORTA_PRONTO = "abrirPdfPronto([{ nome: arquivo.nome, blob: arquivo.blob, parte: 'pdf' }], p.titulo);";
 const EXPORTA_DIRETO = 'entregarArquivo(arquivo.nome, arquivo.blob, p.titulo);';
+// o "ver" da janela PDF pronto com o leitor de PDF aberto embaixo
+const VER_SO_SEM_LEITOR = "var verNoLeitor = !$('#modal-leitor-pdf').classList.contains('aberto');";
+if (MODO === '--envenenado-ver-troca-livro') trocas['/app.js'] = APP.split(VER_SO_SEM_LEITOR).join('var verNoLeitor = true;');
 if (MODO === '--envenenado-exportar-direto') trocas['/app.js'] = APP.split(EXPORTA_PRONTO).join(EXPORTA_DIRETO);
 const amb = H.criarAmbiente(PORTA, 'nath_c15c_exportar', trocas);
 
@@ -309,6 +319,7 @@ function printarPdf(bytes, indice, nome) {
   conf('o PDF exportado é guardado fora da cópia num lugar só', APP.split(GUARDA_FORA).length, 2);
   conf('o cancelar do compartilhar é tratado num lugar só', APP.split(CANCELOU).length, 2);
   conf('o "Só gerar PDF" abre a janela PDF pronto num lugar só', APP.split(EXPORTA_PRONTO).length, 2);
+  conf('o "ver" some com o leitor de PDF aberto, num lugar só', APP.split(VER_SO_SEM_LEITOR).length, 2);
   if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', Object.keys(trocas).length, 1);
   const ZIP = gerarPacote();
   conf('o gerador fez o pacote de prova, com o gabarito', !!ZIP, true);
@@ -475,9 +486,9 @@ function printarPdf(bytes, indice, nome) {
       ajuda: (m.querySelector('#bib-pdf-ajuda') || {}).textContent || ''
     };
   });
-  const soGerar = async jeito => {
+  const soGerar = async (jeito, botao) => {
     await armarCompartilhar(p, jeito);
-    await exportar(p, '#leitor-exportar');
+    await exportar(p, botao || '#leitor-exportar');
     await p.evaluate(() => document.querySelector('#livro-exportar-baixar').click());
     const r = await esperar('a janela PDF pronto (ou o compartilhar sozinho)', () => p.evaluate(() =>
       !!document.querySelector('#modal-bib-compartilhar.aberto') || (window.__saidas || []).length > 0), v => v, 60000);
@@ -493,7 +504,22 @@ function printarPdf(bytes, indice, nome) {
     const s = await saidasDepois(p);
     return { saidas: s, aviso: await textoDoAviso(p), aberta: !!(await pdfPronto()) };
   };
+  // o livro aberto no leitor, antes de exportar: o título e a página
+  const livroNoLeitor = () => p.evaluate(() => (document.querySelector('#modal-leitor-pdf.aberto') ? 'aberto' : 'fechado') + ' | ' +
+    document.querySelector('#titulo-modal-leitor-pdf').textContent + ' | p. ' + (document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada || ''));
+  const livroAntes = await livroNoLeitor();
+  console.log('   no leitor: ' + livroAntes);
   const g1 = await soGerar('AbortError');
+  if (MODO === '--envenenado-ver-troca-livro') {
+    secao('VENENO: o ver com o leitor de PDF aberto embaixo');
+    await p.evaluate(() => document.querySelector('#modal-bib-compartilhar.aberto [data-acao="ver"]').click());
+    await pausa(2500);
+    await fecharModal(p, 'modal-bib-compartilhar');
+    const livroDepois = await livroNoLeitor();
+    console.log('   no leitor depois do ver: ' + livroDepois);
+    conf('envenenado: o ver trocou o livro dela pelo PDF exportado (defeito enxergado)', livroDepois !== livroAntes, true);
+    throw Object.assign(new Error('fim'), { fimDoVeneno: true });
+  }
   if (MODO === '--envenenado-exportar-direto') {
     secao('VENENO: o "Só gerar PDF" direto ao entregarArquivo');
     conf('envenenado: o compartilhar abriu sozinho no fim da montagem, sem a janela PDF pronto (defeito enxergado)',
@@ -503,8 +529,8 @@ function printarPdf(bytes, indice, nome) {
   conf('nada saiu sozinho: nem o compartilhar nem o download', g1.saidas.length, 0);
   const j4b = await pdfPronto();
   conf('a janela PDF pronto abriu, com o nome do PDF', j4b ? j4b.titulo + ' | ' + j4b.nomes.length + ' | ' + /\.pdf$/.test(j4b.nomes[0] || '') : '', 'PDF pronto | 1 | true');
-  conf('com os botões de compartilhar, baixar e ver o PDF', j4b && j4b.acoes,
-    'compartilhar=Compartilhar o PDF, baixar=Baixar o PDF, ver=Ver o PDF');
+  conf('com os botões de compartilhar e baixar, e sem o ver (o livro está aberto no leitor)', j4b && j4b.acoes,
+    'compartilhar=Compartilhar o PDF, baixar=Baixar o PDF');
   conf('e a frase de mandar ao aluno', j4b && j4b.ajuda, 'Mande ao aluno ou guarde no tablet.');
   await printar(p, 'c15c_pdf_pronto.png');
   const tAbort = await tocarNaJanela('compartilhar');
@@ -518,10 +544,11 @@ function printarPdf(bytes, indice, nome) {
   conf('o baixar da janela baixa o PDF, com o aviso da pasta Downloads',
     tBaixa.saidas.join(' | ') + ' | ' + tBaixa.aviso, 'download:' + j4b.nomes[0] + ' | O PDF foi para a pasta Downloads.');
   await fecharModal(p, 'modal-bib-compartilhar');
+  conf('fechada a janela, o livro continua no leitor, no mesmo título e na mesma página', await livroNoLeitor(), livroAntes);
   const g2 = await soGerar('sem');
   const j4bSem = await pdfPronto();
-  conf('sem o compartilhar no aparelho: a janela abre só com baixar e ver, e nada sai sozinho',
-    g2.saidas.length + ' | ' + (j4bSem && j4bSem.acoes), '0 | baixar=Baixar o PDF, ver=Ver o PDF');
+  conf('sem o compartilhar no aparelho: a janela abre só com baixar, e nada sai sozinho',
+    g2.saidas.length + ' | ' + (j4bSem && j4bSem.acoes), '0 | baixar=Baixar o PDF');
   await fecharModal(p, 'modal-bib-compartilhar');
   await fecharModal(p, 'modal-leitor-pdf');
 
@@ -583,6 +610,11 @@ function printarPdf(bytes, indice, nome) {
     pg6.every(x => x.textos.some(t => /^Fonte: Livro de prova em EPUB, Autora de Prova, Editora de Prova, 2026, Capítulo 1: O começo, parte 1$/.test(t))),
     'true | true | true');
   conf('e nada do capítulo 2', /do capítulo 2/.test(tudo6), false);
+  // 6b. o EPUB tem leitor próprio: a janela PDF pronto do "Só gerar PDF" tem o ver
+  const g6 = await soGerar('ok', '#epub-exportar').catch(() => null);
+  conf('do EPUB, "Só gerar PDF": a janela PDF pronto com compartilhar, baixar e ver', g6 && g6.saidas.length + ' | ' + ((await pdfPronto()) || {}).acoes,
+    '0 | compartilhar=Compartilhar o PDF, baixar=Baixar o PDF, ver=Ver o PDF');
+  await fecharModal(p, 'modal-bib-compartilhar');
   await fecharModal(p, 'modal-leitor-epub');
 
   // ================================================================
