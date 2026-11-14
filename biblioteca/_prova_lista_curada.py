@@ -1,7 +1,7 @@
 """Prova do tipo de fonte lista-curada (biblioteca/lista_curada.py), sem navegador, com venenos.
 
     python biblioteca/_prova_lista_curada.py [--sem-navegador]
-        sobre uma fonte INVENTADA que a propria prova desenha na hora: cinco
+        sobre uma fonte INVENTADA que a propria prova desenha na hora: oito
         PDFs sinteticos e o json de itens curados que aponta para eles.
 
     python biblioteca/_prova_lista_curada.py --contra-main [--ref origin/main]
@@ -53,7 +53,29 @@ Travas:
   tracos          travessao no nome da fonte nao chega ao pacote (veneno: sem
                   o sem_tracos); travessao em subitem e recusado
   privado no repo privado true com a saida dentro do repositorio e recusado
-                  antes de gravar nada
+                  antes de gravar nada; a saida dentro de outro checkout git
+                  (git init numa pasta fora deste, e uma com .git em arquivo,
+                  como no worktree) tambem, e com privado false vale (veneno:
+                  a trava que so olha este repositorio deixa passar)
+  tinta clara     o recorte so com figura cinza clara (0.85) ou amarelo palido,
+                  sem texto, vale; a caixa sobre um preenchimento branco puro e
+                  a area vazia de uma pagina creme sao recusadas como em branco,
+                  e o branco vazio numa pagina tomada por um painel claro
+                  tambem (venenos: a tolerancia larga, como o cinza 200 de
+                  antes, recusa as figuras claras; medir contra o branco aceita
+                  o creme; medir so contra o papel aceita o branco do painel)
+  confere         o cabecalho corrido (a mesma linha no alto de cada pagina)
+                  que a caixa pega acima do texto esperado nao reprova o item,
+                  nem o primeiro bloco do PDF de uma pagina so (veneno: so a
+                  ordem natural do PDF reprova); sao recusados a ultima linha
+                  do item de antes ("Resposta: ____"), o item de antes de uma
+                  linha, a pagina trocada com um titulo de uma linha, o titulo
+                  que nao se repete, a caixa alta demais com o item de antes
+                  inteiro, a pagina que so tem o texto num bloco mais abaixo e
+                  a pagina trocada por uma, mesmo com o cabecalho corrido
+                  (venenos: a regra de pular uma linha nos 18 pt do alto da
+                  caixa aceita os tres primeiros, e o comeco de qualquer bloco
+                  aceita os dois da caixa alta e da pagina errada)
   gabarito        --gabarito-externo com --so-com-resposta pela linha de
                   comando: so fica item com gabarito, o numero e o de sem a
                   opcao, as contagens e o relatorio batem, a busca esquece o
@@ -623,6 +645,9 @@ def amostra(temp, placar):
     placar.conferir('lista curada: CropBox fora do MediaBox sem acertar', r, True, 'coletanea-inventada:5ano:3.1')
     casos_de_pagina(temp, pdfs, placar)
     tracos_e_repositorio(temp, pdfs, placar)
+    outro_checkout(temp, pdfs, placar)
+    tinta_clara_e_cabecalho(temp, pdfs, placar)
+    confere_cabecalho(temp, pdfs, placar)
     pilha_trocada(temp, pdfs, c, placar)
     paginas_no_texto(placar)
     venenos_de_validacao(temp, pdfs, placar)
@@ -689,6 +714,234 @@ def tracos_e_repositorio(temp, pdfs, placar):
     placar.conferir('privado no repo: a regra so vale para privado',
                     [] if not lista_curada.dentro_do_repositorio(temp) and lista_curada.dentro_do_repositorio(dentro)
                     else ['dentro_do_repositorio errou'])
+
+
+def outro_checkout(temp, pdfs, placar):
+    """privado true com a saida dentro de um checkout git que nao e este: recusado."""
+    clone = os.path.join(temp, 'outro_clone')
+    os.makedirs(clone)
+    r = subprocess.run(['git', 'init', '-q', clone], capture_output=True, text=True)
+    if r.returncode != 0 or not os.path.isdir(os.path.join(clone, '.git')):
+        placar.conferir('privado no repo: git init fora deste', ['git init falhou: %s' % r.stderr.strip()[:200]])
+        return
+    worktree = os.path.join(temp, 'outro_worktree')
+    os.makedirs(worktree)
+    io.open(os.path.join(worktree, '.git'), 'w', encoding='utf-8').write('gitdir: %s\n' % os.path.join(clone, '.git'))
+    if lista_curada.dentro_do_repositorio(temp):
+        placar.conferir('privado no repo: a pasta temporaria da prova', ['ja esta dentro de um checkout git'])
+        return
+    cp = gravar_json(os.path.join(pdfs, 'privado_clone.json'), json_da_amostra(privado=True))
+    cl = gravar_json(os.path.join(pdfs, 'publico_clone.json'), json_da_amostra(privado=False))
+
+    def tenta(js, saida, trabalho):
+        return recusa_do_gerador(lambda: lista_curada.gerar(js, 1, saida, trabalho=trabalho, gerado_em=GERADO_EM,
+                                                            commit='amostra', gravar_zip=True))
+    for nome, raiz in (('git init fora deste', clone), ('.git em arquivo, como no worktree', worktree)):
+        saida = os.path.join(raiz, 'pacotes', 'saida')
+        r = tenta(cp, saida, os.path.join(temp, 'fora_clone_t'))
+        placar.conferir('privado no repo: --saida dentro de outro checkout (%s)' % nome,
+                        ([r] if r else []) + (['criou a saida'] if os.path.exists(saida) else []), True,
+                        'dentro do repositório git')
+    r = tenta(cp, os.path.join(clone, 's'), os.path.join(clone, 't'))
+    placar.conferir('privado no repo: as duas dentro de outro checkout, ficam', [r] if r else [], True,
+                    'a pasta de trabalho ficam dentro')
+    saida = os.path.join(clone, 'pacotes', 'publico')
+    r = tenta(cl, saida, os.path.join(clone, 'trabalho_publico'))
+    placar.conferir('privado no repo: privado false dentro de outro checkout vale',
+                    ([r] if r else []) + ([] if os.path.exists(saida) else ['nao gravou a saida']))
+    # veneno: a trava de antes, que so olhava este repositorio, deixa passar
+    antes = lista_curada.dentro_do_repositorio
+
+    def so_este(caminho):
+        a, b = os.path.normcase(os.path.realpath(caminho)), os.path.normcase(os.path.realpath(RAIZ))
+        try:
+            return RAIZ if os.path.commonpath([a, b]) == b else None
+        except ValueError:
+            return None
+    lista_curada.dentro_do_repositorio = so_este
+    try:
+        saida = os.path.join(clone, 'pacotes', 'veneno')
+        r = tenta(cp, saida, os.path.join(temp, 'fora_clone_v'))
+    finally:
+        lista_curada.dentro_do_repositorio = antes
+    placar.conferir('privado no repo: a trava que so olha este repositorio', [] if r else ['gravou %s' % saida],
+                    True, 'gravou')
+
+
+def tinta_clara_e_cabecalho(temp, pdfs, placar):
+    """caderno-f.pdf: p. 1 so uma figura cinza clara, p. 2 so uma amarelo
+    palido, p. 3 um preenchimento branco puro, p. 4 um cabecalho que o PDF le
+    antes do item, acima dele."""
+    doc = pymupdf.open()
+    for cor in ((0.85, 0.85, 0.85), (1, 1, 0.8), (1, 1, 1)):
+        p = doc.new_page(width=W, height=H)
+        p.draw_rect(pymupdf.Rect(80, 100, 400, 300), color=None, fill=cor)
+    p = doc.new_page(width=W, height=H)
+    linhas(p, 60, 60, ['Caderno de exercicios, unidade 7'])
+    linhas(p, 60, 100, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
+    # p. 5: a caixa alta demais pega o item de antes inteiro e depois o certo
+    p = doc.new_page(width=W, height=H)
+    linhas(p, 60, 60, ['Atividade 7.0', 'Quanto e 2 + 2?'])
+    linhas(p, 60, 110, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
+    # p. 6: a pagina errada, com um paragrafo no alto e o texto so mais abaixo
+    p = doc.new_page(width=W, height=H)
+    linhas(p, 60, 60, ['Leia com atencao antes de comecar.', 'Use lapis e borracha.'])
+    linhas(p, 60, 110, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
+    # p. 7: pagina creme inteira, com uma figura longe da caixa
+    p = doc.new_page(width=W, height=H)
+    p.draw_rect(p.rect, color=None, fill=(0.97, 0.96, 0.92))
+    p.draw_rect(pymupdf.Rect(80, 600, 400, 700), color=None, fill=(0.2, 0.2, 0.2))
+    # p. 8: um painel cinza claro toma a pagina, com um retangulo branco vazio
+    p = doc.new_page(width=W, height=H)
+    p.draw_rect(p.rect, color=None, fill=(0.88, 0.88, 0.88))
+    p.draw_rect(pymupdf.Rect(80, 100, 400, 300), color=None, fill=(1, 1, 1))
+    salvar(doc, os.path.join(pdfs, 'caderno-f.pdf'))
+
+    def item(k, rect, **extra):
+        return um_item(pdfs, 'tinta_%d' % k, dict({'id': '5ano:7.%d' % k, 'serie': '5ano', 'tema_app': 'MAT05-02',
+                                                   'modulo': {'slug': 'contas', 'titulo': 'Contas'},
+                                                   'titulo': 'Atividade 7.%d' % k, 'subitens': [],
+                                                   'recorte': {'pdf': 'caderno-f.pdf', 'pagina': k, 'rect': rect}},
+                                                  **extra))
+    clara = (('cinza claro 0.85', item(1, [100, 120, 380, 280])), ('amarelo palido', item(2, [100, 120, 380, 280])))
+    for nome, c in clara:
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_' + nome.split()[0]), gravar_zip=False))
+        placar.conferir('tinta clara: so figura %s, sem texto, vale' % nome, [r] if r else [])
+    c = item(3, [100, 120, 380, 280])
+    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_branca'), gravar_zip=False))
+    placar.conferir('tinta clara: caixa sobre branco puro', [r] if r else [], True, 'caixa em branco')
+    c = item(7, [100, 120, 380, 280])
+    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_creme'), gravar_zip=False))
+    placar.conferir('tinta clara: area vazia de pagina creme', [r] if r else [], True, 'caixa em branco')
+    antes = lista_curada.cor_do_papel
+    lista_curada.cor_do_papel = lambda doc, pno: (255, 255, 255)
+    try:
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_v_creme'), gravar_zip=False))
+    finally:
+        lista_curada.cor_do_papel = antes
+    placar.conferir('tinta clara: medir contra o branco, na pagina creme', [] if r else ['a area creme passou'],
+                    True, 'passou')
+    c = item(8, [100, 120, 380, 280])
+    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_painel'), gravar_zip=False))
+    placar.conferir('tinta clara: branco vazio numa pagina tomada por painel claro', [r] if r else [], True,
+                    'caixa em branco')
+    lista_curada.TINTA_LONGE_DO_BRANCO = False
+    try:
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_v_painel'), gravar_zip=False))
+    finally:
+        lista_curada.TINTA_LONGE_DO_BRANCO = True
+    placar.conferir('tinta clara: medir so contra o papel, no branco do painel', [] if r else ['o branco passou'],
+                    True, 'passou')
+    antes = lista_curada.TINTA_TOL
+    lista_curada.TINTA_TOL = 55
+    try:
+        for nome, c in clara:
+            r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_v_' + nome.split()[0]), gravar_zip=False))
+            placar.conferir('tinta clara: a tolerancia larga (55, como o cinza 200) com figura %s' % nome,
+                            [r] if r else [], True, 'caixa em branco')
+    finally:
+        lista_curada.TINTA_TOL = antes
+    c = item(4, [50, 48, 400, 140], confere='Atividade 7.1 Quanto e 6')
+    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'titulo_que_nao_se_repete'), gravar_zip=False))
+    placar.conferir('confere: titulo de uma linha que nao se repete', [r] if r else [], True,
+                    'não começa por confere')
+    antes = lista_curada.comecos_do_recorte
+    for k, nome in ((5, 'caixa alta demais com o item de antes e o confere do item'),
+                    (6, 'pagina errada com o texto so num bloco mais abaixo')):
+        c = item(k, [50, 48, 400, 140], confere='Atividade 7.1 Quanto e 6')
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'confere_%d' % k), gravar_zip=False))
+        placar.conferir('confere: %s' % nome, [r] if r else [], True, 'não começa por confere')
+        # e as duas caixas sao de verdade o defeito: o comeco de qualquer bloco as aceitaria
+
+        def qualquer_bloco(docs, ps):
+            c0, pno0, r0 = ps[0]
+            bl = sorted((b for b in docs[c0][pno0].get_text('blocks', clip=pymupdf.Rect(r0)) if b[6] == 0),
+                        key=lambda b: (b[1], b[0]))
+            return antes(docs, ps) + [''.join(b[4] for b in bl[k:]) for k in range(len(bl))]
+        lista_curada.comecos_do_recorte = qualquer_bloco
+        try:
+            r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'confere_v%d' % k), gravar_zip=False))
+        finally:
+            lista_curada.comecos_do_recorte = antes
+        placar.conferir('confere: o comeco de qualquer bloco, na %s' % nome, [] if r else ['a caixa passou'], True,
+                        'passou')
+
+
+def regra_dos_18_pt_da_caixa(docs, ps):
+    """A regra recusada na revisao (8c870f4): pula o primeiro bloco se e uma
+    linha so nos 18 pt do alto da CAIXA. So para o veneno."""
+    resto = ''.join(gp.texto_do_retangulo(docs[c], pno, r) for c, pno, r in ps[1:])
+    c0, pno0, r0 = ps[0]
+    out = [gp.texto_do_retangulo(docs[c0], pno0, r0) + resto]
+    bl = lista_curada.blocos_de_texto(docs[c0][pno0], pymupdf.Rect(r0))
+    if len(bl) >= 2 and len(bl[0][1]) == 1 and bl[0][0][3] <= r0[1] + 18:
+        out.append('\n'.join(t for _, lns in bl[1:] for t in lns) + '\n' + resto)
+    return out
+
+
+def confere_cabecalho(temp, pdfs, placar):
+    """caderno-g.pdf: p. 1 a 3 com o cabecalho corrido no alto, o item 7.1 na
+    p. 2; p. 4 a pagina trocada (um gabarito) com titulo de uma linha no alto e
+    o texto esperado logo abaixo; p. 5 a ultima linha do item de antes
+    ("Resposta: ____") no alto; p. 6 um item de antes de uma linha no alto.
+    caderno-i.pdf: uma pagina so, com titulo e o item."""
+    cab = 'Caderno de exercicios, unidade 7'
+    doc = pymupdf.open()
+    for primeira, resto_ in (([cab], ['Atividade 6.9', 'Quanto e 5 vezes 5?']),
+                             ([cab], ['Atividade 7.1', 'Quanto e 6 vezes 7?']),
+                             ([cab], ['Atividade 7.2', 'Quanto e 8 menos 3?']),
+                             (['Gabarito da unidade 7'], ['Atividade 7.1', 'Quanto e 6 vezes 7? Resposta: 42'])):
+        p = doc.new_page(width=W, height=H)
+        linhas(p, 60, 45, primeira)
+        linhas(p, 60, 85, resto_)
+    for primeira in ('Resposta: ________', '7.0) Quanto e 2 + 2? ____'):
+        p = doc.new_page(width=W, height=H)
+        linhas(p, 60, 45, [primeira])
+        linhas(p, 60, 85, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
+    salvar(doc, os.path.join(pdfs, 'caderno-g.pdf'))
+    doc = pymupdf.open()
+    p = doc.new_page(width=W, height=H)
+    linhas(p, 60, 45, ['Lista avulsa de exercicios'])
+    linhas(p, 60, 85, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
+    salvar(doc, os.path.join(pdfs, 'caderno-i.pdf'))
+
+    def item(pdf, pag, nome):
+        return um_item(pdfs, 'confere_' + nome, {'id': '5ano:7.1', 'serie': '5ano', 'tema_app': 'MAT05-02',
+                                                  'modulo': {'slug': 'contas', 'titulo': 'Contas'},
+                                                  'titulo': 'Atividade 7.1', 'subitens': [],
+                                                  'confere': 'Atividade 7.1 Quanto e 6',
+                                                  'recorte': {'pdf': pdf, 'pagina': pag, 'rect': [50, 32, 400, 130]}})
+    corrido = item('caderno-g.pdf', 2, 'corrido')
+    sozinho = item('caderno-i.pdf', 1, 'pagina_unica')
+    for nome, c in (('cabecalho corrido acima do texto esperado vale', corrido),
+                    ('primeiro bloco do PDF de uma pagina so vale', sozinho)):
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cab_' + nome.split()[0]), gravar_zip=False))
+        placar.conferir('confere: ' + nome, [r] if r else [])
+    antes = lista_curada.comecos_do_recorte
+    lista_curada.comecos_do_recorte = lambda docs, ps: antes(docs, ps)[:1]
+    try:
+        r = recusa_do_gerador(lambda: gerar(corrido, os.path.join(temp, 'cab_v_natural'), gravar_zip=False))
+    finally:
+        lista_curada.comecos_do_recorte = antes
+    placar.conferir('confere: so a ordem natural do PDF, com o cabecalho corrido', [r] if r else [], True,
+                    'não começa por confere')
+    ruins = (('pagina trocada por uma, com o cabecalho corrido', item('caderno-g.pdf', 3, 'trocada_por_uma')),
+             ('pagina trocada (gabarito) com titulo de uma linha', item('caderno-g.pdf', 4, 'gabarito')),
+             ('ultima linha do item de antes (Resposta: ____)', item('caderno-g.pdf', 5, 'resposta')),
+             ('item de antes de uma linha', item('caderno-g.pdf', 6, 'item_de_uma_linha')))
+    for k, (nome, c) in enumerate(ruins):
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cab_ruim_%d' % k), gravar_zip=False))
+        placar.conferir('confere: ' + nome, [r] if r else [], True, 'não começa por confere')
+        if k == 0:
+            continue
+        # e a caixa e de verdade o defeito: a regra dos 18 pt da caixa a aceitaria
+        lista_curada.comecos_do_recorte = regra_dos_18_pt_da_caixa
+        try:
+            r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cab_v18_%d' % k), gravar_zip=False))
+        finally:
+            lista_curada.comecos_do_recorte = antes
+        placar.conferir('confere: a regra dos 18 pt da caixa, na %s' % nome, [] if r else ['a caixa passou'], True,
+                        'passou')
 
 
 def pilha_trocada(temp, pdfs, c, placar):
