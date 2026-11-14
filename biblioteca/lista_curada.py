@@ -66,9 +66,15 @@ O json (todo campo desconhecido e recusado, em qualquer nivel):
   pulado quando, ao mesmo tempo, (1) e uma linha so; (2) fica inteiro na
   faixa do alto da PAGINA (nao da caixa), de altura min(8% da altura da
   pagina, 60 pt): CABECALHO_FRACAO e CABECALHO_PT, o menor dos dois, para a
-  faixa nao crescer em pagina grande; e (3) e cabecalho corrido: o mesmo texto
-  (sem acento, pontuacao nem espaco) aparece como linha nessa faixa de outra
-  pagina do mesmo PDF. Ai vale tambem o texto do segundo bloco em diante. No
+  faixa nao crescer em pagina grande; (3) e cabecalho corrido: o mesmo texto
+  (sem acento, pontuacao nem espaco) aparece como linha nessa faixa de pelo
+  menos CABECALHO_OUTRAS (2) outras paginas do mesmo PDF, tres no total; e (4)
+  nao tem cara de comeco de exercicio: nao comeca por algarismo ("1)", "1.",
+  "1.2", "7.0) ...") nem por "Atividade", "Exercicio", "Questao", "Problema"
+  ou "Item" seguido de numero (NUMERO_DE_ITEM). O "Atividade 1" que recomeca
+  em cada unidade se repete no alto de varias paginas e nao e cabecalho. O
+  cabecalho que so se repete em duas paginas fica sem folga (ajuste a caixa).
+  Ai vale tambem o texto do segundo bloco em diante. No
   PDF de uma pagina so nao ha folga nenhuma: sem outra pagina nao se separa o
   cabecalho de um item vizinho de uma linha, e vale so a ordem natural (a
   caixa que pega o titulo da pagina unica e recusada; ajuste a caixa). Fora
@@ -139,6 +145,8 @@ TINTA_MIN_PX = 3   # e nunca menos que isto de pixels
 TINTA_LONGE_DO_BRANCO = True  # tinta tambem longe do branco; False so no veneno
 CABECALHO_PT = 60        # pt: no maximo isto do alto da PAGINA e faixa de cabecalho, para o confere
 CABECALHO_FRACAO = 0.08  # e no maximo esta fracao da altura da pagina (vale o menor)
+CABECALHO_OUTRAS = 2     # o cabecalho corrido aparece na faixa de pelo menos tantas OUTRAS paginas
+NUMERO_DE_ITEM = re.compile(r'^\s*(?:\d|(?:atividade|exercicio|questao|problema|item)\s*n?\W*\d)')
 sem_tracos = portal.sem_tracos  # um nome so, para a prova poder desliga-lo (veneno)
 
 
@@ -339,22 +347,33 @@ def faixa_de_cabecalho(page):
 
 def e_cabecalho_da_pagina(doc, pno, bbox, linha):
     """A linha (o bloco de uma linha so em bbox) e cabecalho de verdade: fica
-    na faixa do alto da pagina e se repete nessa faixa em outra pagina do PDF.
+    na faixa do alto da pagina, nao comeca como exercicio (NUMERO_DE_ITEM) e se
+    repete nessa faixa em pelo menos CABECALHO_OUTRAS outras paginas do PDF.
     No PDF de uma pagina so, nunca: nada separa o cabecalho de um item vizinho
     de uma linha."""
     faixa = faixa_de_cabecalho(doc[pno])
     alvo = so_letras(linha)
     if not alvo or bbox[1] < faixa.y0 - TOLERANCIA or bbox[3] > faixa.y1 + TOLERANCIA:
         return False
-    if doc.page_count == 1:
+    if doc.page_count == 1 or parece_comeco_de_item(linha):
         return False
+    outras = 0
     for k in range(doc.page_count):
         if k == pno:
             continue
-        for _, lns in blocos_de_texto(doc[k], faixa_de_cabecalho(doc[k])):
-            if any(so_letras(t) == alvo for t in lns):
+        if any(so_letras(t) == alvo for _, lns in blocos_de_texto(doc[k], faixa_de_cabecalho(doc[k])) for t in lns):
+            outras += 1
+            if outras >= CABECALHO_OUTRAS:
                 return True
     return False
+
+
+def parece_comeco_de_item(linha):
+    """A linha comeca como exercicio: algarismo, ou Atividade/Exercicio/
+    Questao/Problema/Item seguido de numero (sem acento, minusculo)."""
+    t = unicodedata.normalize('NFD', portal.recompor(linha).lower())
+    t = ''.join(c for c in t if unicodedata.category(c) != 'Mn')
+    return bool(NUMERO_DE_ITEM.match(t))
 
 
 def comecos_do_recorte(docs, ps):
