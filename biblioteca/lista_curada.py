@@ -70,10 +70,15 @@ O json (todo campo desconhecido e recusado, em qualquer nivel):
   (sem acento, pontuacao nem espaco) aparece como linha nessa faixa de pelo
   menos CABECALHO_OUTRAS (2) outras paginas do mesmo PDF, tres no total; e (4)
   nao tem cara de comeco de exercicio: nao comeca por algarismo ("1)", "1.",
-  "1.2", "7.0) ...") nem por "Atividade", "Exercicio", "Questao", "Problema"
-  ou "Item" seguido de numero (NUMERO_DE_ITEM). O "Atividade 1" que recomeca
-  em cada unidade se repete no alto de varias paginas e nao e cabecalho. O
-  cabecalho que so se repete em duas paginas fica sem folga (ajuste a caixa).
+  "1.2", "7.0) ..."), nem por subitem com letra ("a)"), nem por "Atividade",
+  "Exercicio", "Questao", "Problema", "Item", "Tarefa", "Desafio", "Lista" ou
+  "Ficha" seguido de numero, com ou sem "nº"/"n.º" no meio ("Atividade nº 1"),
+  ou de numeral romano ("Lista II") (NUMERO_DE_ITEM). O "Atividade 1" que
+  recomeca em cada unidade se repete no alto de varias paginas e nao e
+  cabecalho. O cabecalho que so se repete em duas paginas fica sem folga, e o
+  cabecalho de verdade que comeca por algarismo ("7 Frações", "6º ano")
+  tambem: nos dois casos quem escreve o json desce o topo da caixa para
+  abaixo do cabecalho.
   Ai vale tambem o texto do segundo bloco em diante. No
   PDF de uma pagina so nao ha folga nenhuma: sem outra pagina nao se separa o
   cabecalho de um item vizinho de uma linha, e vale so a ordem natural (a
@@ -146,7 +151,8 @@ TINTA_LONGE_DO_BRANCO = True  # tinta tambem longe do branco; False so no veneno
 CABECALHO_PT = 60        # pt: no maximo isto do alto da PAGINA e faixa de cabecalho, para o confere
 CABECALHO_FRACAO = 0.08  # e no maximo esta fracao da altura da pagina (vale o menor)
 CABECALHO_OUTRAS = 2     # o cabecalho corrido aparece na faixa de pelo menos tantas OUTRAS paginas
-NUMERO_DE_ITEM = re.compile(r'^\s*(?:\d|(?:atividade|exercicio|questao|problema|item)\s*n?\W*\d)')
+NUMERO_DE_ITEM = re.compile(r'^\s*(?:\d|[a-z]\)|(?:atividade|exercicio|questao|problema|item|tarefa|desafio|lista|ficha)'
+                            r'\s*(?:n[.\u00ba\u00b0o]*\s*)?\W*(?:\d|[ivxl]+\b))')
 sem_tracos = portal.sem_tracos  # um nome so, para a prova poder desliga-lo (veneno)
 
 
@@ -369,8 +375,10 @@ def e_cabecalho_da_pagina(doc, pno, bbox, linha):
 
 
 def parece_comeco_de_item(linha):
-    """A linha comeca como exercicio: algarismo, ou Atividade/Exercicio/
-    Questao/Problema/Item seguido de numero (sem acento, minusculo)."""
+    """A linha comeca como exercicio: algarismo, subitem com letra ("a)"),
+    ou Atividade/Exercicio/Questao/Problema/Item/Tarefa/Desafio/Lista/Ficha
+    seguido de numero (com "nº" ou "n.º" no meio, ou romano) (sem acento,
+    minusculo)."""
     t = unicodedata.normalize('NFD', portal.recompor(linha).lower())
     t = ''.join(c for c in t if unicodedata.category(c) != 'Mn')
     return bool(NUMERO_DE_ITEM.match(t))

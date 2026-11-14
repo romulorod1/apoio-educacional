@@ -70,7 +70,9 @@ Travas:
                   "Atividade 1" que recomeca em cada unidade, no alto de varias
                   paginas, e o cabecalho que so se repete em duas paginas sao
                   recusados (veneno: a regra do 6847c26, que bastava achar a
-                  linha em outra pagina, deixa os dois passarem); no PDF de uma
+                  linha em outra pagina, deixa os dois passarem); o "Atividade
+                  nº 1" no alto de tres paginas tambem (veneno: o padrao do
+                  3eaa2e0, que nao atravessava o "º", deixa passar); no PDF de uma
                   pagina so nao ha folga: o titulo da pagina unica acima do
                   texto e o item vizinho de uma linha numa caixa alta sao
                   recusados (veneno: a regra do 17dfb6a, que aceitava o
@@ -96,6 +98,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -920,7 +923,8 @@ def confere_cabecalho(temp, pdfs, placar):
     pagina so, com um item vizinho de uma linha no alto e o item abaixo.
     caderno-k.pdf: duas paginas com o mesmo cabecalho e o item na p. 2.
     caderno-l.pdf: quatro unidades que recomecam por "Atividade 1" no alto; na
-    p. 2 a caixa alta pega o "Atividade 1" de uma linha acima do item 7.1."""
+    p. 2 a caixa alta pega o "Atividade 1" de uma linha acima do item 7.1.
+    caderno-m.pdf: o mesmo com "Atividade nº 1" no alto de tres paginas."""
     cab = 'Caderno de exercicios, unidade 7'
     doc = pymupdf.open()
     for primeira, resto_ in (([cab], ['Atividade 6.9', 'Quanto e 5 vezes 5?']),
@@ -958,6 +962,12 @@ def confere_cabecalho(temp, pdfs, placar):
         linhas(p, 60, 45, ['Atividade 1'])
         linhas(p, 60, 85, resto_)
     salvar(doc, os.path.join(pdfs, 'caderno-l.pdf'))
+    doc = pymupdf.open()
+    for resto_ in (['Quanto e 1 mais 1?'], ['Atividade 7.1', 'Quanto e 6 vezes 7?'], ['Quanto e 3 mais 3?']):
+        p = doc.new_page(width=W, height=H)
+        linhas(p, 60, 45, ['Atividade n\u00ba 1'])
+        linhas(p, 60, 85, resto_)
+    salvar(doc, os.path.join(pdfs, 'caderno-m.pdf'))
 
     def item(pdf, pag, nome):
         return um_item(pdfs, 'confere_' + nome, {'id': '5ano:7.1', 'serie': '5ano', 'tema_app': 'MAT05-02',
@@ -982,9 +992,28 @@ def confere_cabecalho(temp, pdfs, placar):
         finally:
             lista_curada.e_cabecalho_da_pagina = antes_cab
         placar.conferir('confere: a regra do 6847c26, no %s' % nome, [] if r else ['a caixa passou'], True, 'passou')
+    # o "Atividade nº 1": o "º" nao se decompoe no NFD e o padrao antigo nao o atravessava
+    c = item('caderno-m.pdf', 2, 'atividade_n_1')
+    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'repetida_nº'), gravar_zip=False))
+    placar.conferir('confere: "Atividade nº 1" no alto de tres paginas', [r] if r else [], True,
+                    'não começa por confere')
+    antes_padrao = lista_curada.NUMERO_DE_ITEM
+    lista_curada.NUMERO_DE_ITEM = re.compile(r'^\s*(?:\d|(?:atividade|exercicio|questao|problema|item)\s*n?\W*\d)')
+    try:
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'repetida_v_nº'), gravar_zip=False))
+    finally:
+        lista_curada.NUMERO_DE_ITEM = antes_padrao
+    placar.conferir('confere: o padrao do 3eaa2e0, no "Atividade nº 1"', [] if r else ['a caixa passou'], True,
+                    'passou')
     casos = {'Atividade 1': True, 'ATIVIDADE 12': True, 'Exercício 3': True, 'Questão 2': True, '1) Quanto': True,
              '2. Calcule': True, '1.2 Complete': True, '7.0) Quanto e 2 + 2?': True, 'Item 4': True,
-             'Caderno de exercicios, unidade 7': False, 'Atividades da unidade': False, 'Matemática': False}
+             'Atividade n\u00ba 1': True, 'Atividade n.\u00ba 1': True, 'Quest\u00e3o n\u00ba 3': True,
+             'Atividade n\u00b0 2': True, 'Atividade no 4': True, 'Tarefa 2': True, 'Desafio 5': True,
+             'Lista 3': True, 'Ficha 7': True, 'Lista II': True, 'Atividade IV': True, 'Ficha n\u00ba XII': True,
+             'a) Calcule': True, 'B) Complete': True,
+             'Caderno de exercicios, unidade 7': False, 'Atividades da unidade': False, 'Matemática': False,
+             'Lista de materiais': False, 'Ficha de leitura': False, 'Desafio da semana': False,
+             'Tarefa para casa': False, 'Atividade nova': False, 'Lista dividida': False, 'Ana e Bia': False}
     erros = ['%r deu %r' % (t, lista_curada.parece_comeco_de_item(t)) for t, v in casos.items()
              if lista_curada.parece_comeco_de_item(t) is not v]
     placar.conferir('confere: o que parece comeco de exercicio', erros)
