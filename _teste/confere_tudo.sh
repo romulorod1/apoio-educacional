@@ -1119,6 +1119,9 @@ roda "livros exportar --envenenado-travessao"     node "_teste/testa_livros_expo
 # cresce so o registro), e "Gerar de novo" o refaz depois de restaurar. O
 # veneno guarda o PDF no deposito de anexos, que a copia leva.
 roda "livros exportar --envenenado-pdf-na-copia"  node "_teste/testa_livros_exportar.js" --envenenado-pdf-na-copia
+# Cancelar o compartilhar (AbortError) nao baixa o arquivo no entregarArquivo:
+# o veneno volta ao catch antigo, que baixava em qualquer falha.
+roda "livros exportar --envenenado-cancelar-baixa" node "_teste/testa_livros_exportar.js" --envenenado-cancelar-baixa
 # C2b: a lista de base (base-v1) importa, vem primeiro com o nome dela e a
 # frase de posicao na fonte; as tres listas com a etiqueta de nivel. A regra
 # em si e do biblioteca/_prova_kits.py (sem navegador).

@@ -36,6 +36,9 @@
  *   --envenenado-pdf-na-copia       o app.js servido guarda o PDF exportado no
  *                                   depósito de anexos, que a cópia de segurança
  *                                   leva: a cópia cresce o tamanho do PDF.
+ *   --envenenado-cancelar-baixa     o app.js servido volta ao catch antigo do
+ *                                   entregarArquivo: cancelar o compartilhar
+ *                                   (AbortError) baixa o arquivo mesmo assim.
  *
  * Revisão do C15.4 (o PDF exportado mora FORA da cópia de segurança):
  *   8. a cópia antes e depois de exportar o capítulo cresce só alguns KB (o
@@ -45,6 +48,13 @@
  *  10. a cópia restaurada (o PDF não vem): o anexo diz "Exportado do livro
  *      ..." com "Gerar de novo", que refaz o PDF (o capítulo 2 e o gabarito
  *      dele); sem o livro no tablet, a frase diz que falta o livro.
+ *
+ * Cancelar o compartilhar não baixa o arquivo (o entregarArquivo):
+ *  4b. "Só gerar PDF, sem anexar": cancelar a janela do Android (AbortError)
+ *      não baixa nada; outra falha (NotAllowedError) baixa; sem o
+ *      compartilhar no aparelho, baixa; compartilhado, não baixa;
+ *  4c. o mesmo cancelar noutro lugar que usa o entregarArquivo, o "Abrir fora
+ *      do aplicativo" do leitor de PDF: nada baixa.
  *
  *   --prints <pasta>   grava três prints: a janela de exportar, a primeira
  *                      página do PDF gerado e a página do gabarito, as duas
@@ -64,7 +74,8 @@ const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const { conf, secao, esperar, pausa } = H;
 
 const PORTA = 8864;
-const VENENOS = ['--envenenado-gabarito-do-outro', '--envenenado-sem-fonte', '--envenenado-travessao', '--envenenado-pdf-na-copia'];
+const VENENOS = ['--envenenado-gabarito-do-outro', '--envenenado-sem-fonte', '--envenenado-travessao', '--envenenado-pdf-na-copia',
+  '--envenenado-cancelar-baixa'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
@@ -82,6 +93,9 @@ if (MODO === '--envenenado-travessao') trocas['/pdf.js'] = PDF.split(TROCA_TRACO
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const GUARDA_FORA = "return Store.salvarExportado(id, { nome: arquivo.nome, tipo: 'application/pdf', blob: arquivo.blob })";
 if (MODO === '--envenenado-pdf-na-copia') trocas['/app.js'] = APP.split(GUARDA_FORA).join(GUARDA_FORA.replace('salvarExportado', 'salvarAnexo'));
+// sem esta linha, o catch do entregarArquivo volta ao de antes: qualquer falha do compartilhar baixa
+const CANCELOU = "if (e && e.name === 'AbortError') return; // ela cancelou: nada sai do tablet";
+if (MODO === '--envenenado-cancelar-baixa') trocas['/app.js'] = APP.split(CANCELOU).join('');
 const amb = H.criarAmbiente(PORTA, 'nath_c15c_exportar', trocas);
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'c15c_exportar_'));
@@ -185,6 +199,34 @@ async function exportar(pag, botao) {
   await pag.evaluate(b => document.querySelector(b).click(), botao);
   return (await esperar('a janela de exportar', () => janela(pag), v => !!v, 5000)).valor;
 }
+/* O compartilhar do Android, de mentira, e o download por link, anotado em
+ * vez de acontecer. jeito: 'AbortError' (ela cancelou), 'NotAllowedError'
+ * (outra falha), 'ok' (compartilhou) ou 'sem' (aparelho sem o compartilhar). */
+async function armarCompartilhar(pag, jeito) {
+  await pag.evaluate(j => {
+    window.__saidas = [];
+    if (!window.__clicarDeVerdade) {
+      window.__clicarDeVerdade = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {
+        if (this.hasAttribute('download')) { window.__saidas.push('download:' + this.getAttribute('download')); return; }
+        return window.__clicarDeVerdade.apply(this, arguments);
+      };
+    }
+    if (j === 'sem') { navigator.canShare = undefined; navigator.share = undefined; return; }
+    navigator.canShare = () => true;
+    navigator.share = d => {
+      window.__saidas.push('share:' + d.files.map(f => f.name).join(','));
+      return j === 'ok' ? Promise.resolve() : Promise.reject(new DOMException('de prova', j));
+    };
+  }, jeito);
+}
+// espera a primeira saída e dá tempo ao catch do compartilhar
+async function saidasDepois(pag) {
+  await esperar('o compartilhar ou o download', () => pag.evaluate(() => (window.__saidas || []).length), v => v > 0, 60000);
+  await pausa(600);
+  return pag.evaluate(() => window.__saidas.slice());
+}
+const downloads = s => s.filter(x => /^download:/.test(x)).length;
 const lerDados = pag => pag.evaluate(() => Store.carregar());
 const anexosDoLivro = pag => lerDados(pag).then(d => ((d.aulas.filter(a => a.id === 'au1')[0] || {}).anexos || []).filter(a => a.livro));
 async function anexarNaAula(pag, antes) {
@@ -250,6 +292,7 @@ function printarPdf(bytes, indice, nome) {
   conf('o rodapé de fonte entra num lugar só', PDF.split(FONTE).length, 2);
   conf('a troca do travessão do livro mora num lugar só', PDF.split(TROCA_TRACO).length, 2);
   conf('o PDF exportado é guardado fora da cópia num lugar só', APP.split(GUARDA_FORA).length, 2);
+  conf('o cancelar do compartilhar é tratado num lugar só', APP.split(CANCELOU).length, 2);
   if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', Object.keys(trocas).length, 1);
   const ZIP = gerarPacote();
   conf('o gerador fez o pacote de prova, com o gabarito', !!ZIP, true);
@@ -402,7 +445,57 @@ function printarPdf(bytes, indice, nome) {
   conf('as páginas 5 e 6, do capítulo 3, com o nome dele no rodapé',
     pg3.length + ' | ' + pg3.every(x => x.textos.indexOf('Fonte: Livro com gabarito, Volume 2, Autora de Prova, Editora de Prova, 2026, Capítulo 3: Geometria plana, páginas 5 a 6') >= 0) +
     ' | ' + /capítulo 3, parte 1/.test(pg3[0].texto), '2 | true | true');
+
+  // ================================================================
+  secao('4b. "Só gerar PDF, sem anexar": cancelar o compartilhar não baixa');
+  const soGerar = async jeito => {
+    await armarCompartilhar(p, jeito);
+    await exportar(p, '#leitor-exportar');
+    await p.evaluate(() => document.querySelector('#livro-exportar-baixar').click());
+    const s = await saidasDepois(p);
+    console.log('   ' + jeito + ': ' + s.join(' | '));
+    await esperar('a janela de exportar fechou', () => janela(p), v => v === null, 5000);
+    return s;
+  };
+  const sAbort = await soGerar('AbortError');
+  if (MODO === '--envenenado-cancelar-baixa') {
+    secao('VENENO: o catch antigo do entregarArquivo');
+    conf('envenenado: cancelar o compartilhar baixou o arquivo (defeito enxergado)',
+      sAbort.length + ' | ' + downloads(sAbort), '2 | 1');
+    throw Object.assign(new Error('fim'), { fimDoVeneno: true });
+  }
+  conf('cancelou (AbortError): o compartilhar abriu e nada baixou',
+    sAbort.length + ' | ' + /^share:.*\.pdf$/.test(sAbort[0]) + ' | ' + downloads(sAbort), '1 | true | 0');
+  const sNega = await soGerar('NotAllowedError');
+  conf('outra falha (NotAllowedError): baixa, como antes', downloads(sNega) + ' | ' + /^share:/.test(sNega[0]), '1 | true');
+  const sSem = await soGerar('sem');
+  conf('sem o compartilhar no aparelho: baixa', sSem.length + ' | ' + downloads(sSem), '1 | 1');
+  const sOk = await soGerar('ok');
+  conf('compartilhou: nada baixou', sOk.length + ' | ' + downloads(sOk), '1 | 0');
   await fecharModal(p, 'modal-leitor-pdf');
+
+  // ================================================================
+  secao('4c. O mesmo cancelar no "Abrir fora do aplicativo" do leitor de PDF');
+  // um anexo que se diz PDF e não é: o leitor não abre e oferece abrir fora
+  await p.evaluate(async () => {
+    await Store.salvarAnexo('an_quebrado', { nome: 'quebrado_teste.pdf', tipo: 'application/pdf',
+      blob: new Blob(['isto não é um PDF'], { type: 'application/pdf' }) });
+    const d = await Store.carregar();
+    d.aulas.filter(a => a.id === 'au1')[0].anexos.push({ id: 'an_quebrado', nome: 'quebrado_teste.pdf', tamanho: 17 });
+    await Store.salvar(d);
+  });
+  await H.abrirApp(p, amb.ORIGEM);
+  conf('a aula abriu', await abrirAulaDeHoje(p, '09:00'), true);
+  await p.evaluate(() => Array.from(document.querySelectorAll('#lista-anexos [data-anexo-id="an_quebrado"] button'))
+    .find(b => b.textContent.trim() === 'Abrir').click());
+  await esperar('o "Abrir fora do aplicativo"', () => p.evaluate(() => !!document.querySelector('#leitor-abrir-fora')), v => v, 20000);
+  await armarCompartilhar(p, 'AbortError');
+  await p.evaluate(() => document.querySelector('#leitor-abrir-fora').click());
+  const sFora = await saidasDepois(p);
+  console.log('   abrir fora: ' + sFora.join(' | '));
+  conf('cancelou no "Abrir fora": o compartilhar abriu e nada baixou', sFora.join(' | ') + ' | ' + downloads(sFora),
+    'share:quebrado_teste.pdf | 0');
+  await fecharModal(p, 'modal-aula');
 
   // ================================================================
   secao('5. O livro sem gabarito diz isso');
