@@ -25,13 +25,14 @@ rules_version = '2';
 // troca e remoção vinda do aplicativo é negada.
 //
 // Os limites de tamanho e de tipo (livroValido e pacoteValido, abaixo) valem
-// para a escrita. Hoje a escrita é negada e eles não entram em regra nenhuma;
-// ficam prontos para o dia em que a escrita abrir: o nome tem de ser o do
-// caminho (sha256 e extensão); um livro tem de 1 byte a 200 MiB, tipo
-// application/pdf ou application/epub+zip, e a extensão tem de bater com o
-// tipo; um pacote tem de 1 byte a 100 MiB, tipo application/zip. A remoção
-// não tem arquivo novo (request.resource é nulo) e eles a negam: apagar,
-// se um dia abrir, pede regra própria.
+// para a escrita. Hoje a escrita é negada e eles não entram em regra nenhuma,
+// por isso ficam SÓ COMO COMENTÁRIO, guardados para o dia em que a escrita
+// abrir (o console do Firebase avisa função que nenhuma regra chama). O que
+// eles dizem: o nome tem de ser o do caminho (sha256 e extensão); um livro
+// tem de 1 byte a 200 MiB, tipo application/pdf ou application/epub+zip, e a
+// extensão tem de bater com o tipo; um pacote tem de 1 byte a 100 MiB, tipo
+// application/zip. A remoção não tem arquivo novo (request.resource é nulo)
+// e eles a negam: apagar, se um dia abrir, pede regra própria.
 //
 // Qualquer outro caminho é negado pela regra final, que pega tudo.
 service firebase.storage {
@@ -50,23 +51,30 @@ service firebase.storage {
     function nomeDePacote(arquivo) {
       return arquivo.matches('^[0-9a-f]{64}[.]zip$');
     }
-    // limites para a escrita de um livro (prontos; hoje a escrita é negada)
-    function livroValido(arquivo) {
-      return nomeDeLivro(arquivo)
-        && request.resource != null
-        && request.resource.size > 0
-        && request.resource.size <= 200 * 1024 * 1024
-        && ((arquivo.matches('^.*[.]pdf$') && request.resource.contentType == 'application/pdf')
-          || (arquivo.matches('^.*[.]epub$') && request.resource.contentType == 'application/epub+zip'));
-    }
-    // limites para a escrita de um pacote (prontos; hoje a escrita é negada)
-    function pacoteValido(arquivo) {
-      return nomeDePacote(arquivo)
-        && request.resource != null
-        && request.resource.size > 0
-        && request.resource.size <= 100 * 1024 * 1024
-        && request.resource.contentType == 'application/zip';
-    }
+    // GUARDADAS PARA O DIA EM QUE A ESCRITA PELO APLICATIVO ABRIR.
+    // As duas funções abaixo são os limites da escrita de um livro
+    // (livroValido) e de um pacote (pacoteValido). Hoje nenhuma regra as
+    // chama, e por isso ficam só como comentário. Para abrir a escrita, tirar
+    // o "// " do começo de cada linha entre o INÍCIO e o FIM e trocar a
+    // escrita negada de cada pasta por dona(uid) && livroValido(arquivo), ou
+    // por dona(uid) && pacoteValido(arquivo) na pasta dos pacotes.
+    // INÍCIO das funções guardadas
+    // function livroValido(arquivo) {
+    //   return nomeDeLivro(arquivo)
+    //     && request.resource != null
+    //     && request.resource.size > 0
+    //     && request.resource.size <= 200 * 1024 * 1024
+    //     && ((arquivo.matches('^.*[.]pdf$') && request.resource.contentType == 'application/pdf')
+    //       || (arquivo.matches('^.*[.]epub$') && request.resource.contentType == 'application/epub+zip'));
+    // }
+    // function pacoteValido(arquivo) {
+    //   return nomeDePacote(arquivo)
+    //     && request.resource != null
+    //     && request.resource.size > 0
+    //     && request.resource.size <= 100 * 1024 * 1024
+    //     && request.resource.contentType == 'application/zip';
+    // }
+    // FIM das funções guardadas
 
     // os livros: só a dona baixa; ninguém lista nem escreve pelo aplicativo
     match /usuarios/{uid}/livros/{arquivo} {
