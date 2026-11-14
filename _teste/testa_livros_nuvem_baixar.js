@@ -63,7 +63,20 @@
  *   --envenenado-sem-prazo       a baixa que para sem erro nunca cai (3c vê);
  *   --envenenado-cancelar-nao-solta  o Cancelar não para a baixa (3d vê);
  *   --envenenado-copia-inteira   a baixa segura o livro inteiro na memória
- *                                (8b vê, pela memória viva).
+ *                                (8b vê, pela memória viva);
+ *   --envenenado-solta-antes-do-redesenho  a vaga da baixa se solta ANTES de
+ *                                a Estante se refazer: o toque no cartão "Na
+ *                                nuvem" ainda à vista começa outra baixa (4 vê).
+ *
+ * O acabamento (depois do #232): a seção 0 confere o sha256 por trechos
+ * (Biblioteca.Sha256, pelo Store.sha256Hex num Blob) contra o
+ * crypto.subtle.digest nas fronteiras do bloco de 64 bytes e do trecho de 1 MB,
+ * no Node, e o andamento que ele avisa; a 3d confere que a barra e o Cancelar
+ * download ficam POR CIMA da capa, que o cartão parado não reserva altura e
+ * que nenhuma linha da Estante anda quando a baixa começa ou é cancelada, e o
+ * aviso "Download cancelado."; a 8b confere que o livro grande mostra
+ * "Conferindo o livro..." com o andamento antes de "está no tablet", sem
+ * mexer na grade.
  *
  * As seções da revisão das lentes: 3c (a baixa que PARA no meio, sem erro, com
  * a conexão aberta, cai no prazo sem dados, curto só nesta prova), 3d (o
@@ -82,6 +95,7 @@ const os = require('os');
 const path = require('path');
 const http = require('http');
 const crypto = require('crypto');
+const vm = require('vm');
 const { spawn, spawnSync } = require('child_process');
 const H = require('./_bib_navegador.js');
 const { conf, secao, esperar, pausa } = H;
@@ -109,8 +123,8 @@ const FONTES = { app: ['/app.js', APP], nuvem: ['/nuvem.js', NUVEM] };
 // cada veneno: uma ou mais trocas [fonte, trecho, troca]
 const VENENOS = {
   '--envenenado-sem-hash': [['app', 'if (h !== e.sha256) throw', 'if (false) throw']],
-  '--envenenado-guarda-parcial': [['app', 'return conferirLivroBaixado(arquivo, e).then(function () { seCancelou(); return guardarLivroBaixado(arquivo, e); });',
-    'return guardarLivroBaixado(arquivo, e).then(function () { return conferirLivroBaixado(arquivo, e); });']],
+  '--envenenado-guarda-parcial': [['app', 'return conferirLivroBaixado(arquivo, e, aoConferir).then(function () { seCancelou(); return guardarLivroBaixado(arquivo, e); });',
+    'return guardarLivroBaixado(arquivo, e).then(function () { return conferirLivroBaixado(arquivo, e, aoConferir); });']],
   '--envenenado-baixa-dois': [['app', '    if (baixaDaNuvem) return outraBaixaEmCurso(id);\n', '']],
   // o corpo que fecha limpo, mas curto, passa pela conta do tamanho
   '--envenenado-aceita-curto': [['nuvem', "            if (recebidos !== total) throw erroDaBaixa('INCOMPLETO', 'O livro não chegou inteiro.');\n", '']],
@@ -122,6 +136,9 @@ const VENENOS = {
   '--envenenado-cancelar-nao-solta': [['app', "    baixa.cancelada = true; if (baixa.controle) baixa.controle.abort();\n", '']],
   // a baixa segura o livro inteiro na memória: os pedaços nunca viram Blob no caminho
   '--envenenado-copia-inteira': [['nuvem', "          if (noLote >= JUNTAR_BYTES) { partes.push(new Blob(pedacos)); pedacos = []; noLote = 0; }\n", '']],
+  // a vaga da baixa se solta antes de a Estante se refazer: o toque no cartão ainda à vista começa outra baixa
+  '--envenenado-solta-antes-do-redesenho': [['app', 'var soltar = function (v) { baixaDaNuvem = null; return v; };',
+    'baixaDaNuvem = null; var soltar = function (v) { return v; };']],
   // a lista da conta de antes é guardada (e mostrada) na conta que entrou no meio da conferência
   '--envenenado-grava-na-conta-nova': [['app', '      if (!mesmaConta()) return false;\n', ''],
     ['nuvem', "if (!sessao || !sessao.uid || typeof uid !== 'string' || !uid || uid !== sessao.uid) return Promise.resolve(null);\n    return gravarEstado('livrosNaNuvem', Object.assign({}, v, { uid: uid }));",
@@ -401,6 +418,34 @@ const livroGuardado = (pag, id) => pag.evaluate(i => Store.lerLivro(i).then(r =>
     return JSON.stringify({ pacote: r.pacote, versao: r.versao, bytes: r.bytes, blob: r.blob.size, tipo: r.blob.type, sha: s, hash: r.meta.hash,
       nuvem: r.nuvem && r.nuvem.metaVersao });
   }))), id);
+/* O leiaute da grade da Estante: a altura dela e, de cada cartão, o topo e a
+ * altura (arredondados). Igual antes, durante e depois da baixa: nada andou. */
+const leiauteDaGrade = pag => pag.evaluate(() => {
+  const g = document.querySelector('.bibl-painel-estante .bibl-grade');
+  if (!g) return 'sem grade';
+  const rg = g.getBoundingClientRect();
+  return JSON.stringify({ altura: Math.round(rg.height), cartoes: Array.from(g.children).map(c => {
+    const r = c.getBoundingClientRect();
+    return (c.dataset.livro || c.dataset.nuvem) + '@' + Math.round(r.top - rg.top) + '+' + Math.round(r.height);
+  }) });
+});
+/* O cartão parado não reserva altura: solto da linha da grade (alinhado ao
+ * topo), a altura dele é a do botão do livro, sem nada embaixo. */
+const cartoesSemReserva = pag => pag.evaluate(() => Array.from(document.querySelectorAll('.bibl-painel-estante [data-nuvem]')).filter(c => {
+  const antes = c.style.alignSelf;
+  c.style.alignSelf = 'start';
+  const sobra = c.getBoundingClientRect().height - c.querySelector(':scope > .bibl-livro-cartao').getBoundingClientRect().height;
+  c.style.alignSelf = antes;
+  return Math.abs(sobra) > 0.5;
+}).map(c => c.dataset.nuvem).join(','));
+// a barra e o Cancelar download, por cima da capa: o retângulo de cada um, em px inteiros
+const sobreACapa = (pag, id) => pag.evaluate(i => {
+  const c = document.querySelector('[data-nuvem="' + i + '"]');
+  const ret = e => { if (!e) return null; const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)]; };
+  const sobre = c && c.querySelector('.bibl-nuvem-sobre-capa');
+  return { capa: ret(c && c.querySelector('.bibl-capa')), sobre: sobre && !sobre.hidden ? ret(sobre) : null,
+    cancelar: ret(c && c.querySelector('[data-cancelar-nuvem]')), texto: (c && c.querySelector('[data-cancelar-nuvem]') || {}).textContent || '' };
+}, id);
 const textoDoAviso = pag => pag.evaluate(() => (document.querySelector('#aviso-texto') || {}).textContent || '');
 const limparAviso = pag => pag.evaluate(() => { const a = document.querySelector('#aviso-texto'); if (a) a.textContent = ''; });
 const paginaDesenhada = pag => pag.evaluate(() => {
@@ -422,6 +467,41 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   conf('o comentário do nuvem.js diz por que o getDownloadURL não entra (a busca acima não é cega)', /getDownloadURL/.test(NUVEM), true);
   conf('nenhuma fonte do aplicativo cita getDownloadURL nem o token de download', citam.join(','), '');
   conf('o nuvem.js baixa pelo ?alt=media com Authorization: Firebase', /'\?alt=media'/.test(NUVEM) && /Authorization: 'Firebase ' \+ token/.test(NUVEM), true);
+  /* O sha256 por trechos do Store (Biblioteca.Sha256 num Blob, de 1 MB em
+   * 1 MB) contra o crypto.subtle.digest, nas fronteiras: o bloco de 64 bytes
+   * (55 e 56 mudam o fecho de um bloco para dois) e o trecho de 1 MB. No Node,
+   * com o store.js e o biblioteca.js do repositório. */
+  {
+    const Bib = require(path.join(H.RAIZ, 'biblioteca.js'));
+    let fins = 0;
+    const fim0 = Bib.Sha256.prototype.fim;
+    Bib.Sha256.prototype.fim = function () { fins++; return fim0.apply(this, arguments); };
+    const ctx = { Biblioteca: Bib, Blob, crypto: globalThis.crypto, TextEncoder, console, setTimeout, clearTimeout };
+    ctx.self = ctx;
+    vm.createContext(ctx);
+    vm.runInContext(STORE, ctx, { filename: 'store.js' });
+    const MB = 1024 * 1024;
+    const TAMANHOS = [0, 55, 56, 63, 64, 65, MB - 1, MB, MB + 1];
+    const diferentes = [], andamentoErrado = [];
+    for (const n of TAMANHOS) {
+      const bytes = new Uint8Array(n);
+      for (let i = 0; i < n; i++) bytes[i] = (i * 131 + (i >>> 8) * 7 + 13) & 0xff;
+      const passos = [];
+      const porTrechos = await ctx.Store.sha256Hex(new Blob([bytes]), (lidos, total) => passos.push(lidos + '/' + total));
+      const v = new Uint8Array(await crypto.webcrypto.subtle.digest('SHA-256', bytes));
+      let deUmaVez = '';
+      for (const b of v) deUmaVez += (b < 16 ? '0' : '') + b.toString(16);
+      if (porTrechos !== deUmaVez) diferentes.push(n);
+      const esperados = [];
+      for (let p = Math.min(n, MB); p <= n && n > 0; p = p === n ? n + 1 : Math.min(n, p + MB)) esperados.push(p + '/' + n);
+      if (passos.join(',') !== esperados.join(',')) andamentoErrado.push(n + ': ' + passos.join(',') + ' (esperado ' + esperados.join(',') + ')');
+    }
+    Bib.Sha256.prototype.fim = fim0;
+    conf('o sha256 por trechos foi o do Biblioteca.Sha256 (um fim por tamanho, nenhum pelo caminho de uma vez)', fins, TAMANHOS.length);
+    conf('o sha256 por trechos é igual ao do crypto.subtle.digest em 0, 55, 56, 63, 64, 65, 1 MB - 1, 1 MB e 1 MB + 1 bytes',
+      diferentes.join(','), '');
+    conf('o andamento da conferência vem a cada trecho de 1 MB, crescendo, e termina no total', andamentoErrado.join(' ; '), '');
+  }
   conf('o firebase-tools está onde a prova procura (' + FIREBASE + ')', fs.existsSync(FIREBASE), true);
   const vj = /version "(\d+)/.exec(((r) => (r.stderr || '') + (r.stdout || ''))(spawnSync(JAVA_HOME ? path.join(JAVA_HOME, 'bin', 'java') : 'java', ['-version'], { encoding: 'utf8' })));
   conf('há um JDK 21 ou mais novo (' + (JAVA_HOME || 'java do PATH') + ')', !!vj && Number(vj[1]) >= 21, true);
@@ -518,7 +598,8 @@ const paginaDesenhada = pag => pag.evaluate(() => {
     const anotar = () => {
       const c = document.querySelector('[data-nuvem="nuvem-a"] [data-nuvem-estado]');
       if (!c) return;
-      const v = c.getAttribute('data-nuvem-estado') + '|' + c.textContent + '|' + ((c.querySelector('.bibl-progresso i') || { style: {} }).style.width || '');
+      const barra = document.querySelector('[data-nuvem="nuvem-a"] .bibl-nuvem-sobre-capa:not([hidden]) .bibl-progresso i');
+      const v = c.getAttribute('data-nuvem-estado') + '|' + c.textContent + '|' + ((barra || { style: {} }).style.width || '');
       if (window.__andamento[window.__andamento.length - 1] !== v) window.__andamento.push(v);
     };
     window.__amostra = new MutationObserver(anotar);
@@ -531,7 +612,7 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   const pcts = andamento.filter(a => /^baixando\|/.test(a)).map(a => Number(/(\d+)%/.exec(a)[1]));
   conf('a baixa mostrou o andamento: passos entre 0 e 100%, crescendo, com a barra junto', pcts.some(p => p > 0 && p < 100) &&
     pcts.every((p, i) => i === 0 || p >= pcts[i - 1]) && andamento.filter(a => /^baixando\|/.test(a)).every(a => /\|\d+%$/.test(a)), true);
-  conf('e passou pela conferência antes de guardar', andamento.some(a => /^conferindo\|Conferindo o arquivo/.test(a)), true);
+  conf('e passou pela conferência antes de guardar', andamento.some(a => /^conferindo\|Conferindo o livro\.\.\. \d+%\|\d+%$/.test(a)), true);
   conf('o livro entrou no tablet', chegou.ok, true);
   conf('o registro é o de um livro do tablet: pacote nuvem, o Blob inteiro, o sha256 do catálogo', await livroGuardado(pag, 'nuvem-a'),
     JSON.stringify({ pacote: 'nuvem', versao: 1, bytes: ARQ['nuvem-a'].length, blob: ARQ['nuvem-a'].length, tipo: 'application/pdf',
@@ -596,16 +677,29 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   }
   conf('sem bytes por mais que o prazo, o cartão volta a ser baixável, com a frase da rede', parada.valor, 'rede|A internet caiu no meio. Toque para tentar de novo.');
   conf('o motivo é a baixa parada (PARADO), e nada foi guardado', await pag.evaluate(() => window.__codigos.join(',')) + '|' + await livroGuardado(pag, 'nuvem-b'), 'PARADO|null');
-  conf('a vaga ficou livre: o Cancelar sumiu', await pag.evaluate(() => document.querySelector('[data-cancelar-nuvem="nuvem-b"]').classList.contains('bibl-nuvem-cancelar-oculto')), true);
+  conf('a vaga ficou livre: o Cancelar sumiu, e a barra com ele', await pag.evaluate(() => document.querySelector('[data-cancelar-nuvem="nuvem-b"]').classList.contains('bibl-nuvem-cancelar-oculto') &&
+    document.querySelector('[data-nuvem="nuvem-b"] .bibl-nuvem-sobre-capa').hidden), true);
 
-  secao('3d. O Cancelar no meio da baixa não guarda nada e solta a vaga');
+  secao('3d. O Cancelar download, por cima da capa, não guarda nada, solta a vaga e não mexe na Estante');
   await limparAviso(pag);
+  await abrirEstante(pag);
+  await pausa(300);
+  conf('nenhum cartão parado da nuvem reserva altura embaixo do livro', await cartoesSemReserva(pag), '');
+  conf('parado, nada fica por cima da capa', (await sobreACapa(pag, 'nuvem-b')).sobre, null);
   repasse.lento = 250;
   await clicar(pag, '[data-nuvem="nuvem-b"] > .bibl-livro-cartao');
   await esperar('a baixa a cancelar andou', () => estadoDoCartao(pag, 'nuvem-b'), v => { const m = /Baixando · (\d+)%/.exec(v); return !!m && Number(m[1]) >= 10; }, 15000);
   conf('enquanto baixa, o Cancelar está à vista', await pag.evaluate(() => !document.querySelector('[data-cancelar-nuvem="nuvem-b"]').classList.contains('bibl-nuvem-cancelar-oculto')), true);
+  const sobre = await sobreACapa(pag, 'nuvem-b');
+  const dentro = (a, b) => !!a && !!b && a[0] >= b[0] - 1 && a[1] >= b[1] - 1 && a[2] <= b[2] + 1 && a[3] <= b[3] + 1;
+  conf('a barra e o botão ficam exatamente por cima da capa', !!sobre.sobre && sobre.sobre.every((x, k) => Math.abs(x - sobre.capa[k]) <= 1), true);
+  conf('o botão diz "Cancelar download" e cabe inteiro dentro da capa', sobre.texto + '|' + dentro(sobre.cancelar, sobre.capa), 'Cancelar download|true');
+  // a Estante com a baixa em curso, para comparar com a de depois do Cancelar (o cartão parado de novo)
+  const leiauteBaixando = await leiauteDaGrade(pag);
   await clicar(pag, '[data-cancelar-nuvem="nuvem-b"]');
   const cancelada = await esperar('o cartão voltou depois do Cancelar', () => estadoDoCartao(pag, 'nuvem-b'), v => /^na-nuvem\|/.test(v), 5000);
+  const avisoDoCancelar = await textoDoAviso(pag);
+  const leiauteCancelado = await leiauteDaGrade(pag);
   await pausa(5000);   // o tempo de a baixa inteira terminar, se o Cancelar não a tivesse parado
   repasse.lento = 0;
   if (MODO === '--envenenado-cancelar-nao-solta') {
@@ -614,6 +708,9 @@ const paginaDesenhada = pag => pag.evaluate(() => {
     return fim();
   }
   conf('depois do Cancelar o cartão volta a "toque para baixar", sem aviso de erro', cancelada.valor, 'na-nuvem|Na nuvem · toque para baixar');
+  conf('e um aviso curto diz que o download foi cancelado', avisoDoCancelar, 'Download cancelado.');
+  conf('com a baixa em curso e parada, cada linha da Estante tem a mesma altura e a de baixo não andou', leiauteBaixando, leiauteCancelado);
+  conf('e nada fica por cima da capa', (await sobreACapa(pag, 'nuvem-b')).sobre, null);
   conf('e nada foi guardado', await livroGuardado(pag, 'nuvem-b'), null);
 
   secao('4. Dois toques seguidos começam uma baixa só; outro livro espera; o toque logo depois de terminar não baixa de novo');
@@ -650,6 +747,11 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   await pausa(1500);
   if (MODO === '--envenenado-baixa-dois') {
     conf('VENENO visto: dois toques começaram duas baixas', (await pedidosDe(pag, 'nuvem-b')) - antesB >= 2, true);
+    return fim();
+  }
+  if (MODO === '--envenenado-solta-antes-do-redesenho') {
+    conf('VENENO visto: com a vaga solta antes do redesenho, o toque no cartão ainda à vista começou outra baixa',
+      (await pag.evaluate(() => window.__tocouDepois)) === true && (await pedidosDe(pag, 'nuvem-b')) - antesB >= 2, true);
     return fim();
   }
   conf('dois toques seguidos, e mais um logo depois de guardar: uma baixa só', (await pedidosDe(pag, 'nuvem-b')) - antesB, 1);
@@ -740,6 +842,31 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   };
   conf('o Chrome diz a memória dos ArrayBuffers (backingStorageSize), além do heap', typeof (await cdp.send('Runtime.getHeapUsage')).backingStorageSize, 'number');
   await abrirEstante(pag);
+  await limparAviso(pag);
+  const leiauteAntesDoGrande = await leiauteDaGrade(pag);
+  /* cada mudança do cartão do livro grande e do aviso, em ordem, e o leiaute da
+   * grade no primeiro instante da conferência (um observador do DOM) */
+  await pag.evaluate(() => {
+    window.__grande = [];
+    window.__leiauteConferindo = null;
+    const leiaute = () => {
+      const g = document.querySelector('.bibl-painel-estante .bibl-grade');
+      const rg = g.getBoundingClientRect();
+      return JSON.stringify({ altura: Math.round(rg.height), cartoes: Array.from(g.children).map(c => {
+        const r = c.getBoundingClientRect();
+        return (c.dataset.livro || c.dataset.nuvem) + '@' + Math.round(r.top - rg.top) + '+' + Math.round(r.height);
+      }) });
+    };
+    const anotar = () => {
+      const c = document.querySelector('[data-nuvem="nuvem-grande"] [data-nuvem-estado]');
+      const a = (document.querySelector('#aviso-texto') || {}).textContent || '';
+      const v = (/está no tablet/.test(a) ? 'aviso no tablet' : c ? c.getAttribute('data-nuvem-estado') + '|' + c.textContent : 'sem cartão');
+      if (c && c.getAttribute('data-nuvem-estado') === 'conferindo' && !window.__leiauteConferindo) window.__leiauteConferindo = leiaute();
+      if (window.__grande[window.__grande.length - 1] !== v) window.__grande.push(v);
+    };
+    window.__amostraGrande = new MutationObserver(anotar);
+    window.__amostraGrande.observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
   const base = await vivo();
   repasse.lento = 3;
   await clicar(pag, '[data-nuvem="nuvem-grande"] > .bibl-livro-cartao');
@@ -762,6 +889,14 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   conf('o livro grande entrou no tablet, inteiro e conferido', JSON.parse(await livroGuardado(pag, 'nuvem-grande') || '{}').sha, SHA['nuvem-grande']);
   conf('o pico da memória viva acima da base ficou abaixo de metade do livro', acima < 0.5 * N, true);
   conf('a medida teve amostras durante a baixa', amostras >= 5, true);
+  const grande = await pag.evaluate(() => { window.__amostraGrande.disconnect(); return { passos: window.__grande, leiaute: window.__leiauteConferindo }; });
+  const conferindo = grande.passos.map((p, i) => [i, /^conferindo\|Conferindo o livro\.\.\. (\d+)%$/.exec(p)]).filter(x => x[1]);
+  const noTablet = grande.passos.indexOf('aviso no tablet');
+  conf('o cartão do livro grande mostrou "Conferindo o livro..." antes de "está no tablet"',
+    conferindo.length > 0 && noTablet > conferindo[0][0], true);
+  conf('e a conferência mostrou o andamento: passos entre 0 e 100%, crescendo',
+    conferindo.some(x => Number(x[1][1]) > 0 && Number(x[1][1]) < 100) && conferindo.every((x, k) => k === 0 || Number(x[1][1]) >= Number(conferindo[k - 1][1][1])), true);
+  conf('durante a conferência, a grade da Estante estava como antes da baixa', grande.leiaute, leiauteAntesDoGrande);
 
   secao('8c. O livro que ela tira do tablet volta a aparecer "na nuvem" na hora');
   await H.irParaAba(pag, 'ajustes');

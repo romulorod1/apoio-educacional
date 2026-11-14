@@ -1310,6 +1310,7 @@ roda "livros da nuvem, baixar --envenenado-grava-na-conta-nova" node "_teste/tes
 roda "livros da nuvem, baixar --envenenado-sem-prazo" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-sem-prazo
 roda "livros da nuvem, baixar --envenenado-cancelar-nao-solta" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-cancelar-nao-solta
 roda "livros da nuvem, baixar --envenenado-copia-inteira" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-copia-inteira
+roda "livros da nuvem, baixar --envenenado-solta-antes-do-redesenho" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-solta-antes-do-redesenho
 # Nuvem da biblioteca, PR 4 (14/11/2026): o toque em "Atualizar a biblioteca"
 # traz os pacotes de exercicios novos do catalogo (o mapa pacotes), um por
 # vez, e os importa pelo mesmo caminho do zip, contra o emulador do Auth, do
