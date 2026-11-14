@@ -18389,6 +18389,25 @@
     });
   }
 
+  /* O "Atualizar a biblioteca" e a linha dele (fase 1c e PR 4: o mapa novo
+   * dos livros e os pacotes de exercícios da nuvem) moram no cartão da
+   * Biblioteca, logo abaixo do texto que fala dele, À VISTA: fora da lista
+   * recolhida dos instalados, e com ou sem livro no tablet. Só no aparelho que
+   * traz da nuvem: nunca no celular nem no observador. Um lugar só, com os
+   * mesmos ids (#livros-nuvem-estado e #livros-nuvem-atualizar). */
+  function podeAtualizarABiblioteca() { return !modoCelular && !aparelhoSoLe() && temNuvem(); }
+  function desenharAtualizarDaBiblioteca() {
+    var caixa = $('#biblioteca-nuvem');
+    if (!caixa) return;
+    caixa.innerHTML = '';
+    if (!podeAtualizarABiblioteca()) return;
+    caixa.appendChild(el('div', { class: 'livros-nuvem', id: 'livros-nuvem' }, [
+      el('div', { class: 'ajuda cresce', id: 'livros-nuvem-estado', texto: textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem()) }),
+      el('button', { type: 'button', class: 'btn pequeno', id: 'livros-nuvem-atualizar', texto: 'Atualizar a biblioteca',
+        aoClick: function () { tocarAtualizarBiblioteca($('#livros-nuvem-atualizar')); } })
+    ]));
+  }
+
   function desenharLivrosAjustes() {
     var caixa = $('#lista-livros-biblioteca');
     return Store.listarLivros().then(function (lista) {
@@ -18396,6 +18415,7 @@
       atualizarResumoInstaladosBiblioteca();
       livrosDoTablet = lista.map(function (l) { return { id: l.id, meta: l.meta }; });
       livrosDoTabletMudaram();
+      desenharAtualizarDaBiblioteca();
       /* B12: o índice de texto acompanha a lista (livro novo entra na fila,
        * livro removido ou trocado sai). Roda num Worker, sem segurar a tela. */
       if (typeof IndiceLivros === 'object' && IndiceLivros) {
@@ -18409,24 +18429,7 @@
       }
       if (!caixa) return;
       caixa.innerHTML = '';
-      /* Sem livro no tablet, o cartão ainda aparece no aparelho que traz da
-       * nuvem (não o celular nem o observador): é nele que mora o Atualizar a
-       * biblioteca, por onde chegam os pacotes e o mapa dos livros. */
-      var semLivroComNuvem = !lista.length && !modoCelular && !aparelhoSoLe() && temNuvem();
-      if (!lista.length && !semLivroComNuvem) return;
-      var blocoDaNuvem = el('div', { class: 'livros-nuvem', id: 'livros-nuvem' }, [
-        el('div', { class: 'ajuda cresce', id: 'livros-nuvem-estado', texto: textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem()) }),
-        el('button', { type: 'button', class: 'btn pequeno', id: 'livros-nuvem-atualizar', texto: 'Atualizar a biblioteca',
-          aoClick: function () { tocarAtualizarBiblioteca($('#livros-nuvem-atualizar')); } })
-      ]);
-      if (!lista.length) {
-        caixa.appendChild(el('div', { class: 'cartao compacto u-margem-baixo-10', id: 'cartao-livros', 'data-sem-livros': 'sim' }, [
-          el('div', { class: 'u-peso-seminegrito', texto: 'Livros neste tablet' }),
-          el('div', { class: 'ajuda u-margem-0-0-6', texto: 'Nenhum livro neste tablet. Os que estão na sua nuvem aparecem na Estante e baixam com um toque, um por vez.' }),
-          blocoDaNuvem
-        ]));
-        return;
-      }
+      if (!lista.length) return;
       var total = lista.reduce(function (s, l) { return s + (l.bytes || 0); }, 0);
       var linhas = lista.map(function (l) {
         return el('div', { class: 'item-lista livro-linha', 'data-livro': l.id }, [
@@ -18445,9 +18448,7 @@
         el('div', { class: 'livros-total', id: 'livros-total', 'data-bytes': String(total),
           texto: lista.length + (lista.length === 1 ? ' livro, ' : ' livros, ') + Biblioteca.mb(total) + ' no total' }),
         el('div', { class: 'ajuda u-margem-0-0-6', texto: 'Os livros ficam neste tablet: a cópia de segurança não os leva. Os que estão na sua nuvem ' +
-            'aparecem na Estante e baixam com um toque, um por vez.' }),
-        // fase 1c: o mapa novo dos livros chega pelo catálogo da nuvem, sem baixar livro nenhum
-        blocoDaNuvem
+            'aparecem na Estante e baixam com um toque, um por vez.' })
       ].concat(linhas)));
     }).catch(function () { quantosLivros = 0; livrosDoTablet = []; livrosDoTabletMudaram(); if (caixa) caixa.innerHTML = ''; });
   }

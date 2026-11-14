@@ -65,8 +65,8 @@
  *   --envenenado-pacote-para-tudo a falha de um pacote para os outros (1 vê);
  *   --envenenado-pacote-removido-volta  sem a marca da remoção: o pacote que
  *                                 ela removeu volta na mesma versão (6b vê);
- *   --envenenado-sem-livro-sem-botao  o cartão dos livros some sem livro, e
- *                                 com ele o Atualizar a biblioteca (6g vê).
+ *   --envenenado-sem-livro-sem-botao  o Atualizar a biblioteca só aparece com
+ *                                 livro no tablet, como antes (6g vê).
  *
  * Precisa do firebase-tools (FIREBASE_TOOLS) e de um JDK 21 em JAVA_HOME,
  * como o testa_livros_nuvem_baixar.js. Portas: 9081 (app), 9082 (auth), 9083
@@ -107,7 +107,7 @@ const VENENOS = {
   '--envenenado-pacote-sem-hash': ['if (doArquivo !== e.sha256) throw', 'if (false) throw'],
   '--envenenado-pacote-para-tudo': ['return pausaCurta().then(function () { return proximo(i + 1); });',
     "return res.estado === 'falhou' ? null : pausaCurta().then(function () { return proximo(i + 1); });"],
-  '--envenenado-sem-livro-sem-botao': ['if (!lista.length && !semLivroComNuvem) return;', 'if (!lista.length) return;'],
+  '--envenenado-sem-livro-sem-botao': ['    if (!podeAtualizarABiblioteca()) return;', '    if (!podeAtualizarABiblioteca() || !quantosLivros) return;'],
   '--envenenado-pacote-removido-volta': ["if (typeof aqui !== 'number' && typeof removidos[id.pacote] === 'number' && removidos[id.pacote] >= id.versao) { r.removidos++; return; }",
     'if (false) { r.removidos++; return; }']
 };
@@ -360,6 +360,12 @@ const totalStorage = pag => pag.evaluate(() => window.__pedidosStorage.length);
 const lerPacotes = pag => pag.evaluate(() => Store.listarPacotesBiblioteca().then(l => l.map(p => p.pacote + '@' + p.versao).join(',')));
 const versaoDosItens = (pag, id) => pag.evaluate(i => Store.itensDaBiblioteca().then(l =>
   Array.from(new Set(l.filter(x => x.pacote === i).map(x => x.versao))).sort().join(',')), id);
+// o Atualizar a biblioteca está À VISTA: desenhado, com caixa na tela, e a lista recolhida dos instalados fechada
+const botaoAVista = pag => pag.evaluate(() => {
+  const b = document.querySelector('#livros-nuvem-atualizar');
+  const lista = document.querySelector('#lista-instalados-biblioteca');
+  return !!b && b.getClientRects().length > 0 && !!lista && !lista.open && !lista.contains(b);
+});
 const textoDoAviso = pag => pag.evaluate(() => (document.querySelector('#aviso-texto') || {}).textContent || '');
 const limparAviso = pag => pag.evaluate(() => { const a = document.querySelector('#aviso-texto'); if (a) a.textContent = ''; });
 const linhaDaNuvem = pag => pag.evaluate(() => (document.querySelector('#livros-nuvem-estado') || {}).textContent || '');
@@ -471,6 +477,9 @@ async function tocarSemEfeito(pag) {
   secao('1. O primeiro toque: um por vez, a falha de um não para os outros');
   repasse.cortarSha = SHA.m1;
   repasse.lento = 15;
+  await H.irParaAba(pag, 'ajustes');
+  await pag.evaluate(() => { document.querySelector('#cartao-biblioteca').hidden = false; document.querySelector('#lista-instalados-biblioteca').open = false; });
+  conf('o Atualizar a biblioteca está à vista, sem abrir a lista dos instalados', await botaoAVista(pag), true);
   const t1 = await atualizar(pag, 'o primeiro toque terminou');
   repasse.cortarSha = null;
   repasse.lento = 0;
@@ -572,8 +581,19 @@ async function tocarSemEfeito(pag) {
     Nuvem.estado = function () { const e = window.__estado0.apply(this, arguments); e.celular = true; return e; };
   });
   conf('com a marca de celular, o mesmo aviso', await tocarSemEfeito(pag), 'A biblioteca se atualiza no tablet.');
+  // a tela refeita com a marca de celular (o observador também a tem): o botão não aparece
+  await H.irParaAba(pag, 'hoje');
+  await H.irParaAba(pag, 'ajustes');
+  conf('no celular, o Atualizar a biblioteca nem aparece', await existe(pag, '#livros-nuvem-atualizar'), false);
+  await pag.evaluate(() => {
+    Nuvem.estado = function () { const e = window.__estado0.apply(this, arguments); e.observador = true; e.celular = true; return e; };
+  });
+  await H.irParaAba(pag, 'hoje');
+  await H.irParaAba(pag, 'ajustes');
+  conf('para o observador, o Atualizar a biblioteca nem aparece', await existe(pag, '#livros-nuvem-atualizar'), false);
   conf('o observador e o celular não pediram nada ao Storage, e nada entrou', ((await totalStorage(pag)) - n6) + '|' + /trocado/.test(await lerPacotes(pag)), '0|false');
   await pag.evaluate(() => { Nuvem.estado = window.__estado0; });
+  await H.irParaAba(pag, 'hoje');
   const t6 = await atualizar(pag, 'de volta à conta dela, o toque terminou');
   conf('de volta à conta dela, o mesmo toque traz o pacote (o controle)', ((await totalStorage(pag)) - n6) + '|' + /matematica-sintetico-trocado@1/.test(await lerPacotes(pag)), '1|true');
   conf('e a linha diz que ele entrou', t6.linha, 'Biblioteca conferida hoje às HH:MM · nenhum livro com mapa novo · 1 pacote de exercícios novo');
@@ -711,13 +731,13 @@ async function tocarSemEfeito(pag) {
   await H.irParaAba(pag, 'ajustes');
   await pag.evaluate(() => { document.querySelector('#cartao-biblioteca').hidden = false; });
   conf('o tablet está sem livro e sem pacote', (await pag.evaluate(() => Store.listarLivros().then(l => l.length))) + '|' + await lerPacotes(pag), '0|');
-  const temBotao = await esperar('o cartão dos livros, sem livro', () => existe(pag, '#cartao-livros #livros-nuvem-atualizar'), v => v === true, 5000);
+  await pag.evaluate(() => { document.querySelector('#lista-instalados-biblioteca').open = false; });
+  const temBotao = await esperar('o Atualizar a biblioteca, sem livro', () => botaoAVista(pag), v => v === true, 5000);
   if (MODO === '--envenenado-sem-livro-sem-botao') {
     conf('VENENO visto: sem livro no tablet, o Atualizar a biblioteca sumiu', temBotao.ok, false);
     return fim();
   }
-  conf('sem livro, o cartão diz e traz o Atualizar a biblioteca', temBotao.ok + '|' + await pag.evaluate(() => document.querySelector('#cartao-livros .ajuda').textContent),
-    'true|Nenhum livro neste tablet. Os que estão na sua nuvem aparecem na Estante e baixam com um toque, um por vez.');
+  conf('sem livro, o Atualizar a biblioteca está à vista, com a lista dos instalados recolhida', temBotao.ok, true);
   // e a conferência dos livros falha neste toque: os pacotes vêm do mesmo jeito
   await pag.evaluate(() => {
     const c0 = Nuvem.lerCatalogo;
