@@ -57,6 +57,7 @@
  */
 'use strict';
 const fs = require('fs');
+const vm = require('vm');
 const os = require('os');
 const path = require('path');
 const H = require('./_bib_navegador.js');
@@ -112,9 +113,30 @@ conf('a etapa 4 do tutorial existe', etapa4.length > 100, true);
 conf('a etapa 4 não fala em imprimir nem em papel', /imprim|papel/i.test(etapa4), false);
 conf('a etapa 4 diz mandar ao aluno ou guardar no tablet', /mande ao aluno ou guarde no tablet/.test(etapa4), true);
 conf('a figura da etapa 4 não fala em papel', /Na tela ou papel/.test(APP), false);
-// o PDF pronto é só da Biblioteca: o entregarArquivo do resto do app fica como era
-conf('o entregarArquivo continua com a queda para o download (fora da Biblioteca)',
-  APP.indexOf("navigator.share({ files: [arquivo], title: titulo || nome }).catch(function () { baixar(nome, blob); });") >= 0, true);
+/* O PDF pronto é só da Biblioteca: o resto do app entrega pelo entregarArquivo
+ * de sempre, com a queda para o download. Desde o #225, cancelar ali também não
+ * baixa (avisa "Envio cancelado."), e outra recusa continua baixando. Provado
+ * pelo comportamento, na seção 0b: a função do app.js roda aqui no Node, com o
+ * compartilhar e o download de mentira. */
+const I_ENTREGAR = APP.indexOf('  function entregarArquivo(');
+const FIM_ENTREGAR = I_ENTREGAR < 0 ? -1 : APP.slice(I_ENTREGAR).search(/\r?\n  \}\r?\n/);
+const FONTE_ENTREGAR = I_ENTREGAR < 0 || FIM_ENTREGAR < 0 ? '' : APP.slice(I_ENTREGAR, I_ENTREGAR + FIM_ENTREGAR) + '\n  }';
+conf('o entregarArquivo do resto do app existe, e é um só', FONTE_ENTREGAR.length > 100 && APP.split('function entregarArquivo(').length === 2, true);
+async function entregarForaDaBiblioteca(recusa) {
+  const saidas = [];
+  const caixa = {
+    File: function (partes, nome) { this.name = nome; },
+    navigator: {
+      canShare: () => true,
+      share: d => { saidas.push('share:' + d.files[0].name); return Promise.reject({ name: recusa }); }
+    },
+    baixar: nome => saidas.push('download:' + nome),
+    avisar: texto => saidas.push('aviso:' + texto)
+  };
+  vm.runInNewContext(FONTE_ENTREGAR + '\nentregarArquivo("Fechamento_teste.pdf", { type: "application/pdf" }, "Fechamento");', caixa);
+  await new Promise(r => setTimeout(r, 50));
+  return saidas.join(' | ');
+}
 
 const amb = H.criarAmbiente(PORTA, 'perfil_pdf_pronto', trocas);
 
@@ -190,6 +212,11 @@ async function print(pag, nome) {
 const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true });
 
 (async () => {
+  secao('0b. Fora da Biblioteca, o entregarArquivo: cancelar não baixa, outra recusa baixa');
+  conf('AbortError (ela cancelou): não baixa e avisa "Envio cancelado."', await entregarForaDaBiblioteca('AbortError'),
+    'share:Fechamento_teste.pdf | aviso:Envio cancelado.');
+  conf('NotAllowedError (outra recusa): baixa, sem o aviso de cancelado', await entregarForaDaBiblioteca('NotAllowedError'),
+    'share:Fechamento_teste.pdf | download:Fechamento_teste.pdf');
   if (MODO) {
     secao('O veneno é de verdade');
     conf('o app.js servido ficou diferente do repositório (' + MODO + ')', trocas['/app.js'] !== APP, true);
