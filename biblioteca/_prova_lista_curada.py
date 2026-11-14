@@ -1,7 +1,7 @@
 """Prova do tipo de fonte lista-curada (biblioteca/lista_curada.py), sem navegador, com venenos.
 
     python biblioteca/_prova_lista_curada.py [--sem-navegador]
-        sobre uma fonte INVENTADA que a propria prova desenha na hora: nove
+        sobre uma fonte INVENTADA que a propria prova desenha na hora: onze
         PDFs sinteticos e o json de itens curados que aponta para eles.
 
     python biblioteca/_prova_lista_curada.py --contra-main [--ref origin/main]
@@ -64,9 +64,15 @@ Travas:
                   tambem (venenos: a tolerancia larga, como o cinza 200 de
                   antes, recusa as figuras claras; medir contra o branco aceita
                   o creme; medir so contra o papel aceita o branco do painel)
-  confere         o cabecalho corrido (a mesma linha no alto de cada pagina)
-                  que a caixa pega acima do texto esperado nao reprova o item
-                  (veneno: so a ordem natural do PDF reprova); no PDF de uma
+  confere         o cabecalho corrido (a mesma linha no alto de tres paginas
+                  ou mais) que a caixa pega acima do texto esperado nao reprova
+                  o item (veneno: so a ordem natural do PDF reprova); o
+                  "Atividade 1" que recomeca em cada unidade, no alto de varias
+                  paginas, e o cabecalho que so se repete em duas paginas sao
+                  recusados (veneno: a regra do 6847c26, que bastava achar a
+                  linha em outra pagina, deixa os dois passarem); o "Atividade
+                  nº 1" no alto de tres paginas tambem (veneno: o padrao do
+                  3eaa2e0, que nao atravessava o "º", deixa passar); no PDF de uma
                   pagina so nao ha folga: o titulo da pagina unica acima do
                   texto e o item vizinho de uma linha numa caixa alta sao
                   recusados (veneno: a regra do 17dfb6a, que aceitava o
@@ -92,6 +98,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -896,13 +903,28 @@ def cabecalho_de_17dfb6a(doc, pno, bbox, linha):
     return False
 
 
+def cabecalho_de_6847c26(doc, pno, bbox, linha):
+    """A regra do 6847c26: bastava a linha aparecer na faixa do alto de UMA
+    outra pagina. So para o veneno."""
+    faixa = lista_curada.faixa_de_cabecalho(doc[pno])
+    alvo = lista_curada.so_letras(linha)
+    if not alvo or bbox[1] < faixa.y0 - 0.01 or bbox[3] > faixa.y1 + 0.01 or doc.page_count == 1:
+        return False
+    return any(lista_curada.so_letras(t) == alvo for k in range(doc.page_count) if k != pno
+               for _, lns in lista_curada.blocos_de_texto(doc[k], lista_curada.faixa_de_cabecalho(doc[k])) for t in lns)
+
+
 def confere_cabecalho(temp, pdfs, placar):
     """caderno-g.pdf: p. 1 a 3 com o cabecalho corrido no alto, o item 7.1 na
     p. 2; p. 4 a pagina trocada (um gabarito) com titulo de uma linha no alto e
     o texto esperado logo abaixo; p. 5 a ultima linha do item de antes
     ("Resposta: ____") no alto; p. 6 um item de antes de uma linha no alto.
     caderno-i.pdf: uma pagina so, com titulo e o item. caderno-j.pdf: uma
-    pagina so, com um item vizinho de uma linha no alto e o item abaixo."""
+    pagina so, com um item vizinho de uma linha no alto e o item abaixo.
+    caderno-k.pdf: duas paginas com o mesmo cabecalho e o item na p. 2.
+    caderno-l.pdf: quatro unidades que recomecam por "Atividade 1" no alto; na
+    p. 2 a caixa alta pega o "Atividade 1" de uma linha acima do item 7.1.
+    caderno-m.pdf: o mesmo com "Atividade nº 1" no alto de tres paginas."""
     cab = 'Caderno de exercicios, unidade 7'
     doc = pymupdf.open()
     for primeira, resto_ in (([cab], ['Atividade 6.9', 'Quanto e 5 vezes 5?']),
@@ -927,6 +949,25 @@ def confere_cabecalho(temp, pdfs, placar):
     linhas(p, 60, 45, ['7.0) Quanto e 2 + 2? ____'])
     linhas(p, 60, 85, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
     salvar(doc, os.path.join(pdfs, 'caderno-j.pdf'))
+    doc = pymupdf.open()
+    for resto_ in (['Atividade 8.1', 'Quanto e 9 vezes 9?'], ['Atividade 7.1', 'Quanto e 6 vezes 7?']):
+        p = doc.new_page(width=W, height=H)
+        linhas(p, 60, 45, ['Caderno de revisao, unidade 8'])
+        linhas(p, 60, 85, resto_)
+    salvar(doc, os.path.join(pdfs, 'caderno-k.pdf'))
+    doc = pymupdf.open()
+    for resto_ in (['Quanto e 1 mais 1?'], ['Atividade 7.1', 'Quanto e 6 vezes 7?'], ['Quanto e 3 mais 3?'],
+                   ['Quanto e 4 mais 4?']):
+        p = doc.new_page(width=W, height=H)
+        linhas(p, 60, 45, ['Atividade 1'])
+        linhas(p, 60, 85, resto_)
+    salvar(doc, os.path.join(pdfs, 'caderno-l.pdf'))
+    doc = pymupdf.open()
+    for resto_ in (['Quanto e 1 mais 1?'], ['Atividade 7.1', 'Quanto e 6 vezes 7?'], ['Quanto e 3 mais 3?']):
+        p = doc.new_page(width=W, height=H)
+        linhas(p, 60, 45, ['Atividade n\u00ba 1'])
+        linhas(p, 60, 85, resto_)
+    salvar(doc, os.path.join(pdfs, 'caderno-m.pdf'))
 
     def item(pdf, pag, nome):
         return um_item(pdfs, 'confere_' + nome, {'id': '5ano:7.1', 'serie': '5ano', 'tema_app': 'MAT05-02',
@@ -937,6 +978,45 @@ def confere_cabecalho(temp, pdfs, placar):
     corrido = item('caderno-g.pdf', 2, 'corrido')
     r = recusa_do_gerador(lambda: gerar(corrido, os.path.join(temp, 'cab_corrido'), gravar_zip=False))
     placar.conferir('confere: cabecalho corrido acima do texto esperado vale', [r] if r else [])
+    # a linha repetida que nao e cabecalho corrido: o "Atividade 1" de cada
+    # unidade, e o cabecalho de duas paginas so
+    antes_cab = lista_curada.e_cabecalho_da_pagina
+    repetidas = (('"Atividade 1" de cada unidade numa caixa alta', item('caderno-l.pdf', 2, 'atividade_1')),
+                 ('cabecalho que so se repete em duas paginas', item('caderno-k.pdf', 2, 'duas_paginas')))
+    for k, (nome, c) in enumerate(repetidas):
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'repetida_%d' % k), gravar_zip=False))
+        placar.conferir('confere: ' + nome, [r] if r else [], True, 'não começa por confere')
+        lista_curada.e_cabecalho_da_pagina = cabecalho_de_6847c26
+        try:
+            r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'repetida_v%d' % k), gravar_zip=False))
+        finally:
+            lista_curada.e_cabecalho_da_pagina = antes_cab
+        placar.conferir('confere: a regra do 6847c26, no %s' % nome, [] if r else ['a caixa passou'], True, 'passou')
+    # o "Atividade nº 1": o "º" nao se decompoe no NFD e o padrao antigo nao o atravessava
+    c = item('caderno-m.pdf', 2, 'atividade_n_1')
+    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'repetida_nº'), gravar_zip=False))
+    placar.conferir('confere: "Atividade nº 1" no alto de tres paginas', [r] if r else [], True,
+                    'não começa por confere')
+    antes_padrao = lista_curada.NUMERO_DE_ITEM
+    lista_curada.NUMERO_DE_ITEM = re.compile(r'^\s*(?:\d|(?:atividade|exercicio|questao|problema|item)\s*n?\W*\d)')
+    try:
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'repetida_v_nº'), gravar_zip=False))
+    finally:
+        lista_curada.NUMERO_DE_ITEM = antes_padrao
+    placar.conferir('confere: o padrao do 3eaa2e0, no "Atividade nº 1"', [] if r else ['a caixa passou'], True,
+                    'passou')
+    casos = {'Atividade 1': True, 'ATIVIDADE 12': True, 'Exercício 3': True, 'Questão 2': True, '1) Quanto': True,
+             '2. Calcule': True, '1.2 Complete': True, '7.0) Quanto e 2 + 2?': True, 'Item 4': True,
+             'Atividade n\u00ba 1': True, 'Atividade n.\u00ba 1': True, 'Quest\u00e3o n\u00ba 3': True,
+             'Atividade n\u00b0 2': True, 'Atividade no 4': True, 'Tarefa 2': True, 'Desafio 5': True,
+             'Lista 3': True, 'Ficha 7': True, 'Lista II': True, 'Atividade IV': True, 'Ficha n\u00ba XII': True,
+             'a) Calcule': True, 'B) Complete': True,
+             'Caderno de exercicios, unidade 7': False, 'Atividades da unidade': False, 'Matemática': False,
+             'Lista de materiais': False, 'Ficha de leitura': False, 'Desafio da semana': False,
+             'Tarefa para casa': False, 'Atividade nova': False, 'Lista dividida': False, 'Ana e Bia': False}
+    erros = ['%r deu %r' % (t, lista_curada.parece_comeco_de_item(t)) for t, v in casos.items()
+             if lista_curada.parece_comeco_de_item(t) is not v]
+    placar.conferir('confere: o que parece comeco de exercicio', erros)
     # PDF de uma pagina so: nenhuma folga, nem para o titulo da pagina
     unicas = (('titulo da pagina unica acima do texto esperado', item('caderno-i.pdf', 1, 'pagina_unica')),
               ('pagina unica com item vizinho de uma linha numa caixa alta', item('caderno-j.pdf', 1, 'vizinho_unica')))
