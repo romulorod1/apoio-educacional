@@ -1,7 +1,7 @@
 """Prova do tipo de fonte lista-curada (biblioteca/lista_curada.py), sem navegador, com venenos.
 
     python biblioteca/_prova_lista_curada.py [--sem-navegador]
-        sobre uma fonte INVENTADA que a propria prova desenha na hora: seis
+        sobre uma fonte INVENTADA que a propria prova desenha na hora: oito
         PDFs sinteticos e o json de itens curados que aponta para eles.
 
     python biblioteca/_prova_lista_curada.py --contra-main [--ref origin/main]
@@ -59,14 +59,23 @@ Travas:
                   a trava que so olha este repositorio deixa passar)
   tinta clara     o recorte so com figura cinza clara (0.85) ou amarelo palido,
                   sem texto, vale; a caixa sobre um preenchimento branco puro e
-                  a area vazia de uma pagina creme sao recusadas como em branco
-                  (venenos: a tolerancia larga, como o cinza 200 de antes,
-                  recusa as figuras claras; medir contra o branco aceita o creme)
-  confere         o cabecalho de uma linha no alto da caixa, que o PDF le
-                  primeiro, nao reprova o item (veneno: so a ordem natural do
-                  PDF reprova); a caixa alta demais, com o item de antes
-                  inteiro e o confere do item, e a pagina errada que so tem o
-                  texto num bloco mais abaixo continuam recusadas
+                  a area vazia de uma pagina creme sao recusadas como em branco,
+                  e o branco vazio numa pagina tomada por um painel claro
+                  tambem (venenos: a tolerancia larga, como o cinza 200 de
+                  antes, recusa as figuras claras; medir contra o branco aceita
+                  o creme; medir so contra o papel aceita o branco do painel)
+  confere         o cabecalho corrido (a mesma linha no alto de cada pagina)
+                  que a caixa pega acima do texto esperado nao reprova o item,
+                  nem o primeiro bloco do PDF de uma pagina so (veneno: so a
+                  ordem natural do PDF reprova); sao recusados a ultima linha
+                  do item de antes ("Resposta: ____"), o item de antes de uma
+                  linha, a pagina trocada com um titulo de uma linha, o titulo
+                  que nao se repete, a caixa alta demais com o item de antes
+                  inteiro, a pagina que so tem o texto num bloco mais abaixo e
+                  a pagina trocada por uma, mesmo com o cabecalho corrido
+                  (venenos: a regra de pular uma linha nos 18 pt do alto da
+                  caixa aceita os tres primeiros, e o comeco de qualquer bloco
+                  aceita os dois da caixa alta e da pagina errada)
   gabarito        --gabarito-externo com --so-com-resposta pela linha de
                   comando: so fica item com gabarito, o numero e o de sem a
                   opcao, as contagens e o relatorio batem, a busca esquece o
@@ -638,6 +647,7 @@ def amostra(temp, placar):
     tracos_e_repositorio(temp, pdfs, placar)
     outro_checkout(temp, pdfs, placar)
     tinta_clara_e_cabecalho(temp, pdfs, placar)
+    confere_cabecalho(temp, pdfs, placar)
     pilha_trocada(temp, pdfs, c, placar)
     paginas_no_texto(placar)
     venenos_de_validacao(temp, pdfs, placar)
@@ -781,6 +791,10 @@ def tinta_clara_e_cabecalho(temp, pdfs, placar):
     p = doc.new_page(width=W, height=H)
     p.draw_rect(p.rect, color=None, fill=(0.97, 0.96, 0.92))
     p.draw_rect(pymupdf.Rect(80, 600, 400, 700), color=None, fill=(0.2, 0.2, 0.2))
+    # p. 8: um painel cinza claro toma a pagina, com um retangulo branco vazio
+    p = doc.new_page(width=W, height=H)
+    p.draw_rect(p.rect, color=None, fill=(0.88, 0.88, 0.88))
+    p.draw_rect(pymupdf.Rect(80, 100, 400, 300), color=None, fill=(1, 1, 1))
     salvar(doc, os.path.join(pdfs, 'caderno-f.pdf'))
 
     def item(k, rect, **extra):
@@ -807,6 +821,17 @@ def tinta_clara_e_cabecalho(temp, pdfs, placar):
         lista_curada.cor_do_papel = antes
     placar.conferir('tinta clara: medir contra o branco, na pagina creme', [] if r else ['a area creme passou'],
                     True, 'passou')
+    c = item(8, [100, 120, 380, 280])
+    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_painel'), gravar_zip=False))
+    placar.conferir('tinta clara: branco vazio numa pagina tomada por painel claro', [r] if r else [], True,
+                    'caixa em branco')
+    lista_curada.TINTA_LONGE_DO_BRANCO = False
+    try:
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_v_painel'), gravar_zip=False))
+    finally:
+        lista_curada.TINTA_LONGE_DO_BRANCO = True
+    placar.conferir('tinta clara: medir so contra o papel, no branco do painel', [] if r else ['o branco passou'],
+                    True, 'passou')
     antes = lista_curada.TINTA_TOL
     lista_curada.TINTA_TOL = 55
     try:
@@ -817,19 +842,10 @@ def tinta_clara_e_cabecalho(temp, pdfs, placar):
     finally:
         lista_curada.TINTA_TOL = antes
     c = item(4, [50, 48, 400, 140], confere='Atividade 7.1 Quanto e 6')
-    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cabecalho'), gravar_zip=False))
-    placar.conferir('confere: cabecalho acima do texto esperado vale', [r] if r else [])
-    antes = lista_curada.comecos_do_recorte
-    lista_curada.comecos_do_recorte = lambda docs, ps: antes(docs, ps)[:1]
-    try:
-        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cabecalho_v'), gravar_zip=False))
-    finally:
-        lista_curada.comecos_do_recorte = antes
-    placar.conferir('confere: so a ordem natural do PDF, com o cabecalho', [r] if r else [], True,
+    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'titulo_que_nao_se_repete'), gravar_zip=False))
+    placar.conferir('confere: titulo de uma linha que nao se repete', [r] if r else [], True,
                     'não começa por confere')
-    c = item(4, [50, 48, 400, 140], confere='Atividade 7.2 Quanto e 6')
-    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cabecalho_errado'), gravar_zip=False))
-    placar.conferir('confere: com o cabecalho, outro texto esperado', [r] if r else [], True, 'não começa por confere')
+    antes = lista_curada.comecos_do_recorte
     for k, nome in ((5, 'caixa alta demais com o item de antes e o confere do item'),
                     (6, 'pagina errada com o texto so num bloco mais abaixo')):
         c = item(k, [50, 48, 400, 140], confere='Atividade 7.1 Quanto e 6')
@@ -848,6 +864,83 @@ def tinta_clara_e_cabecalho(temp, pdfs, placar):
         finally:
             lista_curada.comecos_do_recorte = antes
         placar.conferir('confere: o comeco de qualquer bloco, na %s' % nome, [] if r else ['a caixa passou'], True,
+                        'passou')
+
+
+def regra_dos_18_pt_da_caixa(docs, ps):
+    """A regra recusada na revisao (8c870f4): pula o primeiro bloco se e uma
+    linha so nos 18 pt do alto da CAIXA. So para o veneno."""
+    resto = ''.join(gp.texto_do_retangulo(docs[c], pno, r) for c, pno, r in ps[1:])
+    c0, pno0, r0 = ps[0]
+    out = [gp.texto_do_retangulo(docs[c0], pno0, r0) + resto]
+    bl = lista_curada.blocos_de_texto(docs[c0][pno0], pymupdf.Rect(r0))
+    if len(bl) >= 2 and len(bl[0][1]) == 1 and bl[0][0][3] <= r0[1] + 18:
+        out.append('\n'.join(t for _, lns in bl[1:] for t in lns) + '\n' + resto)
+    return out
+
+
+def confere_cabecalho(temp, pdfs, placar):
+    """caderno-g.pdf: p. 1 a 3 com o cabecalho corrido no alto, o item 7.1 na
+    p. 2; p. 4 a pagina trocada (um gabarito) com titulo de uma linha no alto e
+    o texto esperado logo abaixo; p. 5 a ultima linha do item de antes
+    ("Resposta: ____") no alto; p. 6 um item de antes de uma linha no alto.
+    caderno-i.pdf: uma pagina so, com titulo e o item."""
+    cab = 'Caderno de exercicios, unidade 7'
+    doc = pymupdf.open()
+    for primeira, resto_ in (([cab], ['Atividade 6.9', 'Quanto e 5 vezes 5?']),
+                             ([cab], ['Atividade 7.1', 'Quanto e 6 vezes 7?']),
+                             ([cab], ['Atividade 7.2', 'Quanto e 8 menos 3?']),
+                             (['Gabarito da unidade 7'], ['Atividade 7.1', 'Quanto e 6 vezes 7? Resposta: 42'])):
+        p = doc.new_page(width=W, height=H)
+        linhas(p, 60, 45, primeira)
+        linhas(p, 60, 85, resto_)
+    for primeira in ('Resposta: ________', '7.0) Quanto e 2 + 2? ____'):
+        p = doc.new_page(width=W, height=H)
+        linhas(p, 60, 45, [primeira])
+        linhas(p, 60, 85, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
+    salvar(doc, os.path.join(pdfs, 'caderno-g.pdf'))
+    doc = pymupdf.open()
+    p = doc.new_page(width=W, height=H)
+    linhas(p, 60, 45, ['Lista avulsa de exercicios'])
+    linhas(p, 60, 85, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
+    salvar(doc, os.path.join(pdfs, 'caderno-i.pdf'))
+
+    def item(pdf, pag, nome):
+        return um_item(pdfs, 'confere_' + nome, {'id': '5ano:7.1', 'serie': '5ano', 'tema_app': 'MAT05-02',
+                                                  'modulo': {'slug': 'contas', 'titulo': 'Contas'},
+                                                  'titulo': 'Atividade 7.1', 'subitens': [],
+                                                  'confere': 'Atividade 7.1 Quanto e 6',
+                                                  'recorte': {'pdf': pdf, 'pagina': pag, 'rect': [50, 32, 400, 130]}})
+    corrido = item('caderno-g.pdf', 2, 'corrido')
+    sozinho = item('caderno-i.pdf', 1, 'pagina_unica')
+    for nome, c in (('cabecalho corrido acima do texto esperado vale', corrido),
+                    ('primeiro bloco do PDF de uma pagina so vale', sozinho)):
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cab_' + nome.split()[0]), gravar_zip=False))
+        placar.conferir('confere: ' + nome, [r] if r else [])
+    antes = lista_curada.comecos_do_recorte
+    lista_curada.comecos_do_recorte = lambda docs, ps: antes(docs, ps)[:1]
+    try:
+        r = recusa_do_gerador(lambda: gerar(corrido, os.path.join(temp, 'cab_v_natural'), gravar_zip=False))
+    finally:
+        lista_curada.comecos_do_recorte = antes
+    placar.conferir('confere: so a ordem natural do PDF, com o cabecalho corrido', [r] if r else [], True,
+                    'não começa por confere')
+    ruins = (('pagina trocada por uma, com o cabecalho corrido', item('caderno-g.pdf', 3, 'trocada_por_uma')),
+             ('pagina trocada (gabarito) com titulo de uma linha', item('caderno-g.pdf', 4, 'gabarito')),
+             ('ultima linha do item de antes (Resposta: ____)', item('caderno-g.pdf', 5, 'resposta')),
+             ('item de antes de uma linha', item('caderno-g.pdf', 6, 'item_de_uma_linha')))
+    for k, (nome, c) in enumerate(ruins):
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cab_ruim_%d' % k), gravar_zip=False))
+        placar.conferir('confere: ' + nome, [r] if r else [], True, 'não começa por confere')
+        if k == 0:
+            continue
+        # e a caixa e de verdade o defeito: a regra dos 18 pt da caixa a aceitaria
+        lista_curada.comecos_do_recorte = regra_dos_18_pt_da_caixa
+        try:
+            r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cab_v18_%d' % k), gravar_zip=False))
+        finally:
+            lista_curada.comecos_do_recorte = antes
+        placar.conferir('confere: a regra dos 18 pt da caixa, na %s' % nome, [] if r else ['a caixa passou'], True,
                         'passou')
 
 

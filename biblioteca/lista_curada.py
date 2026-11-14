@@ -60,14 +60,20 @@ O json (todo campo desconhecido e recusado, em qualquer nivel):
   creme, e recusada.
 - confere: o texto do recorte, sem acento, sem pontuacao e sem espaco (o
   espaco e a quebra de linha nao contam), tem de comecar pelo confere escrito
-  do mesmo jeito, na ordem natural do PDF. Uma folga so: o primeiro bloco de
-  texto do primeiro pedaco (de cima para baixo) pode ser pulado quando e uma
-  linha so, inteira na faixa de CABECALHO_PT pt do alto da caixa (o cabecalho
-  da pagina que a caixa pegou de raspao e que o PDF le primeiro); ai vale
-  tambem o texto do segundo bloco em diante. Nunca mais que um bloco: a caixa
-  alta demais, que comeca por um item inteiro de antes, e a pagina que so
-  cita o texto num bloco mais abaixo continuam recusadas. Pega a pagina
-  trocada por uma.
+  do mesmo jeito, na ordem natural do PDF. Uma folga so, para o cabecalho de
+  verdade da pagina que a caixa pegou de raspao (e que o PDF le primeiro): o
+  primeiro bloco de texto do primeiro pedaco (de cima para baixo) pode ser
+  pulado quando, ao mesmo tempo, (1) e uma linha so; (2) fica inteiro na
+  faixa do alto da PAGINA (nao da caixa), de altura min(8% da altura da
+  pagina, 60 pt): CABECALHO_FRACAO e CABECALHO_PT, o menor dos dois, para a
+  faixa nao crescer em pagina grande; e (3) e cabecalho corrido: o mesmo texto
+  (sem acento, pontuacao nem espaco) aparece como linha nessa faixa de outra
+  pagina do mesmo PDF, ou, no PDF de uma pagina so, e o primeiro bloco de
+  texto da pagina. Ai vale tambem o texto do segundo bloco em diante. Fora
+  disso, so a ordem natural, como antes: a ultima linha do item de antes
+  ("Resposta: ____"), um item de antes de uma linha, o titulo da pagina
+  trocada (um gabarito) e a pagina que so cita o texto mais abaixo sao
+  recusados. Pega a pagina trocada por uma.
 - atribuicao: modelo com {fonte} (o nome), {serie} ("3º ano"), {paginas}
   ("p. 12", "p. 12 a 13" ou "p. 12 e 15", as do PDF), {titulo}, {id} e
   {arquivo} (o nome do PDF). Outro nome entre chaves, formato ({fonte:>30})
@@ -128,7 +134,9 @@ RECT_MIN = 5.0     # pt: caixa mais estreita ou mais baixa que isto nao e recort
 TINTA_TOL = 16     # canal (0 a 255) mais longe que isto da cor do papel e tinta, na conferencia da caixa vazia
 TINTA_MIN = 0.002  # fracao minima de pixels de tinta no pedaco (0,2%)
 TINTA_MIN_PX = 3   # e nunca menos que isto de pixels
-CABECALHO_PT = 18  # pt: faixa do alto da caixa onde a linha de cabecalho pode ser pulada pelo confere
+TINTA_LONGE_DO_BRANCO = True  # tinta tambem longe do branco; False so no veneno
+CABECALHO_PT = 60        # pt: no maximo isto do alto da PAGINA e faixa de cabecalho, para o confere
+CABECALHO_FRACAO = 0.08  # e no maximo esta fracao da altura da pagina (vale o menor)
 sem_tracos = portal.sem_tracos  # um nome so, para a prova poder desliga-lo (veneno)
 
 
@@ -282,15 +290,16 @@ def acertar_cropbox(doc, pno, notas):
 # ------------------------------------------------------------------ leitura
 
 def cor_do_papel(doc, pno):
-    """A cor mais comum da pagina desenhada a 36 dpi, em RGB: o papel."""
+    """A cor mais comum da pagina desenhada a 36 dpi, em RGB: o papel (ou o
+    painel que toma a pagina; por isso a tinta tambem se mede contra o branco)."""
     pix = doc[pno].get_pixmap(dpi=36, colorspace=pymupdf.csRGB, alpha=False)
     s = pix.samples
     return collections.Counter(s[i:i + 3] for i in range(0, len(s), 3)).most_common(1)[0][0]
 
 
 def tem_conteudo(doc, pno, rect):
-    """O retangulo tem texto ou tinta: pixels que se afastam da cor do papel
-    mais de TINTA_TOL em algum canal, pelo menos TINTA_MIN da caixa (e
+    """O retangulo tem texto ou tinta: pixels que se afastam da cor do papel,
+    e tambem do branco, mais de TINTA_TOL em algum canal, pelo menos TINTA_MIN da caixa (e
     TINTA_MIN_PX). A figura clara sem texto vale; a caixa da cor do papel, nao."""
     if doc[pno].get_text('text', clip=pymupdf.Rect(rect)).strip():
         return True
@@ -298,31 +307,66 @@ def tem_conteudo(doc, pno, rect):
     pix = doc[pno].get_pixmap(dpi=72, colorspace=pymupdf.csRGB, clip=pymupdf.Rect(rect), alpha=False)
     s = pix.samples
     n = len(s) // 3
+    def longe(i, cor):
+        return abs(s[i] - cor[0]) > TINTA_TOL or abs(s[i + 1] - cor[1]) > TINTA_TOL or abs(s[i + 2] - cor[2]) > TINTA_TOL
+    # longe do papel E do branco: o branco vazio numa pagina tomada por um painel claro nao e tinta
     tinta = sum(1 for i in range(0, len(s), 3)
-                if abs(s[i] - papel[0]) > TINTA_TOL or abs(s[i + 1] - papel[1]) > TINTA_TOL
-                or abs(s[i + 2] - papel[2]) > TINTA_TOL)
+                if longe(i, papel) and (longe(i, (255, 255, 255)) or not TINTA_LONGE_DO_BRANCO))
     return tinta >= max(TINTA_MIN_PX, TINTA_MIN * n)
+
+
+def blocos_de_texto(page, clip=None):
+    """[(bbox, [texto de cada linha])] dos blocos de texto, de cima para baixo."""
+    out = []
+    for b in page.get_text('dict', clip=clip)['blocks']:
+        if b.get('type') != 0:
+            continue
+        lns = [''.join(sp['text'] for sp in ln['spans']) for ln in b['lines']]
+        lns = [t for t in lns if t.strip()]
+        if lns:
+            out.append((b['bbox'], lns))
+    out.sort(key=lambda b: (b[0][1], b[0][0]))
+    return out
+
+
+def faixa_de_cabecalho(page):
+    """O retangulo do alto da pagina onde mora o cabecalho: min(8% da altura, 60 pt)."""
+    r = page.rect
+    return pymupdf.Rect(r.x0, r.y0, r.x1, r.y0 + min(CABECALHO_FRACAO * r.height, CABECALHO_PT))
+
+
+def e_cabecalho_da_pagina(doc, pno, bbox, linha):
+    """A linha (o bloco de uma linha so em bbox) e cabecalho de verdade: fica
+    na faixa do alto da pagina e se repete nessa faixa em outra pagina do PDF
+    (ou, no PDF de uma pagina, e o primeiro bloco de texto dela)."""
+    faixa = faixa_de_cabecalho(doc[pno])
+    alvo = so_letras(linha)
+    if not alvo or bbox[1] < faixa.y0 - TOLERANCIA or bbox[3] > faixa.y1 + TOLERANCIA:
+        return False
+    if doc.page_count == 1:
+        todos = blocos_de_texto(doc[pno])
+        return bool(todos) and len(todos[0][1]) == 1 and so_letras(todos[0][1][0]) == alvo
+    for k in range(doc.page_count):
+        if k == pno:
+            continue
+        for _, lns in blocos_de_texto(doc[k], faixa_de_cabecalho(doc[k])):
+            if any(so_letras(t) == alvo for t in lns):
+                return True
+    return False
 
 
 def comecos_do_recorte(docs, ps):
     """Os textos com que o recorte pode comecar, para o confere: o da ordem
     natural do PDF e, so quando o primeiro bloco de texto do primeiro pedaco
-    (de cima para baixo) e uma linha so dentro da faixa de CABECALHO_PT do alto
-    da caixa, o texto do segundo bloco em diante mais o dos pedacos seguintes."""
+    (de cima para baixo) e o cabecalho da pagina (e_cabecalho_da_pagina), o
+    texto do segundo bloco em diante mais o dos pedacos seguintes."""
     resto = ''.join(gerar_pacote.texto_do_retangulo(docs[c], pno, r) for c, pno, r in ps[1:])
     c0, pno0, r0 = ps[0]
     out = [gerar_pacote.texto_do_retangulo(docs[c0], pno0, r0) + resto]
-    blocos = []
-    for b in docs[c0][pno0].get_text('dict', clip=pymupdf.Rect(r0))['blocks']:
-        if b.get('type') != 0:
-            continue
-        linhas_b = [ln for ln in b['lines'] if ''.join(sp['text'] for sp in ln['spans']).strip()]
-        if linhas_b:
-            blocos.append((b['bbox'], linhas_b))
-    blocos.sort(key=lambda b: (b[0][1], b[0][0]))
-    if len(blocos) >= 2 and len(blocos[0][1]) == 1 and blocos[0][0][3] <= r0[1] + CABECALHO_PT:
-        out.append('\n'.join(''.join(sp['text'] for sp in ln['spans']) for _, lns in blocos[1:] for ln in lns)
-                   + '\n' + resto)
+    blocos = blocos_de_texto(docs[c0][pno0], pymupdf.Rect(r0))
+    if len(blocos) >= 2 and len(blocos[0][1]) == 1 and \
+            e_cabecalho_da_pagina(docs[c0], pno0, blocos[0][0], blocos[0][1][0]):
+        out.append('\n'.join(t for _, lns in blocos[1:] for t in lns) + '\n' + resto)
     return out
 
 
