@@ -1,2 +1,2 @@
 # F10 (#202): o domínio é marcado na linha do assunto, dentro da aula.
-O domínio é marcado ao lado do assunto trabalhado, na própria aula.
+Na aula, o domínio de cada assunto se marca ali mesmo, ao lado dele.
