@@ -110,7 +110,7 @@ const tocar = (pag, temaId, estado) => pag.evaluate((t, e) => {
     conf('o Domina de B grava no assunto de B', gravou.ok, true);
     const tela = await esperar('a tela de B mostra', () => ativoNaTela(pag, 'tB'), v => v === 'domina', 3000);
     if (MODO === MODOS[0]) {
-      conf('VENENO visto: a tela de B mostra o Domina marcado, e quebrou (' + tela.valor + ')', tela.valor, 'domina');
+      conf('VENENO visto: a tela de B mostra o Domina marcado, e quebrou (' + tela.valor + ')', tela.valor === 'domina', false);
       fimDoVeneno();
     }
     conf('a tela de B mostra o Domina marcado', tela.valor, 'domina');
