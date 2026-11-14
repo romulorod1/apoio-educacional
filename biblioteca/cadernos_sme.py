@@ -57,7 +57,13 @@ aplicativo ignora o que nao conhece):
   sem_solucao true, resposta null. Com --gabarito-externo, o item que tem
   entrada ganha `gabarito` {origem: 'agente-conferido', respostas: [{subitem,
   resposta}]}, a resposta de duas IAs que resolveram separadas e concordaram
-  (gerar_pacote.aplicar_gabarito_externo); o resto do item nao muda.
+  (gerar_pacote.aplicar_gabarito_externo); o resto do item nao muda. Com
+  --so-com-resposta, o item que ficou sem gabarito sai do pacote
+  (gerar_pacote.tirar_sem_resposta), e o que fica guarda o `numero` que teria
+  sem a opção (a lista pode ficar com buraco: o aplicativo ordena por numero).
+  A atividade de dinâmica de sala (em grupo, jogo, material, pesquisa com a
+  turma) não é filtrada aqui: a curadoria a lê e julga item a item antes de
+  as IAs resolverem, e só o item julgado ganha gabarito.
 - origem_detalhe (aditivo): caderno, ano, volume, edicao, pagina(s), unidade,
   atividade e, na revisao, a questao.
 """
@@ -938,7 +944,7 @@ def referencia_de_fora(texto, tipo):
 
 
 def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=None, commit=None, gravar_zip=True,
-          series=None, gabarito_externo=None):
+          series=None, gabarito_externo=None, so_com_resposta=False):
     t_ini = time.time()
     # com --serie, o pacote parcial leva as series no nome: com o nome do completo,
     # importado no app ele substituiria o completo (achado da revisao do C5)
@@ -1100,6 +1106,26 @@ def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=Non
     # caderno do aluno nao traz respostas, e as de duas IAs conferidas entram aqui
     n_gabarito = (gerar_pacote.aplicar_gabarito_externo(itens, gabarito_externo)
                   if gabarito_externo is not None else None)
+    # --so-com-resposta (gerar_pacote.tirar_sem_resposta), depois do gabarito de
+    # fora: sai o item sem gabarito, a lista que ficou vazia some com ele, e o
+    # numero dos que ficam e o mesmo de sem a opção
+    sem_resposta = None
+    if so_com_resposta:
+        antes = {i['serie'] for i in itens}
+        sem_resposta = gerar_pacote.tirar_sem_resposta(itens, conteudo, docs_busca)
+        gerar_pacote.recusar_pacote_vazio(itens, sem_resposta, series)
+        fora = {e['id'] for e in sem_resposta}
+        for reg in relatorio['unidades']:
+            if reg['id'] in fora:
+                reg['destino'] = 'sem_resposta'
+        for rel in relatorio['cadernos']:
+            rel['sem_resposta'] = sum(1 for e in sem_resposta if e['id'].split(':')[1] == rel['serie'])
+            rel['itens'] = sum(1 for i in itens if i['serie'] == rel['serie'])
+        relatorio['assuntos'] = gerar_pacote.assuntos_sem(relatorio['assuntos'], sem_resposta)
+        relatorio['sem_resposta'] = sem_resposta
+        series_vistas = {i['serie'] for i in itens}
+        # o ano que tinha item e ficou sem nenhum (sem --serie, não é recusa: fica dito no relatório)
+        relatorio['series_sem_item'] = sorted(antes - series_vistas, key=lambda s: int(s[0]))
     conteudo['itens.json'] = gerar_pacote.json_bytes(itens)
     conteudo['teoria.json'] = gerar_pacote.json_bytes([])
     conteudo['busca.json'] = gerar_pacote.json_bytes(gerar_pacote.montar_busca(docs_busca))
@@ -1110,6 +1136,8 @@ def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=Non
                  'itens_com_solucao': 0, 'itens_excluidos': len(relatorio['excluidos'])}
     if n_gabarito is not None:
         contagens['itens_com_gabarito_agente'], contagens['itens_com_gabarito_agente_parcial'] = n_gabarito
+    if sem_resposta is not None:
+        contagens['itens_sem_resposta_excluidos'] = len(sem_resposta)
     manifest = {
         'esquema': 1, 'pacote': nome, 'versao': versao,
         'gerado_em': gerado_em or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).replace(microsecond=0).isoformat(),
@@ -1122,7 +1150,7 @@ def gerar(pdfs, vinculos, versao, saida, curadoria, trabalho=None, gerado_em=Non
     manifest_b = (json.dumps(manifest, ensure_ascii=False, indent=1) + '\n').encode('utf-8')
     zip_caminho = gerar_pacote.gravar_pacote(conteudo, manifest_b, nome, versao, saida, trabalho, gravar_zip)
     ids = {i['id'] for i in itens}
-    ids_excl = {e['id'] for e in relatorio['excluidos']}
+    ids_excl = {e['id'] for e in relatorio['excluidos'] + (sem_resposta or [])}
     relatorio['curadoria_sem_item'] = sorted(
         ['dificuldade.csv: ' + k for k in dif_cur if k.startswith('sme:') and k not in ids | ids_excl] +
         ['exclusoes.csv: ' + k for k in excl_cur if k.startswith('sme:') and k not in ids_excl])
