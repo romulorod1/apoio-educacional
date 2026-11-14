@@ -1,0 +1,2 @@
+# Nuvem da biblioteca, PR 4: o toque em "Atualizar a biblioteca" traz, um por vez, os pacotes de exercícios da nuvem dela que o tablet ainda não tem nessa versão, conferidos pelo sha256 do catálogo e importados pelo mesmo caminho do zip.
+O Atualizar a biblioteca também traz os pacotes de exercícios novos da sua nuvem.
