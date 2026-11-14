@@ -1232,6 +1232,21 @@ roda "publicador do catalogo --envenenado-registro-vazio-passa" node "_teste/tes
 roda "publicador do catalogo --envenenado-relatorio-grava" node "_teste/testa_publicador_catalogo.js" --envenenado-relatorio-grava
 roda "publicador do catalogo --envenenado-so-pelo-id" node "_teste/testa_publicador_catalogo.js" --envenenado-so-pelo-id
 roda "publicador do catalogo --envenenado-homonimo-na-lista" node "_teste/testa_publicador_catalogo.js" --envenenado-homonimo-na-lista
+# Nuvem da biblioteca, PR 2 (14/11/2026): o publicador sobe os arquivos dos
+# livros e dos pacotes ao Storage pelo sha256, contra o emulador do Storage,
+# do Firestore e do Auth, com arquivos sinteticos: o --ensaio so lista; a
+# primeira publicacao sobe tudo e grava caminho, hash e tamanho; a segunda nao
+# sobe nada; o arquivo trocado vira objeto novo; a falha no envio deixa o
+# catalogo como estava; acima do limite e recusa; nenhum token de download; o
+# privado so na pasta da dona; as versoes velhas e as subpastas nao sobem. Os
+# venenos: a conferencia do que ja esta la some, o envio grava o token, e o
+# catalogo e gravado antes dos arquivos. Portas 9061 a 9066.
+roda "publicador de arquivos"                       node "_teste/testa_publicador_arquivos.js"
+roda "publicador de arquivos --envenenado-reenvia"  node "_teste/testa_publicador_arquivos.js" --envenenado-reenvia
+roda "publicador de arquivos --envenenado-grava-token" node "_teste/testa_publicador_arquivos.js" --envenenado-grava-token
+roda "publicador de arquivos --envenenado-catalogo-antes" node "_teste/testa_publicador_arquivos.js" --envenenado-catalogo-antes
+roda "publicador de arquivos --envenenado-aceita-token" node "_teste/testa_publicador_arquivos.js" --envenenado-aceita-token
+roda "publicador de arquivos --envenenado-sem-md5"  node "_teste/testa_publicador_arquivos.js" --envenenado-sem-md5
 # Fase 1c (13/11/2026): o mapa novo chega ao tablet pelo catalogo, de ponta a
 # ponta no emulador: o publicador da 1b publica os metas vivos; o "Atualizar a
 # biblioteca" troca so o meta dos livros de mesmo arquivo; a defasagem da
@@ -1653,6 +1668,15 @@ roda "corrigir pacote Mirim C7"                 python biblioteca/_prova_corrigi
 # regra de validacao, o gabarito de fora com --so-com-resposta e o privado do
 # manifest. Nao abre Chrome: o desenho do SVG e conferido pelo MuPDF.
 roda "lista curada da biblioteca"               python biblioteca/_prova_lista_curada.py
+# Nuvem da biblioteca, PR 2: o envio retomavel do publicador (pedacos, 308 com e
+# sem Range, queda no meio com consulta de estado, 410, 412 e ifGenerationMatch,
+# o 308 que nunca avanca) contra um Cloud Storage FALSO em http.server, mais os
+# nomes dos pacotes e o teto do indice. Sem Chrome nem emulador: roda no --rapido.
+roda "envio retomavel do publicador"            python _teste/testa_envio_retomavel.py
+roda "envio retomavel --envenenado-retoma-no-byte-errado" python _teste/testa_envio_retomavel.py --envenenado-retoma-no-byte-errado
+roda "envio retomavel --envenenado-308-sem-limite" python _teste/testa_envio_retomavel.py --envenenado-308-sem-limite
+roda "envio retomavel --envenenado-sem-precondicao" python _teste/testa_envio_retomavel.py --envenenado-sem-precondicao
+roda "envio retomavel --envenenado-reenvia"     python _teste/testa_envio_retomavel.py --envenenado-reenvia
 # C15.1: o tipo de fonte livros, sobre livros sinteticos (tres PDF, um EPUB e um
 # arquivo de 161 MB): o teto de 160 MB nos dois lados da fronteira (o grande
 # recusado, listado no relatorio e nunca aberto) e igual ao do aplicativo, o
