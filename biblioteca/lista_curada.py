@@ -153,6 +153,26 @@ def ler_fonte(f):
     return f
 
 
+def acertar_cropbox(doc, pno, notas):
+    """A pagina com o CropBox maior que o MediaBox (ha PDF publicado assim)
+    nao deixa o svg_do_pedaco pôr o CropBox do recorte. O leitor de PDF ja
+    mostra so a parte comum dos dois; a copia aberta aqui passa a ter o CropBox
+    igual a ela, e o desenho e as coordenadas da pagina nao mudam (conferido:
+    se page.rect mudasse, o gerador para). O arquivo do PDF nao e tocado."""
+    pg_ = doc[pno]
+    cb, mb = pg_.cropbox, pg_.mediabox
+    if mb.contains(cb):
+        return
+    antes = pymupdf.Rect(pg_.rect)
+    pg_.set_cropbox(cb & mb)
+    if doc[pno].rect != antes:
+        raise SystemExit('erro: --itens-curados: a pagina %d de %s tem o CropBox fora do MediaBox, e acerta-lo mudaria '
+                         'as coordenadas da pagina' % (pno + 1, os.path.basename(doc.name)))
+    notas.append('%s p%d: CropBox %s fora do MediaBox %s; usado o comum aos dois'
+                 % (os.path.basename(doc.name), pno + 1, list(map(lambda v: round(v, 1), cb)),
+                    list(map(lambda v: round(v, 1), mb))))
+
+
 def ler_recorte(r, base, onde, docs):
     """[(caminho do pdf, pno, rect)], conferido contra o PDF."""
     if not isinstance(r, dict):
@@ -258,6 +278,11 @@ def ler_itens_curados(caminho):
     return fonte, itens, docs
 
 
+def acertar_paginas(itens, docs, notas):
+    for cam, pno in sorted(set((p[0], p[1]) for c in itens for p in c['pedacos'])):
+        acertar_cropbox(docs[cam], pno, notas)
+
+
 def paginas_de(ps):
     return sorted(set(p[1] + 1 for p in ps))
 
@@ -279,6 +304,7 @@ def gerar(itens_curados, versao, saida, curadoria=None, trabalho=None, gerado_em
     conteudo, itens, docs_busca = {}, [], []
     relatorio = {'pacote': nome, 'versao': versao, 'pymupdf': portal.versao_pymupdf(), 'privado': fonte['privado'],
                  'excluidos': [], 'assuntos': {}, 'tema_de_outro_ano': [], 'notas': []}
+    acertar_paginas(lidos, docs, relatorio['notas'])
     por_lista = collections.Counter()
     for c in lidos:
         iid, serie, ps = c['id'], c['serie'], c['pedacos']

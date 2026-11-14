@@ -23,7 +23,10 @@ Travas:
                   de varias paginas empilhado com os pedacos na origem; o texto
                   do recorte na busca e nada do vizinho de fora da caixa; o SVG
                   desenhado pelo MuPDF igual a pagina na caixa; o assunto de
-                  outro ano listado no relatorio; determinismo; e as genericas
+                  outro ano listado no relatorio; a pagina com o CropBox maior
+                  que o MediaBox (ha PDF publicado assim) acertada na copia
+                  aberta, com nota, e o desenho igual (veneno: sem acertar, o
+                  gerador quebra); determinismo; e as genericas
                   do gerador (svg, xml, manifesto com zip, tracos)
   privado         o manifest diz privado como o json diz, true ou false
   sem fonte real  nada no pacote que o json nao disse: o nome de outra fonte
@@ -115,6 +118,12 @@ def fazer_pdfs(pasta):
     linhas(p, 60, 80, ['Atividade 2.1', 'Calcule 25 + 17.'])
     linhas(p, 60, 300, ['Atividade 2.2', 'Quanto e a metade de 48?'])
     salvar(doc, os.path.join(pasta, 'caderno-b.pdf'))
+    # caderno-c.pdf: o CropBox maior que o MediaBox, como ha PDF publicado
+    doc = pymupdf.open()
+    p = doc.new_page(width=W, height=H)
+    linhas(p, 60, 80, ['Atividade 3.1', 'Quanto e 3 vezes 4?'])
+    doc.xref_set_key(p.xref, 'CropBox', '[-30 -30 625 872]')
+    salvar(doc, os.path.join(pasta, 'caderno-c.pdf'))
     return pasta
 
 
@@ -140,6 +149,11 @@ def json_da_amostra(privado=False, nome=NOME, id_fonte=ID_FONTE):
             {'id': 'inv:4ano:2.2', 'serie': '4ano', 'tema_app': 'MAT04-01',
              'modulo': {'slug': 'contas', 'titulo': 'Contas'}, 'titulo': 'Atividade 2.2', 'subitens': [],
              'recorte': {'pdf': 'caderno-b.pdf', 'pagina': 1, 'rect': [50, 282, 300, 330]}},
+            # a pagina com o CropBox fora do MediaBox, recortada de beira a beira (como o
+            # PDF real em que isto apareceu): sem acertar, o CropBox do recorte sai do MediaBox
+            {'id': 'inv:5ano:3.1', 'serie': '5ano', 'tema_app': 'MAT05-02',
+             'modulo': {'slug': 'contas', 'titulo': 'Contas'}, 'titulo': 'Atividade 3.1', 'subitens': [],
+             'recorte': {'pdf': 'caderno-c.pdf', 'pagina': 1, 'rect': [0, 62, 595, 110]}},
         ]}
 
 
@@ -147,6 +161,7 @@ GABARITO = [
     {'id_item': 'inv:3ano:1.1', 'subitem': 'A', 'resposta': '3', 'origem': 'agente-conferido'},
     {'id_item': 'inv:3ano:1.1', 'subitem': 'B', 'resposta': '5', 'origem': 'agente-conferido'},
     {'id_item': 'inv:4ano:2.2', 'subitem': None, 'resposta': '24', 'origem': 'agente-conferido'},
+    {'id_item': 'inv:5ano:3.1', 'subitem': None, 'resposta': '12', 'origem': 'agente-conferido'},
 ]
 
 
@@ -367,7 +382,7 @@ def venenos_de_validacao(temp, pdfs, placar):
 
 def trava_gabarito_so_com_resposta(q, p):
     erros = []
-    ficam = {'inv:3ano:1.1', 'inv:4ano:2.2'}
+    ficam = {'inv:3ano:1.1', 'inv:4ano:2.2', 'inv:5ano:3.1'}
     if {i['id'] for i in q.itens} != ficam:
         erros.append('ficaram %r, e com gabarito so %r' % (sorted(i['id'] for i in q.itens), sorted(ficam)))
     num_sem = {i['id']: i['numero'] for i in p.itens}
@@ -383,7 +398,7 @@ def trava_gabarito_so_com_resposta(q, p):
         erros.append('inv:3ano:1.1: subitens do gabarito %r fora da ordem do item' % subs)
     c = q.manifest['contagens']
     if (c.get('itens'), c.get('itens_com_gabarito_agente'), c.get('itens_com_gabarito_agente_parcial'),
-            c.get('itens_sem_resposta_excluidos')) != (2, 2, 0, 2):
+            c.get('itens_sem_resposta_excluidos')) != (3, 3, 0, 2):
         erros.append('contagens %r' % c)
     tirados = sorted(e['id'] for e in q.relatorio.get('sem_resposta') or [])
     if tirados != ['inv:3ano:1.2', 'inv:4ano:2.1']:
@@ -422,8 +437,8 @@ def gabarito_so_com_resposta(temp, pdfs, placar, p):
                     '--gabarito-externo', gab])
     q2 = pg.Pacote(t2, pdfs)
     c = q2.manifest['contagens']
-    placar.conferir('gabarito: sem --so-com-resposta os quatro ficam, dois com gabarito',
-                    [] if (c['itens'], c.get('itens_com_gabarito_agente')) == (4, 2) else ['contagens %r' % c])
+    placar.conferir('gabarito: sem --so-com-resposta os cinco ficam, tres com gabarito',
+                    [] if (c['itens'], c.get('itens_com_gabarito_agente')) == (5, 3) else ['contagens %r' % c])
     # gabarito para item que nao existe na lista: recusado como nas outras fontes
     ruim = gravar_json(os.path.join(temp, 'gabarito_ruim.json'),
                        GABARITO + [{'id_item': 'inv:9ano:9.9', 'subitem': None, 'resposta': '1',
@@ -488,6 +503,22 @@ def amostra(temp, placar):
     placar.conferir('sem fonte real: so o que o json disse', trava_sem_fonte_real(p, qn, 'Antologia Imaginaria'))
     placar.conferir('sem fonte real: pacote do nome antigo como se fosse o novo', trava_sem_fonte_real(p, p, 'Antologia'),
                     True, 'nome')
+    # o CropBox fora do MediaBox: acertado na copia aberta, com nota, e o desenho igual (trava_desenho acima)
+    notas = [n for n in p.relatorio['notas'] if 'CropBox' in n]
+    placar.conferir('lista curada: CropBox fora do MediaBox acertado, com nota',
+                    [] if len(notas) == 1 and notas[0].startswith('caderno-c.pdf p1') else ['notas %r' % p.relatorio['notas']])
+    antes = lista_curada.acertar_cropbox
+    lista_curada.acertar_cropbox = lambda doc, pno, notas: None
+    try:
+        # sem acertar, ou o gerador quebra (o CropBox do recorte fora do MediaBox)
+        # ou o SVG sai deslocado (o recorte somado a posicao do CropBox)
+        gerar(c, os.path.join(temp, 'v_cropbox'), gravar_zip=False)
+        r = trava_desenho(pg.Pacote(os.path.join(temp, 'v_cropbox'), pdfs))
+    except Exception as e:  # noqa: BLE001
+        r = ['inv:5ano:3.1: sem acertar o CropBox o gerador quebra: %s' % e]
+    finally:
+        lista_curada.acertar_cropbox = antes
+    placar.conferir('lista curada: CropBox fora do MediaBox sem acertar', r, True, 'inv:5ano:3.1')
     venenos_de_validacao(temp, pdfs, placar)
     gabarito_so_com_resposta(temp, pdfs, placar, p)
 
