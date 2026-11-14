@@ -18411,8 +18411,14 @@
   function removerLivroDoTablet(l) {
     if (importandoBiblioteca) { avisar('Espere a importação terminar para remover.'); return Promise.resolve(); }
     var espaco = Biblioteca.mb(l.bytes || 0);
+    /* Como ele volta: o livro que veio da nuvem, ou que a Estante já sabe que
+     * está na nuvem dela, volta pela Estante com um toque. Sem essa certeza
+     * (o catálogo não é lido aqui), a frase diz os dois caminhos. */
+    var naNuvem = podeBaixarDaNuvem() && (l.pacote === 'nuvem' || !!(livrosNaNuvem && livrosNaNuvem.livros && livrosNaNuvem.livros[l.id]));
+    var volta = naNuvem ? 'Para ler de novo, toque nele na Estante: ele está na sua nuvem e baixa de novo com um toque.'
+      : 'Para ler de novo: se ele estiver na sua nuvem, toque nele na Estante; se não, importe o pacote de livros outra vez do Drive.';
     if (!confirmar('Tirar "' + tituloDoLivro(l.meta) + '" deste tablet?\n\n' +
-        'Para ler de novo, é só importar o pacote de livros outra vez do Drive. O lugar onde você parou ' +
+        volta + ' O lugar onde você parou ' +
         'neste livro não fica guardado.\n\nVoltam ' + espaco + ' de espaço.')) {
       return Promise.resolve();
     }
