@@ -1283,6 +1283,33 @@ roda "regras do storage --envenenado-sem-login"     node "_teste/testa_storage_r
 roda "regras do storage --envenenado-escrita"       node "_teste/testa_storage_regras.js" --envenenado-escrita
 roda "regras do storage --envenenado-leitor-le"     node "_teste/testa_storage_regras.js" --envenenado-leitor-le
 roda "regras do storage --envenenado-nome-livre"   node "_teste/testa_storage_regras.js" --envenenado-nome-livre
+# Nuvem da biblioteca, PR 3 (14/11/2026): o livro do catalogo com o arquivo no
+# Storage (caminhoNuvem) que nao esta no tablet aparece na Estante como "Na
+# nuvem" e baixa com um toque, contra o emulador do Auth, do Firestore e do
+# Storage, com as regras do repositorio: o sha256 errado e recusado sem
+# guardar nada; a baixa interrompida nao guarda nada e a seguinte baixa com
+# andamento, guarda e abre no leitor; dois toques sao uma baixa so; sem
+# internet e sem espaco o cartao diz e nada e pedido; o observador nao ve; o
+# getDownloadURL nunca entra (nas fontes e nos pedidos). Revisao: a cor da
+# capa e do livro; o mesmo arquivo com outro id nao aparece; o corpo curto e
+# o longo nao viram livro; a cota que acaba; a conta trocada no meio; o
+# observador e o celular de verdade. Segunda revisao: o prazo sem dados (a
+# baixa parada), o Cancelar, o toque logo depois de guardar, a memoria viva
+# abaixo de metade do livro (48 MB) e o livro tirado que volta "na nuvem".
+# Os venenos: a
+# conferencia do sha256 pulada, guardar antes de conferir e a falta da guarda
+# do toque repetido.
+# Portas 9071 a 9078.
+roda "livros da nuvem, baixar"                      node "_teste/testa_livros_nuvem_baixar.js"
+roda "livros da nuvem, baixar --envenenado-sem-hash" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-sem-hash
+roda "livros da nuvem, baixar --envenenado-guarda-parcial" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-guarda-parcial
+roda "livros da nuvem, baixar --envenenado-baixa-dois" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-baixa-dois
+roda "livros da nuvem, baixar --envenenado-aceita-curto" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-aceita-curto
+roda "livros da nuvem, baixar --envenenado-cor-pela-posicao" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-cor-pela-posicao
+roda "livros da nuvem, baixar --envenenado-grava-na-conta-nova" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-grava-na-conta-nova
+roda "livros da nuvem, baixar --envenenado-sem-prazo" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-sem-prazo
+roda "livros da nuvem, baixar --envenenado-cancelar-nao-solta" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-cancelar-nao-solta
+roda "livros da nuvem, baixar --envenenado-copia-inteira" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-copia-inteira
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve

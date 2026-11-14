@@ -4095,6 +4095,21 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bibl-livro-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .bibl-tipo-selo { align-self: flex-start; margin-bottom: 2px; padding: 2px 7px; border-radius: 999px; background: var(--soft); color: var(--muted); font-size: var(--letra-12); }
 .bibl-tipo-selo.pratica { background: var(--acao-clara); color: var(--navy); }
+/* o livro que está na nuvem e não no tablet (nuvem da biblioteca, PR 3): a capa
+   clara e tracejada, com a lombada na cor do livro, e uma linha pequena com o
+   estado (na nuvem, baixando com a barra, ou o que impediu) */
+.bibl-capa.na-nuvem { background: var(--fundo-leve); color: var(--navy); box-shadow: none; border: 1px dashed var(--fio); }
+.bibl-capa.na-nuvem::before { background: color-mix(in srgb, var(--capa, var(--navy)) 60%, var(--branco-a00)); }
+.bibl-capa.na-nuvem::after { background: var(--fio-claro); }
+.bibl-nuvem-estado { display: block; margin-top: 2px; }
+.bibl-nuvem-estado .bibl-pequena { color: var(--navy); }
+.bibl-nuvem-estado .bibl-pequena.bibl-nuvem-falha { color: var(--aviso-texto); }
+.bibl-nuvem-estado .bibl-progresso { max-width: 8.25rem; }
+.bibl-nuvem-estado .bibl-progresso-reservado { visibility: hidden; }
+/* o cartão da nuvem: o livro e, embaixo, o lugar do Cancelar, sempre reservado */
+.bibl-nuvem-cartao { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bibl-nuvem-acoes { min-height: var(--alvo); }
+.bibl-nuvem-cancelar-oculto { visibility: hidden; }
 .bibl-exercicios { padding: 8px; border: 1px dashed var(--fio); border-radius: var(--raio); }
 .bibl-vazio { margin: 12px 0 0; }
 .bibl-exercicios-titulo { margin-top: 20px; }
