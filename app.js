@@ -17942,11 +17942,14 @@
     ]);
   }
   // a internet voltou ou caiu: o cartão diz, e o "sem internet" de antes deixa de valer
-  window.addEventListener('online', function () {
-    Object.keys(falhasDaBaixa).forEach(function (id) { if (falhasDaBaixa[id] === 'sem-rede') delete falhasDaBaixa[id]; });
-    atualizarCartoesDaNuvem();
-  });
-  window.addEventListener('offline', atualizarCartoesDaNuvem);
+  // (o app.js também é lido no Node por provas sem navegador: lá não há window)
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('online', function () {
+      Object.keys(falhasDaBaixa).forEach(function (id) { if (falhasDaBaixa[id] === 'sem-rede') delete falhasDaBaixa[id]; });
+      atualizarCartoesDaNuvem();
+    });
+    window.addEventListener('offline', atualizarCartoesDaNuvem);
+  }
 
   // na abertura, no máximo uma vez por hora, e só com a constante ligada
   function atualizarBibliotecaNaAbertura() {
