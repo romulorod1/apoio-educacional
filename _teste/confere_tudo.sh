@@ -1229,6 +1229,19 @@ roda "publicador do catalogo --envenenado-registro-vazio-passa" node "_teste/tes
 roda "publicador do catalogo --envenenado-relatorio-grava" node "_teste/testa_publicador_catalogo.js" --envenenado-relatorio-grava
 roda "publicador do catalogo --envenenado-so-pelo-id" node "_teste/testa_publicador_catalogo.js" --envenenado-so-pelo-id
 roda "publicador do catalogo --envenenado-homonimo-na-lista" node "_teste/testa_publicador_catalogo.js" --envenenado-homonimo-na-lista
+# Nuvem da biblioteca, PR 2 (14/11/2026): o publicador sobe os arquivos dos
+# livros e dos pacotes ao Storage pelo sha256, contra o emulador do Storage,
+# do Firestore e do Auth, com arquivos sinteticos: o --ensaio so lista; a
+# primeira publicacao sobe tudo e grava caminho, hash e tamanho; a segunda nao
+# sobe nada; o arquivo trocado vira objeto novo; a falha no envio deixa o
+# catalogo como estava; acima do limite e recusa; nenhum token de download; o
+# privado so na pasta da dona; as versoes velhas e as subpastas nao sobem. Os
+# venenos: a conferencia do que ja esta la some, o envio grava o token, e o
+# catalogo e gravado antes dos arquivos. Portas 9061 a 9066.
+roda "publicador de arquivos"                       node "_teste/testa_publicador_arquivos.js"
+roda "publicador de arquivos --envenenado-reenvia"  node "_teste/testa_publicador_arquivos.js" --envenenado-reenvia
+roda "publicador de arquivos --envenenado-grava-token" node "_teste/testa_publicador_arquivos.js" --envenenado-grava-token
+roda "publicador de arquivos --envenenado-catalogo-antes" node "_teste/testa_publicador_arquivos.js" --envenenado-catalogo-antes
 # Fase 1c (13/11/2026): o mapa novo chega ao tablet pelo catalogo, de ponta a
 # ponta no emulador: o publicador da 1b publica os metas vivos; o "Atualizar a
 # biblioteca" troca so o meta dos livros de mesmo arquivo; a defasagem da
