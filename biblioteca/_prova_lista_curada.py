@@ -37,7 +37,9 @@ Travas:
                   da pagina, rect invertido, id repetido, tema_app fora do
                   catalogo, subitens que nao sao lista de textos, licenca e
                   atribuicao faltando, atribuicao com campo que nao existe,
-                  privado que nao e booleano, modulo com dois titulos; e na
+                  privado que nao e booleano, modulo com dois titulos, chave
+                  repetida em qualquer nivel (e no gabarito de fora), subitem
+                  com espaco sobrando, privado com licenca aberta; e na
                   linha de comando, --itens-curados com outra fonte e --pdfs
                   ou --serie com esta. Cada veneno so conta se o gerador parar
                   PELO motivo esperado
@@ -422,6 +424,34 @@ def venenos_de_validacao(temp, pdfs, placar):
         j['itens'][0]['id'] = '3ano:numeros'
     caso('id igual ao do documento de modulo', id_de_modulo, 'documento de módulo')
     caso('subitem com travessao', lambda j: j['itens'][0].update(subitens=['A', 'B \u2013 C']), 'travessão')
+    caso('subitem com espaco sobrando', lambda j: j['itens'][0].update(subitens=['A ', 'B']), 'espaço no começo')
+    for lic in ('CC BY-NC-SA 4.0', 'Creative Commons Atribuição', 'domínio público'):
+        caso('privado com licenca aberta (%s)' % lic, lambda j, lic=lic: j['fonte'].update(privado=True, licenca=lic),
+             'licença aberta')
+    # a mesma licenca aberta com privado false vale (controle)
+    js = copy.deepcopy(boa)
+    js['fonte']['licenca'] = 'CC BY-NC-SA 4.0'
+    c = gravar_json(os.path.join(pdfs, 'licenca_aberta_publica.json'), js)
+    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'licenca_aberta_publica'), gravar_zip=False))
+    placar.conferir('validacao: licenca aberta com privado false vale', [r] if r else [])
+    # chave repetida: o json.load ficaria com a ultima, calado
+    texto_boa = json.dumps(boa, ensure_ascii=False, indent=1)
+    repetidas = (
+        ('privado repetido', texto_boa.replace('"privado": false', '"privado": true, "privado": false', 1),
+         "'privado' repetida"),
+        ('licenca repetida', texto_boa.replace('"licenca": ', '"licenca": "outra", "licenca": ', 1),
+         "'licenca' repetida"),
+        ('chave repetida dentro do item', texto_boa.replace('"serie": "3ano"', '"serie": "3ano", "serie": "4ano"', 1),
+         "'serie' repetida"),
+        ('chave repetida dentro do recorte', texto_boa.replace('"pagina": 1,', '"pagina": 1, "pagina": 2,', 1),
+         "'pagina' repetida"),
+    )
+    for nome, txt, motivo in repetidas:
+        assert txt != texto_boa, nome
+        c = os.path.join(pdfs, 'v_%s.json' % nome)
+        io.open(c, 'w', encoding='utf-8').write(txt)
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'v_' + nome), gravar_zip=False))
+        placar.conferir('validacao: ' + nome, [r] if r else [], True, motivo)
 
     # a linha de comando: --itens-curados so com esta fonte, e esta fonte sem --pdfs nem --serie
     c = gravar_json(os.path.join(pdfs, 'boa.json'), boa)
@@ -513,6 +543,12 @@ def gabarito_so_com_resposta(temp, pdfs, placar, p):
                                                   '--saida', t2 + '_zip', '--trabalho', t2 + 'r', '--sem-zip',
                                                   '--gabarito-externo', ruim]))
     placar.conferir('gabarito: entrada de item que nao esta na lista', [r] if r else [], True, 'nao e item deste pacote')
+    # chave repetida no gabarito de fora: o json.load ficaria com a ultima resposta, calado
+    rep = os.path.join(temp, 'gabarito_repetido.json')
+    io.open(rep, 'w', encoding='utf-8').write(json.dumps(GABARITO, ensure_ascii=False).replace(
+        '"resposta": "3"', '"resposta": "9", "resposta": "3"', 1))
+    r = recusa_do_gerador(lambda: gp.ler_gabarito_externo(rep))
+    placar.conferir('gabarito: chave repetida no gabarito de fora', [r] if r else [], True, "'resposta' repetida")
 
 
 # ------------------------------------------------------------------ amostra

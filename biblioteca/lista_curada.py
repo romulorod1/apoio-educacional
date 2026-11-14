@@ -63,7 +63,11 @@ O json (todo campo desconhecido e recusado, em qualquer nivel):
   viram hifen; nos subitens sao recusados (o rotulo tem de ser o mesmo do
   --gabarito-externo).
 - privado true com a saida ou a pasta de trabalho dentro do repositorio e
-  recusado.
+  recusado; privado true com licenca aberta (CC BY, Creative Commons, dominio
+  publico...) tambem: privado e uso pessoal entre professor e aluno.
+- chave repetida em qualquer objeto do json e recusada (o json.load ficaria
+  calado com a ultima); o mesmo vale para o --gabarito-externo.
+- subitem com espaco no comeco ou no fim e recusado.
 - tema_app pode ser de outro ano que o do item (o mais proximo, quando o ano
   do item nao tem assunto que sirva): vale, e o relatorio lista em
   tema_de_outro_ano.
@@ -161,6 +165,16 @@ def so_letras(t):
     return ''.join(c for c in t if unicodedata.category(c) != 'Mn' and c.isalnum())
 
 
+LICENCA_ABERTA = re.compile(r'\bcc[ -]?(?:by|0|zero)\b|creative commons|dominio publico|public domain|'
+                            r'licenca (?:livre|aberta)|open licen[cs]e|\bgpl\b|\bmit license\b')
+
+
+def so_letras_e_espacos(t):
+    t = unicodedata.normalize('NFD', t.lower())
+    t = ''.join(c for c in t if unicodedata.category(c) != 'Mn')
+    return ' '.join(re.sub(r'[^a-z0-9-]+', ' ', t).split())
+
+
 def ler_fonte(f):
     faltam = sobra(f, CAMPOS_FONTE, 'fonte')
     if faltam:
@@ -184,6 +198,9 @@ def ler_fonte(f):
         if formato or conversao:
             erro('fonte', 'atribuicao com formato ou conversão em {%s%s%s}: só vale o nome entre chaves'
                  % (campo, '!' + conversao if conversao else '', ':' + formato if formato else ''))
+    if f['privado'] and LICENCA_ABERTA.search(so_letras_e_espacos(f['licenca'])):
+        erro('fonte', 'privado true com licença aberta (%r): fonte privada é de uso pessoal entre professor e aluno; '
+                      'licença aberta vai com privado false' % f['licenca'])
     f = dict(f)
     for c in ('nome', 'licenca', 'atribuicao'):
         f[c] = sem_tracos(f[c])
@@ -316,7 +333,7 @@ def ler_itens_curados(caminho):
     """(fonte, [item lido], {caminho: doc}). Para tudo no primeiro erro."""
     try:
         with io.open(caminho, encoding='utf-8') as f:
-            dados = json.load(f)
+            dados = json.load(f, object_pairs_hook=gerar_pacote.sem_chave_repetida)
     except (OSError, ValueError) as e:
         raise SystemExit('erro: --itens-curados %s: não consegui ler o json (%s)' % (caminho, e))
     faltam = sobra(dados, CAMPOS_TOPO, 'o arquivo')
@@ -364,6 +381,10 @@ def ler_itens_curados(caminho):
             erro(onde, 'subitens tem de ser uma lista de textos não vazios (veio %r)' % (subs,))
         if len(set(subs)) != len(subs):
             erro(onde, 'subitens repetidos: %r' % (subs,))
+        com_espaco = [s for s in subs if s != s.strip()]
+        if com_espaco:
+            erro(onde, 'subitem com espaço no começo ou no fim: %r (o rótulo tem de ser o mesmo do '
+                       '--gabarito-externo, sem espaço sobrando)' % com_espaco[0])
         com_traco = [s for s in subs if any(t in s for t in TRACOS)]
         if com_traco:
             erro(onde, 'subitem com travessão, meia-risca ou sinal de menos: %r (troque por hífen aqui e no '

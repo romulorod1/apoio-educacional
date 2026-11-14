@@ -2325,10 +2325,22 @@ def caracteres_que_o_pdf_nao_desenha(texto):
     return fora
 
 
+def sem_chave_repetida(pares):
+    """object_pairs_hook do json.load: o json.load sozinho fica com o ULTIMO
+    valor de uma chave repetida, calado; aqui a chave repetida, em qualquer
+    nivel, e erro (ValueError, que quem le transforma em recusa)."""
+    vistas = set()
+    for k, _ in pares:
+        if k in vistas:
+            raise ValueError('chave %r repetida no mesmo objeto' % k)
+        vistas.add(k)
+    return dict(pares)
+
+
 def ler_gabarito_externo(caminho):
     try:
         with io.open(caminho, encoding='utf-8') as f:
-            dados = json.load(f)
+            dados = json.load(f, object_pairs_hook=sem_chave_repetida)
     except (OSError, ValueError) as e:
         raise SystemExit('erro: --gabarito-externo %s: nao consegui ler o json (%s)' % (caminho, e))
     if not isinstance(dados, list):
