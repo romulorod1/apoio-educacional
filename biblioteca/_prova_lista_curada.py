@@ -1,7 +1,7 @@
 """Prova do tipo de fonte lista-curada (biblioteca/lista_curada.py), sem navegador, com venenos.
 
     python biblioteca/_prova_lista_curada.py [--sem-navegador]
-        sobre uma fonte INVENTADA que a propria prova desenha na hora: cinco
+        sobre uma fonte INVENTADA que a propria prova desenha na hora: seis
         PDFs sinteticos e o json de itens curados que aponta para eles.
 
     python biblioteca/_prova_lista_curada.py --contra-main [--ref origin/main]
@@ -53,7 +53,16 @@ Travas:
   tracos          travessao no nome da fonte nao chega ao pacote (veneno: sem
                   o sem_tracos); travessao em subitem e recusado
   privado no repo privado true com a saida dentro do repositorio e recusado
-                  antes de gravar nada
+                  antes de gravar nada; a saida dentro de outro checkout git
+                  (git init numa pasta fora deste, e uma com .git em arquivo,
+                  como no worktree) tambem, e com privado false vale (veneno:
+                  a trava que so olha este repositorio deixa passar)
+  tinta clara     o recorte so com figura cinza clara (0.85) ou amarelo palido,
+                  sem texto, vale; a caixa sobre um preenchimento branco puro e
+                  recusada como em branco (veneno: o limite antigo, cinza 200,
+                  recusa as figuras claras)
+  confere         o cabecalho acima do texto esperado, que o PDF le primeiro,
+                  nao reprova o item (veneno: so a ordem natural do PDF reprova)
   gabarito        --gabarito-externo com --so-com-resposta pela linha de
                   comando: so fica item com gabarito, o numero e o de sem a
                   opcao, as contagens e o relatorio batem, a busca esquece o
@@ -623,6 +632,8 @@ def amostra(temp, placar):
     placar.conferir('lista curada: CropBox fora do MediaBox sem acertar', r, True, 'coletanea-inventada:5ano:3.1')
     casos_de_pagina(temp, pdfs, placar)
     tracos_e_repositorio(temp, pdfs, placar)
+    outro_checkout(temp, pdfs, placar)
+    tinta_clara_e_cabecalho(temp, pdfs, placar)
     pilha_trocada(temp, pdfs, c, placar)
     paginas_no_texto(placar)
     venenos_de_validacao(temp, pdfs, placar)
@@ -689,6 +700,109 @@ def tracos_e_repositorio(temp, pdfs, placar):
     placar.conferir('privado no repo: a regra so vale para privado',
                     [] if not lista_curada.dentro_do_repositorio(temp) and lista_curada.dentro_do_repositorio(dentro)
                     else ['dentro_do_repositorio errou'])
+
+
+def outro_checkout(temp, pdfs, placar):
+    """privado true com a saida dentro de um checkout git que nao e este: recusado."""
+    clone = os.path.join(temp, 'outro_clone')
+    os.makedirs(clone)
+    r = subprocess.run(['git', 'init', '-q', clone], capture_output=True, text=True)
+    if r.returncode != 0 or not os.path.isdir(os.path.join(clone, '.git')):
+        placar.conferir('privado no repo: git init fora deste', ['git init falhou: %s' % r.stderr.strip()[:200]])
+        return
+    worktree = os.path.join(temp, 'outro_worktree')
+    os.makedirs(worktree)
+    io.open(os.path.join(worktree, '.git'), 'w', encoding='utf-8').write('gitdir: %s\n' % os.path.join(clone, '.git'))
+    if lista_curada.dentro_do_repositorio(temp):
+        placar.conferir('privado no repo: a pasta temporaria da prova', ['ja esta dentro de um checkout git'])
+        return
+    cp = gravar_json(os.path.join(pdfs, 'privado_clone.json'), json_da_amostra(privado=True))
+    cl = gravar_json(os.path.join(pdfs, 'publico_clone.json'), json_da_amostra(privado=False))
+
+    def tenta(js, saida, trabalho):
+        return recusa_do_gerador(lambda: lista_curada.gerar(js, 1, saida, trabalho=trabalho, gerado_em=GERADO_EM,
+                                                            commit='amostra', gravar_zip=True))
+    for nome, raiz in (('git init fora deste', clone), ('.git em arquivo, como no worktree', worktree)):
+        saida = os.path.join(raiz, 'pacotes', 'saida')
+        r = tenta(cp, saida, os.path.join(temp, 'fora_clone_t'))
+        placar.conferir('privado no repo: --saida dentro de outro checkout (%s)' % nome,
+                        ([r] if r else []) + (['criou a saida'] if os.path.exists(saida) else []), True,
+                        'dentro do repositório git')
+    r = tenta(cp, os.path.join(clone, 's'), os.path.join(clone, 't'))
+    placar.conferir('privado no repo: as duas dentro de outro checkout, ficam', [r] if r else [], True,
+                    'a pasta de trabalho ficam dentro')
+    saida = os.path.join(clone, 'pacotes', 'publico')
+    r = tenta(cl, saida, os.path.join(clone, 'trabalho_publico'))
+    placar.conferir('privado no repo: privado false dentro de outro checkout vale',
+                    ([r] if r else []) + ([] if os.path.exists(saida) else ['nao gravou a saida']))
+    # veneno: a trava de antes, que so olhava este repositorio, deixa passar
+    antes = lista_curada.dentro_do_repositorio
+
+    def so_este(caminho):
+        a, b = os.path.normcase(os.path.realpath(caminho)), os.path.normcase(os.path.realpath(RAIZ))
+        try:
+            return RAIZ if os.path.commonpath([a, b]) == b else None
+        except ValueError:
+            return None
+    lista_curada.dentro_do_repositorio = so_este
+    try:
+        saida = os.path.join(clone, 'pacotes', 'veneno')
+        r = tenta(cp, saida, os.path.join(temp, 'fora_clone_v'))
+    finally:
+        lista_curada.dentro_do_repositorio = antes
+    placar.conferir('privado no repo: a trava que so olha este repositorio', [] if r else ['gravou %s' % saida],
+                    True, 'gravou')
+
+
+def tinta_clara_e_cabecalho(temp, pdfs, placar):
+    """caderno-f.pdf: p. 1 so uma figura cinza clara, p. 2 so uma amarelo
+    palido, p. 3 um preenchimento branco puro, p. 4 um cabecalho que o PDF le
+    antes do item, acima dele."""
+    doc = pymupdf.open()
+    for cor in ((0.85, 0.85, 0.85), (1, 1, 0.8), (1, 1, 1)):
+        p = doc.new_page(width=W, height=H)
+        p.draw_rect(pymupdf.Rect(80, 100, 400, 300), color=None, fill=cor)
+    p = doc.new_page(width=W, height=H)
+    linhas(p, 60, 60, ['Caderno de exercicios, unidade 7'])
+    linhas(p, 60, 100, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
+    salvar(doc, os.path.join(pdfs, 'caderno-f.pdf'))
+
+    def item(k, rect, **extra):
+        return um_item(pdfs, 'tinta_%d' % k, dict({'id': '5ano:7.%d' % k, 'serie': '5ano', 'tema_app': 'MAT05-02',
+                                                   'modulo': {'slug': 'contas', 'titulo': 'Contas'},
+                                                   'titulo': 'Atividade 7.%d' % k, 'subitens': [],
+                                                   'recorte': {'pdf': 'caderno-f.pdf', 'pagina': k, 'rect': rect}},
+                                                  **extra))
+    clara = (('cinza claro 0.85', item(1, [100, 120, 380, 280])), ('amarelo palido', item(2, [100, 120, 380, 280])))
+    for nome, c in clara:
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_' + nome.split()[0]), gravar_zip=False))
+        placar.conferir('tinta clara: so figura %s, sem texto, vale' % nome, [r] if r else [])
+    c = item(3, [100, 120, 380, 280])
+    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_branca'), gravar_zip=False))
+    placar.conferir('tinta clara: caixa sobre branco puro', [r] if r else [], True, 'caixa em branco')
+    antes = lista_curada.BRANCO
+    lista_curada.BRANCO = 200
+    try:
+        for nome, c in clara:
+            r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'tinta_v_' + nome.split()[0]), gravar_zip=False))
+            placar.conferir('tinta clara: o limite antigo (200) com figura %s' % nome, [r] if r else [], True,
+                            'caixa em branco')
+    finally:
+        lista_curada.BRANCO = antes
+    c = item(4, [50, 45, 400, 140], confere='Atividade 7.1 Quanto e 6')
+    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cabecalho'), gravar_zip=False))
+    placar.conferir('confere: cabecalho acima do texto esperado vale', [r] if r else [])
+    antes = lista_curada.comecos_do_recorte
+    lista_curada.comecos_do_recorte = lambda docs, ps: antes(docs, ps)[:1]
+    try:
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cabecalho_v'), gravar_zip=False))
+    finally:
+        lista_curada.comecos_do_recorte = antes
+    placar.conferir('confere: so a ordem natural do PDF, com o cabecalho', [r] if r else [], True,
+                    'não começa por confere')
+    c = item(4, [50, 45, 400, 140], confere='Atividade 7.2 Quanto e 6')
+    r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cabecalho_errado'), gravar_zip=False))
+    placar.conferir('confere: com o cabecalho, outro texto esperado', [r] if r else [], True, 'não começa por confere')
 
 
 def pilha_trocada(temp, pdfs, c, placar):

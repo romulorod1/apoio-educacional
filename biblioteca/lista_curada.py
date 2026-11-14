@@ -51,10 +51,16 @@ O json (todo campo desconhecido e recusado, em qualquer nivel):
   "rect": [...]}, {"pagina": 13, "rect": [...]}]} no lugar de pagina e rect;
   os pedacos saem empilhados num SVG so, na ordem do json.
 - pedaco sem texto e sem tinta (regiao em branco, ou caixa menor que
-  RECT_MIN pt) e recusado.
-- confere: o texto do recorte, sem acento, sem pontuacao e sem espaco, tem
-  de comecar pelo confere escrito do mesmo jeito; pega a pagina trocada por
-  uma.
+  RECT_MIN pt) e recusado. Tinta e qualquer pixel abaixo de BRANCO em algum
+  canal (RGB), medido contra o branco: a figura clara (cinza 0.85, amarelo
+  palido) sem texto vale; so a caixa toda branca e recusada.
+- confere: o texto do recorte, sem acento, sem pontuacao e sem espaco (o
+  espaco e a quebra de linha nao contam), tem de comecar pelo confere escrito
+  do mesmo jeito. Vale o comeco do texto na ordem natural do PDF ou o comeco
+  de qualquer bloco de texto do recorte, com os blocos do primeiro pedaco
+  postos de cima para baixo e o texto dos pedacos seguintes depois: um
+  cabecalho acima do item, que o PDF le primeiro, nao reprova o item certo.
+  Pega a pagina trocada por uma.
 - atribuicao: modelo com {fonte} (o nome), {serie} ("3º ano"), {paginas}
   ("p. 12", "p. 12 a 13" ou "p. 12 e 15", as do PDF), {titulo}, {id} e
   {arquivo} (o nome do PDF). Outro nome entre chaves, formato ({fonte:>30})
@@ -62,8 +68,9 @@ O json (todo campo desconhecido e recusado, em qualquer nivel):
 - travessao e meia-risca: no nome, na licenca, na atribuicao, nos titulos
   viram hifen; nos subitens sao recusados (o rotulo tem de ser o mesmo do
   --gabarito-externo).
-- privado true com a saida ou a pasta de trabalho dentro do repositorio e
-  recusado; privado true com licenca aberta (CC BY, Creative Commons, dominio
+- privado true com a saida ou a pasta de trabalho dentro deste repositorio,
+  ou de qualquer checkout git (uma pasta acima dela, ou ela mesma, com .git,
+  pasta ou arquivo: outro clone, outro worktree), e recusado; privado true com licenca aberta (CC BY, Creative Commons, dominio
   publico...) tambem: privado e uso pessoal entre professor e aluno.
 - chave repetida em qualquer objeto do json e recusada (o json.load ficaria
   calado com a ultima); o mesmo vale para o --gabarito-externo.
@@ -110,7 +117,7 @@ SERIE = re.compile(r'^(?:([1-9])ano|([1-3])em)$')
 TRACOS = ('–', '—', '−')
 TOLERANCIA = 0.01  # pt: arredondamento de quem escreveu a caixa
 RECT_MIN = 5.0     # pt: caixa mais estreita ou mais baixa que isto nao e recorte
-TINTA = 200        # cinza (0 a 255) abaixo disto e tinta, na conferencia da caixa vazia
+BRANCO = 250       # canal (0 a 255) abaixo disto e tinta, na conferencia da caixa vazia
 sem_tracos = portal.sem_tracos  # um nome so, para a prova poder desliga-lo (veneno)
 
 
@@ -264,11 +271,26 @@ def acertar_cropbox(doc, pno, notas):
 # ------------------------------------------------------------------ leitura
 
 def tem_conteudo(doc, pno, rect):
-    """O retangulo tem texto ou tinta."""
+    """O retangulo tem texto ou tinta: algum pixel, em algum canal, abaixo de
+    BRANCO (a figura clara sem texto vale; so a caixa toda branca nao)."""
     if doc[pno].get_text('text', clip=pymupdf.Rect(rect)).strip():
         return True
-    pix = doc[pno].get_pixmap(dpi=72, colorspace=pymupdf.csGRAY, clip=pymupdf.Rect(rect), alpha=False)
-    return any(b < TINTA for b in pix.samples)
+    pix = doc[pno].get_pixmap(dpi=72, colorspace=pymupdf.csRGB, clip=pymupdf.Rect(rect), alpha=False)
+    return any(b < BRANCO for b in pix.samples)
+
+
+def comecos_do_recorte(docs, ps):
+    """Os textos com que o recorte pode comecar, para o confere: o da ordem
+    natural do PDF e, para cada bloco de texto do primeiro pedaco (de cima para
+    baixo), o texto dele em diante mais o dos pedacos seguintes."""
+    resto = ''.join(gerar_pacote.texto_do_retangulo(docs[c], pno, r) for c, pno, r in ps[1:])
+    c0, pno0, r0 = ps[0]
+    out = [gerar_pacote.texto_do_retangulo(docs[c0], pno0, r0) + resto]
+    blocos = [b for b in docs[c0][pno0].get_text('blocks', clip=pymupdf.Rect(r0)) if b[6] == 0 and b[4].strip()]
+    blocos.sort(key=lambda b: (b[1], b[0]))
+    for k in range(len(blocos)):
+        out.append(''.join(b[4] for b in blocos[k:]) + resto)
+    return out
 
 
 def ler_recorte(r, base, onde, docs):
@@ -392,8 +414,9 @@ def ler_itens_curados(caminho):
         ps = ler_recorte(it['recorte'], base, onde, docs)
         if 'confere' in it:
             esperado = so_letras(texto(it['confere'], onde, 'confere'))
-            lido = so_letras(''.join(gerar_pacote.texto_do_retangulo(docs[c], pno, r) for c, pno, r in ps))
-            if not esperado or not lido.startswith(esperado):
+            comecos = [so_letras(t) for t in comecos_do_recorte(docs, ps)]
+            lido = comecos[0]
+            if not esperado or not any(t.startswith(esperado) for t in comecos):
                 erro(onde, 'o texto do recorte não começa por confere %r (começa por %r): página ou caixa trocada?'
                      % (it['confere'], lido[:max(len(esperado), 20)]))
         itens.append({'id': iid, 'serie': serie, 'tema_app': tid, 'tema_serie': temas[tid]['serie'],
@@ -425,11 +448,24 @@ def texto_das_paginas(pags):
 
 
 def dentro_do_repositorio(caminho):
+    """A raiz do repositorio em que o caminho cai, ou None: este (RAIZ, mesmo
+    sem .git, como na arvore do git archive) ou qualquer checkout git, achado
+    subindo do caminho ate a raiz do disco atras de um .git (pasta ou arquivo,
+    como no worktree)."""
     a, b = os.path.normcase(os.path.realpath(caminho)), os.path.normcase(os.path.realpath(RAIZ))
     try:
-        return os.path.commonpath([a, b]) == b
+        if os.path.commonpath([a, b]) == b:
+            return RAIZ
     except ValueError:  # outro disco
-        return False
+        pass
+    d = os.path.realpath(os.path.abspath(caminho))
+    while True:
+        if os.path.lexists(os.path.join(d, '.git')):
+            return d
+        pai = os.path.dirname(d)
+        if pai == d:
+            return None
+        d = pai
 
 
 def gerar(itens_curados, versao, saida, curadoria=None, trabalho=None, gerado_em=None, commit=None, gravar_zip=True,
@@ -439,10 +475,13 @@ def gerar(itens_curados, versao, saida, curadoria=None, trabalho=None, gerado_em
     nome = 'matematica-%s' % fonte['id']
     trabalho = trabalho or os.path.join(os.path.dirname(os.path.abspath(saida)), 'trabalho', '%s-v%d' % (nome, versao))
     if fonte['privado']:
-        dentro = [o for o, c in (('--saida', saida), ('a pasta de trabalho', trabalho)) if dentro_do_repositorio(c)]
+        dentro = [(o, dentro_do_repositorio(c)) for o, c in (('--saida', saida), ('a pasta de trabalho', trabalho))]
+        dentro = [(o, r) for o, r in dentro if r]
         if dentro:
-            raise SystemExit('erro: --itens-curados: a fonte é privada, e %s fica dentro do repositório (%s). '
-                             'Gere fora dele.' % (' e '.join(dentro), RAIZ))
+            raise SystemExit('erro: --itens-curados: a fonte é privada, e %s %s dentro do repositório git (%s). '
+                             'Gere fora de qualquer checkout git.'
+                             % (' e '.join(o for o, _ in dentro), 'ficam' if len(dentro) > 1 else 'fica',
+                                ', '.join(sorted(set(r for _, r in dentro)))))
     if curadoria:
         dif_cur, apelidos, excl_cur, _meta = gerar_pacote.ler_curadoria(curadoria)
     else:
