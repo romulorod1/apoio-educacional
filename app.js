@@ -4261,6 +4261,12 @@
       return;
     }
     aulaEmEdicao = novo;
+    /* F10: a lista de assuntos (com os botões de domínio) guarda a aula de
+     * antes. Sem redesenhar com o registro novo, uma marca feita depois de
+     * chegar a sincronização ia para um objeto fora do db.aulas e se perdia. */
+    if ($('#lista-temas-aula') && $('#lista-temas-aula').isConnected) {
+      desenharTemasDaAula($('#lista-temas-aula'), novo, alunoPorId(novo.alunoId));
+    }
     var noBanco = valoresDaAulaNoBanco(id);
     var base = baseBancoAutosaveAula || {};
     var mudaram = Object.keys(noBanco).filter(function (k) { return noBanco[k] !== base[k]; });
@@ -5143,7 +5149,7 @@
       /* Registrado não é fechado (C1): o passo só fecha com "Domina". Sem esta
        * linha ela veria o passo registrado e a trilha parada, sem saber por quê. */
       dentro.push(el('div', {
-        class: 'ajuda u-margem-6-0-0', id: 'passo-fecha-com-dominio', texto: 'O passo fecha quando você marcar Domina neste assunto, em Registrar como foi.'
+        class: 'ajuda u-margem-6-0-0', id: 'passo-fecha-com-dominio', texto: 'O passo fecha quando você marcar Domina neste assunto, na linha dele na aula.'
       }));
     } else {
       dentro.push(el('button', {
@@ -5159,7 +5165,7 @@
       dentro.push(el('div', {
         class: 'ajuda u-margem-6-0-0', texto: contaAgora
           ? 'Um toque registra o assunto da aula. O passo fecha quando você marcar Domina nele, ' +
-            'em Registrar como foi, com a data desta aula.'
+            'na linha do assunto da aula, com a data desta aula.'
           : 'Um toque registra o assunto. O passo só fecha em aula realizada ou reposição, e ' +
             'esta está como ' + (Core.STATUS[st] ? Core.STATUS[st].rotulo.toLowerCase() : st) + '.'
       }));
@@ -5236,9 +5242,15 @@
   function desenharTemasDaAula(caixa, aula, aluno) {
     caixa.innerHTML = '';
     var lista = Core.temasDaAula(aula);
-    blocoDominioAtivo = { aulaId: aula.id, desenhar: function () {
-      if ($('#lista-temas-aula')) desenharTemasDaAula($('#lista-temas-aula'), aula, aluno);
-    } };
+    /* F10: o domínio marcado redesenha esta lista pelo blocoDominioAtivo. Só a
+     * aula aberta pode tomá-lo: um redesenho atrasado de OUTRA aula (o índice
+     * que chega depois de ela trocar de aula) não pode apontá-lo para a aula
+     * de antes, senão a marca grava e a tela não mostra. */
+    if (aulaEmEdicao && aulaEmEdicao.id === aula.id) {
+      blocoDominioAtivo = { aulaId: aula.id, desenhar: function () {
+        if ($('#lista-temas-aula')) desenharTemasDaAula($('#lista-temas-aula'), aulaEmEdicao && aulaEmEdicao.id === aula.id ? aulaEmEdicao : aula, aluno);
+      } };
+    }
     if (!lista.length) return;
 
     if (!aluno) aluno = alunoPorId(aula.alunoId);
@@ -5250,6 +5262,11 @@
     caixa.appendChild(el('div', {
       class: 'ajuda u-margem-topo-menos2 dominio-assuntos-privado',
       texto: 'Domínio por assunto · Só você vê'
+    }));
+    // a explicação dos botões, uma vez só, e não em cada linha de assunto
+    caixa.appendChild(el('div', {
+      class: 'ajuda u-margem-topo-menos2 dominio-como-marcar',
+      texto: 'Toque de novo no marcado para desmarcar. Domina fecha o passo da trilha daquele assunto.'
     }));
 
     /* A etiqueta da matéria e o botão Material dependem de dois índices
@@ -5278,7 +5295,7 @@
       return !t.anexoId && disciplinaDoAssunto(t) === Core.MATERIA_PADRAO;
     })) {
       carregarBiblioteca().then(function () {
-        if (caixa.parentNode) desenharTemasDaAula(caixa, aula, aluno);
+        if (caixa.isConnected) desenharTemasDaAula(caixa, aula, aluno); // só a lista que está na tela
       }, function () {});
     }
     /* O "Abrir no livro" (C15.3) depende da lista dos livros do tablet, que o
@@ -5287,7 +5304,7 @@
     if (livrosDoTablet === null && !livrosDoTabletPedidos) {
       livrosDoTabletPedidos = true;
       desenharLivrosAjustes().then(function () {
-        if (caixa.parentNode) desenharTemasDaAula(caixa, aula, aluno);
+        if (caixa.isConnected) desenharTemasDaAula(caixa, aula, aluno); // só a lista que está na tela
       });
     }
     if (faltaIndice || faltaTopicos) {
@@ -5301,7 +5318,7 @@
         if (!faltaTopicos) return null;
         return carregarIndiceTopicos().catch(function () { indiceTopicosFalhou = true; });
       }).then(function () {
-        if (caixa.parentNode) desenharTemasDaAula(caixa, aula, aluno);
+        if (caixa.isConnected) desenharTemasDaAula(caixa, aula, aluno); // só a lista que está na tela
       });
     }
 
@@ -11552,8 +11569,8 @@
       painel.appendChild(el('h3', { class: 'subtitulo', texto: 'Trilhas' }));
       painel.appendChild(el('div', {
         class: 'ajuda u-margem-topo-0', texto: 'A trilha é a sequência de assuntos que precisa vir antes daquele em que ele ' +
-          'travou, na ordem. Ela anda sozinha: quando você marca Domina no assunto da aula, em ' +
-          'Registrar como foi, o passo daquele assunto fecha com a data da aula.'
+          'travou, na ordem. Ela anda sozinha: quando você marca Domina na linha do assunto da aula, ' +
+          'o passo daquele assunto fecha com a data da aula.'
       }));
 
       painel.appendChild(el('div', { class: 'barra u-margem-10-0' }, [
@@ -12933,7 +12950,7 @@
     }
 
     /* Registrar o assunto NÃO fecha mais o passo da trilha (C1): o passo fecha
-     * quando ela marca "Domina" no assunto, em Registrar como foi
+     * quando ela marca "Domina" na linha do assunto da aula
      * (marcarDominioNaAula). Aqui só se descobre se o assunto é passo aberto
      * de alguma trilha, para o aviso dizer o que falta. */
     var alunoDaAula = alunoPorId(aula.alunoId);
@@ -12953,7 +12970,7 @@
       desenharAgenda();
       if (ehPassoAberto) {
         avisar('Assunto registrado: ' + item.titulo + '. O passo da trilha fecha quando você ' +
-          'marcar Domina, em Registrar como foi.');
+          'marcar Domina na linha do assunto da aula.');
         return;
       }
       avisar('Assunto registrado: ' + item.titulo + '.');
