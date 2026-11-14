@@ -1176,7 +1176,7 @@ def comeca_pelo_numero(doc, ps, n, fonte):
 
 
 def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, commit=None, gravar_zip=True,
-          provas=None, gabarito_externo=None):
+          provas=None, gabarito_externo=None, so_com_resposta=False):
     if serie not in COLECOES:
         raise SystemExit('erro: a serie do tipo de fonte provas e m1, m2 ou 3em, e nao %r' % serie)
     t_ini = time.time()
@@ -1317,6 +1317,13 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     docs_busca.sort(key=lambda d: d['id'])
     n_gabarito = (gerar_pacote.aplicar_gabarito_externo(itens, gabarito_externo)
                   if gabarito_externo is not None else None)
+    # --so-com-resposta (gerar_pacote.tirar_sem_resposta), depois do gabarito de fora
+    sem_resposta = None
+    if so_com_resposta:
+        sem_resposta = gerar_pacote.tirar_sem_resposta(itens, conteudo, docs_busca)
+        gerar_pacote.recusar_pacote_vazio(itens, sem_resposta, [serie])
+        for rel in relatorio['provas']:
+            rel['itens'] = sum(1 for i in itens if os.path.basename(i['origem']['arquivo']) == os.path.basename(rel['prova']))
     conteudo['itens.json'] = gerar_pacote.json_bytes(itens)
     conteudo['teoria.json'] = gerar_pacote.json_bytes([])
     conteudo['busca.json'] = gerar_pacote.json_bytes(gerar_pacote.montar_busca(docs_busca))
@@ -1327,6 +1334,12 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
                  'itens_excluidos': len(relatorio['excluidos'])}
     if n_gabarito is not None:
         contagens['itens_com_gabarito_agente'], contagens['itens_com_gabarito_agente_parcial'] = n_gabarito
+    if sem_resposta is not None:
+        # só com a opção: o módulo que ficou sem item não conta
+        contagens['modulos'] = len({i['modulo']['slug'] for i in itens})
+        contagens['itens_sem_resposta_excluidos'] = len(sem_resposta)
+        relatorio['sem_resposta'] = sem_resposta
+        relatorio['assuntos'] = gerar_pacote.assuntos_sem(relatorio['assuntos'], sem_resposta)
     manifest = {
         'esquema': 1, 'pacote': nome, 'versao': versao,
         'gerado_em': gerado_em or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).replace(microsecond=0).isoformat(),
@@ -1340,7 +1353,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     manifest_b = (json.dumps(manifest, ensure_ascii=False, indent=1) + '\n').encode('utf-8')
     zip_caminho = gerar_pacote.gravar_pacote(conteudo, manifest_b, nome, versao, saida, trabalho, gravar_zip)
     ids = {i['id'] for i in itens}
-    ids_excl = {e['id'] for e in relatorio['excluidos']}
+    ids_excl = {e['id'] for e in relatorio['excluidos'] + (sem_resposta or [])}
     pref = 'enem:' if col['fonte'] == 'enem' else 'mirim:'
     relatorio['curadoria_sem_item'] = sorted(
         ['dificuldade.csv: ' + k for k in dif_cur if k.startswith(pref) and k not in ids | ids_excl

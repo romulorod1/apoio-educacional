@@ -179,6 +179,9 @@ const checa = (rotulo, obtido, esperado, doVeneno) => {
     await H.irParaAba(pag, 'biblioteca');
     await esperar('a aba Biblioteca desenhada', () => pag.evaluate(() => !!document.querySelector('#bib-corpo').children.length), v => v, 10000);
     await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+    // P3: a Matemática abre por assunto; os livros dela ficam na Estante, a um toque (espera pela condição)
+    await esperar('a Estante da Matemática', async () => { await clicar(pag, '#bib-abrir-estante');
+      return pag.evaluate(() => !!document.querySelector('#bib-livros .bibl-painel-estante')); }, v => v, 10000);
     await esperar('os anos da matemática', () => pag.evaluate(() => document.querySelectorAll('#bib-livros .bibl-ano').length), v => v > 0, 5000);
     let achou = false;
     for (const ano of await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-livros .bibl-ano')).map(b => b.dataset.ano))) {

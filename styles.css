@@ -4178,18 +4178,44 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
   background: transparent; font: inherit; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--acao); cursor: pointer;
 }
 .bibl-n-livros:hover { background: var(--acao-clara); }
-/* "Comparar livros por assunto", na aba */
-.bibl-comparar { margin-top: 20px; }
-.bibl-comparar .bibl-rotulo { font-size: var(--letra-16); }
-.bibl-comparar-lista { display: flex; flex-wrap: wrap; gap: 8px; }
-.bibl-comparar-chip {
-  display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
-  min-height: var(--alvo); padding: 6px 14px; border: 1px solid var(--fio); border-radius: 999px;
-  background: var(--branco); font: inherit; font-size: var(--letra-16); color: var(--texto); text-align: left; cursor: pointer;
+/* P3: a tela principal por assunto. A Matemática abre por ano e assunto; a
+   estante (livros, Continuar lendo, Minhas listas) fica a um toque. */
+.bibl-painel-assuntos .bibl-painel-cabeca { align-items: center; }
+.bibl-painel-assuntos .bibl-painel-cabeca .cresce { flex: 1 1 8rem; min-width: 0; }
+.bibl-estante-abrir {
+  display: inline-flex; align-items: center; gap: 10px; min-height: var(--alvo); max-width: 100%;
+  padding: 6px 14px; text-align: left;
 }
-.bibl-comparar-chip:hover { background: var(--soft); }
-.bibl-comparar-nome { min-width: 0; overflow-wrap: anywhere; }
-.bibl-comparar-chip .bibl-apoio { flex: none; }
+.bibl-estante-abrir .ico { flex: none; }
+.bibl-estante-abrir-texto { display: flex; flex-direction: column; min-width: 0; }
+.bibl-estante-abrir-texto .bibl-forte { color: var(--navy); }
+.bibl-estante-abrir-texto .bibl-pequena { display: block; overflow-wrap: anywhere; }
+.bibl-assuntos-ajuda { margin: 10px 0 0; }
+.bibl-assuntos-conta { margin: 6px 0 0; font-size: var(--letra-12); }
+.bibl-assuntos { margin-top: 12px; }
+.bibl-unidade { margin-top: 14px; }
+.bibl-unidade:first-child { margin-top: 4px; }
+.bibl-unidade-titulo {
+  margin: 0 0 8px; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--muted);
+  letter-spacing: .02em;
+}
+.bibl-unidade-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(18rem, 100%), 1fr)); gap: 8px; }
+.bibl-unidade-lista .item-lista { margin-bottom: 0; min-height: var(--alvo); cursor: pointer; }
+.bibl-unidade-lista .item-lista .nome { overflow-wrap: anywhere; }
+.bibl-unidade-lista .item-lista .detalhe { font-size: var(--letra-14); color: var(--muted); }
+/* o assunto sem material não some: fica apagado, e ainda abre a página que explica o vazio */
+.bibl-assunto-linha.sem-material { background: var(--fundo-leve); border-style: dashed; }
+.bibl-assunto-linha.sem-material .nome { color: var(--muted); font-weight: var(--peso-normal, 400); }
+.bibl-assunto-linha.sem-material .detalhe { font-style: normal; }
+.bibl-so-matematica { margin: 8px 0 0; }
+.bibl-painel-estante > .bib-voltar { margin-bottom: 8px; }
+.bibl-painel-estante .bibl-continuar { margin: 14px 0 4px; }
+/* com a lista de assuntos à vista, o começo dos exercícios fica na estante */
+#tela-biblioteca.bibl-com-assuntos.bib-corpo-home #bib-corpo,
+#tela-biblioteca.bibl-com-assuntos.bib-corpo-home #bib-exercicios-cabeca,
+#tela-biblioteca.bibl-com-assuntos.bib-corpo-home #bib-carrinho.vazia { display: none; }
+/* Comparar os livros, na página do assunto */
+.bib-assunto-comparar { display: inline-flex; align-items: center; gap: 8px; min-height: var(--alvo); margin-top: 10px; }
 
 /* a tela: tela cheia com Voltar, a cabeça, o filtro e a tabela que rola */
 .lado {

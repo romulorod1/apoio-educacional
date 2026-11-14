@@ -182,6 +182,17 @@ async function abrirBiblioteca(pag) {
   await pausa(300);
 }
 
+/* P3: a Matemática abre por assunto, e as capas, o Continuar lendo e Minhas
+ * listas ficam na Estante, a um toque. Esta prova é a das capas: ela chega a
+ * elas pelo botão da Estante, esperando pela condição (a estante à vista). A
+ * tela principal por assunto é provada no testa_biblioteca_tela_principal. */
+async function abrirEstante(pag) {
+  await esperar('a Estante', async () => {
+    await clicar(pag, '#bib-abrir-estante');
+    return pag.evaluate(() => !!document.querySelector('#bib-livros .bibl-painel-estante'));
+  }, v => v, 10000);
+}
+
 // o que a seção de livros mostra agora
 const lerSecao = pag => pag.evaluate(() => {
   const caixa = document.querySelector('#bib-livros');
@@ -565,6 +576,10 @@ async function secaoP2(pag) {
   conf('os livros sintéticos entraram', /Livros importados\./.test(imp2), true);
   conf('o aviso da importação diz onde ler', /abra a aba Biblioteca e toque no livro\./.test(imp2), true);
   await abrirBiblioteca(pag);
+  // P3: a aba abre na Matemática por assunto, sem as capas; elas ficam na Estante
+  await esperar('a lista de assuntos', () => pag.evaluate(() => !!document.querySelector('#bib-livros .bibl-assunto-linha')), v => v, 10000);
+  conf('a aba abre por assunto, sem capas no caminho principal', (await lerSecao(pag)).livros, '');
+  await abrirEstante(pag);
   await esperar('a seção de livros', () => lerSecao(pag), v => v.visivel && !!v.livros, 10000);
   s = await lerSecao(pag);
   conf('a contagem diz materiais e disciplinas', s.contagem, '4 materiais, 2 disciplinas');
@@ -605,6 +620,8 @@ async function secaoP2(pag) {
   }
 
   secao('3. Os exercícios continuam alcançáveis');
+  // voltar à Matemática é voltar aos assuntos (P3): os exercícios por série moram na Estante
+  await abrirEstante(pag);
   await clicar(pag, '#bib-livros .bibl-ano[data-ano="09"]');
   conf('o cartão dos exercícios do 9º ano está lá', await clicar(pag, '#bib-livros [data-exercicios="9ano"]'), true);
   await pausa(300);
@@ -811,11 +828,18 @@ async function secaoP2(pag) {
   await clicar(pag, '#bib-livro-voltar');
   await esperar('a aba de volta', () => lerSecao(pag), v => v.visivel && /livro-de-prova/.test(v.continuar), 5000);
   s = await lerSecao(pag);
-  conf('o Continuar lendo põe o último lido primeiro', s.continuar, 'livro-de-prova|Cap. 3, O fim,livro-com-marcadores|Cap. 2, Frações · p. 4');
+  // P3 (revisão cega do #211): na estante de uma disciplina, só o Continuar lendo dela
+  conf('na estante da Literatura, o Continuar lendo é o do livro dela, com a posição', s.continuar, 'livro-de-prova|Cap. 3, O fim');
+  await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  await abrirEstante(pag);
+  s = (await esperar('a estante da Matemática', () => lerSecao(pag), v => v.visivel && !!v.continuar, 5000)).valor;
+  conf('na da Matemática, o livro de Matemática lido, e não o de Literatura', s.continuar, 'livro-com-marcadores|Cap. 2, Frações · p. 4');
+  await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="literatura"]');
 
   // ================================================================
   secao('6. O livro sem sumário diz isso');
   await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  await abrirEstante(pag);
   await clicar(pag, '#bib-livros .bibl-ano[data-ano="06"]');
   await clicar(pag, '#bib-livros [data-livro="livro-sem-sumario"]');
   await esperar('a tela do livro sem sumário', () => lerLivro(pag), v => v.visivel && v.livro === 'livro-sem-sumario', 5000);
@@ -850,21 +874,32 @@ async function secaoP2(pag) {
   // ================================================================
   secao('7b. O topo do desenho, a largura estreita e o Material da aula');
   await H.irParaAba(pag, 'biblioteca');
+  await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  await esperar('a lista de assuntos', () => pag.evaluate(() => !!document.querySelector('#bib-livros .bibl-assunto-linha')), v => v, 10000);
   await pausa(400);
   const topo = await pag.evaluate(() => {
     const t = document.querySelector('.bibl-topo .titulo').getBoundingClientRect();
     const c = document.querySelector('#bib-livros-contagem').getBoundingClientRect();
     const b = document.querySelector('#bib-busca-cartao').getBoundingClientRect();
-    const cont = document.querySelector('.bibl-continuar').getBoundingClientRect();
+    const nav = document.querySelector('#bib-livros .bibl-paineis').getBoundingClientRect();
     const area = document.querySelector('.conteudo').getBoundingClientRect();
     const meio = r => r.top + r.height / 2;
     return { umaLinha: Math.abs(meio(t) - meio(c)) < 12 && Math.abs(meio(t) - meio(b)) < 12,
       lupa: !!document.querySelector('#bib-busca-cartao svg[data-icone-nome="search"]'),
-      continuar: Math.round(cont.top - area.top) };
+      assuntos: !!document.querySelector('#bib-livros .bibl-assunto-linha'),
+      navegacao: Math.round(nav.top - area.top) };
   });
   conf('título, contagem e busca (com a lupa) numa linha só', topo.umaLinha && topo.lupa, true);
-  conf('o Continuar lendo logo abaixo do topo (a menos de 120 px do alto)', topo.continuar < 120, true);
-  console.log('   Continuar lendo a ' + topo.continuar + ' px do alto');
+  // P3: o alto da aba é a navegação por assunto; o Continuar lendo foi para a Estante
+  conf('a navegação por assunto logo abaixo do topo (a menos de 120 px do alto)', topo.assuntos && topo.navegacao < 120, true);
+  await abrirEstante(pag);
+  const contNaEstante = await pag.evaluate(() => {
+    const cont = document.querySelector('#bib-livros .bibl-painel-estante .bibl-continuar');
+    const area = document.querySelector('.conteudo').getBoundingClientRect();
+    return cont ? Math.round(cont.getBoundingClientRect().top - area.top) : null;
+  });
+  conf('na Estante, o Continuar lendo fica no alto dela (a menos de 260 px do alto da área)', contNaEstante !== null && contNaEstante < 260, true);
+  console.log('   navegação por assunto a ' + topo.navegacao + ' px do alto; Continuar lendo na Estante a ' + contNaEstante + ' px');
   ruins = await medir(pag, '.bibl-topo');
   conf('o topo não transborda', ruins.join('; '), '');
   await pag.setViewport({ width: 800, height: 1280, hasTouch: true });
@@ -969,6 +1004,7 @@ async function secaoP2(pag) {
   await H.irParaAba(pag, 'biblioteca');
   await pausa(300);
   await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  await abrirEstante(pag);
   await clicar(pag, '#bib-livros .bibl-ano[data-ano="06"]');
   await esperar('os livros de prova na aba', () => lerSecao(pag), v => /prova-marcadores-lixo/.test(v.livros), 10000);
   const cartao = id => pag.evaluate(i => {
@@ -1123,6 +1159,7 @@ async function secaoP2(pag) {
   await importar(pag, zipLeitor);
   await abrirBiblioteca(pag);
   await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
+  await abrirEstante(pag);
   let achou = false;
   for (const ano of await pag.evaluate(() => Array.from(document.querySelectorAll('#bib-livros .bibl-ano')).map(b => b.dataset.ano))) {
     await clicar(pag, '#bib-livros .bibl-ano[data-ano="' + ano + '"]');

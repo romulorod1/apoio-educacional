@@ -1,0 +1,1 @@
+# Linha de Ajustes da biblioteca na nuvem: separa os livros que ainda não estão neste tablet dos que chegam com outro arquivo. Sem novidade na janela: ela não nota diferença no dia a dia.

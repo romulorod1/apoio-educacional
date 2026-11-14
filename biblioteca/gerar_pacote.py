@@ -1818,7 +1818,7 @@ def gravar_pacote(conteudo, manifest_b, nome, versao, saida, trabalho, gravar_zi
 
 def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, commit=None,
           so_modulos=None, gravar_zip=True, anterior=None, com_kits=False, com_listas=False,
-          regra_listas=None, com_base=False, gabarito_externo=None):
+          regra_listas=None, com_base=False, gabarito_externo=None, so_com_resposta=False):
     t_ini = time.time()
     nome = 'matematica-obmep-%s' % serie
     trabalho = trabalho or os.path.join(os.path.dirname(os.path.abspath(saida)), 'trabalho', '%s-v%d' % (nome, versao))
@@ -2127,6 +2127,17 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     teoria.sort(key=lambda t: t['id'])
     docs_busca.sort(key=lambda d: d['id'])
     n_gabarito = aplicar_gabarito_externo(itens, gabarito_externo) if gabarito_externo is not None else None
+    sem_resposta = None
+    if so_com_resposta:
+        # o resumo do módulo do Portal: os títulos das listas, na ordem, e depois os da teoria
+        def resumo_portal(its, teos):
+            listas = sorted({(i['aula']['n'], i['aula']['titulo']) for i in its})
+            return ' '.join([t for _, t in listas] + [t['aula']['titulo'] for t in sorted(teos, key=lambda t: t['aula']['n'])])
+        sem_resposta = tirar_sem_resposta(itens, conteudo, docs_busca, teoria, resumo_portal)
+        recusar_pacote_vazio(itens, sem_resposta, [serie])
+        for l in relatorio['listas']:
+            if 'itens_no_pacote' in l:
+                l['itens_no_pacote'] = sum(1 for i in itens if os.path.basename(i['origem']['arquivo']) == l['arquivo'])
     conteudo['itens.json'] = json_bytes(itens)
     conteudo['teoria.json'] = json_bytes(teoria)
     conteudo['busca.json'] = json_bytes(montar_busca(docs_busca))
@@ -2150,6 +2161,8 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
             linha = {'id': e['id'], 'motivo': e['motivo']}
             linha.update(excl_meta.get(e['id'], {}))
             excluidos.append(linha)
+        # com --so-com-resposta, o item tirado por falta de resposta também
+        excluidos.extend({'id': e['id'], 'motivo': e['motivo']} for e in sem_resposta or [])
         excluidos.sort(key=lambda e: e['id'])
         conteudo['exclusoes.json'] = json_bytes(excluidos)
         if com_listas:
@@ -2182,6 +2195,13 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     if n_gabarito is not None:
         # so com --gabarito-externo: sem ele o manifest sai como saia antes
         contagens['itens_com_gabarito_agente'], contagens['itens_com_gabarito_agente_parcial'] = n_gabarito
+    if sem_resposta is not None:
+        # só com --so-com-resposta: o módulo e a lista que ficaram vazios não
+        # contam (o módulo com teoria continua), e o que saiu fica contado
+        contagens['modulos'] = len({i['modulo']['slug'] for i in itens} | {t['modulo']['slug'] for t in teoria})
+        contagens['aulas_exercicios'] = len({(i['modulo']['slug'], i['aula']['slug']) for i in itens})
+        contagens['itens_sem_resposta_excluidos'] = len(sem_resposta)
+        relatorio['sem_resposta'] = sem_resposta
     manifest = {
         'esquema': 1, 'pacote': nome, 'versao': versao,
         'gerado_em': gerado_em or datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).replace(microsecond=0).isoformat(),
@@ -2209,7 +2229,7 @@ def gerar(pdfs, serie, versao, saida, curadoria, trabalho=None, gerado_em=None, 
     # curadoria desta serie que nao achou item: id digitado errado nao pode
     # passar calado (o arquivo e um so para todas as series)
     ids = {i['id'] for i in itens}
-    ids_excl = {e['id'] for e in relatorio['excluidos']}
+    ids_excl = {e['id'] for e in relatorio['excluidos'] + (sem_resposta or [])}
     prefixo = serie + ':'
     relatorio['curadoria_sem_item'] = sorted(
         ['dificuldade.csv: ' + k for k in dif_cur if k.startswith(prefixo) and k not in ids and k not in ids_excl] +
@@ -2375,6 +2395,93 @@ def aplicar_gabarito_externo(itens, entradas):
     return len(respostas), parciais
 
 
+# --so-com-resposta (regra de foco da biblioteca: exercício só entra se tem
+# resposta). Vale para toda fonte com item (Portal, provas e Cadernos SME-SP)
+# e roda DEPOIS do --gabarito-externo. Tem resposta o item com a solução da
+# fonte (assets.solucao), com a resposta oficial da fonte (o campo resposta,
+# a letra do gabarito oficial de uma prova) ou com o gabarito de fora já
+# aplicado (o campo gabarito). O resto sai do pacote inteiro: do itens.json,
+# os seus SVG, o seu documento da busca e, se o módulo ficou sem exercício e
+# sem teoria, o documento do módulo. O `numero` do item que fica NÃO muda: é o
+# mesmo que ele teria sem a opção, para a lista salva no aparelho continuar
+# mostrando o mesmo número depois de uma regeração (o buraco na sequência é
+# aceito, o aplicativo ordena por `numero`). Pacote que fica sem item nenhum, ou
+# série pedida que fica vazia, é recusado (recusar_pacote_vazio). Sem a opção,
+# nada disto roda e o pacote sai byte a byte como antes.
+MOTIVO_SEM_RESPOSTA = 'sem solução da fonte, sem resposta oficial e sem gabarito conferido'
+RECUSA_PACOTE_VAZIO = True  # False só no veneno
+
+
+def tem_resposta(item):
+    """O item tem resposta: solução da fonte, resposta oficial ou gabarito de fora."""
+    return bool((item.get('assets') or {}).get('solucao')) or item.get('resposta') is not None or \
+        bool((item.get('gabarito') or {}).get('respostas'))
+
+
+def resumo_pelas_aulas(itens_do_modulo, teorias_do_modulo):
+    """O resumo do documento de módulo na busca das provas e dos Cadernos: os
+    títulos das aulas dos itens do módulo, sem repetir, em ordem alfabética."""
+    return ' '.join(sorted(set(i['aula']['titulo'] for i in itens_do_modulo)))
+
+
+def tirar_sem_resposta(itens, conteudo, docs_busca, teoria=(), resumo_do_modulo=resumo_pelas_aulas):
+    """Tira do pacote, no lugar, todo item sem resposta (tem_resposta). Mexe em
+    `itens`, `conteudo` (os SVG do item) e `docs_busca` (o documento do item e o
+    do módulo que ficou vazio; o módulo que perdeu item e ficou tem o `resumo`
+    refeito por `resumo_do_modulo(itens, teorias)`, para não citar a lista ou a
+    prova que sumiu); na teoria, o `exercicios_pareados` deixa de apontar para
+    lista que sumiu. O `numero` dos que ficam não muda. Devolve a linha do
+    relatório de cada item tirado: {id, arquivo, numero, motivo}, em ordem de id."""
+    fora = [i for i in itens if not tem_resposta(i)]
+    if not fora:
+        return []
+    ids_fora = {i['id'] for i in fora}
+    itens[:] = [i for i in itens if i['id'] not in ids_fora]
+    for i in fora:
+        for cam in (i.get('assets') or {}).values():
+            if cam:
+                conteudo.pop(cam, None)
+    # o módulo continua enquanto tiver exercício ou teoria; a lista (a aula de
+    # exercícios) continua enquanto tiver exercício
+    modulos_vivos = {'%s:%s' % (x['serie'], x['modulo']['slug']) for x in list(itens) + list(teoria)}
+    listas_vivas = {'%s:%s:%s' % (i['serie'], i['modulo']['slug'], i['aula']['slug']) for i in itens}
+    docs_busca[:] = [d for d in docs_busca if d['id'] not in ids_fora and
+                     (d.get('tipo') != 'modulo' or d['id'] in modulos_vivos)]
+    chave = lambda x: '%s:%s' % (x['serie'], x['modulo']['slug'])
+    mexidos = {chave(i) for i in fora}
+    for d in docs_busca:
+        if d.get('tipo') == 'modulo' and d['id'] in mexidos:
+            d['resumo'] = resumo_do_modulo([i for i in itens if chave(i) == d['id']],
+                                           [t for t in teoria if chave(t) == d['id']])
+    for t in teoria:
+        if 'exercicios_pareados' in t:
+            t['exercicios_pareados'] = [l for l in t['exercicios_pareados'] if l in listas_vivas]
+    return sorted(({'id': i['id'], 'arquivo': os.path.basename((i.get('origem') or {}).get('arquivo') or ''),
+                    'numero': i.get('numero'), 'motivo': MOTIVO_SEM_RESPOSTA} for i in fora), key=lambda e: e['id'])
+
+
+def recusar_pacote_vazio(itens, tirados, series_pedidas=None):
+    """Com --so-com-resposta: recusa o pacote que ficou sem item nenhum, e a
+    série pedida (--serie) que ficou sem item, em vez de gravar um pacote vazio."""
+    if not RECUSA_PACOTE_VAZIO:
+        return
+    if not itens:
+        raise SystemExit('erro: com --so-com-resposta o pacote ficou sem item nenhum (%d tirados por falta de '
+                         'resposta). Confira o --gabarito-externo: sem ele, item sem solução da fonte não entra.'
+                         % len(tirados))
+    vazias = [s for s in series_pedidas or () if not any(i['serie'] == s for i in itens)]
+    if vazias:
+        raise SystemExit('erro: com --so-com-resposta a série %s ficou sem item nenhum. Tire-a do --serie ou '
+                         'confira o --gabarito-externo.' % ', '.join(vazias))
+
+
+def assuntos_sem(assuntos, tirados):
+    """O {assunto: [ids]} do relatório sem os itens tirados; o assunto que fica vazio some."""
+    fora = {e['id'] for e in tirados}
+    novo = {k: [x for x in v if x not in fora] for k, v in assuntos.items()}
+    return {k: v for k, v in novo.items() if v}
+
+
 # A versao do PyMuPDF que gera os pacotes publicados (biblioteca/requirements-gerador.txt).
 PYMUPDF_DO_GERADOR = '1.27.2.3'
 
@@ -2463,6 +2570,13 @@ def principal(argv=None):
                     'chegaram ao mesmo resultado: lista de {id_item, subitem ou null, resposta, origem: '
                     '"agente-conferido"}. O item ganha o campo gabarito; item sem entrada fica como antes. Nao vale '
                     'com --fonte livros')
+    ap.add_argument('--so-com-resposta', action='store_true',
+                    help='tira do pacote todo item sem resposta: sem a solução da fonte, sem a resposta oficial e sem '
+                    'gabarito (o de --gabarito-externo, aplicado antes). Lista, aula e módulo que ficam vazios somem; '
+                    'a contagem fica em itens_sem_resposta_excluidos e cada item tirado em sem_resposta do relatório; o '
+                    'numero de quem fica é o mesmo de sem a opção, e o pacote (ou a série pedida) que fica sem item é '
+                    'recusado. '
+                    'Sem esta opção o pacote sai byte a byte como antes. Não vale com --fonte livros')
     ap.add_argument('--fontes-negrito', help='pedacos de nome de fonte negrito, separados por virgula '
                     '(padrao %s)' % ','.join(FONTES_NEGRITO))
     a = ap.parse_args(argv)
@@ -2477,6 +2591,8 @@ def principal(argv=None):
         raise SystemExit('erro: --vinculos so vale com --fonte cadernos-sme-sp')
     if a.fonte == 'livros' and a.gabarito_externo:
         raise SystemExit('erro: --gabarito-externo nao vale com --fonte livros (livro nao tem item)')
+    if a.fonte == 'livros' and a.so_com_resposta:
+        raise SystemExit('erro: --so-com-resposta não vale com --fonte livros (livro não tem item)')
     gab = ler_gabarito_externo(a.gabarito_externo) if a.gabarito_externo else None
     if a.fonte == 'cadernos-sme-sp':
         extras = [o for o, v in (('--kits', a.kits), ('--listas', a.listas), ('--listas-aula', a.listas_aula),
@@ -2489,7 +2605,8 @@ def principal(argv=None):
         if series and any(s not in cadernos_sme.TOM for s in series):
             raise SystemExit('erro: com --fonte cadernos-sme-sp, --serie e uma lista de 2ano a 9ano: %r' % a.serie)
         manifest, rel, trab = cadernos_sme.gerar(a.pdfs, a.vinculos, a.versao, a.saida, a.curadoria, a.trabalho,
-                                                 a.gerado_em, a.commit, not a.sem_zip, series, gabarito_externo=gab)
+                                                 a.gerado_em, a.commit, not a.sem_zip, series, gabarito_externo=gab,
+                                                 so_com_resposta=a.so_com_resposta)
         print(json.dumps({'contagens': manifest['contagens'], 'zip': rel['zip'], 'bytes_por_tipo': rel['bytes_por_tipo'],
                           'excluidos': len(rel['excluidos']), 'fora_do_alvo': len(rel['fora_do_alvo']),
                           'sem_vinculo': len(rel['sem_vinculo']), 'segundos': rel['segundos'], 'trabalho': trab},
@@ -2523,7 +2640,8 @@ def principal(argv=None):
             raise SystemExit('erro: %s so vale com --fonte portal' % ', '.join(extras))
         import provas
         manifest, rel, trab = provas.gerar(a.pdfs, a.serie, a.versao, a.saida, a.curadoria, a.trabalho, a.gerado_em,
-                                           a.commit, not a.sem_zip, gabarito_externo=gab)
+                                           a.commit, not a.sem_zip, gabarito_externo=gab,
+                                           so_com_resposta=a.so_com_resposta)
         print(json.dumps({'contagens': manifest['contagens'], 'zip': rel['zip'], 'bytes_por_tipo': rel['bytes_por_tipo'],
                           'excluidos': len(rel['excluidos']), 'segundos': rel['segundos'], 'trabalho': trab},
                          ensure_ascii=False, indent=1))
@@ -2549,7 +2667,7 @@ def principal(argv=None):
     manifest, rel, trab = gerar(a.pdfs, a.serie, a.versao, a.saida, a.curadoria, a.trabalho, a.gerado_em, a.commit,
                                 a.modulos.split(',') if a.modulos else None, not a.sem_zip, a.anterior, a.kits,
                                 a.listas, kits.REGRA_AULA if a.listas_aula else None, a.lista_de_base,
-                                gabarito_externo=gab)
+                                gabarito_externo=gab, so_com_resposta=a.so_com_resposta)
     print(json.dumps({'contagens': manifest['contagens'], 'zip': rel['zip'], 'bytes_por_tipo': rel['bytes_por_tipo'],
                       'excluidos': len(rel['excluidos']), 'segundos': rel['segundos'], 'trabalho': trab},
                      ensure_ascii=False, indent=1))

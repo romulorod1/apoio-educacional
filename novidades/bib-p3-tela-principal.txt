@@ -1,0 +1,3 @@
+A Biblioteca abre na Matemática por ano e por assunto; o assunto apagado é o que ainda não tem material.
+Os livros, o Continuar lendo e Minhas listas ficam no botão Estante.
+Para comparar livros, abra o assunto e toque em "Comparar os livros".
