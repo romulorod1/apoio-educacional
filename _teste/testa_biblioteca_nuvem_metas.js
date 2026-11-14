@@ -26,7 +26,7 @@
  *   4. a posição de leitura e o db dela (as correções do mapa) ficam byte a
  *      byte; a correção do capítulo de mesmo título segue valendo no mapa novo;
  *   5. a linha de Ajustes diz o que aconteceu ("3 livros com mapa novo",
- *      "1 livro chega com a próxima versão", "1 livro não pôde ser
+ *      "1 livro chega com a próxima versão (arquivo diferente)", "1 livro não pôde ser
  *      conferido"), e um segundo toque não troca nada nem baixa de novo o
  *      livro de meta igual;
  *   2 e 5 também: o livro cujo meta da nuvem é IGUAL ao do tablet não é
@@ -56,7 +56,9 @@
  *   --envenenado-aceita-mapa-texto o mapa em texto passa na conferência (7);
  *   --envenenado-um-lote-so        tudo numa transação: a falha desfaz tudo (8);
  *   --envenenado-app-aceita-outro-id  o documento de outro livro chega ao Store (8);
- *   --envenenado-vencida-pede-tente  a entrada vencida diz "tente de novo" (9).
+ *   --envenenado-vencida-pede-tente  a entrada vencida diz "tente de novo" (9);
+ *   --envenenado-junta-as-contas  o livro que não está no tablet volta a ser contado
+ *                                  como "chega com a próxima versão" (8).
  *
  * Precisa do firebase-tools (FIREBASE_TOOLS) e de um JDK 21 em JAVA_HOME,
  * como o testa_nuvem.js. Portas: 9041 (app), 9042 (auth), 9043 (firestore),
@@ -98,7 +100,8 @@ const VENENOS = {
   '--envenenado-aceita-mapa-texto': ['biblioteca', 'if (meta.mapa !== undefined && (!Array.isArray(meta.mapa) ||', 'if (false && (!Array.isArray(meta.mapa) ||'],
   '--envenenado-um-lote-so': ['store', 'var LOTE_DA_NUVEM = 5;', 'var LOTE_DA_NUVEM = 1000;'],
   '--envenenado-app-aceita-outro-id': ['app', 'if (!doc || doc.id !== ped.id || doc.metaHash', 'if (!doc || doc.metaHash'],
-  '--envenenado-vencida-pede-tente': ['app', '        : PEDE_ENTRAR_DE_NOVO[codigo] ?', '        : false ?']
+  '--envenenado-vencida-pede-tente': ['app', '        : PEDE_ENTRAR_DE_NOVO[codigo] ?', '        : false ?'],
+  '--envenenado-junta-as-contas': ['app', 'estado.naoEstao++;', 'estado.chegam++;']
 };
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && !VENENOS[a]);
@@ -398,7 +401,7 @@ const so = (r, id) => { const l = JSON.parse(r.livros[id]); delete l.meta; delet
 
   secao('5. A linha de Ajustes e o segundo toque');
   conf('a linha diz quantos ganharam mapa novo, quantos chegam depois e quantos não puderam ser conferidos', linha.valor.replace(/\d\d:\d\d/, 'HH:MM'),
-    'Biblioteca conferida hoje às HH:MM · 3 livros com mapa novo · 1 livro chega com a próxima versão · 1 livro não pôde ser conferido');
+    'Biblioteca conferida hoje às HH:MM · 3 livros com mapa novo · 1 livro chega com a próxima versão (arquivo diferente) · 1 livro não pôde ser conferido');
   conf('o estado da linha mora na chave do padrão apoio-educacional:', await pag.evaluate(() => !!localStorage.getItem('apoio-educacional:biblioteca-nuvem')), true);
   // no segundo toque, quem baixa de novo o documento do catálogo: só o de meta inválido (o igual ficou marcado)
   await pag.evaluate(() => {
@@ -469,6 +472,8 @@ const so = (r, id) => { const l = JSON.parse(r.livros[id]); delete l.meta; delet
       docs[m0.id] = { id: m.id, sha256: sha, tamanho: m.bytes, metaJson: texto, metaHash: h, metaVersao: 2 };
       indice.livros[m0.id] = { sha256: sha, tamanho: m.bytes, metaHash: h, metaVersao: 2, formato: 'pdf' };
     }
+    // um livro do catálogo que não está neste tablet (como um pacote que ela não importou)
+    indice.livros['ausente-z'] = { sha256: 'a'.repeat(64), tamanho: 100, metaHash: 'b'.repeat(64), metaVersao: 2, formato: 'pdf' };
     window.__entregues = [];
     const trocar0 = Store.trocarMetaDaNuvem;
     Store.trocarMetaDaNuvem = function (itens) {
@@ -483,16 +488,17 @@ const so = (r, id) => { const l = JSON.parse(r.livros[id]); delete l.meta; delet
   await esperar('o botão da biblioteca na nuvem', () => existe(pag, '#livros-nuvem-atualizar'), v => v === true, 10000);
   await clicar(pag, '#livros-nuvem-atualizar');
   const linha8 = await esperar('a linha do toque com a falha', () => pag.evaluate(() => (document.querySelector('#livros-nuvem-estado') || {}).textContent || ''),
-    v => /próximo toque|livros? com mapa novo · /.test(v) && !/· 1 livro chega/.test(v), 30000);
+    v => /próximo toque/.test(v), 30000);   // a linha da seção 5 não tem "próximo toque"; esta tem, com ou sem veneno
   const r8 = await retrato(pag);
   const trocados8 = LOTE.filter(id => JSON.parse(r8.livros[id]).meta.mapa[0].titulo === 'Decimais').join(',');
   const entregues = await pag.evaluate(() => window.__entregues.join(','));
+  if (MODO === '--envenenado-junta-as-contas') { conf('VENENO visto: o livro que não está no tablet saiu como "chega com a próxima versão"', /1 livro chega com a próxima versão/.test(linha8.valor) && !/ainda não está/.test(linha8.valor), true); return fim(); }
   if (MODO === '--envenenado-um-lote-so') { conf('VENENO visto: a falha de um lote desfez os anteriores', trocados8, ''); return fim(); }
   if (MODO === '--envenenado-app-aceita-outro-id') { conf('VENENO visto: o documento de outro livro chegou ao Store', /lote-8:lote-9/.test(entregues), true); return fim(); }
   conf('os cinco do primeiro lote ficaram trocados; os do lote que falhou, não', trocados8, 'lote-1,lote-2,lote-3,lote-4,lote-5');
   conf('o documento de outro livro nem chegou ao Store', entregues.split(',').filter(x => x.split(':')[0] !== x.split(':')[1]).join(','), '');
   conf('a linha diz os trocados, o não conferido, os que ficaram e a correção sem capítulo', linha8.valor.replace(/\d\d:\d\d/, 'HH:MM'),
-    'Biblioteca conferida hoje às HH:MM · 5 livros com mapa novo · 1 livro não pôde ser conferido · 2 livros ficaram para o próximo toque · ' +
+    'Biblioteca conferida hoje às HH:MM · 5 livros com mapa novo · 1 livro ainda não está neste tablet · 1 livro não pôde ser conferido · 2 livros ficaram para o próximo toque · ' +
     '1 correção sua ficou sem capítulo; veja no livro');
   await pag.evaluate(() => { window.__falharPutDe = null; });
   await clicar(pag, '#livros-nuvem-atualizar');

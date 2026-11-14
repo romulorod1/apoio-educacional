@@ -17519,9 +17519,11 @@
    * catálogo e um meta que ainda não foi aplicado, baixa o documento do livro,
    * confere o meta (Biblioteca.conferirMetaDaNuvem) e troca SÓ o meta
    * (Store.trocarMetaDaNuvem). Nada de PDF baixado nem regravado; a posição e
-   * as correções dela ficam como estão. O livro de outro arquivo, ou que ainda
-   * não está no aparelho, só entra na conta "chegam com a próxima versão"
-   * (fase 2). Só no tablet, com a conta dela: o celular e o observador ficam
+   * as correções dela ficam como estão. O livro de outro arquivo só entra na
+   * conta "chegam com a próxima versão (arquivo diferente)", e o que ainda não
+   * está no aparelho, na conta "ainda não estão neste tablet" (as duas são da
+   * fase 2; juntas, a linha do primeiro toque real, 13/11, não deixava ver
+   * que eram pacotes não importados). Só no tablet, com a conta dela: o celular e o observador ficam
    * para a 2c.
    *
    * A conferência sozinha na abertura fica DESLIGADA até a orquestradora
@@ -17549,7 +17551,9 @@
     // a marca do livro cujo meta da nuvem veio IGUAL ao do aparelho (não regravado): o metaHash do
     // catálogo e o hash do meta do aparelho; se um dos dois mudar, o livro volta a ser conferido
     var marcas = antes.conferidos && typeof antes.conferidos === 'object' ? antes.conferidos : {};
-    var estado = { quando: new Date().toISOString(), trocados: 0, chegam: 0, invalidos: 0, faltaram: 0, semEspaco: false, orfas: 0,
+    // chegam: o livro está aqui com OUTRO arquivo (a troca de arquivo é da fase 2b);
+    // naoEstao: o livro do catálogo que não está neste aparelho (pacote não importado, ou a fase 2)
+    var estado = { quando: new Date().toISOString(), trocados: 0, chegam: 0, naoEstao: 0, invalidos: 0, faltaram: 0, semEspaco: false, orfas: 0,
       semCatalogo: false, conferidos: {} };
     var hashDoMeta = function (m) { return Store.sha256Hex(Store.canonicoDoMeta(m)); };
     var doAparelho = {};
@@ -17567,7 +17571,7 @@
         candidatos.push({ id: l.id, entrada: e });
       });
       Object.keys(indice.livros).forEach(function (id) {
-        if (!doAparelho[id] && !indice.livros[id].retiradoEm) estado.chegam++;
+        if (!doAparelho[id] && !indice.livros[id].retiradoEm) estado.naoEstao++;
       });
       return Promise.all(candidatos.map(function (ped) {
         var m = marcas[ped.id];
@@ -17647,7 +17651,8 @@
     var dia = d.toDateString() === hoje.toDateString() ? 'hoje' : 'em ' + ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
     var partes = ['Biblioteca conferida ' + dia + ' às ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2)];
     partes.push(est.trocados ? est.trocados + ' ' + palavraPlural(est.trocados, 'livro com mapa novo', 'livros com mapa novo') : 'nenhum livro com mapa novo');
-    if (est.chegam) partes.push(est.chegam + ' ' + palavraPlural(est.chegam, 'livro chega', 'livros chegam') + ' com a próxima versão');
+    if (est.naoEstao) partes.push(est.naoEstao + ' ' + palavraPlural(est.naoEstao, 'livro ainda não está', 'livros ainda não estão') + ' neste tablet');
+    if (est.chegam) partes.push(est.chegam + ' ' + palavraPlural(est.chegam, 'livro chega', 'livros chegam') + ' com a próxima versão (arquivo diferente)');
     if (est.invalidos) partes.push(est.invalidos + ' ' + palavraPlural(est.invalidos, 'livro não pôde ser conferido', 'livros não puderam ser conferidos'));
     if (est.faltaram) {
       partes.push(est.faltaram + ' ' + palavraPlural(est.faltaram, 'livro ficou', 'livros ficaram') + ' para o próximo toque' +
