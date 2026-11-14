@@ -481,6 +481,8 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   const coresAntes = await coresDaGrade(pag);
   // a cor de hoje (pela posição em ordem de título) fica com os livros que ela já tem
   conf('os livros que já estavam no tablet ficam com a cor de sempre', coresAntes['local-l'] + '|' + coresAntes['local-m'], 'var(--capa-alfa)|var(--capa-beta)');
+  // olhar a Biblioteca não grava nada: o mapa das cores só é gravado quando um livro vai entrar
+  conf('só olhar a Estante não grava o mapa das cores', await pag.evaluate(() => localStorage.getItem('apoio-educacional:cores-das-capas')), null);
   const r1 = await pag.evaluate((m, b64) => Store.gravarLivroDaNuvem({ meta: m, blob: new Blob([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], { type: 'application/pdf' }),
     sha256: m.hash.slice(7), metaHash: 'f'.repeat(64), metaVersao: 1 }).then(r => JSON.stringify(r)).then(r => Store.lerLivro(m.id).then(l => r + '|' + !!l)),
   meta('nuvem-dup'), ARQ['nuvem-dup'].toString('base64'));
@@ -552,6 +554,9 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   conf('a cor dos livros que já estavam no tablet não mudou com a chegada do outro', coresDepois['local-l'] + '|' + coresDepois['local-m'],
     coresAntes['local-l'] + '|' + coresAntes['local-m']);
   conf('o livro baixado ficou com a cor que o cartão "Na nuvem" mostrava', coresDepois['nuvem-a'], coresAntes['nuvem-a']);
+  conf('a baixa gravou o mapa das cores antes de o livro entrar: os do tablet com a cor que tinham, o que chegou com a do cartão',
+    await pag.evaluate(() => { const m = JSON.parse(localStorage.getItem('apoio-educacional:cores-das-capas') || '{}'); return [m['local-l'], m['local-m'], typeof m['nuvem-a']].join('|'); }),
+    '0|1|number');
   conf('e no mesmo lugar: nenhum livro andou na Estante', await ordemDaGrade(pag),
     'livro:nuvem-a,nuvem:nuvem-b,nuvem:nuvem-c,nuvem:nuvem-falso,livro:local-l,livro:local-m,nuvem:nuvem-grande');
 

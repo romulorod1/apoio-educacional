@@ -17519,7 +17519,10 @@
       return Store.tornarPersistente();
     }).then(function () {
       andamento(['Gravando os livros no tablet...']);
-      return Store.gravarLivros(aberto, aberto.idsDoPacote);
+      // a cor de cada livro fica fixa antes de a lista mudar: os que já estão não trocam de cor
+      return fixarCoresAntesDeEntrar(aberto.livros.map(function (l) { return l.meta.id; })).then(function () {
+        return Store.gravarLivros(aberto, aberto.idsDoPacote);
+      });
     }).then(function (contas) {
       var linhas = ['Livros importados.'].concat(Biblioteca.resumoDeLivros(contas),
         ['Para ler, abra a aba Biblioteca e toque no livro.']);
@@ -17868,9 +17871,7 @@
         avisar('Este livro já está no tablet, com outro nome: ' + r.mesmoArquivo.titulo + '.');
         return Promise.resolve(desenharLivrosDaBiblioteca()).then(function () { return soltar(false); }, function () { return soltar(false); });
       }
-      // a cor que o cartão "Na nuvem" mostrava fica sendo a do livro
-      var mapa = lerMapaDasCores();
-      if (mapa && typeof mapa[id] !== 'number') { mapa[id] = CORES_DAS_CAPAS.indexOf(corDaCapaDe(id)); guardarMapaDasCores(); }
+
       avisar(tituloDoLivro(e.meta) + ' está no tablet. Toque nele para abrir.');
       return Promise.resolve(desenharLivrosAjustes()).catch(function () { /* a lista de Ajustes se refaz ao abrir */ })
         .then(function () { atualizarResumoInstaladosBiblioteca(); return desenharLivrosDaBiblioteca(); })
@@ -17908,7 +17909,10 @@
     var tipo = e.formato === 'epub' ? 'application/epub+zip' : 'application/pdf';
     // o Blob que veio da nuvem vai como está (fatiar com outro tipo não copia os bytes)
     var blob = arquivo instanceof Blob ? (arquivo.type === tipo ? arquivo : arquivo.slice(0, arquivo.size, tipo)) : new Blob([arquivo], { type: tipo });
-    return Store.gravarLivroDaNuvem({ meta: e.meta, blob: blob, sha256: e.sha256, metaHash: e.metaHash, metaVersao: e.metaVersao });
+    // a cor de cada livro fica fixa antes de a lista mudar (a do que chega é a do cartão "Na nuvem")
+    return fixarCoresAntesDeEntrar([e.meta.id]).then(function () {
+      return Store.gravarLivroDaNuvem({ meta: e.meta, blob: blob, sha256: e.sha256, metaHash: e.metaHash, metaVersao: e.metaVersao });
+    });
   }
   function motivoDaFalhaDaBaixa(err) {
     var c = err && err.codigo;
@@ -19744,10 +19748,14 @@
    * nuvem da biblioteca): ela reconhece o livro pela capa. Até aqui a cor vinha
    * da posição em ordem de título, e todo livro novo trocava a cor dos que
    * vinham depois dele. Agora cada livro guarda a cor que tem (neste
-   * aparelho, CHAVE_CORES_DAS_CAPAS): na primeira vez, os que já estão no
-   * tablet ficam com a cor de hoje (a da posição); o livro que chega depois
-   * ganha a cor pelo id (corPeloId), a mesma que o cartão "Na nuvem" já
-   * mostrava. Sem o localStorage, o mapa vive só na memória da abertura. */
+   * aparelho, CHAVE_CORES_DAS_CAPAS), e o mapa só é GRAVADO quando a lista de
+   * livros vai mudar: logo ANTES de um livro entrar (fixarCoresAntesDeEntrar,
+   * chamado pela importação do pacote e pela baixa da nuvem), os que já estão
+   * no tablet ficam com a cor que têm (a da posição, para quem ainda não está
+   * no mapa), e o que chega ganha a cor pelo id (corPeloId), a mesma que o
+   * cartão "Na nuvem" já mostrava. Olhar a Biblioteca não grava nada: o
+   * desenho calcula na memória (o mapa para quem está nele, a posição para
+   * quem não está). Sem o localStorage, o mapa vive só na memória. */
   var CHAVE_CORES_DAS_CAPAS = 'apoio-educacional:cores-das-capas';
   var mapaDasCores = null;
   function corPeloId(id) {
@@ -19764,22 +19772,32 @@
   function guardarMapaDasCores() {
     try { localStorage.setItem(CHAVE_CORES_DAS_CAPAS, JSON.stringify(mapaDasCores)); } catch (e) { /* fica na memória até fechar */ }
   }
-  // a cor de cada livro do tablet (a lista em ordem de título, a do Store): { id: uma das CORES_DAS_CAPAS }
+  // o número da cor de um livro: o do mapa, ou o da posição dele na lista (a regra de antes)
+  function numeroDaCor(mapa, id, i) {
+    return mapa && typeof mapa[id] === 'number' && CORES_DAS_CAPAS[mapa[id]] ? mapa[id] : i % CORES_DAS_CAPAS.length;
+  }
+  // a cor de cada livro do tablet (a lista em ordem de título, a do Store): { id: uma das CORES_DAS_CAPAS }. Não grava.
   function coresDasCapas(lista) {
-    var mapa = lerMapaDasCores(), mudou = false;
-    if (!mapa) {
-      // a primeira vez: a cor de hoje, pela posição, para nenhum livro que ela já conhece mudar de cor
-      mapa = mapaDasCores = {};
-      lista.forEach(function (l, i) { mapa[l.id] = i % CORES_DAS_CAPAS.length; });
-      mudou = true;
-    }
+    var mapa = lerMapaDasCores();
     var cores = {};
-    lista.forEach(function (l) {
-      if (typeof mapa[l.id] !== 'number' || !CORES_DAS_CAPAS[mapa[l.id]]) { mapa[l.id] = corPeloId(l.id); mudou = true; }
-      cores[l.id] = CORES_DAS_CAPAS[mapa[l.id]];
-    });
-    if (mudou) guardarMapaDasCores();
+    lista.forEach(function (l, i) { cores[l.id] = CORES_DAS_CAPAS[numeroDaCor(mapa, l.id, i)]; });
     return cores;
+  }
+  /* Logo ANTES de livros entrarem no tablet (os ids que chegam): os que já
+   * estão ficam com a cor que têm hoje, e os que chegam, sem cor no mapa,
+   * ganham a do id. É a única gravação do mapa. */
+  function fixarCoresAntesDeEntrar(idsQueChegam) {
+    return Store.listarLivros().then(function (lista) {
+      var mapa = lerMapaDasCores() || {};
+      var novo = {};
+      Object.keys(mapa).forEach(function (k) { novo[k] = mapa[k]; });
+      lista.forEach(function (l, i) { novo[l.id] = numeroDaCor(mapa, l.id, i); });
+      (idsQueChegam || []).forEach(function (id) {
+        if (typeof novo[id] !== 'number' || !CORES_DAS_CAPAS[novo[id]]) novo[id] = corPeloId(id);
+      });
+      mapaDasCores = novo;
+      guardarMapaDasCores();
+    }, function () { /* sem a lista, as cores ficam como estão */ });
   }
   // a cor de um livro que ainda não está no tablet: a que ele terá quando chegar
   function corDaCapaDe(id) {
