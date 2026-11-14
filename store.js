@@ -2898,8 +2898,10 @@
    * Nunca troca o que já está: o livro de mesmo id que entrou enquanto baixava
    * (por um pacote, ou por outra aba) fica, e a resposta diz `jaEstava`. A
    * posição de leitura que ficou de quando o livro saiu do tablet volta pela
-   * mesma regra da troca de arquivo (posicaoNoArquivoNovo).
-   * Devolve { entrou, jaEstava, bytes }. */
+   * mesma regra da troca de arquivo (posicaoNoArquivoNovo). O MESMO ARQUIVO
+   * (o mesmo sha256) com outro id também é recusado: o livro já está aqui, e
+   * a resposta diz qual em `mesmoArquivo` ({ id, titulo }).
+   * Devolve { entrou, jaEstava, mesmoArquivo, bytes }. */
   function gravarLivroDaNuvem(item) {
     var meta = item && item.meta;
     if (!meta || typeof meta.id !== 'string' || !item.blob || typeof item.sha256 !== 'string' ||
@@ -2911,10 +2913,27 @@
       return new Promise(function (resolve, reject) {
         var t = transacao(b, ['livros', 'livros_posicoes'], 'readwrite');
         var dep = t.objectStore('livros');
-        var r = { entrou: false, jaEstava: false, bytes: item.blob.size };
+        var r = { entrou: false, jaEstava: false, mesmoArquivo: null, bytes: item.blob.size };
+        var falha = null;
         var req = dep.get(meta.id);
         req.onsuccess = function () {
           if (req.result) { r.jaEstava = true; return; }
+          // o mesmo arquivo com outro id: um cursor pelos registros (o Blob do IndexedDB é só uma referência)
+          var cur = dep.openCursor();
+          cur.onsuccess = function () {
+            var c = cur.result;
+            if (c) {
+              if (c.value && c.value.meta && c.value.meta.hash === meta.hash) {
+                r.mesmoArquivo = { id: c.value.id, titulo: String(c.value.meta.titulo || c.value.id) };
+                return;
+              }
+              c.continue();
+              return;
+            }
+            guardar();
+          };
+        };
+        function guardar() {
           var ps = t.objectStore('livros_posicoes');
           var rv = ps.get(meta.id);
           rv.onsuccess = function () {
@@ -2923,12 +2942,21 @@
             var voltou = posicaoNoArquivoNovo(velha, null, meta);
             if (voltou) ps.put(voltou);
           };
-          dep.put({ id: meta.id, pacote: 'nuvem', versao: item.metaVersao || 1, meta: meta, blob: item.blob,
-            bytes: item.blob.size, importadoEm: agora, nuvem: { metaHash: item.metaHash || null, metaVersao: item.metaVersao || 1 } });
-          r.entrou = true;
-        };
+          /* a falta de espaço chega como a transação abortada (t.error), ou, em
+           * alguns navegadores, como a exceção do próprio put: as duas saem com o
+           * nome dela (QuotaExceededError), e nada fica gravado */
+          try {
+            dep.put({ id: meta.id, pacote: 'nuvem', versao: item.metaVersao || 1, meta: meta, blob: item.blob,
+              bytes: item.blob.size, importadoEm: agora, nuvem: { metaHash: item.metaHash || null, metaVersao: item.metaVersao || 1 } });
+            r.entrou = true;
+          } catch (e) {
+            falha = e;
+            r.entrou = false;
+            try { t.abort(); } catch (e2) { /* já abortou */ }
+          }
+        }
         t.oncomplete = function () { resolve(r); };
-        t.onabort = function () { reject(t.error || new Error('A gravação foi interrompida.')); };
+        t.onabort = function () { reject(falha || t.error || new Error('A gravação foi interrompida.')); };
       });
     });
   }

@@ -16,24 +16,36 @@
  * O que se prova:
  *   1. a Estante mostra os livros da nuvem que não estão no tablet ("Na
  *      nuvem · toque para baixar"), ao lado do livro do tablet; o que não tem
- *      arquivo na nuvem, o retirado e o que já está no tablet não aparecem; e
- *      mostrar não baixa nada;
+ *      arquivo na nuvem, o retirado e o que já está no tablet (pelo id ou pelo
+ *      sha256, com outro id) não aparecem; mostrar não baixa nada; os da nuvem
+ *      ficam entre os do tablet, em ordem de título; e o Store recusa o mesmo
+ *      arquivo com outro id;
  *   2. o sha256 errado é recusado: o cartão diz, e nenhum livro é guardado;
  *   3. a baixa interrompida no meio não guarda nada, e o toque seguinte baixa,
  *      com o andamento à vista (entre 0 e 100%), confere e guarda: o livro
  *      vira um livro do tablet (pacote 'nuvem', o Blob inteiro, o sha256 do
- *      catálogo) e abre no leitor;
+ *      catálogo) e abre no leitor; a cor e o lugar de cada livro não mudam com
+ *      a chegada dele (a cor é do livro, e os que já estavam ficam com a de hoje);
+ *  3b. o corpo que fecha limpo, mas curto (INCOMPLETO), e o maior que o
+ *      catálogo (TAMANHO_DIFERENTE) não viram livro;
  *   4. dois toques seguidos começam UMA baixa; o toque noutro livro enquanto
  *      um baixa não começa outra, e avisa;
  *   5. sem internet, o cartão diz que não baixa agora, e o toque não pede nada
  *      à rede; a internet volta e ele volta a dizer "toque para baixar";
- *   6. sem espaço no tablet (o estimate), avisa quanto falta e não baixa;
+ *   6. sem espaço no tablet (o estimate), avisa quanto falta e não baixa; 6b. a
+ *      cota que acaba na gravação (QuotaExceededError) dá o mesmo aviso, e nada
+ *      fica guardado;
  *   7. o observador (D7) não vê livro da nuvem nenhum;
  *   8. o getDownloadURL nunca entra: nenhuma das fontes do aplicativo o cita
  *      (nem o token de download), e todo pedido da página ao Storage foi um
  *      GET ?alt=media com "Authorization: Firebase <idToken>", sem token na
  *      URL e sem ler os metadados do objeto;
- *   9. nenhum erro de página.
+ *   9. a conta troca no meio da conferência (ela sai e entra com outra): a lista
+ *      da primeira nunca fica guardada para a segunda, que não vê nada dela;
+ *  10. o observador de verdade (a marca de celular com a conta de outra
+ *      pessoa) e 11. o celular da dona, pela tela do celular: nenhum cartão da
+ *      nuvem e nenhuma leitura do catálogo;
+ *  12. nenhum erro de página.
  *
  * Venenos (a prova TEM de ver o defeito e passa dizendo que viu):
  *   --envenenado-sem-hash        a conferência do sha256 é pulada: o arquivo
@@ -41,7 +53,13 @@
  *   --envenenado-guarda-parcial  guarda antes de conferir: o arquivo errado
  *                                fica guardado mesmo recusado (2 vê);
  *   --envenenado-baixa-dois      sem a guarda do toque repetido: dois toques
- *                                começam duas baixas (4 vê).
+ *                                começam duas baixas (4 vê);
+ *   --envenenado-aceita-curto    o nuvem.js entrega o corpo que fechou curto
+ *                                (3b vê);
+ *   --envenenado-cor-pela-posicao  a cor da capa volta a ser a da posição: o
+ *                                livro que já estava muda de cor (3 vê);
+ *   --envenenado-grava-na-conta-nova  a lista da conta de antes é guardada
+ *                                para a conta que entrou no meio (9 vê).
  *
  * Precisa do firebase-tools (FIREBASE_TOOLS) e de um JDK 21 em JAVA_HOME,
  * como o testa_storage_regras.js. Portas: 9071 (app), 9072 (auth), 9073
@@ -75,19 +93,30 @@ const CFG = { auth: AUTH, firestore: FS, projectId: PROJETO, storage: REPASSE, b
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 const NUVEM = fs.readFileSync(path.join(H.RAIZ, 'nuvem.js'), 'utf8').replace(/\r\n/g, '\n');
 const STORE = fs.readFileSync(path.join(H.RAIZ, 'store.js'), 'utf8').replace(/\r\n/g, '\n');
-const FONTES = { app: ['/app.js', APP] };
+const FONTES = { app: ['/app.js', APP], nuvem: ['/nuvem.js', NUVEM] };
+// cada veneno: uma ou mais trocas [fonte, trecho, troca]
 const VENENOS = {
-  '--envenenado-sem-hash': ['app', 'if (h !== e.sha256) throw', 'if (false) throw'],
-  '--envenenado-guarda-parcial': ['app', 'return conferirLivroBaixado(bytes, e).then(function () { return guardarLivroBaixado(bytes, e); });',
-    'return guardarLivroBaixado(bytes, e).then(function () { return conferirLivroBaixado(bytes, e); });'],
-  '--envenenado-baixa-dois': ['app', '    if (baixaDaNuvem) return outraBaixaEmCurso(id);\n', '']
+  '--envenenado-sem-hash': [['app', 'if (h !== e.sha256) throw', 'if (false) throw']],
+  '--envenenado-guarda-parcial': [['app', 'return conferirLivroBaixado(bytes, e).then(function () { return guardarLivroBaixado(bytes, e); });',
+    'return guardarLivroBaixado(bytes, e).then(function () { return conferirLivroBaixado(bytes, e); });']],
+  '--envenenado-baixa-dois': [['app', '    if (baixaDaNuvem) return outraBaixaEmCurso(id);\n', '']],
+  // o corpo que fecha limpo, mas curto, passa pela conta do tamanho
+  '--envenenado-aceita-curto': [['nuvem', "            if (recebidos !== total) throw erroDaBaixa('INCOMPLETO', 'O livro não chegou inteiro.');\n", '']],
+  // a cor da capa volta a ser a da posição na lista
+  '--envenenado-cor-pela-posicao': [['app', 'cor: cores[l.id] };', 'cor: CORES_DAS_CAPAS[i % CORES_DAS_CAPAS.length] };']],
+  // a lista da conta de antes é guardada (e mostrada) na conta que entrou no meio da conferência
+  '--envenenado-grava-na-conta-nova': [['app', '      if (!mesmaConta()) return false;\n', ''],
+    ['nuvem', "if (!sessao || !sessao.uid || typeof uid !== 'string' || !uid || uid !== sessao.uid) return Promise.resolve(null);\n    return gravarEstado('livrosNaNuvem', Object.assign({}, v, { uid: uid }));",
+      "if (!sessao || !sessao.uid) return Promise.resolve(null);\n    return gravarEstado('livrosNaNuvem', Object.assign({}, v, { uid: sessao.uid }));"]]
 };
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && !VENENOS[a]);
 const trocas = {};
 if (MODO) {
-  const [qual, de, para] = VENENOS[MODO];
-  trocas[FONTES[qual][0]] = FONTES[qual][1].split(de).join(para);
+  for (const [qual, de, para] of VENENOS[MODO]) {
+    const atual = trocas[FONTES[qual][0]] || FONTES[qual][1];
+    trocas[FONTES[qual][0]] = atual.split(de).join(para);
+  }
 }
 const amb = H.criarAmbiente(PORTA_APP, 'nath_nuvem_baixar', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'nuvem_baixar_'));
@@ -129,6 +158,7 @@ const ARQ = {
   'nuvem-c': pdfMinimo(4, 'Livro C', 20000),
   'nuvem-falso': pdfMinimo(4, 'Livro falso', 20000),
   'local-l': pdfMinimo(4, 'Livro local', 0),
+  'local-m': pdfMinimo(4, 'Outro livro local', 0),
   'sem-arquivo': pdfMinimo(3, 'Sem arquivo', 0),
   'retirado-r': pdfMinimo(3, 'Retirado', 0)
 };
@@ -136,8 +166,12 @@ const ARQ = {
 const SHA = {};
 Object.keys(ARQ).forEach(id => { SHA[id] = hex(ARQ[id]); });
 SHA['nuvem-falso'] = hex(Buffer.from('outro conteúdo, que não é o do arquivo'));
+// o MESMO arquivo do livro local-l, publicado com outro id: já está no tablet, não aparece "na nuvem"
+ARQ['nuvem-dup'] = ARQ['local-l'];
+SHA['nuvem-dup'] = SHA['local-l'];
 const TITULOS = { 'nuvem-a': 'Álgebra na nuvem', 'nuvem-b': 'Bloco de geometria', 'nuvem-c': 'Caderno de frações',
-  'nuvem-falso': 'Dicionário trocado', 'local-l': 'Estatística do tablet', 'sem-arquivo': 'Sem arquivo na nuvem', 'retirado-r': 'Retirado do catálogo' };
+  'nuvem-falso': 'Dicionário trocado', 'local-l': 'Estatística do tablet', 'local-m': 'Frações do tablet',
+  'nuvem-dup': 'Mesmo arquivo com outro nome', 'sem-arquivo': 'Sem arquivo na nuvem', 'retirado-r': 'Retirado do catálogo' };
 function meta(id) {
   return { id, formato: 'pdf', arquivo: 'livros/' + id + '.pdf', hash: 'sha256:' + SHA[id], bytes: ARQ[id].length,
     titulo: TITULOS[id], materia: 'matematica', materia_nome: 'Matemática', segmento: 'Fundamental II', series: ['08'],
@@ -198,7 +232,8 @@ function derrubarEmulador() {
 }
 
 /* ---------- o repasse do Storage: conta, corta e segura ---------- */
-const repasse = { pedidos: [], cortarApos: null, lento: 0 };
+// cortarApos: derruba a conexão; encurtar: fecha LIMPO depois de n bytes (o tamanho diz n); alongar: manda n bytes a mais
+const repasse = { pedidos: [], cortarApos: null, lento: 0, encurtar: null, alongar: null };
 const servidorRepasse = http.createServer((req, res) => {
   if (req.method !== 'OPTIONS') repasse.pedidos.push({ metodo: req.method, url: req.url, autor: req.headers.authorization || '', quando: Date.now() });
   const cab = Object.assign({}, req.headers, { host: '127.0.0.1:' + PORTA_ST });
@@ -211,7 +246,9 @@ const servidorRepasse = http.createServer((req, res) => {
     const partes = [];
     volta.on('data', p => partes.push(p));
     volta.on('end', async () => {
-      const corpo = Buffer.concat(partes);
+      let corpo = Buffer.concat(partes);
+      if (repasse.encurtar !== null) corpo = corpo.subarray(0, repasse.encurtar);
+      if (repasse.alongar !== null) corpo = Buffer.concat([corpo, Buffer.alloc(repasse.alongar, 0x25)]);
       const cabV = Object.assign({}, volta.headers, { 'content-length': String(corpo.length) });
       delete cabV['transfer-encoding'];
       res.writeHead(200, cabV);
@@ -259,6 +296,7 @@ async function semearNuvem(uid) {
   const indice = { versao: 1, publicadoEm: '2026-11-14T10:00:00-03:00', livros: {} };
   const status = [];
   for (const id of Object.keys(ARQ)) {
+    if (id === 'local-m') continue;   // só no tablet
     const m = meta(id);
     const texto = JSON.stringify(m);
     const metaHash = hex(Buffer.from(texto, 'utf8'));
@@ -274,19 +312,21 @@ async function semearNuvem(uid) {
 }
 
 /* ---------- a página ---------- */
-async function prepararPagina(pag) {
-  await pag.evaluateOnNewDocument(() => {
-    Object.defineProperty(Screen.prototype, 'width', { configurable: true, get: () => 1280 });
-    Object.defineProperty(Screen.prototype, 'height', { configurable: true, get: () => 800 });
-  });
+async function prepararPagina(pag, tela) {
+  await pag.evaluateOnNewDocument(t => {
+    Object.defineProperty(Screen.prototype, 'width', { configurable: true, get: () => t[0] });
+    Object.defineProperty(Screen.prototype, 'height', { configurable: true, get: () => t[1] });
+  }, tela || [1280, 800]);
   await pag.evaluateOnNewDocument(cfg => { window.NUVEM_EMULADOR = cfg; }, CFG);
   // cada fetch da página que vai ao Storage (o repasse), e quem chamou um getDownloadURL, se alguém chamasse
   await pag.evaluateOnNewDocument(porta => {
     window.__pedidosStorage = [];
+    window.__pedidosCatalogo = [];
     const f0 = window.fetch;
     window.fetch = function (url, op) {
       const u = String(url && url.url || url);
       if (u.indexOf(':' + porta + '/') !== -1 || u.indexOf('firebasestorage') !== -1) window.__pedidosStorage.push(u);
+      if (/\/catalogo(\/|$|\?)/.test(u)) window.__pedidosCatalogo.push(u);
       return f0.apply(this, arguments);
     };
     window.getDownloadURL = function () { window.__chamouGetDownloadURL = true; throw new Error('getDownloadURL não pode ser chamado'); };
@@ -312,6 +352,18 @@ async function abrirEstante(pag) {
   if (!(await existe(pag, '.bibl-painel-estante'))) await clicar(pag, '#bib-abrir-estante');
   return esperar('a Estante está à vista', () => existe(pag, '.bibl-painel-estante .bibl-grade'), v => v === true, 10000);
 }
+// a ordem da grade da Estante: livro:<id> do tablet, nuvem:<id> da nuvem
+const ordemDaGrade = pag => pag.evaluate(() => Array.from(document.querySelectorAll('.bibl-painel-estante .bibl-grade > [data-livro], .bibl-painel-estante .bibl-grade > [data-nuvem]'))
+  .map(c => c.dataset.livro ? 'livro:' + c.dataset.livro : 'nuvem:' + c.dataset.nuvem).join(','));
+// a cor da capa de cada livro da grade, como a tela a pinta (--capa)
+const coresDaGrade = pag => pag.evaluate(() => {
+  const r = {};
+  document.querySelectorAll('.bibl-painel-estante .bibl-grade > [data-livro], .bibl-painel-estante .bibl-grade > [data-nuvem]').forEach(c => {
+    const capa = c.querySelector('.bibl-capa');
+    r[c.dataset.livro || c.dataset.nuvem] = capa ? capa.style.getPropertyValue('--capa') : '';
+  });
+  return r;
+});
 const cartoesDaNuvem = pag => pag.evaluate(() => Array.from(document.querySelectorAll('[data-nuvem]')).map(c => c.dataset.nuvem).join(','));
 const estadoDoCartao = (pag, id) => pag.evaluate(i => {
   const c = document.querySelector('[data-nuvem="' + i + '"] [data-nuvem-estado]');
@@ -334,8 +386,7 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   secao('0. A prova se confere');
   conf('nenhum veneno desconhecido foi pedido', desconhecidos.join(','), '');
   for (const m of Object.keys(VENENOS)) {
-    const [qual, de] = VENENOS[m];
-    conf('a âncora de ' + m + ' aparece uma vez só', FONTES[qual][1].split(de).length - 1, 1);
+    for (const [qual, de] of VENENOS[m]) conf('a âncora de ' + m + ' (' + qual + ') aparece uma vez só', FONTES[qual][1].split(de).length - 1, 1);
   }
   // o getDownloadURL (e o token de download que ele cria) não aparece em fonte nenhuma do aplicativo
   // (no código, sem os comentários: o comentário do nuvem.js explica por que ele não é usado)
@@ -365,15 +416,25 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   await prepararPagina(pag);
   await pag.setViewport({ width: 1280, height: 800 });
   await H.abrirApp(pag, amb.ORIGEM);
-  // o tablet sintético: um livro importado (também está no catálogo, com arquivo na nuvem)
-  const gravados = await pag.evaluate(async (m, b64) => {
-    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-    const c = await Store.gravarLivros({ manifest: { pacote: 'livros-prova', versao: 1 }, livros: [{ meta: m, blob: new Blob([bytes], { type: 'application/pdf' }) }] });
+  // o tablet sintético: dois livros importados (o local-l também está no catálogo, e com outro id, o nuvem-dup)
+  const gravados = await pag.evaluate(async (ms, b64s) => {
+    const livros = ms.map((m, i) => ({ meta: m, blob: new Blob([Uint8Array.from(atob(b64s[i]), c => c.charCodeAt(0))], { type: 'application/pdf' }) }));
+    const c = await Store.gravarLivros({ manifest: { pacote: 'livros-prova', versao: 1 }, livros });
     return c.novos;
-  }, meta('local-l'), ARQ['local-l'].toString('base64'));
-  conf('o tablet sintético tem o livro importado', gravados, 1);
+  }, [meta('local-l'), meta('local-m')], [ARQ['local-l'].toString('base64'), ARQ['local-m'].toString('base64')]);
+  conf('o tablet sintético tem os dois livros importados', gravados, 2);
   await H.abrirApp(pag, amb.ORIGEM);
   conf('entrou na nuvem com a conta de teste da dona', await entrar(pag, 'dona@exemplo.test', 'senha-da-dona-1'), true);
+  // o motivo de cada baixa que não deu certo, como o nuvem.js o diz (e.codigo)
+  const anotarCodigos = () => pag.evaluate(() => {
+    window.__codigos = [];
+    const b0 = Nuvem.baixarLivroDaNuvem;
+    Nuvem.baixarLivroDaNuvem = function () {
+      return b0.apply(this, arguments).then(v => { window.__codigos.push('ENTREGUE'); return v; },
+        e => { window.__codigos.push(e && e.codigo); throw e; });
+    };
+  });
+  await anotarCodigos();
 
   secao('1. A Estante mostra os livros da nuvem');
   await abrirEstante(pag);
@@ -386,8 +447,19 @@ const paginaDesenhada = pag => pag.evaluate(() => {
     'Baixar Álgebra na nuvem da nuvem para o tablet');
   conf('a capa do livro da nuvem é a clara', await pag.evaluate(() => !!document.querySelector('[data-nuvem="nuvem-a"] .bibl-capa.na-nuvem')), true);
   conf('a contagem da seção diz quantos estão na nuvem', await pag.evaluate(() => (document.querySelector('#bib-livros-contagem') || {}).textContent || ''),
-    '1 material, 1 disciplina · 4 livros na nuvem');
+    '2 materiais, 1 disciplina · 4 livros na nuvem');
   conf('mostrar não baixou nada do Storage', repasse.pedidos.length, 0);
+  conf('o livro do catálogo com o MESMO arquivo de um livro do tablet (outro id) não aparece', await existe(pag, '[data-nuvem="nuvem-dup"]'), false);
+  conf('os da nuvem ficam entre os do tablet, em ordem de título', await ordemDaGrade(pag),
+    'nuvem:nuvem-a,nuvem:nuvem-b,nuvem:nuvem-c,nuvem:nuvem-falso,livro:local-l,livro:local-m');
+  const coresAntes = await coresDaGrade(pag);
+  // a cor de hoje (pela posição em ordem de título) fica com os livros que ela já tem
+  conf('os livros que já estavam no tablet ficam com a cor de sempre', coresAntes['local-l'] + '|' + coresAntes['local-m'], 'var(--capa-alfa)|var(--capa-beta)');
+  const r1 = await pag.evaluate((m, b64) => Store.gravarLivroDaNuvem({ meta: m, blob: new Blob([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], { type: 'application/pdf' }),
+    sha256: m.hash.slice(7), metaHash: 'f'.repeat(64), metaVersao: 1 }).then(r => JSON.stringify(r)).then(r => Store.lerLivro(m.id).then(l => r + '|' + !!l)),
+  meta('nuvem-dup'), ARQ['nuvem-dup'].toString('base64'));
+  conf('o Store recusa o mesmo arquivo com outro id, e diz qual livro já o tem', r1,
+    JSON.stringify({ entrou: false, jaEstava: false, mesmoArquivo: { id: 'local-l', titulo: 'Estatística do tablet' }, bytes: ARQ['local-l'].length }) + '|false');
 
   secao('2. O sha256 errado é recusado, e nada é guardado');
   await clicar(pag, '[data-nuvem="nuvem-falso"]');
@@ -409,7 +481,7 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   const caiu = await esperar('a baixa interrompida terminou', () => estadoDoCartao(pag, 'nuvem-a'), v => /^(rede|outro|conferencia)\|/.test(v), 20000);
   conf('o cartão diz que a internet caiu no meio, e que o toque tenta de novo', caiu.valor, 'rede|A internet caiu no meio. Toque para tentar de novo.');
   conf('a metade não virou livro', await livroGuardado(pag, 'nuvem-a'), null);
-  conf('nenhum registro novo em livros (só o do tablet)', await pag.evaluate(() => Store.listarLivros().then(l => l.map(x => x.id).join(','))), 'local-l');
+  conf('nenhum registro novo em livros (só os do tablet)', await pag.evaluate(() => Store.listarLivros().then(l => l.map(x => x.id).join(','))), 'local-l,local-m');
   repasse.cortarApos = null;
   repasse.lento = 60;
   // o andamento, anotado a cada mudança da própria tela (um observador do DOM: nenhum passo escapa)
@@ -445,6 +517,39 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   conf('o livro baixado abre no leitor, como um importado', abriu.valor, '1');
   await pag.evaluate(() => { const b = document.querySelector('#modal-leitor-pdf .modal-rodape [data-fechar]') || document.querySelector('#modal-leitor-pdf [data-fechar]'); if (b) b.click(); });
   await esperar('o leitor fechou', () => paginaDesenhada(pag), v => v === 'fechado', 5000);
+  await abrirEstante(pag);
+  const coresDepois = await coresDaGrade(pag);
+  if (MODO === '--envenenado-cor-pela-posicao') {
+    conf('VENENO visto: o livro que já estava no tablet mudou de cor quando outro chegou', coresDepois['local-l'] !== coresAntes['local-l'], true);
+    return fim();
+  }
+  conf('a cor dos livros que já estavam no tablet não mudou com a chegada do outro', coresDepois['local-l'] + '|' + coresDepois['local-m'],
+    coresAntes['local-l'] + '|' + coresAntes['local-m']);
+  conf('o livro baixado ficou com a cor que o cartão "Na nuvem" mostrava', coresDepois['nuvem-a'], coresAntes['nuvem-a']);
+  conf('e no mesmo lugar: nenhum livro andou na Estante', await ordemDaGrade(pag),
+    'livro:nuvem-a,nuvem:nuvem-b,nuvem:nuvem-c,nuvem:nuvem-falso,livro:local-l,livro:local-m');
+
+  secao('3b. O corpo curto e o corpo longo não viram livro');
+  await pag.evaluate(() => { window.__codigos = []; });
+  repasse.encurtar = 8000;
+  await clicar(pag, '[data-nuvem="nuvem-falso"]');
+  await esperar('a baixa curta terminou', () => pag.evaluate(() => window.__codigos.length), v => v === 1, 20000);
+  repasse.encurtar = null;
+  const curto = await pag.evaluate(() => window.__codigos[0]);
+  if (MODO === '--envenenado-aceita-curto') {
+    conf('VENENO visto: o nuvem.js entregou o corpo que fechou curto (só a conferência do sha256 o parou)', curto, 'ENTREGUE');
+    return fim();
+  }
+  conf('o corpo que fecha limpo, mas curto, é recusado pelo tamanho (INCOMPLETO)', curto, 'INCOMPLETO');
+  conf('e o cartão diz que a internet caiu, sem guardar nada', await estadoDoCartao(pag, 'nuvem-falso') + '|' + await livroGuardado(pag, 'nuvem-falso'),
+    'rede|A internet caiu no meio. Toque para tentar de novo.|null');
+  repasse.alongar = 1000;
+  await clicar(pag, '[data-nuvem="nuvem-falso"]');
+  await esperar('a baixa longa terminou', () => pag.evaluate(() => window.__codigos.length), v => v === 2, 20000);
+  repasse.alongar = null;
+  conf('o corpo maior que o catálogo é recusado no meio (TAMANHO_DIFERENTE)', await pag.evaluate(() => window.__codigos[1]), 'TAMANHO_DIFERENTE');
+  conf('e o cartão diz que o arquivo veio diferente, sem guardar nada', await estadoDoCartao(pag, 'nuvem-falso') + '|' + await livroGuardado(pag, 'nuvem-falso'),
+    'conferencia|O arquivo veio diferente do catálogo e não foi guardado. Toque para tentar de novo.|null');
 
   secao('4. Dois toques seguidos começam uma baixa só; outro livro espera');
   await abrirEstante(pag);
@@ -491,6 +596,22 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   conf('sem espaço, nada é pedido à rede nem guardado', await pedidosDe(pag, 'nuvem-c') + '|' + await livroGuardado(pag, 'nuvem-c'), '0|null');
   await pag.evaluate(() => { Store.estimarEspaco = window.__estimar0; });
 
+  secao('6b. A cota do IndexedDB acaba na gravação: o mesmo aviso, e nada guardado');
+  await limparAviso(pag);
+  await pag.evaluate(() => {
+    window.__put0 = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (v) {
+      if (this.name === 'livros' && v && v.id === 'nuvem-c') throw new DOMException('A cota acabou.', 'QuotaExceededError');
+      return window.__put0.apply(this, arguments);
+    };
+  });
+  await clicar(pag, '[data-nuvem="nuvem-c"]');
+  const cota = await esperar('o cartão diz da cota', () => estadoDoCartao(pag, 'nuvem-c'), v => /^sem-espaco\|/.test(v), 20000);
+  await pag.evaluate(() => { IDBObjectStore.prototype.put = window.__put0; });
+  conf('a cota que acaba na gravação diz que falta espaço', cota.valor, 'sem-espaco|Falta espaço no tablet para este livro.');
+  conf('o aviso diz o que fazer', /^O tablet está sem espaço para este livro: .+ Libere espaço no tablet/.test(await textoDoAviso(pag)), true);
+  conf('e nada foi guardado', await livroGuardado(pag, 'nuvem-c'), null);
+
   secao('7. O observador não vê livro da nuvem');
   await pag.evaluate(() => {
     window.__estado0 = Nuvem.estado;
@@ -510,13 +631,84 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   conf('todo pedido ao Storage foi um GET ?alt=media com Authorization: Firebase <idToken>, sem token na URL', fora.map(p => p.metodo + ' ' + p.url).join(' ; '), '');
   conf('nenhum pedido leu os metadados do objeto (onde mora o token do getDownloadURL)', doStorage.filter(p => !/alt=media/.test(p.url)).length, 0);
   const daPagina = await pag.evaluate(() => window.__pedidosStorage.slice());
-  conf('a página pediu ao Storage só as quatro baixas (o falso, o A duas vezes e o B), todas pelo ?alt=media', daPagina.length + '|' +
-    daPagina.every(u => /\?alt=media$/.test(u) && !/token=/.test(u)), '4|true');
+  conf('a página pediu ao Storage só as sete baixas (o falso três vezes, o A duas, o B e o C da cota), todas pelo ?alt=media', daPagina.length + '|' +
+    daPagina.every(u => /\?alt=media$/.test(u) && !/token=/.test(u)), '7|true');
   conf('todo fetch da página chegou ao repasse (a conta dele não é menor)', doStorage.length >= daPagina.length, true);
   conf('ninguém chamou getDownloadURL na página', await pag.evaluate(() => !!window.__chamouGetDownloadURL), false);
 
-  secao('9. Nenhum erro de página');
-  conf('nenhum erro de página', pag.errosDePagina.join(' | '), '');
+  secao('9. A conta troca no meio da conferência: a outra conta não vê nada da primeira');
+  const outra = await conta('outra@exemplo.test', 'senha-da-outra-1');
+  conf('a segunda conta de teste existe no emulador (sem catálogo nenhum)', !!outra.localId, true);
+  // a lista guardada fica velha (a conferência roda de novo ao abrir a Estante), e a página abre de novo
+  await pag.evaluate(() => Nuvem.lerLivrosNaNuvem().then(v => Nuvem.guardarLivrosNaNuvem(Object.assign({}, v, { quando: 0, livros: {} }), v.uid)));
+  await H.abrirApp(pag, amb.ORIGEM);
+  // o último documento do catálogo da dona (o nuvem-falso; o nuvem-c já chegou) fica SEGURO até a conta trocar
+  await pag.evaluate(() => {
+    window.__soltar = null;
+    const l0 = Nuvem.lerLivroDoCatalogo;
+    Nuvem.lerLivroDoCatalogo = function (id) {
+      const p = l0.apply(this, arguments);
+      if (id !== 'nuvem-falso') return p;
+      return p.then(d => new Promise(r => { window.__soltar = () => r(d); }));
+    };
+  });
+  await abrirEstante(pag);
+  const segurou = await esperar('a conferência está no meio (um documento da dona seguro)', () => pag.evaluate(() => !!window.__soltar), v => v === true, 20000);
+  conf('a conferência da dona começou e parou no meio', segurou.ok, true);
+  const trocou = await pag.evaluate(() => Nuvem.sair().then(() => Nuvem.entrar('outra@exemplo.test', 'senha-da-outra-1')).then(s => s.uid));
+  conf('saiu da conta da dona e entrou com a outra no meio da conferência', trocou, outra.localId);
+  /* o que fica guardado depois de cada gravação da lista, na conta que está dentro: a conferência
+   * da outra conta, logo depois, regrava a lista dela (vazia), e por isso a prova olha cada momento */
+  await pag.evaluate(() => {
+    window.__guardadas = [];
+    const g0 = Nuvem.guardarLivrosNaNuvem;
+    Nuvem.guardarLivrosNaNuvem = function () {
+      return g0.apply(this, arguments).then(r => Nuvem.lerLivrosNaNuvem().then(v => {
+        window.__guardadas.push(Object.keys(v && v.livros || {}).join('+'));
+        return r;
+      }));
+    };
+  });
+  await pag.evaluate(() => window.__soltar());
+  await pausa(2500);
+  const guardadas = await pag.evaluate(() => window.__guardadas.filter(Boolean).join(' ; '));
+  const guardada = await pag.evaluate(() => Nuvem.lerLivrosNaNuvem().then(v => JSON.stringify(v ? Object.keys(v.livros || {}) : null)));
+  if (MODO === '--envenenado-grava-na-conta-nova') {
+    conf('VENENO visto: a lista da dona ficou guardada como da outra conta', /nuvem-c/.test(guardadas), true);
+    return fim();
+  }
+  conf('em nenhum momento a lista da dona ficou guardada para a outra conta', guardadas, '');
+  conf('e nada da dona ficou guardado no fim', /nuvem-c|nuvem-falso/.test(guardada), false);
+  await H.abrirApp(pag, amb.ORIGEM);
+  await abrirEstante(pag);
+  await pausa(1500);
+  const textoDaBib = await pag.evaluate(() => (document.querySelector('#tela-biblioteca') || document.body).innerText);
+  conf('a outra conta não vê nenhum livro da nuvem da dona', await cartoesDaNuvem(pag) + '|' + /Caderno de frações|Dicionário trocado/.test(textoDaBib), '|false');
+
+  secao('10. O observador de verdade (a marca de celular, com a conta de outra pessoa) não vê nem lê o catálogo');
+  // a outra conta está dentro; a marca diz que a cópia é da dona: é o observador (D7)
+  await pag.evaluate(u => Nuvem.marcarCelular(u), U);
+  await H.abrirApp(pag, amb.ORIGEM);
+  await pausa(3000);
+  const obs = await pag.evaluate(() => JSON.stringify({ observador: Nuvem.estado().observador, celular: document.body.classList.contains('modo-celular'),
+    cartoes: document.querySelectorAll('[data-nuvem]').length, catalogo: window.__pedidosCatalogo.length }));
+  conf('o observador está em modo celular, sem cartão da nuvem e sem ler o catálogo', obs, JSON.stringify({ observador: true, celular: true, cartoes: 0, catalogo: 0 }));
+  await pag.evaluate(() => Nuvem.desmarcarCelular().then(() => Nuvem.sair()));
+
+  secao('11. No modo celular (a tela do celular), nenhum livro da nuvem');
+  const pagCel = await amb.pagina();
+  await prepararPagina(pagCel, [390, 844]);
+  await pagCel.setViewport({ width: 390, height: 844 });
+  await H.abrirApp(pagCel, amb.ORIGEM);
+  await pagCel.evaluate(() => Nuvem.entrar('dona@exemplo.test', 'senha-da-dona-1'));
+  await H.abrirApp(pagCel, amb.ORIGEM);
+  await pausa(3000);
+  const cel = await pagCel.evaluate(() => JSON.stringify({ celular: document.body.classList.contains('modo-celular'), conta: !!Nuvem.estado().entrada,
+    cartoes: document.querySelectorAll('[data-nuvem]').length, catalogo: window.__pedidosCatalogo.length }));
+  conf('no celular da dona, sem cartão da nuvem e sem ler o catálogo', cel, JSON.stringify({ celular: true, conta: true, cartoes: 0, catalogo: 0 }));
+
+  secao('12. Nenhum erro de página');
+  conf('nenhum erro de página', pag.errosDePagina.concat(pagCel.errosDePagina).join(' | '), '');
   return fim();
 })().catch(e => { console.error('erro:', e && e.stack || e); H.placar.falhas++; return fim(); });
 

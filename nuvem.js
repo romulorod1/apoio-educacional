@@ -403,7 +403,9 @@
 
   function sair() {
     sessao = null;
-    return gravarEstado('sessao', null).then(avisarOuvintes);
+    // a lista dos livros da nuvem é da conta que saiu: sai junto (os títulos dela não ficam para a próxima conta)
+    return Promise.all([gravarEstado('sessao', null), gravarEstado('livrosNaNuvem', null).catch(function () { /* a leitura confere a conta */ })])
+      .then(avisarOuvintes);
   }
 
   /* O Firebase manda o e-mail com o link de redefinição; o aplicativo só pede.
@@ -1966,15 +1968,17 @@
 
   /* Os livros do catálogo que a Estante mostra "na nuvem" (o meta conferido
    * de cada um), guardados no banco próprio para a Estante abrir sem rede.
-   * São da conta que entrou: a lista de outra conta não vale. */
+   * São da conta que entrou: a lista de outra conta não vale. Quem guarda diz
+   * de que conta é a lista (`uid`, a da conferência que a montou); se a sessão
+   * já é de outra conta (ela saiu e entrou com outra no meio), nada é guardado. */
   function lerLivrosNaNuvem() {
     return carregarEstado().then(function () { return lerEstado('livrosNaNuvem'); }).then(function (v) {
       return v && sessao && v.uid === sessao.uid ? v : null;
     });
   }
-  function guardarLivrosNaNuvem(v) {
-    if (!sessao || !sessao.uid) return Promise.resolve(null);
-    return gravarEstado('livrosNaNuvem', Object.assign({}, v, { uid: sessao.uid }));
+  function guardarLivrosNaNuvem(v, uid) {
+    if (!sessao || !sessao.uid || typeof uid !== 'string' || !uid || uid !== sessao.uid) return Promise.resolve(null);
+    return gravarEstado('livrosNaNuvem', Object.assign({}, v, { uid: uid }));
   }
 
   root.Nuvem = {
