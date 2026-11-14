@@ -70,8 +70,9 @@ O json (todo campo desconhecido e recusado, em qualquer nivel):
   --gabarito-externo).
 - privado true com a saida ou a pasta de trabalho dentro deste repositorio,
   ou de qualquer checkout git (uma pasta acima dela, ou ela mesma, com .git,
-  pasta ou arquivo: outro clone, outro worktree), e recusado; privado true com licenca aberta (CC BY, Creative Commons, dominio
-  publico...) tambem: privado e uso pessoal entre professor e aluno.
+  pasta ou arquivo: outro clone, outro worktree), e recusado; privado true
+  com licenca aberta (CC BY, Creative Commons, dominio publico...) tambem:
+  privado e uso pessoal entre professor e aluno.
 - chave repetida em qualquer objeto do json e recusada (o json.load ficaria
   calado com a ultima); o mesmo vale para o --gabarito-externo.
 - subitem com espaco no comeco ou no fim e recusado.
