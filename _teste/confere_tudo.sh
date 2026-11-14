@@ -644,6 +644,7 @@ roda "leitor voltar --controle-pai"                node "_teste/testa_leitor_vol
 roda "dominio troca de aula" node "_teste/testa_dominio_troca_aula.js"
 roda "dominio troca de aula --envenenado-sequestro" node "_teste/testa_dominio_troca_aula.js" --envenenado-sequestro
 roda "dominio troca de aula --envenenado-rebase-velho" node "_teste/testa_dominio_troca_aula.js" --envenenado-rebase-velho
+roda "dominio troca de aula --envenenado-bloco-guardado" node "_teste/testa_dominio_troca_aula.js" --envenenado-bloco-guardado
 # Fatia 7 do leitor: texto selecionavel sobre a pagina. Na p. 206 a camada de
 # texto existe, arrastar pela linha desenhada e copiar traz "Exercicio 206", a
 # caneta (pen) nao seleciona, so as paginas desenhadas tem texto vivo e o

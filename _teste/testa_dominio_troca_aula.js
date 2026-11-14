@@ -6,11 +6,15 @@
  *    e a lista de A se redesenharia (estava fora da tela). Ela toca "Domina"
  *    em B: grava, e a tela de B mostra o marcado.
  * 2. Chega um registro da nuvem com a aula aberta (rebasearAulaAberta troca o
- *    registro dela): ela marca "Domina" depois, e a marca fica no banco.
+ *    registro dela): ela marca "Domina" depois, e a marca fica no banco. O
+ *    Domina anda a trilha, e isso redesenha o bloco de assunto inteiro
+ *    (atualizarBlocoAssunto): a tela mostra o Domina, e uma segunda marca grava
+ *    no registro do banco, e não no objeto da abertura.
  * Venenos, cada um tem de cair:
  *   --envenenado-sequestro      as duas guardas voltam (o redesenho de A olha só o
  *                               parentNode, e qualquer aula toma o domínio ativo);
- *   --envenenado-rebase-velho   o rebase não redesenha a lista de assuntos.
+ *   --envenenado-rebase-velho   o rebase não redesenha a lista de assuntos;
+ *   --envenenado-bloco-guardado o bloco de assunto desenha com o objeto da abertura.
  * Dados fictícios.
  */
 'use strict';
@@ -20,19 +24,21 @@ const H = require('./_bib_navegador');
 const RELOGIO = H.relogioDaRodada('2026-11-16', '11:00');
 const { conf, secao, esperar, pausa } = H;
 
-const MODOS = ['--envenenado-sequestro', '--envenenado-rebase-velho'];
+const MODOS = ['--envenenado-sequestro', '--envenenado-rebase-velho', '--envenenado-bloco-guardado'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) >= 0)[0] || '';
 const GUARDA_AULA = '    if (aulaEmEdicao && aulaEmEdicao.id === aula.id) {\n      blocoDominioAtivo = { aulaId: aula.id, desenhar: function () {';
 const GUARDA_TELA = '        if (caixa.isConnected) desenharTemasDaAula(caixa, aula, aluno); // só a lista que está na tela';
-const REBASE = "    if ($('#lista-temas-aula') && $('#lista-temas-aula').isConnected) {\n      desenharTemasDaAula($('#lista-temas-aula'), novo, alunoPorId(novo.alunoId));\n    }";
+const REBASE = "    if (!atualizarBlocoAssunto(novo.id) && $('#lista-temas-aula') && $('#lista-temas-aula').isConnected) {\n      desenharTemasDaAula($('#lista-temas-aula'), novo, alunoPorId(novo.alunoId));\n    }";
+const BLOCO_VIVO = '      var aula = aulaViva(aulaDaAbertura); // e não o objeto guardado na abertura';
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
-conf('(arranjo) as âncoras dos venenos estão no app.js', [GUARDA_AULA, GUARDA_TELA, REBASE].map(a => APP.split(a).length).join(','), '2,4,2');
+conf('(arranjo) as âncoras dos venenos estão no app.js', [GUARDA_AULA, GUARDA_TELA, REBASE, BLOCO_VIVO].map(a => APP.split(a).length).join(','), '2,4,2,2');
 const trocas = {};
 if (MODO === MODOS[0]) {
   trocas['/app.js'] = APP.replace(GUARDA_AULA, '    if (true) {\n      blocoDominioAtivo = { aulaId: aula.id, desenhar: function () {')
     .split(GUARDA_TELA).join('        if (caixa.parentNode) desenharTemasDaAula(caixa, aula, aluno);');
 }
 if (MODO === MODOS[1]) trocas['/app.js'] = APP.replace(REBASE, '');
+if (MODO === MODOS[2]) trocas['/app.js'] = APP.replace(BLOCO_VIVO, '      var aula = aulaDaAbertura;');
 if (MODO) conf('(veneno) o app.js servido mudou', trocas['/app.js'] !== APP, true);
 const amb = H.criarAmbiente(8894, 'nath_f10_troca_aula', trocas);
 function fimDoVeneno() { throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true, fimDoVeneno: true }); }
@@ -83,6 +89,8 @@ const tocar = (pag, temaId, estado) => pag.evaluate((t, e) => {
     const d = await Store.carregar();
     const hoje = Core.hojeIso();
     d.alunos = [{ id: 'f10_alfa', nome: 'Aluna Alfa Teste', ativo: true, precos: [] }];
+    d.alunos[0].trilhas = [Core.criarTrilha({ alunoId: 'f10_alfa', titulo: 'Trilha Teste', alvoId: 'tC', materia: 'matematica',
+      passos: [{ temaId: 'tC', titulo: 'Assunto C Teste', serie: '07', modulo: '7ano:teste', duracaoMin: 60 }] })];
     d.series = []; d.resumos = [];
     const base = { alunoId: 'f10_alfa', data: hoje, duracaoMin: 60, status: 'realizada', cobravel: true, notaTexto: '', notaPrivada: '', anexos: [] };
     d.aulas = [
@@ -118,7 +126,7 @@ const tocar = (pag, temaId, estado) => pag.evaluate((t, e) => {
     await fechar(pag);
   }
 
-  if (MODO === MODOS[1] || !MODO) {
+  if (MODO === MODOS[1] || MODO === MODOS[2] || !MODO) {
     secao('2. Depois de chegar um registro da nuvem, a marca fica no banco');
     await pag.evaluate(() => window.__soltarIndice && window.__soltarIndice());
     conf('(arranjo) a aula C abriu', (await abrir(pag, 'f10_C')).ok, true);
@@ -141,12 +149,28 @@ const tocar = (pag, temaId, estado) => pag.evaluate((t, e) => {
       document.querySelector('#campo-nota-privada').value === 'Nota que chegou do celular'), Boolean, 5000);
     await tocar(pag, 'tC', 'domina');
     const gravouC = await esperar('o Domina de C gravou', () => lerAula(pag, 'f10_C'), a => a && a.temas[0].dominio === 'domina', 5000);
-    if (MODO === MODOS[1]) {
+    if (MODO === MODOS[1] || (MODO === MODOS[2] && !gravouC.ok)) {
       conf('VENENO visto: a marca feita depois da chegada ficou no banco, e quebrou', gravouC.ok, false);
       fimDoVeneno();
     }
     conf('a marca feita depois da chegada fica no banco', gravouC.ok, true);
     conf('e a nota que chegou também', (await lerAula(pag, 'f10_C')).notaPrivada, 'Nota que chegou do celular');
+    const andou = await esperar('o Domina andou a trilha', () => pag.evaluate(() => Store.carregar().then(d =>
+      !!d.alunos.find(a => a.id === 'f10_alfa').trilhas[0].passos[0].feitoEm)), Boolean, 5000);
+    conf('(arranjo) o Domina andou a trilha (e o bloco de assunto se redesenhou)', andou.ok, true);
+    const telaC = await esperar('a tela de C mostra', () => ativoNaTela(pag, 'tC'), v => v === 'domina', 3000);
+    if (MODO === MODOS[2] && telaC.valor !== 'domina') {
+      conf('VENENO visto: a tela mostra o Domina depois do redesenho do bloco, e quebrou (' + telaC.valor + ')', telaC.valor === 'domina', false);
+      fimDoVeneno();
+    }
+    conf('depois do redesenho do bloco, a tela mostra o Domina', telaC.valor, 'domina');
+    await tocar(pag, 'tC', 'andamento');
+    const segunda = await esperar('a segunda marca gravou', () => lerAula(pag, 'f10_C'), a => a && a.temas[0].dominio === 'andamento', 5000);
+    if (MODO === MODOS[2]) {
+      conf('VENENO visto: a segunda marca gravou no registro do banco, e quebrou', segunda.ok, false);
+      fimDoVeneno();
+    }
+    conf('a segunda marca grava no registro do banco, e não no objeto da abertura', segunda.ok, true);
   }
 
   conf('não houve erro de página', (pag.errosDePagina || []).join(' | '), '');

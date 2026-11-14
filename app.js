@@ -4264,7 +4264,7 @@
     /* F10: a lista de assuntos (com os botões de domínio) guarda a aula de
      * antes. Sem redesenhar com o registro novo, uma marca feita depois de
      * chegar a sincronização ia para um objeto fora do db.aulas e se perdia. */
-    if ($('#lista-temas-aula') && $('#lista-temas-aula').isConnected) {
+    if (!atualizarBlocoAssunto(novo.id) && $('#lista-temas-aula') && $('#lista-temas-aula').isConnected) {
       desenharTemasDaAula($('#lista-temas-aula'), novo, alunoPorId(novo.alunoId));
     }
     var noBanco = valoresDaAulaNoBanco(id);
@@ -5005,11 +5005,14 @@
         var chk = el('input', { type: 'checkbox', class: 'caixa-de-marcar' });
         chk.checked = aula.areas.indexOf(item.id) >= 0;
         chk.addEventListener('change', function () {
+          var viva = aulaViva(aula); // a aula do db.aulas, mesmo depois de chegar a nuvem
+          viva.areas = viva.areas || [];
           if (this.checked) {
-            if (aula.areas.indexOf(item.id) < 0) aula.areas.push(item.id);
+            if (viva.areas.indexOf(item.id) < 0) viva.areas.push(item.id);
           } else {
-            aula.areas = aula.areas.filter(function (x) { return x !== item.id; });
+            viva.areas = viva.areas.filter(function (x) { return x !== item.id; });
           }
+          aula = viva;
           atualizarContador();
           salvar();
         });
@@ -5037,12 +5040,24 @@
    * que as áreas trabalhadas já fazem aqui embaixo. */
   var blocoAssuntoAtivo = null;
 
-  function desenharAssuntos(corpo, aula, aluno) {
+  /* F10 (rodada 3): a aula VIVA pelo id. A chegada de um registro da nuvem
+   * (rebasearAulaAberta) troca o objeto da aula aberta; quem guardou o objeto da
+   * abertura num fechamento (o bloco de assunto, as áreas, os anexos) mexeria
+   * num objeto fora do db.aulas, e a mudança se perdia. Quem desenha ou grava
+   * pela janela resolve a aula aqui, na hora. */
+  function aulaViva(aula) {
+    if (!aula) return aula;
+    if (aulaEmEdicao && aulaEmEdicao.id === aula.id) return aulaEmEdicao;
+    return (db.aulas || []).filter(function (x) { return x.id === aula.id; })[0] || aula;
+  }
+
+  function desenharAssuntos(corpo, aulaDaAbertura, aluno) {
     var bloco = el('div', { id: 'bloco-assunto', class: 'u-margem-baixo-14' });
     corpo.appendChild(bloco);
 
     function desenhar() {
       bloco.innerHTML = '';
+      var aula = aulaViva(aulaDaAbertura); // e não o objeto guardado na abertura
 
       /* O próximo passo da trilha entra ANTES de tudo, porque é a primeira
        * pergunta da aula: o que vem hoje. Ele não mora mais dentro deste bloco,
@@ -5088,7 +5103,7 @@
       }
     }
 
-    blocoAssuntoAtivo = { aulaId: aula.id, desenhar: desenhar };
+    blocoAssuntoAtivo = { aulaId: aulaDaAbertura.id, desenhar: desenhar };
     desenhar();
   }
 
@@ -5594,6 +5609,7 @@
         el('button', {
           type: 'button', class: 'btn pequeno perigo', texto: 'Remover',
           aoClick: function () {
+            aula = aulaViva(aula); // a aula do db.aulas, mesmo depois de chegar a nuvem
             aula.anexos = (aula.anexos || []).filter(function (x) { return x.id !== an.id; });
             apagarArquivoDoAnexo(an);
             /* O assunto que carregava este PDF volta a ser só registro.
