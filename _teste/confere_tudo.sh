@@ -206,7 +206,7 @@ ${2:-}"
   # acha sai com 77 e uma linha "PULADA: motivo". Nao e aprovacao nem falha: e
   # conferencia pulada, como a lista de nomes que falta no confere_privacidade.
   # Sem a linha PULADA, o 77 segue o caminho de sempre e reprova.
-  if [ "$codigo" = "77" ] && printf '%s\n' "$saida" | grep -q "PULADA:"; then
+  if [ "$codigo" = "77" ] && printf '%s\n' "$saida" | grep -q '^ *PULADA:'; then
     printf '  INSTAVEL %-23s pulada: %s\n' "$nome" \
       "$(printf '%s\n' "$saida" | sed -n 's/^ *PULADA: //p' | head -1 | cut -c1-90)"
     pulada=1
