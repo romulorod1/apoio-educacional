@@ -1,0 +1,1 @@
+# Nuvem da biblioteca, PR 1: as regras do Storage (só a dona baixa os livros e os pacotes dela; ninguém grava pelo aplicativo). Para ela não há novidade: o aplicativo ainda não baixa nada do Storage.
