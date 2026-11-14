@@ -86,17 +86,22 @@
    * natureza; o que ela identifica é o projeto, não a dona. */
   var CONFIGURACAO = {
     apiKey: 'AIzaSyB1p6CvU0gw-MUjKjJhEVZ4wEioje73DOI',
-    projectId: 'nw-apoio-educacional'
+    projectId: 'nw-apoio-educacional',
+    storageBucket: 'nw-apoio-educacional.firebasestorage.app'
   };
   var PONTAS = {
     identidade: 'https://identitytoolkit.googleapis.com/v1',
     token: 'https://securetoken.googleapis.com/v1',
-    firestore: 'https://firestore.googleapis.com/v1'
+    firestore: 'https://firestore.googleapis.com/v1',
+    storage: 'https://firebasestorage.googleapis.com'
   };
   /* O emulador (Firebase Emulator Suite) entra por aqui, antes de este arquivo
    * carregar: window.NUVEM_EMULADOR = { auth: 'http://127.0.0.1:9099',
-   * firestore: 'http://127.0.0.1:8080', projectId: 'demo-x' }. */
+   * firestore: 'http://127.0.0.1:8080', projectId: 'demo-x' }; com o Storage,
+   * também storage: 'http://127.0.0.1:9199' e bucket: 'demo-x.appspot.com'. */
   if (root.NUVEM_EMULADOR) {
+    if (root.NUVEM_EMULADOR.storage) PONTAS.storage = root.NUVEM_EMULADOR.storage;
+    if (root.NUVEM_EMULADOR.bucket) CONFIGURACAO.storageBucket = root.NUVEM_EMULADOR.bucket;
     PONTAS.identidade = root.NUVEM_EMULADOR.auth + '/identitytoolkit.googleapis.com/v1';
     PONTAS.token = root.NUVEM_EMULADOR.auth + '/securetoken.googleapis.com/v1';
     PONTAS.firestore = root.NUVEM_EMULADOR.firestore + '/v1';
@@ -398,7 +403,9 @@
 
   function sair() {
     sessao = null;
-    return gravarEstado('sessao', null).then(avisarOuvintes);
+    // a lista dos livros da nuvem é da conta que saiu: sai junto (os títulos dela não ficam para a próxima conta)
+    return Promise.all([gravarEstado('sessao', null), gravarEstado('livrosNaNuvem', null).catch(function () { /* a leitura confere a conta */ })])
+      .then(avisarOuvintes);
   }
 
   /* O Firebase manda o e-mail com o link de redefinição; o aplicativo só pede.
@@ -1875,8 +1882,167 @@
     return lerDoc(nomeDoc(sessao.uid, 'catalogo/' + id));
   }
 
+  /* O ARQUIVO DE UM LIVRO DO CATÁLOGO (nuvem da biblioteca, PR 3), baixado do
+   * Storage sob demanda, um por vez, quando ela toca no livro "na nuvem".
+   *
+   * Como baixa: pela API REST do Storage do Firebase, a mesma que o getBytes e
+   * o getBlob do SDK usam por dentro, `GET <storage>/v0/b/<bucket>/o/<caminho>
+   * ?alt=media` com `Authorization: Firebase <idToken>`. O pedido passa pelas
+   * regras (storage.rules: só a dona lê, pelo uid) e não cria nem usa token de
+   * download: o link com token (o do getDownloadURL) passaria por cima das
+   * regras, e este aplicativo nunca o pede, nem lê os metadados do objeto,
+   * onde esse token mora. O aplicativo não carrega SDK do Firebase: fala com o
+   * Auth e o Firestore pela mesma REST. O corpo vem em fluxo (ReadableStream),
+   * e é por ele que a tela mostra o andamento; o getBytes e o getBlob não
+   * dizem quanto já chegou.
+   *
+   * Confere aqui só a forma: o caminho tem de ser um livro DESTA conta
+   * (usuarios/<uid>/livros/<sha256>.pdf ou .epub) e o tamanho, o do catálogo;
+   * vir a mais é recusa, e vir a menos (a rede caiu, a conexão fechou antes)
+   * também. O sha256 quem confere é quem guarda (app.js), antes de guardar: o
+   * arquivo pela metade, ou outro arquivo, nunca vira livro.
+   *
+   * A MEMÓRIA (revisão das lentes): o livro pode ter 200 MB, e o tablet mata a
+   * aba que segura três cópias dele. O corpo chega em pedaços, que viram um
+   * Blob a cada JUNTAR_BYTES (o Blob do navegador mora fora da memória do
+   * JavaScript, e juntar Blobs não copia os bytes): nunca há mais que um lote
+   * de pedaços na mão. Sai daqui um Blob, do tipo do arquivo; o sha256 dele é
+   * calculado por trechos (Store.sha256Hex aceita o Blob).
+   *
+   * O PRAZO (revisão das lentes): na rede fraca a conexão para sem erro. Sem
+   * nenhum byte por PRAZO_SEM_DADOS_MS (desde o pedido, e de novo a cada
+   * pedaço: a baixa lenta que anda nunca cai), a baixa é abortada e falha com
+   * PARADO, e ela pode tocar de novo. Quem chama pode cancelar pelo
+   * opcoes.sinal (um AbortSignal): a baixa para e falha com CANCELADO.
+   *
+   * opcoes: { tamanho, aoProgresso(recebidos, total), sinal }. Devolve um Blob
+   * com os bytes inteiros. baixarDoStorage(caminho, opcoes, padrao) é a mesma
+   * baixa para outro padrão de caminho (o pacote do PR 4). */
+  var CAMINHO_DE_LIVRO = /^usuarios\/([^\/]+)\/livros\/[0-9a-f]{64}\.(pdf|epub)$/;
+  var TIPOS_DO_STORAGE = { pdf: 'application/pdf', epub: 'application/epub+zip', zip: 'application/zip' };
+  var JUNTAR_BYTES = 4 * 1024 * 1024;
+  var PRAZO_SEM_DADOS_MS = 30000;
+  function erroDaBaixa(codigo, frase) {
+    var e = new Error(frase);
+    e.codigo = codigo;
+    return e;
+  }
+  function baixarLivroDaNuvem(caminho, opcoes) { return baixarDoStorage(caminho, opcoes, CAMINHO_DE_LIVRO); }
+  function baixarDoStorage(caminho, opcoes, padrao) {
+    opcoes = opcoes || {};
+    var total = opcoes.tamanho;
+    var aoProgresso = typeof opcoes.aoProgresso === 'function' ? opcoes.aoProgresso : function () {};
+    if (!sessao || !sessao.uid) return Promise.reject(erro('TOKEN_EXPIRED'));
+    var m = padrao.exec(String(caminho || ''));
+    if (!m || m[1] !== sessao.uid) return Promise.reject(erroDaBaixa('CAMINHO_INVALIDO', 'Este livro não é desta conta.'));
+    if (typeof total !== 'number' || !isFinite(total) || total <= 0 || Math.floor(total) !== total) {
+      return Promise.reject(erroDaBaixa('TAMANHO_INVALIDO', 'O catálogo não diz o tamanho deste livro.'));
+    }
+    if (!online()) return Promise.reject(semRede());
+    var sinal = opcoes.sinal || null;
+    if (sinal && sinal.aborted) return Promise.reject(erroDaBaixa('CANCELADO', 'A baixa foi cancelada.'));
+    var tipo = TIPOS_DO_STORAGE[String(caminho).split('.').pop()] || 'application/octet-stream';
+    var url = PONTAS.storage + '/v0/b/' + encodeURIComponent(CONFIGURACAO.storageBucket) + '/o/' +
+      encodeURIComponent(caminho) + '?alt=media';
+    // o prazo menor é só da prova, pela configuração do emulador
+    var prazoMs = (root.NUVEM_EMULADOR && root.NUVEM_EMULADOR.prazoSemDadosMs) || PRAZO_SEM_DADOS_MS;
+    var controle = typeof AbortController === 'function' ? new AbortController() : null;
+    var motivo = null;   // por que a baixa foi abortada: 'PARADO' ou 'CANCELADO'
+    var prazo = null;
+    var parar = function (codigo) {
+      if (motivo) return;
+      motivo = codigo;
+      clearTimeout(prazo);
+      if (controle) controle.abort();
+    };
+    var parou = function () { parar('PARADO'); };
+    var armarPrazo = function () {
+      clearTimeout(prazo);
+      if (prazoMs > 0) prazo = setTimeout(parou, prazoMs);
+    };
+    var aoCancelar = function () { parar('CANCELADO'); };
+    if (sinal) sinal.addEventListener('abort', aoCancelar);
+    var soltar = function () {
+      clearTimeout(prazo);
+      if (sinal) sinal.removeEventListener('abort', aoCancelar);
+    };
+    // a falha de rede depois de um aborto é o aborto, com o motivo dele
+    var falhaDeRede = function () {
+      if (motivo === 'CANCELADO') return erroDaBaixa('CANCELADO', 'A baixa foi cancelada.');
+      if (motivo === 'PARADO') return erroDaBaixa('PARADO', 'A internet parou de mandar o livro.');
+      return semRede();
+    };
+    armarPrazo();
+    return tokenValido().then(function (token) {
+      if (motivo) throw falhaDeRede();
+      return fetch(url, { headers: { Authorization: 'Firebase ' + token }, cache: 'no-store', signal: controle ? controle.signal : undefined })
+        .catch(function () { throw falhaDeRede(); });
+    }).then(function (r) {
+      if (!r.ok) {
+        var e = r.status === 401 ? erro('TOKEN_EXPIRED') : r.status === 403 ? erro('PERMISSION_DENIED') :
+          r.status === 404 ? erroDaBaixa('NAO_ESTA_NA_NUVEM', 'Este livro ainda não está na nuvem.') :
+            r.status === 429 ? erro('RESOURCE_EXHAUSTED') : r.status >= 500 ? erro('UNAVAILABLE') : erro('HTTP ' + r.status);
+        e.status = r.status;
+        if (r.body && r.body.cancel) r.body.cancel().catch(function () { /* nada a ler */ });
+        throw e;
+      }
+      armarPrazo();
+      var recebidos = 0;
+      var pedacos = [], noLote = 0, partes = [];
+      aoProgresso(0, total);
+      if (!r.body || typeof r.body.getReader !== 'function') {
+        return r.blob().then(function (b) {
+          if (b.size !== total) throw erroDaBaixa(b.size > total ? 'TAMANHO_DIFERENTE' : 'INCOMPLETO', 'O livro não chegou inteiro.');
+          aoProgresso(total, total);
+          return b.slice(0, b.size, tipo);
+        }, function () { throw falhaDeRede(); });
+      }
+      var leitor = r.body.getReader();
+      var ler = function () {
+        return leitor.read().then(function (pedaco) {
+          if (motivo) throw falhaDeRede();
+          if (pedaco.done) {
+            if (recebidos !== total) throw erroDaBaixa('INCOMPLETO', 'O livro não chegou inteiro.');
+            partes.push(new Blob(pedacos));
+            pedacos = [];
+            return new Blob(partes, { type: tipo });
+          }
+          armarPrazo();
+          var v = pedaco.value;
+          if (recebidos + v.length > total) {
+            leitor.cancel().catch(function () { /* já parou */ });
+            throw erroDaBaixa('TAMANHO_DIFERENTE', 'O arquivo da nuvem não tem o tamanho do catálogo.');
+          }
+          pedacos.push(v);
+          noLote += v.length;
+          recebidos += v.length;
+          if (noLote >= JUNTAR_BYTES) { partes.push(new Blob(pedacos)); pedacos = []; noLote = 0; }
+          aoProgresso(recebidos, total);
+          return ler();
+        }, function () { throw falhaDeRede(); });
+      };
+      return ler();
+    }).then(function (b) { soltar(); return b; }, function (e) { soltar(); throw e; });
+  }
+
+  /* Os livros do catálogo que a Estante mostra "na nuvem" (o meta conferido
+   * de cada um), guardados no banco próprio para a Estante abrir sem rede.
+   * São da conta que entrou: a lista de outra conta não vale. Quem guarda diz
+   * de que conta é a lista (`uid`, a da conferência que a montou); se a sessão
+   * já é de outra conta (ela saiu e entrou com outra no meio), nada é guardado. */
+  function lerLivrosNaNuvem() {
+    return carregarEstado().then(function () { return lerEstado('livrosNaNuvem'); }).then(function (v) {
+      return v && sessao && v.uid === sessao.uid ? v : null;
+    });
+  }
+  function guardarLivrosNaNuvem(v, uid) {
+    if (!sessao || !sessao.uid || typeof uid !== 'string' || !uid || uid !== sessao.uid) return Promise.resolve(null);
+    return gravarEstado('livrosNaNuvem', Object.assign({}, v, { uid: uid }));
+  }
+
   root.Nuvem = {
     lerCatalogo: lerCatalogo, lerLivroDoCatalogo: lerLivroDoCatalogo,
+    baixarLivroDaNuvem: baixarLivroDaNuvem, lerLivrosNaNuvem: lerLivrosNaNuvem, guardarLivrosNaNuvem: guardarLivrosNaNuvem,
     disponivel: disponivel, pronto: carregarEstado, estado: estado, aoMudar: aoMudar,
     entrar: entrar, sair: sair, esqueciASenha: esqueciASenha, trocarSenha: trocarSenha,
     enviarCopia: enviarCopia, listarCopias: listarCopias, baixarCopia: baixarCopia, restaurou: restaurou,

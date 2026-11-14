@@ -1523,6 +1523,7 @@
     return typeof crypto !== 'undefined' && !!(crypto.subtle && crypto.subtle.digest) && typeof TextEncoder !== 'undefined';
   }
   function sha256Hex(entrada) {
+    if (typeof Blob !== 'undefined' && entrada instanceof Blob) return sha256DoBlob(entrada);
     if (!temWebCrypto()) return Promise.reject(Object.assign(new Error('Este navegador não tem o WebCrypto que a folha na nuvem precisa.'), { codigo: 'SEM_WEBCRYPTO' }));
     var bytes = typeof entrada === 'string' ? new TextEncoder().encode(entrada) : entrada;
     return crypto.subtle.digest('SHA-256', bytes).then(function (buf) {
@@ -1530,6 +1531,28 @@
       for (var i = 0; i < v.length; i++) s += (v[i] < 16 ? '0' : '') + v[i].toString(16);
       return s;
     });
+  }
+  /* O SHA-256 DE UM BLOB, por trechos de 1 MB (o livro que veio da nuvem, PR 3
+   * da biblioteca na nuvem): o crypto.subtle só calcula de uma vez, com uma
+   * cópia do arquivo inteiro na memória, e o livro pode ter 200 MB. O cálculo
+   * por partes é o da importação dos livros (Biblioteca.Sha256, conferido
+   * contra o crypto.subtle no testa_livros.js); nunca há mais que um trecho na
+   * mão. Sem ele (o Store lido sozinho, numa prova), o caminho de sempre. */
+  var TRECHO_DO_HASH = 1024 * 1024;
+  function sha256DoBlob(blob) {
+    var B = typeof Biblioteca !== 'undefined' ? Biblioteca : null;
+    if (!B || typeof B.Sha256 !== 'function') return blob.arrayBuffer().then(function (ab) { return sha256Hex(new Uint8Array(ab)); });
+    var sha = new B.Sha256(), pos = 0, total = blob.size;
+    var proximo = function () {
+      if (pos >= total) return Promise.resolve(sha.fim());
+      var ate = Math.min(total, pos + TRECHO_DO_HASH);
+      return blob.slice(pos, ate).arrayBuffer().then(function (ab) {
+        sha.atualizar(new Uint8Array(ab));
+        pos = ate;
+        return proximo();
+      });
+    };
+    return proximo();
   }
   /* O hash da página para o estado local: null sem WebCrypto (a página conta
    * como mudada a cada gravação e fica na fila, sem subir). */
@@ -2886,6 +2909,81 @@
     }).then(function () { return contas; });
   }
 
+  /* O LIVRO QUE CHEGOU DA NUVEM (nuvem da biblioteca, PR 3): ela tocou no
+   * livro "na nuvem" da Estante, o arquivo baixou INTEIRO e o sha256 dele já
+   * foi conferido contra o do catálogo (app.js). Só então chega aqui, e entra
+   * numa transação só, com o Blob montado: o IndexedDB não grava metade de um
+   * registro, e a falha (a falta de espaço chega como a transação abortada)
+   * não deixa registro nenhum.
+   * item: { meta, blob, sha256, metaHash, metaVersao }. O registro fica como
+   * o de um livro importado, com pacote 'nuvem', a versão do meta e a marca
+   * `nuvem` (o meta aplicado), como o DESENHO, seção 5, pede.
+   * Nunca troca o que já está: o livro de mesmo id que entrou enquanto baixava
+   * (por um pacote, ou por outra aba) fica, e a resposta diz `jaEstava`. A
+   * posição de leitura que ficou de quando o livro saiu do tablet volta pela
+   * mesma regra da troca de arquivo (posicaoNoArquivoNovo). O MESMO ARQUIVO
+   * (o mesmo sha256) com outro id também é recusado: o livro já está aqui, e
+   * a resposta diz qual em `mesmoArquivo` ({ id, titulo }).
+   * Devolve { entrou, jaEstava, mesmoArquivo, bytes }. */
+  function gravarLivroDaNuvem(item) {
+    var meta = item && item.meta;
+    if (!meta || typeof meta.id !== 'string' || !item.blob || typeof item.sha256 !== 'string' ||
+      meta.hash !== 'sha256:' + item.sha256 || item.blob.size !== meta.bytes) {
+      return Promise.reject(new Error('O livro da nuvem não confere com o catálogo.'));
+    }
+    var agora = new Date().toISOString();
+    return abrir().then(function (b) {
+      return new Promise(function (resolve, reject) {
+        var t = transacao(b, ['livros', 'livros_posicoes'], 'readwrite');
+        var dep = t.objectStore('livros');
+        var r = { entrou: false, jaEstava: false, mesmoArquivo: null, bytes: item.blob.size };
+        var falha = null;
+        var req = dep.get(meta.id);
+        req.onsuccess = function () {
+          if (req.result) { r.jaEstava = true; return; }
+          // o mesmo arquivo com outro id: um cursor pelos registros (o Blob do IndexedDB é só uma referência)
+          var cur = dep.openCursor();
+          cur.onsuccess = function () {
+            var c = cur.result;
+            if (c) {
+              if (c.value && c.value.meta && c.value.meta.hash === meta.hash) {
+                r.mesmoArquivo = { id: c.value.id, titulo: String(c.value.meta.titulo || c.value.id) };
+                return;
+              }
+              c.continue();
+              return;
+            }
+            guardar();
+          };
+        };
+        function guardar() {
+          var ps = t.objectStore('livros_posicoes');
+          var rv = ps.get(meta.id);
+          rv.onsuccess = function () {
+            var velha = rv.result;
+            if (!velha || typeof velha.sha !== 'string' || !velha.sha || velha.sha === meta.hash) return;
+            var voltou = posicaoNoArquivoNovo(velha, null, meta);
+            if (voltou) ps.put(voltou);
+          };
+          /* a falta de espaço chega como a transação abortada (t.error), ou, em
+           * alguns navegadores, como a exceção do próprio put: as duas saem com o
+           * nome dela (QuotaExceededError), e nada fica gravado */
+          try {
+            dep.put({ id: meta.id, pacote: 'nuvem', versao: item.metaVersao || 1, meta: meta, blob: item.blob,
+              bytes: item.blob.size, importadoEm: agora, nuvem: { metaHash: item.metaHash || null, metaVersao: item.metaVersao || 1 } });
+            r.entrou = true;
+          } catch (e) {
+            falha = e;
+            r.entrou = false;
+            try { t.abort(); } catch (e2) { /* já abortou */ }
+          }
+        }
+        t.oncomplete = function () { resolve(r); };
+        t.onabort = function () { reject(falha || t.error || new Error('A gravação foi interrompida.')); };
+      });
+    });
+  }
+
   /* Os livros guardados, em ordem de título. O registro traz o Blob, mas o
    * Blob do IndexedDB é só uma referência: listar não lê os livros. */
   function listarLivros() {
@@ -3652,7 +3750,7 @@
     gravarEtiquetaBiblioteca: gravarEtiquetaBiblioteca, etiquetasDaBiblioteca: etiquetasDaBiblioteca,
     gravarListaBiblioteca: gravarListaBiblioteca, apagarListaBiblioteca: apagarListaBiblioteca,
     listasDaBiblioteca: listasDaBiblioteca,
-    gravarLivros: gravarLivros, listarLivros: listarLivros, lerLivro: lerLivro, removerLivro: removerLivro,
+    gravarLivros: gravarLivros, gravarLivroDaNuvem: gravarLivroDaNuvem, listarLivros: listarLivros, lerLivro: lerLivro, removerLivro: removerLivro,
     lerPosicaoLivro: lerPosicaoLivro, gravarPosicaoLivro: gravarPosicaoLivro, posicaoNoArquivoNovo: posicaoNoArquivoNovo,
     trocarMetaDaNuvem: trocarMetaDaNuvem, canonicoDoMeta: canonicoDoMeta,
     aoMudar: aoMudar, somenteLeitura: somenteLeitura, celularQueEdita: celularQueEdita,
