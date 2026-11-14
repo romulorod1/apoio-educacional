@@ -1,1 +1,1 @@
-Na sondagem do 2º e do 3º médio, a lacuna de gráficos e estatística deixa de trazer exercícios de desigualdade entre médias, que não são de estatística, e não pede mais o pacote do 1º médio para ela.
+Na sondagem do 2º e do 3º médio, a lacuna de gráficos não traz mais exercícios que não são de estatística.
