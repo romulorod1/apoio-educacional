@@ -120,6 +120,30 @@ const ANCORA_SUMARIO = 'return Biblioteca.sumarioDoLivro(meta);';
 if (VENENO_SUMARIO) trocas['/app.js'] = APP.split(ANCORA_SUMARIO).join('return Array.isArray(meta.sumario) ? meta.sumario : [];');
 if (VENENO_LEITOR) trocas['/app.js'] = APP.split(VENENOS_LEITOR[VENENO_LEITOR][0]).join(VENENOS_LEITOR[VENENO_LEITOR][1]);
 if (VENENO_PAGINA_PRESA) trocas['/app.js'] = APP.split(ANCORA_PAGINA_PRESA).join(ANCORA_PAGINA_PRESA + '    return;\n');
+/* P2 (seção 11): a busca em três blocos. Cada veneno tira uma peça do app.js
+ * servido, e a seção 11 TEM de ver o defeito ("VENENO visto"):
+ *   capitulo-vira-assunto  o assunto casa também pelo título dos capítulos
+ *                          ligados a ele: um termo que só existe num capítulo
+ *                          ("lúnulas") aparece em Assuntos;
+ *   assunto-sumido         o bloco Assuntos nunca acha nada: "pitagoras" não
+ *                          cai no assunto (o outro lado do mesmo veneno);
+ *   ano-nao-filtra         com o ano escrito, o que o livro de outro ano casou
+ *                          só no texto volta a ser resultado (o caso real de
+ *                          "volume 9º ano");
+ *   outros-anos-juntos     "volume 8º ano" põe os assuntos de outro ano logo
+ *                          abaixo, no mesmo nível e sem marca. */
+const VENENOS_P2 = {
+  'capitulo-vira-assunto': ['var doTitulo = guardado.titulo, dasChaves = guardado.chaves;',
+    'var doTitulo = guardado.titulo, dasChaves = guardado.chaves.concat([].concat.apply([], indiceDosCapitulosDaBiblioteca().livros.map(function (l) { ' +
+    'return l.capitulos.filter(function (c) { return c.assuntos.some(function (x) { return x.id === a.id; }); }).map(function (c) { return raizesDoTexto(c.titulo).join(\' \'); }); })).join(\' \').split(\' \'));'],
+  'assunto-sumido': ['if (!grupos.length) return [];\n    var literal', 'return [];\n    var literal'],
+  'ano-nao-filtra': ['        if (outroAno && !b.achado) return;\n', ''],
+  'outros-anos-juntos': ['var deOutros = serie ? achados.filter(function (a) { return a.serie !== serie; }) : [];',
+    'var deOutros = []; doAno = achados; serie = null;']
+};
+const VENENO_P2 = Object.keys(VENENOS_P2).find(k => process.argv.indexOf('--envenenado-' + k) !== -1) || null;
+Object.keys(VENENOS_P2).forEach(k => VENENOS.push('--envenenado-' + k));
+if (VENENO_P2) trocas['/app.js'] = APP.split(VENENOS_P2[VENENO_P2][0]).join(VENENOS_P2[VENENO_P2][1]);
 
 const amb = H.criarAmbiente(PORTA, 'perfil_biblioteca_livros_tela', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'b2_livros_'));
@@ -262,8 +286,224 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   return ruins;
 }, raiz);
 
+/* 11. P2: A BUSCA EM TRÊS BLOCOS. Quatro livros SINTÉTICOS a mais, gravados
+ * direto no tablet (nenhum livro de verdade, nenhum nome de criança):
+ *   p2-nove   9º ano, "vol. 9": o mapa tem "Lúnulas de Hipócrates" (p. 2 a 3,
+ *             ligado ao MAT09-07) e "Volume de sólidos" (p. 4, MAT09-12);
+ *   p2-seis   6º ano, 12 páginas com "Volume 2. Matemática 9º ano." no texto
+ *             (o cabeçalho que fazia "volume 9º ano" casar centenas de
+ *             páginas) e um capítulo só no sumário;
+ *   p2-solto  sem ano e sem sumário: "9º ano" em toda página e "quadrívio"
+ *             numa só (a página solta);
+ *   p2-pratica  declarado tipo_material "pratica", com "Roteiro das lúnulas";
+ *   p2-caderno  título "Caderno de atividades de prova", SEM tipo declarado,
+ *             com "Lúnulas no caderno" (o controle: a pista do título não
+ *             esconde nada, só o campo declarado). */
+async function secaoP2(pag) {
+  secao('11. P2: a busca em três blocos (Assuntos, Capítulos nos livros, Listas e exercícios)');
+  const pdf = (nome, paginas) => {
+    const arq = path.join(TMP, nome + '.pdf');
+    const r = spawnSync(PYTHON, ['-X', 'utf8', '-c', 'import sys, json, pymupdf\nd = pymupdf.open()\n' +
+      'for t in json.loads(sys.argv[2]):\n    d.new_page().insert_text((72, 90), t)\nd.save(sys.argv[1])', arq, JSON.stringify(paginas)], { encoding: 'utf8' });
+    conf('o PDF ' + nome + ' foi gerado', r.status === 0 && fs.existsSync(arq), true);
+    amb.extras['/' + nome + '.pdf'] = { tipo: 'application/pdf', corpo: fs.existsSync(arq) ? fs.readFileSync(arq) : Buffer.from('') };
+  };
+  pdf('p2-nove', ['Capa.', 'Lunulas: areas curvas.', 'Mais lunulas.', 'Volume do prisma.']);
+  pdf('p2-seis', Array.from({ length: 12 }, (_, i) => 'Volume 2. Matematica 9º ano. Pagina ' + (i + 1) + '.'));
+  pdf('p2-solto', Array.from({ length: 6 }, (_, i) => 'Matematica 9º ano. Revisao ' + (i + 1) + '.' + (i === 3 ? ' O quadrivio antigo.' : '')));
+  pdf('p2-pratica', ['Roteiro.', 'Mais.']);
+  await pag.evaluate(() => Promise.all(['p2-nove', 'p2-seis', 'p2-solto', 'p2-pratica'].map(n => fetch('/' + n + '.pdf').then(r => r.blob())))
+    .then(([nove, seis, solto, pratica]) => Store.gravarLivros({ manifest: { pacote: 'prova-p2', versao: 1 }, livros: [
+      { blob: nove, meta: { id: 'p2-nove', hash: 'sha256:p2-nove', titulo: 'Matemática de prova', volume: 'Volume 9', formato: 'pdf', paginas: 4,
+        series: ['09'], materia: 'matematica', mapa_disciplina: 'matematica', sumario: [],
+        mapa: [{ n: 1, titulo: 'Lúnulas de Hipócrates', pagina: 2, pagina_fim: 3, assuntos: [{ id: 'MAT09-07' }] },
+          { n: 2, titulo: 'Volume de sólidos', pagina: 4, pagina_fim: 4, assuntos: [{ id: 'MAT09-12' }] }] } },
+      { blob: seis, meta: { id: 'p2-seis', hash: 'sha256:p2-seis', titulo: 'Matemática do sexto', formato: 'pdf', paginas: 12,
+        series: ['06'], materia: 'matematica', sumario: [{ n: 1, nivel: 1, titulo: 'Capítulo 1: Números naturais', pagina: 1 }] } },
+      { blob: solto, meta: { id: 'p2-solto', hash: 'sha256:p2-solto', titulo: 'Revisão sem sumário', formato: 'pdf', paginas: 6, materia: 'matematica', sumario: [] } },
+      { blob: pratica, meta: { id: 'p2-pratica', hash: 'sha256:p2-pratica', titulo: 'Experimentos de prova', formato: 'pdf', paginas: 2, series: ['09'],
+        materia: 'matematica', mapa_disciplina: 'matematica', tipo_material: 'pratica', sumario: [],
+        mapa: [{ n: 1, titulo: 'Roteiro das lúnulas', pagina: 1, pagina_fim: 2, assuntos: [] }] } },
+      { blob: pratica, meta: { id: 'p2-caderno', hash: 'sha256:p2-caderno', titulo: 'Caderno de atividades de prova', formato: 'pdf', paginas: 2, series: ['09'],
+        materia: 'matematica', mapa_disciplina: 'matematica', sumario: [],
+        mapa: [{ n: 1, titulo: 'Lúnulas no caderno', pagina: 1, pagina_fim: 2, assuntos: [] }] } }] })));
+  await pag.setViewport({ width: 1280, height: 800, hasTouch: true, deviceScaleFactor: 1 });
+  await H.abrirApp(pag, amb.ORIGEM);
+  await abrirBiblioteca(pag);
+  const foto = () => pag.evaluate(() => new Promise((res, rej) => {
+    const q = indexedDB.open('apoio-educacional');
+    q.onerror = () => rej(q.error);
+    q.onsuccess = () => {
+      // a posição de leitura é o que abrir o livro sempre gravou; o resto tem de ficar idêntico
+      const b = q.result, nomes = Array.from(b.objectStoreNames).filter(n => n !== 'livros' && n !== 'livros_posicoes').sort(), saida = {};
+      const t = b.transaction(nomes, 'readonly');
+      nomes.forEach(n => { const r = t.objectStore(n).getAll(); r.onsuccess = () => { saida[n] = r.result; }; });
+      t.oncomplete = () => { b.close(); res(JSON.stringify(saida)); };
+      t.onerror = () => rej(t.error);
+    };
+  }));
+  const banco = await foto();
+  const digitar = t => pag.evaluate(v => { const i = document.querySelector('#busca-biblioteca'); i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); }, t);
+  /* o resultado inteiro de um termo, lido quando ASSENTA: os capítulos sem
+   * "Buscando" nem "preparada", e o bloco dos assuntos decidido (à vista, ou o
+   * índice já aberto); nunca por tempo fixo */
+  const ler = () => pag.evaluate(() => {
+    const corpo = document.querySelector('#bib-corpo');
+    const a = document.querySelector('#bib-assuntos-da-busca');
+    const st = document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status');
+    const vazio = corpo.querySelector(':scope > .vazio');
+    return {
+      termo: document.querySelector('#busca-biblioteca').value,
+      // o desenho é deste termo: nada do desenho anterior (marcado antes de digitar) ficou, e os assuntos decidiram
+      novo: !corpo.querySelector(':scope > [data-velho]') && !!a && a.getAttribute('data-decidido') === 'true',
+      ordem: [...corpo.children].filter(e => !e.hidden && (e.dataset.grupo || e.classList.contains('vazio'))).map(e => e.dataset.grupo || 'vazio').join(','),
+      assuntos: a && !a.hidden ? [...a.querySelectorAll('[data-assunto]')].map(l => l.dataset.assunto + (l.dataset.outroAno ? '*' : '')) : [],
+      assuntosVisiveis: a && !a.hidden ? [...a.querySelectorAll('[data-assunto]')].filter(l => l.offsetParent !== null).map(l => l.dataset.assunto + '|' + l.querySelector('.detalhe').textContent) : [],
+      outrosAnos: ((a && a.querySelector('.bib-assuntos-outros-anos-ver')) || {}).textContent || '',
+      status: st ? st.textContent : '',
+      contagem: ((document.querySelector('#bib-corpo [data-grupo="livros"] .bib-grupo-contagem')) || {}).textContent || '',
+      capitulos: [...document.querySelectorAll('#bib-corpo [data-grupo="livros"] .bib-busca-livro-grupo')].map(c => c.dataset.livro + ':' +
+        c.querySelector('.bib-busca-livro-paginas strong').textContent + ':' + ((c.querySelector('.bib-busca-obra') || {}).textContent || '') + (c.dataset.outras ? ':OUTRAS' : '')),
+      vazio: vazio ? vazio.textContent : '',
+      pronto: !!vazio || (!!st && !!st.textContent && !/Buscando|preparada/.test(st.textContent))
+    };
+  });
+  const buscar = async (termo, extra, limite) => {
+    await pag.evaluate(() => document.querySelectorAll('#bib-corpo > *').forEach(e => { e.dataset.velho = '1'; }));
+    await digitar(termo);
+    const r = await esperar('o resultado de "' + termo + '"', ler, v => !!v && v.termo === termo && v.novo && v.pronto && (!extra || extra(v)), limite || 20000);
+    console.log('   "' + termo + '": ' + JSON.stringify(r.valor));
+    return r.valor || {};
+  };
+  /* o índice do texto dos livros novos: pede a leitura e espera ela terminar
+   * (na rodada inteira, o livro de 400 páginas da seção 9 vai na frente) */
+  await pag.evaluate(() => IndiceLivros.sincronizar());
+  const lido = await esperar('o índice leu todos os livros', () => pag.evaluate(() => IndiceLivros.estado()),
+    v => !!v && v.total > 0 && v.prontos === v.total && !v.rodando && (v.fila || []).length === 0, 240000);
+  conf('o índice do texto leu os livros da prova', lido.ok, true);
+  await buscar('quadrívio', v => /fora dos capítulos/.test(v.status), 30000);
+
+  // a ordem dos blocos e o termo do assunto (um lado do veneno)
+  const pit = await buscar('pitagoras', v => v.assuntos.length > 0 || VENENO_P2 === 'assunto-sumido');
+  const vistoSumido = !pit.assuntos.some(x => /^MAT09-07/.test(x));
+  if (VENENO_P2 === 'assunto-sumido') {
+    // sem bloco Assuntos, o resto da seção não tem o que medir: o veredito sai aqui
+    secao('VENENO: assunto-sumido');
+    conf('envenenado-assunto-sumido: a seção 11 viu o defeito', vistoSumido, true);
+    if (vistoSumido) console.log('VENENO visto: assunto-sumido');
+    return;
+  }
+  {
+    conf('"pitagoras" cai no bloco Assuntos, com o Teorema de Pitágoras em primeiro', pit.assuntos[0], 'MAT09-07');
+    conf('os blocos vêm na ordem: Assuntos, Capítulos nos livros, Listas e exercícios', pit.ordem, 'assuntos,livros,exercicios');
+  }
+  // o termo que só existe num capítulo (o outro lado): "lúnulas" não é assunto, e o capítulo aparece
+  const lun = await buscar('lúnulas', v => v.capitulos.length > 0);
+  const vistoCapitulo = lun.assuntos.length > 0;
+  if (VENENO_P2 !== 'capitulo-vira-assunto') {
+    conf('"lúnulas" (só no título de um capítulo) não aparece em Assuntos', lun.assuntos.length + '|' + lun.ordem, '0|livros,exercicios');
+    conf('controle positivo: o capítulo "Lúnulas de Hipócrates" aparece em Capítulos nos livros, com o livro e o volume',
+      lun.capitulos.indexOf('p2-nove:Lúnulas de Hipócrates:Matemática de prova, vol. 9') >= 0, true);
+    conf('o livro declarado "pratica" (roteiro de experimento) não aparece na busca', lun.capitulos.some(c => /^p2-pratica:/.test(c)), false);
+    conf('controle: o livro com "Caderno de atividades" só no título, sem tipo declarado, ainda aparece (a pista do título não esconde)',
+      lun.capitulos.some(c => /^p2-caderno:Lúnulas no caderno:/.test(c)), true);
+    // cada capítulo abre o livro nele, pelo mapa
+    await pag.evaluate(() => document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livro-grupo[data-livro="p2-nove"] .bib-busca-abrir-capitulo').click());
+    const abriu = await esperar('o capítulo abre na p. 2', () => pag.evaluate(() =>
+      (document.querySelector('#modal-leitor-pdf.aberto') && document.querySelector('#corpo-modal-leitor-pdf').dataset.paginaDesenhada) || ''), v => v === '2', 15000);
+    conf('"Abrir no capítulo" abre o livro no começo do capítulo pelo mapa (p. 2)', abriu.valor, '2');
+    await fecharModal(pag, 'modal-leitor-pdf');
+  }
+  // acento, maiúscula e plural caem no assunto certo primeiro
+  if (!VENENO_P2) {
+    for (const [termo, re] of [['senos', /^MAT09-09$/], ['SENOS', /^MAT09-09$/], ['fração', /^MAT0[4-6]-0\d$/], ['FRACOES', /^MAT0[4-6]-0\d$/]]) {
+      const r = await buscar(termo, v => v.assuntos.length > 0);
+      conf('"' + termo + '" põe o assunto certo em primeiro (' + r.assuntos[0] + ')', re.test(r.assuntos[0] || ''), true);
+    }
+    const fr = await buscar('fração', v => v.assuntos.length > 0);
+    conf('"fração" não traz "Refração" no alto: os três primeiros começam por Frações',
+      await pag.evaluate(() => [...document.querySelectorAll('#bib-assuntos-da-busca [data-assunto] .nome')].slice(0, 3).every(n => /^Frações/.test(n.textContent))), true);
+    void fr;
+  }
+
+  /* CASO REAL 1 (13/11/2026): "volume 9º ano" mostrava 1942 páginas em 87
+   * livros. O ano escrito não é palavra procurada, e o que um livro de OUTRO
+   * ano casou só no texto não é resultado. Veneno dos dois lados: com o ano,
+   * o livro do 6º (12 páginas com "Volume 2 ... 9º ano") some; sem o ano,
+   * "volume" sozinho continua achando os capítulos de volume. */
+  const v9 = await buscar('volume 9º ano', v => v.capitulos.length > 0);
+  const vistoAno = v9.capitulos.some(c => /^p2-seis:/.test(c));
+  if (VENENO_P2 !== 'ano-nao-filtra') {
+    conf('"volume 9º ano": o capítulo de volume do 9º ano aparece primeiro', /^p2-nove:Volume de sólidos:/.test(v9.capitulos[0] || ''), true);
+    conf('"volume 9º ano": o livro do 6º, que casa só no texto ("Volume 2 ... 9º ano"), não aparece', vistoAno, false);
+    conf('"volume 9º ano": o livro sem ano que tem só "9º ano" no texto não aparece', v9.capitulos.some(c => /^p2-solto:/.test(c)), false);
+    conf('"volume 9º ano": nenhuma página solta vira resultado, e a contagem é de capítulos', v9.capitulos.some(c => /OUTRAS/.test(c)) + '|' + /página/.test(v9.contagem), 'false|false');
+    conf('"volume 9º ano": o assunto do 9º ano vem primeiro', v9.assuntos[0], 'MAT09-12');
+  }
+  const vol = await buscar('volume', v => v.capitulos.length > 0);
+  conf('"volume" sozinho continua achando os capítulos de volume (o do mapa e o do texto do 6º)',
+    vol.capitulos.some(c => /^p2-nove:Volume de sólidos:/.test(c)) + '|' + vol.capitulos.some(c => /^p2-seis:/.test(c)), 'true|true');
+  conf('"volume" sozinho não marca ninguém como de outro ano', vol.capitulos.some(c => /de outro ano/.test(c)) + '|' + vol.assuntos.some(x => /\*$/.test(x)), 'false|false');
+
+  /* CASO REAL 2: "volume 8º ano" punha os do 5º e do 6º logo abaixo do 8º, no
+   * mesmo nível. Agora os do 8º ficam à vista, e os outros atrás de "Ver de
+   * outros anos", marcados "de outro ano". */
+  const v8 = await buscar('volume 8º ano', v => v.assuntos.length > 0);
+  const vistoJuntos = v8.assuntosVisiveis.some(x => !/^MAT08-/.test(x));
+  if (VENENO_P2 !== 'outros-anos-juntos') {
+    conf('"volume 8º ano": à vista, só os assuntos do 8º ano, com o MAT08-15 em primeiro', v8.assuntosVisiveis.length > 0 && !vistoJuntos &&
+      /^MAT08-15\|/.test(v8.assuntosVisiveis[0]), true);
+    conf('"volume 8º ano": os de outro ano ficam a um toque, com a contagem', /^Ver de outros anos \(\d+\)$/.test(v8.outrosAnos), true);
+    await pag.evaluate(() => document.querySelector('#bib-assuntos-da-busca .bib-assuntos-outros-anos-ver').click());
+    const abertos = await esperar('os de outros anos', () => pag.evaluate(() => [...document.querySelectorAll('#bib-assuntos-da-busca [data-outro-ano]')]
+      .map(l => l.querySelector('.detalhe').textContent)), v => v.length > 0, 5000);
+    conf('abertos, os de outro ano dizem "de outro ano" e ficam sob "De outros anos"', (abertos.valor || []).every(d => /, de outro ano/.test(d)) &&
+      await pag.evaluate(() => /De outros anos/.test(document.querySelector('#bib-assuntos-da-busca .bib-assuntos-outros-anos').textContent)), true);
+  }
+
+  if (VENENO_P2) {
+    secao('VENENO: ' + VENENO_P2);
+    const visto = { 'capitulo-vira-assunto': vistoCapitulo, 'assunto-sumido': vistoSumido, 'ano-nao-filtra': vistoAno, 'outros-anos-juntos': vistoJuntos }[VENENO_P2];
+    conf('envenenado-' + VENENO_P2 + ': a seção 11 viu o defeito', visto, true);
+    if (visto) console.log('VENENO visto: ' + VENENO_P2);
+    return;
+  }
+
+  // a página solta não é resultado: "quadrívio" só existe numa página fora de capítulo
+  const qd = await buscar('quadrívio', v => /fora dos capítulos/.test(v.status));
+  conf('"quadrívio" (só numa página solta): nenhuma linha, e uma frase diz onde ela está', qd.capitulos.length + '|' + qd.status,
+    '0|Nenhum capítulo com essa palavra. Ela aparece só em 1 página fora dos capítulos, em 1 livro.');
+  // a busca vazia diz o que fazer
+  const nada = await buscar('zqxjkw', v => !!v.vazio);
+  conf('a busca sem resultado diz o que fazer, numa frase só', nada.vazio,
+    'Nada encontrado para "zqxjkw".Tente uma palavra só, com o nome do assunto ou do capítulo (frações, volume, Pitágoras), ou apague a busca e escolha o ano.');
+  // a trava de transbordo do resultado, e os prints do painel cego
+  for (const termo of ['volume 8º ano', 'lúnulas', 'zqxjkw']) {
+    await buscar(termo, v => termo === 'zqxjkw' ? !!v.vazio : v.capitulos.length > 0);
+    for (const [w, h, css] of [[1280, 800, ''], [800, 1280, ''], [412, 915, ''], [360, 800, LETRA_130]]) {
+      await pag.setViewport({ width: w, height: h, hasTouch: true, deviceScaleFactor: 1 });
+      await letra(pag, css);
+      await esperar('a largura ' + w, () => pag.evaluate(() => innerWidth), v => v === w, 5000);
+      const ruins = await medir(pag, '#bib-corpo');
+      conf('"' + termo + '" a ' + w + 'x' + h + (css ? ' com a letra a 130%' : '') + ' não transborda', ruins.join('; '), '');
+      if (PRINTS && !css) {
+        await pag.evaluate(() => { const c = document.querySelector('.conteudo'); if (c) c.scrollTop = 0; });
+        await pag.screenshot({ path: path.join(PRINTS, 'p2-' + termo.replace(/[^a-z0-9]+/gi, '-') + '-' + w + 'x' + h + '.png') });
+      }
+      await letra(pag, '');
+    }
+  }
+  await pag.setViewport({ width: 1280, height: 800, hasTouch: true, deviceScaleFactor: 1 });
+  conf('buscar, abrir os de outros anos e abrir o capítulo não gravam nada novo', (await foto()) === banco, true);
+  await digitar('');
+}
+
 (async () => {
   secao('0. A prova se confere');
+  conf('cada âncora dos venenos da P2 aparece uma vez só no app.js',
+    Object.keys(VENENOS_P2).map(k => k + ':' + (APP.split(VENENOS_P2[k][0]).length - 1)).join(','),
+    Object.keys(VENENOS_P2).map(k => k + ':1').join(','));
+  if (VENENO_P2) conf('o app.js servido está envenenado (' + VENENO_P2 + ')', trocas['/app.js'] !== APP, true);
   conf('a lista de venenos não está vazia', VENENOS.length > 0, true);
   conf('a âncora da página do assunto presa aparece uma vez no app.js', APP.split(ANCORA_PAGINA_PRESA).length - 1, 1);
   if (VENENO_PAGINA_PRESA) conf('o app.js servido está envenenado (página presa)', trocas['/app.js'] !== APP, true);
@@ -357,6 +597,13 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await clicar(pag, '#bib-livros .bibl-disciplina[data-disciplina="matematica"]');
 
   // ================================================================
+  // os venenos da P2 vão direto à seção 11: as seções 3 a 10 não são o que eles seguram
+  if (VENENO_P2) {
+    await secaoP2(pag);
+    await H.fim(amb)();
+    return;
+  }
+
   secao('3. Os exercícios continuam alcançáveis');
   await clicar(pag, '#bib-livros .bibl-ano[data-ano="09"]');
   conf('o cartão dos exercícios do 9º ano está lá', await clicar(pag, '#bib-livros [data-exercicios="9ano"]'), true);
@@ -387,35 +634,35 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   const busca = await esperar('o resultado da busca', () => pag.evaluate(() => [document.querySelector('#bib-corpo').innerText,
     !!document.querySelector('#bib-corpo .bib-titulo')]), v => !v[1] && /Equações do Segundo Grau/.test(v[0]), 5000);
   conf('a busca "bhaskara" mostra o resultado', busca.ok, true);
-  // B12: um campo só; com livro no tablet, o resultado tem dois grupos, primeiro Exercícios e depois Nos livros
-  const grupos = await esperar('os dois grupos da busca', () => pag.evaluate(() => ({
+  // P2: um campo só; o resultado tem três blocos, nesta ordem: Assuntos, Capítulos nos livros e Listas e exercícios
+  const grupos = await esperar('os três blocos da busca', () => pag.evaluate(() => ({
     campo: document.querySelector('#busca-biblioteca').getAttribute('aria-label'),
     campos: document.querySelectorAll('.bibl-busca input').length,
-    grupos: Array.from(document.querySelectorAll('#bib-corpo > .bib-grupo-busca')).map(d => d.dataset.grupo + ':' +
+    grupos: Array.from(document.querySelectorAll('#bib-corpo > .bib-grupo-busca')).filter(d => !d.hidden).map(d => d.dataset.grupo + ':' +
       d.querySelector('.bib-grupo-titulo').textContent + ':' + d.open).join(','),
     livros: (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''
-  })), v => !!v && /Buscando|Nenhum livro|preparada|encontrada|em \d+ livros?\./.test(v.livros) && !/Buscando/.test(v.livros), 10000);
+  })), v => !!v && /Nenhum livro|Nenhum capítulo|preparada|em \d+ livros?\./.test(v.livros) && !/Buscando/.test(v.livros) && /^assuntos:/.test(v.grupos), 10000);
   conf('um campo de busca só, e ele diz que busca nos exercícios e nos livros',
     grupos.valor.campos + ' | ' + grupos.valor.campo, '1 | Buscar nos exercícios e nos livros');
-  conf('o resultado tem dois grupos abertos: Exercícios e depois Nos livros', grupos.valor.grupos,
-    'exercicios:Exercícios:true,livros:Nos livros:true');
+  conf('o resultado tem três blocos abertos: Assuntos, Capítulos nos livros e Listas e exercícios', grupos.valor.grupos,
+    'assuntos:Assuntos:true,livros:Capítulos nos livros:true,exercicios:Listas e exercícios:true');
   const leGrupoEx = () => pag.evaluate(() => {
     const g = document.querySelector('#bib-corpo [data-grupo="exercicios"]');
     const visiveis = Array.from(g.querySelectorAll('.item-lista')).filter(e => e.offsetParent !== null);
-    const livros = document.querySelector('#bib-corpo [data-grupo="livros"] > summary');
+    const cabeca = g.querySelector(':scope > summary');
     return { contagem: g.querySelector('.bib-grupo-contagem').textContent, linhas: visiveis.length, todas: g.querySelectorAll('.item-lista').length,
       blocos: Array.from(g.querySelectorAll('.bloco-exercicios')).filter(b => b.offsetParent !== null).map(b => b.textContent).join(','),
-      resumo: (document.querySelector('#bib-busca-resumo') || {}).textContent || '',
+      resumo: !!document.querySelector('#bib-busca-resumo'),
       verTodos: (g.querySelector('.bib-grupo-ver-todos') || {}).textContent || '',
-      livrosNoAlto: livros ? Math.round(livros.getBoundingClientRect().top) : null, altura: innerHeight };
+      exNoAlto: cabeca ? Math.round(cabeca.getBoundingClientRect().top) : null, altura: innerHeight };
   });
   const gx = await leGrupoEx();
   conf('a contagem dos exercícios tem unidade e conta as linhas do grupo (as à vista e as do "Ver todos")',
     /^\d+ (lista|listas|resultado|resultados|módulo|módulos|aula de teoria|aulas de teoria|problema|problemas)$/.test(gx.contagem) &&
     parseInt(gx.contagem, 10) === gx.todas ? 'ok' : JSON.stringify(gx), 'ok');
   conf('dentro do grupo, o bloco das listas não repete "Exercícios"', /(^|,)Exercícios(,|$)/.test(gx.blocos), false);
-  conf('a linha-resumo no alto diz os dois grupos', /^Exercícios.+·Nos livros/.test(gx.resumo), true);
-  // um termo curto e comum: muitos exercícios, e os livros continuam na primeira tela
+  conf('a linha-resumo do alto saiu: os três rótulos já dizem o que há', gx.resumo, false);
+  // um termo curto e comum: muitos exercícios e capítulos, e o bloco das listas continua na primeira tela
   for (const [w, h] of [[1280, 800], [800, 1280]]) {
     await pag.setViewport({ width: w, height: h, hasTouch: true, deviceScaleFactor: 1 });
     await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = 'de'; i.dispatchEvent(new Event('input', { bubbles: true })); });
@@ -423,19 +670,24 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
       (document.querySelector('#bib-corpo [data-grupo="livros"] .bib-busca-livros-status') || {}).textContent || ''), v => !!v && !/Buscando/.test(v), 10000);
     await pausa(300);
     const gd = await leGrupoEx();
-    console.log('   "de" a ' + w + 'x' + h + ': ' + gd.contagem + ', ' + gd.linhas + ' linhas à vista, "Nos livros" a ' + gd.livrosNoAlto + ' px de ' + gd.altura);
+    console.log('   "de" a ' + w + 'x' + h + ': ' + gd.contagem + ', ' + gd.linhas + ' linhas à vista, "Listas e exercícios" a ' + gd.exNoAlto + ' px de ' + gd.altura);
     conf('a ' + w + 'x' + h + ', com mais de 3 linhas, o grupo mostra 3 e "Ver todos os N"', gd.linhas + ' | ' + (gd.verTodos === 'Ver todos os ' + gd.todas), '3 | true');
-    conf('a ' + w + 'x' + h + ', o cabeçalho "Nos livros" fica na primeira tela', gd.livrosNoAlto !== null && gd.livrosNoAlto < gd.altura - 48, true);
+    /* P2: os capítulos vêm antes das listas. O cabeçalho dos capítulos fica na
+     * primeira tela; o das listas, a no máximo uma tela de rolagem (deitado,
+     * com "de" casando capítulos, ele cai logo abaixo da dobra: medido 822 px de 800) */
+    const capNoAlto = await pag.evaluate(() => { const s = document.querySelector('#bib-corpo [data-grupo="livros"] > summary'); return s ? Math.round(s.getBoundingClientRect().top) : null; });
+    conf('a ' + w + 'x' + h + ', o cabeçalho "Capítulos nos livros" fica na primeira tela', capNoAlto !== null && capNoAlto < gd.altura - 48, true);
+    conf('a ' + w + 'x' + h + ', o cabeçalho "Listas e exercícios" fica a no máximo uma tela de rolagem', gd.exNoAlto !== null && gd.exNoAlto < 2 * gd.altura - 48, true);
     const ruinsB = await medir(pag, '#bib-corpo');
     conf('a ' + w + 'x' + h + ', o resultado não transborda', ruinsB.join('; '), '');
   }
   // nada nos dois grupos: um estado vazio só, com a frase e o caminho de sempre
   await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = 'zqxjkw'; i.dispatchEvent(new Event('input', { bubbles: true })); });
   const vazio = await esperar('o estado vazio único', () => pag.evaluate(() => ({
-    vazios: document.querySelectorAll('#bib-corpo .vazio').length, grupos: document.querySelectorAll('#bib-corpo .bib-grupo-busca').length,
+    vazios: document.querySelectorAll('#bib-corpo .vazio').length, grupos: [...document.querySelectorAll('#bib-corpo .bib-grupo-busca')].filter(d => !d.hidden).length,
     texto: (document.querySelector('#bib-corpo .vazio') || {}).textContent || '' })), v => !!v && v.vazios === 1 && v.grupos === 0, 10000);
-  conf('sem nada nos exercícios nem nos livros, uma frase só, com o caminho de procurar outra palavra',
-    vazio.ok && /Procure por outra palavra, ou navegue pela série\./.test(vazio.valor.texto), true);
+  conf('sem nada nos assuntos, nos capítulos e nas listas, uma frase só, que diz o que fazer',
+    vazio.ok && /^Nada encontrado para "zqxjkw"\.Tente uma palavra só, com o nome do assunto ou do capítulo \(frações, volume, Pitágoras\), ou apague a busca e escolha o ano\.$/.test(vazio.valor.texto), true);
   await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); i.value = 'de'; i.dispatchEvent(new Event('input', { bubbles: true })); });
   await pausa(500);
   for (const w of [360, 390, 412]) {
@@ -893,7 +1145,8 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     return { meio: caixa ? +caixa.dataset.paginaArquivo : null, contador: document.querySelector('#leitor-contador').textContent,
       fy: rc ? (y - rc.top) / rc.height : null, altura: rc ? rc.height : null, largura: rc ? Math.round(rc.width) : null,
       canvas: !!(caixa && caixa.querySelector('canvas')), vazias: vazias.join(','),
-      vivos: Array.from(c.querySelectorAll('canvas')).filter(k => k.width > 0).length };
+      vivos: Array.from(c.querySelectorAll('canvas')).filter(k => k.width > 0).length,
+      pixels: Array.from(c.querySelectorAll('canvas')).reduce((s, k) => s + k.width * k.height, 0) };
   });
   const irParaPagina = async n => {
     await pag.evaluate(v => { const i = document.querySelector('#leitor-ir-pagina'); i.value = String(v); i.dispatchEvent(new Event('change')); }, n);
@@ -1047,14 +1300,23 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   // no zoom 4 a página é muito maior que a tela: a vizinha longe não fica viva
   for (let i = 0; i < 5; i++) { await clicar(pag, '#leitor-mais'); await pausa(400); }
   await pausa(800);
-  let picoZ4 = 0;
+  /* Desde a fatia 3 do leitor, o que se conta no zoom 4 são os PIXELS, e não
+   * os canvases: há o canvas de detalhe por cima da página à vista e a página
+   * seguinte pré-desenhada na direção da rolagem, e o leitor segura o total no
+   * orçamento de 16 milhões. A vizinha longe, do lado de trás, continua solta. */
+  let picoZ4 = 0, picoPx = 0;
   for (let i = 0; i < 12; i++) {
     await pag.evaluate(() => { document.querySelector('#corpo-modal-leitor-pdf').scrollTop += 300; });
     await pausa(250);
-    picoZ4 = Math.max(picoZ4, (await meioDoLeitor()).vivos);
+    const m = await meioDoLeitor();
+    picoZ4 = Math.max(picoZ4, m.vivos);
+    picoPx = Math.max(picoPx, m.pixels);
   }
-  console.log('   zoom 4: pico de ' + picoZ4 + ' canvases vivos rolando de 300 em 300 px');
-  conf('no zoom 4, o pico fica em no máximo 2 canvases vivos', picoZ4 <= 2, true);
+  console.log('   zoom 4: pico de ' + picoZ4 + ' canvases vivos e ' + (picoPx / 1e6).toFixed(2) + ' milhões de pixels rolando de 300 em 300 px');
+  /* com o veneno canvas-sem-soltar a pré-desenhada de cada passo fica viva e
+   * o orçamento estoura: aqui também é a falha que o veneno tem de dar */
+  checa('no zoom 4, o pico fica em no máximo 16 milhões de pixels de canvas vivos', picoPx <= 16000000, true, 'canvas-sem-soltar');
+  checa('e em no máximo 5 canvases (as à vista, os detalhes delas e a pré-desenhada)', picoZ4 <= 5, true, 'canvas-sem-soltar');
   conf('e a página à vista segue desenhada', (await esperar('o zoom 4: a página à vista desenhada', meioDoLeitor, v => v.vazias === '', 8000)).ok, true);
   await clicar(pag, '#leitor-largura');
   await pausa(400);
@@ -1111,9 +1373,23 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
     const q = indexedDB.open('apoio-educacional');
     q.onerror = () => rej(q.error);
     q.onsuccess = () => {
+      /* as miniaturas que a Biblioteca desenha ficam em 'midias' com a chave
+       * 'bib:' (store.js, PREFIXO_MINIATURA): é cache de desenho, e não conta
+       * como gravação; o resto de 'midias' (as fotos dela e o "Abrir como
+       * folha") continua conferido */
       const b = q.result, nomes = Array.from(b.objectStoreNames).filter(n => n !== 'livros').sort(), saida = {};
       const t = b.transaction(nomes, 'readonly');
-      nomes.forEach(n => { const r = t.objectStore(n).getAll(); r.onsuccess = () => { saida[n] = r.result; }; });
+      nomes.forEach(n => {
+        const st = t.objectStore(n), r = st.getAll(), k = st.getAllKeys();
+        let valores = null, chaves = null;
+        const junta = () => {
+          if (!valores || !chaves) return;
+          saida[n] = n !== 'midias' ? valores
+            : chaves.map((c, i) => [c, valores[i]]).filter(par => !String(par[0]).startsWith('bib:'));
+        };
+        r.onsuccess = () => { valores = r.result; junta(); };
+        k.onsuccess = () => { chaves = k.result; junta(); };
+      });
       t.oncomplete = () => { b.close(); res(JSON.stringify(saida)); };
       t.onerror = () => rej(t.error);
     };
@@ -1193,8 +1469,10 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
       livros: [...p.querySelectorAll('[data-secao="livros"] .bib-assunto-livro')].map(c => c.dataset.livro + ':' + c.querySelector('strong').textContent + ':' + ((c.querySelector('.bib-busca-livro-quantas') || {}).textContent || '') + ':' + c.querySelector('button').textContent),
       livrosVazio: ((secao('livros') || document).querySelector('.bib-assunto-vazio') || {}).textContent || '',
       fontes: [...p.querySelectorAll('[data-secao="teoria"] [data-fonte]')].map(f => f.dataset.fonte),
-      obmep: secao('obmep') ? [...secao('obmep').querySelectorAll('[data-fonte]')].map(f => f.querySelector('.detalhe').textContent) : null,
-      enem: secao('enem') ? [...secao('enem').querySelectorAll('[data-fonte]')].map(f => f.querySelector('.detalhe').textContent) : null,
+      // a OBMEP e o ENEM são seções do bloco da T2: um cartão por questão, com o tipo da fonte
+      obmep: secao('obmep') ? [...secao('obmep').querySelectorAll('.bte-ex[data-fonte]')].map(f => f.dataset.fonte) : null,
+      enem: secao('enem') ? [...secao('enem').querySelectorAll('.bte-ex[data-fonte]')].map(f => f.dataset.fonte) : null,
+      bloco: !!p.querySelector('[data-secao="teoria"] .bte'), tituloDoBloco: !!p.querySelector('.bte-titulo'),
       vizinhos: [...p.querySelectorAll('[data-secao="vizinhos"] [data-assunto]')].map(b => b.dataset.assunto),
       campo: document.querySelector('#busca-biblioteca').value,
       livrosDaEstante: vis('#bib-livros'), topo: vis('#bib-exercicios-cabeca') || vis('#bib-carrinho'),
@@ -1207,10 +1485,12 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   conf('a página abre com o caminho (matéria, ano e tema) e o título do assunto', P.titulo + ' | ' + /^Matemática› 9º ano› /.test(P.caminho.replace(/\s+›/g, '›').replace(/›\s+/g, '› ')), 'Teorema de Pitágoras | true');
   conf('"Também aparece como" traz o nome do capítulo no mapa', /Pitágoras e aplicações/.test(P.tambem), true);
   conf('"Nos livros" traz o capítulo ligado, com a faixa de páginas (1 vínculo, como na busca)', (P.livros || []).join(','), 'b1-livro:Pitágoras e aplicações:p. 2 a 3:Abrir');
-  conf('"Teoria e exercícios" traz as fontes do módulo do assunto', (P.fontes || []).length > 0, true);
-  conf('o bloco OBMEP aparece com as questões ligadas, e diz quantas são de quantas', !!P.obmep && P.obmep.length > 0 &&
-    P.obmep.every(d => /^(\d+ questões?|\d+ questões? ligadas?, numa lista de \d+) · /.test(d)), true);
-  conf('a questão do ENEM fica no bloco ENEM, e não no da OBMEP', !!P.enem && P.enem.length === 1 && /^1 questão ligada, numa lista de \d+ · /.test(P.enem[0]), true);
+  conf('"Teoria e exercícios" é o bloco da T2, sem repetir o título da seção', P.bloco + '|' + P.tituloDoBloco, 'true|false');
+  conf('"Teoria e exercícios" traz a teoria e os exercícios do módulo do assunto',
+    (P.fontes || []).some(f => /^teoria:/.test(f)) && (P.fontes || []).some(f => /^exercicio:/.test(f)), true);
+  conf('a OBMEP aparece com as duas questões ligadas, cada uma no seu cartão', !!P.obmep && P.obmep.length === 2 &&
+    P.obmep.every(f => /^obmep:/.test(f)), true);
+  conf('a questão do ENEM fica na seção do ENEM, e não na da OBMEP', !!P.enem && P.enem.length === 1 && /^enem:/.test(P.enem[0]), true);
   conf('os vizinhos são do mesmo tema e ano, e não o próprio assunto', (P.vizinhos || []).length > 0 && (P.vizinhos || []).every(v => /^MAT09-/.test(v) && v !== 'MAT09-07'), true);
   conf('a busca deu lugar à página; a estante, o topo dos exercícios e a faixa saem, e a página começa no alto',
     P.campo + '|' + P.livrosDaEstante + '|' + P.topo + '|' + (P.alto <= 2), '|false|false|true');
@@ -1235,14 +1515,19 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   await fecharModal(pag, 'modal-leitor-pdf');
   // o Voltar do aparelho (o history.back do Android, #179) volta à página do assunto depois de abrir uma fonte dela
   await pausa(600);
-  await clicar(pag, '#bib-corpo [data-secao="teoria"] [data-fonte^="teoria:"]');
+  /* a teoria abre na tela cheia, por cima da página (o bloco da T2), e não sai
+   * dela: fechar a tela cheia deixa a página como estava. (A tela cheia da
+   * Biblioteca não entra no histórico do Voltar do aparelho; isso vale para a
+   * Biblioteca inteira e está anotado como pendência no PR.) */
+  await clicar(pag, '#bib-corpo [data-secao="teoria"] [data-fonte^="teoria:"] .bte-teoria-abrir');
   const naTeoria = await esperar('a teoria aberta pela página', () => pag.evaluate(() =>
-    !document.querySelector('#bib-corpo .bib-assunto') && !!document.querySelector('#bib-corpo .bib-titulo')), v => v, 10000);
-  conf('a teoria abre a partir da página do assunto', naTeoria.ok, true);
-  await pausa(700);
-  await pag.evaluate(() => history.back());
-  const deVolta = await esperar('a página do assunto de volta', lerPagina, v => !!v && v.id === 'MAT09-07', 10000);
-  conf('o Voltar do aparelho, numa teoria aberta pela página, volta à página do assunto', deVolta.ok, true);
+    !!document.querySelector('#modal-biblioteca.aberto') && !!document.querySelector('#bib-corpo .bib-assunto')), v => v, 10000);
+  conf('a teoria abre na tela cheia, por cima da página do assunto', naTeoria.ok, true);
+  await pausa(400);
+  await clicar(pag, '#bib-fechar-visor');
+  const deVolta = await esperar('a página do assunto de volta', () => pag.evaluate(() =>
+    !document.querySelector('#modal-biblioteca.aberto') && !!document.querySelector('#bib-corpo .bib-assunto[data-assunto="MAT09-07"]')), v => v, 10000);
+  conf('fechar a tela cheia deixa a página do assunto como estava', deVolta.ok, true);
   await pausa(600);
   // um vizinho abre a página dele; o Voltar devolve a busca como estava
   const vizinho = (P.vizinhos || [])[0];
@@ -1305,6 +1590,8 @@ const medir = (pag, raiz) => pag.evaluate(sel => {
   }), true);
   await digitarB1('');
   await pausa(400);
+
+  await secaoP2(pag);
 
   conf('nenhum erro de página', errosDePagina.join(' | '), '');
   await H.fim(amb)();

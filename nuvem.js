@@ -1860,7 +1860,23 @@
   }
   if (disponivel()) carregarEstado();
 
+  /* O CATÁLOGO DA BIBLIOTECA (fase 1c), só leitura: o índice
+   * (usuarios/{uid}/config/catalogo) e o documento de um livro
+   * (catalogo/{id}), da conta que entrou. Quem grava é só o publicador do
+   * dono (biblioteca/publicar_catalogo.py); as regras negam escrita do
+   * aplicativo. null quando o documento não existe. */
+  function lerCatalogo() {
+    if (!sessao || !sessao.uid) return Promise.reject(Object.assign(new Error('Entre na nuvem para atualizar a biblioteca.'), { codigo: 'SEM_SESSAO' }));
+    return lerDoc(nomeDoc(sessao.uid, 'config/catalogo'));
+  }
+  function lerLivroDoCatalogo(id) {
+    if (!sessao || !sessao.uid) return Promise.reject(Object.assign(new Error('Entre na nuvem para atualizar a biblioteca.'), { codigo: 'SEM_SESSAO' }));
+    if (typeof id !== 'string' || !/^[a-z0-9][a-z0-9-]{0,199}$/.test(id)) return Promise.reject(new Error('id de livro inválido'));
+    return lerDoc(nomeDoc(sessao.uid, 'catalogo/' + id));
+  }
+
   root.Nuvem = {
+    lerCatalogo: lerCatalogo, lerLivroDoCatalogo: lerLivroDoCatalogo,
     disponivel: disponivel, pronto: carregarEstado, estado: estado, aoMudar: aoMudar,
     entrar: entrar, sair: sair, esqueciASenha: esqueciASenha, trocarSenha: trocarSenha,
     enviarCopia: enviarCopia, listarCopias: listarCopias, baixarCopia: baixarCopia, restaurou: restaurou,

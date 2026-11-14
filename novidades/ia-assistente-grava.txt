@@ -1,0 +1,5 @@
+# Fase 4a: o assistente também muda aulas. Só o que ela nota no dia a dia (regra do 00-LEIA-PRIMEIRO): no máximo 3 itens curtos.
+No Perguntar, agora você também pode pedir: "remarca a da quinta para sexta", "a de hoje foi falta", "cancela a de amanhã", "marca uma aula sábado às 10:00".
+Nada muda sozinho: aparece um cartão com o antes e o depois, e só grava quando você toca em Confirmar. Logo depois, dá para desfazer.
+Dite como foi a aula ou o feedback do mês: o assistente prepara o texto e você ajusta antes de gravar.
+# Ficaram fora da janela (detalhes do cartão): a pergunta da cobrança aula por aula, o Confirmar tudo dos pedidos com várias aulas e as aulas que ficam de fora.

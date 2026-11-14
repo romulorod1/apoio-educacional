@@ -24,6 +24,9 @@
       <strong>Nathália Wajsenzon</strong>
       <span>Apoio Educacional</span>
     </div>
+    <!-- IA, fase 3: o assistente só de leitura, numa pílula com rótulo, vizinha do olho. Some sem a conta da
+         nuvem e no observador (app.js, podeUsarAssistente). -->
+    <button class="pilula-perguntar" id="abrir-assistente" type="button" title="Perguntar ao assistente" data-icone="perguntar" data-assistente="abrir" hidden>Perguntar</button>
     <button class="olho" id="alternar-valores" type="button" title="Esconder os valores" aria-label="Esconder os valores" data-icone="olho"></button>
     <!-- B1: o trilho lateral do tablet (o "+" no alto, os quatro destinos e Ajustes no pé).
          Os ganchos das provas ficam: #abas, .aba, .ativa e data-tela.
@@ -381,9 +384,9 @@
       <div class="modal-corpo" id="corpo-modal-aula"></div>
       <div class="modal-rodape" id="rodape-modal-aula">
         <button class="btn perigo esquerda" id="excluir-aula" type="button">Excluir</button>
-        <span class="ajuda-salvamento" id="aviso-salvamento-aula" style="display:none">
-          Assuntos, domínio, habilidades e arquivos salvam na hora neste tablet. Horário e situação gravam ao clicar em Salvar. O relato tem rascunho automático e entra na aula quando você salva.
-        </span>
+        <span class="estado-salvamento-aula" id="estado-salvamento-aula" aria-live="polite" style="display:none"></span>
+        <!-- F7: na aula que já existe, fecha sem gravar o pendente e volta o relato ao que havia ao abrir -->
+        <button class="btn" type="button" id="descartar-aula" style="display:none">Descartar alterações</button>
         <button class="btn" data-fechar type="button" id="cancelar-aula">Cancelar</button>
         <button class="btn secundaria" id="salvar-preparar-aula" type="button" style="display:none">Salvar e preparar</button>
         <button class="btn principal" id="salvar-aula" type="button">Salvar</button>
@@ -630,6 +633,20 @@
       </div>
       <div class="modal-corpo" id="corpo-modal-planejamento"></div>
       <div class="modal-rodape" id="rodape-modal-planejamento"></div>
+    </div>
+  </div>
+
+  <!-- IA, fase 3: o assistente só de leitura. A conversa no corpo; o campo,
+       o Ditar e o Perguntar no rodapé, sempre à mão. -->
+  <div class="fundo-modal" id="modal-assistente">
+    <div class="modal ass-modal">
+      <div class="modal-cabecalho">
+        <h3 id="titulo-modal-assistente" tabindex="-1">Assistente</h3>
+        <button class="btn pequeno" id="ass-nova" type="button" hidden>Nova conversa</button>
+        <button class="fechar" data-fechar type="button" aria-label="Fechar" data-icone="x"></button>
+      </div>
+      <div class="modal-corpo" id="corpo-modal-assistente"></div>
+      <div class="modal-rodape ass-rodape" id="rodape-modal-assistente"></div>
     </div>
   </div>
 
@@ -944,6 +961,7 @@
   <!-- O planejamento de estudos com IA: do pedido ao plano e do plano à folha.
        Puro, antes do app.js, e na lista ARQUIVOS do sw.js. -->
   <script src="planejamento.js"></script>
+  <script src="assistente.js"></script>
   <script src="app.js"></script>
 </body>
 

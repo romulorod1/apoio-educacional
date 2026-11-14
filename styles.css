@@ -34,6 +34,9 @@
   --acao-clara: #E8EDF4;
   --trilho-do-deslize: #ECEEF1;
   --fundo-escurecido: rgba(15, 23, 42, .35);
+  /* a seleção do texto sobre a página do livro (fatia 7): translúcida, porque a
+     letra que se vê é a desenhada no canvas, por baixo da camada */
+  --selecao-no-livro: rgba(46, 125, 107, .28);
   --navy-escuro: #16314F;
   --teal: #2E7D6B;
   --teal-claro: #E6F1EE;
@@ -2122,6 +2125,15 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-rotulo { font-size: var(--letra-14); font-weight: 600; color: var(--navy); }
 .bib-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .bib-origem { font-size: var(--letra-12); color: var(--muted); }
+/* o crédito que a licença da fonte pede (L6): sempre visível, nunca escondido */
+.bib-credito { font-size: var(--letra-12); color: var(--muted); overflow-wrap: anywhere; }
+/* a marca da resposta de duas IAs conferida: sempre à vista; tocar abre o porquê */
+.bib-marca-ia { font-size: var(--letra-12); color: var(--muted); margin-top: 6px; }
+.bib-marca-ia > summary { display: inline-flex; align-items: center; gap: 4px; min-height: var(--alvo); cursor: pointer; color: var(--navy); font-weight: 600; list-style: none; }
+.bib-marca-ia > summary::-webkit-details-marker { display: none; }
+.bib-marca-ia[open] > summary .bib-grupo-seta { transform: rotate(90deg); }
+.bib-marca-ia-explica { margin: 0 0 6px; }
+.bib-sem-resposta { font-style: italic; color: var(--muted); }
 .bib-visor { background: var(--fio-claro); }
 .bib-cheia { width: 100%; height: auto; display: block; margin: 0 auto; background: var(--branco); box-shadow: var(--sombra); }
 /* o selo "Marcado" sobre a imagem da tela cheia: ela anda pelo Anterior e
@@ -2176,7 +2188,56 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-pdf-navegacao input { display: block; width: 100%; min-height: var(--alvo); margin: 0; accent-color: var(--navy); }
 .leitor-pdf-pagina { position: relative; margin: 0 auto 18px; background: var(--branco); box-shadow: var(--sombra); }
 .leitor-pdf-pagina canvas { display: block; margin: 0; background: var(--branco); }
+/* O canvas de detalhe do zoom alto (fatia 3): só o pedaço à vista, na densidade
+   da tela, por cima da página inteira; o toque passa direto para a página. */
+.leitor-pdf-pagina canvas.leitor-pdf-detalhe { position: absolute; pointer-events: none; }
+/* A camada de texto do livro (fatia 7): o CSS do textLayer do pdf.js 6.4.299
+   (pdf_viewer.css), só o que a camada usa. O texto fica transparente, por cima
+   do canvas e do detalhe, no lugar da letra desenhada; a seleção aparece no
+   verde translúcido do sistema. O tamanho é o da caixa da página (o pdf.js o
+   escreve com round(), que nem todo navegador tem). A --total-scale-factor
+   vale 1 aqui e o app.js põe a da página na camada. O tamanho da letra de cada
+   pedaço de texto NÃO está aqui: é geometria da página do PDF, em px, e não
+   tipografia do app; o app.js o põe no estilo de cada pedaço (como o pdf.js
+   fazia até a versão 3). */
+.leitor-pdf-pagina .textLayer { position: absolute; inset: 0; width: 100% !important; height: 100% !important;
+  z-index: 1; overflow: clip; opacity: 1; line-height: 1; text-align: initial;
+  -webkit-text-size-adjust: none; text-size-adjust: none; forced-color-adjust: none;
+  transform-origin: 0 0; caret-color: CanvasText;
+  --total-scale-factor: 1;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+.leitor-pdf-pagina .textLayer span, .leitor-pdf-pagina .textLayer br { color: transparent; position: absolute;
+  white-space: pre; cursor: text; transform-origin: 0% 0%;
+  --font-height: 0;
+  --scale-x: 1; --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv)); }
+.leitor-pdf-pagina .textLayer span.markedContent { top: 0; height: 0; }
+/* O fim do conteúdo (o do TextLayerBuilder do pdf.js; o app.js o põe e o
+   move): fora da seleção, uma faixa de altura zero no pé da camada; com a
+   seleção na camada (classe selecting), a camada inteira, por baixo dos
+   pedaços de texto. O arrasto que passa do fim da linha cai nele, e não no
+   vazio. Sem texto: a cor transparente é a dos pedaços. */
+.leitor-pdf-pagina .textLayer > :not(.markedContent),
+.leitor-pdf-pagina .textLayer .markedContent span:not(.markedContent) { z-index: 1; }
+.leitor-pdf-pagina .textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: 0;
+  cursor: default; color: transparent; -webkit-user-select: none; user-select: none; }
+.leitor-pdf-pagina .textLayer.selecting .endOfContent { top: 0; }
+.leitor-pdf-pagina .textLayer ::selection { background: var(--selecao-no-livro); }
+.leitor-pdf-pagina .textLayer br::selection { background: transparent; }
 .leitor-pdf-pagina-vazia { width: 100%; height: 100%; background: var(--branco); }
+/* "Voltar à p. 45" (fatia 6): depois de um salto, flutua por cima do pé da
+   área de leitura, no meio, por 10 s, como o aviso de uma linha com uma ação
+   (benchmark 2.5 e 5.3). A faixa tem altura zero: não empurra a página nem a
+   barra, e o botão não rola junto com o livro. Alvo de 48 px (padrão 8). */
+.leitor-voltar-faixa { position: relative; flex: 0 0 0; height: 0; z-index: 2; }
+.leitor-voltar-salto { position: absolute; left: 50%; bottom: 1rem; transform: translateX(-50%);
+  min-height: var(--alvo); min-width: var(--alvo); padding: 0 1.25rem; border-radius: var(--alvo);
+  white-space: nowrap; box-shadow: var(--sombra-forte); }
+.leitor-voltar-salto:active { transform: translateX(-50%) translateY(1px); }
+.leitor-voltar-salto[hidden] { display: none; }
 /* A frase do C3 ("Escolha a página e toque em...") fica colada embaixo da
    barra, de ponta a ponta, sem rolar junto com a página. */
 .leitor-pdf-dica { flex-shrink: 0; margin: 0; border-radius: 0; border-width: 0 0 1px; }
@@ -2232,6 +2293,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-cobre .cobre-rolagem { flex: 1 1 100%; margin: 0; }
 .livro-linha .detalhe { margin-top: 2px; }
 #lista-livros-biblioteca .livros-total { font-weight: 600; margin: 4px 0 8px; }
+/* fase 1c: a linha da biblioteca na nuvem, com o botão ao lado (quebra quando falta largura) */
+#lista-livros-biblioteca .livros-nuvem { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 10px; }
+#lista-livros-biblioteca .livros-nuvem .ajuda { margin: 0; min-width: 12rem; overflow-wrap: anywhere; }
 #lista-instalados-biblioteca > summary {
   cursor: pointer;
   color: inherit;
@@ -2450,6 +2514,11 @@ button.alvo-rascunho:hover { background: var(--soft); }
   margin-right: auto;
   max-width: 300px;
   text-align: left;
+}
+.estado-salvamento-aula {
+  font-size: var(--letra-12);
+  color: var(--muted);
+  margin-right: auto;
 }
 
 .ajuda-exemplo-curto {
@@ -3876,6 +3945,11 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bib-grupo-busca { margin: 0 0 12px; min-width: 0; }
 .bib-grupo-cabeca { display: flex; align-items: center; gap: 8px; min-height: var(--alvo); padding: 0 4px; cursor: pointer; border-bottom: 1px solid var(--fio); }
 .bib-grupo-titulo { font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
+/* P2 (revisão cega): no celular, "Capítulos nos livros" e a contagem quebravam cada um em duas linhas, com a seta
+ * entre elas; o título fica inteiro numa linha e a contagem desce inteira para a de baixo, alinhada ao título */
+.bib-grupo-cabeca { flex-wrap: wrap; row-gap: 0; }
+.bib-grupo-contagem { white-space: nowrap; }
+@media (max-width: 480px) { .bib-grupo-cabeca .bib-grupo-contagem { flex-basis: 100%; padding-left: 28px; padding-bottom: 6px; } }
 .bib-grupo-contagem { font-size: var(--letra-14); color: var(--muted); }
 .bib-grupo-corpo { padding-top: 4px; min-width: 0; }
 .bib-grupo-vazio { margin: 8px 0; }
@@ -3886,22 +3960,13 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bib-grupo-busca > summary::-webkit-details-marker, .bib-busca-livros-sem-texto > summary::-webkit-details-marker { display: none; }
 .bib-grupo-seta { display: inline-flex; color: var(--muted); transition: transform .15s; }
 .bib-grupo-busca[open] > summary .bib-grupo-seta, .bib-busca-livros-sem-texto[open] > summary .bib-grupo-seta { transform: rotate(90deg); }
-/* a linha-resumo no alto do resultado: cada parte leva ao grupo */
-.bib-busca-resumo { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0 0 8px; min-width: 0; }
-.bib-busca-resumo-parte { display: inline-flex; align-items: baseline; gap: 6px; min-height: var(--alvo); padding: 0 8px; border: 0; border-radius: var(--raio); background: transparent; color: var(--texto); font: inherit; cursor: pointer; }
-.bib-busca-resumo-titulo { font-weight: var(--peso-forte); color: var(--navy); }
-.bib-busca-resumo-valor { font-size: var(--letra-14); color: var(--muted); }
-.bib-busca-resumo-ponto { color: var(--muted); }
 /* as páginas encontradas: cada uma abre o leitor nela */
 .bib-busca-paginas { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .bib-busca-pagina { min-width: var(--alvo); min-height: var(--alvo); padding: 0 8px; border: 1px solid var(--fio); border-radius: 8px; background: var(--branco); color: var(--navy); font: inherit; cursor: pointer; }
 .bib-busca-livro-quantas { display: block; font-size: var(--letra-14); color: var(--muted); }
 .bib-busca-livros-dispensar { margin-top: 4px; }
-.bib-grupo-ver-todos, .bib-busca-livros-mais { margin-top: 8px; min-height: var(--alvo); }
+.bib-grupo-ver-todos { margin-top: 8px; min-height: var(--alvo); }
 .bib-busca-livros-sem-texto-lista { margin: 4px 0 0; padding-left: 20px; overflow-wrap: anywhere; }
-.bib-busca-livro { margin-top: 8px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
-.bib-busca-livro-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); overflow-wrap: anywhere; }
-.bib-busca-livro-volume { margin: 0 0 8px; font-size: var(--letra-14); color: var(--muted); }
 .bib-busca-livro-grupo { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; margin-top: 8px; border-top: 1px solid var(--fio); min-width: 0; }
 .bib-busca-livro-paginas { flex: 0 0 auto; min-width: 0; font-size: var(--letra-14); overflow-wrap: anywhere; }
 .bib-busca-livro-grupo .btn { min-height: var(--alvo); }
@@ -3913,9 +3978,7 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bib-busca-paginas[hidden] { display: none; }
 .bib-busca-obra { margin: 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
 /* B1: os assuntos no alto da busca e a página do assunto */
-.bib-assuntos-da-busca { margin: 0 0 12px; }
 .bib-assuntos-da-busca[hidden] { display: none; }
-.bib-assuntos-titulo { margin: 0 0 4px; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
 .bib-assunto { min-width: 0; }
 .bib-assunto-caminho { margin: 8px 0 0; font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
 .bib-assunto-passo + .bib-assunto-passo { margin-left: 6px; }
@@ -3936,14 +3999,14 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 #tela-biblioteca.com-pagina-do-assunto #bib-contexto,
 #tela-biblioteca.com-pagina-do-assunto #bib-carrinho { display: none; }
 .bib-assuntos-mais { min-height: var(--alvo); margin-top: 4px; }
-/* "Melhores resultados" no alto do grupo "Nos livros", e o resto recolhido em "Mais resultados (N)" */
-.bib-busca-melhores { margin-top: 8px; padding: 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
-.bib-busca-melhores-titulo { margin: 0; font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); }
-.bib-busca-mais { margin-top: 8px; }
-.bib-busca-mais > summary { list-style: none; cursor: pointer; min-height: var(--alvo); display: flex; align-items: center; gap: 4px;
-  font-weight: var(--peso-forte); color: var(--navy); }
-.bib-busca-mais > summary::-webkit-details-marker { display: none; }
-.bib-busca-mais[open] > summary .bib-grupo-seta { transform: rotate(90deg); }
+/* P2: os capítulos do resultado, uma linha por capítulo (com o livro nela), num cartão só */
+.bib-busca-capitulos { margin-top: 8px; padding: 0 12px 12px; border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); min-width: 0; }
+.bib-busca-capitulos > .bib-busca-livro-grupo:first-child { border-top: 0; margin-top: 0; }
+.bib-busca-capitulos-mais, .bib-assuntos-outros-anos-ver { min-height: var(--alvo); margin-top: 8px; }
+.bib-assuntos-outros-anos .bloco-exercicios { margin-top: 8px; }
+/* a busca sem resultado: a frase e, logo abaixo, o que fazer */
+.bib-busca-vazia p { margin: 0; }
+.bib-busca-vazia .bib-busca-vazia-dica { margin-top: 8px; font-size: var(--letra-14); }
 /* a faixa do material marcado vazia não gruda no alto durante a busca: rola junto */
 .bib-carrinho.vazia.na-busca { position: static; }
 .bib-busca-livros-aviso { margin-top: 8px; }
@@ -4318,3 +4381,245 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 #modal-leitor-pdf.leitor-compacto .modal-rodape { flex-wrap: nowrap; }
 #modal-leitor-pdf.leitor-compacto #leitor-compartilhar { flex: 1; }
 /* ==================== planejamento (fim) ==================== */
+
+/* ==================== T2: o bloco "Teoria e exercícios" da página do assunto ==================== */
+/* Os tons da dificuldade (D3): três degraus do mesmo marinho, do claro ao
+   escuro, nos pontos (sinal gráfico, 3:1 sobre o branco), e o selo inteiro
+   acompanha: fundo e borda mais fortes a cada degrau. A letra do selo fica
+   sempre no marinho da casa, que passa dos 4,5:1. */
+:root {
+  --bte-dif-1: #5B86B3;
+  --bte-dif-2: #2F5A8A;
+}
+/* Uma coluna só, no tablet e no celular (D5 e a parte A do 12b). O teto é de
+   leitura: a página do assunto decide onde o bloco fica. */
+.bte { min-width: 0; max-width: 46rem; margin: 0 0 24px; }
+h3.subtitulo.bte-titulo { margin: 6px 0 0; padding-bottom: 0; border-bottom: 0; font-size: var(--letra-20); }
+.bte-vazio { margin: 10px 0 0; }
+.bte-secao { min-width: 0; }
+.bte-secao .bloco-exercicios { margin-top: 18px; }
+.bte-secao-titulo { display: flex; align-items: baseline; gap: 8px; }
+.bte-secao-quantos { color: var(--muted); font-weight: var(--peso-normal); }
+/* a teoria: uma linha por aula, com a capa pequena; tocar na linha abre, e a
+   caixa fica na mesma linha */
+.bte-teorias { min-width: 0; }
+.bte-teoria { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; padding: 4px 0;
+  border-bottom: 1px solid var(--fio-claro); }
+.bte-teoria.bte-marcado { background: var(--acao-clara); }
+.bte-teoria-abrir { flex: 1 1 12rem; min-width: 0; display: flex; align-items: center; gap: 12px;
+  min-height: var(--alvo); padding: 6px 0; border: 1px solid transparent; border-radius: 10px;
+  background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.bte-teoria-abrir:hover .nome { text-decoration: underline; }
+.bte-teoria-abrir > .ico { color: var(--muted); }
+.bte-teoria-capa.bib-mini { width: 56px; flex: none; }
+.bte-teoria-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bte-teoria-texto .nome { font-weight: var(--peso-forte); color: var(--navy); overflow-wrap: anywhere; }
+.bte-teoria-texto .detalhe { font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+/* a lista de base: um cartão, com Ver e Usar à mão */
+.bte-lista { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 12px 14px;
+  border: 1px solid var(--fio); border-radius: var(--raio); background: var(--branco); }
+.bte-lista-texto { flex: 1 1 10rem; min-width: 0; }
+.bte-lista-texto .nome { font-weight: var(--peso-forte); color: var(--navy); }
+.bte-lista-texto .detalhe { font-size: var(--letra-14); color: var(--muted); }
+.bte-lista-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+.bte-lista-acoes .btn { min-height: var(--alvo); }
+/* os exercícios: grandes, um embaixo do outro; a caixa na linha do nome, e
+   o recorte num cartão da largura da coluna */
+.bte-exercicios { display: flex; flex-direction: column; gap: 24px; margin-top: 10px; min-width: 0; }
+.bte-ex { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bte-ex-de { margin-top: 4px; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--muted); overflow-wrap: anywhere; }
+.bte-ex-cabeca { display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; }
+.bte-ex-cabeca .cresce { flex: 1 1 0; min-width: 0; }
+/* a caixa fica sempre na ponta direita, mesmo quando a linha quebra no celular */
+.bte-ex-cabeca .bte-marcar { margin-left: auto; }
+.bte-ex-nome { font-size: var(--letra-16); font-weight: var(--peso-forte); color: var(--navy); overflow-wrap: anywhere; }
+.bte-ex-abrir { display: block; width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--fio);
+  border-radius: 10px; background: var(--branco); cursor: pointer; text-align: left; }
+.bte-ex-abrir:hover { border-color: var(--acao); }
+.bte-ex-abrir .bib-mini { border: 0; border-radius: 0; }
+.bte-ex.bte-marcado .bte-ex-abrir { border-color: var(--acao); box-shadow: inset 0 0 0 1px var(--acao); }
+.bte-marcar { min-height: var(--alvo); }
+.bte-marcar input:indeterminate { accent-color: var(--acao); }
+.bte-mais { align-self: flex-start; margin-top: 14px; min-height: var(--alvo); }
+/* o selo da dificuldade (D3): pontos e nome, e cada degrau mais forte que o
+   de baixo; o "para mim" dela tem a borda grossa da cor de ação */
+.bte-dificuldade { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bte-selo { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 2px 10px;
+  border: 1px solid var(--fio); border-radius: 999px; background: var(--branco);
+  font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--navy); white-space: nowrap; }
+.bte-pontos { display: inline-flex; gap: 3px; }
+.bte-ponto { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; box-sizing: border-box; }
+.bte-ponto.cheio { background: currentColor; }
+.bte-dif-1 .bte-pontos { color: var(--bte-dif-1); }
+.bte-dif-2 { background: var(--acao-clara); border-color: var(--bte-dif-2); }
+.bte-dif-2 .bte-pontos { color: var(--bte-dif-2); }
+.bte-dif-3 { background: var(--soft-2); border: 2px solid var(--navy-escuro); }
+.bte-dif-3 .bte-pontos { color: var(--navy-escuro); }
+/* o "para mim" é o chip de dentro: a moldura do selo continua a do degrau,
+   para um Fácil dela não parecer Difícil */
+.bte-selo-para-mim { padding: 1px 8px; border: 1px solid var(--acao); border-radius: 999px;
+  background: var(--acao-clara); font-size: var(--letra-14); font-weight: var(--peso-forte); }
+/* o desafio é um sinal forte e próprio (D3), e não uma terceira etiqueta apagada */
+.tag.bte-desafio { padding: 3px 10px; border: 1px solid var(--aviso-borda); background: var(--aviso-fundo);
+  color: var(--aviso-texto); font-size: var(--letra-14); font-weight: var(--peso-forte); text-transform: none; letter-spacing: 0; }
+/* ==================== T2 (fim) ==================== */
+
+/* ==================== assistente (IA, fase 3: só leitura) ==================== */
+/* A porta do tablet: a pílula com o balão e a palavra "Perguntar", vizinha
+   do olho (a margem automática junta as duas à direita do cabeçalho), com a
+   mesma borda e o mesmo branco do olho. */
+.pilula-perguntar {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 48px; padding: 0 16px 0 12px;
+  border: 1px solid var(--fio); border-radius: 999px;
+  background: var(--branco); color: var(--navy);
+  font: inherit; font-size: var(--letra-14); font-weight: 600;
+  cursor: pointer; flex-shrink: 0;
+}
+.pilula-perguntar[hidden] { display: none; }
+.pilula-perguntar .ico { width: 20px; height: 20px; }
+.pilula-perguntar:hover { background: var(--soft); }
+@media (max-width: 720px) {
+  .pilula-perguntar { position: absolute; top: 8px; right: 64px; }
+}
+/* A porta do celular: a mesma pílula, presa no pé de Hoje, acima das abas,
+   à direita (perto do polegar). O alto (a linha do dia) fica como era. */
+.cel-assistente-pe { position: sticky; bottom: 12px; display: flex; justify-content: flex-end; margin-top: 8px; pointer-events: none; z-index: 3; }
+.cel-assistente-pe .cel-perguntar {
+  pointer-events: auto; box-shadow: var(--sombra-forte); background: var(--branco); border: 1px solid var(--fio);
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: var(--alvo-celular); padding: 0 16px 0 12px;
+  border-radius: 999px; color: var(--navy); font-weight: 600;
+}
+.cel-assistente-pe .cel-perguntar .ico { width: 20px; height: 20px; }
+/* No fim da rolagem de Hoje, a pílula fica no próprio lugar, depois de uma
+   folga do tamanho dela: a última aula rola até ficar livre. */
+#cel-hoje .cel-assistente-pe { padding-top: 12px; }
+
+.ass-modal { max-width: 640px; height: 88vh; }
+/* No celular, a janela desce até o fim da tela e cobre a barra de abas (os
+   rótulos não aparecem borrados por baixo). */
+body.modo-celular #modal-assistente { padding: 8px 0 0; align-items: stretch; }
+body.modo-celular #modal-assistente .ass-modal { height: 100%; max-height: 100%; max-width: 100%; border-radius: 16px 16px 0 0; }
+.modal-cabecalho .btn#ass-nova { min-height: 48px; margin-left: auto; white-space: nowrap; }
+/* o título recebe o foco ao abrir (o teclado não sobe); não é um controle, sem moldura */
+#titulo-modal-assistente:focus { outline: none; }
+.ass-conversa { display: flex; flex-direction: column; gap: 14px; }
+.ass-vez { display: flex; flex-direction: column; gap: 6px; scroll-margin-top: 8px; }
+.ass-pergunta {
+  align-self: flex-end; max-width: 85%; margin: 0;
+  background: var(--soft); border: 1px solid var(--fio); border-radius: 14px 14px 4px 14px;
+  padding: 8px 12px; font-size: var(--letra-16); color: var(--texto); overflow-wrap: anywhere;
+}
+.ass-resposta { font-size: var(--letra-16); line-height: 1.45; color: var(--texto); overflow-wrap: anywhere; }
+.ass-resposta p { margin: 0 0 4px; }
+.ass-linha-valor { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--fio-claro); padding-bottom: 2px; }
+.ass-valor { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ass-pensando { color: var(--muted); font-style: italic; margin: 0; }
+.ass-conversa .ass-entendido, .ass-entendido { margin: 0; font-size: var(--letra-14); line-height: 1.35; color: var(--muted); }
+.ass-cartao {
+  border: 1px solid var(--fio); border-radius: 12px; padding: 10px 12px; background: var(--branco);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.ass-cartao-linha { display: flex; align-items: flex-start; gap: 8px; font-size: var(--letra-16); overflow-wrap: anywhere; min-width: 0; }
+.ass-cartao-linha .ass-cartao-ico { width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; color: var(--navy); }
+.ass-cartao-quem { min-width: 0; font-weight: 600; color: var(--texto); }
+.ass-cinza { font-weight: 400; color: var(--muted); }
+.ass-numero { white-space: nowrap; }
+.ass-mensagem { width: 100%; box-sizing: border-box; min-height: 72px; resize: none; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 8px; background: var(--soft); }
+.ass-mensagem:focus { outline: 1px solid var(--navy); outline-offset: 0; }
+.ass-cartao-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+.ass-link { min-height: 48px; min-width: 48px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
+.ass-exemplos { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.ass-exemplo { min-height: 48px; text-align: left; white-space: normal; max-width: 100%; }
+.ass-ideias > summary { min-height: 48px; display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--navy); font-weight: 600; list-style: none; }
+.ass-ideias > summary::-webkit-details-marker { display: none; }
+.ass-ideias .ass-ideias-seta { width: 20px; height: 20px; transform: rotate(-90deg); transition: transform .15s ease; }
+.ass-ideias[open] .ass-ideias-seta { transform: none; }
+.ass-ideias .ass-exemplos { padding-top: 4px; }
+/* Com o erro aberto, uma linha só: o ícone, o texto e o "Tentar de novo". */
+.ass-falha { margin: 0; display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; padding-top: 6px; padding-bottom: 6px; }
+.ass-falha .ass-falha-ico { width: 20px; height: 20px; flex-shrink: 0; }
+.ass-falha span { flex: 1 1 auto; min-width: 0; font-size: var(--letra-14); line-height: 1.3; }
+.ass-falha .btn { flex: 0 0 auto; white-space: nowrap; }
+.ass-texto.ass-texto-curto { min-height: 48px; height: 48px; }
+.ass-campo-junto { gap: 8px; align-items: center; }
+.ass-campo-junto .btn { min-height: 48px; flex: 0 0 auto; }
+.ass-falha .btn { min-height: 48px; }
+.modal-rodape.ass-rodape { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
+.ass-campo { display: flex; }
+.ass-texto { flex: 1; min-width: 0; min-height: 48px; resize: none; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 10px; box-sizing: border-box; }
+.ass-texto:focus { outline: 1px solid var(--navy); outline-offset: 0; }
+.ass-botoes { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
+.ass-botoes .btn { min-height: 48px; }
+.ass-botoes .esquerda { margin-right: auto; }
+/* desligado, o Perguntar continua legível: texto escuro sobre cinza claro */
+.ass-botoes .btn.principal:disabled { background: var(--fio-claro); border-color: var(--fio); color: var(--texto); opacity: 1; }
+/* O cartão de confirmação (fase 4a): o que muda, o antes e o depois, o
+ * dinheiro e o Confirmar à mão, no pé do cartão. */
+.ass-proposta { align-items: stretch; border-color: var(--navy); }
+.ass-proposta[data-estado="feito"] { border-color: var(--teal); }
+.ass-proposta[data-estado="recusado"], .ass-proposta[data-estado="mudou"], .ass-proposta[data-estado="erro"], .ass-proposta[data-estado="desfeito"] { border-color: var(--fio); }
+.ass-linha { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; border-top: 1px solid var(--fio); min-width: 0; }
+.ass-linha:first-of-type, .ass-proposta > .ass-cartao-titulo + .ass-linha { border-top: 0; padding-top: 0; }
+.ass-linha.tirada .ass-linha-titulo, .ass-linha.tirada dl, .ass-linha.tirada .ass-dinheiro { opacity: .5; text-decoration: line-through; }
+.ass-linha-cabeca { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.ass-linha-titulo { font-size: var(--letra-16); color: var(--texto); overflow-wrap: anywhere; min-width: 0; padding-top: 2px; }
+.ass-marca {
+  flex: 0 0 48px; width: 48px; height: 48px; margin: -12px 0 -8px -12px; padding: 0; border: 0; background: transparent;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.ass-marca-caixa {
+  width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--navy); background: var(--navy); box-sizing: border-box;
+  color: var(--branco); font-size: var(--letra-14); font-weight: 700; display: flex; align-items: center; justify-content: center; line-height: 1;
+}
+.ass-marca[aria-checked="false"] .ass-marca-caixa { background: var(--branco); }
+.ass-marca:focus-visible { outline: 2px solid var(--navy); outline-offset: -3px; }
+.ass-antes-depois { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; margin: 0; font-size: var(--letra-14); }
+.ass-antes-depois dt { color: var(--muted); }
+.ass-antes-depois dd { margin: 0; overflow-wrap: anywhere; }
+.ass-dinheiro { margin: 0; font-weight: 600; font-size: var(--letra-14); color: var(--navy); }
+.ass-aviso { margin: 0; display: flex; align-items: flex-start; gap: 6px; font-size: var(--letra-14); color: var(--aviso-texto); background: var(--aviso-fundo); border-radius: 6px; padding: 4px 8px; overflow-wrap: anywhere; }
+.ass-opcoes { display: flex; flex-direction: column; gap: 6px; scroll-margin-bottom: 104px; } /* a folga do Confirmar preso ao pé, ao rolar até a escolha */
+.ass-opcao {
+  min-height: 48px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px;
+  padding: 6px 12px; border: 1px solid var(--fio); border-radius: 10px; background: var(--branco); color: var(--texto);
+  font: inherit; text-align: left; cursor: pointer; width: 100%; box-sizing: border-box;
+}
+.ass-opcao.escolhida { border: 2px solid var(--navy); background: var(--soft); }
+.ass-opcao-nome { font-size: var(--letra-16); font-weight: 600; overflow-wrap: anywhere; }
+.ass-opcao-dinheiro { font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+.ass-campo-rascunho { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.ass-campo-rascunho span { font-size: var(--letra-14); color: var(--muted); }
+.ass-rascunho { width: 100%; box-sizing: border-box; min-height: 72px; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 10px; resize: vertical; max-height: 40vh; overflow-y: auto; }
+.ass-fichas-rotulo { margin: 0; font-size: var(--letra-14); color: var(--muted); }
+.ass-fichas { display: flex; flex-wrap: wrap; gap: 6px; }
+.ass-ficha { min-height: 48px; white-space: normal; text-align: left; max-width: 100%; }
+/* O Confirmar fica à vista: preso ao pé da área que rola enquanto o cartão
+ * está na tela (padrão 3). O fundo cobre o que passa por baixo. */
+.ass-confirmar {
+  justify-content: flex-end; position: sticky; bottom: 0; z-index: 1;
+  margin: 0 -12px -12px; padding: 8px 12px 12px; background: var(--branco);
+  border-top: 1px solid var(--fio); border-radius: 0 0 12px 12px;
+}
+/* O texto que já estava: à parte, só para ler; o novo vem depois, destacado. */
+.ass-texto-antigo { background: var(--soft); border-radius: 8px; padding: 6px 10px; max-height: 30vh; overflow-y: auto; }
+.ass-texto-antigo p { margin: 2px 0 0; font-size: var(--letra-14); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ass-campo-rascunho span.ass-texto-antigo-rotulo, .ass-campo-rascunho span.ass-texto-novo-rotulo { font-size: var(--letra-14); }
+.ass-campo-rascunho span.ass-texto-novo-rotulo { color: var(--navy); font-weight: 600; }
+.ass-campo-rascunho.com-antigo .ass-rascunho { border: 2px solid var(--navy); }
+.ass-confirmar .btn { min-height: 48px; }
+.ass-estado { margin: 0; display: flex; align-items: flex-start; gap: 6px; font-size: var(--letra-14); color: var(--muted); }
+.ass-estado.ass-estado-erro { color: var(--vermelho); }
+.ass-linha-cabeca .ass-cartao-ico, .ass-aviso .ass-cartao-ico, .ass-estado .ass-cartao-ico { width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; color: var(--navy); }
+.ass-aviso .ass-cartao-ico { color: var(--aviso-texto); }
+.ass-estado-erro .ass-cartao-ico { color: var(--vermelho); }
+/* ==================== assistente (fim) ==================== */
+
+/* Assistente: a linha que o lote poupa (já registrada ou de mês com pagamento) e o aviso da saída. */
+.ass-poupada { display: flex; gap: 6px; align-items: flex-start; margin: 0; padding: 4px 8px; border-radius: 6px; background: var(--aviso-fundo); border: 1px solid var(--aviso-borda); color: var(--texto); font-size: var(--letra-14); }
+.ass-poupada strong { font-weight: var(--peso-forte); }
+.ass-poupada-fora { background: var(--soft); border-color: var(--fio); }
+.ass-marca-fora { opacity: .4; }
+.ass-opcao-aviso { display: block; margin-top: 2px; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--aviso-texto); }

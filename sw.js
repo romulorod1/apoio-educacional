@@ -214,6 +214,8 @@ var ARQUIVOS = [
    * e o desenho da folha. Fora da lista, o app.js novo abriria o botão sem o
    * módulo depois de uma atualização sem sinal. */
   './planejamento.js',
+  /* O assistente só de leitura (fase 3): as ferramentas que leem o banco. */
+  './assistente.js',
   './app.js',
   './manifest.webmanifest',
   './icons/icon-192.png',

@@ -382,6 +382,39 @@
     return saida;
   }
 
+  /* O META DE UM LIVRO DO CATÁLOGO DA NUVEM (fase 1c), conferido antes de
+   * entrar no aparelho: o documento catalogo/{id} traz o meta como texto
+   * (metaJson) e o hash dele (metaHash). Vale só se o meta é o do livro do
+   * documento (id, "sha256:" + sha256 e o tamanho) e passa na MESMA
+   * conferência de forma do pacote zip (lerLivros: arquivo, título, sumário
+   * dentro do livro, numeração). `hashDoTexto` é o sha256 do metaJson, que a
+   * página calcula (WebCrypto). Devolve o meta, ou null com o motivo em
+   * `porque`. */
+  function conferirMetaDaNuvem(doc, hashDoTexto) {
+    var porque = function (m) { return { meta: null, porque: m }; };
+    if (!doc || typeof doc.metaJson !== 'string' || typeof doc.id !== 'string') return porque('documento sem meta');
+    if (hashDoTexto !== doc.metaHash) return porque('o meta não confere com o metaHash');
+    var meta;
+    try { meta = JSON.parse(doc.metaJson); } catch (e) { return porque('o meta não é JSON'); }
+    if (!meta || meta.id !== doc.id) return porque('o meta é de outro livro');
+    if (!/^[0-9a-f]{64}$/.test(String(doc.sha256 || '')) || meta.hash !== 'sha256:' + doc.sha256) return porque('o meta é de outro arquivo');
+    if (!inteiro(meta.bytes) || meta.bytes !== doc.tamanho) return porque('o tamanho não confere');
+    // o mapa, quando vem, é uma lista de capítulos: nem texto, nem null, nem lista dentro de lista
+    if (meta.mapa !== undefined && (!Array.isArray(meta.mapa) || meta.mapa.some(function (e) { return !e || typeof e !== 'object' || Array.isArray(e); }))) {
+      return porque('o mapa não é uma lista de capítulos');
+    }
+    var noZip = {}, lista = {};
+    noZip[meta.arquivo] = true;
+    lista[meta.arquivo] = meta.hash;
+    try {
+      var lidos = lerLivros({ livros: [meta] }, noZip, lista);
+      if (!lidos.length) return porque((lidos.recusados && lidos.recusados[0] && lidos.recusados[0].motivo) || 'a forma do meta não confere');
+    } catch (e) {
+      return porque(e && e.message || 'a forma do meta não confere');
+    }
+    return { meta: meta, porque: null };
+  }
+
   /* As linhas que a tela mostra depois de importar livros. */
   function resumoDeLivros(contas) {
     var linhas = [];
@@ -655,8 +688,17 @@
 
   /* A entrada do mapa onde a leitura está: no PDF, a que tem a página entre o
    * começo e o fim; no EPUB, a que tem a parte (posição na espinha). Com duas
-   * (capítulos que se cruzam), a que começa mais perto. */
-  function entradaDoMapa(mapa, formato, valor) {
+   * (capítulos que se cruzam), a que começa mais perto.
+   *
+   * Item 12a, parte 0: no EPUB, vários capítulos podem começar na MESMA parte,
+   * cada um na sua âncora (o FME de teoria). Com a `ancora` por onde ela
+   * entrou na parte (o "Abrir no livro" ou o sumário), vale o capítulo que
+   * começa nela; sem âncora, ou sem capítulo nela, a regra de sempre. */
+  function entradaDoMapa(mapa, formato, valor, ancora) {
+    if (formato === 'epub' && ancora) {
+      var naAncora = (mapa || []).filter(function (e) { return e.capitulo === valor && e.ancora === ancora; });
+      if (naAncora.length) return naAncora[0];
+    }
     var achada = null;
     (mapa || []).forEach(function (e) {
       var ini = formato === 'epub' ? e.capitulo : e.pagina;
@@ -776,9 +818,30 @@
     var uteis = marcadores.length - lixo;
     return lixo * 2 > marcadores.length || uteis * 2 < caps.length;
   }
+  /* Item 12a, parte 0: o EPUB com mapa de capítulos por parte e âncora. O
+   * gerador já põe o sumário do mapa no pacote quando o EPUB não tem sumário
+   * (sumario_origem "mapa"); aqui vale o mesmo para o pacote que chegou com o
+   * sumário vazio e o mapa. Só os capítulos com título com sentido e parte
+   * dentro da espinha, em ordem de parte e, na mesma parte, na ordem do mapa
+   * (o gerador já ordena pela âncora no texto). Forma do sumário de EPUB:
+   * { n, nivel: 1, titulo, capitulo, ancora?, mapa_n }. */
+  function sumarioDoMapaDoEpub(meta) {
+    var partes = ((meta.epub && meta.epub.espinha) || []).length;
+    return (Array.isArray(meta.mapa) ? meta.mapa : []).filter(function (e) {
+      return !!e && inteiro(e.n) && !e.obra_inteira && typeof e.titulo === 'string' && !marcadorSemSentido(e.titulo) &&
+        inteiro(e.capitulo) && e.capitulo >= 1 && e.capitulo <= partes;
+    }).map(function (e, i) { return { e: e, i: i }; })
+      .sort(function (a, b) { return a.e.capitulo - b.e.capitulo || a.i - b.i; })
+      .map(function (x, i) {
+        var s = { n: i + 1, nivel: 1, titulo: x.e.titulo, capitulo: x.e.capitulo, mapa_n: x.e.n };
+        if (typeof x.e.ancora === 'string' && x.e.ancora) s.ancora = x.e.ancora;
+        return s;
+      });
+  }
   function sumarioDoLivro(meta) {
     var sumario = meta && Array.isArray(meta.sumario) ? meta.sumario : [];
-    if (!meta || meta.formato === 'epub') return sumario;
+    if (meta && meta.formato === 'epub') return sumario.length ? sumario : sumarioDoMapaDoEpub(meta);
+    if (!meta) return sumario;
     var doMapa = !sumario.length ? capitulosDoMapaParaSumario(meta).length > 0 : sumarioDosMarcadoresInutil(meta);
     if (!doMapa) return sumario;
     var total = inteiro(meta.paginas) ? meta.paginas : Infinity;
@@ -1146,6 +1209,325 @@
       .filter(function (x) { return x !== null && x !== undefined && String(x).trim(); }).map(function (x) { return String(x).trim(); });
     var g = gabarito && gabarito.length ? '; gabarito: ' + descreverUnidades(gabarito, nome) : '';
     return semTracos('Fonte: ' + partes.join(', ') + g);
+  }
+
+  /* ---------------------------- as fontes de um assunto (página do assunto, T2)
+   *
+   * A página do assunto (formato B da Biblioteca, decisão do dono de
+   * 12/11/2026) reúne, para UM assunto do índice (banco/topicos/*.json), o que
+   * o aparelho tem de teoria, lista de base, exercícios avulsos e OBMEP. Esta
+   * função SÓ LÊ: não grava, não vai à rede e não conhece a tela. Quem desenha
+   * é o desenharBlocoTeoriaExercicios, no app.js.
+   *
+   * O VÍNCULO DE HOJE, em três camadas, nesta ordem. A primeira camada que liga
+   * um item é a que fica escrita no campo `vinculo` dele:
+   *   1. 'modulo': o campo `modulo` do assunto no índice ("9ano:equacoes-do-
+   *      segundo-grau", "m1:mirim-adicao-ate-100") é a chave série:módulo dos
+   *      pacotes. É a ligação exata que a trilha e o Material da aula já usam
+   *      (moduloDoAssunto, no app.js). O caminho de reserva de lá, que procura
+   *      o título do assunto na busca, é aproximado e NÃO entra aqui: nada
+   *      aproximado chega à página do assunto.
+   *   2. 'tema_app': o item do pacote que diz de qual assunto é. As provas da
+   *      Mirim e do ENEM já trazem; o Portal ainda vem nulo.
+   *   3. 'curadoria': a tabela de vínculos por item da frente C1, que ainda
+   *      não existe. Entra por opcoes.vinculos quando existir, e sem ela tudo
+   *      funciona com as duas camadas de cima.
+   *
+   * UM ID SÓ POR ITEM. O mesmo item pode estar em vários assuntos (um módulo
+   * serve a "Equação do 2º grau: como resolver" e a "...: problemas"), mas
+   * aparece UMA vez em cada assunto, venha por quantas camadas vier e mesmo que
+   * chegue repetido na entrada (dois pacotes com o mesmo exercício).
+   *
+   * opcoes (todas opcionais):
+   *   temas     a lista `temas` do índice de assuntos (banco/topicos/matematica.json);
+   *   itens     os exercícios dos pacotes (itens.json; do aparelho, com `pacote`);
+   *   teoria    as aulas de teoria (teoria.json);
+   *   listas    as listas prontas (kits.json, ou as do app, que já trazem `ids`);
+   *   vinculos  a tabela da C1: linhas { assunto, item } ou { assunto, teoria }
+   *             ou { assunto, lista } ou { assunto, modulo }, ou as linhas do
+   *             vinculos-exercicios-C1.csv lidas como estão ({ pacote, item_id,
+   *             ano, assuntos, confianca, justificativa }).
+   *   (do índice) fontes_vizinhas  a lista explícita, no próprio assunto, dos
+   *             assuntos de onde vem o material quando ele não tem nenhum
+   *             próprio (o MAT08-15 não tem módulo nos pacotes: herda o de
+   *             MAT06-12 e MAT09-12). Cada fonte herdada leva `deVizinho` (o id
+   *             do vizinho), e o retorno traz `vizinhos` [{ id, titulo, serie }].
+   *             Um nível só: o vizinho não passa adiante os vizinhos dele.
+   *   modulosEquivalentes  as chaves de módulo de mesmo título que o app achou
+   *             quando a chave do índice não está no aparelho (camada 'modulo').
+   *
+   * Devolve { assunto, titulo, serie, teoria: [], listaBase: null|{...},
+   * exercicios: [], obmep: [], enem: [], vazio: null|{ motivo, texto } }. A OBMEP
+   * (o Banco de Questões e a Mirim) e o ENEM vêm separados, como a página do
+   * assunto os mostra, e o `tipo` de cada um segue a fonte ('obmep' ou 'enem').
+   * Cada fonte tem
+   * { tipo, id, titulo, serie, quantidade, abrir, anexar, vinculo } e, conforme o
+   * tipo, os campos de desenho: imagem (o recorte ou a capa), modulo, lista,
+   * numero, dificuldade (1 a 3, a do pacote), dificuldadeOrigem ('proxy' é a
+   * estimativa pela posição na lista da OBMEP; 'curadoria', a revisada),
+   * desafio (dificuldade 3 do pacote), objetiva e semSolucao.
+   *   abrir  diz como o app abre hoje: { como: 'visor', tipo: 'teoria', id,
+   *          indice } (a tela cheia na página), { como: 'visor', tipo:
+   *          'exercicio', modulo, lista, id } (a tela cheia no exercício, dentro
+   *          da lista da fonte) ou { como: 'lista-pronta', id, modulo }.
+   *   anexar diz o que vai para o material: { tipo: 'itens'|'paginas', ids } ou
+   *          { tipo: 'lista-pronta', id, ids }. */
+  function tabela(o) {
+    var t = Object.create(null);
+    Object.keys(o).forEach(function (k) { t[k] = o[k]; });
+    return t;
+  }
+  // as provas de fora: a OBMEP (Banco e Mirim) num grupo, o ENEM noutro
+  var FONTES_DE_OLIMPIADA = tabela({ 'obmep-banco': true, 'obmep-mirim': true, enem: true });
+  var ORDEM_DA_OLIMPIADA = tabela({ 'obmep-mirim': 1, 'obmep-banco': 2, enem: 3 });
+  function grupoDaFonte(fonte) {
+    return fonte === 'enem' ? 'enem' : FONTES_DE_OLIMPIADA[fonte] ? 'obmep' : 'exercicio';
+  }
+  // as provas (Mirim e ENEM): nelas o módulo é o assunto, ou é o Diversos (C12)
+  var FONTES_DE_PROVA = tabela({ 'obmep-mirim': true, enem: true });
+  // a força de cada camada: quando o mesmo id chega por duas, fica a mais forte
+  var FORCA_DO_VINCULO = tabela({ modulo: 1, tema_app: 2, curadoria: 3 });
+
+  /* O módulo Diversos de uma prova não é assunto (a mesma regra do eDiversos,
+   * no core.js): nem o tema_app nem um módulo ligado pela tabela o trazem
+   * inteiro. A linha da tabela que cita o ITEM continua valendo, porque é
+   * assim que a C1 dá assunto às questões que estão no Diversos. */
+  function moduloDiversos(it) {
+    var m = (it && it.modulo) || {};
+    return /(^|-)diversos$/.test(String(m.slug || '')) || String(m.titulo || '') === 'Diversos';
+  }
+
+  function chaveDoModuloDe(x) {
+    return x && typeof x.serie === 'string' && x.modulo && typeof x.modulo.slug === 'string'
+      ? x.serie + ':' + x.modulo.slug : null;
+  }
+
+  function nomeDoExercicio(it) {
+    if (it.fonte === 'obmep-banco') return 'Problema ' + it.numero + (it.titulo ? ': ' + it.titulo : '');
+    if (FONTES_DE_OLIMPIADA[it.fonte]) return 'Questão ' + it.numero;
+    return 'Exercício ' + it.numero;
+  }
+
+  /* Uma linha da tabela de vínculos vale para o assunto? Duas formas:
+   *   { assunto, item|teoria|lista|modulo }, a de uma linha por vínculo;
+   *   { item_id, assuntos, confianca }, a linha do vinculos-exercicios-C1.csv
+   *     (Biblioteca\curadoria, no Drive), com os assuntos separados por "|"
+   *     (ou já em lista). Dessa, só a confiança alta e a média entram, como o
+   *     LEIA-ME da tabela pede; a baixa fica para conferência. */
+  var CONFIANCA_QUE_VALE = tabela({ alta: true, 'média': true, media: true });
+  function vinculoValeParaOAssunto(v, id) {
+    if (v.confianca !== undefined && v.confianca !== null &&
+        !CONFIANCA_QUE_VALE[String(v.confianca).trim().toLowerCase()]) return false;
+    if (typeof v.assunto === 'string') return v.assunto === id;
+    var lista = Array.isArray(v.assuntos) ? v.assuntos : String(v.assuntos || '').split('|');
+    return lista.some(function (a) { return String(a).trim() === id; });
+  }
+
+  function fontesDoAssunto(assuntoId, opcoes) {
+    var o = opcoes || {};
+    var id = typeof assuntoId === 'string' ? assuntoId : '';
+    var temas = Array.isArray(o.temas) ? o.temas : [];
+    var itens = Array.isArray(o.itens) ? o.itens : [];
+    var aulas = Array.isArray(o.teoria) ? o.teoria : [];
+    var listas = Array.isArray(o.listas) ? o.listas : [];
+    var tema = null;
+    for (var i = 0; i < temas.length; i++) {
+      if (temas[i] && temas[i].id === id) { tema = temas[i]; break; }
+    }
+
+    // as chaves de módulo do assunto, e a camada que liga cada uma
+    var modulos = Object.create(null), ordemDosModulos = [];
+    function ligarModulo(chave, camada) {
+      if (typeof chave !== 'string' || !chave || modulos[chave]) return;
+      modulos[chave] = camada;
+      ordemDosModulos.push(chave);
+    }
+    if (tema) ligarModulo(tema.modulo, 'modulo');
+    /* O módulo de MESMO TÍTULO, quando a chave do índice não está no aparelho
+     * (um pacote que renomeou a chave): o app acha com o moduloDoAssuntoNoIndice
+     * (título igual, na mesma série, sem ambiguidade) e passa aqui. A conta do
+     * título é do app (Core.chaveDeBusca), e por isso ela não mora aqui. */
+    (Array.isArray(o.modulosEquivalentes) ? o.modulosEquivalentes : []).forEach(function (k) { ligarModulo(k, 'modulo'); });
+    var porItem = Object.create(null), porTeoria = Object.create(null), porLista = Object.create(null);
+    (Array.isArray(o.vinculos) ? o.vinculos : []).forEach(function (v) {
+      if (!v || !id || !vinculoValeParaOAssunto(v, id)) return;
+      ligarModulo(v.modulo, 'curadoria');
+      var item = typeof v.item === 'string' ? v.item : v.item_id;
+      if (typeof item === 'string') porItem[item] = 'curadoria';
+      if (typeof v.teoria === 'string') porTeoria[v.teoria] = 'curadoria';
+      if (typeof v.lista === 'string') porLista[v.lista] = 'curadoria';
+    });
+    function posicaoDoModulo(chave) {
+      var p = ordemDosModulos.indexOf(chave);
+      return p < 0 ? ordemDosModulos.length : p;
+    }
+    function porModulo(a, b) {
+      return posicaoDoModulo(a.modulo.chave) - posicaoDoModulo(b.modulo.chave) ||
+        (a.modulo.chave < b.modulo.chave ? -1 : a.modulo.chave > b.modulo.chave ? 1 : 0);
+    }
+
+    /* OS EXERCÍCIOS, em duas passadas. A primeira acha, para cada id, a cópia
+     * ligada pela camada mais forte (o mesmo exercício em dois pacotes pode
+     * chegar por camadas diferentes); no empate, a da chave de módulo menor,
+     * para a ordem da entrada não mudar a saída. A segunda monta as fontes, e
+     * o id que já entrou não entra de novo. */
+    var itemPorId = Object.create(null), melhor = Object.create(null), vistos = Object.create(null);
+    var exercicios = [], obmep = [], enem = [], moduloPresente = Object.create(null);
+    var destinoDoGrupo = { exercicio: exercicios, obmep: obmep, enem: enem };
+    function vinculoDoItem(it, chave) {
+      var prova = !!FONTES_DE_PROVA[it.fonte] && moduloDiversos(it);
+      if (chave && modulos[chave] === 'modulo') return 'modulo';
+      if (id && it.tema_app === id && !prova) return 'tema_app';
+      if (chave && modulos[chave] && !prova) return modulos[chave];
+      return porItem[it.id] || null;
+    }
+    itens.forEach(function (it) {
+      if (!it || typeof it.id !== 'string') return;
+      if (!itemPorId[it.id]) itemPorId[it.id] = it;
+      var chave = chaveDoModuloDe(it);
+      if (chave) moduloPresente[chave] = true;
+      var vinculo = vinculoDoItem(it, chave);
+      if (!vinculo) return;
+      var atual = melhor[it.id];
+      var forca = FORCA_DO_VINCULO[vinculo];
+      if (!atual || forca < atual.forca || (forca === atual.forca && String(chave) < String(atual.chave))) {
+        melhor[it.id] = { it: it, vinculo: vinculo, forca: forca, chave: chave };
+      }
+    });
+    itens.forEach(function (it) {
+      var m = it && typeof it.id === 'string' ? melhor[it.id] : null;
+      if (!m || m.it !== it) return;
+      if (vistos[it.id]) return;
+      vistos[it.id] = true;
+      var chave = m.chave, vinculo = m.vinculo;
+      var aula = it.aula || {};
+      // a dificuldade neutra (o ENEM traz um 2 sem graduação, proxy.neutro) não é dificuldade
+      var neutra = !!(it.proxy && it.proxy.neutro);
+      var dif = !neutra && (it.dificuldade === 1 || it.dificuldade === 2 || it.dificuldade === 3) ? it.dificuldade : null;
+      var assets = it.assets || {}, medidas = it.medidas || {};
+      var grupo = grupoDaFonte(it.fonte);
+      destinoDoGrupo[grupo].push({
+        tipo: grupo, id: it.id, titulo: nomeDoExercicio(it),
+        serie: it.serie, quantidade: 1, numero: it.numero, fonte: it.fonte || null,
+        modulo: { chave: chave, titulo: (it.modulo && it.modulo.titulo) || '' },
+        lista: { slug: aula.slug || '', titulo: aula.titulo || '', n: aula.n || 0 },
+        dificuldade: dif, dificuldadeOrigem: dif ? (it.dificuldade_origem || null) : null, desafio: dif === 3,
+        dificuldadeNeutra: neutra,
+        objetiva: it.formato === 'objetiva', semSolucao: !!(it.sem_solucao || !assets.solucao),
+        imagem: { pacote: it.pacote || null, caminho: assets.enunciado || null, medidas: medidas.enunciado || null },
+        vinculo: vinculo,
+        abrir: { como: 'visor', tipo: 'exercicio', modulo: chave, lista: aula.slug || '', id: it.id },
+        anexar: { tipo: 'itens', ids: [it.id] }
+      });
+    });
+    function porLugarNaFonte(a, b) {
+      return (a.lista.n - b.lista.n) || (a.lista.slug < b.lista.slug ? -1 : a.lista.slug > b.lista.slug ? 1 : 0) ||
+        ((a.numero || 0) - (b.numero || 0)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    }
+    exercicios.sort(function (a, b) { return porModulo(a, b) || porLugarNaFonte(a, b); });
+    enem.sort(function (a, b) { return porModulo(a, b) || porLugarNaFonte(a, b); });
+    obmep.sort(function (a, b) {
+      return ((ORDEM_DA_OLIMPIADA[a.fonte] || 9) - (ORDEM_DA_OLIMPIADA[b.fonte] || 9)) || porModulo(a, b) || porLugarNaFonte(a, b);
+    });
+
+    // a teoria: uma fonte por aula, com as páginas dela
+    var teoria = [], teoriaVista = Object.create(null);
+    aulas.forEach(function (t) {
+      if (!t || typeof t.id !== 'string' || teoriaVista[t.id]) return;
+      var chave = chaveDoModuloDe(t);
+      if (chave) moduloPresente[chave] = true;
+      var vinculo = (chave && modulos[chave]) || porTeoria[t.id] || null;
+      if (!vinculo) return;
+      teoriaVista[t.id] = true;
+      var paginas = (Array.isArray(t.paginas) ? t.paginas : []).filter(function (p) { return p && typeof p.id === 'string'; });
+      // aula de teoria sem página nenhuma não tem o que abrir nem o que anexar
+      if (!paginas.length) return;
+      var capa = paginas[0];
+      teoria.push({
+        tipo: 'teoria', id: t.id, titulo: (t.aula && t.aula.titulo) || '', serie: t.serie, quantidade: paginas.length,
+        modulo: { chave: chave, titulo: (t.modulo && t.modulo.titulo) || '' },
+        n: (t.aula && t.aula.n) || 0,
+        imagem: { pacote: t.pacote || null, caminho: capa.asset || null, medidas: capa.medidas || null },
+        vinculo: vinculo,
+        abrir: { como: 'visor', tipo: 'teoria', id: t.id, indice: 0 },
+        anexar: { tipo: 'paginas', ids: paginas.map(function (p) { return p.id; }) }
+      });
+    });
+    teoria.sort(function (a, b) { return porModulo(a, b) || (a.n - b.n) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); });
+
+    /* A LISTA DE BASE (base-v1, nível 1): a do módulo do assunto, ou a que a
+     * tabela de vínculos citar. Como no app, só vale a lista cujos exercícios
+     * TODOS existem no aparelho: lista com buraco não aparece. */
+    var bases = [];
+    listas.forEach(function (l) {
+      if (!l || l.regra !== 'base-v1' || typeof l.id !== 'string') return;
+      var vinculo = (typeof l.modulo === 'string' && modulos[l.modulo]) || porLista[l.id] || null;
+      if (!vinculo) return;
+      var ids = Array.isArray(l.ids) ? l.ids.slice()
+        : (Array.isArray(l.degraus) ? l.degraus : []).map(function (d) { return d && d.item; });
+      if (!ids.length || ids.some(function (x) { return typeof x !== 'string' || !itemPorId[x]; })) return;
+      bases.push({
+        tipo: 'lista-base', id: l.id, titulo: 'Lista de base', serie: l.serie || (itemPorId[ids[0]] || {}).serie || null,
+        quantidade: ids.length, minutos: typeof l.minutos === 'number' && isFinite(l.minutos) ? l.minutos : null,
+        nivel: l.nivel || 1, modulo: { chave: l.modulo || null, titulo: (itemPorId[ids[0]].modulo || {}).titulo || '' },
+        itens: ids, vinculo: vinculo,
+        abrir: { como: 'lista-pronta', id: l.id, modulo: l.modulo || null },
+        anexar: { tipo: 'lista-pronta', id: l.id, ids: ids }
+      });
+    });
+    bases.sort(function (a, b) { return porModulo(a, b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); });
+    var listaBase = bases[0] || null;
+
+    /* OS VIZINHOS DECLARADOS. O assunto sem material próprio nenhum herda o
+     * dos assuntos que o índice lista em `fontes_vizinhas`, um nível só, e cada
+     * fonte herdada diz de qual vizinho veio. Não há adivinhação: sem a lista
+     * no índice, nada é herdado. */
+    var vizinhos = [];
+    var semMaterial = !teoria.length && !listaBase && !exercicios.length && !obmep.length && !enem.length;
+    if (semMaterial && tema && Array.isArray(tema.fontes_vizinhas) && !o.semVizinhos) {
+      var vistosDoVizinho = Object.create(null);
+      tema.fontes_vizinhas.forEach(function (vid) {
+        if (typeof vid !== 'string' || vid === id) return;
+        var r = fontesDoAssunto(vid, Object.assign({}, o, { semVizinhos: true, vinculos: null, modulosEquivalentes: null }));
+        var achou = false;
+        function herda(lista, destino) {
+          lista.forEach(function (f) {
+            if (vistosDoVizinho[f.tipo + '|' + f.id]) return;
+            vistosDoVizinho[f.tipo + '|' + f.id] = true;
+            f.deVizinho = vid;
+            destino.push(f);
+            achou = true;
+          });
+        }
+        herda(r.teoria, teoria);
+        herda(r.exercicios, exercicios);
+        herda(r.obmep, obmep);
+        herda(r.enem, enem);
+        if (r.listaBase && !listaBase) { r.listaBase.deVizinho = vid; listaBase = r.listaBase; achou = true; }
+        if (achou) vizinhos.push({ id: vid, titulo: r.titulo, serie: r.serie });
+      });
+    }
+
+    /* O VAZIO DIZ O PORQUÊ, numa linha: o aparelho sem pacote nenhum, o pacote
+     * do assunto que ainda não chegou, ou o assunto sem vínculo ainda. */
+    var vazio = null;
+    if (!teoria.length && !listaBase && !exercicios.length && !obmep.length && !enem.length) {
+      if (!itens.length && !aulas.length) {
+        vazio = { motivo: 'sem-pacote', texto: 'A teoria e os exercícios da Biblioteca ainda não estão neste aparelho.' };
+      } else if (ordemDosModulos.some(function (k) { return !moduloPresente[k]; })) {
+        vazio = { motivo: 'pacote-ausente', texto: 'O pacote com a teoria e os exercícios deste assunto ainda não está neste aparelho.' };
+      } else if (!temas.length) {
+        // sem o índice não há como saber o módulo do assunto: não dizer que não há nada
+        vazio = { motivo: 'sem-indice', texto: 'Não consegui ler a lista de assuntos agora. Tente de novo daqui a pouco.' };
+      } else {
+        vazio = { motivo: 'sem-vinculo', texto: 'Ainda não há teoria nem exercícios ligados a este assunto.' };
+      }
+    }
+
+    return {
+      assunto: id, titulo: tema && tema.pt ? tema.pt.titulo || null : null, serie: tema ? tema.serie || null : null,
+      teoria: teoria, listaBase: listaBase, exercicios: exercicios, obmep: obmep, enem: enem, vizinhos: vizinhos, vazio: vazio
+    };
   }
 
   /* Todo caminho de asset citado por itens.json e teoria.json. */
@@ -1724,6 +2106,7 @@
     sha256: sha256, tipoDoAsset: tipoDoAsset,
     paginaImpressa: paginaImpressa, paginaDoArquivo: paginaDoArquivo, paginaDaPosicao: paginaDaPosicao,
     resolverPaginaDoLeitor: resolverPaginaDoLeitor, conferirNumeracao: conferirNumeracao, paraRomano: paraRomano, deRomano: deRomano,
+    conferirMetaDaNuvem: conferirMetaDaNuvem,
     mapaDoLivro: mapaDoLivro, resolverCorrecoes: resolverCorrecoes, correcoesOrfas: correcoesOrfas,
     chaveParaGravarCorrecao: chaveParaGravarCorrecao, tituloNormalizado: tituloNormalizado, entradaDoMapa: entradaDoMapa, livroDoAno: livroDoAno, livrosComAssunto: livrosComAssunto,
     indiceDeCapitulos: indiceDeCapitulos, procurarNosCapitulos: procurarNosCapitulos,
@@ -1736,6 +2119,7 @@
     partesDoCapitulo: partesDoCapitulo, paginasEscolhidas: paginasEscolhidas, descreverUnidades: descreverUnidades,
     fonteDoLivro: fonteDoLivro, semTracos: semTracos,
     rasterizarRecorte: rasterizarRecorte, rasterizarPagina: rasterizarPagina,
-    alturasDosPedacos: alturasDosPedacos
+    alturasDosPedacos: alturasDosPedacos,
+    fontesDoAssunto: fontesDoAssunto
   };
 });

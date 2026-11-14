@@ -723,6 +723,7 @@ function gerarCadernos(saida, opcoes) {
         dificuldade: null, dificuldade_origem: null, proxy: null, tema_app: tema, tema_origem: 'leitura', tom,
         licenca: 'Uso não comercial, com atribuição e pela mesma licença (Decreto municipal 52.681/2011 de São Paulo; equivale a CC BY-NC-SA). Recorte fiel, sem alteração.',
         atribuicao: `Cadernos de Apoio e Aprendizagem: Matemática, ${nomeSerie[serie]} (SME-SP, 2014), p. ${pagina}, atividade "${atividade}".`,
+        link: 'https://example.invalid/acervo-sintetico',
         origem_detalhe: { caderno: 'Cadernos de Apoio e Aprendizagem: Matemática', ano: nomeSerie[serie], volume: 'único',
           edicao: '2ª edição revisada e atualizada, SME-SP, 2014', paginas: [pagina], unidade: 1, atividade, questao: null },
         assets: { enunciado: base + '.svg', solucao: null },

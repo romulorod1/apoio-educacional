@@ -1,0 +1,37 @@
+#!/bin/sh
+# Hook OPCIONAL de pre-push: roda a trava da fonte privada de anos iniciais
+# sobre os commits que vão ser enviados, ANTES de eles chegarem ao GitHub:
+# o tipo proibido, as marcas e, na máquina que tem a lista privada, o SHA.
+#
+# Existe porque o CI só barra o merge: um push num ramo já publica os commits
+# no repositório público, com o portão vermelho ou não. Nenhum clone o tem
+# ligado por padrão. Para ligar neste clone:
+#
+#   git config core.hooksPath _teste/hooks
+#
+# O git passa, uma linha por ref: <ref local> <sha local> <ref remoto> <sha remoto>.
+# Ref nova (sha remoto só de zeros) é conferida desde a origin/main; ref
+# apagada (sha local só de zeros) não tem o que conferir.
+raiz=$(git rev-parse --show-toplevel) || exit 1
+falhou=0
+while read -r ref_local sha_local ref_remoto sha_remoto; do
+  case "$sha_local" in *[!0]*) ;; *) continue ;; esac
+  case "$sha_remoto" in
+    *[!0]*) faixa="$sha_remoto..$sha_local" ;;
+    *)
+      if git rev-parse -q --verify origin/main >/dev/null; then
+        faixa="origin/main..$sha_local"
+      else
+        faixa="$sha_local"
+      fi
+      ;;
+  esac
+  printf 'trava da fonte privada: %s (%s)\n' "$ref_local" "$faixa"
+  if ! node "$raiz/_teste/testa_sem_fonte_privada.js" --faixa "$faixa"; then
+    falhou=1
+  fi
+done
+if [ "$falhou" != "0" ]; then
+  printf 'push recusado: a trava da fonte privada achou algo (acima).\n'
+fi
+exit "$falhou"
