@@ -3433,17 +3433,25 @@
     }
     $('#corpo-modal-leitor-pdf').addEventListener('scroll', rolarLeitorContinuo, { passive: true });
     ligarGestosDoLeitor($('#corpo-modal-leitor-pdf'));
+    ligarCanetaSemSelecao($('#corpo-modal-leitor-pdf'));
+    ligarFimDoConteudo();
     $('#leitor-slider-pagina').addEventListener('input', function () {
       // rolagem DIRETA: a suave atravessava as páginas do caminho, desenhava cada uma
       // e deixava o temporizador gravar posições intermediárias depois de soltar
       if (leitor && leitor.continuo) {
+        // o ponto de onde o arrasto saiu é a volta do salto (fatia 6), uma vez por arrasto
+        if (!leitor.origemDoArrasto) leitor.origemDoArrasto = origemDoSalto();
         leitor.arrastandoAte = Date.now() + LEITOR_ARRASTO_MS;
         irAProximaPaginaDoLeitor(+this.value, false, true);
       }
     });
-    // ao soltar a barra: aí sim a posição do livro é gravada, uma vez
+    // ao soltar a barra: aí sim a posição do livro é gravada, uma vez, e o salto entra na pilha
     $('#leitor-slider-pagina').addEventListener('change', function () {
-      if (!leitor || !leitor.continuo || typeof leitor.opcoes.aoMudarPagina !== 'function') return;
+      if (!leitor || !leitor.continuo) return;
+      var origem = leitor.origemDoArrasto;
+      leitor.origemDoArrasto = null;
+      guardarSaltoDoLeitor(origem, leitor.pagina);
+      if (typeof leitor.opcoes.aoMudarPagina !== 'function') return;
       try { leitor.opcoes.aoMudarPagina(leitor.pagina); } catch (e) { /* posição é auxiliar */ }
     });
     $('#epub-anterior').addEventListener('click', function () { andarNoEpub(-1); });
@@ -17488,6 +17496,169 @@
   }
 
   /* A lista de Ajustes: cada livro com o tamanho e o Remover, e o total. */
+  /* ---- a biblioteca na nuvem, fase 1c: o mapa novo chega pelo catálogo ----
+   *
+   * O "Atualizar a biblioteca" (Ajustes, Livros) lê o índice do catálogo
+   * (Nuvem.lerCatalogo) e, para cada livro do aparelho com o MESMO arquivo do
+   * catálogo e um meta que ainda não foi aplicado, baixa o documento do livro,
+   * confere o meta (Biblioteca.conferirMetaDaNuvem) e troca SÓ o meta
+   * (Store.trocarMetaDaNuvem). Nada de PDF baixado nem regravado; a posição e
+   * as correções dela ficam como estão. O livro de outro arquivo, ou que ainda
+   * não está no aparelho, só entra na conta "chegam com a próxima versão"
+   * (fase 2). Só no tablet, com a conta dela: o celular e o observador ficam
+   * para a 2c.
+   *
+   * A conferência sozinha na abertura fica DESLIGADA até a orquestradora
+   * conferir o relatório da primeira publicação real (decisão de 13/11): até
+   * lá, só o botão. Ligar é trocar esta constante, com prova. */
+  var ATUALIZAR_BIBLIOTECA_NA_ABERTURA = false;
+  var UMA_HORA_MS = 60 * 60 * 1000;
+  var atualizandoBiblioteca = null;
+  var CHAVE_ESTADO_DA_BIBLIOTECA = 'apoio-educacional:biblioteca-nuvem';
+  // a entrada dela venceu ou não existe: a linha pede para entrar de novo, e não "tente de novo"
+  var PEDE_ENTRAR_DE_NOVO = { SEM_SESSAO: true, TOKEN_EXPIRED: true, INVALID_REFRESH_TOKEN: true, USER_NOT_FOUND: true, UNAUTHENTICATED: true };
+  function estadoDaBibliotecaNuvem() {
+    try { return JSON.parse(localStorage.getItem(CHAVE_ESTADO_DA_BIBLIOTECA) || 'null'); } catch (e) { return null; }
+  }
+  function guardarEstadoDaBibliotecaNuvem(est) {
+    try { localStorage.setItem(CHAVE_ESTADO_DA_BIBLIOTECA, JSON.stringify(est)); } catch (e) { /* só a linha de Ajustes depende disto */ }
+  }
+
+  function atualizarBibliotecaDaNuvem() {
+    if (atualizandoBiblioteca) return atualizandoBiblioteca;
+    if (modoCelular || aparelhoSoLe() || typeof Nuvem !== 'object' || !Nuvem || typeof Nuvem.lerCatalogo !== 'function') {
+      return Promise.resolve(null);
+    }
+    var antes = estadoDaBibliotecaNuvem() || {};
+    // a marca do livro cujo meta da nuvem veio IGUAL ao do aparelho (não regravado): o metaHash do
+    // catálogo e o hash do meta do aparelho; se um dos dois mudar, o livro volta a ser conferido
+    var marcas = antes.conferidos && typeof antes.conferidos === 'object' ? antes.conferidos : {};
+    var estado = { quando: new Date().toISOString(), trocados: 0, chegam: 0, invalidos: 0, faltaram: 0, semEspaco: false, orfas: 0,
+      semCatalogo: false, conferidos: {} };
+    var hashDoMeta = function (m) { return Store.sha256Hex(Store.canonicoDoMeta(m)); };
+    var doAparelho = {};
+    var itens = [];
+    atualizandoBiblioteca = Promise.all([Nuvem.lerCatalogo(), Store.listarLivros()]).then(function (r) {
+      var indice = r[0], lista = r[1] || [];
+      if (!indice || !indice.livros || typeof indice.livros !== 'object') { estado.semCatalogo = true; return null; }
+      var candidatos = [];
+      lista.forEach(function (l) {
+        doAparelho[l.id] = l;
+        var e = indice.livros[l.id];
+        if (!e || e.retiradoEm) return;
+        if (!l.meta || l.meta.hash !== 'sha256:' + e.sha256) { estado.chegam++; return; }
+        if (l.nuvem && l.nuvem.metaHash === e.metaHash) return;
+        candidatos.push({ id: l.id, entrada: e });
+      });
+      Object.keys(indice.livros).forEach(function (id) {
+        if (!doAparelho[id] && !indice.livros[id].retiradoEm) estado.chegam++;
+      });
+      return Promise.all(candidatos.map(function (ped) {
+        var m = marcas[ped.id];
+        if (!m || m.metaHash !== ped.entrada.metaHash) return ped;
+        return hashDoMeta(doAparelho[ped.id].meta).then(function (h) {
+          if (h !== m.local) return ped;
+          estado.conferidos[ped.id] = m;
+          return null;
+        });
+      })).then(function (l) {
+        var pedidos = l.filter(Boolean);
+        // um livro por vez: são poucos KB cada, e a rede do tablet é a da aula
+        return pedidos.reduce(function (p, ped) {
+          return p.then(function () {
+            return Nuvem.lerLivroDoCatalogo(ped.id).then(function (doc) {
+              if (!doc || doc.id !== ped.id || doc.metaHash !== ped.entrada.metaHash || doc.sha256 !== ped.entrada.sha256) { estado.invalidos++; return; }
+              return Store.sha256Hex(doc.metaJson).then(function (h) {
+                var c = Biblioteca.conferirMetaDaNuvem(doc, h);
+                if (!c.meta) { estado.invalidos++; return; }
+                itens.push({ id: ped.id, sha256: doc.sha256, meta: c.meta, metaHash: doc.metaHash, metaVersao: doc.metaVersao });
+              });
+            });
+          });
+        }, Promise.resolve());
+      }).then(function () {
+        return itens.length ? Store.trocarMetaDaNuvem(itens) : null;
+      });
+    }).then(function (contas) {
+      if (!contas) return null;
+      estado.trocados = contas.trocados.length;
+      estado.invalidos += contas.invalidos;
+      estado.faltaram = contas.faltaram;
+      estado.semEspaco = !!(contas.falha && contas.falha.name === 'QuotaExceededError');
+      // as correções dela que o mapa novo deixou sem capítulo (as que já estavam órfãs não contam)
+      var correcoes = correcoesDosLivros();
+      itens.forEach(function (it) {
+        var c = correcoes[it.id];
+        if (!c || contas.trocados.indexOf(it.id) === -1) return;
+        try {
+          var velhas = {};
+          Biblioteca.correcoesOrfas(doAparelho[it.id].meta, c).forEach(function (o) { velhas[o.chave] = true; });
+          estado.orfas += Biblioteca.correcoesOrfas(it.meta, c).filter(function (o) { return !velhas[o.chave]; }).length;
+        } catch (e) { /* a conta é só da linha; a tela do livro mostra as órfãs de qualquer jeito */ }
+      });
+      return Promise.all(contas.iguais.map(function (id) {
+        var it = itens.filter(function (x) { return x.id === id; })[0];
+        return hashDoMeta(doAparelho[id].meta).then(function (h) { estado.conferidos[id] = { metaHash: it.metaHash, local: h }; });
+      }));
+    }).then(function () {
+      guardarEstadoDaBibliotecaNuvem(estado);
+      if (estado.trocados) {
+        indiceDosCapitulos = null;   // a busca pelos capítulos (#181) refaz com os mapas novos
+        return desenharLivrosAjustes().then(function () { return estado; });
+      }
+      desenharEstadoDaBibliotecaNuvem();
+      return estado;
+    }).then(function (est) { atualizandoBiblioteca = null; return est; }, function (e) {
+      atualizandoBiblioteca = null;
+      throw e;
+    });
+    return atualizandoBiblioteca;
+  }
+
+  // na abertura, no máximo uma vez por hora, e só com a constante ligada
+  function atualizarBibliotecaNaAbertura() {
+    if (!ATUALIZAR_BIBLIOTECA_NA_ABERTURA) return Promise.resolve(null);
+    var est = estadoDaBibliotecaNuvem();
+    if (est && est.quando && Date.now() - Date.parse(est.quando) < UMA_HORA_MS) return Promise.resolve(null);
+    return atualizarBibliotecaDaNuvem().catch(function () { return null; });
+  }
+
+  function textoDoEstadoDaBibliotecaNuvem(est) {
+    if (!est || !est.quando) return 'A biblioteca ainda não foi conferida com a nuvem.';
+    if (est.semCatalogo) return 'A biblioteca da nuvem ainda não tem livros.';
+    var d = new Date(est.quando);
+    var hoje = new Date();
+    var dia = d.toDateString() === hoje.toDateString() ? 'hoje' : 'em ' + ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
+    var partes = ['Biblioteca conferida ' + dia + ' às ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2)];
+    partes.push(est.trocados ? est.trocados + ' ' + palavraPlural(est.trocados, 'livro com mapa novo', 'livros com mapa novo') : 'nenhum livro com mapa novo');
+    if (est.chegam) partes.push(est.chegam + ' ' + palavraPlural(est.chegam, 'livro chega', 'livros chegam') + ' com a próxima versão');
+    if (est.invalidos) partes.push(est.invalidos + ' ' + palavraPlural(est.invalidos, 'livro não pôde ser conferido', 'livros não puderam ser conferidos'));
+    if (est.faltaram) {
+      partes.push(est.faltaram + ' ' + palavraPlural(est.faltaram, 'livro ficou', 'livros ficaram') + ' para o próximo toque' +
+        (est.semEspaco ? ', por falta de espaço no tablet' : ''));
+    }
+    if (est.orfas) partes.push(est.orfas + ' ' + palavraPlural(est.orfas, 'correção sua ficou', 'correções suas ficaram') + ' sem capítulo; veja no livro');
+    return partes.join(' · ');
+  }
+
+  function desenharEstadoDaBibliotecaNuvem() {
+    var linha = $('#livros-nuvem-estado');
+    if (linha) linha.textContent = textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem());
+  }
+
+  function tocarAtualizarBiblioteca(botao) {
+    if (botao) botao.disabled = true;
+    return atualizarBibliotecaDaNuvem().then(function (est) {
+      if (botao) botao.disabled = false;
+      if (est === null && (modoCelular || aparelhoSoLe())) avisar('A biblioteca se atualiza no tablet.');
+    }, function (e) {
+      if (botao) botao.disabled = false;
+      var codigo = e && e.codigo;
+      avisar(codigo === 'SEM_SESSAO' ? 'Entre na nuvem para atualizar a biblioteca.'
+        : PEDE_ENTRAR_DE_NOVO[codigo] ? 'A entrada na nuvem venceu. Entre de novo para atualizar a biblioteca.' : 'Não consegui conferir a biblioteca agora. Tente de novo daqui a pouco.');
+    });
+  }
+
   function desenharLivrosAjustes() {
     var caixa = $('#lista-livros-biblioteca');
     return Store.listarLivros().then(function (lista) {
@@ -17527,7 +17698,13 @@
         el('div', { class: 'livros-total', id: 'livros-total', 'data-bytes': String(total),
           texto: lista.length + (lista.length === 1 ? ' livro, ' : ' livros, ') + Biblioteca.mb(total) + ' no total' }),
         el('div', { class: 'ajuda u-margem-0-0-6', texto: 'Os livros ficam só neste tablet: a cópia de segurança não os leva. Para usar num tablet novo, ' +
-            'importe o pacote de livros de novo do Drive.' })
+            'importe o pacote de livros de novo do Drive.' }),
+        // fase 1c: o mapa novo dos livros chega pelo catálogo da nuvem, sem baixar livro nenhum
+        el('div', { class: 'livros-nuvem', id: 'livros-nuvem' }, [
+          el('div', { class: 'ajuda cresce', id: 'livros-nuvem-estado', texto: textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem()) }),
+          el('button', { type: 'button', class: 'btn pequeno', id: 'livros-nuvem-atualizar', texto: 'Atualizar a biblioteca',
+            aoClick: function () { tocarAtualizarBiblioteca($('#livros-nuvem-atualizar')); } })
+        ])
       ].concat(linhas)));
     }).catch(function () { quantosLivros = 0; livrosDoTablet = []; livrosDoTabletMudaram(); if (caixa) caixa.innerHTML = ''; });
   }
@@ -23834,7 +24011,8 @@
       });
     return Promise.all([enun, sol]).then(function (r) {
       return { id: it.id, origem: origemCurta(it), credito: creditoDaLicenca(it), enunciado: r[0], solucao: r[1],
-        semSolucao: !!(it.sem_solucao || !it.assets.solucao), resposta: respostaSemSolucao(it) };
+        semSolucao: !!(it.sem_solucao || !it.assets.solucao), resposta: respostaSemSolucao(it),
+        gabaritoAgente: respostasDoAgente(it) };
     });
   }
 
@@ -23843,6 +24021,54 @@
    * solução mostra a solução, e a letra fica dentro dela. */
   function respostaSemSolucao(it) {
     return it && !it.assets.solucao && it.formato === 'objetiva' && /^[A-E]$/.test(it.resposta || '') ? it.resposta : null;
+  }
+
+  /* O GABARITO RESOLVIDO POR AGENTE E CONFERIDO (aditivo no pacote). Fonte
+   * sem solução (os Cadernos da SME-SP: o caderno do aluno não traz respostas)
+   * pode trazer no item `gabarito: { origem: 'agente-conferido', respostas:
+   * [{ subitem, resposta }] }`, a resposta de duas IAs que resolveram separadas
+   * e chegaram ao mesmo resultado (o gerador grava pelo --gabarito-externo).
+   * Onde a resposta aparece (a tela cheia e o gabarito do PDF), a marca vai
+   * SEMPRE junto, e nenhuma caixa a desliga: quem lê precisa saber que aquela
+   * resposta não veio do livro. Item sem o campo, ou de outra origem, devolve
+   * null e fica exatamente como era. As linhas saem prontas para mostrar,
+   * como { texto, semResposta }: "1) 38" por subitem, ou "Resposta: 38"
+   * quando o item não tem subitens. A resposta PARCIAL é de propósito (o
+   * subitem em que as duas IAs não concordaram fica sem entrada): item com
+   * subitens lista TODOS, e o que não tem resposta sai "sem resposta
+   * conferida". */
+  var MARCA_GABARITO_AGENTE = 'Resposta conferida por duas IAs';
+  var EXPLICA_GABARITO_AGENTE = 'Este livro não traz gabarito. Duas IAs resolveram separadas e chegaram à mesma resposta.';
+  var SEM_RESPOSTA_CONFERIDA = 'sem resposta conferida';
+  function respostasDoAgente(it) {
+    var g = it && it.gabarito;
+    if (!g || g.origem !== 'agente-conferido' || !Array.isArray(g.respostas)) return null;
+    var limpo = function (v) { return typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : ''; };
+    var rs = g.respostas.filter(function (r) { return r && limpo(r.resposta); });
+    if (!rs.length) return null;
+    var subs = (Array.isArray(it.subitens) ? it.subitens : []).map(limpo).filter(Boolean);
+    if (subs.length) {
+      var de = {};
+      rs.forEach(function (r) { if (limpo(r.subitem)) de[limpo(r.subitem)] = limpo(r.resposta); });
+      return subs.map(function (s) {
+        return de[s] ? { texto: s + ') ' + de[s], semResposta: false }
+          : { texto: s + ') ' + SEM_RESPOSTA_CONFERIDA, semResposta: true };
+      });
+    }
+    if (rs.length === 1 && !limpo(rs[0].subitem)) return [{ texto: 'Resposta: ' + limpo(rs[0].resposta), semResposta: false }];
+    return rs.map(function (r) {
+      return { texto: (limpo(r.subitem) ? limpo(r.subitem) + ') ' : '') + limpo(r.resposta), semResposta: false };
+    });
+  }
+
+  /* A marca, que se toca para ler o porquê. Um <details>: sem script, e o
+   * leitor de tela anuncia que abre. */
+  function marcaDoAgente() {
+    return el('details', { id: 'bib-marca-ia', class: 'bib-marca-ia u-texto-centro' }, [
+      el('summary', {}, [el('span', { class: 'bib-grupo-seta', 'aria-hidden': 'true' }, [icone('chr')]),
+        el('span', { texto: MARCA_GABARITO_AGENTE })]),
+      el('p', { id: 'bib-marca-ia-explica', class: 'bib-marca-ia-explica', texto: EXPLICA_GABARITO_AGENTE })
+    ]);
   }
 
   /* Módulo de prova que não é assunto do aplicativo ("Diversos", C12) não vira
@@ -25855,6 +26081,14 @@
       corpo.appendChild(el('div', { id: 'bib-resposta', class: 'bib-resposta u-texto-centro u-letra-6 u-peso-negrito u-cor-navy u-margem-topo-10',
         texto: 'Resposta: ' + resposta }));
     }
+    /* A resposta de duas IAs conferida (item sem solução na fonte): pelo mesmo
+     * "Ver resposta", e a marca embaixo SEMPRE, aberta ou não a resposta. */
+    var doAgente = bibVendo.tipo === 'exercicio' ? respostasDoAgente(peca.item) : null;
+    if (doAgente && bibVendo.solucao) {
+      corpo.appendChild(el('div', { id: 'bib-resposta-agente', class: 'bib-resposta u-texto-centro u-margem-topo-10' },
+        doAgente.map(function (l) { return el('div', { class: l.semResposta ? 'bib-sem-resposta' : 'u-peso-negrito u-cor-navy', texto: l.texto }); })));
+    }
+    if (doAgente) corpo.appendChild(marcaDoAgente());
     var vez = ++bibVezDoVisor;
     Store.lerAssetBiblioteca(peca.pacote, peca.caminho).then(function (blob) {
       // ela pode ter andado para outra página enquanto esta era lida
@@ -25868,7 +26102,7 @@
     if (bibVendo.tipo === 'exercicio' && peca.item.assets.solucao) {
       sol.style.display = '';
       sol.textContent = bibVendo.solucao ? 'Ver enunciado' : 'Ver solução';
-    } else if (resposta) {
+    } else if (resposta || doAgente) {
       sol.style.display = '';
       sol.textContent = bibVendo.solucao ? 'Esconder a resposta' : 'Ver resposta';
     } else {
@@ -26410,9 +26644,109 @@
       return false;
     }
     fecharSumarioDoLeitor();
-    if (leitor.continuo) irAProximaPaginaDoLeitor(destino, false);
+    if (leitor.continuo) saltarNoLeitor(destino);
     else { leitor.pagina = destino; desenharPaginaDoLeitor(true); }
     return true;
+  }
+
+  /* VOLTAR PARA ONDE EU ESTAVA (fatia 6 do leitor). Cada SALTO de navegação
+   * (o Sumário, o "Ir p." e a barra de página) guarda o ponto de onde ela
+   * saiu: a página do meio da tela e o lugar dentro dela, a mesma âncora do
+   * zoom e do giro. Por 10 s aparece "Voltar à p. 45"; o toque leva de volta
+   * ao mesmo trecho, e a pílula SOME: oferecer em seguida o salto anterior
+   * ("Voltar à p. 10") mostraria um destino que ela não reconhece naquele
+   * momento. A pilha continua guardada e a pílula só reaparece no próximo
+   * salto, com a volta desse salto novo. Rolar, a pinça, o zoom, o giro e o Anterior e Próxima não são
+   * salto: são leitura, e não mexem na pilha.
+   * A pilha vive só no leitor aberto (memória da sessão): fechar o livro a
+   * esquece, nada vai para o banco, e a posição gravada continua a da leitura
+   * (a volta é uma ida como outra, e grava a página onde ela chegou). */
+  var LEITOR_VOLTA_MS = 10000;
+  var LEITOR_SALTOS_MAX = 50;
+  var leitorVoltaTimer = null;
+
+  function origemDoSalto() {
+    return leitor && leitor.continuo && leitor.paginas ? ancoraDoLeitorContinuo(leitor) : null;
+  }
+
+  // o salto direto, com a volta guardada
+  function saltarNoLeitor(destino) {
+    var origem = origemDoSalto();
+    var r = irAProximaPaginaDoLeitor(destino, false);
+    guardarSaltoDoLeitor(origem, destino);
+    return r;
+  }
+
+  function guardarSaltoDoLeitor(origem, destino) {
+    if (!leitor || !origem || origem.n === destino) return;
+    leitor.saltos = leitor.saltos || [];
+    leitor.saltos.push(origem);
+    if (leitor.saltos.length > LEITOR_SALTOS_MAX) leitor.saltos.shift();
+    mostrarVoltaDoLeitor();
+  }
+
+  function botaoDeVoltaDoLeitor() {
+    var b = $('#leitor-voltar-salto');
+    if (b) return b;
+    var corpo = $('#corpo-modal-leitor-pdf');
+    if (!corpo || !corpo.parentNode) return null;
+    /* Uma faixa de altura zero logo abaixo da área de leitura: o botão flutua
+     * por cima do pé da página, sem empurrar nada e sem rolar junto. */
+    b = el('button', { type: 'button', class: 'btn principal leitor-voltar-salto', id: 'leitor-voltar-salto',
+      hidden: 'hidden', aoClick: voltarDoSaltoDoLeitor });
+    var faixa = el('div', { class: 'leitor-voltar-faixa' }, [b]);
+    corpo.parentNode.insertBefore(faixa, corpo.nextSibling);
+    return b;
+  }
+
+  // o rótulo diz a página como ela a conhece: a impressa, quando o livro tem
+  function rotuloDaVoltaDoLeitor(n) {
+    var meta = leitor && leitor.opcoes && leitor.opcoes.livro ? leitor.opcoes.livro.meta : null;
+    var imp = meta ? Biblioteca.paginaImpressa(meta, n) : null;
+    return 'Voltar à p. ' + (imp !== null && imp !== undefined ? imp : n);
+  }
+
+  // mostra a volta do salto do topo da pilha por 10 s; sem pilha, some
+  function mostrarVoltaDoLeitor() {
+    clearTimeout(leitorVoltaTimer);
+    leitorVoltaTimer = null;
+    var b = botaoDeVoltaDoLeitor();
+    if (!b) return;
+    var topo = leitor && leitor.saltos && leitor.saltos.length ? leitor.saltos[leitor.saltos.length - 1] : null;
+    if (!topo) { b.hidden = true; return; }
+    trocarComIcone(b, 'undo', rotuloDaVoltaDoLeitor(topo.n));
+    b.hidden = false;
+    leitorVoltaTimer = setTimeout(esconderVoltaDoLeitor, LEITOR_VOLTA_MS);
+  }
+
+  function esconderVoltaDoLeitor() {
+    clearTimeout(leitorVoltaTimer);
+    leitorVoltaTimer = null;
+    var b = $('#leitor-voltar-salto');
+    if (b) b.hidden = true;
+  }
+
+  function voltarDoSaltoDoLeitor() {
+    if (!leitor || !leitor.continuo || !leitor.saltos || !leitor.saltos.length) { esconderVoltaDoLeitor(); return; }
+    // "ponto", e não "ancora": a linha voltarParaAncoraDoLeitor(estado, ancora) é
+    // âncora única de veneno da prova da fatia 3 (testa_biblioteca_livros_tela)
+    var estado = leitor, ponto = estado.saltos.pop();
+    var corpo = $('#corpo-modal-leitor-pdf');
+    fecharSumarioDoLeitor();
+    var desenho = irAProximaPaginaDoLeitor(ponto.n, false);
+    // o mesmo trecho no meio, e não o alto da página
+    voltarParaAncoraDoLeitor(estado, ponto);
+    estado.ultimoTopo = corpo.scrollTop;
+    var posto = corpo.scrollTop;
+    /* Se a página, ao ser desenhada, tiver outra proporção que a guardada, a
+     * caixa muda de altura: o ponto se refaz, a não ser que ela já tenha rolado. */
+    desenho.then(function () {
+      if (estado === leitor && corpo.scrollTop === posto) {
+        voltarParaAncoraDoLeitor(estado, ponto);
+        estado.ultimoTopo = corpo.scrollTop;
+      }
+    });
+    esconderVoltaDoLeitor(); // a volta feita, a pílula some
   }
 
   function fecharSumarioDoLeitor() {
@@ -26432,7 +26766,7 @@
       fecharSumarioDoLeitor();
       if (!leitor || !leitor.doc) return;
       var destino = Math.max(1, Math.min(leitor.total, e.pagina));
-      if (leitor.continuo) irAProximaPaginaDoLeitor(destino, false);
+      if (leitor.continuo) saltarNoLeitor(destino);
       else { leitor.pagina = destino; desenharPaginaDoLeitor(true); }
     }, meta);
     lista.hidden = false;
@@ -26605,6 +26939,7 @@
         if (antigo) { antigo.width = 0; antigo.height = 0; }
         registro.caixa.innerHTML = '';
         registro.caixa.appendChild(canvas);
+        criarCamadaDeTexto(estado, registro, pagina, vp);
         registro.temCanvas = true;
         registro.esticado = false;
         registro.densidade = densidade;
@@ -26714,11 +27049,131 @@
     }).catch(function () { /* o detalhe é só nitidez: a página inteira continua lá */ }).then(atualizarOcupacaoDoLeitor);
   }
 
+  /* A CAMADA DE TEXTO (fatia 7 do leitor): o texto da página, transparente,
+   * por cima do canvas, para o dedo selecionar e copiar (o TextLayer do
+   * pdf.js). Nasce com o canvas da página (desenharPaginaContinua) e sai com
+   * ele (liberarPaginaContinua): só as páginas desenhadas têm texto vivo.
+   * Página sem texto (a do escaneado) não ganha camada, e o livro escaneado
+   * (a sonda da fatia 3) é dito uma vez por abertura. O anexo da aula (página
+   * única) continua sem camada. */
+  var LEITOR_SEM_TEXTO = 'Este livro é imagem: o texto não pode ser selecionado nem buscado.';
+  function criarCamadaDeTexto(estado, registro, pagina, vp) {
+    if (estado.escaneado && !estado.avisouImagem) { estado.avisouImagem = true; avisar(LEITOR_SEM_TEXTO); }
+    var velha = registro.texto;
+    // a página foi redesenhada no mesmo tamanho (a segunda passada): a camada pronta volta
+    if (velha && velha.escala === vp.scale) { if (velha.temTexto) registro.caixa.appendChild(velha.div); return; }
+    soltarCamadaDeTexto(registro);
+    var camada = { div: el('div', { class: 'textLayer leitor-pdf-texto' }), escala: vp.scale, tarefa: null, temTexto: false };
+    camada.div.style.setProperty('--total-scale-factor', String(vp.scale));
+    registro.texto = camada;
+    Promise.all([carregarPdfJs(), pagina.getTextContent({ includeMarkedContent: true, disableNormalization: true })]).then(function (r) {
+      // a página saiu (ou foi redesenhada em outro tamanho) enquanto o texto chegava
+      if (registro.texto !== camada || estado !== leitor) return null;
+      var temTexto = (r[1].items || []).some(function (i) { return i.str && i.str.trim(); });
+      // caixa.dataset.texto diz que a página já foi lida: '1' com camada pronta, '0' sem texto
+      if (!temTexto) { registro.caixa.dataset.texto = '0'; return null; }
+      camada.temTexto = true;
+      if (registro.temCanvas && !camada.div.parentNode) registro.caixa.appendChild(camada.div);
+      camada.tarefa = new r[0].TextLayer({ textContentSource: r[1], container: camada.div, viewport: vp });
+      return camada.tarefa.render().then(function () {
+        if (registro.texto !== camada) return;
+        /* a letra de cada pedaço no tamanho que ele tem na página: geometria do
+         * PDF, em px, e não tipografia do app (por isso não está no styles.css) */
+        Array.prototype.forEach.call(camada.div.querySelectorAll('span'), function (s) {
+          s.style.fontSize = 'calc(var(--text-scale-factor) * var(--font-height))';
+        });
+        camada.div.appendChild(el('div', { class: 'endOfContent' }));
+        registro.caixa.dataset.texto = '1';
+      });
+    }).catch(function () { /* sem a camada a página continua lá; só não seleciona */ });
+  }
+
+  function soltarCamadaDeTexto(registro) {
+    var camada = registro.texto;
+    delete registro.caixa.dataset.texto;
+    if (!camada) return;
+    registro.texto = null;
+    if (camada.tarefa) { try { camada.tarefa.cancel(); } catch (e) { /* já terminou */ } }
+    if (camada.div.parentNode) camada.div.parentNode.removeChild(camada.div);
+  }
+
+  /* A S Pen não seleciona o texto do livro: a caneta é da folha (padrão 4.5
+   * do benchmark). O navegador começa a seleção depois do pointerdown; se ele
+   * veio da caneta, o selectstart é cancelado. O dedo e o mouse selecionam. */
+  var canetaNoLeitor = false;
+  function ligarCanetaSemSelecao(corpo) {
+    corpo.addEventListener('pointerdown', function (ev) { canetaNoLeitor = ev.pointerType === 'pen'; }, true);
+    corpo.addEventListener('selectstart', function (ev) { if (canetaNoLeitor) ev.preventDefault(); });
+  }
+
+  /* O FIM DO CONTEÚDO: o mecanismo do TextLayerBuilder do visualizador do
+   * pdf.js (web/text_layer_builder.js), que o TextLayer do núcleo não traz.
+   * Sem ele, o arrasto que termina depois do fim da linha (o dedo quase sempre
+   * passa) cai no vazio da camada e o Chrome põe a ponta da seleção longe: a
+   * seleção some ou pula para a linha de cima. Cada camada tem no fim um
+   * div.endOfContent; enquanto há seleção nela (classe selecting) ele cobre a
+   * camada inteira por baixo dos pedaços de texto (styles.css), e a cada
+   * mudança da seleção ele é posto logo depois do pedaço em que a ponta está:
+   * o arrasto no vazio pega até o fim daquele pedaço, e não mais. Uma escuta
+   * só, no documento, para todas as páginas. */
+  function ligarFimDoConteudo() {
+    var apertado = false, anterior = null;
+    var camadas = function () { return document.querySelectorAll('#corpo-modal-leitor-pdf .leitor-pdf-texto'); };
+    var devolver = function (camada) {
+      var fim = camada.querySelector('.endOfContent');
+      if (fim) { fim.style.width = ''; fim.style.height = ''; fim.style.userSelect = ''; if (fim.parentNode !== camada || fim.nextSibling) camada.appendChild(fim); }
+      camada.classList.remove('selecting');
+    };
+    var devolverTodas = function () { Array.prototype.forEach.call(camadas(), devolver); };
+    document.addEventListener('pointerdown', function (ev) {
+      apertado = true;
+      var camada = ev.pointerType !== 'pen' && ev.target.closest && ev.target.closest('.leitor-pdf-texto');
+      if (camada) camada.classList.add('selecting');
+    });
+    document.addEventListener('pointerup', function () { apertado = false; devolverTodas(); });
+    window.addEventListener('blur', function () { apertado = false; devolverTodas(); });
+    document.addEventListener('keyup', function () { if (!apertado) devolverTodas(); });
+    document.addEventListener('selectionchange', function () {
+      var sel = document.getSelection();
+      if (!sel.rangeCount) { devolverTodas(); return; }
+      var r = sel.getRangeAt(0), ativa = false;
+      Array.prototype.forEach.call(camadas(), function (c) {
+        if (r.intersectsNode(c)) { c.classList.add('selecting'); ativa = true; } else devolver(c);
+      });
+      if (!ativa) { anterior = null; return; }
+      // a ponta que o arrasto está mexendo: a do começo, se a do fim ficou parada
+      var mexeInicio = !!anterior && (r.compareBoundaryPoints(Range.END_TO_END, anterior) === 0 ||
+        r.compareBoundaryPoints(Range.START_TO_END, anterior) === 0);
+      var ponta = mexeInicio ? r.startContainer : r.endContainer;
+      if (ponta.nodeType === Node.TEXT_NODE) ponta = ponta.parentNode;
+      if (!mexeInicio && r.endOffset === 0) {
+        // a ponta no começo de um pedaço: o fim vai depois do pedaço com texto anterior
+        do {
+          while (ponta && !ponta.previousSibling) ponta = ponta.parentNode;
+          ponta = ponta && ponta.previousSibling;
+        } while (ponta && !ponta.childNodes.length);
+      }
+      var camada = ponta && ponta.parentElement && ponta.parentElement.closest('.leitor-pdf-texto');
+      var fim = camada && camada.querySelector('.endOfContent');
+      if (fim && ponta !== fim) {
+        fim.style.width = camada.clientWidth + 'px';
+        fim.style.height = camada.clientHeight + 'px';
+        // no Chrome o fim do conteúdo tem de ser selecionável enquanto está atrás
+        // da ponta (o TextLayerBuilder do pdf.js faz o mesmo): com user-select
+        // none, o ponteiro que passa do fim da linha cai num ponto do meio dela
+        fim.style.userSelect = 'text';
+        ponta.parentElement.insertBefore(fim, mexeInicio ? ponta : ponta.nextSibling);
+      }
+      anterior = r.cloneRange();
+    });
+  }
+
   function liberarPaginaContinua(registro) {
     soltarDetalhe(registro);
     if (registro.tarefa) { registro.tarefa.cancel(); registro.tarefa = null; }
     var c = registro.caixa.querySelector('canvas');
     if (c) { c.width = 0; c.height = 0; registro.caixa.removeChild(c); }
+    soltarCamadaDeTexto(registro);
     registro.caixa.innerHTML = '';
     registro.caixa.appendChild(el('div', { class: 'leitor-pdf-pagina-vazia', 'aria-hidden': 'true' }));
     registro.desenhando = false;
@@ -27219,6 +27674,8 @@
     leitorRolarDestinoTimer = null;
     zerarGestosDoLeitor();
     if (leitor && leitor.paginas) leitor.paginas.forEach(liberarPaginaContinua);
+    // a pilha de saltos (fatia 6) vai embora com o leitor
+    esconderVoltaDoLeitor();
     leitor = null;
     fecharSumarioDoLeitor();
     esconderCobre('pdf');
@@ -27368,6 +27825,8 @@
     if (typeof Store.aoReceber === 'function') Store.aoReceber(registrosChegaram);
     var lembretePronto = function () { lembreteNuvemPronta = true; relerFilaDoLembrete(); };
     Nuvem.pronto().then(lembretePronto, lembretePronto);
+    // fase 1c: a conferência do catálogo na abertura (desligada até a primeira publicação conferida)
+    Nuvem.pronto().then(atualizarBibliotecaNaAbertura, function () { /* sem nuvem, sem catálogo */ });
     Nuvem.pronto().then(function () {
       desenharNuvem();
       // o celular busca a cópia mais nova; quem sobe a dele é só o tablet

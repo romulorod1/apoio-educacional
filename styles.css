@@ -34,6 +34,9 @@
   --acao-clara: #E8EDF4;
   --trilho-do-deslize: #ECEEF1;
   --fundo-escurecido: rgba(15, 23, 42, .35);
+  /* a seleção do texto sobre a página do livro (fatia 7): translúcida, porque a
+     letra que se vê é a desenhada no canvas, por baixo da camada */
+  --selecao-no-livro: rgba(46, 125, 107, .28);
   --navy-escuro: #16314F;
   --teal: #2E7D6B;
   --teal-claro: #E6F1EE;
@@ -2119,6 +2122,13 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .bib-origem { font-size: var(--letra-12); color: var(--muted); }
 /* o crédito que a licença da fonte pede (L6): sempre visível, nunca escondido */
 .bib-credito { font-size: var(--letra-12); color: var(--muted); overflow-wrap: anywhere; }
+/* a marca da resposta de duas IAs conferida: sempre à vista; tocar abre o porquê */
+.bib-marca-ia { font-size: var(--letra-12); color: var(--muted); margin-top: 6px; }
+.bib-marca-ia > summary { display: inline-flex; align-items: center; gap: 4px; min-height: var(--alvo); cursor: pointer; color: var(--navy); font-weight: 600; list-style: none; }
+.bib-marca-ia > summary::-webkit-details-marker { display: none; }
+.bib-marca-ia[open] > summary .bib-grupo-seta { transform: rotate(90deg); }
+.bib-marca-ia-explica { margin: 0 0 6px; }
+.bib-sem-resposta { font-style: italic; color: var(--muted); }
 .bib-visor { background: var(--fio-claro); }
 .bib-cheia { width: 100%; height: auto; display: block; margin: 0 auto; background: var(--branco); box-shadow: var(--sombra); }
 /* o selo "Marcado" sobre a imagem da tela cheia: ela anda pelo Anterior e
@@ -2176,7 +2186,53 @@ button.alvo-rascunho:hover { background: var(--soft); }
 /* O canvas de detalhe do zoom alto (fatia 3): só o pedaço à vista, na densidade
    da tela, por cima da página inteira; o toque passa direto para a página. */
 .leitor-pdf-pagina canvas.leitor-pdf-detalhe { position: absolute; pointer-events: none; }
+/* A camada de texto do livro (fatia 7): o CSS do textLayer do pdf.js 6.4.299
+   (pdf_viewer.css), só o que a camada usa. O texto fica transparente, por cima
+   do canvas e do detalhe, no lugar da letra desenhada; a seleção aparece no
+   verde translúcido do sistema. O tamanho é o da caixa da página (o pdf.js o
+   escreve com round(), que nem todo navegador tem). A --total-scale-factor
+   vale 1 aqui e o app.js põe a da página na camada. O tamanho da letra de cada
+   pedaço de texto NÃO está aqui: é geometria da página do PDF, em px, e não
+   tipografia do app; o app.js o põe no estilo de cada pedaço (como o pdf.js
+   fazia até a versão 3). */
+.leitor-pdf-pagina .textLayer { position: absolute; inset: 0; width: 100% !important; height: 100% !important;
+  z-index: 1; overflow: clip; opacity: 1; line-height: 1; text-align: initial;
+  -webkit-text-size-adjust: none; text-size-adjust: none; forced-color-adjust: none;
+  transform-origin: 0 0; caret-color: CanvasText;
+  --total-scale-factor: 1;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+.leitor-pdf-pagina .textLayer span, .leitor-pdf-pagina .textLayer br { color: transparent; position: absolute;
+  white-space: pre; cursor: text; transform-origin: 0% 0%;
+  --font-height: 0;
+  --scale-x: 1; --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv)); }
+.leitor-pdf-pagina .textLayer span.markedContent { top: 0; height: 0; }
+/* O fim do conteúdo (o do TextLayerBuilder do pdf.js; o app.js o põe e o
+   move): fora da seleção, uma faixa de altura zero no pé da camada; com a
+   seleção na camada (classe selecting), a camada inteira, por baixo dos
+   pedaços de texto. O arrasto que passa do fim da linha cai nele, e não no
+   vazio. Sem texto: a cor transparente é a dos pedaços. */
+.leitor-pdf-pagina .textLayer > :not(.markedContent),
+.leitor-pdf-pagina .textLayer .markedContent span:not(.markedContent) { z-index: 1; }
+.leitor-pdf-pagina .textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: 0;
+  cursor: default; color: transparent; -webkit-user-select: none; user-select: none; }
+.leitor-pdf-pagina .textLayer.selecting .endOfContent { top: 0; }
+.leitor-pdf-pagina .textLayer ::selection { background: var(--selecao-no-livro); }
+.leitor-pdf-pagina .textLayer br::selection { background: transparent; }
 .leitor-pdf-pagina-vazia { width: 100%; height: 100%; background: var(--branco); }
+/* "Voltar à p. 45" (fatia 6): depois de um salto, flutua por cima do pé da
+   área de leitura, no meio, por 10 s, como o aviso de uma linha com uma ação
+   (benchmark 2.5 e 5.3). A faixa tem altura zero: não empurra a página nem a
+   barra, e o botão não rola junto com o livro. Alvo de 48 px (padrão 8). */
+.leitor-voltar-faixa { position: relative; flex: 0 0 0; height: 0; z-index: 2; }
+.leitor-voltar-salto { position: absolute; left: 50%; bottom: 1rem; transform: translateX(-50%);
+  min-height: var(--alvo); min-width: var(--alvo); padding: 0 1.25rem; border-radius: var(--alvo);
+  white-space: nowrap; box-shadow: var(--sombra-forte); }
+.leitor-voltar-salto:active { transform: translateX(-50%) translateY(1px); }
+.leitor-voltar-salto[hidden] { display: none; }
 /* A frase do C3 ("Escolha a página e toque em...") fica colada embaixo da
    barra, de ponta a ponta, sem rolar junto com a página. */
 .leitor-pdf-dica { flex-shrink: 0; margin: 0; border-radius: 0; border-width: 0 0 1px; }
@@ -2232,6 +2288,9 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-cobre .cobre-rolagem { flex: 1 1 100%; margin: 0; }
 .livro-linha .detalhe { margin-top: 2px; }
 #lista-livros-biblioteca .livros-total { font-weight: 600; margin: 4px 0 8px; }
+/* fase 1c: a linha da biblioteca na nuvem, com o botão ao lado (quebra quando falta largura) */
+#lista-livros-biblioteca .livros-nuvem { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 10px; }
+#lista-livros-biblioteca .livros-nuvem .ajuda { margin: 0; min-width: 12rem; overflow-wrap: anywhere; }
 #lista-instalados-biblioteca > summary {
   cursor: pointer;
   color: inherit;

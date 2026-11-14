@@ -623,6 +623,31 @@ roda "leitor nitidez --envenenado-sem-detalhe"      node "_teste/testa_leitor_ni
 roda "leitor nitidez --envenenado-sem-teto"         node "_teste/testa_leitor_nitidez.js" --envenenado-sem-teto
 roda "leitor nitidez --envenenado-direcao-errada"   node "_teste/testa_leitor_nitidez.js" --envenenado-direcao-errada
 roda "leitor nitidez --envenenado-sem-meia-densidade" node "_teste/testa_leitor_nitidez.js" --envenenado-sem-meia-densidade
+# Fatia 6 do leitor: voltar para onde eu estava. Depois do Sumario, do Ir p. e
+# da barra de pagina aparece por 10 s "Voltar a p. 45", e o toque volta ao
+# mesmo trecho no meio (24 px) e a pilula some, ate o proximo salto;
+# rolar, o zoom e a Proxima nao sao salto. Um veneno por criterio, e o
+# controle no commit pai (a39e13f), onde os criterios tem de falhar.
+roda "leitor voltar"                               node "_teste/testa_leitor_voltar.js"
+roda "leitor voltar --envenenado-volta-no-topo"    node "_teste/testa_leitor_voltar.js" --envenenado-volta-no-topo
+roda "leitor voltar --envenenado-continua-depois-do-toque" node "_teste/testa_leitor_voltar.js" --envenenado-continua-depois-do-toque
+roda "leitor voltar --envenenado-nao-some"         node "_teste/testa_leitor_voltar.js" --envenenado-nao-some
+roda "leitor voltar --envenenado-aparece-na-rolagem" node "_teste/testa_leitor_voltar.js" --envenenado-aparece-na-rolagem
+roda "leitor voltar --controle-pai"                node "_teste/testa_leitor_voltar.js" --controle-pai
+# Fatia 7 do leitor: texto selecionavel sobre a pagina. Na p. 206 a camada de
+# texto existe, arrastar pela linha desenhada e copiar traz "Exercicio 206", a
+# caneta (pen) nao seleciona, so as paginas desenhadas tem texto vivo e o
+# escaneado nao tem camada e diz a frase uma vez. Um veneno por criterio.
+roda "leitor texto"                                 node "_teste/testa_leitor_texto.js"
+roda "leitor texto --envenenado-sem-camada"         node "_teste/testa_leitor_texto.js" --envenenado-sem-camada
+roda "leitor texto --envenenado-sem-selecao"        node "_teste/testa_leitor_texto.js" --envenenado-sem-selecao
+roda "leitor texto --envenenado-caneta-seleciona"   node "_teste/testa_leitor_texto.js" --envenenado-caneta-seleciona
+roda "leitor texto --envenenado-texto-sem-soltar"   node "_teste/testa_leitor_texto.js" --envenenado-texto-sem-soltar
+roda "leitor texto --envenenado-escaneado-com-camada" node "_teste/testa_leitor_texto.js" --envenenado-escaneado-com-camada
+roda "leitor texto --envenenado-aviso-repetido"     node "_teste/testa_leitor_texto.js" --envenenado-aviso-repetido
+roda "leitor texto --envenenado-sem-fim-do-conteudo" node "_teste/testa_leitor_texto.js" --envenenado-sem-fim-do-conteudo
+roda "leitor texto --envenenado-camada-visivel"     node "_teste/testa_leitor_texto.js" --envenenado-camada-visivel
+roda "leitor texto --envenenado-letra-fora-da-camada" node "_teste/testa_leitor_texto.js" --envenenado-letra-fora-da-camada
 # B6: o assunto lado a lado. A tabela de um assunto com os livros sinteticos do
 # 6o ano (um trata em dois capitulos, um sem vinculo no mapa, dois sem mapa
 # revisado): o capitulo e as paginas do arquivo em cada celula, as tres entradas
@@ -683,6 +708,14 @@ roda "biblioteca credito da licenca --envenenado-link" node "_teste/testa_biblio
 roda "biblioteca credito da licenca --envenenado-abrir" node "_teste/testa_biblioteca_credito.js" --envenenado-abrir
 roda "biblioteca credito da licenca --envenenado-listafolha" node "_teste/testa_biblioteca_credito.js" --envenenado-listafolha
 roda "biblioteca credito da licenca --envenenado-pdf" node "_teste/testa_biblioteca_credito.js" --envenenado-pdf
+# O gabarito resolvido por agente e conferido: o item sem solucao que traz
+# gabarito (origem agente-conferido) mostra as respostas e, sempre, a marca
+# "Resposta conferida por duas IAs" na tela cheia e no gabarito do PDF, sem
+# depender da caixa "origem"; item sem o campo nao ganha nada. Um veneno por
+# superficie.
+roda "gabarito do agente"                     node "_teste/testa_gabarito_agente.js"
+roda "gabarito do agente --envenenado-sem-marca-visor" node "_teste/testa_gabarito_agente.js" --envenenado-sem-marca-visor
+roda "gabarito do agente --envenenado-sem-marca-pdf" node "_teste/testa_gabarito_agente.js" --envenenado-sem-marca-pdf
 # FRENTE B: selecionar e compor. Sem navegador, o compositor do pdf.js (lista
 # renumerada, gabarito separado, sem solucao escrito, quebra entre pedacos, marca
 # por cima so nesta folha e os outros documentos byte a byte iguais aos de main).
@@ -1161,6 +1194,25 @@ roda "publicador do catalogo --envenenado-registro-vazio-passa" node "_teste/tes
 roda "publicador do catalogo --envenenado-relatorio-grava" node "_teste/testa_publicador_catalogo.js" --envenenado-relatorio-grava
 roda "publicador do catalogo --envenenado-so-pelo-id" node "_teste/testa_publicador_catalogo.js" --envenenado-so-pelo-id
 roda "publicador do catalogo --envenenado-homonimo-na-lista" node "_teste/testa_publicador_catalogo.js" --envenenado-homonimo-na-lista
+# Fase 1c (13/11/2026): o mapa novo chega ao tablet pelo catalogo, de ponta a
+# ponta no emulador: o publicador da 1b publica os metas vivos; o "Atualizar a
+# biblioteca" troca so o meta dos livros de mesmo arquivo; a defasagem da
+# romul-c0 vai a zero nos que ficam; Blob, posicao e correcoes byte a byte; o
+# SAI, o de outro arquivo e o de meta invalido intocados; nada na abertura.
+# Portas 9041 a 9046.
+roda "biblioteca na nuvem, metas"                   node "_teste/testa_biblioteca_nuvem_metas.js"
+roda "biblioteca na nuvem, metas --envenenado-troca-o-blob" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-troca-o-blob
+roda "biblioteca na nuvem, metas --envenenado-solta-a-posicao" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-solta-a-posicao
+roda "biblioteca na nuvem, metas --envenenado-aceita-meta-invalido" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-aceita-meta-invalido
+roda "biblioteca na nuvem, metas --envenenado-liga-na-abertura" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-liga-na-abertura
+roda "biblioteca na nuvem, metas --envenenado-regrava-o-igual" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-regrava-o-igual
+roda "biblioteca na nuvem, metas --envenenado-store-aceita-outro-id" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-store-aceita-outro-id
+roda "biblioteca na nuvem, metas --envenenado-aceita-outro-formato" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-aceita-outro-formato
+roda "biblioteca na nuvem, metas --envenenado-aceita-outras-paginas" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-aceita-outras-paginas
+roda "biblioteca na nuvem, metas --envenenado-aceita-mapa-texto" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-aceita-mapa-texto
+roda "biblioteca na nuvem, metas --envenenado-um-lote-so" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-um-lote-so
+roda "biblioteca na nuvem, metas --envenenado-app-aceita-outro-id" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-app-aceita-outro-id
+roda "biblioteca na nuvem, metas --envenenado-vencida-pede-tente" node "_teste/testa_biblioteca_nuvem_metas.js" --envenenado-vencida-pede-tente
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve

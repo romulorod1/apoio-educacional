@@ -382,9 +382,11 @@ def pdf_sem_texto(caminho, paginas=3):
     return salvar(doc, caminho)
 
 
-def pdf_leitor_400(caminho, paginas=400, por_cap=40):
+def pdf_leitor_400(caminho, paginas=400, por_cap=40, exercicio=False):
     """Livro de 400 paginas para a ancora do leitor continuo (zoom e giro):
-    cada pagina diz o numero dela em letra grande, 10 capitulos no sumario."""
+    cada pagina diz o numero dela em letra grande, 10 capitulos no sumario.
+    Com exercicio (fatia 7, o texto selecionavel), cada pagina traz tambem o
+    enunciado "Exercicio N." numa linha so, logo abaixo do titulo."""
     doc = pymupdf.open()
     toc = []
     for n in range(1, paginas + 1):
@@ -393,6 +395,8 @@ def pdf_leitor_400(caminho, paginas=400, por_cap=40):
             toc.append([1, 'Capítulo %d: Assunto %d' % (cap, cap), n])
         pg = doc.new_page(width=W, height=H)
         pg.insert_text((72, 90), 'Página %d do livro do leitor.' % n, fontname='helv', fontsize=20)
+        if exercicio:
+            pg.insert_text((72, 140), 'Exercício %d. Calcule a soma dos números de 1 a %d.' % (n, n), fontname='helv', fontsize=14)
         pg.draw_rect(pymupdf.Rect(72, 400, 300, 600), color=CORES[cap % 3], fill=CORES[cap % 3])
     doc.set_toc(toc)
     return salvar(doc, caminho)
@@ -431,10 +435,11 @@ def pdf_escaneado(caminho, paginas=12, dpi=150):
     return salvar(saida, caminho)
 
 
-def fazer_nitidez(pasta):
-    """O livro de 400 paginas do leitor e um escaneado de 12, num pacote so."""
-    raiz = os.path.join(pasta, 'Nitidez')
-    pdf_leitor_400(os.path.join(raiz, 'matematica', 'livro-leitor-400.pdf'))
+def fazer_nitidez(pasta, exercicio=False):
+    """O livro de 400 paginas do leitor e um escaneado de 12, num pacote so.
+    Com exercicio, o de 400 paginas traz o enunciado (a prova do texto)."""
+    raiz = os.path.join(pasta, 'Texto' if exercicio else 'Nitidez')
+    pdf_leitor_400(os.path.join(raiz, 'matematica', 'livro-leitor-400.pdf'), exercicio=exercicio)
     pdf_escaneado(os.path.join(raiz, 'matematica', 'livro-escaneado-12.pdf'))
     planilha = os.path.join(raiz, 'livros_nitidez.csv')
     with open(planilha, 'w', encoding='utf-8-sig', newline='') as f:
@@ -502,6 +507,15 @@ def principal():
                                         trabalho=os.path.join(pasta, 'trabalho-nitidez'),
                                         gerado_em='2026-11-13T10:00:00-03:00', commit='prova')
         print('%d livros no pacote da nitidez' % manifest['contagens']['livros'])
+        print(rel['zip']['caminho'])
+        return
+    if '--texto' in sys.argv:
+        import livros
+        c = fazer_nitidez(pasta, exercicio=True)
+        manifest, rel, _ = livros.gerar(c['planilha'], 'prova-texto', 1, os.path.join(pasta, 'pacotes'),
+                                        trabalho=os.path.join(pasta, 'trabalho-texto'),
+                                        gerado_em='2026-11-13T10:00:00-03:00', commit='prova')
+        print('%d livros no pacote do texto' % manifest['contagens']['livros'])
         print(rel['zip']['caminho'])
         return
     if '--indice' in sys.argv:
