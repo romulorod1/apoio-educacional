@@ -960,6 +960,9 @@ roda "pdf pronto --envenenado-sem-sugestao"      node "_teste/testa_biblioteca_p
 roda "pdf pronto --envenenado-sugere-depois"     node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-sugere-depois
 roda "pdf pronto --envenenado-filtro-fora"       node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-filtro-fora
 roda "pdf pronto --envenenado-voltar"            node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-voltar
+# Fechada por qualquer caminho, a janela PDF pronto solta os PDFs (corpo vazio).
+# O veneno tira a soltura e o corpo continua montado.
+roda "pdf pronto --envenenado-guarda-pdf"         node "_teste/testa_biblioteca_pdf_pronto.js" --envenenado-guarda-pdf
 # C2a: o banco sobe de 2 para 3. A subida nao perde nada; codigo mais velho que
 # o banco diz o que fazer; a janela antiga larga o banco e avisa.
 roda "banco v3"                                   node "_teste/testa_banco_v3.js"

@@ -1,0 +1,1 @@
+# A janela PDF pronto solta o PDF da memória ao fechar. Para ela não há novidade visível.
