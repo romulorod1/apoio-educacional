@@ -1151,6 +1151,7 @@ roda "aula salva sozinha --envenenado-descartar-velho" node "_teste/testa_aula_s
 roda "aula salva sozinha --envenenado-volta-atras" node "_teste/testa_aula_salva_sozinha.js" --envenenado-volta-atras
 roda "aula salva sozinha --envenenado-desfazer-tudo" node "_teste/testa_aula_salva_sozinha.js" --envenenado-desfazer-tudo
 roda "aula salva sozinha --envenenado-desfazer-so-no-lote" node "_teste/testa_aula_salva_sozinha.js" --envenenado-desfazer-so-no-lote
+roda "aula salva sozinha --envenenado-voltar-nao-pergunta" node "_teste/testa_aula_salva_sozinha.js" --envenenado-voltar-nao-pergunta
 roda "Voltar do aparelho nas telas"              node "_teste/testa_voltar_android.js"
 roda "Voltar do aparelho --envenenado-voltar-sem-tela" node "_teste/testa_voltar_android.js" --envenenado-voltar-sem-tela
 roda "Voltar do aparelho --envenenado-volta-dois-passos" node "_teste/testa_voltar_android.js" --envenenado-volta-dois-passos
