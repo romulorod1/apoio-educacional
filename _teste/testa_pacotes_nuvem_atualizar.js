@@ -419,6 +419,14 @@ async function atualizar(pag, rotulo) {
   return { ok: r.ok, linha: r.valor.linha.replace(/\d\d:\d\d/, 'HH:MM'), andamento };
 }
 // o toque que não deve fazer nada: espera o aviso e conta
+// o toque no botão como ele está na tela agora, sem refazer Ajustes antes
+async function tocarSemRedesenhar(pag) {
+  await limparAviso(pag);
+  await clicar(pag, '#livros-nuvem-atualizar');
+  const r = await esperar('o aviso apareceu', () => textoDoAviso(pag), v => !!v, 10000);
+  await pausa(800);
+  return r.valor;
+}
 async function tocarSemEfeito(pag) {
   await H.irParaAba(pag, 'ajustes');
   await limparAviso(pag);
@@ -576,11 +584,11 @@ async function tocarSemEfeito(pag) {
     window.__estado0 = Nuvem.estado;
     Nuvem.estado = function () { const e = window.__estado0.apply(this, arguments); e.observador = true; e.celular = true; return e; };
   });
-  conf('como observador, o toque avisa que a biblioteca se atualiza no tablet', await tocarSemEfeito(pag), 'A biblioteca se atualiza no tablet.');
+  conf('como observador, o toque no botão que ainda estava na tela avisa que a biblioteca se atualiza no tablet', await tocarSemRedesenhar(pag), 'A biblioteca se atualiza no tablet.');
   await pag.evaluate(() => {
     Nuvem.estado = function () { const e = window.__estado0.apply(this, arguments); e.celular = true; return e; };
   });
-  conf('com a marca de celular, o mesmo aviso', await tocarSemEfeito(pag), 'A biblioteca se atualiza no tablet.');
+  conf('com a marca de celular, o mesmo aviso', await tocarSemRedesenhar(pag), 'A biblioteca se atualiza no tablet.');
   // a tela refeita com a marca de celular (o observador também a tem): o botão não aparece
   await H.irParaAba(pag, 'hoje');
   await H.irParaAba(pag, 'ajustes');
