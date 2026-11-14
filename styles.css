@@ -4539,6 +4539,11 @@ h3.subtitulo.bte-titulo { margin: 6px 0 0; padding-bottom: 0; border-bottom: 0; 
 .pilula-perguntar:hover { background: var(--soft); }
 @media (max-width: 720px) {
   .pilula-perguntar { position: absolute; top: 8px; right: 64px; }
+  /* Com a pílula à vista, o nome do cabeçalho guarda o lugar dela e do olho
+     (a pílula e o olho ocupam cerca de 184 px à direita; ficam uns 12 de folga) e, se não couber, termina em
+     reticências, em vez de correr por baixo da pílula. */
+  .cabecalho:has(> .pilula-perguntar:not([hidden])) .marca { padding-right: 180px; }
+  .cabecalho:has(> .pilula-perguntar:not([hidden])) .marca strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 }
 /* A porta do celular: a mesma pílula, presa no pé de Hoje, acima das abas,
    à direita (perto do polegar). O alto (a linha do dia) fica como era. */
