@@ -36,6 +36,11 @@
  *   7b. VENENO: a cópia que escolhe de Diversos, a que escolhe fora da ordem
  *      da prova, a que deixa o terço final entrar e a que aceita assunto de
  *      ano acima TÊM de reprovar.
+ *
+ * C1 (12/11/2026): nenhuma lacuna aponta para "Estatística Básica I" do 1º EM,
+ * que é desigualdade entre médias (seção 1), e o veneno
+ * graficos-com-desigualdade, que o devolve a gráficos e estatística, TEM de
+ * reprovar (7c).
  */
 'use strict';
 const fs = require('fs');
@@ -56,6 +61,21 @@ function secao(t) { console.log('\n=== ' + t + ' ==='); }
 
 const TRAVESSAO = new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']');
 const grupo = chave => Core.MAPA.filter(g => g.chave === chave)[0];
+
+/* C1 (12/11/2026): o módulo "Estatística Básica I" do 1º EM da OBMEP NÃO é
+ * estatística, é desigualdade entre médias. Nenhuma lacuna aponta para ele, e a
+ * de gráficos e estatística, que apontava, fica só com a estatística do 7º ano,
+ * também no 2º e no 3º médio, que são os anos que a sondam (onde o 1º EM vinha
+ * primeiro, por ser o mais perto). Recebe o Core, para o veneno do 7c. */
+const MODULO_DE_MEDIAS = '1em:estatistica-basica-i';
+function provasDoModuloDeMedias(C, conf) {
+  const lac = C.MAPA.filter(g => g.chave === 'lacunas')[0];
+  conf('nenhuma lacuna aponta para "Estatística Básica I" do 1º EM (é desigualdade entre médias)',
+    lac.itens.filter(i => (i.obmep || []).some(p => p === MODULO_DE_MEDIAS || p.indexOf(MODULO_DE_MEDIAS + ':') === 0)).map(i => i.id), []);
+  conf('gráficos e estatística sonda só a estatística do 7º ano, no 2º e no 3º médio',
+    [C.prefixosDaSondagem('graficos', 'em2'), C.prefixosDaSondagem('graficos', 'em3')],
+    [['7ano:nocoes-basicas-de-estatistica'], ['7ano:nocoes-basicas-de-estatistica']]);
+}
 const temas = indice.temas || indice;
 const temaPorId = {};
 temas.forEach(t => { temaPorId[t.id] = t; });
@@ -98,6 +118,7 @@ conf('nenhum travessão nas lacunas', TRAVESSAO.test(JSON.stringify(LAC)), false
 conf('as novas aparecem para matemática, e não para história',
   [NOVAS.every(id => Core.itensDaMateria('lacunas', 'matematica').some(i => i.id === id)),
     Core.itensDaMateria('lacunas', 'historia').length], [true, 0]);
+provasDoModuloDeMedias(Core, conf);
 
 // ================================================================
 secao('1b. As lacunas dos anos iniciais e a regra da Mirim (C5b)');
@@ -594,6 +615,33 @@ Object.keys(VENENOS_MIRIM).forEach(nome => {
   let n;
   try { n = contarFalhasDaMirim(carregar(fonte, 'core_' + nome + '.js')); } catch (e) { n = 'erro: ' + e.message; }
   console.log('       veneno ' + nome + ': ' + n + ' prova(s) da escolha reprovaram');
+  conf('veneno ' + nome + ': reprova (veneno visto)', typeof n === 'number' && n > 0, true);
+});
+
+// ================================================================
+secao('7c. VENENO: a cópia do core.js que devolve o módulo de desigualdade entre médias a gráficos TEM de reprovar (C1)');
+
+function contarFalhasDasMedias(C) {
+  let n = 0;
+  provasDoModuloDeMedias(C, (rotulo, obtido, esperado) => { if (JSON.stringify(obtido) !== JSON.stringify(esperado)) n++; });
+  return n;
+}
+let controleMedias;
+try { controleMedias = contarFalhasDasMedias(carregar(FONTE, 'core_de_verdade.js')); } catch (e) { controleMedias = 'erro: ' + e.message; }
+conf('controle: o core.js de verdade, pelo carregador dos venenos, não aponta para o módulo de médias', controleMedias, 0);
+
+const VENENOS_MEDIAS = {
+  // o defeito do C1: gráficos e estatística volta a listar o módulo de médias
+  'graficos-com-desigualdade': [["obmep: ['7ano:nocoes-basicas-de-estatistica'],",
+    "obmep: ['7ano:nocoes-basicas-de-estatistica', '" + MODULO_DE_MEDIAS + "'],"]]
+};
+Object.keys(VENENOS_MEDIAS).forEach(nome => {
+  const fonte = trocarTrechos(VENENOS_MEDIAS[nome]);
+  conf('veneno ' + nome + ': a troca foi aplicada', fonte !== null && fonte !== FONTE, true);
+  if (!fonte) return;
+  let n;
+  try { n = contarFalhasDasMedias(carregar(fonte, 'core_' + nome + '.js')); } catch (e) { n = 'erro: ' + e.message; }
+  console.log('       veneno ' + nome + ': ' + n + ' prova(s) do módulo de médias reprovaram');
   conf('veneno ' + nome + ': reprova (veneno visto)', typeof n === 'number' && n > 0, true);
 });
 
