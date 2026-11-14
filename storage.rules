@@ -1,0 +1,87 @@
+rules_version = '2';
+
+// Regras do Cloud Storage do Apoio Educacional (a biblioteca na nuvem,
+// projeto nw-apoio-educacional, bucket nw-apoio-educacional.firebasestorage.app).
+//
+// O bucket guarda só os arquivos da biblioteca dela, pelo conteúdo: o nome de
+// cada arquivo é o sha256 dos bytes, em 64 hexadecimais minúsculos. Os dois
+// caminhos que existem, embaixo de usuarios/{uid}:
+//   usuarios/{uid}/livros/{sha256}.pdf     um livro em PDF
+//   usuarios/{uid}/livros/{sha256}.epub    um livro em EPUB
+//   usuarios/{uid}/pacotes/{sha256}.zip    um pacote de exercícios
+// O uid é o da conta que entrou no app, como no firestore.rules.
+//
+// Quem lê: SÓ a dona do caminho (request.auth.uid igual ao uid). O aparelho
+// observador listado em usuarios/{uid}/config/leitores, no Firestore, NÃO lê
+// o Storage: fica assim até o dono decidir. Abrir para ele é uma linha nova
+// na regra de leitura, com firestore.get no documento de leitores.
+// Qualquer outra conta, com ou sem login, não lê nada. Ler aqui é só baixar
+// um arquivo pelo nome (get): listar uma pasta é negado a todos, porque o
+// aplicativo sabe o nome de cada arquivo pelo catálogo do Firestore.
+//
+// Quem escreve: NINGUÉM pelo aplicativo. Só o publicador do dono grava, na
+// máquina dele, com a credencial de administrador do Google dele (o SDK de
+// administrador passa por cima destas regras). Por isso toda criação,
+// troca e remoção vinda do aplicativo é negada.
+//
+// Os limites de tamanho e de tipo (livroValido e pacoteValido, abaixo) valem
+// para a escrita. Hoje a escrita é negada e eles não entram em regra nenhuma;
+// ficam prontos para o dia em que a escrita abrir: o nome tem de ser o do
+// caminho (sha256 e extensão); um livro tem de 1 byte a 200 MiB, tipo
+// application/pdf ou application/epub+zip, e a extensão tem de bater com o
+// tipo; um pacote tem de 1 byte a 100 MiB, tipo application/zip. A remoção
+// não tem arquivo novo (request.resource é nulo) e eles a negam: apagar,
+// se um dia abrir, pede regra própria.
+//
+// Qualquer outro caminho é negado pela regra final, que pega tudo.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function entrou() {
+      return request.auth != null && request.auth.uid != null;
+    }
+    function dona(uid) {
+      return entrou() && request.auth.uid == uid;
+    }
+    // o nome de um livro: o sha256 dos bytes e a extensão do formato
+    function nomeDeLivro(arquivo) {
+      return arquivo.matches('^[0-9a-f]{64}[.](pdf|epub)$');
+    }
+    // o nome de um pacote: o sha256 dos bytes e .zip
+    function nomeDePacote(arquivo) {
+      return arquivo.matches('^[0-9a-f]{64}[.]zip$');
+    }
+    // limites para a escrita de um livro (prontos; hoje a escrita é negada)
+    function livroValido(arquivo) {
+      return nomeDeLivro(arquivo)
+        && request.resource != null
+        && request.resource.size > 0
+        && request.resource.size <= 200 * 1024 * 1024
+        && ((arquivo.matches('^.*[.]pdf$') && request.resource.contentType == 'application/pdf')
+          || (arquivo.matches('^.*[.]epub$') && request.resource.contentType == 'application/epub+zip'));
+    }
+    // limites para a escrita de um pacote (prontos; hoje a escrita é negada)
+    function pacoteValido(arquivo) {
+      return nomeDePacote(arquivo)
+        && request.resource != null
+        && request.resource.size > 0
+        && request.resource.size <= 100 * 1024 * 1024
+        && request.resource.contentType == 'application/zip';
+    }
+
+    // os livros: só a dona baixa; ninguém lista nem escreve pelo aplicativo
+    match /usuarios/{uid}/livros/{arquivo} {
+      allow get: if dona(uid) && nomeDeLivro(arquivo);
+      allow write: if false;
+    }
+    // os pacotes de exercícios: só a dona baixa; ninguém lista nem escreve
+    // pelo aplicativo
+    match /usuarios/{uid}/pacotes/{arquivo} {
+      allow get: if dona(uid) && nomeDePacote(arquivo);
+      allow write: if false;
+    }
+    // todo o resto: negado
+    match /{tudo=**} {
+      allow read, write: if false;
+    }
+  }
+}
