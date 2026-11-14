@@ -18357,7 +18357,7 @@
   function fraseDoErroDaBiblioteca(e) {
     var codigo = e && e.codigo;
     return codigo === 'SEM_REDE' ? SEM_INTERNET_NA_BIBLIOTECA : codigo === 'SEM_SESSAO' ? 'Entre na nuvem para atualizar a biblioteca.'
-      : PEDE_ENTRAR_DE_NOVO[codigo] ? 'A entrada na nuvem venceu. Entre de novo para atualizar a biblioteca.' : 'Não consegui conferir a biblioteca agora. Tente de novo daqui a pouco.';
+        : PEDE_ENTRAR_DE_NOVO[codigo] ? 'A entrada na nuvem venceu. Entre de novo para atualizar a biblioteca.' : 'Não consegui conferir a biblioteca agora. Tente de novo daqui a pouco.';
   }
   function tocarAtualizarBiblioteca(botao) {
     // o celular e o observador não atualizam, com ou sem internet
