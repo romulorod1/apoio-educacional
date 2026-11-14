@@ -204,7 +204,7 @@ async function transbordo(pag, raizSel) {
   await clicar(pag, '#ass-exemplos .ass-exemplo');
   await respondeu(pag);
   const p0 = falso.pedidos[0] && falso.pedidos[0].corpo, p1 = falso.pedidos[1] && falso.pedidos[1].corpo;
-  conf('tocar no exemplo já pergunta: dois pedidos na rota assistente, com o login e as 16 ferramentas', [falso.pedidos.length, p0.rota, falso.pedidos[0].autorizacao, p0.tools.length, /O que eu tenho amanhã\?/.test(p0.messages[0].content[0].text)], [2, 'assistente', 'Bearer token-falso-da-prova', 16, true]);
+  conf('tocar no exemplo já pergunta: dois pedidos na rota assistente, com o login e as 20 ferramentas (16 de leitura e, desde a fase 4a, as 4 de proposta do tablet da dona)', [falso.pedidos.length, p0.rota, falso.pedidos[0].autorizacao, p0.tools.length, /O que eu tenho amanhã\?/.test(p0.messages[0].content[0].text)], [2, 'assistente', 'Bearer token-falso-da-prova', 20, true]);
   conf('o pedido leva o agora pelo relógio da tela e os alunos só pelo primeiro nome', [/Agora: segunda-feira, 16\/11\/2026 \(2026-11-16\), 11:/.test(p0.messages[0].content[0].text), /Sobrenome/.test(JSON.stringify(p0)), /98765|Rua Sintética|Responsável/.test(JSON.stringify(p0))], [true, false, false]);
   conf('o segundo pedido devolve o content do modelo INTACTO e os dois resultados juntos', [JSON.stringify(p1.messages[1].content) === JSON.stringify(primeira.resposta.content), p1.messages[2].content.map(b => b.type + ':' + b.tool_use_id).join(',')],
     [true, 'tool_result:toolu_0_listar_aulas,tool_result:toolu_1_preparar_whatsapp']);

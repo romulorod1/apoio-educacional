@@ -4551,4 +4551,70 @@ body.modo-celular #modal-assistente .ass-modal { height: 100%; max-height: 100%;
 .ass-botoes .esquerda { margin-right: auto; }
 /* desligado, o Perguntar continua legível: texto escuro sobre cinza claro */
 .ass-botoes .btn.principal:disabled { background: var(--fio-claro); border-color: var(--fio); color: var(--texto); opacity: 1; }
+/* O cartão de confirmação (fase 4a): o que muda, o antes e o depois, o
+ * dinheiro e o Confirmar à mão, no pé do cartão. */
+.ass-proposta { align-items: stretch; border-color: var(--navy); }
+.ass-proposta[data-estado="feito"] { border-color: var(--teal); }
+.ass-proposta[data-estado="recusado"], .ass-proposta[data-estado="mudou"], .ass-proposta[data-estado="erro"], .ass-proposta[data-estado="desfeito"] { border-color: var(--fio); }
+.ass-linha { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; border-top: 1px solid var(--fio); min-width: 0; }
+.ass-linha:first-of-type, .ass-proposta > .ass-cartao-titulo + .ass-linha { border-top: 0; padding-top: 0; }
+.ass-linha.tirada .ass-linha-titulo, .ass-linha.tirada dl, .ass-linha.tirada .ass-dinheiro { opacity: .5; text-decoration: line-through; }
+.ass-linha-cabeca { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.ass-linha-titulo { font-size: var(--letra-16); color: var(--texto); overflow-wrap: anywhere; min-width: 0; padding-top: 2px; }
+.ass-marca {
+  flex: 0 0 48px; width: 48px; height: 48px; margin: -12px 0 -8px -12px; padding: 0; border: 0; background: transparent;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.ass-marca-caixa {
+  width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--navy); background: var(--navy); box-sizing: border-box;
+  color: var(--branco); font-size: var(--letra-14); font-weight: 700; display: flex; align-items: center; justify-content: center; line-height: 1;
+}
+.ass-marca[aria-checked="false"] .ass-marca-caixa { background: var(--branco); }
+.ass-marca:focus-visible { outline: 2px solid var(--navy); outline-offset: -3px; }
+.ass-antes-depois { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; margin: 0; font-size: var(--letra-14); }
+.ass-antes-depois dt { color: var(--muted); }
+.ass-antes-depois dd { margin: 0; overflow-wrap: anywhere; }
+.ass-dinheiro { margin: 0; font-weight: 600; font-size: var(--letra-14); color: var(--navy); }
+.ass-aviso { margin: 0; display: flex; align-items: flex-start; gap: 6px; font-size: var(--letra-14); color: var(--aviso-texto); background: var(--aviso-fundo); border-radius: 6px; padding: 4px 8px; overflow-wrap: anywhere; }
+.ass-opcoes { display: flex; flex-direction: column; gap: 6px; scroll-margin-bottom: 104px; } /* a folga do Confirmar preso ao pé, ao rolar até a escolha */
+.ass-opcao {
+  min-height: 48px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px;
+  padding: 6px 12px; border: 1px solid var(--fio); border-radius: 10px; background: var(--branco); color: var(--texto);
+  font: inherit; text-align: left; cursor: pointer; width: 100%; box-sizing: border-box;
+}
+.ass-opcao.escolhida { border: 2px solid var(--navy); background: var(--soft); }
+.ass-opcao-nome { font-size: var(--letra-16); font-weight: 600; overflow-wrap: anywhere; }
+.ass-opcao-dinheiro { font-size: var(--letra-14); color: var(--muted); overflow-wrap: anywhere; }
+.ass-campo-rascunho { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.ass-campo-rascunho span { font-size: var(--letra-14); color: var(--muted); }
+.ass-rascunho { width: 100%; box-sizing: border-box; min-height: 72px; font: inherit; font-size: var(--letra-16); padding: 8px 10px; border: 1px solid var(--fio); border-radius: 10px; resize: vertical; max-height: 40vh; overflow-y: auto; }
+.ass-fichas-rotulo { margin: 0; font-size: var(--letra-14); color: var(--muted); }
+.ass-fichas { display: flex; flex-wrap: wrap; gap: 6px; }
+.ass-ficha { min-height: 48px; white-space: normal; text-align: left; max-width: 100%; }
+/* O Confirmar fica à vista: preso ao pé da área que rola enquanto o cartão
+ * está na tela (padrão 3). O fundo cobre o que passa por baixo. */
+.ass-confirmar {
+  justify-content: flex-end; position: sticky; bottom: 0; z-index: 1;
+  margin: 0 -12px -12px; padding: 8px 12px 12px; background: var(--branco);
+  border-top: 1px solid var(--fio); border-radius: 0 0 12px 12px;
+}
+/* O texto que já estava: à parte, só para ler; o novo vem depois, destacado. */
+.ass-texto-antigo { background: var(--soft); border-radius: 8px; padding: 6px 10px; max-height: 30vh; overflow-y: auto; }
+.ass-texto-antigo p { margin: 2px 0 0; font-size: var(--letra-14); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ass-campo-rascunho span.ass-texto-antigo-rotulo, .ass-campo-rascunho span.ass-texto-novo-rotulo { font-size: var(--letra-14); }
+.ass-campo-rascunho span.ass-texto-novo-rotulo { color: var(--navy); font-weight: 600; }
+.ass-campo-rascunho.com-antigo .ass-rascunho { border: 2px solid var(--navy); }
+.ass-confirmar .btn { min-height: 48px; }
+.ass-estado { margin: 0; display: flex; align-items: flex-start; gap: 6px; font-size: var(--letra-14); color: var(--muted); }
+.ass-estado.ass-estado-erro { color: var(--vermelho); }
+.ass-linha-cabeca .ass-cartao-ico, .ass-aviso .ass-cartao-ico, .ass-estado .ass-cartao-ico { width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; color: var(--navy); }
+.ass-aviso .ass-cartao-ico { color: var(--aviso-texto); }
+.ass-estado-erro .ass-cartao-ico { color: var(--vermelho); }
 /* ==================== assistente (fim) ==================== */
+
+/* Assistente: a linha que o lote poupa (já registrada ou de mês com pagamento) e o aviso da saída. */
+.ass-poupada { display: flex; gap: 6px; align-items: flex-start; margin: 0; padding: 4px 8px; border-radius: 6px; background: var(--aviso-fundo); border: 1px solid var(--aviso-borda); color: var(--texto); font-size: var(--letra-14); }
+.ass-poupada strong { font-weight: var(--peso-forte); }
+.ass-poupada-fora { background: var(--soft); border-color: var(--fio); }
+.ass-marca-fora { opacity: .4; }
+.ass-opcao-aviso { display: block; margin-top: 2px; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--aviso-texto); }

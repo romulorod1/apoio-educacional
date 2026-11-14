@@ -5,7 +5,14 @@
  * local. Os atalhos (WhatsApp, ligar, mapa) viram cartões que ELA toca: o app
  * nunca envia nada sozinho.
  *
- * NADA GRAVA. Toda ferramenta daqui só lê o db: as regras são as do core
+ * FASE 4a: para quem pode gravar (ctx.gravar: o tablet e o celular da dona),
+ * entram as ferramentas de PROPOSTA (propor_aulas, propor_relato,
+ * propor_feedback e buscar_assunto). Elas também não gravam: cada proposta
+ * é conferida contra o banco e vira as linhas de um cartão; o dinheiro sai
+ * do core numa CÓPIA do banco (simular). Quem grava é o app.js, no toque em
+ * Confirmar, pelo aplicarPlano com as funções da tela.
+ *
+ * NADA GRAVA AQUI. Toda ferramenta daqui só lê o db: as regras são as do core
  * (valor por vigência, situação da aula, repetições previstas, Vagos,
  * fechamento e pagamentos), chamadas como as telas chamam. A prova
  * (_teste/testa_assistente.js) congela o banco antes e confere byte a byte
@@ -166,6 +173,37 @@
     '- Pode chamar mais de uma ferramenta de uma vez quando a pergunta pedir.'
   ].join('\n');
 
+  /* O sistema de quem PODE gravar (o tablet e o celular da dona, fase 4a): o
+   * mesmo texto, com a linha do "ainda não faz" trocada e as regras das
+   * propostas no fim. O modelo nunca grava: cada proposta vira um cartão, e
+   * só o toque dela em Confirmar grava, pelas funções da tela. Também fixo
+   * entre pedidos (cache). */
+  var LINHA_NAO_FAZ = SISTEMA.split('\n').filter(function (l) { return /^O que você ainda NÃO faz/.test(l); })[0];
+  var SISTEMA_GRAVA = SISTEMA.replace(LINHA_NAO_FAZ, [
+    'O que você também faz: PROPÕE mudanças numa aula (marcar, remarcar, mudar a duração, cancelar, registrar falta, não cobrar, voltar a agendar), o relato de como foi a aula e o feedback do mês. Você nunca grava: a proposta vira um cartão na tela dela, com o antes e o depois e o efeito no dinheiro, e só ela grava, tocando em Confirmar.',
+    'O que você ainda NÃO faz: repetição semanal (criar, mudar daqui em diante, encerrar), valor por hora, cadastro de aluno, pagamento, apagar aula ou aluno. Se ela pedir, diga em uma frase que isso ainda se faz na tela do aplicativo.'
+  ].join('\n')) + '\n' + [
+    '',
+    'Mudanças (sempre por cartão de confirmação):',
+    '- Mudança de aula: propor_aulas, um item por aula. Identifique a aula pelo aluno, pela data e pela hora em que ela está HOJE na agenda (nunca a hora nova). Sem a hora, mande hora vazia: o aplicativo acha a aula do dia ou devolve as opções.',
+    '- nome_dito é o nome do aluno como ela falou ("Ana", "a Marina"), sem corrigir.',
+    '- "Remarca", "passa para", "muda para": remarcar, com nova_data e nova_hora (repita a data ou a hora que não muda). "A Marina vai faltar quinta, remarca para sexta": um item, remarcar.',
+    '- "Vai ser de 1h30": mudar_duracao.',
+    '- Cancelar: cobranca "com" só quando ela disser que cobra; "sem" só quando ela disser que não cobra ou que é sem cobrança. Em qualquer outro caso, "perguntar": o cartão pergunta a ela. Nunca deduza a cobrança de "avisou antes" ou "em cima da hora".',
+    '- "Faltou", "não veio": falta, só para aula de hoje ou que já passou. Na falta e na aula nova, cobranca "com" quando ela disser que cobra, "sem" quando disser que não cobra, "perguntar" se ficou em dúvida e "nao_disse" só quando ela não falou de cobrança (aí a falta e a aula nova são cobradas). Aula que ainda vai acontecer e o aluno não vai: cancelar com "perguntar", ou remarcar se ela disse a data nova.',
+    '- "Não cobra essa aula", "foi cortesia": nao_cobrar.',
+    '- "A falta foi engano", "a aula voltou", "não cancela mais": voltar_a_dada.',
+    '- "Marca uma aula": criar_aula. "É a reposição", "marca a reposição": criar_reposicao. Duração 0 é 1h. Os campos que não se aplicam vão vazios (texto vazio, 0 ou nao_disse).',
+    '- "Cancela todas as aulas da semana que vem": chame listar_aulas do período e proponha um item cancelar para CADA aula, com cobranca "perguntar" se ela não disse. Nunca mude a repetição inteira.',
+    '- Tudo o que vem de uma frase vai num cartão só: mande todas as propostas na mesma resposta (por exemplo, a falta e a reposição; os relatos e a falta de um dos alunos).',
+    '- Relato da aula: propor_relato. Separe o que vai para a família (relato_familia: o que foi trabalhado e como foi, claro e gentil, sem diagnóstico) do que é anotação só dela (nota_so_minha: dificuldade, comportamento, combinados com ela mesma). Assunto: chame buscar_assunto e use o ref do catálogo; sem achado, ref vazio com as palavras dela. Áreas só quando ela falar delas.',
+    '- Feedback do mês para a família: propor_feedback, no tom dela. Leia antes historico_aluno (traz os feedbacks recentes dela e o que foi dado) e escreva parecido, em primeira pessoa, curto. Use só o que ela disse e o que as ferramentas trouxeram.',
+    '- Depois de propor, diga em uma frase curta o que está no cartão e que é só conferir e tocar em Confirmar. Nunca diga que gravou, remarcou, cancelou ou marcou.',
+    '- Se a proposta voltar com erro "ambiguo" ou "nao_achei", pergunte a ela com as opções que vieram, sem chutar.',
+    '- O começo da pergunta diz o que aconteceu com os cartões anteriores. Se ela corrigir um cartão que não confirmou, proponha de novo.',
+    '- Um cartão novo troca os cartões ainda abertos: repita nele as linhas que ela ainda quer.'
+  ].join('\n');
+
   var DATA = { type: 'string', format: 'date', description: 'AAAA-MM-DD' };
   var ALUNO = { type: 'string', description: 'O id do aluno, copiado da lista de alunos.' };
   var ALUNO_OU_NULO = { anyOf: [{ type: 'string' }, { type: 'null' }], description: 'O id do aluno, copiado da lista; null para todos.' };
@@ -212,6 +250,82 @@
     ferramenta('preparar_mapa', 'Prepara o cartão "Abrir no mapa" com o endereço do aluno.',
       { alunoId: ALUNO })
   ];
+
+  /* As ferramentas de PROPOSTA (fase 4a). Só entram no pedido de quem pode
+   * gravar, e nenhuma grava: cada uma volta ao aplicativo como uma proposta,
+   * que ele confere contra o banco e mostra num cartão. São quatro, para o
+   * total ficar no teto do endpoint (20 ferramentas, servidor/ia.mjs): as
+   * mudanças de aula vão todas numa só, com um item por aula.
+   *
+   * SEM "anyOf" com null nos campos das propostas: a API recusa o pedido
+   * quando o conjunto das ferramentas estritas passa de cerca de 12 campos
+   * com união de tipos (medido em 12/11/2026: as 16 de leitura têm 7; com as
+   * 4 de proposta e os nulos, 14 eram recusados). O "não disse" é o texto
+   * vazio, o 0 ou "nao_disse", e o semNulo() abaixo os lê como null. */
+  var ACOES = ['criar_aula', 'criar_reposicao', 'remarcar', 'mudar_duracao', 'cancelar', 'falta', 'nao_cobrar', 'voltar_a_dada'];
+  var HORA_OU_NULO = { type: 'string', description: 'HH:MM, 24 horas; texto vazio quando ela não disse.' };
+  /* Os feedbacks recentes (o tom dela) só vão ao modelo quando a PERGUNTA
+   * ATUAL (ctx.pergunta; nunca a fala anterior) pede o RASCUNHO: escrever,
+   * preparar, fazer ou montar o feedback, a devolutiva, a mensagem ou o
+   * retorno do mês. A palavra "feedback" numa consulta ("feedbacks
+   * pendentes?", "de quem falta o feedback?") não basta (lente da romul-ac, 6;
+   * rodada final da orquestradora, 3). Entre o verbo e o objeto, só palavras
+   * de ligação ("faz pra mim o feedback"). */
+  var PEDE_RASCUNHO = new RegExp('\\b(escrev\\w*|prepar\\w*|faz|faca|fazer|faria|monta\\w*|redig\\w*|rascunh\\w*)' +
+    '(\\s+(o|a|os|as|um|uma|me|mim|pra|para|pro|ai|la|ja|logo|so|de|novo|nova|esse|essa|este|esta|rascunho|texto|do|da|seu|sua|meu|minha)){0,4}' +
+    '\\s+(feedback|devolutiva|(mensagem|retorno|recado)\\s+(do mes|mensal|de (janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)|para a familia|pra familia|para os pais|pros pais))\\b');
+  function pedeOFeedback(ctx) { return PEDE_RASCUNHO.test(semAcento(soTexto(ctx && ctx.pergunta)).toLowerCase()); }
+  function semNulo(v) { return v === '' || v === 0 || v === 'nao_disse' || v === undefined ? null : v; }
+  var NOME_DITO = { type: 'string', description: 'O nome do aluno como ela falou, sem corrigir.' };
+  function ferramentasDeProposta(Core) {
+    var areas = [];
+    ((Core && Core.AREAS) || []).forEach(function (g) { g.itens.forEach(function (i) { areas.push(i.id); }); });
+    var legendaAreas = ((Core && Core.AREAS) || []).map(function (g) {
+      return g.grupo + ': ' + g.itens.map(function (i) { return i.id + ' (' + i.rotulo + ')'; }).join(', ');
+    }).join('. ');
+    return [
+      ferramenta('propor_aulas', 'Propõe mudanças em aulas, uma por item. NÃO grava: o aplicativo confere cada item contra a agenda e mostra um cartão; só ela grava, tocando em Confirmar. ' +
+        'acao: criar_aula (aula avulsa nova), criar_reposicao (aula nova de reposição), remarcar (nova data e/ou hora), mudar_duracao, cancelar, falta (o aluno não veio), nao_cobrar (a aula fica sem cobrança), voltar_a_dada (desfaz falta ou cancelamento; volta a agendar).',
+        { itens: { type: 'array', description: 'Um item por aula.', items: objeto({
+          acao: { type: 'string', enum: ACOES },
+          alunoId: ALUNO,
+          nome_dito: NOME_DITO,
+          data: { type: 'string', format: 'date', description: 'A data da aula como está HOJE na agenda (AAAA-MM-DD); em criar_aula e criar_reposicao, a data da aula nova.' },
+          hora: { type: 'string', description: 'A hora da aula como está hoje (HH:MM); texto vazio se ela não disse. Em criar_aula e criar_reposicao, a hora da aula nova (obrigatória).' },
+          nova_data: { type: 'string', description: 'Só em remarcar: a data nova, AAAA-MM-DD (repita a de hoje se só muda a hora); nos outros, texto vazio.' },
+          nova_hora: { type: 'string', description: 'Só em remarcar: a hora nova, HH:MM (repita a de hoje se só muda a data); nos outros, texto vazio.' },
+          duracao_min: { type: 'integer', description: 'Em mudar_duracao, a duração nova em minutos; em criar, a duração (0 é 1h); nos outros, 0.' },
+          cobranca: { type: 'string', enum: ['sem', 'com', 'perguntar', 'nao_disse'], description: 'Em cancelar: com, sem ou perguntar. Em falta e em criar: com se ela disse que cobra, sem se disse que não cobra, perguntar na dúvida, nao_disse se ela não falou de cobrança. Nos outros, nao_disse.' }
+        }) } }),
+      ferramenta('propor_relato', 'Propõe o registro de como foi a aula (o relato que vai para a família, a nota só dela, os assuntos e as áreas), um item por aula. NÃO grava: o cartão mostra o rascunho editável, e só ela grava.',
+        { itens: { type: 'array', items: objeto({
+          alunoId: ALUNO,
+          nome_dito: NOME_DITO,
+          data: DATA,
+          hora: HORA_OU_NULO,
+          relato_familia: { type: 'string', description: 'O que foi trabalhado e como foi, para a família; vazio se ela não disse nada para a família.' },
+          nota_so_minha: { type: 'string', description: 'A anotação só dela, que a família nunca vê; vazio se não houver.' },
+          assuntos: { type: 'array', items: objeto({ titulo: { type: 'string' }, ref: { type: 'string', description: 'O ref que buscar_assunto devolveu; texto vazio para as palavras dela.' } }) },
+          areas: { type: 'array', items: { type: 'string', enum: areas }, description: 'As áreas trabalhadas que ela citou. ' + legendaAreas }
+        }) } }),
+      ferramenta('propor_feedback', 'Propõe o rascunho do feedback do mês de um aluno para a família, no tom dela. NÃO grava: o cartão mostra o texto editável, e só ela grava.',
+        { alunoId: ALUNO, nome_dito: NOME_DITO, mes: MES, texto: { type: 'string', description: 'O feedback, em primeira pessoa, curto, para a família.' } }),
+      ferramenta('buscar_assunto', 'Procura um assunto no catálogo do aplicativo (todas as matérias). Devolve até 8 assuntos com o ref para usar em propor_relato.',
+        { termo: { type: 'string', description: 'Duas ou três palavras do assunto.' } })
+    ].map(function (f) {
+      /* O propor_relato vai SEM strict: com ele, o conjunto das 20 estritas
+       * passa do que a API aceita compilar e o pedido inteiro é recusado
+       * (medido em 12/11/2026 pela conta de teste: sem o strict só nele,
+       * passa). Os campos dele são texto livre, e o app confere tudo o que
+       * importa (a aula, o aluno, as áreas contra o core, o ref contra o
+       * catálogo). As mudanças de aula, as de dinheiro, seguem estritas. */
+      if (f.name === 'propor_relato') delete f.strict;
+      return f;
+    });
+  }
+  /* As ferramentas que vão ao modelo: as de leitura sempre; as de proposta
+   * só para quem pode gravar. */
+  function ferramentasPara(gravar, Core) { return gravar ? FERRAMENTAS.concat(ferramentasDeProposta(Core)) : FERRAMENTAS; }
 
   // ================= os alunos =================
 
@@ -423,9 +537,15 @@
           vistos[k].ultima_vez = ddmm(a.data) + '/' + a.data.slice(0, 4);
         });
       });
+      /* Os dois últimos feedbacks do mês (o texto que já foi para a família):
+       * o tom dela, para o rascunho do feedback (fase 4a). */
+      var feedbacks = ((ctx.db && ctx.db.resumos) || []).filter(function (x) { return x && x.alunoId === aluno.id && String(x.texto || '').trim(); })
+        .slice().sort(function (a, b) { return String(b.mes).localeCompare(String(a.mes)); }).slice(0, 2)
+        .map(function (x) { var t = String(x.texto).trim(); return { mes: mesValido(x.mes) ? rotuloDoMes(x.mes) : String(x.mes), texto: t.length > 600 ? t.slice(0, 600) + '...' : t }; });
       return {
         entendido: [nomes[aluno.id]],
-        resultado: { aluno: nomes[aluno.id], ultimas_aulas: ultimas.length ? ultimas : 'nenhuma aula dada ainda', assuntos_ja_dados: assuntos.slice(-40) }
+        resultado: Object.assign({ aluno: nomes[aluno.id], ultimas_aulas: ultimas.length ? ultimas : 'nenhuma aula dada ainda', assuntos_ja_dados: assuntos.slice(-40) },
+          ctx.gravar === true && pedeOFeedback(ctx) ? { feedbacks_recentes: feedbacks } : {})
       };
     },
 
@@ -642,26 +762,855 @@
     return String(t || '').replace(/\s*[–—]\s*/g, ', ').replace(/[ \t]+/g, ' ').trim();
   }
 
+  // ================= as propostas (fase 4a: nada grava aqui) =================
+
+  /* Cada proposta do modelo é CONFERIDA contra o banco e vira linhas de um
+   * cartão. Uma linha leva o que a tela mostra (título, antes, depois, o
+   * dinheiro, os avisos) e a operação (`op`) que o toque em Confirmar
+   * executa, pelas funções da tela (aplicarPlano, abaixo, com as funções que
+   * o app.js passa). Aqui só se LÊ o banco: a conta do dinheiro roda numa
+   * CÓPIA (simular), e a prova congela o banco e confere byte a byte. */
+
+  function semAcento(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+  function clonar(o) { return JSON.parse(JSON.stringify(o)); }
+
+  /* O aluno é inequívoco? O id veio do modelo; o nome que ela disse decide se
+   * havia mais de um candidato. "Ana" com duas Anas ativas é ambíguo, a não
+   * ser que ela tenha dito o sobrenome ou a inicial ("Ana S."). Nome que não
+   * casa com nenhum ativo (ditado trocado) fica com o id, e o cartão mostra o
+   * nome do aluno escrito. */
+  /* A fala tem, logo depois do primeiro nome (pulando "da", "de", "do"), uma
+   * palavra que começa uma parte do nome DESTE aluno e de nenhum outro dos
+   * homônimos ("Ana S.", "Ana Silveira", "Ana da Silva")? */
+  function falaDistingue(ctx, aluno, homonimos) {
+    /* Só vale a INICIAL COM PONTO no texto dela ("Ana S.") ou uma palavra
+     * INTEIRA igual a uma parte do nome ("Souza"). Prefixo não vale: "só",
+     * "o", "às", "na", "me" e "e" começam sobrenomes (lente do #213, N4). */
+    var p = semAcento(soTexto(ctx && ctx.fala)).replace(/[^a-z0-9. ]+/g, ' ').split(/\s+/).filter(Boolean);
+    var primeiro = semAcento(primeiroNome(aluno.nome));
+    var partes = function (a) { return semAcento(a.nome).split(/\s+/).slice(1).filter(function (x) { return ['da', 'de', 'do', 'dos', 'das', 'e'].indexOf(x) < 0; }); };
+    var serve = function (a, t) {
+      if (/^[a-z]\.$/.test(t)) return partes(a).some(function (q) { return q.charAt(0) === t.charAt(0); });
+      var w = t.replace(/\.+$/, '');
+      return w.length > 1 && partes(a).indexOf(w) >= 0;
+    };
+    for (var i = 0; i < p.length; i++) {
+      if (p[i].replace(/\.+$/, '') !== primeiro) continue;
+      var j = i + 1;
+      while (j < p.length && ['da', 'de', 'do', 'dos', 'das'].indexOf(p[j]) >= 0) j++;
+      var t = p[j];
+      if (!t || !serve(aluno, t)) continue;
+      if (!homonimos.some(function (a) { return a.id !== aluno.id && serve(a, t); })) return true;
+    }
+    return false;
+  }
+  function alunoInequivoco(ctx, alunoId, nomeDito) {
+    var aluno = alunoDe(ctx, alunoId);
+    var nomes = nomesParaIA(ctx.db);
+    /* HOMÔNIMO PELA FALA (lente do #213, 2): o nome_dito vem do modelo, que
+     * pode copiar "Ana S." da lista. Com mais de um ativo com o mesmo primeiro
+     * nome, o diferenciador (a inicial ou o sobrenome) tem de estar na fala
+     * DELA, logo depois do primeiro nome; senão, ela escolhe. */
+    var homonimos = ativos(ctx.db).filter(function (a) { return semAcento(primeiroNome(a.nome)) === semAcento(primeiroNome(aluno.nome)); });
+    /* Quando ela não disse nome nenhum ("cancela todas as aulas da semana que
+     * vem"), quem identifica a aula é a agenda (a data e a hora), e o cartão
+     * mostra o nome: aí não há o que desempatar pela fala. */
+    /* Conta como citar o nome qualquer palavra que começa com as 3 primeiras
+     * letras dele ("Aninha", "Anna", "Anas"; lente do #213, N5). */
+    var nomeLimpo = semAcento(primeiroNome(aluno.nome)).replace(/[^a-z0-9]/g, '');
+    // nome curto ("Ana"): as 2 primeiras letras, para pegar "Aninha" e "Anna"; os outros, as 3
+    var raiz = nomeLimpo.slice(0, nomeLimpo.length <= 3 ? 2 : 3);
+    var citaONome = !!raiz && semAcento(soTexto(ctx && ctx.fala)).replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).some(function (w) { return w.indexOf(raiz) === 0; });
+    if (homonimos.length > 1) {
+      if (!citaONome) return aluno; // a aula vem da agenda; o cartão avisa do outro homônimo no dia
+      if (!falaDistingue(ctx, aluno, homonimos)) falha('ambiguo: a fala dela diz "' + primeiroNome(aluno.nome) + '", que serve para ' + homonimos.map(function (a) { return nomes[a.id]; }).join(' e ') + '. Pergunte a ela qual, sem propor.');
+    }
+    /* Só o artigo do começo sai ("a Marina", "o Tomás"); a inicial do meio
+     * fica ("Ana O." é Ana Oliveira). Cada palavra depois do primeiro nome
+     * tem de começar alguma parte do nome ("Ana Silva" é Ana da Silva). */
+    /* O rótulo exato da lista ("Ana S.", "Marina Sintética (2)") é sempre
+     * inequívoco: é o que ela leu ou o que o modelo copiou da lista. */
+    var limpo = function (s) { return semAcento(s).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(); };
+    if (limpo(nomeDito) && limpo(nomeDito) === limpo(nomes[aluno.id])) return aluno;
+    var palavras = limpo(nomeDito).split(' ').filter(Boolean);
+    if (palavras.length > 1 && (palavras[0] === 'a' || palavras[0] === 'o')) palavras.shift();
+    var cands = !palavras.length ? [] : ativos(ctx.db).filter(function (a) {
+      var partes = semAcento(a.nome).split(/\s+/);
+      return partes[0] === palavras[0] && palavras.slice(1).every(function (p) {
+        return partes.slice(1).some(function (q) { return q.indexOf(p) === 0; });
+      });
+    });
+    if (cands.length > 1) {
+      falha('ambiguo: "' + nomeDito + '" serve para ' + cands.map(function (a) { return nomes[a.id]; }).join(' e ') + '. Pergunte a ela qual, sem propor.');
+    }
+    if (cands.length === 1 && cands[0].id !== aluno.id) falha('o nome dito ("' + nomeDito + '") é de ' + nomes[cands[0].id] + ', e não de ' + nomes[aluno.id] + '. Confira o id.');
+    /* Nome dito vazio ou que não casa com ninguém (ditado trocado): só vale
+     * o id se nenhum outro ativo tiver o mesmo primeiro nome do aluno. */
+    if (!cands.length) {
+      var mesmo = ativos(ctx.db).filter(function (a) { return a.id !== aluno.id && semAcento(primeiroNome(a.nome)) === semAcento(primeiroNome(aluno.nome)); });
+      if (mesmo.length) falha('ambiguo: o nome dito ("' + (nomeDito || '') + '") não diz qual de ' + [aluno].concat(mesmo).map(function (a) { return nomes[a.id]; }).join(' e ') + '. Pergunte a ela qual, sem propor.');
+    }
+    return aluno;
+  }
+
+  function quando(a, ctx) {
+    return rotuloDoDia(a.data, ctx.hoje) + (a.hora ? ', ' + horaCurta(a.hora) : ', sem hora');
+  }
+  /* Com o ano quando não é o de hoje ("sex 01/01/2027"): uma data de outro
+   * ano nunca aparece no cartão como se fosse deste (lente do #213, 1). */
+  function quandoCurto(data, hora, hoje) {
+    var ano = hoje && String(hoje).slice(0, 4) !== String(data).slice(0, 4) ? '/' + String(data).slice(0, 4) : '';
+    return DIAS_CURTO[diaDaSemana(data)] + ' ' + ddmm(data) + ano + (hora ? ', ' + horaCurta(hora) : '');
+  }
+  /* O destino de uma aula (remarcar e marcar): de hoje até 12 meses à frente.
+   * A data que já passou é recusada, com a mesma frase nos dois. */
+  function exigeDestino(data, ctx, campo) {
+    exigeData(data, campo);
+    if (data < ctx.hoje) falha('a data ' + rotuloDoDia(data, ctx.hoje) + ' já passou: o assistente só marca e remarca para hoje ou depois. Confira o ano com ela; aula passada se lança na tela do aplicativo.');
+    if (data > somaDias(ctx.hoje, 366)) falha('a data ' + rotuloDoDia(data, ctx.hoje) + ' está a mais de 12 meses de hoje: mude essa aula na tela do aplicativo.');
+  }
+
+  /* A aula de que ela fala: a do aluno naquela data (e hora, se disse),
+   * inclusive a da repetição que o tablet ainda não lançou (prevista). */
+  function resolverAula(ctx, aluno, data, hora) {
+    exigeData(data, 'data');
+    if (hora !== null && hora !== undefined && !horaValida(hora)) falha('hora inválida: "' + hora + '". Use HH:MM de 24 horas.');
+    var nomes = nomesParaIA(ctx.db);
+    var doDia = aulasDoPeriodo(ctx, data, data, aluno.id);
+    var cand = hora ? doDia.filter(function (a) { return (a.hora || '') === hora; }) : doDia;
+    var lista = function (l) { return l.map(function (a) { return (a.hora ? horaCurta(a.hora) : 'sem hora') + ' (' + situacao(a, ctx) + ')'; }).join(', '); };
+    if (!cand.length) {
+      falha('nao_achei: não há aula de ' + nomes[aluno.id] + ' em ' + rotuloDoDia(data, ctx.hoje) + (hora ? ' às ' + horaCurta(hora) : '') + '.' +
+        (doDia.length ? ' Nesse dia: ' + lista(doDia) + '.' : ' Nesse dia não há aula dele. Confira o dia com listar_aulas ou proximas_aulas e pergunte a ela.'));
+    }
+    if (cand.length > 1) falha('ambiguo: ' + nomes[aluno.id] + ' tem ' + cand.length + ' aulas em ' + rotuloDoDia(data, ctx.hoje) + ': ' + lista(cand) + '. Pergunte qual.');
+    /* A repetição prevista longe demais lançaria meses de aulas de todos os
+     * alunos no Confirmar (lente de dados, A4): até 12 meses de hoje. */
+    /* A aula de origem com mais de 12 meses é recusada (lente do #213, N7). */
+    if (data < somaDias(ctx.hoje, -366)) falha('a aula de ' + rotuloDoDia(data, ctx.hoje) + ' é de mais de 12 meses atrás: confira o ano com ela; mudanças tão antigas se fazem na tela do aplicativo.');
+    if (cand[0].prevista && data > somaDias(ctx.hoje, 366)) falha('a aula de ' + rotuloDoDia(data, ctx.hoje) + ' está a mais de 12 meses de hoje: mude essa aula na tela do aplicativo.');
+    return cand[0];
+  }
+
+  /* A operação sobre uma aula que existe, ou sobre a da repetição que ainda
+   * não foi lançada: aí o Confirmar a lança antes (Core.garantirSeriesAte, a
+   * MESMA função do tablet ao navegar pelos meses) e acha a aula pela série e
+   * pela data. */
+  function opDeEdicao(a, mudancas) {
+    var op = { k: 'editar', alunoId: a.alunoId, data: a.data, mudancas: mudancas };
+    if (a.prevista) { op.serieId = a.serieId; op.materializar = a.data.slice(0, 7); }
+    else op.aulaId = a.id;
+    return op;
+  }
+  function chaveDaOp(op) {
+    if (op.k === 'criar') return 'criar:' + op.campos.alunoId + ':' + op.campos.data + ':' + op.campos.hora;
+    if (op.k === 'feedback') return 'feedback:' + op.alunoId + ':' + op.mes;
+    return op.aulaId ? 'aula:' + op.aulaId : 'serie:' + op.serieId + '@' + op.data;
+  }
+
+  /* A aula nova do tablet e do celular (o novaAulaAvulsa do app.js), para a
+   * simulação e para a prova no Node. No aparelho, quem cria é a função dele. */
+  function aulaNova(Core, c) {
+    return { id: Core.uid(), alunoId: c.alunoId, serieId: null, destacada: false, data: c.data, hora: c.hora, duracaoMin: c.duracaoMin,
+      status: c.status, cobravel: c.cobravel, notaTexto: '', notaPrivada: '', temNota: false, anexos: [] };
+  }
+
+  /* Executa as operações confirmadas, na ordem, sobre `db`. Quem grava de
+   * verdade é o app.js, que passa as funções da tela em `fns`:
+   *   editarAula(aulaId, alunoId, mudancas) -> o resultado da trilha
+   *       (o que o alterarAulaComDesfazer faz por dentro);
+   *   aplicarSo(aulaId, mudancas), assunto(aula, item), trilhas(alunoId)
+   *       (o "Registrar como foi" do celular, na mesma ordem);
+   *   criar(campos) (novaAulaAvulsa e o push), feedback(alunoId, mes, texto)
+   *       (Core.gravarTextoDoMes).
+   * Sem `fns` (a simulação do dinheiro e a prova), usa o core direto.
+   * Primeiro lança as repetições que faltam e acha TODAS as aulas; se alguma
+   * sumiu, lança erro antes de mudar qualquer aula (o app.js então volta o
+   * banco ao retrato de antes). Devolve as trilhas que mexeram. */
+  /* Até que mês lançar as repetições antes de mexer: o da aula prevista e
+   * também o de DESTINO de um remarcar. Sem o destino, a aula movida para um
+   * dia da própria série num mês ainda não lançado ocupava a data, e o
+   * lançamento depois pulava a aula fixa daquele dia (a lente de dados, A1).
+   * Lançar antes é o que o tablet faz ao navegar até o mês. */
+  function mesesALancar(ops) {
+    var meses = [];
+    ops.forEach(function (o) {
+      if (o.materializar) meses.push(o.materializar);
+      if (o.k === 'editar' && o.mudancas && o.mudancas.data) meses.push(String(o.mudancas.data).slice(0, 7));
+    });
+    meses.sort();
+    return meses.length ? meses[meses.length - 1] : null;
+  }
+  function aplicarPlano(db, ops, Core, fns) {
+    /* Sem as funções da tela não há gravação (lente do #213, 6): nenhum
+     * caminho que grave sem ser o da tela. */
+    var nomesDasFns = ['editarAula', 'aplicarSo', 'trilhas', 'criar', 'assunto', 'feedback'];
+    if (!fns || nomesDasFns.some(function (n) { return typeof fns[n] !== 'function'; })) throw new Error('sem_as_funcoes_da_tela');
+    var aplicarSo = fns.aplicarSo, trilhas = fns.trilhas, editarAula = fns.editarAula, criar = fns.criar, assunto = fns.assunto, feedback = fns.feedback;
+    var ultimo = mesesALancar(ops);
+    if (ultimo) Core.garantirSeriesAte(db, ultimo);
+    var ids = ops.map(function (o) {
+      if (o.k !== 'editar' && o.k !== 'relato') return null;
+      var a = (db.aulas || []).filter(function (x) { return o.aulaId ? x.id === o.aulaId : x.serieId === o.serieId && x.data === o.data; })[0];
+      if (!a || a.alunoId !== o.alunoId) throw new Error('aula_sumiu');
+      return a.id;
+    });
+    var mexidas = [];
+    ops.forEach(function (o, i) {
+      if (o.k === 'editar') mexidas.push(editarAula(ids[i], o.alunoId, o.mudancas));
+      else if (o.k === 'criar') criar(o.campos);
+      else if (o.k === 'relato') {
+        aplicarSo(ids[i], o.mudancas);
+        var aula = db.aulas.filter(function (x) { return x.id === ids[i]; })[0];
+        (o.assuntos || []).forEach(function (it) { assunto(aula, Object.assign({}, it)); });
+        if (o.areas && o.areas.length) {
+          aula.areas = aula.areas || [];
+          o.areas.forEach(function (id) { if (aula.areas.indexOf(id) < 0) aula.areas.push(id); });
+        }
+        mexidas.push(trilhas(o.alunoId));
+      } else if (o.k === 'feedback') feedback(o.alunoId, o.mes, o.texto);
+    });
+    return mexidas.filter(Boolean);
+  }
+
+  /* O dinheiro de uma operação, pelo core (Core.calcularFechamento: a
+   * vigência do valor na data da aula, a cobrança da situação): o total do
+   * mês de cada aluno e mês atingido, antes e depois, numa CÓPIA do banco. */
+  /* As funções da simulação: o core direto, numa CÓPIA, só para a conta do
+   * dinheiro (a trilha não muda valor). Nunca recebem o banco de verdade. */
+  function funcoesDaSimulacao(copia, Core) {
+    var aplicarSo = function (id, m) { Core.aplicarEdicaoAula(copia, id, m, 'esta'); };
+    return { aplicarSo: aplicarSo, trilhas: function () { return null; }, editarAula: function (id, alunoId, m) { aplicarSo(id, m); return null; },
+      criar: function (c) { copia.aulas.push(aulaNova(Core, c)); },
+      assunto: function (aula, item) { aula.temas = Core.temasDaAula(aula); aula.temas.push(item); delete aula.tema; return true; },
+      feedback: function (alunoId, mes, texto) { Core.gravarTextoDoMes(copia, alunoId, mes, texto); } };
+  }
+  /* A cópia leva só os alunos das operações (com as séries e as aulas
+   * deles): a conta do mês de um aluno só lê o que é dele, e a máquina tem
+   * pouca memória (lente do #213, 14). */
+  function copiaDosAlunos(db, ids) {
+    var dele = function (x) { return x && ids.indexOf(x.alunoId) >= 0; };
+    return clonar({ versao: db.versao, ajustes: db.ajustes || {}, alunos: (db.alunos || []).filter(function (a) { return ids.indexOf(a.id) >= 0; }),
+      series: (db.series || []).filter(dele), aulas: (db.aulas || []).filter(dele), resumos: [], pagamentos: (db.pagamentos || []).filter(dele) });
+  }
+  function simular(ctx, ops) {
+    var Core = ctx.Core;
+    var ids = []; ops.forEach(function (o) { if (o.alunoId && ids.indexOf(o.alunoId) < 0) ids.push(o.alunoId); });
+    var copia = copiaDosAlunos(ctx.db, ids);
+    var ultimo = mesesALancar(ops);
+    if (ultimo) Core.garantirSeriesAte(copia, ultimo);
+    var alvos = {};
+    ops.forEach(function (o) {
+      if (o.k === 'feedback') return;
+      var datas = [o.data || (o.campos && o.campos.data)];
+      if (o.mudancas && o.mudancas.data) datas.push(o.mudancas.data);
+      datas.filter(Boolean).forEach(function (d) { alvos[o.alunoId + '|' + d.slice(0, 7)] = { alunoId: o.alunoId, mes: d.slice(0, 7) }; });
+    });
+    var total = function (db, a) { var f = Core.calcularFechamento(db, a.alunoId, a.mes, ctx.hoje); return f ? Math.round(f.totalValor * 100) : 0; };
+    var lista = Object.keys(alvos).sort().map(function (k) { return alvos[k]; });
+    var antes = lista.map(function (a) { return total(copia, a); });
+    aplicarPlano(copia, clonar(ops), Core, funcoesDaSimulacao(copia, Core));
+    return lista.map(function (a, i) { return { alunoId: a.alunoId, mes: a.mes, antes: antes[i], depois: total(copia, a) }; });
+  }
+  function fraseDoDinheiro(ctx, efeitos) {
+    var Core = ctx.Core;
+    var mudou = efeitos.filter(function (e) { return e.depois !== e.antes; });
+    if (!mudou.length) return 'O valor do mês não muda.';
+    return mudou.map(function (e) {
+      var d = e.depois - e.antes;
+      var ano = String(ctx.hoje).slice(0, 4) !== e.mes.slice(0, 4) ? ' de ' + e.mes.slice(0, 4) : '';
+      return 'O valor de ' + MESES[Number(e.mes.slice(5, 7)) - 1] + ano + ' ' + (d < 0 ? 'diminui ' : 'aumenta ') + Core.fmtMoeda(Math.abs(d) / 100) + '.';
+    }).join(' ');
+  }
+  function avisosDoDinheiro(ctx, efeitos) {
+    return efeitos.filter(function (e) {
+      return e.depois !== e.antes && ((ctx.db && ctx.db.pagamentos) || []).some(function (p) { return p && p.alunoId === e.alunoId && p.mes === e.mes && p.pagoEm; });
+    }).map(function (e) { return rotuloDoMes(e.mes).replace(/^./, function (c) { return c.toUpperCase(); }) + ' já tem pagamento marcado: o selo do mês vai mudar.'; });
+  }
+  function choques(ctx, a, data, hora, duracaoMin) {
+    var nomes = nomesParaIA(ctx.db);
+    return ctx.Core.conflitosComRepeticoes(ctx.db, { id: a ? a.id : null, data: data, hora: hora, duracaoMin: duracaoMin, status: 'realizada' })
+      .sort(ordem).map(function (c) { return (nomes[c.alunoId] || 'aluno inativo') + (c.hora ? ' às ' + horaCurta(c.hora) : ''); });
+  }
+  function avisoDeChoque(lista) {
+    return lista.length ? 'Já há aula neste horário: ' + lista.join(', ') + '. As duas ficam no mesmo horário.' : null;
+  }
+  function descricao(a, ctx) {
+    return quandoCurto(a.data, a.hora, ctx.hoje) + ' (' + duracaoCurta(a.duracaoMin || 60) + '), ' + situacao(a, ctx).toLowerCase();
+  }
+
+  /* Uma linha do cartão com o dinheiro calculado. */
+  function linha(ctx, o) {
+    if (o.op) {
+      var ef = simular(ctx, [o.op]);
+      o.dinheiro = fraseDoDinheiro(ctx, ef);
+      o.avisos = (o.avisos || []).concat(avisosDoDinheiro(ctx, ef));
+    }
+    o.avisos = (o.avisos || []).filter(Boolean);
+    return o;
+  }
+  /* As saídas de um cancelamento: as três com dinheiro diferente, cada uma
+   * com o nome que sai no PDF e o efeito no mês. */
+  /* A COBRANÇA: NA DÚVIDA, O CARTÃO PERGUNTA (lente do #213, N1 a N3).
+   * Regex de português nunca cobre tudo, então só um conjunto pequeno de
+   * formas inequívocas decide sozinho; qualquer outra palavra de cobrança
+   * deixa a cobrança AMBÍGUA, e o cartão pergunta (no cancelar, na falta e na
+   * aula nova). Um toque dela custa menos que uma cobrança errada.
+   *   SEM: "sem cobrar", "sem cobrança", "não cobra", "não precisa cobrar",
+   *        "cortesia", "de graça", sem negação nas 3 palavras antes;
+   *   COM: "cobra", "pode cobrar", "cobrada", sem negação nas 3 palavras
+   *        antes nem "não" logo depois (a vírgula corta a frase);
+   *   AMBÍGUA: qualquer outra palavra da família (cobrar, cobre, cobrança,
+   *        pago, paga, pagou, custo, isenta, metade, conta, grátis...), a
+   *        negação perto, "nem cobra", número junto, a frase que cita outro
+   *        aluno, e a frase com "também" ou "depois".
+   * Graça e Grátis como nome de aluno não contam. Lê a fala da conversa desde
+   * o último cartão confirmado ou trocado (ctx.fala). */
+  var FORMAS_SEM = [['sem', 'cobrar'], ['sem', 'cobranca'], ['nao', 'cobra'], ['nao', 'precisa', 'cobrar'], ['cortesia'], ['de', 'graca']];
+  var FORMAS_COM = [['pode', 'cobrar'], ['cobra'], ['cobrada']];
+  /* Lente da romul-ac, 3: "nada de cortesia", "jamais cobra", "ninguém cobra",
+   * "chega de cortesia" e "acabou a cortesia" também negam. */
+  var NEGACAO = ['nao', 'nem', 'sem', 'nunca', 'nada', 'jamais', 'ninguem', 'nenhum', 'nenhuma', 'chega', 'acabou', 'acabaram'];
+  function daFamilia(t) {
+    return /^cobr/.test(t) || /^pag(o|a|ou|ar|amento|ando|ue|uei|aram|os|as)?$/.test(t) || /^gratu/.test(t) || /^isent/.test(t) ||
+      ['cortesia', 'graca', 'gratis', 'custo', 'metade', 'conta'].indexOf(t) >= 0;
+  }
+  function raizDoNome(a) { var n = semAcento(primeiroNome(a.nome)).replace(/[^a-z0-9]/g, ''); return n.slice(0, Math.max(3, n.length - 2)); }
+  function cobrancaDaFrase(T, nomesAluno) {
+    var familia = T.filter(daFamilia);
+    if (!familia.length) return null;
+    if (T.indexOf('tambem') >= 0 || T.indexOf('depois') >= 0) return 'ambigua';
+    var usado = T.map(function () { return false; });
+    var casa = function (forma, i) { return forma.every(function (w, k) { return T[i + k] === w && !usado[i + k]; }); };
+    var negadoAntes = function (i) { for (var k = i - 1; k >= 0 && k >= i - 3; k--) { if (T[k] === ',') return false; if (NEGACAO.indexOf(T[k]) >= 0 && !usado[k]) return true; } return false; };
+    /* A negação logo depois ("cobra ela não", "cobra dela não", "cobra nada"): até dois termos, a vírgula para. */
+    var negadoDepois = function (i) { for (var k = i; k < T.length && k < i + 2; k++) { if (T[k] === ',') return false; if (NEGACAO.indexOf(T[k]) >= 0 && !usado[k]) return true; } return false; };
+    var sem = false, com = false, ruim = false;
+    T.forEach(function (t, i) { if (daFamilia(t) && T.slice(Math.max(0, i - 3), i + 4).some(function (x) { return /\d/.test(x); })) ruim = true; });
+    for (var i = 0; i < T.length; i++) {
+      FORMAS_SEM.forEach(function (f) {
+        if (!casa(f, i)) return;
+        if (negadoAntes(i) || negadoDepois(i + f.length)) ruim = true;
+        for (var k = 0; k < f.length; k++) usado[i + k] = true;
+        sem = true;
+      });
+    }
+    for (var j = 0; j < T.length; j++) {
+      FORMAS_COM.forEach(function (f) {
+        if (!casa(f, j)) return;
+        if (negadoAntes(j) || negadoDepois(j + f.length)) ruim = true;
+        for (var k = 0; k < f.length; k++) usado[j + k] = true;
+        com = true;
+      });
+    }
+    if (T.some(function (t, k) { return daFamilia(t) && !usado[k]; })) ruim = true;
+    if (ruim || (sem && com)) return 'ambigua';
+    return sem ? 'sem' : com ? 'com' : null;
+  }
+  function polaridadeDaFala(ctx, aluno) {
+    var todos = ativos(ctx.db);
+    var meuPrimeiro = aluno ? semAcento(primeiroNome(aluno.nome)) : null;
+    var outros = todos.filter(function (a) { return semAcento(primeiroNome(a.nome)) !== meuPrimeiro; });
+    /* Graça e Grátis, quando são nome de aluno, não são palavra de cobrança. */
+    var nomesQueSaoPalavra = todos.map(function (a) { return semAcento(primeiroNome(a.nome)); }).filter(function (n) { return n === 'graca' || n === 'gratis'; });
+    var texto = semAcento(soTexto(ctx && ctx.fala)).replace(/\b([a-z])\.(?=\s|$)/g, '$1').replace(/\s+/g, ' ');
+    var resultado = null;
+    texto.split(/[.;!?\n]+/).forEach(function (frase) {
+      var cru = frase.replace(/,/g, ' , ').replace(/[^a-z0-9, ]+/g, ' ').split(/\s+/).filter(Boolean);
+      var T = cru.filter(function (t) { return nomesQueSaoPalavra.indexOf(t) < 0; });
+      /* "de Graça" com uma aluna Graça: pode ser a aula dela ou "de graça".
+       * Não decide nada; deixa a cobrança em dúvida. */
+      var deNome = cru.some(function (t, i) { return nomesQueSaoPalavra.indexOf(t) >= 0 && cru[i - 1] === 'de'; });
+      var r = deNome ? 'ambigua' : cobrancaDaFrase(T);
+      if (!r) return;
+      var citaOutro = outros.some(function (a) { var rz = raizDoNome(a); return T.some(function (t) { return t.indexOf(rz) === 0; }); });
+      if (citaOutro) r = 'ambigua';
+      resultado = !resultado || resultado === r ? r : 'ambigua';
+    });
+    return resultado;
+  }
+  /* A decisão: 'com', 'sem', 'perguntar' ou null (a cobrança padrão).
+   * perguntarSemFala: o cancelamento pergunta quando a fala não diz nada; a
+   * falta e a aula nova ficam no padrão (cobradas). */
+  /* A REGEX SÓ CONFIRMA (lente da romul-ac, 3): ela nunca vence o "perguntar"
+   * nem o "nao_disse" do modelo. Decide "com" ou "sem" só quando o modelo
+   * diz isso E a fala diz o mesmo pela forma inequívoca. O "com" ou o "sem"
+   * do modelo que a fala não confirma pergunta. Só quando o modelo não disse
+   * nada E a fala não fala de cobrança, a falta e a aula nova ficam no padrão
+   * (cobradas); o cancelamento sempre pergunta. */
+  var COBRANCAS_VALIDAS = ['com', 'sem', 'perguntar', 'nao_disse'];
+  function decidirCobranca(v, ctx, aluno, perguntarSemFala) {
+    if (v !== null && v !== undefined && COBRANCAS_VALIDAS.indexOf(v) < 0) falha('cobranca inválida: "' + v + '". Use com, sem, perguntar ou nao_disse.');
+    var pol = polaridadeDaFala(ctx, aluno);
+    if ((v === 'com' || v === 'sem') && pol === v) return v;
+    if (!perguntarSemFala && !pol && (v === null || v === undefined || v === 'nao_disse')) return null;
+    return 'perguntar';
+  }
+  /* Uma saída com o dinheiro do core, para a pergunta da cobrança. */
+  function opcaoComDinheiro(ctx, id, rotulo, op) {
+    var ef = simular(ctx, [op]);
+    var centavos = ef.reduce(function (t, e) { return t + e.depois - e.antes; }, 0);
+    return { id: id, rotulo: rotulo, dinheiro: fraseDoDinheiro(ctx, ef), centavos: centavos, avisos: avisosDoDinheiro(ctx, ef), op: op };
+  }
+
+  function opcaoDeCancelamento(ctx, a, id) {
+    var m = id === 'falta' ? { status: 'falta', cobravel: true }
+      : { status: 'cancelada', cobravel: id === 'com' };
+    var rot = id === 'falta' ? 'Falta sem aviso (cobrada)' : ctx.Core.rotuloDoCancelamento(id === 'com');
+    var op = opDeEdicao(a, m);
+    var ef = simular(ctx, [op]);
+    var centavos = ef.reduce(function (t, e) { return t + e.depois - e.antes; }, 0);
+    return { id: id, rotulo: rot, dinheiro: fraseDoDinheiro(ctx, ef), centavos: centavos, avisos: avisosDoDinheiro(ctx, ef), op: op };
+  }
+
+  var PROPOR_AULA = {
+    remarcar: function (it, ctx, aluno, nome) {
+      var a = resolverAula(ctx, aluno, it.data, it.hora);
+      if (a.status === 'cancelada') falha('a aula de ' + quando(a, ctx) + ' está cancelada. Para ela voltar, use voltar_a_dada; para outra data, criar_aula.');
+      /* A falta já aconteceu (e é cobrada): mover a data apagaria a falta do
+       * dia em que ela foi. Repor é outra aula (lente de dados, A3). */
+      if (a.status === 'falta') falha('a aula de ' + quando(a, ctx) + ' está como falta: ela não muda de data. Para repor, use criar_reposicao; se a falta foi engano, voltar_a_dada.');
+      var nd = it.nova_data || a.data, nh = it.nova_hora || a.hora || '';
+      if (nd !== a.data) exigeDestino(nd, ctx, 'nova_data');
+      if (nh && !horaValida(nh)) falha('nova_hora inválida: "' + nh + '". Use HH:MM de 24 horas.');
+      if (nd === a.data && nh === (a.hora || '')) falha('a data e a hora novas são as mesmas da aula; pergunte a ela para quando.');
+      var dur = Number(a.duracaoMin) || 60;
+      var mesmoDia = nd === a.data;
+      return {
+        tipo: 'remarcar', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
+        titulo: 'Remarcar ' + nome + ', ' + quandoCurto(a.data, '', ctx.hoje) + ': de ' + (mesmoDia ? horaCurta(a.hora) + ' para ' + horaCurta(nh) : quandoCurto(a.data, a.hora, ctx.hoje) + ' para ' + quandoCurto(nd, nh, ctx.hoje)),
+        antes: descricao(a, ctx), depois: quandoCurto(nd, nh, ctx.hoje) + ' (' + duracaoCurta(dur) + ')',
+        avisos: [avisoDeChoque(choques(ctx, a, nd, nh, dur)), a.serieId ? 'É uma aula fixa: muda só esta, e as outras semanas continuam iguais.' : null,
+          nd === ctx.hoje && minutos(nh) !== null && minutos(nh) < ctx.agoraMin ? 'Esse horário de hoje já passou: a aula entra como já dada.' : null,
+          jaAcabou(a, ctx) && ctx.Core.temConteudo(a) && (nd > ctx.hoje || (nd === ctx.hoje && minutos(nh) !== null && minutos(nh) >= ctx.agoraMin)) ? 'Esta aula já foi dada e tem registro: remarcada, ela volta a ser agendada, com o registro junto.' : null],
+        op: opDeEdicao(a, { data: nd, hora: nh, duracaoMin: dur })
+      };
+    },
+    mudar_duracao: function (it, ctx, aluno, nome) {
+      var a = resolverAula(ctx, aluno, it.data, it.hora);
+      var dur = it.duracao_min;
+      if (typeof dur !== 'number' || Math.floor(dur) !== dur || dur < 15 || dur > 240 || dur % 15) falha('duracao_min precisa ser um múltiplo de 15 entre 15 e 240 minutos.');
+      var atual = Number(a.duracaoMin) || 60;
+      if (dur === atual) falha('a aula já é de ' + duracaoCurta(atual) + '.');
+      return {
+        tipo: 'mudar_duracao', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
+        titulo: 'Duração da aula de ' + nome + ', ' + quandoCurto(a.data, a.hora, ctx.hoje) + ': de ' + duracaoCurta(atual) + ' para ' + duracaoCurta(dur),
+        antes: descricao(a, ctx), depois: quandoCurto(a.data, a.hora, ctx.hoje) + ' (' + duracaoCurta(dur) + ')',
+        avisos: [avisoDeChoque(choques(ctx, a, a.data, a.hora, dur)), a.serieId ? 'É uma aula fixa: muda só esta, e as outras semanas continuam iguais.' : null],
+        op: opDeEdicao(a, { duracaoMin: dur })
+      };
+    },
+    cancelar: function (it, ctx, aluno, nome) {
+      var a = resolverAula(ctx, aluno, it.data, it.hora);
+      var cob = decidirCobranca(it.cobranca, ctx, aluno, true);
+      var c = cobravel(a, ctx.Core);
+      if (a.status === 'cancelada' && (cob === 'perguntar' || (cob === 'com') === c)) falha('a aula de ' + quando(a, ctx) + ' já está como ' + situacao(a, ctx).toLowerCase() + '.');
+      var jaConta = a.status !== 'cancelada' && c && (a.status === 'falta' || jaAcabou(a, ctx) || a.data <= ctx.hoje);
+      var base = {
+        tipo: 'cancelar', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
+        antes: descricao(a, ctx),
+        avisos: [jaConta ? (a.status === 'falta' ? 'Esta aula já é falta cobrada' : 'Esta aula já foi dada') + ': veja abaixo o que muda no valor do mês.' : null,
+          a.serieId ? 'É uma aula fixa: cancela só esta, e as outras semanas continuam iguais.' : null]
+      };
+      if (cob === 'perguntar') {
+        var ops = ['sem', 'com'];
+        if (a.data <= ctx.hoje && a.status !== 'falta') ops.push('falta');
+        base.titulo = 'Cancelar a aula de ' + nome + ', ' + quandoCurto(a.data, a.hora, ctx.hoje) + ': com ou sem cobrança?';
+        base.depois = null;
+        base.opcoes = ops.map(function (id) { return opcaoDeCancelamento(ctx, a, id); });
+        base.pergunta = 'cobranca';
+        return linha(ctx, base);
+      }
+      var o = opcaoDeCancelamento(ctx, a, cob);
+      base.titulo = 'Cancelar a aula de ' + nome + ', ' + quandoCurto(a.data, a.hora, ctx.hoje) + ': ' + o.rotulo.toLowerCase();
+      base.depois = o.rotulo;
+      base.op = o.op;
+      return base;
+    },
+    falta: function (it, ctx, aluno, nome) {
+      var a = resolverAula(ctx, aluno, it.data, it.hora);
+      if (a.data > ctx.hoje) falha('a aula de ' + quando(a, ctx) + ' ainda não aconteceu: para aula futura, use cancelar (com cobranca "perguntar") ou remarcar.');
+      var dec = decidirCobranca(it.cobranca, ctx, aluno, false);
+      if (dec === 'perguntar') {
+        return linha(ctx, { tipo: 'falta', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
+          titulo: 'Falta de ' + nome + ', ' + quandoCurto(a.data, a.hora, ctx.hoje) + ': com ou sem cobrança?',
+          antes: descricao(a, ctx), depois: null, pergunta: 'cobranca',
+          opcoes: [opcaoComDinheiro(ctx, 'com', 'Falta sem aviso (cobrada)', opDeEdicao(a, { status: 'falta', cobravel: true })),
+            opcaoComDinheiro(ctx, 'sem', 'Falta sem aviso, sem cobrança', opDeEdicao(a, { status: 'falta', cobravel: false }))] });
+      }
+      var cobrar = dec !== 'sem';
+      if (a.status === 'falta' && cobravel(a, ctx.Core) === cobrar) falha('a aula de ' + quando(a, ctx) + ' já está como falta.');
+      return {
+        tipo: 'falta', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
+        titulo: 'Falta de ' + nome + ', ' + quandoCurto(a.data, a.hora, ctx.hoje) + (cobrar ? ': falta sem aviso, cobrada' : ': falta sem aviso, sem cobrança'),
+        antes: descricao(a, ctx), depois: cobrar ? 'Falta sem aviso (cobrada)' : 'Falta sem aviso, sem cobrança',
+        op: opDeEdicao(a, { status: 'falta', cobravel: cobrar })
+      };
+    },
+    nao_cobrar: function (it, ctx, aluno, nome) {
+      var a = resolverAula(ctx, aluno, it.data, it.hora);
+      if (!cobravel(a, ctx.Core)) falha('a aula de ' + quando(a, ctx) + ' já está sem cobrança.');
+      /* Tirar a cobrança é dinheiro: só com a palavra DELA (cortesia, não
+       * cobra, de graça) numa frase deste aluno. */
+      if (polaridadeDaFala(ctx, aluno) !== 'sem') falha('a fala dela não diz, com todas as letras, para não cobrar esta aula: pergunte a ela antes de propor.');
+      return {
+        tipo: 'nao_cobrar', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
+        titulo: 'Não cobrar a aula de ' + nome + ', ' + quandoCurto(a.data, a.hora, ctx.hoje),
+        antes: descricao(a, ctx), depois: a.status === 'cancelada' ? 'Cancelada sem cobrança' : 'Sem cobrança',
+        op: opDeEdicao(a, { cobravel: false })
+      };
+    },
+    voltar_a_dada: function (it, ctx, aluno, nome) {
+      var a = resolverAula(ctx, aluno, it.data, it.hora);
+      if (a.status !== 'falta' && a.status !== 'cancelada') falha('a aula de ' + quando(a, ctx) + ' não é falta nem cancelada: está como ' + situacao(a, ctx).toLowerCase() + '.');
+      var futura = !jaAcabou(a, ctx);
+      return {
+        tipo: 'voltar_a_dada', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
+        titulo: (futura ? 'Voltar a agendar a aula de ' : 'A aula de ') + nome + ', ' + quandoCurto(a.data, a.hora, ctx.hoje) + (futura ? '' : ' volta a contar como realizada'),
+        antes: descricao(a, ctx), depois: futura ? 'Agendada (cobrada)' : 'Realizada (cobrada)',
+        op: opDeEdicao(a, { status: 'realizada', cobravel: true })
+      };
+    }
+  };
+  function proporCriacao(it, ctx, aluno, nome, reposicao) {
+    exigeDestino(it.data, ctx, 'data');
+    if (!horaValida(it.hora)) falha('a aula nova precisa de hora (HH:MM). Pergunte a ela o horário.');
+    var dur = it.duracao_min === null || it.duracao_min === undefined ? 60 : it.duracao_min;
+    if (typeof dur !== 'number' || Math.floor(dur) !== dur || dur < 15 || dur > 240 || dur % 15) falha('duracao_min precisa ser um múltiplo de 15 entre 15 e 240 minutos.');
+    var mesma = aulasDoPeriodo(ctx, it.data, it.data, aluno.id).filter(function (a) { return (a.hora || '') === it.hora && a.status !== 'cancelada'; })[0];
+    if (mesma) falha('já existe aula de ' + nome + ' em ' + quando(mesma, ctx) + '.');
+    var dec = decidirCobranca(it.cobranca, ctx, aluno, false);
+    var cobrar = dec !== 'sem';
+    var status = reposicao ? 'reposicao' : 'realizada';
+    var opDe = function (cob) { return { k: 'criar', alunoId: aluno.id, data: it.data, campos: { alunoId: aluno.id, data: it.data, hora: it.hora, duracaoMin: dur, status: status, cobravel: cob } }; };
+    var op = opDe(cobrar);
+    var agoraPassou = it.data === ctx.hoje && minutos(it.hora) !== null && minutos(it.hora) < ctx.agoraMin ? 'Esse horário de hoje já passou: a aula entra como já dada.' : null;
+    if (dec === 'perguntar') {
+      return linha(ctx, { tipo: reposicao ? 'criar_reposicao' : 'criar_aula', alunoId: aluno.id, nome: nome, entendido: rotuloDoDia(it.data, ctx.hoje) + ', ' + horaCurta(it.hora),
+        titulo: (reposicao ? 'Marcar a reposição de ' : 'Marcar aula de ') + nome + ', ' + quandoCurto(it.data, it.hora, ctx.hoje) + ' (' + duracaoCurta(dur) + '): com ou sem cobrança?',
+        antes: null, depois: null, pergunta: 'cobranca', avisos: [avisoDeChoque(choques(ctx, null, it.data, it.hora, dur)), agoraPassou],
+        opcoes: [opcaoComDinheiro(ctx, 'com', (reposicao ? 'Reposição' : 'Aula') + ' cobrada', opDe(true)), opcaoComDinheiro(ctx, 'sem', (reposicao ? 'Reposição' : 'Aula') + ' sem cobrança', opDe(false))] });
+    }
+    return {
+      tipo: reposicao ? 'criar_reposicao' : 'criar_aula', alunoId: aluno.id, nome: nome, entendido: rotuloDoDia(it.data, ctx.hoje) + ', ' + horaCurta(it.hora),
+      titulo: (reposicao ? 'Marcar a reposição de ' : 'Marcar aula de ') + nome + ', ' + quandoCurto(it.data, it.hora, ctx.hoje) + ' (' + duracaoCurta(dur) + ')',
+      antes: null, depois: (reposicao ? 'Reposição' : 'Aula') + (cobrar ? ' cobrada' : ' sem cobrança') + ', ' + quandoCurto(it.data, it.hora, ctx.hoje) + ' (' + duracaoCurta(dur) + ')',
+      avisos: [avisoDeChoque(choques(ctx, null, it.data, it.hora, dur)), agoraPassou,
+        reposicao ? 'A reposição não fica ligada à aula que ela repõe: o aplicativo ainda não guarda esse vínculo.' : null],
+      op: op
+    };
+  }
+
+  function proporRelato(it, ctx, aluno, nome) {
+    var a = resolverAula(ctx, aluno, it.data, it.hora);
+    if (!jaAcabou(a, ctx) && a.data > ctx.hoje) falha('a aula de ' + quando(a, ctx) + ' ainda não aconteceu.');
+    if (a.status === 'cancelada') falha('a aula de ' + quando(a, ctx) + ' está cancelada: não tem relato.');
+    if (a.prevista) falha('a aula de ' + quando(a, ctx) + ' ainda não foi lançada no aplicativo.');
+    var Core = ctx.Core;
+    var temas = Core.temasDaAula(a);
+    var vistos = temas.map(function (t) { return Core.chaveDeBusca(t.titulo || ''); });
+    var assuntos = [];
+    (Array.isArray(it.assuntos) ? it.assuntos : []).forEach(function (s) {
+      var item = s && typeof s.ref === 'string' && s.ref && ctx.catalogo && ctx.catalogo.item(s.ref);
+      if (!item) {
+        var t = limparMensagem(soTexto(s && s.titulo)).slice(0, 70).trim();
+        if (!t) return;
+        item = { titulo: t, fonte: 'livre' };
+      }
+      var k = Core.chaveDeBusca(item.titulo || '');
+      if (vistos.indexOf(k) >= 0) return;
+      vistos.push(k);
+      assuntos.push(item);
+    });
+    var validas = Object.create(null);
+    (Core.AREAS || []).forEach(function (g) { g.itens.forEach(function (i) { validas[i.id] = i.rotulo; }); });
+    var areas = (Array.isArray(it.areas) ? it.areas : []).filter(function (id, i, l) { return typeof id === 'string' && Object.prototype.hasOwnProperty.call(validas, id) && l.indexOf(id) === i && (a.areas || []).indexOf(id) < 0; });
+    /* O texto NOVO fica separado do que já estava (que nunca muda): o
+     * cartão mostra o antigo à parte e o rascunho só com o novo, com teto. */
+    var relato = limparMensagem(soTexto(it.relato_familia)).slice(0, MAX_TEXTO_NOVO).trim();
+    var nota = limparMensagem(soTexto(it.nota_so_minha)).slice(0, MAX_TEXTO_NOVO).trim();
+    if (!relato && !nota && !assuntos.length && !areas.length) falha('nada a registrar: o relato veio vazio.');
+    return {
+      tipo: 'relato', alunoId: aluno.id, nome: nome, entendido: quando(a, ctx),
+      titulo: 'Como foi a aula de ' + nome + ', ' + quandoCurto(a.data, a.hora, ctx.hoje),
+      antes: null, depois: null, dinheiro: null,
+      avisos: [String(a.notaTexto || '').trim() || String(a.notaPrivada || '').trim() ? 'Já havia registro nesta aula: ele continua, e o novo entra depois.' : null].filter(Boolean),
+      editavel: { relatoAntes: a.notaTexto || '', relato: relato, notaAntes: a.notaPrivada || '', nota: nota, max: MAX_TEXTO_NOVO, assuntos: assuntos, areas: areas.map(function (id) { return { id: id, rotulo: validas[id] }; }) },
+      op: { k: 'relato', aulaId: a.id, alunoId: aluno.id, data: a.data, status: a.status || 'realizada',
+        notaTextoAntes: a.notaTexto || '', notaPrivadaAntes: a.notaPrivada || '' }
+    };
+  }
+
+  /* A operação do relato com o que ela deixou no cartão (o texto editado,
+   * os assuntos e as áreas que ficaram marcados). Igual ao "Registrar como
+   * foi" do celular: a situação de agora e o relato; a nota só dela só entra
+   * se mudou. */
+  /* O texto antigo fica EXATAMENTE como estava, e o novo (com o teto)
+   * entra depois de uma linha em branco. Sem novo, fica só o antigo. */
+  var MAX_TEXTO_NOVO = 2000, MAX_FEEDBACK_NOVO = 3000;
+  function soTexto(v) { return typeof v === 'string' ? v : ''; }
+  function juntarAoAntigo(antes, novo, max) {
+    antes = String(antes || ''); novo = String(novo || '').slice(0, max || MAX_TEXTO_NOVO).trim();
+    if (!novo) return antes;
+    return antes.trim() ? antes + '\n\n' + novo : novo;
+  }
+  function opDoRelato(l, ed) {
+    var o = l.op, e = ed || {};
+    var relato = juntarAoAntigo(l.editavel.relatoAntes, typeof e.relato === 'string' ? e.relato : l.editavel.relato);
+    var nota = juntarAoAntigo(l.editavel.notaAntes, typeof e.nota === 'string' ? e.nota : l.editavel.nota);
+    var m = { status: o.status, notaTexto: relato };
+    if (nota !== o.notaPrivadaAntes) m.notaPrivada = nota;
+    return { k: 'relato', aulaId: o.aulaId, alunoId: o.alunoId, data: o.data, mudancas: m,
+      assuntos: l.editavel.assuntos.filter(function (x, i) { return !e.semAssunto || !e.semAssunto[i]; }),
+      areas: l.editavel.areas.filter(function (x, i) { return !e.semArea || !e.semArea[i]; }).map(function (x) { return x.id; }) };
+  }
+
+  function proporFeedback(e, ctx) {
+    var aluno = alunoInequivoco(ctx, e.alunoId, e.nome_dito);
+    exigeMes(e.mes);
+    var nome = nomesParaIA(ctx.db)[aluno.id];
+    var texto = limparMensagem(soTexto(e.texto)).slice(0, MAX_FEEDBACK_NOVO).trim();
+    if (!texto) falha('o texto do feedback está vazio.');
+    /* O mês do feedback tem de estar na janela das aulas dele: do mês da
+     * primeira aula (ou da repetição, ou do feedback que já existe) até o mês
+     * de hoje (lente da romul-ac, 9). */
+    var mesesDasAulas = ((ctx.db && ctx.db.aulas) || []).filter(function (a) { return a && a.alunoId === aluno.id && a.data; }).map(function (a) { return a.data.slice(0, 7); })
+      .concat(((ctx.db && ctx.db.series) || []).filter(function (x) { return x && x.alunoId === aluno.id && typeof x.inicio === 'string'; }).map(function (x) { return x.inicio.slice(0, 7); }))
+      .concat(((ctx.db && ctx.db.resumos) || []).filter(function (x) { return x && x.alunoId === aluno.id && typeof x.mes === 'string'; }).map(function (x) { return x.mes; })).sort();
+    if (!mesesDasAulas.length || e.mes < mesesDasAulas[0] || e.mes > String(ctx.hoje).slice(0, 7)) falha('o mês ' + rotuloDoMes(e.mes) + ' está fora das aulas de ' + nome + ' (de ' + (mesesDasAulas.length ? rotuloDoMes(mesesDasAulas[0]) : 'nenhuma aula') + ' até este mês): confira o mês com ela.');
+    var antes = String(ctx.Core.textoDoMes(ctx.db, aluno.id, e.mes) || '');
+    return {
+      tipo: 'feedback', alunoId: aluno.id, nome: nome, entendido: rotuloDoMes(e.mes) + ', ' + nome,
+      titulo: 'Feedback de ' + rotuloDoMes(e.mes) + ' de ' + nome,
+      antes: null, depois: null, dinheiro: null,
+      avisos: [antes.trim() ? 'Já havia um feedback deste mês: ele continua, e o novo entra depois.' : null].filter(Boolean),
+      editavel: { feedbackAntes: antes, feedback: texto, max: MAX_FEEDBACK_NOVO },
+      op: { k: 'feedback', alunoId: aluno.id, mes: e.mes }
+    };
+  }
+
+  /* As ferramentas de proposta. Cada uma devolve { linhas, resultado }: as
+   * linhas vão ao cartão; o resultado vai ao modelo, que só fica sabendo do
+   * que está no cartão (e que nada foi gravado). `jaNoCartao` são as linhas
+   * já propostas nesta pergunta: a mesma aula duas vezes é recusada. */
+  function resultadoDaProposta(linhas, jaNoCartao) {
+    /* O lote é do cartão inteiro (as linhas desta chamada e as de antes). */
+    var todas = (jaNoCartao || []).concat(linhas);
+    var fora = todas.filter(function (l, i) { var x = situacaoDaLinha(todas, i); return x && x.fora; }).map(function (l) { return l.titulo + ' (' + (l.poupada === 'registrada' ? 'já registrada' : 'mês com pagamento') + ')'; });
+    return { cartao: 'mostrado na tela dela', linhas: linhas.map(function (l) { return l.titulo; }),
+      ficam_de_fora: fora.length ? fora : undefined,
+      perguntas: linhas.filter(function (l) { return l.pergunta; }).length ? 'o cartão pergunta a ela com ou sem cobrança' : undefined,
+      obs: 'NADA foi gravado: ela confere e toca em Confirmar. Diga em uma frase o que está no cartão.' };
+  }
+  function semRepetir(linhas, jaNoCartao) {
+    var chaves = (jaNoCartao || []).map(function (l) { return chaveDaOp(l.op || (l.opcoes && l.opcoes[0].op) || {}); }).filter(Boolean);
+    linhas.forEach(function (l) {
+      var k = chaveDaOp(l.op || (l.opcoes && l.opcoes[0].op) || {});
+      if (k && chaves.indexOf(k) >= 0) falha('a aula de ' + l.entendido + ' já está numa linha deste cartão; uma mudança por aula.');
+      if (k) chaves.push(k);
+    });
+  }
+  /* O que toda linha de aula leva: "Há outra Ana com aula neste dia" (o
+   * homônimo, quando a aula veio da agenda; N5) e a origem num mês já
+   * fechado ou com mais de 60 dias (N7). */
+  function avisosDaLinha(ctx, aluno, l) {
+    var op = l.op || (l.opcoes && l.opcoes[0] && l.opcoes[0].op) || {};
+    var data = op.k === 'criar' ? op.campos.data : op.data;
+    if (!data) return l;
+    var mais = [];
+    /* A REGRA DO LOTE (lente da romul-ac, 1): a mesma do app, Core.motivoParaPoupar.
+     * A aula que já tem registro, ou a passada de um mês com pagamento
+     * marcado, fica marcada: no lote (duas ou mais linhas da MESMA ação) ela
+     * fica de fora; sozinha na sua ação (ela pediu aquela aula), segue com o
+     * destaque (situacaoDaLinha).
+     * A aula PREVISTA (a da repetição ainda não lançada, pela série e pela
+     * data) entra na mesma regra: o motivoParaPoupar lê o aluno, a data e o
+     * conteúdo, e a prevista não tem conteúdo; o mês pago vem do
+     * Core.pagamentoDe, dentro dele (rodada final da orquestradora, 2). */
+    if (op.k === 'editar' && (op.aulaId || op.serieId) && ctx.Core.motivoParaPoupar) {
+      var aulaDaOp = op.aulaId ? ((ctx.db && ctx.db.aulas) || []).filter(function (x) { return x.id === op.aulaId; })[0]
+        : { alunoId: op.alunoId, serieId: op.serieId, data: op.data, prevista: true };
+      var motivo = aulaDaOp ? ctx.Core.motivoParaPoupar(ctx.db, aulaDaOp, ctx.hoje, {}) : null;
+      if (motivo) {
+        l.poupada = motivo;
+        /* "o valor muda" só quando muda de fato: a linha ou alguma saída mexe nos reais. */
+        l.poupadaMuda = [l.op].concat((l.opcoes || []).map(function (o) { return o.op; })).filter(Boolean)
+          .some(function (o) { return simular(ctx, [o]).some(function (e) { return e.depois !== e.antes; }); });
+      }
+    }
+    var homonimos = ativos(ctx.db).filter(function (a) { return a.id !== aluno.id && semAcento(primeiroNome(a.nome)) === semAcento(primeiroNome(aluno.nome)); });
+    if (homonimos.some(function (a) { return aulasDoPeriodo(ctx, data, data, a.id).length; })) mais.push('Há outra ' + primeiroNome(aluno.nome) + ' com aula neste dia: confira o nome.');
+    if (op.k !== 'criar' && (data.slice(0, 7) < String(ctx.hoje).slice(0, 7) || data < somaDias(ctx.hoje, -60))) {
+      mais.push('Esta aula é de ' + rotuloDoMes(data.slice(0, 7)) + ', mês já fechado.');
+    }
+    l.avisos = (l.avisos || []).concat(mais).filter(Boolean);
+    return l;
+  }
+  var PROPOSTAS = {
+    propor_aulas: function (e, ctx, jaNoCartao) {
+      if (!Array.isArray(e.itens) || !e.itens.length) falha('itens vazio: mande um item por aula.');
+      if (e.itens.length > 30) falha('no máximo 30 aulas num cartão.');
+      var linhas = e.itens.map(function (cru, i) {
+        try {
+          var it = cru && typeof cru === 'object' ? Object.assign({}, cru) : null;
+          if (it) ['hora', 'nova_data', 'nova_hora', 'duracao_min'].forEach(function (k) { it[k] = semNulo(it[k]); });
+          if (it && it.cobranca === '') it.cobranca = null;
+          if (!it || ACOES.indexOf(it.acao) < 0) falha('acao desconhecida: ' + (it && it.acao));
+          var aluno = alunoInequivoco(ctx, it.alunoId, it.nome_dito);
+          var nome = nomesParaIA(ctx.db)[aluno.id];
+          if (it.acao === 'criar_aula' || it.acao === 'criar_reposicao') return avisosDaLinha(ctx, aluno, linha(ctx, proporCriacao(it, ctx, aluno, nome, it.acao === 'criar_reposicao')));
+          return avisosDaLinha(ctx, aluno, linha(ctx, PROPOR_AULA[it.acao](it, ctx, aluno, nome)));
+        } catch (x) {
+          if (x instanceof Erro && e.itens.length > 1) throw new Erro('item ' + (i + 1) + ': ' + x.msg);
+          throw x;
+        }
+      });
+      semRepetir(linhas, jaNoCartao);
+      return { linhas: linhas, resultado: resultadoDaProposta(linhas, jaNoCartao) };
+    },
+    propor_relato: function (e, ctx, jaNoCartao) {
+      if (!Array.isArray(e.itens) || !e.itens.length) falha('itens vazio: mande um item por aula.');
+      var linhas = e.itens.map(function (cru, i) {
+        try {
+          if (!cru || typeof cru !== 'object') falha('item inválido.');
+          var it = Object.assign({}, cru, { hora: semNulo(typeof cru.hora === 'string' ? cru.hora : ''), assuntos: (Array.isArray(cru.assuntos) ? cru.assuntos : []).map(function (s) { return s && typeof s === 'object' ? Object.assign({}, s, { ref: semNulo(s.ref) }) : null; }) });
+          var aluno = alunoInequivoco(ctx, it.alunoId, it.nome_dito);
+          return avisosDaLinha(ctx, aluno, proporRelato(it, ctx, aluno, nomesParaIA(ctx.db)[aluno.id]));
+        } catch (x) {
+          if (x instanceof Erro && e.itens.length > 1) throw new Erro('item ' + (i + 1) + ': ' + x.msg);
+          throw x;
+        }
+      });
+      semRepetir(linhas, jaNoCartao);
+      return { linhas: linhas, resultado: resultadoDaProposta(linhas, jaNoCartao) };
+    },
+    propor_feedback: function (e, ctx, jaNoCartao) {
+      var linhas = [proporFeedback(e, ctx)];
+      semRepetir(linhas, jaNoCartao);
+      return { linhas: linhas, resultado: resultadoDaProposta(linhas, jaNoCartao) };
+    }
+  };
+  /* buscar_assunto é leitura, mas só existe junto das propostas: o catálogo
+   * vem do aparelho (ctx.catalogo, montado pelo app.js dos índices de
+   * assuntos). */
+  function buscarAssunto(e, ctx) {
+    var termo = String(e.termo || '').trim();
+    if (!termo) falha('termo vazio.');
+    if (!ctx.catalogo) falha('o catálogo de assuntos não abriu agora: use ref vazio com as palavras dela.');
+    var achados = ctx.catalogo.buscar(termo).slice(0, 8);
+    return { entendido: [], resultado: { termo: termo, assuntos: achados.length ? achados : 'nenhum assunto do catálogo casou; use ref vazio com as palavras dela.' } };
+  }
+
+  /* O cartão de uma pergunta: todas as linhas propostas nela, e as chamadas
+   * que as geraram (o Confirmar as confere de novo contra o banco de agora:
+   * se alguma coisa mudou, não grava). */
+  function conferirDeNovo(chamadas, ctx, fala) {
+    ctx = Object.assign({}, ctx, { fala: typeof fala === 'string' ? fala : '' });
+    var linhas = [];
+    chamadas.forEach(function (c) {
+      var r = PROPOSTAS[c.nome](c.entrada, ctx, linhas);
+      linhas = linhas.concat(r.linhas);
+    });
+    return linhas;
+  }
+  /* A assinatura do que o cartão mostra e grava: muda se a agenda mudou. */
+  function assinatura(linhas) {
+    return JSON.stringify(linhas.map(function (l) {
+      return [l.titulo, l.antes, l.depois, l.dinheiro, l.avisos || [], l.poupada || null, !!l.poupadaMuda, l.op || null, (l.opcoes || []).map(function (o) { return [o.id, o.dinheiro, o.avisos || [], o.op]; }), l.editavel || null];
+    }));
+  }
+
+  /* O que o Confirmar grava: as linhas marcadas, com a escolha de cobrança
+   * (por linha, ou uma para o conjunto) e o que ela editou. Devolve
+   * { ops } ou { falta: 'cobranca' | 'nada' }. */
+  /* O que o cartão diz da linha poupada (Core.motivoParaPoupar). No lote ela
+   * fica de fora, com o motivo escrito como no app; sozinha na sua ação,
+   * segue, com o destaque antes do Confirmar.
+   * O LOTE é o grupo de linhas da MESMA ação (rodada final da orquestradora,
+   * 1): várias canceladas, várias remarcadas, várias faltas. Num cartão de
+   * ações diferentes cada linha é um pedido à parte e segue a regra da linha
+   * sozinha; o cartão que mistura aplica o lote só dentro de cada ação com
+   * duas linhas ou mais. A ação é o tipo da linha (cancelar, falta,
+   * remarcar, criar_reposicao, relato...). */
+  function noLote(linhas, i) {
+    var tipo = linhas[i].tipo;
+    return linhas.filter(function (x) { return x && x.tipo === tipo; }).length > 1;
+  }
+  function situacaoDaLinha(linhas, i) {
+    var l = linhas && linhas[i];
+    if (!l || !l.poupada) return null;
+    if (noLote(linhas, i)) return { fora: true, texto: l.poupada === 'registrada' ? 'Fica de fora: esta aula já tem registro de como foi.' : 'Fica de fora: o mês dela já tem pagamento marcado.' };
+    return { fora: false, texto: l.poupada === 'registrada' ? 'Esta aula já tem registro.' : 'Este mês já tem pagamento marcado' + (l.poupadaMuda ? ': o valor muda.' : '.') };
+  }
+  function opsConfirmadas(linhas, estado) {
+    var e = estado || {};
+    /* No LOTE (duas ou mais linhas da mesma ação) as linhas poupadas
+     * (motivoParaPoupar) ficam de fora, como no app. A linha sozinha na sua
+     * ação segue, com o destaque. */
+    var poupada = function (i) { var x = situacaoDaLinha(linhas, i); return !!(x && x.fora); };
+    var fora = function (l, i) { return (e.semLinha && e.semLinha[i]) || poupada(i); };
+    var marcadas = linhas.filter(function (l, i) { return !fora(l, i); });
+    if (!marcadas.length) return { falta: linhas.every(function (l, i) { return poupada(i); }) ? 'poupadas' : 'nada' };
+    var ops = [];
+    for (var i = 0; i < linhas.length; i++) {
+      if (fora(linhas[i], i)) continue;
+      var l = linhas[i];
+      if (l.opcoes) {
+        var id = e.escolha && e.escolha[i];
+        var o = l.opcoes.filter(function (x) { return x.id === id; })[0];
+        if (!o) return { falta: 'cobranca' };
+        ops.push(o.op);
+      } else if (l.op.k === 'relato') ops.push(opDoRelato(l, e.edicao && e.edicao[i]));
+      else if (l.op.k === 'feedback') {
+        var txt = e.edicao && e.edicao[i] && typeof e.edicao[i].feedback === 'string' ? e.edicao[i].feedback : l.editavel.feedback;
+        if (!String(txt).trim()) return { falta: 'texto' };
+        ops.push({ k: 'feedback', alunoId: l.op.alunoId, mes: l.op.mes, texto: juntarAoAntigo(l.editavel.feedbackAntes, txt, MAX_FEEDBACK_NOVO) });
+      } else ops.push(l.op);
+    }
+    return { ops: ops };
+  }
+
+  /* Uma proposta nova SUBSTITUI os cartões ainda abertos (lente do #213, 4):
+   * só o último cartão pode ser confirmado. Devolve quantos mudaram. */
+  function substituirCartoesAbertos(historico) {
+    var n = 0;
+    (historico || []).forEach(function (h) { if (h && h.proposta && h.proposta.estado === 'aberto') { h.proposta.estado = 'substituido'; n++; } });
+    return n;
+  }
+
   /* Executa UMA ferramenta. ctx: { db, Core, hoje, agoraMin, links }.
    * Devolve { resultado, erro (bool), cartao|null, entendido: [] }: o erro
    * volta ao modelo como tool_result com is_error, e ele corrige. */
-  function executar(nome, entrada, ctx) {
-    var fazer = Object.prototype.hasOwnProperty.call(EXECUTORES, nome) ? EXECUTORES[nome] : null;
-    if (!fazer) return { erro: true, resultado: { erro: 'ferramenta desconhecida: ' + nome }, cartao: null, entendido: [] };
-    if (!entrada || typeof entrada !== 'object') return { erro: true, resultado: { erro: 'entrada inválida' }, cartao: null, entendido: [] };
+  function executar(nome, entrada, ctx, jaNoCartao) {
+    var tem = function (o) { return Object.prototype.hasOwnProperty.call(o, nome); };
+    /* As propostas só existem para quem pode gravar (ctx.gravar): no celular
+     * que só lê, um pedido de proposta é uma ferramenta desconhecida. */
+    var proposta = ctx && ctx.gravar === true && tem(PROPOSTAS) ? PROPOSTAS[nome] : null;
+    var fazer = tem(EXECUTORES) ? EXECUTORES[nome] : ctx && ctx.gravar === true && nome === 'buscar_assunto' ? buscarAssunto : null;
+    if (!fazer && !proposta) return { erro: true, resultado: { erro: 'ferramenta desconhecida: ' + nome }, cartao: null, entendido: [], linhas: null };
+    if (!entrada || typeof entrada !== 'object') return { erro: true, resultado: { erro: 'entrada inválida' }, cartao: null, entendido: [], linhas: null };
     try {
+      if (proposta) {
+        var p = proposta(entrada, ctx, jaNoCartao || []);
+        var ent = [];
+        p.linhas.forEach(function (l) { if (l.entendido && ent.indexOf(l.entendido) < 0) ent.push(l.entendido); });
+        return { erro: false, resultado: p.resultado, cartao: null, entendido: ent, linhas: p.linhas };
+      }
       var r = fazer(entrada, ctx);
-      return { erro: false, resultado: r.resultado, cartao: r.cartao || null, entendido: r.entendido || [] };
+      return { erro: false, resultado: r.resultado, cartao: r.cartao || null, entendido: r.entendido || [], linhas: null };
     } catch (e) {
-      if (e instanceof Erro) return { erro: true, resultado: { erro: e.msg }, cartao: null, entendido: [] };
-      return { erro: true, resultado: { erro: 'não consegui ler isso no aplicativo' }, cartao: null, entendido: [] };
+      if (e instanceof Erro) return { erro: true, resultado: { erro: e.msg }, cartao: null, entendido: [], linhas: null };
+      return { erro: true, resultado: { erro: 'não consegui ler isso no aplicativo' }, cartao: null, entendido: [], linhas: null };
     }
   }
 
   // ================= a conversa =================
 
-  function corpo(mensagens) {
-    return { rota: 'assistente', system: SISTEMA, tools: FERRAMENTAS, esforco: 'low', max_tokens: 4000, messages: mensagens };
+  /* gravar: o aparelho pode gravar (o tablet ou o celular da dona). Sem ele,
+   * o pedido é o da fase 3, byte a byte: o sistema e as 16 ferramentas de
+   * leitura. */
+  function corpo(mensagens, gravar, Core) {
+    return { rota: 'assistente', system: gravar ? SISTEMA_GRAVA : SISTEMA, tools: ferramentasPara(!!gravar, Core), esforco: 'low', max_tokens: 4000, messages: mensagens };
   }
 
   /* resposta: o JSON do endpoint. Devolve { erro } ou { conteudo, uso, stop,
@@ -758,17 +1707,28 @@
 
   function perguntar(sessao, texto, o, jaGastas, recomecou) {
     var ctx = o.ctx;
+    var gravar = ctx.gravar === true;
     var pergunta = String(texto || '').trim();
     var gastas = jaGastas || 0;
+    /* A conversa com propostas não continua sem elas (e vice-versa): as
+     * ferramentas da conversa têm de existir no pedido. */
+    if (sessao.gravar !== undefined && sessao.gravar !== gravar) sessao.mensagens = [];
+    sessao.gravar = gravar;
     if (sessao.mensagens.length > MAX_MENSAGENS) { sessao.mensagens = []; recomecou = true; }
     var inicio = sessao.mensagens.length;
     var partes = [];
     if (!inicio) partes.push(blocoDeAlunos(ctx.db, ctx.hoje), '');
-    partes.push(contextoDoAgora(ctx.hoje, o.hora, o.hojeBrasilia), '', 'Pergunta da professora:', pergunta);
+    partes.push(contextoDoAgora(ctx.hoje, o.hora, o.hojeBrasilia), '');
+    if (gravar && inicio && o.cartoesAnteriores) partes.push('Cartões anteriores: ' + o.cartoesAnteriores, '');
+    partes.push('Pergunta da professora:', pergunta);
     var minha = { role: 'user', content: [{ type: 'text', text: partes.join('\n') }] };
     var lista = sessao.mensagens;
     lista.push(minha);
     var usos = [], cartoes = [], entendido = [], voltas = 0;
+    var linhas = [], chamadas = [];
+    var falaDaConversa = (o.falasAnteriores || []).filter(function (x) { return typeof x === 'string' && x.trim(); }).concat([pergunta]).join('\n');
+    var ctxDaFala = Object.assign({}, ctx, { fala: falaDaConversa, pergunta: pergunta });
+    function proposta() { return linhas.length ? { linhas: linhas, chamadas: chamadas, fala: falaDaConversa, assinatura: assinatura(linhas) } : null; }
 
     /* Tira desta conversa só o que é desta pergunta, e só se a conversa
      * ainda é a mesma (outra pergunta ou uma "Nova conversa" no meio não
@@ -780,7 +1740,7 @@
     function volta() {
       if (o.cancelado && o.cancelado()) { desfazer(); return Promise.resolve(fim({ erro: 'cancelado' })); }
       voltas++;
-      return Promise.resolve(o.chamar(corpo(lista.slice()))).then(function (resposta) {
+      return Promise.resolve(o.chamar(corpo(lista.slice(), gravar, ctx.Core))).then(function (resposta) {
         if (o.cancelado && o.cancelado()) { desfazer(); return fim({ erro: 'cancelado' }); }
         var lido = lerResposta(resposta);
         /* A conversa passou do teto do endpoint: recomeça sozinha, só com
@@ -794,17 +1754,19 @@
         if (lido.uso) usos.push(lido.uso);
         lista.push({ role: 'assistant', content: lido.conteudo });
         if (lido.stop !== 'tool_use') {
-          return fim({ texto: lido.texto || 'Não encontrei uma resposta para isso.', cartoes: cartoes, entendido: resumirEntendido(entendido), recomecou: !!recomecou });
+          return fim({ texto: lido.texto || (linhas.length ? 'Confira no cartão e toque em Confirmar.' : 'Não encontrei uma resposta para isso.'),
+            cartoes: cartoes, entendido: resumirEntendido(entendido), recomecou: !!recomecou, proposta: proposta() });
         }
         if (gastas + voltas >= MAX_VOLTAS) { desfazer(); return fim({ erro: 'voltas' }); }
         var resultados = lido.chamadas.map(function (c, i) {
-          var r = i < MAX_FERRAMENTAS_POR_VOLTA ? executar(c.name, c.input, ctx)
+          var r = i < MAX_FERRAMENTAS_POR_VOLTA ? executar(c.name, c.input, ctxDaFala, linhas)
             : { erro: true, resultado: { erro: 'ferramentas demais de uma vez: no máximo ' + MAX_FERRAMENTAS_POR_VOLTA + '. Peça o resto na volta seguinte.' }, cartao: null, entendido: [] };
           var conteudo = JSON.stringify(r.resultado);
           if (conteudo.length > MAX_RESULTADO) {
             r = { erro: true, resultado: { erro: 'o resultado ficou grande demais. Peça um período menor.' }, cartao: null, entendido: [] };
             conteudo = JSON.stringify(r.resultado);
           }
+          if (r.linhas) { linhas = linhas.concat(r.linhas); chamadas.push({ nome: c.name, entrada: c.input }); }
           if (r.cartao) cartoes.push(r.cartao);
           r.entendido.forEach(function (t) { if (entendido.indexOf(t) < 0) entendido.push(t); });
           var bloco = { type: 'tool_result', tool_use_id: c.id, content: conteudo };
@@ -826,7 +1788,16 @@
     MAX_FERRAMENTAS_POR_VOLTA: MAX_FERRAMENTAS_POR_VOLTA,
     MAX_RESULTADO: MAX_RESULTADO,
     SISTEMA: SISTEMA,
+    SISTEMA_GRAVA: SISTEMA_GRAVA,
     FERRAMENTAS: FERRAMENTAS,
+    ferramentasPara: ferramentasPara,
+    conferirDeNovo: conferirDeNovo,
+    assinatura: assinatura,
+    opsConfirmadas: opsConfirmadas, situacaoDaLinha: situacaoDaLinha,
+    aplicarPlano: aplicarPlano,
+    simular: simular,
+    substituirCartoesAbertos: substituirCartoesAbertos,
+    polaridadeDaFala: polaridadeDaFala,
     novaSessao: novaSessao,
     sessaoValida: sessaoValida,
     perguntar: perguntar,

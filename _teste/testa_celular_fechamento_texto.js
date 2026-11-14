@@ -125,8 +125,8 @@ conf('o app.js, o core.js e o styles.css não têm travessão', [APP, CORE, CSS]
 /* Um lugar só para o texto: o tablet e o celular gravam pela mesma função do
  * core, e ninguém mais empurra resumo à mão no app (a janela "Preparar e
  * enviar", de antes, é a única exceção que sobra, e é contada). */
-conf('o tablet e o celular gravam a mensagem pela mesma função (Core.gravarTextoDoMes: no feedback do tablet e no editor do celular)',
-  [APP.split('Core.gravarTextoDoMes(').length - 1, APP.split('db.resumos.push(').length - 1, /function gravarTextoDoMes\(db, alunoId, mesIso, texto\)/.test(CORE)].join(','), '2,1,true');
+conf('o tablet, o celular e o assistente gravam a mensagem pela mesma função (Core.gravarTextoDoMes: no feedback do tablet, no editor do celular e no Confirmar do assistente, fase 4a)',
+  [APP.split('Core.gravarTextoDoMes(').length - 1, APP.split('db.resumos.push(').length - 1, /function gravarTextoDoMes\(db, alunoId, mesIso, texto\)/.test(CORE)].join(','), '3,1,true');
 const trocas = { '/app.js': APP_SERVIDO };
 const numVersao = v => v.split('.').map(Number).reduce((a, n) => a * 1000 + n, 0);
 conf('(arranjo) o app servido leva a VERSAO ' + VERSAO_SERVIDA + ', acima da 1.42.18', APP_SERVIDO.indexOf("var VERSAO = '" + VERSAO_SERVIDA + "';") >= 0 && numVersao(VERSAO_SERVIDA) > numVersao('1.42.18'), true);
