@@ -47,6 +47,9 @@
  *                                   escolhida sozinha (achado da revisão).
  *   --envenenado-filtro-fora        o filtro guardado vale mesmo fora da tela
  *                                   (achado da segunda revisão).
+ *   --envenenado-guarda-pdf         a janela PDF pronto fechada não solta os
+ *                                   PDFs: o corpo continua montado, com os
+ *                                   botões e os arquivos presos neles.
  *   --envenenado-voltar             a janela PDF pronto sai do histórico: o
  *                                   Voltar do aparelho deixa a janela aberta e
  *                                   troca a tela por baixo (achado da
@@ -68,7 +71,7 @@ const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8853;
 const MODOS = ['--envenenado-baixa-ao-cancelar', '--envenenado-so-hoje', '--envenenado-sem-sugestao',
-  '--envenenado-sugere-depois', '--envenenado-filtro-fora', '--envenenado-voltar'];
+  '--envenenado-sugere-depois', '--envenenado-filtro-fora', '--envenenado-voltar', '--envenenado-guarda-pdf'];
 const MODO = MODOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const PRINTS = (process.argv.filter(a => a.indexOf('--prints=') === 0)[0] || '').slice('--prints='.length);
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
@@ -95,6 +98,9 @@ if (MODO === '--envenenado-sem-sugestao') trocas['/app.js'] = APP.split(L_SUGEST
 if (MODO === '--envenenado-sugere-depois') trocas['/app.js'] = APP.split(L_GASTA).join(T_GASTA);
 if (MODO === '--envenenado-filtro-fora') trocas['/app.js'] = APP.split(L_FORA).join(T_FORA);
 if (MODO === '--envenenado-voltar') trocas['/app.js'] = APP.split(L_VOLTAR).join(T_VOLTAR);
+// fechada por qualquer caminho, a janela solta os PDFs; o veneno tira a soltura
+const L_SOLTA = "    if (id === 'modal-bib-compartilhar') soltarPdfPronto();";
+if (MODO === '--envenenado-guarda-pdf') trocas['/app.js'] = APP.split(L_SOLTA).join('');
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'l1_pdf_pronto_'));
 process.on('exit', () => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { /* ok */ } });
@@ -106,7 +112,7 @@ const HOJE = '2026-11-16';
 
 // ---------------------------------------------------------------- 0 (Node)
 secao('0. Sem navegador: as âncoras dos venenos e o texto do tutorial');
-[['cancelar', L_CANCELA], ['limite', L_LIMITE], ['sugestão', L_SUGESTAO], ['sugestão gasta', L_GASTA], ['filtro na tela', L_FORA], ['voltar', L_VOLTAR]]
+[['cancelar', L_CANCELA], ['limite', L_LIMITE], ['sugestão', L_SUGESTAO], ['sugestão gasta', L_GASTA], ['filtro na tela', L_FORA], ['voltar', L_VOLTAR], ['soltar os PDFs', L_SOLTA]]
   .forEach(([n, a]) => conf('âncora de veneno uma vez só: ' + n, umaVez(APP, a), true));
 const etapa4 = APP.slice(APP.indexOf("etapa: 'Etapa 4 de 4"), APP.indexOf("etapa: 'Etapa 4 de 4") + 900);
 conf('a etapa 4 do tutorial existe', etapa4.length > 100, true);
@@ -502,6 +508,12 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   conf('o Voltar com o leitor aberto fecha só o leitor', leitorFechou.ok, true);
   conf('e a janela PDF pronto continua', (await janelaPdf(pag)).aberta, true);
   conf('e ver não baixou nada', (await baixados(pag)).length, 1);
+  // o leitor aberto por cima e fechado não esvazia a janela: os botões dela continuam funcionando
+  conf('depois do ver, a janela continua montada, com os dois arquivos', (await janelaPdf(pag)).itens.length, 2);
+  await pag.evaluate(() => document.querySelector('#bib-pdf-baixar-lista').click());
+  await pausa(300);
+  const b3b = await baixados(pag);
+  conf('e o baixar dela ainda baixa a lista', b3b.length === 2 && /lista.*\.pdf$/.test(b3b[1]), true);
   await pag.evaluate(() => history.back());
   const fechou = await esperar('o Voltar fechar a janela PDF pronto', () => janelaPdf(pag), v => v && !v.aberta, 5000);
   await pausa(600);
@@ -512,7 +524,18 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
       !fechou.ok || telaDepois !== telaAntes, true);
     throw fim();
   }
+  /* Fechada, a janela solta os PDFs: o corpo vazio é o sinal de que os botões
+   * (e os arquivos que eles guardavam no toque) foram embora. */
+  const corpoDaJanela = () => pag.evaluate(() => document.querySelector('#corpo-modal-bib-compartilhar').childElementCount + ' | ' +
+    document.querySelectorAll('.bib-pdf-acao').length);
+  const corpoVoltar = await corpoDaJanela();
+  if (MODO === '--envenenado-guarda-pdf') {
+    secao('VENENO: a janela fechada guarda os PDFs');
+    conf('envenenado: fechada pelo Voltar, a janela continua com os botões e os PDFs (defeito enxergado)', corpoVoltar !== '0 | 0', true);
+    throw fim();
+  }
   conf('o Voltar seguinte fecha a janela PDF pronto', fechou.ok, true);
+  conf('e a janela fechada pelo Voltar solta os PDFs: corpo vazio, nenhum botão', corpoVoltar, '0 | 0');
   conf('e a tela da Biblioteca por baixo continua a mesma', telaDepois, telaAntes);
   await pag.evaluate(() => { const b = document.querySelector('#modal-bib-compartilhar.aberto [data-fechar]'); if (b) b.click(); });
   await pausa(300);
@@ -529,8 +552,12 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   conf('sem o botão de compartilhar: baixar e ver', j4.itens.map(i => i.acoes.map(a => a.acao).join('+')).join(','), 'baixar+ver');
   conf('com os nomes do material', j4.itens.map(i => i.acoes.map(a => a.rotulo).join('|')).join(','), 'Baixar o material|Ver o material');
   conf('e nada foi baixado sozinho', (await baixados(pag)).length, 0);
+  conf('reaberta depois de fechada, a janela funciona: baixar baixa o material', await pag.evaluate(() => {
+    document.querySelector('#bib-pdf-baixar-material').click(); return window.__baixados.length; }), 1);
   await pag.evaluate(() => document.querySelector('#modal-bib-compartilhar [data-fechar]').click());
   await pausa(300);
+  conf('fechada pelo X, a janela também solta os PDFs', await pag.evaluate(() =>
+    document.querySelector('#corpo-modal-bib-compartilhar').childElementCount + ' | ' + document.querySelectorAll('.bib-pdf-acao').length), '0 | 0');
 
   // ================================================================
   secao('5. O tutorial, etapa 4, não manda imprimir');

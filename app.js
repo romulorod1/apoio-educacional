@@ -2146,6 +2146,8 @@
     if (id === 'modal-biblioteca') soltarVisor();
     // o leitor de PDF, fechado por qualquer caminho, para de desenhar e solta o canvas
     if (id === 'modal-leitor-pdf') soltarLeitorPdf();
+    // a janela PDF pronto, fechada por qualquer caminho, solta os PDFs que mostrava
+    if (id === 'modal-bib-compartilhar') soltarPdfPronto();
     // o leitor de EPUB (C15.1): guarda onde ela parou e solta o livro da memória
     if (id === 'modal-leitor-epub') soltarLeitorEpub();
     // B2: o Continuar lendo e a tela do livro passam a mostrar onde ela parou
@@ -2816,6 +2818,17 @@
     });
   }
   // opcoes.ajuda: a frase do alto, quando o PDF não vai ao aluno (o fechamento vai à família)
+  /* Fechada, a janela solta os PDFs: cada botão guardava o arquivo no toque
+   * dele, e o corpo ficava montado até a próxima abertura, com o PDF (alguns
+   * MB, no livro exportado) preso na memória do tablet. Esvaziar o corpo leva
+   * os botões e, com eles, a última referência aos arquivos. A janela não cria
+   * endereço de arquivo (o baixar solta o dele sozinho), então não há o que
+   * revogar aqui. O "ver" abre o leitor por cima sem fechar a janela: ela
+   * continua montada até ser fechada. */
+  function soltarPdfPronto() {
+    var corpo = $('#corpo-modal-bib-compartilhar');
+    if (corpo) corpo.innerHTML = '';
+  }
   function abrirPdfPronto(arquivos, titulo, opcoes) {
     var corpo = $('#corpo-modal-bib-compartilhar');
     corpo.innerHTML = '';
