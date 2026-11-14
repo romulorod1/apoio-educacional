@@ -35,7 +35,12 @@
  *      e os registros exatamente como estavam; a falha que passa na segunda
  *      tentativa sobe e grava;
  *  10. o arquivo acima do limite (livro com 200 MiB e 1 byte, pacote com
- *      100 MiB e 1 byte) é recusado com o motivo, e nada sobe.
+ *      100 MiB e 1 byte) é recusado com o motivo, e nada sobe;
+ *  11. o objeto que já está no Storage com token de download (o console cria
+ *      um ao abrir o arquivo) é recusado, com o remédio, e o catálogo fica igual;
+ *  12. o objeto que já está lá com os bytes trocados (o mesmo tamanho, o mesmo
+ *      nome e o sha256 certo nos metadados) é recusado pelo md5, com o
+ *      remédio, e o catálogo fica igual.
  *
  * Venenos (a prova TEM de ver o defeito e passa dizendo que viu):
  *   --envenenado-reenvia           a conferência do que já está no Storage some:
@@ -44,7 +49,16 @@
  *                                  nos metadados (4);
  *   --envenenado-catalogo-antes    o catálogo é gravado antes de os arquivos
  *                                  subirem e serem conferidos: a falha do 9
- *                                  deixa o catálogo apontando para nada.
+ *                                  deixa o catálogo apontando para nada;
+ *   --envenenado-aceita-token      o objeto que já está lá com token de
+ *                                  download passa na conferência (11);
+ *   --envenenado-sem-md5           a conferência do md5 some: o objeto com os
+ *                                  bytes trocados, do mesmo tamanho e com o
+ *                                  sha256 certo nos metadados, passa (12).
+ *
+ * O envio retomável em pedaços (308, Range, consulta de estado, 410, 412 e o
+ * ifGenerationMatch) não roda no emulador: a prova dele é a
+ * biblioteca/_prova_envio_retomavel.py, contra um servidor falso.
  *
  * Precisa do firebase-tools fora do repositório (FIREBASE_TOOLS) e de um JDK
  * 21 em JAVA_HOME, como o testa_publicador_catalogo.js; sem eles, REPROVA
@@ -77,8 +91,10 @@ const FONTE = fs.readFileSync(PUBLICADOR, 'utf8').replace(/\r\n/g, '\n');
 const VENENOS = {
   '--envenenado-reenvia': ['            if existente is not None:\n', '            if False:\n'],
   '--envenenado-grava-token': ["'metadata': {'sha256': e['sha256']}", "'metadata': {'sha256': e['sha256'], 'firebaseStorageDownloadTokens': 'veneno-0000'}"],
-  '--envenenado-catalogo-antes': ['            enviados = st.subir(faltam) if faltam else []\n            publicado = gravar_catalogo()\n',
-    '            publicado = gravar_catalogo()\n            enviados = st.subir(faltam) if faltam else []\n']
+  '--envenenado-catalogo-antes': ['            enviados, existiam = st.subir(faltam) if faltam else ([], [])\n            publicado = gravar_catalogo()\n',
+    '            publicado = gravar_catalogo()\n            enviados, existiam = st.subir(faltam) if faltam else ([], [])\n'],
+  '--envenenado-aceita-token': ["        if 'firebaseStorageDownloadTokens' in meta:\n", '        if False:\n'],
+  '--envenenado-sem-md5': ["        if obj.get('md5Hash') != md5:\n", '        if False:\n']
 };
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && !VENENOS[a]);
@@ -164,7 +180,7 @@ const escrever = (nome, dados) => { const p = path.join(TMP, nome); fs.writeFile
 const manifesto = (nome, livros) => escrever(nome, { esquema: 1, conteudo: 'livros', livros });
 const CHAVES = path.join(TMP, '_chaves');
 const IDS = path.join(TMP, '_ids.json');
-const CLASSIF = escrever('classificacao.csv', 'id;resultado;motivo\nlivro-a;FICA;teoria\nlivro-b;FICA;teoria\nlivro-g;FICA;teoria\n');
+const CLASSIF = escrever('classificacao.csv', 'id;resultado;motivo\nlivro-a;FICA;teoria\nlivro-b;FICA;teoria\nlivro-g;FICA;teoria\nlivro-t;FICA;teoria\nlivro-c;FICA;teoria\n');
 let uid = 'donaDeTeste';
 const comuns = () => ['--emulador', '--uid', uid, '--bucket', BUCKET, '--agora', '2026-11-14T10:00:00-03:00', '--chaves', CHAVES,
   '--registro-ids', IDS, '--classificacao', CLASSIF, '--livros', LIVROS, '--pacotes', PACOTES, '--pacotes', PRIVADO_OFICIAL];
@@ -260,6 +276,18 @@ const geracoes = async () => (await objetos()).map(o => o.name + '@' + o.generat
 const comToken = async () => (await objetos()).filter(o => 'firebaseStorageDownloadTokens' in o.metadata).map(o => o.name);
 const noLivro = (sha, ext) => 'usuarios/' + uid + '/livros/' + sha + '.' + ext;
 const noPacote = sha => 'usuarios/' + uid + '/pacotes/' + sha + '.zip';
+// um objeto posto direto pelo administrador (o que o console ou outra mão poria lá), com os metadados dados
+async function adminSobe(nome, conteudo, tipo, metadados) {
+  const limite = 'limite-da-prova-' + crypto.randomBytes(6).toString('hex');
+  const corpo = Buffer.concat([Buffer.from('--' + limite + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' +
+    JSON.stringify({ name: nome, contentType: tipo, metadata: metadados }) + '\r\n--' + limite + '\r\nContent-Type: ' + tipo + '\r\n\r\n'),
+  conteudo, Buffer.from('\r\n--' + limite + '--\r\n')]);
+  const r = await fetch(ST + '/upload/storage/v1/b/' + BUCKET + '/o?uploadType=multipart&name=' + encodeURIComponent(nome),
+    { method: 'POST', headers: { Authorization: 'Bearer owner', 'Content-Type': 'multipart/related; boundary=' + limite }, body: corpo });
+  const o = (await objetos()).filter(x => x.name === nome)[0] || {};
+  return r.status + '|' + (o.size === conteudo.length && o.contentType === tipo && o.md5Hash === md5(conteudo) ? 'posto' : 'errado:' + JSON.stringify(o));
+}
+const adminApaga = nome => fetch(ST + '/storage/v1/b/' + BUCKET + '/o/' + encodeURIComponent(nome), { method: 'DELETE', headers: { Authorization: 'Bearer owner' } }).then(r => r.status);
 
 (async () => {
   secao('0. A prova se confere');
@@ -362,7 +390,7 @@ const noPacote = sha => 'usuarios/' + uid + '/pacotes/' + sha + '.zip';
     conf('VENENO visto: sem a conferência do que já está lá, tudo subiu de novo', (await geracoes()) !== g7 && /ARQUIVOS: 5 enviado\(s\)/.test(r.saida), true);
     return fim();
   }
-  conf('nada enviado, nada mudaria', r.st + '|' + /ARQUIVOS: 0 enviado\(s\) ao Storage; 0 a enviar \(0 bytes\); 5 já estavam lá/.test(r.saida) + '|' + /nada mudaria/.test(r.saida), '0|true|true');
+  conf('nada enviado, nada mudaria', r.st + '|' + /ARQUIVOS: 0 enviado\(s\) ao Storage; 5 já estava\(m\) lá; 0 a enviar \(0 bytes\)/.test(r.saida) + '|' + /nada mudaria/.test(r.saida), '0|true|true');
   conf('os objetos ficaram com as mesmas gerações', await geracoes(), g7);
   conf('o catálogo e os registros ficaram iguais', JSON.stringify(await retrato()), JSON.stringify(antes7));
 
@@ -422,6 +450,44 @@ const noPacote = sha => 'usuarios/' + uid + '/pacotes/' + sha + '.zip';
   conf('o pacote com 100 MiB e 1 byte é recusado, com o motivo', r.st + '|' + /prova-w v1 tem 104857601 bytes, acima do limite de 104857600 \(100 MiB\); não sobe/.test(r.saida), '2|true');
   fs.unlinkSync(enorme);
   conf('nada subiu e o catálogo ficou igual', (await geracoes() === g10) + '|' + (JSON.stringify(await retrato()) === JSON.stringify(antes10)), 'true|true');
+
+  secao('11. O objeto que já está lá com token de download é recusado');
+  const arqT = grava(path.join(LIVROS, 'Matematica', 'livro-t.pdf'), Buffer.concat([Buffer.from('%PDF-1.4\n'), bytes('livro t', 80)]));
+  const caminhoT = noLivro(hex(arqT), 'pdf');
+  conf('o objeto certo, com token, foi posto pelo administrador', await adminSobe(caminhoT, arqT, 'application/pdf',
+    { sha256: hex(arqT), firebaseStorageDownloadTokens: 'token-posto-pelo-console' }) + '|' + ((await comToken()).indexOf(caminhoT) !== -1), '200|posto|true');
+  const M5 = manifesto('m5.json', [livro('livro-a', 'livro-a.pdf', arqA2), livro('livro-b', 'livro-b.epub', arqB), livro('livro-t', 'livro-t.pdf', arqT)]);
+  const antes11 = await retrato();
+  r = publicador(['--manifesto', M5, '--publicar'].concat(comuns()));
+  if (MODO === '--envenenado-aceita-token') {
+    const i11 = await indice();
+    conf('VENENO visto: o objeto com token passou, e o catálogo aponta para ele', r.st === 0 && !!i11.livros['livro-t'] && i11.livros['livro-t'].caminhoNuvem === caminhoT, true);
+    return fim();
+  }
+  conf('recusado, dizendo o que fazer', r.st + '|' + /tem token de download/.test(r.saida) + '|' + /apague-o no console do Firebase \(Storage\) e rode de novo/.test(r.saida), '2|true|true');
+  conf('o catálogo e os registros ficaram iguais', JSON.stringify(await retrato()), JSON.stringify(antes11));
+  conf('o objeto com token sai (como o dono faria no console)', await adminApaga(caminhoT), 204);
+
+  secao('12. O objeto que já está lá com os bytes trocados é recusado pelo md5');
+  const arqC = grava(path.join(LIVROS, 'Matematica', 'livro-c.pdf'), Buffer.concat([Buffer.from('%PDF-1.4\n'), bytes('livro c', 80)]));
+  const trocado = Buffer.from(arqC);
+  trocado[trocado.length - 1] ^= 0xff;
+  const caminhoC = noLivro(hex(arqC), 'pdf');
+  conf('o objeto do mesmo tamanho, com o nome e o sha256 certos e outros bytes, foi posto', await adminSobe(caminhoC, trocado, 'application/pdf', { sha256: hex(arqC) }) +
+    '|' + (trocado.length === arqC.length), '200|posto|true');
+  const M6 = manifesto('m6.json', [livro('livro-a', 'livro-a.pdf', arqA2), livro('livro-b', 'livro-b.epub', arqB), livro('livro-c', 'livro-c.pdf', arqC)]);
+  const antes12 = await retrato();
+  r = publicador(['--manifesto', M6, '--publicar'].concat(comuns()));
+  if (MODO === '--envenenado-sem-md5') {
+    conf('VENENO visto: sem o md5, o objeto com os bytes trocados passou e entrou no catálogo', r.st === 0 && ((await indice()).livros['livro-c'] || {}).caminhoNuvem === caminhoC, true);
+    return fim();
+  }
+  conf('recusado pelo md5, dizendo o que fazer', r.st + '|' + /está no Storage com bytes diferentes \(o md5 não é o do arquivo\); apague-o no console/.test(r.saida), '2|true');
+  conf('o catálogo e os registros ficaram iguais', JSON.stringify(await retrato()), JSON.stringify(antes12));
+  r = publicador(['--manifesto', M6, '--ensaio'].concat(comuns()));
+  conf('o --ensaio também mostra a recusa', r.st + '|' + /bytes diferentes/.test(r.saida), '2|true');
+  conf('apagado o objeto errado, a rodada seguinte sobe o certo', await adminApaga(caminhoC) + '|' +
+    publicador(['--manifesto', M6, '--publicar'].concat(comuns())).st + '|' + ((await objetos()).filter(o => o.name === caminhoC)[0] || {}).md5Hash, '204|0|' + md5(arqC));
 
   conf('no fim, nenhum objeto tem token de download', (await comToken()).join(','), '');
   if (MODO) conf('o veneno pedido foi visto pela seção dele', 'não visto', 'visto');

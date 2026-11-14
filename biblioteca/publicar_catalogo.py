@@ -26,8 +26,9 @@ cópias de segurança e os ensaios ficam de fora) sobe em
 usuarios/<uid>/pacotes/<sha256>.zip. Tudo, inclusive o pacote privado, vai só
 para a pasta da dona (lista fechada de caminhos no Storage, conferida antes de
 qualquer pedido). O nome é o sha256 dos bytes: o envio é idempotente (o objeto
-que já está lá, conferido pelo tamanho, pelo sha256 dos metadados e pelo tipo,
-não sobe de novo) e um arquivo novo nunca sobrescreve outro (ifGenerationMatch=0).
+que já está lá, conferido pelo tamanho, pelo md5 contra o do disco, pelo sha256
+dos metadados e pelo tipo, não sobe de novo; o que não confere é recusa, com o
+remédio: apagá-lo no console e rodar de novo) e um arquivo novo nunca sobrescreve outro (ifGenerationMatch=0).
 Limites, que recusam a publicação inteira com o motivo: o livro até 200 MiB e o
 pacote até 100 MiB, e vazio nunca. O tipo vai certo (application/pdf,
 application/epub+zip, application/zip), e NUNCA um token de download: nada de
@@ -105,6 +106,7 @@ import chaves  # noqa: E402
 PROJETO = 'nw-apoio-educacional'
 MAX_ESCRITAS = 500
 MAX_BYTES_DO_LOTE = 10 * 1024 * 1024
+MAX_BYTES_DO_INDICE = 900 * 1024   # o documento do Firestore tem 1 MiB; o índice para antes, com folga
 CAMINHO_PERMITIDO = re.compile(r'usuarios/[A-Za-z0-9]{1,128}/(config/catalogo|catalogo/[a-z0-9][a-z0-9-]{0,199})')   # sempre com fullmatch
 CAMPOS_DO_DOCUMENTO = ('id', 'titulo', 'volume', 'materia', 'materia_nome', 'segmento', 'series', 'formato', 'paginas')
 
@@ -300,6 +302,9 @@ def proximo_byte(faixa):
     return int(m.group(1)) + 1 if m else 0
 
 
+APAGUE = 'apague-o no console do Firebase (Storage) e rode de novo'
+
+
 class Storage:
     """Ler os metadados de um objeto e enviar um arquivo, pela API JSON do
     Cloud Storage, com o mesmo Bearer do Firestore. Só caminhos da lista
@@ -310,7 +315,9 @@ class Storage:
         self.bucket, self.token, self.uid, self.emulador = bucket, token, uid, emulador
         self.falhas_forcadas = falhas_forcadas
         self.espera = 0.05 if emulador else 2.0
+        self.pedaco = PEDACO
         self.enviados = []
+        self.existiam = []
         if emulador:
             host, porta = emulador.rsplit(':', 1)
             self.conexao = lambda: http.client.HTTPConnection(host, int(porta), timeout=120)
@@ -366,39 +373,51 @@ class Storage:
             raise Recusa('não consegui ler o objeto %s no Storage (HTTP %d): %s' % (caminho, st, corpo[:300].decode('utf-8', 'replace')))
         return json.loads(corpo.decode('utf-8'))
 
-    def conferir(self, e, obj, md5=None):
-        """O objeto é o arquivo: o tamanho, o sha256 dos metadados, o tipo, nenhum
-        token de download e, logo depois de subir, o md5 dos bytes. Senão, recusa."""
-        problemas = []
+    def conferir(self, e, obj, md5, depois_de_subir=False):
+        """O objeto é o arquivo: o tamanho, o md5 dos bytes (SEMPRE, contra o
+        md5 do disco), o sha256 dos metadados, o tipo e nenhum token de
+        download. Senão, recusa, dizendo o que fazer."""
         if obj is None:
-            problemas.append('o objeto não está lá')
-        else:
-            meta = obj.get('metadata') or {}
-            if str(obj.get('size')) != str(e['tamanho']):
-                problemas.append('o tamanho é %s, e o arquivo tem %d' % (obj.get('size'), e['tamanho']))
-            if meta.get('sha256') != e['sha256']:
-                problemas.append('o sha256 dos metadados não é o do arquivo')
-            if obj.get('contentType') != e['contentType']:
-                problemas.append('o tipo é %r, e não %r' % (obj.get('contentType'), e['contentType']))
-            if 'firebaseStorageDownloadTokens' in meta:
-                problemas.append('o objeto tem token de download (abriria o arquivo a quem tiver o link)')
-            if md5 is not None and obj.get('md5Hash') != md5:
-                problemas.append('o md5 do que subiu não é o do arquivo' if obj.get('md5Hash') else 'o Storage não devolveu o md5 para conferir')
+            raise Recusa('o objeto %s não está no Storage depois do envio; rode de novo' % e['caminho'])
+        meta = obj.get('metadata') or {}
+        if 'firebaseStorageDownloadTokens' in meta:
+            raise Recusa('o objeto %s no Storage tem token de download (abriria o arquivo a quem tiver o link; o console '
+                         'do Firebase cria um ao abrir o arquivo): %s' % (e['caminho'], APAGUE))
+        problemas = []
+        if str(obj.get('size')) != str(e['tamanho']):
+            problemas.append('o tamanho é %s, e o arquivo tem %d' % (obj.get('size'), e['tamanho']))
+        if obj.get('md5Hash') != md5:
+            problemas.append('o md5 não é o do arquivo' if obj.get('md5Hash') else 'o Storage não devolveu o md5 para conferir')
+        if meta.get('sha256') != e['sha256']:
+            problemas.append('o sha256 dos metadados não é o do arquivo')
+        if obj.get('contentType') != e['contentType']:
+            problemas.append('o tipo é %r, e não %r' % (obj.get('contentType'), e['contentType']))
         if problemas:
-            raise Recusa('o objeto %s no Storage não confere: %s' % (e['caminho'], '; '.join(problemas)))
+            if depois_de_subir:
+                raise Recusa('o objeto %s acabou de subir e não confere (%s). Ele FICA no Storage com esse nome, e a '
+                             'rodada seguinte o recusaria: %s' % (e['caminho'], '; '.join(problemas), APAGUE))
+            raise Recusa('o objeto %s está no Storage com bytes diferentes (%s); %s' % (e['caminho'], '; '.join(problemas), APAGUE))
 
     def situacao(self, envios):
         """(os que já estão lá, conferidos; os que faltam; os problemas), sem
-        gravar nada. O mesmo caminho conta uma vez."""
+        gravar nada. O mesmo caminho conta uma vez. Lê cada arquivo do disco
+        (sha256 e md5): o objeto que já existe é conferido pelos bytes."""
         ja, faltam, problemas, vistos = [], [], [], set()
         for e in envios:
             if e['caminho'] in vistos:
                 continue
             vistos.add(e['caminho'])
+            if not e.get('md5'):
+                sha, md5, tamanho = hashes_do_arquivo(e['disco'])
+                if sha != e['sha256'] or tamanho != e['tamanho']:
+                    problemas.append('o arquivo de %s no disco não é o do catálogo (o sha256 ou o tamanho mudou desde a '
+                                     'geração): gere de novo' % e['rotulo'])
+                    continue
+                e['md5'] = md5
             existente = self.metadados(e['caminho'])
             if existente is not None:
                 try:
-                    self.conferir(e, existente)
+                    self.conferir(e, existente, e['md5'])
                 except Recusa as erro:
                     problemas.append(str(erro))
                     continue
@@ -438,10 +457,13 @@ class Storage:
         return None
 
     def _enviar(self, e):
-        """O arquivo, em pedaços, retomado no erro de rede. 'enviado' ou 'existia'."""
+        """O arquivo, em pedaços, retomado no erro de rede. 'enviado' ou 'existia'.
+        Toda tentativa que não avança (erro de rede, 404, 408, 410, 429, 5xx,
+        e o 308 que não guardou nada além do que já estava) gasta do mesmo
+        orçamento de TENTATIVAS: o envio nunca fica girando."""
         total = e['tamanho']
         # o emulador fecha o objeto no primeiro PUT: lá, o arquivo vai inteiro
-        pedaco = total if self.emulador else PEDACO
+        pedaco = total if self.emulador else self.pedaco
         sessao = self._sessao(e)
         if sessao is None:
             return 'existia'
@@ -465,7 +487,17 @@ class Storage:
                 if st == 412:
                     return 'existia'
                 if st == 308:
-                    feito = proximo_byte(cab.get('range'))
+                    novo = proximo_byte(cab.get('range'))
+                    if novo > feito:
+                        feito = novo
+                        continue
+                    # o 308 que não avançou: conta como tentativa perdida, e recomeça de onde o Storage diz
+                    erros += 1
+                    if erros >= TENTATIVAS:
+                        raise SemResposta('o envio de %s não avança: o Storage parou no byte %d em %d tentativas'
+                                          % (e['rotulo'], novo, erros))
+                    time.sleep(self.espera * (2 ** (erros - 1)))
+                    feito = novo
                     continue
                 if st is not None and st not in (404, 408, 410, 429) and st < 500:
                     raise Recusa('o Storage recusou o envio de %s (HTTP %d): %s' % (e['rotulo'], st, texto[:300].decode('utf-8', 'replace')))
@@ -489,27 +521,29 @@ class Storage:
 
     def subir(self, faltam):
         """Cada arquivo que falta: confere o disco (sha256 e tamanho), envia,
-        relê os metadados e confere tamanho, sha256, tipo, md5 e a ausência de
-        token. Qualquer falha é recusa, e quem chama não grava o catálogo."""
+        relê os metadados e confere tamanho, md5, sha256, tipo e a ausência de
+        token. Qualquer falha é recusa, e quem chama não grava o catálogo.
+        Devolve (enviados, os que já existiam quando o envio abriu)."""
         for e in faltam:
             try:
                 sha, md5, tamanho = hashes_do_arquivo(e['disco'])
                 if sha != e['sha256'] or tamanho != e['tamanho']:
                     raise Recusa('o arquivo de %s no disco não é mais o da conferência (o sha256 ou o tamanho mudou)' % e['rotulo'])
                 como = self._enviar(e)
-                self.conferir(e, self.metadados(e['caminho']), md5 if como == 'enviado' else None)
+                self.conferir(e, self.metadados(e['caminho']), md5, depois_de_subir=(como == 'enviado'))
             except Recusa as erro:
                 raise type(erro)('%s. %d arquivo(s) subiram e foram conferidos antes deste (ficam no Storage, e a rodada '
                                  'seguinte não os reenvia); o catálogo NÃO foi gravado' % (erro, len(self.enviados)))
-            self.enviados.append(e)
-        return self.enviados
+            (self.enviados if como == 'enviado' else self.existiam).append(e)
+        return self.enviados, self.existiam
 
 
 def pacotes_das_pastas(pastas):
     """Os pacotes de exercícios, só na versão VIGENTE: o maior -vN de cada nome,
     entre os .zip soltos nas pastas dadas. Subpasta nenhuma é lida (as cópias de
-    segurança e os ensaios moram nelas). Devolve (pacotes, recusas, linhas)."""
-    achados, recusas, linhas, antigas, subpastas = {}, [], [], 0, 0
+    segurança e os ensaios moram nelas). O .zip fora do padrão <nome>-v<N>.zip é
+    listado pelo nome e fica de fora. Devolve (pacotes, recusas, linhas)."""
+    achados, recusas, linhas, antigas, subpastas, fora = {}, [], [], 0, 0, []
     for pasta in pastas:
         if not os.path.isdir(pasta):
             recusas.append('a pasta dos pacotes não existe: %s' % pasta)
@@ -521,6 +555,8 @@ def pacotes_das_pastas(pastas):
                 continue
             m = NOME_DE_PACOTE.fullmatch(nome)
             if not m:
+                if nome.lower().endswith('.zip'):
+                    fora.append(nome)
                 continue
             achados.setdefault(m.group(1), []).append((int(m.group(2)), caminho))
     pacotes = []
@@ -530,7 +566,10 @@ def pacotes_das_pastas(pastas):
         vigentes = [c for v, c in versoes if v == maior]
         antigas += len(versoes) - len(vigentes)
         if len(vigentes) > 1:
-            recusas.append('o pacote %s v%d está em %d pastas: diga uma só' % (nome, maior, len(vigentes)))
+            pastas_deles = {os.path.dirname(os.path.abspath(c)) for c in vigentes}
+            onde = ('em %d pastas' % len(pastas_deles)) if len(pastas_deles) > 1 else 'na mesma pasta'
+            recusas.append('o pacote %s v%d aparece em %d arquivos, %s (%s): deixe um só' % (
+                nome, maior, len(vigentes), onde, ', '.join(sorted(os.path.basename(c) for c in vigentes))))
             continue
         tamanho = os.path.getsize(vigentes[0])
         if tamanho <= 0:
@@ -539,12 +578,14 @@ def pacotes_das_pastas(pastas):
         if tamanho > LIMITE_DO_PACOTE:
             recusas.append('o pacote %s v%d tem %d bytes, acima do limite de %d (100 MiB); não sobe' % (nome, maior, tamanho, LIMITE_DO_PACOTE))
             continue
-        sha, _md5, _n = hashes_do_arquivo(vigentes[0])
-        pacotes.append({'nome': nome, 'versao': maior, 'disco': vigentes[0], 'sha256': sha, 'tamanho': tamanho})
+        sha, md5, _n = hashes_do_arquivo(vigentes[0])
+        pacotes.append({'nome': nome, 'versao': maior, 'disco': vigentes[0], 'sha256': sha, 'md5': md5, 'tamanho': tamanho})
     if antigas:
         linhas.append('- pacotes: %d versão(ões) antiga(s) ficam de fora (só a vigente de cada pacote sobe)' % antigas)
     if subpastas:
         linhas.append('- pacotes: %d subpasta(s) não lida(s) (cópias de segurança e ensaios ficam de fora)' % subpastas)
+    if fora:
+        linhas.append('- pacotes: %d .zip fora do padrão <nome>-v<N>.zip, ignorado(s): %s' % (len(fora), ', '.join(fora)))
     return pacotes, recusas, linhas
 
 
@@ -876,7 +917,7 @@ def planejar(livros_novos, indice, registro_ids, trocas=None, retirar=None, banc
             continue
         caminho = caminho_no_storage(uid, sha, 'zip')
         envios.append({'rotulo': 'pacote %s v%d' % (nome, versao), 'caminho': caminho, 'disco': p['disco'], 'sha256': sha,
-                       'tamanho': p['tamanho'], 'contentType': TIPOS['zip']})
+                       'md5': p.get('md5'), 'tamanho': p['tamanho'], 'contentType': TIPOS['zip']})
         if a.get('sha256') == sha and a.get('versao') == versao and a.get('caminhoNuvem') == caminho:
             continue
         novos_pacotes[nome] = {'versao': versao, 'sha256': sha, 'tamanho': p['tamanho'], 'caminhoNuvem': caminho, 'publicadoEm': agora}
@@ -908,6 +949,10 @@ def montar_escritas(plano, uid):
             escritas.append({'caminho': '%s/catalogo/%s' % (raiz, lid), 'dados': doc, 'campos': list(campos), 'existe': True})
         else:
             escritas.append({'caminho': '%s/catalogo/%s' % (raiz, lid), 'dados': doc})
+    tamanho = len(json.dumps({k: para_valor(v) for k, v in plano['indice'].items()}).encode('utf-8'))
+    if tamanho > MAX_BYTES_DO_INDICE:
+        raise Recusa('o índice do catálogo ficaria com %d bytes, acima de %d (900 KiB; o Firestore guarda até 1 MiB por '
+                     'documento); nada foi gravado: o índice tem de ser dividido antes' % (tamanho, MAX_BYTES_DO_INDICE))
     escritas.append({'caminho': '%s/config/catalogo' % raiz, 'dados': plano['indice']})
     return escritas
 
@@ -1128,11 +1173,13 @@ def principal(argv=None):
                 gravar_json(os.path.join(a.chaves, '%s.json' % lid), reg)
             return True
         publicado = False
-        enviados = []
+        enviados, existiam = [], []
         if a.publicar and not plano['recusas']:
             # primeiro os arquivos, cada um conferido depois de subir; o catálogo SÓ depois de todos
-            enviados = st.subir(faltam) if faltam else []
+            enviados, existiam = st.subir(faltam) if faltam else ([], [])
             publicado = gravar_catalogo()
+        if existiam:
+            plano['linhas_arquivos'].append('- %d arquivo(s) apareceram no Storage entre a conferência e o envio; conferidos, não subiram de novo' % len(existiam))
         if enviados:
             plano['linhas_arquivos'].append('- enviados e conferidos (tamanho e md5): %d arquivo(s), %d bytes' % (
                 len(enviados), sum(e['tamanho'] for e in enviados)))
@@ -1145,8 +1192,8 @@ def principal(argv=None):
             return 2
         if st is not None:
             pendentes = [] if a.publicar else faltam
-            print(marca + 'ARQUIVOS: %d enviado(s) ao Storage; %d a enviar (%d bytes); %d já estavam lá.' % (
-                len(enviados), len(pendentes), sum(e['tamanho'] for e in pendentes), len(ja)))
+            print(marca + 'ARQUIVOS: %d enviado(s) ao Storage; %d já estava(m) lá; %d a enviar (%d bytes).' % (
+                len(enviados), len(ja) + len(existiam), len(pendentes), sum(e['tamanho'] for e in pendentes)))
         print(marca + ('PUBLICADO: versão %d, %d escrita(s) em %d commit.' % (plano['indice']['versao'], fs.escritas, fs.commits) if publicado else
                        ('RELATÓRIO: nada mudaria.' if not plano['indice'] else
                         'ENSAIO: nada foi gravado.' if a.ensaio else 'RELATÓRIO: sem --publicar, nada foi gravado.')))

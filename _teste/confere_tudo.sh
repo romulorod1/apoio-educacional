@@ -1242,6 +1242,8 @@ roda "publicador de arquivos"                       node "_teste/testa_publicado
 roda "publicador de arquivos --envenenado-reenvia"  node "_teste/testa_publicador_arquivos.js" --envenenado-reenvia
 roda "publicador de arquivos --envenenado-grava-token" node "_teste/testa_publicador_arquivos.js" --envenenado-grava-token
 roda "publicador de arquivos --envenenado-catalogo-antes" node "_teste/testa_publicador_arquivos.js" --envenenado-catalogo-antes
+roda "publicador de arquivos --envenenado-aceita-token" node "_teste/testa_publicador_arquivos.js" --envenenado-aceita-token
+roda "publicador de arquivos --envenenado-sem-md5"  node "_teste/testa_publicador_arquivos.js" --envenenado-sem-md5
 # Fase 1c (13/11/2026): o mapa novo chega ao tablet pelo catalogo, de ponta a
 # ponta no emulador: o publicador da 1b publica os metas vivos; o "Atualizar a
 # biblioteca" troca so o meta dos livros de mesmo arquivo; a defasagem da
@@ -1647,6 +1649,15 @@ roda "corrigir pacote Mirim C7"                 python biblioteca/_prova_corrigi
 # regra de validacao, o gabarito de fora com --so-com-resposta e o privado do
 # manifest. Nao abre Chrome: o desenho do SVG e conferido pelo MuPDF.
 roda "lista curada da biblioteca"               python biblioteca/_prova_lista_curada.py
+# Nuvem da biblioteca, PR 2: o envio retomavel do publicador (pedacos, 308 com e
+# sem Range, queda no meio com consulta de estado, 410, 412 e ifGenerationMatch,
+# o 308 que nunca avanca) contra um Cloud Storage FALSO em http.server, mais os
+# nomes dos pacotes e o teto do indice. Sem Chrome nem emulador: roda no --rapido.
+roda "envio retomavel do publicador"            python biblioteca/_prova_envio_retomavel.py
+roda "envio retomavel --envenenado-retoma-no-byte-errado" python biblioteca/_prova_envio_retomavel.py --envenenado-retoma-no-byte-errado
+roda "envio retomavel --envenenado-308-sem-limite" python biblioteca/_prova_envio_retomavel.py --envenenado-308-sem-limite
+roda "envio retomavel --envenenado-sem-precondicao" python biblioteca/_prova_envio_retomavel.py --envenenado-sem-precondicao
+roda "envio retomavel --envenenado-reenvia"     python biblioteca/_prova_envio_retomavel.py --envenenado-reenvia
 # C15.1: o tipo de fonte livros, sobre livros sinteticos (tres PDF, um EPUB e um
 # arquivo de 161 MB): o teto de 160 MB nos dois lados da fronteira (o grande
 # recusado, listado no relatorio e nunca aberto) e igual ao do aplicativo, o
