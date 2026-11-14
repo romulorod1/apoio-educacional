@@ -44,6 +44,8 @@
  *  6b. o pacote que ela REMOVEU (o Remover de Ajustes) não volta na mesma
  *      versão (nenhum download); a versão mais nova no catálogo volta; o zip
  *      importado à mão apaga a marca, e daí o pacote perdido volta;
+ *  6c. a baixa que PARA no meio, sem erro, cai no prazo sem dados (PARADO):
+ *      o pacote é contado como falha de rede, e o seguinte entra;
  *   7. o nome e o título do pacote privado não aparecem em pedido nenhum, e
  *      todo pedido ao Storage foi um GET ?alt=media com "Authorization:
  *      Firebase", pelo caminho com o sha256, sem token e sem metadados;
@@ -86,7 +88,9 @@ const DOCS = FS + '/v1/projects/' + PROJETO + '/databases/(default)/documents';
 const FIREBASE = process.env.FIREBASE_TOOLS ||
   'C:/Users/romul/ferramentas/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js';
 const JAVA_HOME = process.env.JAVA_HOME || '';
-const CFG = { auth: AUTH, firestore: FS, projectId: PROJETO, storage: REPASSE, bucket: BUCKET };
+// o prazo sem dados da baixa (nuvem.js, PRAZO_SEM_DADOS_MS), curto na prova: o pacote parado cai nele
+const PRAZO_DA_PROVA_MS = 2500;
+const CFG = { auth: AUTH, firestore: FS, projectId: PROJETO, storage: REPASSE, bucket: BUCKET, prazoSemDadosMs: PRAZO_DA_PROVA_MS };
 
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 const VENENOS = {
@@ -134,7 +138,9 @@ const ZIP = {
   sond1: Sintetico.gerarSondagem(null, { versao: 1 }).zip,
   trocado: pacoteRenomeado('m2', 'matematica-sintetico-trocado', 'trocado', 'Pacote trocado sintético'),
   trocado2: pacoteRenomeado('m2', 'matematica-sintetico-trocado', 'trocado', 'Pacote trocado sintético', 2),
-  privado: pacoteRenomeado('m1', 'privado-sintetico-licenca', 'privado', 'Coleção privada sintética')
+  privado: pacoteRenomeado('m1', 'privado-sintetico-licenca', 'privado', 'Coleção privada sintética'),
+  parado: pacoteRenomeado('m1', 'matematica-sintetico-parado', 'parado', 'Pacote parado sintético'),
+  segue: pacoteRenomeado('m2', 'matematica-sintetico-segue', 'segue', 'Pacote que segue sintético')
 };
 // o que NUNCA pode sair do tablet num pedido: o id e o título do pacote privado
 const PRIVADOS = ['privado-sintetico-licenca', 'Coleção privada sintética', 'privado:2099'];
@@ -194,7 +200,7 @@ function derrubarEmulador() {
 }
 
 /* ---------- o repasse do Storage: conta e corta ---------- */
-const repasse = { pedidos: [], cortarSha: null, lento: 0 };
+const repasse = { pedidos: [], cortarSha: null, pararSha: null, parados: [], lento: 0 };
 const servidorRepasse = http.createServer((req, res) => {
   if (req.method !== 'OPTIONS') repasse.pedidos.push({ metodo: req.method, url: req.url, autor: req.headers.authorization || '' });
   const cab = Object.assign({}, req.headers, { host: '127.0.0.1:' + PORTA_ST });
@@ -212,9 +218,12 @@ const servidorRepasse = http.createServer((req, res) => {
       delete cabV['transfer-encoding'];
       res.writeHead(200, cabV);
       const corta = repasse.cortarSha && req.url.indexOf(repasse.cortarSha) !== -1;
+      // a rede fraca: a conexão fica aberta, sem erro, e para de mandar bytes no meio
+      const para = repasse.pararSha && req.url.indexOf(repasse.pararSha) !== -1;
       const PASSO = 1024;
       for (let i = 0; i < corpo.length; i += PASSO) {
         if (corta && i >= Math.floor(corpo.length / 2)) { res.socket.destroy(); return; }
+        if (para && i >= Math.floor(corpo.length / 2)) { repasse.parados.push(res); return; }
         res.write(corpo.subarray(i, Math.min(corpo.length, i + PASSO)));
         if (repasse.lento) await pausa(repasse.lento);
       }
@@ -224,7 +233,7 @@ const servidorRepasse = http.createServer((req, res) => {
   ida.on('error', () => { try { res.socket.destroy(); } catch (e) { /* já caiu */ } });
   req.pipe(ida);
 });
-const fim = () => derrubarEmulador().then(() => new Promise(r => servidorRepasse.close(() => r()))).then(() => H.fim(amb)());
+const fim = () => Promise.resolve(repasse.parados.forEach(r => { try { r.socket.destroy(); } catch (e) { /* já caiu */ } })).then(derrubarEmulador).then(() => new Promise(r => servidorRepasse.close(() => r()))).then(() => H.fim(amb)());
 
 /* ---------- a nuvem de teste ---------- */
 const conta = (email, senha) => fetch(AUTH + '/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake', { method: 'POST',
@@ -558,6 +567,29 @@ async function tocarSemEfeito(pag) {
   const n2 = await pedidosDe(pag, SHA.trocado2);
   await atualizar(pag, 'o toque sem a marca terminou');
   conf('sem a marca, o toque traz o pacote de volta', ((await pedidosDe(pag, SHA.trocado2)) - n2) + '|' + /matematica-sintetico-trocado@2/.test(await lerPacotes(pag)), '1|true');
+
+  secao('6c. A baixa que para no meio cai no prazo, e o pacote seguinte entra');
+  await pag.evaluate(() => {
+    window.__codigosPacote = [];
+    const b0 = Nuvem.baixarPacoteDaNuvem;
+    Nuvem.baixarPacoteDaNuvem = function () {
+      return b0.apply(this, arguments).catch(e => { window.__codigosPacote.push(e && e.codigo); throw e; });
+    };
+  });
+  await publicar(U, Object.assign({}, consertado, { 'matematica-sintetico-trocado': ['trocado2', 2],
+    'matematica-sintetico-parado': ['parado', 1], 'matematica-sintetico-segue': ['segue', 1] }));
+  repasse.pararSha = SHA.parado;
+  const antesDoPrazo = Date.now();
+  const tP = await atualizar(pag, 'o toque com a baixa parada terminou');
+  const levou = Date.now() - antesDoPrazo;
+  repasse.pararSha = null;
+  conf('a baixa parada caiu pelo prazo sem dados (PARADO)', await pag.evaluate(() => window.__codigosPacote.join(',')), 'PARADO');
+  conf('e caiu perto do prazo, sem ficar presa', levou >= PRAZO_DA_PROVA_MS && levou < PRAZO_DA_PROVA_MS * 6, true);
+  const rP = await caixa(pag);
+  conf('o resumo conta a parada como falha e o seguinte como entrou', rP.resumo, 'Pacotes da nuvem: 1 entrou, 1 não entrou.');
+  conf('a linha do pacote parado diz que a internet caiu', /^falhou\|matematica-sintetico-parado-v1\.zip\|.*a internet caiu no meio do download\./.test(rP.linhas[0] || ''), true);
+  conf('o parado não entrou, e o seguinte entrou', /parado/.test(await lerPacotes(pag)) + '|' + /matematica-sintetico-segue@1/.test(await lerPacotes(pag)), 'false|true');
+  conf('a linha de Ajustes', tP.linha, 'Biblioteca conferida hoje às HH:MM · nenhum livro com mapa novo · 1 pacote de exercícios novo · 1 pacote não entrou; toque de novo para tentar');
 
   secao('7. O nome do privado não sai do tablet; só o GET pelo sha256');
   const vazou = pedidosDaPagina.filter(p => PRIVADOS.some(n => p.indexOf(n) !== -1) || /privado-sintetico/i.test(decodeURIComponent(p)));
