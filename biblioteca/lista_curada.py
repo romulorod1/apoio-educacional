@@ -68,8 +68,10 @@ O json (todo campo desconhecido e recusado, em qualquer nivel):
   pagina, 60 pt): CABECALHO_FRACAO e CABECALHO_PT, o menor dos dois, para a
   faixa nao crescer em pagina grande; e (3) e cabecalho corrido: o mesmo texto
   (sem acento, pontuacao nem espaco) aparece como linha nessa faixa de outra
-  pagina do mesmo PDF, ou, no PDF de uma pagina so, e o primeiro bloco de
-  texto da pagina. Ai vale tambem o texto do segundo bloco em diante. Fora
+  pagina do mesmo PDF. Ai vale tambem o texto do segundo bloco em diante. No
+  PDF de uma pagina so nao ha folga nenhuma: sem outra pagina nao se separa o
+  cabecalho de um item vizinho de uma linha, e vale so a ordem natural (a
+  caixa que pega o titulo da pagina unica e recusada; ajuste a caixa). Fora
   disso, so a ordem natural, como antes: a ultima linha do item de antes
   ("Resposta: ____"), um item de antes de uma linha, o titulo da pagina
   trocada (um gabarito) e a pagina que so cita o texto mais abaixo sao
@@ -337,15 +339,15 @@ def faixa_de_cabecalho(page):
 
 def e_cabecalho_da_pagina(doc, pno, bbox, linha):
     """A linha (o bloco de uma linha so em bbox) e cabecalho de verdade: fica
-    na faixa do alto da pagina e se repete nessa faixa em outra pagina do PDF
-    (ou, no PDF de uma pagina, e o primeiro bloco de texto dela)."""
+    na faixa do alto da pagina e se repete nessa faixa em outra pagina do PDF.
+    No PDF de uma pagina so, nunca: nada separa o cabecalho de um item vizinho
+    de uma linha."""
     faixa = faixa_de_cabecalho(doc[pno])
     alvo = so_letras(linha)
     if not alvo or bbox[1] < faixa.y0 - TOLERANCIA or bbox[3] > faixa.y1 + TOLERANCIA:
         return False
     if doc.page_count == 1:
-        todos = blocos_de_texto(doc[pno])
-        return bool(todos) and len(todos[0][1]) == 1 and so_letras(todos[0][1][0]) == alvo
+        return False
     for k in range(doc.page_count):
         if k == pno:
             continue
