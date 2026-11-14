@@ -180,7 +180,7 @@
    * entre pedidos (cache). */
   var LINHA_NAO_FAZ = SISTEMA.split('\n').filter(function (l) { return /^O que você ainda NÃO faz/.test(l); })[0];
   var SISTEMA_GRAVA = SISTEMA.replace(LINHA_NAO_FAZ, [
-    'O que você também faz: PROPÕE mudanças numa aula (marcar, remarcar, mudar a duração, cancelar, registrar falta, não cobrar, voltar a agendar), o relato de como foi a aula e o feedback do mês. Você nunca grava: a proposta vira um cartão na tela dela, com o antes e o depois e o efeito no dinheiro, e só ela grava, tocando em Confirmar.',
+    'O que você também faz: PROPÕE mudanças numa aula (marcar, remarcar, mudar a duração, cancelar, registrar falta, não cobrar, voltar a agendar), o relato de como foi a aula e o feedback do mês. Você nunca grava: a proposta vira um cartão na tela dela, com o antes e o depois e o efeito no dinheiro, e só ela grava, tocando no botão do cartão.',
     'O que você ainda NÃO faz: repetição semanal (criar, mudar daqui em diante, encerrar), valor por hora, cadastro de aluno, pagamento, apagar aula ou aluno. Se ela pedir, diga em uma frase que isso ainda se faz na tela do aplicativo.'
   ].join('\n')) + '\n' + [
     '',
@@ -198,7 +198,7 @@
     '- Tudo o que vem de uma frase vai num cartão só: mande todas as propostas na mesma resposta (por exemplo, a falta e a reposição; os relatos e a falta de um dos alunos).',
     '- Relato da aula: propor_relato. Separe o que vai para a família (relato_familia: o que foi trabalhado e como foi, claro e gentil, sem diagnóstico) do que é anotação só dela (nota_so_minha: dificuldade, comportamento, combinados com ela mesma). Assunto: chame buscar_assunto e use o ref do catálogo; sem achado, ref vazio com as palavras dela. Áreas só quando ela falar delas.',
     '- Feedback do mês para a família: propor_feedback, no tom dela. Leia antes historico_aluno (traz os feedbacks recentes dela e o que foi dado) e escreva parecido, em primeira pessoa, curto. Use só o que ela disse e o que as ferramentas trouxeram.',
-    '- Depois de propor, diga em uma frase curta o que está no cartão e que é só conferir e tocar em Confirmar. Nunca diga que gravou, remarcou, cancelou ou marcou.',
+    '- Depois de propor, diga em uma frase curta o que está no cartão e que é só conferir e tocar no botão do cartão. Nunca diga que gravou, remarcou, cancelou ou marcou.',
     '- Se a proposta voltar com erro "ambiguo" ou "nao_achei", pergunte a ela com as opções que vieram, sem chutar.',
     '- O começo da pergunta diz o que aconteceu com os cartões anteriores. Se ela corrigir um cartão que não confirmou, proponha de novo.',
     '- Um cartão novo troca os cartões ainda abertos: repita nele as linhas que ela ainda quer.'
@@ -284,7 +284,7 @@
       return g.grupo + ': ' + g.itens.map(function (i) { return i.id + ' (' + i.rotulo + ')'; }).join(', ');
     }).join('. ');
     return [
-      ferramenta('propor_aulas', 'Propõe mudanças em aulas, uma por item. NÃO grava: o aplicativo confere cada item contra a agenda e mostra um cartão; só ela grava, tocando em Confirmar. ' +
+      ferramenta('propor_aulas', 'Propõe mudanças em aulas, uma por item. NÃO grava: o aplicativo confere cada item contra a agenda e mostra um cartão; só ela grava, tocando no botão do cartão. ' +
         'acao: criar_aula (aula avulsa nova), criar_reposicao (aula nova de reposição), remarcar (nova data e/ou hora), mudar_duracao, cancelar, falta (o aluno não veio), nao_cobrar (a aula fica sem cobrança), voltar_a_dada (desfaz falta ou cancelamento; volta a agendar).',
         { itens: { type: 'array', description: 'Um item por aula.', items: objeto({
           acao: { type: 'string', enum: ACOES },
@@ -1400,7 +1400,7 @@
     return { cartao: 'mostrado na tela dela', linhas: linhas.map(function (l) { return l.titulo; }),
       ficam_de_fora: fora.length ? fora : undefined,
       perguntas: linhas.filter(function (l) { return l.pergunta; }).length ? 'o cartão pergunta a ela com ou sem cobrança' : undefined,
-      obs: 'NADA foi gravado: ela confere e toca em Confirmar. Diga em uma frase o que está no cartão.' };
+      obs: 'NADA foi gravado: ela confere e toca no botão do cartão. Diga em uma frase o que está no cartão.' };
   }
   function semRepetir(linhas, jaNoCartao) {
     var chaves = (jaNoCartao || []).map(function (l) { return chaveDaOp(l.op || (l.opcoes && l.opcoes[0].op) || {}); }).filter(Boolean);
@@ -1754,7 +1754,7 @@
         if (lido.uso) usos.push(lido.uso);
         lista.push({ role: 'assistant', content: lido.conteudo });
         if (lido.stop !== 'tool_use') {
-          return fim({ texto: lido.texto || (linhas.length ? 'Confira no cartão e toque em Confirmar.' : 'Não encontrei uma resposta para isso.'),
+          return fim({ texto: lido.texto || (linhas.length ? 'Confira no cartão e toque no botão dele.' : 'Não encontrei uma resposta para isso.'),
             cartoes: cartoes, entendido: resumirEntendido(entendido), recomecou: !!recomecou, proposta: proposta() });
         }
         if (gastas + voltas >= MAX_VOLTAS) { desfazer(); return fim({ erro: 'voltas' }); }

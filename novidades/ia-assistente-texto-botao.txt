@@ -1,0 +1,2 @@
+# Ajuste de texto do assistente: ele fala em "tocar no botão do cartão" em vez de "tocar em Confirmar", porque o botão do relato e do feedback é "Salvar".
+# Fora da janela de Novidades: ela não chegou a ver o texto antigo (regra do 00-LEIA-PRIMEIRO).
