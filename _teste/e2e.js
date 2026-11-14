@@ -528,6 +528,11 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await espera(1600);
   await clicarTexto('#doc-mais-formatos button', 'PDF com as folhas');
   await espera(2200);
+  // o PDF com as folhas abre a janela PDF pronto (sem compartilhar aqui): o baixar dela baixa
+  await clicar('#modal-bib-compartilhar.aberto [data-acao="baixar"]');
+  await espera(1200);
+  await clicar('#modal-bib-compartilhar.aberto [data-fechar]');
+  await espera(300);
   await clicarTexto('#doc-mais-formatos button', 'Texto');
   await espera(1200);
   await clicar('#modal-documento-familia [data-fechar]');

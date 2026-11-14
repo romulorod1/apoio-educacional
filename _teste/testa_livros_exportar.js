@@ -38,7 +38,12 @@
  *                                   leva: a cópia cresce o tamanho do PDF.
  *   --envenenado-cancelar-baixa     o app.js servido volta ao catch antigo do
  *                                   entregarArquivo: cancelar o compartilhar
- *                                   (AbortError) baixa o arquivo mesmo assim.
+ *                                   (AbortError) baixa o arquivo mesmo assim
+ *                                   (visto no "Abrir fora", seção 4c).
+ *   --envenenado-exportar-direto    o app.js servido volta a mandar o PDF do
+ *                                   "Só gerar PDF" direto ao entregarArquivo:
+ *                                   o compartilhar abre sozinho, no fim da
+ *                                   montagem, e a janela PDF pronto não abre.
  *
  * Revisão do C15.4 (o PDF exportado mora FORA da cópia de segurança):
  *   8. a cópia antes e depois de exportar o capítulo cresce só alguns KB (o
@@ -49,13 +54,16 @@
  *      ..." com "Gerar de novo", que refaz o PDF (o capítulo 2 e o gabarito
  *      dele); sem o livro no tablet, a frase diz que falta o livro.
  *
- * Cancelar o compartilhar não baixa o arquivo (o entregarArquivo):
- *  4b. "Só gerar PDF, sem anexar": cancelar a janela do Android (AbortError)
- *      não baixa nada e avisa "Envio cancelado."; outra falha
- *      (NotAllowedError) baixa; sem o compartilhar no aparelho, baixa;
- *      compartilhado, não baixa nem avisa;
- *  4c. o mesmo cancelar noutro lugar que usa o entregarArquivo, o "Abrir fora
- *      do aplicativo" do leitor de PDF: nada baixa, e o mesmo aviso.
+ * "Só gerar PDF" abre a janela PDF pronto (o compartilhar nasce de um toque
+ * novo, e não do fim da montagem, quando o prazo do toque já venceu):
+ *  4b. "Só gerar PDF, sem anexar": nada sai sozinho; a janela PDF pronto abre
+ *      com o nome do arquivo e os botões de compartilhar, baixar e ver; o
+ *      compartilhar chama o navigator.share com o PDF; cancelar ali
+ *      (AbortError) não baixa e a janela continua aberta; o baixar baixa;
+ *      sem o compartilhar no aparelho, só baixar e ver;
+ *  4c. cancelar o compartilhar no "Abrir fora do aplicativo" do leitor de
+ *      PDF, que segue no entregarArquivo: nada baixa, e o aviso diz "Envio
+ *      cancelado.".
  *
  *   --prints <pasta>   grava três prints: a janela de exportar, a primeira
  *                      página do PDF gerado e a página do gabarito, as duas
@@ -76,7 +84,7 @@ const { conf, secao, esperar, pausa } = H;
 
 const PORTA = 8864;
 const VENENOS = ['--envenenado-gabarito-do-outro', '--envenenado-sem-fonte', '--envenenado-travessao', '--envenenado-pdf-na-copia',
-  '--envenenado-cancelar-baixa'];
+  '--envenenado-cancelar-baixa', '--envenenado-exportar-direto'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const iPrints = process.argv.indexOf('--prints');
 const PRINTS = iPrints > 0 ? process.argv[iPrints + 1] : null;
@@ -97,6 +105,10 @@ if (MODO === '--envenenado-pdf-na-copia') trocas['/app.js'] = APP.split(GUARDA_F
 // sem esta linha, o catch do entregarArquivo volta ao de antes: qualquer falha do compartilhar baixa
 const CANCELOU = "if (e && e.name === 'AbortError') { avisar('Envio cancelado.'); return; } // ela cancelou: nada sai do tablet";
 if (MODO === '--envenenado-cancelar-baixa') trocas['/app.js'] = APP.split(CANCELOU).join('');
+// o "Só gerar PDF" de antes: o PDF montado vai direto ao entregarArquivo, sem a janela PDF pronto
+const EXPORTA_PRONTO = "abrirPdfPronto([{ nome: arquivo.nome, blob: arquivo.blob, parte: 'pdf' }], p.titulo);";
+const EXPORTA_DIRETO = 'entregarArquivo(arquivo.nome, arquivo.blob, p.titulo);';
+if (MODO === '--envenenado-exportar-direto') trocas['/app.js'] = APP.split(EXPORTA_PRONTO).join(EXPORTA_DIRETO);
 const amb = H.criarAmbiente(PORTA, 'nath_c15c_exportar', trocas);
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'c15c_exportar_'));
@@ -296,6 +308,7 @@ function printarPdf(bytes, indice, nome) {
   conf('a troca do travessão do livro mora num lugar só', PDF.split(TROCA_TRACO).length, 2);
   conf('o PDF exportado é guardado fora da cópia num lugar só', APP.split(GUARDA_FORA).length, 2);
   conf('o cancelar do compartilhar é tratado num lugar só', APP.split(CANCELOU).length, 2);
+  conf('o "Só gerar PDF" abre a janela PDF pronto num lugar só', APP.split(EXPORTA_PRONTO).length, 2);
   if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', Object.keys(trocas).length, 1);
   const ZIP = gerarPacote();
   conf('o gerador fez o pacote de prova, com o gabarito', !!ZIP, true);
@@ -450,35 +463,66 @@ function printarPdf(bytes, indice, nome) {
     ' | ' + /capítulo 3, parte 1/.test(pg3[0].texto), '2 | true | true');
 
   // ================================================================
-  secao('4b. "Só gerar PDF, sem anexar": cancelar o compartilhar não baixa');
+  secao('4b. "Só gerar PDF, sem anexar": a janela PDF pronto, e o compartilhar num toque novo');
+  // a janela PDF pronto como ela a vê: o nome e os botões de cada arquivo
+  const pdfPronto = () => p.evaluate(() => {
+    const m = document.querySelector('#modal-bib-compartilhar');
+    if (!m || !m.classList.contains('aberto')) return null;
+    return {
+      titulo: m.querySelector('.modal-cabecalho h3').textContent.trim(),
+      nomes: Array.from(m.querySelectorAll('.bib-compartilhar-nome')).map(n => n.textContent),
+      acoes: Array.from(m.querySelectorAll('.bib-pdf-item button')).map(b => b.dataset.acao + '=' + b.getAttribute('aria-label')).join(', '),
+      ajuda: (m.querySelector('#bib-pdf-ajuda') || {}).textContent || ''
+    };
+  });
   const soGerar = async jeito => {
     await armarCompartilhar(p, jeito);
     await exportar(p, '#leitor-exportar');
     await p.evaluate(() => document.querySelector('#livro-exportar-baixar').click());
-    const s = await saidasDepois(p);
-    console.log('   ' + jeito + ': ' + s.join(' | '));
+    const r = await esperar('a janela PDF pronto (ou o compartilhar sozinho)', () => p.evaluate(() =>
+      !!document.querySelector('#modal-bib-compartilhar.aberto') || (window.__saidas || []).length > 0), v => v, 60000);
+    await pausa(600);
+    const s = await p.evaluate(() => window.__saidas.slice());
+    console.log('   ' + jeito + ': janela ' + JSON.stringify(await pdfPronto()) + ' | saídas: ' + s.join(' | '));
     await esperar('a janela de exportar fechou', () => janela(p), v => v === null, 5000);
-    s.aviso = await textoDoAviso(p);
-    return s;
+    return { saidas: s, aberta: !!r.valor && !!(await pdfPronto()) };
   };
-  const sAbort = await soGerar('AbortError');
-  if (MODO === '--envenenado-cancelar-baixa') {
-    secao('VENENO: o catch antigo do entregarArquivo');
-    conf('envenenado: cancelar o compartilhar baixou o arquivo (defeito enxergado)',
-      sAbort.length + ' | ' + downloads(sAbort), '2 | 1');
+  const tocarNaJanela = async acao => {
+    await p.evaluate(() => { window.__saidas = []; const a = document.querySelector('#aviso-texto'); if (a) a.textContent = ''; });
+    await p.evaluate(a => document.querySelector('#modal-bib-compartilhar.aberto [data-acao="' + a + '"]').click(), acao);
+    const s = await saidasDepois(p);
+    return { saidas: s, aviso: await textoDoAviso(p), aberta: !!(await pdfPronto()) };
+  };
+  const g1 = await soGerar('AbortError');
+  if (MODO === '--envenenado-exportar-direto') {
+    secao('VENENO: o "Só gerar PDF" direto ao entregarArquivo');
+    conf('envenenado: o compartilhar abriu sozinho no fim da montagem, sem a janela PDF pronto (defeito enxergado)',
+      g1.aberta + ' | ' + /^share:.*\.pdf$/.test(g1.saidas[0] || ''), 'false | true');
     throw Object.assign(new Error('fim'), { fimDoVeneno: true });
   }
-  conf('cancelou (AbortError): o compartilhar abriu, nada baixou e o aviso diz "Envio cancelado."',
-    sAbort.length + ' | ' + /^share:.*\.pdf$/.test(sAbort[0]) + ' | ' + downloads(sAbort) + ' | ' + sAbort.aviso,
-    '1 | true | 0 | Envio cancelado.');
-  const sNega = await soGerar('NotAllowedError');
-  conf('outra falha (NotAllowedError): o compartilhar e o download, como antes',
-    sNega.length + ' | ' + /^share:/.test(sNega[0]) + ' | ' + downloads(sNega), '2 | true | 1');
-  const sSem = await soGerar('sem');
-  conf('sem o compartilhar no aparelho: baixa', sSem.length + ' | ' + downloads(sSem), '1 | 1');
-  const sOk = await soGerar('ok');
-  conf('compartilhou: nada baixou e nada de "Envio cancelado."',
-    sOk.length + ' | ' + downloads(sOk) + ' | ' + /Envio cancelado/.test(sOk.aviso), '1 | 0 | false');
+  conf('nada saiu sozinho: nem o compartilhar nem o download', g1.saidas.length, 0);
+  const j4b = await pdfPronto();
+  conf('a janela PDF pronto abriu, com o nome do PDF', j4b ? j4b.titulo + ' | ' + j4b.nomes.length + ' | ' + /\.pdf$/.test(j4b.nomes[0] || '') : '', 'PDF pronto | 1 | true');
+  conf('com os botões de compartilhar, baixar e ver o PDF', j4b && j4b.acoes,
+    'compartilhar=Compartilhar o PDF, baixar=Baixar o PDF, ver=Ver o PDF');
+  conf('e a frase de mandar ao aluno', j4b && j4b.ajuda, 'Mande ao aluno ou guarde no tablet.');
+  await printar(p, 'c15c_pdf_pronto.png');
+  const tAbort = await tocarNaJanela('compartilhar');
+  conf('o compartilhar da janela chama o navigator.share com o PDF; cancelado, nada baixa e a janela fica',
+    tAbort.saidas.join(' | ') + ' | ' + tAbort.aviso + ' | ' + tAbort.aberta,
+    'share:' + j4b.nomes[0] + ' | Envio cancelado. O PDF continua aqui. | true');
+  await armarCompartilhar(p, 'ok');
+  const tOk = await tocarNaJanela('compartilhar');
+  conf('compartilhado pela janela: só o compartilhar, nenhum download', tOk.saidas.join(' | '), 'share:' + j4b.nomes[0]);
+  const tBaixa = await tocarNaJanela('baixar');
+  conf('o baixar da janela baixa o PDF, com o aviso da pasta Downloads',
+    tBaixa.saidas.join(' | ') + ' | ' + tBaixa.aviso, 'download:' + j4b.nomes[0] + ' | O PDF foi para a pasta Downloads.');
+  await fecharModal(p, 'modal-bib-compartilhar');
+  const g2 = await soGerar('sem');
+  const j4bSem = await pdfPronto();
+  conf('sem o compartilhar no aparelho: a janela abre só com baixar e ver, e nada sai sozinho',
+    g2.saidas.length + ' | ' + (j4bSem && j4bSem.acoes), '0 | baixar=Baixar o PDF, ver=Ver o PDF');
+  await fecharModal(p, 'modal-bib-compartilhar');
   await fecharModal(p, 'modal-leitor-pdf');
 
   // ================================================================
@@ -500,6 +544,12 @@ function printarPdf(bytes, indice, nome) {
   await p.evaluate(() => document.querySelector('#leitor-abrir-fora').click());
   const sFora = await saidasDepois(p);
   console.log('   abrir fora: ' + sFora.join(' | '));
+  if (MODO === '--envenenado-cancelar-baixa') {
+    secao('VENENO: o catch antigo do entregarArquivo');
+    conf('envenenado: cancelar o compartilhar baixou o arquivo (defeito enxergado)',
+      sFora.length + ' | ' + downloads(sFora), '2 | 1');
+    throw Object.assign(new Error('fim'), { fimDoVeneno: true });
+  }
   conf('cancelou no "Abrir fora": o compartilhar abriu, nada baixou e o aviso diz "Envio cancelado."',
     sFora.join(' | ') + ' | ' + downloads(sFora) + ' | ' + (await textoDoAviso(p)), 'share:quebrado_teste.pdf | 0 | Envio cancelado.');
   await fecharModal(p, 'modal-aula');

@@ -1,0 +1,1 @@
+Ao exportar páginas de um livro, ao gerar o PDF da folha e o PDF do fechamento com as folhas, o PDF pronto abre com os botões de compartilhar e de baixar.

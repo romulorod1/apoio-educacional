@@ -18,10 +18,29 @@
  *
  * O compartilhar do aparelho é desligado (navigator.canShare devolve falso) e
  * os arquivos são pegos em URL.createObjectURL, com o nome do download.
+ *
+ * O PDF com as folhas lê as folhas e as imagens no tablet antes de existir, e
+ * o prazo do toque vence no caminho: ele abre a janela PDF pronto, e o
+ * compartilhar nasce do toque no botão dela (na seção 3, com um compartilhar
+ * de mentira ligado só para esse passo). O baixar da janela baixa.
+ *
+ * Veneno:
+ *   --envenenado-folhas-direto  o app.js servido volta a mandar o PDF com as
+ *                               folhas direto ao entregarArquivo: o
+ *                               compartilhar abre sozinho e a janela PDF
+ *                               pronto não abre.
  */
 'use strict';
+const fs = require('fs');
+const path = require('path');
 const H = require('./_bib_navegador');
-const amb = H.criarAmbiente(8856, 'nath_c10b_preparar_enviar');
+const MODO = ['--envenenado-folhas-direto'].filter(m => process.argv.indexOf(m) !== -1)[0] || '';
+const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
+const FOLHAS_PRONTO = "else if (comFolhas) abrirPdfPronto([{ nome: nomeDoPdf, blob: blobDoPdf, parte: 'pdf' }], 'Fechamento de ' + f.alunoNome, { ajuda: 'Mande à família ou guarde no tablet.' });";
+const FOLHAS_DIRETO = "else if (comFolhas) entregarArquivo(nomeDoPdf, blobDoPdf, 'Fechamento de ' + f.alunoNome);";
+const trocas = {};
+if (MODO === '--envenenado-folhas-direto') trocas['/app.js'] = APP.split(FOLHAS_PRONTO).join(FOLHAS_DIRETO);
+const amb = H.criarAmbiente(8856, 'nath_c10b_preparar_enviar', trocas);
 const { conf, secao, esperar, pausa } = H;
 
 const MES = '2026-06';
@@ -85,6 +104,8 @@ function arquivosNovos(pag) {
 }
 
 (async () => {
+  conf('o PDF com as folhas abre a janela PDF pronto num lugar só', APP.split(FOLHAS_PRONTO).length, 2);
+  if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', Object.keys(trocas).length, 1);
   await amb.subir();
   const pag = await amb.pagina();
   await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
@@ -189,11 +210,56 @@ function arquivosNovos(pag) {
   conf('PDF do fechamento: com o nome do aluno e sem as folhas',
     !!saiu[0] && /Alfa/.test(saiu[0].nome) && /\.pdf$/.test(saiu[0].nome) && !/com_folhas/.test(saiu[0].nome), true);
 
+  // só neste passo o aparelho tem compartilhar (de mentira): o que ele recebe fica em __compartilhados
+  await pag.evaluate(() => {
+    window.__compartilhados = [];
+    window.__shareAntes = navigator.share; window.__canShareAntes = navigator.canShare;
+    navigator.canShare = () => true;
+    navigator.share = d => { window.__compartilhados.push(d.files.map(f => f.name).join(',')); return Promise.resolve(); };
+  });
   conf('tocou em PDF com as folhas', await tocar(pag, '#doc-mais-formatos button', 'PDF com as folhas'), true);
-  await esperar('o PDF com as folhas', () => pag.evaluate(() => window.__saidas.length), v => v >= 1, 15000);
+  const folhas = await esperar('a janela PDF pronto (ou o compartilhar sozinho)', () => pag.evaluate(() =>
+    !!document.querySelector('#modal-bib-compartilhar.aberto') || window.__compartilhados.length > 0 || window.__saidas.length > 0), v => v, 15000);
+  await pausa(400);
+  const pronto = await pag.evaluate(() => {
+    const m = document.querySelector('#modal-bib-compartilhar.aberto');
+    return {
+      aberta: !!m,
+      nomes: m ? Array.from(m.querySelectorAll('.bib-compartilhar-nome')).map(n => n.textContent) : [],
+      acoes: m ? Array.from(m.querySelectorAll('.bib-pdf-item button')).map(b => b.dataset.acao).join(',') : '',
+      ajuda: m ? (m.querySelector('#bib-pdf-ajuda') || {}).textContent : '',
+      compartilhados: window.__compartilhados.slice(), baixados: window.__saidas.length
+    };
+  });
+  console.log('   PDF com as folhas: ' + JSON.stringify(pronto) + ' (' + !!folhas.valor + ')');
+  if (MODO === '--envenenado-folhas-direto') {
+    secao('VENENO: o PDF com as folhas direto ao entregarArquivo');
+    conf('envenenado: o compartilhar abriu sozinho, sem a janela PDF pronto (defeito enxergado)',
+      pronto.aberta + ' | ' + /_com_folhas\.pdf$/.test(pronto.compartilhados[0] || ''), 'false | true');
+    throw Object.assign(new Error('fim'), { fimDoVeneno: true });
+  }
+  conf('PDF com as folhas: nada saiu sozinho, e a janela PDF pronto abriu',
+    pronto.compartilhados.length + ' | ' + pronto.baixados + ' | ' + pronto.aberta, '0 | 0 | true');
+  conf('PDF com as folhas: o nome diz que leva as folhas', /_com_folhas\.pdf$/.test(pronto.nomes[0] || ''), true);
+  conf('PDF com as folhas: compartilhar, baixar e ver, com a frase da família', pronto.acoes + ' | ' + pronto.ajuda,
+    'compartilhar,baixar,ver | Mande à família ou guarde no tablet.');
+  await printar(pag, 'depois_pdf_pronto_folhas');
+  await pag.evaluate(() => document.querySelector('#modal-bib-compartilhar.aberto [data-acao="compartilhar"]').click());
+  await esperar('o compartilhar da janela', () => pag.evaluate(() => window.__compartilhados.length), v => v >= 1, 5000);
+  conf('o compartilhar da janela chama o navigator.share com o PDF, e nada baixa',
+    (await pag.evaluate(() => window.__compartilhados.join(' | '))) + ' | ' + (await pag.evaluate(() => window.__saidas.length)),
+    pronto.nomes[0] + ' | 0');
+  await pag.evaluate(() => document.querySelector('#modal-bib-compartilhar.aberto [data-acao="baixar"]').click());
+  await esperar('o PDF com as folhas baixado', () => pag.evaluate(() => window.__saidas.length), v => v >= 1, 15000);
   saiu = await arquivosNovos(pag);
-  conf('PDF com as folhas: é PDF', saiu[0] && saiu[0].comeco.slice(0, 4), '%PDF');
-  conf('PDF com as folhas: o nome diz que leva as folhas', !!saiu[0] && /_com_folhas\.pdf$/.test(saiu[0].nome), true);
+  conf('o baixar da janela baixa o PDF com as folhas', saiu.length + ' | ' + (saiu[0] && saiu[0].comeco.slice(0, 4)) + ' | ' + (saiu[0] && saiu[0].nome),
+    '1 | %PDF | ' + pronto.nomes[0]);
+  await pag.evaluate(() => {
+    navigator.share = window.__shareAntes; navigator.canShare = window.__canShareAntes;
+    document.querySelector('#modal-bib-compartilhar.aberto [data-fechar]').click();
+  });
+  await esperar('a janela PDF pronto fechou, e a do documento continua', () => pag.evaluate(() =>
+    !document.querySelector('#modal-bib-compartilhar.aberto') && !!document.querySelector('#modal-documento-familia.aberto')), v => v, 5000);
 
   conf('tocou em Texto', await tocar(pag, '#doc-mais-formatos button', 'Texto'), true);
   await esperar('o texto', () => pag.evaluate(() => window.__saidas.length), v => v >= 1, 15000);
@@ -270,4 +336,4 @@ function arquivosNovos(pag) {
   // ================================================================
   secao('6. Nenhum erro');
   conf('nenhum erro de página', pag.errosDePagina.join(' | '), '');
-})().then(() => H.fim(amb)(), e => H.fim(amb)(e));
+})().then(() => H.fim(amb)(), e => (e && e.fimDoVeneno ? H.fim(amb)() : H.fim(amb)(e)));

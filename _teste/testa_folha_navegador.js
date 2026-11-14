@@ -22,10 +22,59 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { execFileSync } = require('child_process');
-const amb = H.criarAmbiente(8849, 'nath_t09_folha');
+/* Veneno: --envenenado-folha-direto serve o app.js com o PDF da folha indo
+ * direto ao entregarArquivo, como antes: o compartilhar abre sozinho no fim da
+ * montagem, e a janela PDF pronto não abre. */
+const MODO = ['--envenenado-folha-direto'].filter(m => process.argv.indexOf(m) !== -1)[0] || '';
+const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
+const FOLHA_PRONTO = "abrirPdfPronto([{ nome: nomeArquivo, blob: new Blob([bytes], { type: 'application/pdf' }), parte: 'pdf' }],";
+const FOLHA_DIRETO = "entregarArquivo(nomeArquivo, new Blob([bytes], { type: 'application/pdf' }),";
+const trocas = {};
+if (MODO === '--envenenado-folha-direto') trocas['/app.js'] = APP.split(FOLHA_PRONTO).join(FOLHA_DIRETO);
+const amb = H.criarAmbiente(8849, 'nath_t09_folha', trocas);
 const { conf, secao, esperar, pausa } = H;
 
+/* O PDF da folha pela janela PDF pronto: um compartilhar de mentira, o toque
+ * no "PDF da folha", a janela, e o toque no compartilhar dela. "sozinho" diz se
+ * o compartilhar abriu antes do toque na janela (o caminho de antes). */
+function pdfDaFolhaPelaJanela(pag, confirmaImagem) {
+  return pag.evaluate(async (confirmaImagem) => {
+    let pergunta = '';
+    let arquivo = null;
+    const confirmarAntes = window.confirm;
+    const compartilharAntes = navigator.share, podeAntes = navigator.canShare;
+    if (confirmaImagem) window.confirm = msg => { pergunta = msg; return true; };
+    navigator.canShare = () => true;
+    navigator.share = async data => { arquivo = data.files && data.files[0]; };
+    document.querySelector('#btn-pdf-folha').click();
+    const t0 = Date.now();
+    while (Date.now() - t0 < 10000 && !arquivo && !document.querySelector('#modal-bib-compartilhar.aberto')) {
+      await new Promise(r => setTimeout(r, 50));
+    }
+    const sozinho = !!arquivo;
+    const m = document.querySelector('#modal-bib-compartilhar.aberto');
+    const info = { janela: !!m, sozinho, acoes: '', nomeNaJanela: '' };
+    if (m) {
+      info.acoes = Array.from(m.querySelectorAll('.bib-pdf-item button')).map(b => b.dataset.acao).join(',');
+      info.nomeNaJanela = (m.querySelector('.bib-compartilhar-nome') || {}).textContent || '';
+      m.querySelector('[data-acao="compartilhar"]').click();
+      await new Promise(r => setTimeout(r, 200));
+      m.querySelector('[data-fechar]').click();
+      await new Promise(r => setTimeout(r, 200));
+    }
+    window.confirm = confirmarAntes;
+    navigator.share = compartilharAntes; navigator.canShare = podeAntes;
+    const bytes = arquivo ? new Uint8Array(await arquivo.arrayBuffer()) : new Uint8Array(0);
+    return Object.assign(info, {
+      pergunta, nome: arquivo ? arquivo.name : '', tipo: arquivo ? arquivo.type : '', tamanho: bytes.length,
+      header: String.fromCharCode(...bytes.slice(0, 5)), bytes: Array.from(bytes)
+    });
+  }, !!confirmaImagem);
+}
+
 async function rodar() {
+  conf('o PDF da folha abre a janela PDF pronto num lugar só', APP.split(FOLHA_PRONTO).length, 2);
+  if (MODO) conf('o arquivo servido ficou diferente do repositório (' + MODO + ')', Object.keys(trocas).length, 1);
   await amb.subir();
   const pag = await amb.pagina();
   await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
@@ -255,58 +304,21 @@ async function rodar() {
   });
   conf('botao PDF da folha esta presente no rodape', !!btnPdfExiste, true);
 
-  // Dispara exportacao de PDF da folha interceptando entrega (navigator.share no tablet ou download via URL)
-  const interceptacaoPdf = await pag.evaluate(() => {
-    return new Promise(resolve => {
-      let capturado = null;
-      if (navigator.share) {
-        navigator.share = async data => {
-          capturado = { files: data.files, title: data.title };
-        };
-      }
-      const origCreate = URL.createObjectURL;
-      URL.createObjectURL = blob => {
-        capturado = { blob: blob };
-        return origCreate.call(URL, blob);
-      };
-
-      const origClick = HTMLAnchorElement.prototype.click;
-      HTMLAnchorElement.prototype.click = function () {
-        if (this.download) {
-          window.__ultimoDownloadNome = this.download;
-        }
-        return origClick.call(this);
-      };
-
-      document.querySelector('#btn-pdf-folha').click();
-
-      setTimeout(async () => {
-        if (capturado && capturado.files && capturado.files[0]) {
-          const file = capturado.files[0];
-          const buf = await file.arrayBuffer();
-          const arr = new Uint8Array(buf);
-          resolve({
-            nome: file.name,
-            tipo: file.type,
-            tamanho: file.size,
-            header: String.fromCharCode(...arr.slice(0, 5))
-          });
-        } else if (capturado && capturado.blob) {
-          const buf = await capturado.blob.arrayBuffer();
-          const arr = new Uint8Array(buf);
-          resolve({
-            nome: window.__ultimoDownloadNome || '',
-            tipo: capturado.blob.type,
-            tamanho: capturado.blob.size,
-            header: String.fromCharCode(...arr.slice(0, 5))
-          });
-        } else {
-          resolve({ erro: 'timeout' });
-        }
-      }, 1500);
-    });
-  });
-
+  /* O PDF da folha sai depois de gravar a folha: o prazo do toque vence no
+   * caminho, e o PDF abre a janela PDF pronto. O compartilhar nasce do toque
+   * no botão dela; nada sai sozinho. */
+  const interceptacaoPdf = await pdfDaFolhaPelaJanela(pag);
+  console.log('   PDF da folha: ' + JSON.stringify(Object.assign({}, interceptacaoPdf, { bytes: undefined })));
+  if (MODO === '--envenenado-folha-direto') {
+    secao('VENENO: o PDF da folha direto ao entregarArquivo');
+    conf('envenenado: o compartilhar abriu sozinho, sem a janela PDF pronto (defeito enxergado)',
+      interceptacaoPdf.janela + ' | ' + interceptacaoPdf.sozinho, 'false | true');
+    await H.fim(amb)();
+    return;
+  }
+  conf('o PDF da folha abre a janela PDF pronto, e nada sai sozinho', interceptacaoPdf.janela + ' | ' + interceptacaoPdf.sozinho, 'true | false');
+  conf('a janela tem compartilhar, baixar e ver', interceptacaoPdf.acoes, 'compartilhar,baixar,ver');
+  conf('o nome na janela e o do compartilhar', interceptacaoPdf.nomeNaJanela, interceptacaoPdf.nome);
   conf('exportacao gerou arquivo PDF', interceptacaoPdf.tipo, 'application/pdf');
   conf('nome do arquivo comeca com Folha_com_anotacoes_', interceptacaoPdf.nome.startsWith('Folha_com_anotacoes_'), true);
   conf('nome do arquivo identifica o aluno Marcelo', interceptacaoPdf.nome.includes('Aluno_Referencia_Teste'), true);
@@ -333,24 +345,8 @@ async function rodar() {
     const nota = await Store.lerNota(document.querySelector('[data-aula-id]').getAttribute('data-aula-id'));
     return !!(nota && nota.paginas.some(p => p.itens.some(it => it.t === 'imagem')));
   }), v => v === true, 5000);
-  const pdfComImagem = await pag.evaluate(() => new Promise(resolve => {
-    let pergunta = '';
-    let arquivo = null;
-    const confirmarAntes = window.confirm;
-    const criarAntes = URL.createObjectURL;
-    const compartilharAntes = navigator.share;
-    window.confirm = msg => { pergunta = msg; return true; };
-    navigator.share = async data => { arquivo = data.files && data.files[0]; };
-    URL.createObjectURL = blob => { arquivo = blob; return criarAntes.call(URL, blob); };
-    document.querySelector('#btn-pdf-folha').click();
-    setTimeout(async () => {
-      window.confirm = confirmarAntes;
-      URL.createObjectURL = criarAntes;
-      navigator.share = compartilharAntes;
-      const bytes = arquivo ? new Uint8Array(await arquivo.arrayBuffer()) : [];
-      resolve({ pergunta, inicio: String.fromCharCode(...bytes.slice(0, 5)), bytes: Array.from(bytes) });
-    }, 1500);
-  }));
+  const pdfComImagem = await pdfDaFolhaPelaJanela(pag, true);
+  pdfComImagem.inicio = pdfComImagem.header;
   conf('alerta esclarece que imagens podem incluir gabarito', /solu[cç][aã]o ou gabarito/i.test(pdfComImagem.pergunta), true);
   conf('PDF com imagem tem assinatura valida', pdfComImagem.inicio, '%PDF-');
   conf('PDF com imagem nao ficou vazio', pdfComImagem.bytes.length > 2000, true);

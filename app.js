@@ -2753,15 +2753,23 @@
    * AbortError também em algumas falhas do próprio compartilhar, e a janela
    * de onde ela veio já fechou. Aqui o compartilhar
    * nasce do próprio toque no botão e a janela continua aberta até ela
-   * fechar. O entregarArquivo serve o resto do aplicativo (Fechamento,
-   * Proposta, Exportar páginas do livro e os outros).
+   * fechar.
+   *
+   * A mesma janela serve as outras montagens demoradas, as que leem o tablet
+   * ou desenham páginas antes de o arquivo existir: o "Exportar páginas" do
+   * livro (Só gerar PDF), o PDF da folha de aula e o PDF do fechamento com
+   * as folhas. Ali o prazo do toque vencia no meio da montagem, e o
+   * compartilhar virava download. O entregarArquivo fica com o que já está
+   * pronto no toque (Proposta, Ficha, o PDF do mês, o PDF do ciclo, os
+   * textos e os outros).
    *
    * Sem compartilhamento no aparelho (o computador), o botão de compartilhar
    * não aparece, e ficam baixar e ver. */
   var PARTES_DO_PDF = {
     lista: { artigo: 'a lista' },
     gabarito: { artigo: 'o gabarito' },
-    material: { artigo: 'o material' }
+    material: { artigo: 'o material' },
+    pdf: { artigo: 'o PDF' }
   };
   function podeCompartilharPdf(a) {
     try {
@@ -2802,12 +2810,13 @@
       else avisar('Não consegui abrir o compartilhar. O PDF continua aqui para baixar ou ver.');
     });
   }
-  function abrirPdfPronto(arquivos, titulo) {
+  // opcoes.ajuda: a frase do alto, quando o PDF não vai ao aluno (o fechamento vai à família)
+  function abrirPdfPronto(arquivos, titulo, opcoes) {
     var corpo = $('#corpo-modal-bib-compartilhar');
     corpo.innerHTML = '';
-    corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', id: 'bib-pdf-ajuda', texto: arquivos.length > 1
+    corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', id: 'bib-pdf-ajuda', texto: (opcoes && opcoes.ajuda) || (arquivos.length > 1
       ? 'Mande a lista ao aluno e guarde o gabarito no tablet.'
-      : 'Mande ao aluno ou guarde no tablet.' }));
+      : 'Mande ao aluno ou guarde no tablet.') }));
     arquivos.forEach(function (a, k) {
       var parte = PARTES_DO_PDF[a.parte] ? a.parte : 'material';
       var artigo = PARTES_DO_PDF[parte].artigo;
@@ -9948,8 +9957,10 @@
       });
       var slug = Core.nomeArquivo(nomeAluno || 'aula');
       var nomeArquivo = 'Folha_com_anotacoes_' + slug + '_' + aula.data + '.pdf';
-      entregarArquivo(nomeArquivo, new Blob([bytes], { type: 'application/pdf' }), 'Folha de aula de ' + (nomeAluno || 'aula'));
-      avisar('PDF da folha pronto para salvar ou compartilhar.');
+      /* A folha é gravada antes e o PDF sai depois: o prazo do toque pode
+       * vencer no caminho, e o compartilhar nasce do toque na janela PDF pronto. */
+      abrirPdfPronto([{ nome: nomeArquivo, blob: new Blob([bytes], { type: 'application/pdf' }), parte: 'pdf' }],
+        'Folha de aula de ' + (nomeAluno || 'aula'));
     }).catch(function () {
       avisar('Não foi possível gerar o PDF da folha.');
     });
@@ -15946,10 +15957,15 @@
       };
       var opts = opcoesDoDocumento(Object.assign(baseOpts, extraOpcoes || {}));
       var bytes = gen.gerarFechamento(f, opts);
+      var nomeDoPdf = nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf';
+      var blobDoPdf = new Blob([bytes], { type: 'application/pdf' });
       // `entrega`: o "Ver o PDF" do celular baixa (abre no leitor) em vez de compartilhar
-      (entrega || entregarArquivo)(nomeBase(f) + (comFolhas ? '_com_folhas' : '') + '.pdf',
-        new Blob([bytes], { type: 'application/pdf' }),
-        'Fechamento de ' + f.alunoNome);
+      if (entrega) entrega(nomeDoPdf, blobDoPdf, 'Fechamento de ' + f.alunoNome);
+      /* Com as folhas, o PDF espera a leitura das folhas e das imagens no
+       * tablet: o prazo do toque vence no caminho, e o compartilhar nasce do
+       * toque na janela PDF pronto. */
+      else if (comFolhas) abrirPdfPronto([{ nome: nomeDoPdf, blob: blobDoPdf, parte: 'pdf' }], 'Fechamento de ' + f.alunoNome, { ajuda: 'Mande à família ou guarde no tablet.' });
+      else entregarArquivo(nomeDoPdf, blobDoPdf, 'Fechamento de ' + f.alunoNome);
       return true;
     }).catch(function (e) {
       avisar('Não foi possível gerar o PDF.');
@@ -18896,7 +18912,8 @@
     }).then(function (arquivo) {
       if (!aulaId) {
         fecharModal('modal-livro-exportar');
-        entregarArquivo(arquivo.nome, arquivo.blob, p.titulo);
+        // as páginas levaram segundos para desenhar: o compartilhar nasce do toque na janela PDF pronto
+        abrirPdfPronto([{ nome: arquivo.nome, blob: arquivo.blob, parte: 'pdf' }], p.titulo);
         return null;
       }
       return anexarPdfDoLivro(aulaId, arquivo, {
