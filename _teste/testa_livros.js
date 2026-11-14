@@ -234,6 +234,8 @@ async function abrirPelaEstante(pag, id) {
     if (document.querySelector(sel)) return true;
     for (const d of Array.from(document.querySelectorAll('#bib-livros .bibl-disciplina')).map(b => b.dataset.disciplina)) {
       document.querySelector('#bib-livros .bibl-disciplina[data-disciplina="' + d + '"]').click();
+      // P3: a Matemática abre por assunto; os livros dela ficam na Estante, a um toque
+      const estante = document.querySelector('#bib-abrir-estante'); if (estante) estante.click();
       if (document.querySelector(sel)) return true;
       for (const a of Array.from(document.querySelectorAll('#bib-livros .bibl-ano')).map(b => b.dataset.ano)) {
         document.querySelector('#bib-livros .bibl-ano[data-ano="' + a + '"]').click();

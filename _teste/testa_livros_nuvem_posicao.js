@@ -217,6 +217,8 @@ async function abrirTela(pag, id) {
     const sel = '#bib-livros [data-livro="' + i + '"]';
     if (document.querySelector(sel)) return true;
     const d = document.querySelector('#bib-livros .bibl-disciplina[data-disciplina="matematica"]'); if (d) d.click();
+    // P3: a Matemática abre por assunto; os livros dela ficam na Estante, a um toque
+    const e = document.querySelector('#bib-abrir-estante'); if (e) e.click();
     const a = document.querySelector('#bib-livros .bibl-ano[data-ano="09"]'); if (a) a.click();
     return !!document.querySelector(sel);
   }, id), v => v, 10000);

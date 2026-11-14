@@ -664,6 +664,20 @@ roda "assunto lado a lado"                      node "_teste/testa_assunto_lado_
 roda "assunto lado a lado --envenenado-nao-trata-vira-sem-mapa" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-nao-trata-vira-sem-mapa
 roda "assunto lado a lado --envenenado-mapa-vazio-nao-trata" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-mapa-vazio-nao-trata
 roda "assunto lado a lado --envenenado-parcial-nao-trata" node "_teste/testa_assunto_lado_a_lado.js" --envenenado-parcial-nao-trata
+# P3: a tela principal nova da Biblioteca. A Matematica abre por ano e por
+# assunto, agrupada pela unidade do catalogo; o assunto sem material aparece
+# apagado e nao some (particao conferida pela propria pagina do assunto); as
+# capas, o Continuar lendo e Minhas listas ficam na Estante; nada novo gravado.
+# Venenos dos dois lados do apagado (o vazio some; tudo apagado), a estante que
+# nao abre o livro, e o controle no commit pai (a tela antiga tem de ser vista).
+roda "biblioteca tela principal"               node "_teste/testa_biblioteca_tela_principal.js"
+roda "biblioteca tela principal --envenenado-some-sem-material" node "_teste/testa_biblioteca_tela_principal.js" --envenenado-some-sem-material
+roda "biblioteca tela principal --envenenado-tudo-apagado" node "_teste/testa_biblioteca_tela_principal.js" --envenenado-tudo-apagado
+roda "biblioteca tela principal --envenenado-estante-nao-abre" node "_teste/testa_biblioteca_tela_principal.js" --envenenado-estante-nao-abre
+# Os dois medios da revisao cega do #211: o Continuar lendo da estante e so o da disciplina, e Minhas listas aparece uma vez.
+roda "biblioteca tela principal --envenenado-continuar-de-outra-materia" node "_teste/testa_biblioteca_tela_principal.js" --envenenado-continuar-de-outra-materia
+roda "biblioteca tela principal --envenenado-minhas-listas-dobrada" node "_teste/testa_biblioteca_tela_principal.js" --envenenado-minhas-listas-dobrada
+roda "biblioteca tela principal --controle-pai" node "_teste/testa_biblioteca_tela_principal.js" --controle-pai
 # T2 (listas): o bloco "Teoria e exercicios" da pagina do assunto, numa pagina
 # de prova (a pagina do assunto e de outra executora), a 1280x800, 800x1280 e
 # 412x915: as quatro secoes, o exercicio grande numa coluna, nada marcado, o
@@ -1161,6 +1175,10 @@ roda "Voltar do aparelho --envenenado-folha-fora-do-historico" node "_teste/test
 roda "Voltar do aparelho --envenenado-pergunta-do-formulario-some" node "_teste/testa_voltar_android.js" --envenenado-pergunta-do-formulario-some
 roda "Voltar do aparelho --envenenado-guarda-depois-da-janela" node "_teste/testa_voltar_android.js" --envenenado-guarda-depois-da-janela
 roda "Voltar do aparelho --envenenado-sem-ramo-bib" node "_teste/testa_voltar_android.js" --envenenado-sem-ramo-bib
+# P3: a vista da Biblioteca (Assuntos ou Estante) esta no retrato da tela: fora dele, o Voltar na Estante sai da Biblioteca;
+# com o passo e sem devolver a vista, a Estante fica.
+roda "Voltar do aparelho --envenenado-estante-fora-do-retrato" node "_teste/testa_voltar_android.js" --envenenado-estante-fora-do-retrato
+roda "Voltar do aparelho --envenenado-vista-nao-volta" node "_teste/testa_voltar_android.js" --envenenado-vista-nao-volta
 roda "copia ZIP e restauracao atomica"              node "_teste/testa_copia_zip.js"
 # N0: a copia na nuvem contra o Firebase Emulator Suite: as regras nos tres
 # casos (dona, observador, estranho), a ida e volta entre dois aparelhos pela
