@@ -1397,7 +1397,7 @@
         { id: 'funcoes', rotulo: 'Funções', busca: 'função', alvos: ['MAT09-10', 'MATEM1-03'],
           obmep: ['9ano:funcoes-nocoes-basicas', '9ano:funcao-afim', '1em:funcao-quadratica'] },
         { id: 'graficos', rotulo: 'Leitura de gráficos e estatística', busca: 'gráfico', alvos: ['MAT04-12', 'MAT05-12', 'MAT06-14', 'MATEM3-14'],
-          obmep: ['7ano:nocoes-basicas-de-estatistica', '1em:estatistica-basica-i'],
+          obmep: ['7ano:nocoes-basicas-de-estatistica'],
           mirim: ['MAT02-11', 'MAT03-12', 'MAT04-12', 'MAT05-12'] },
         { id: 'probabilidade', rotulo: 'Probabilidade', busca: 'probabilidade', alvos: ['MAT07-14', 'MAT08-14', 'MAT09-14', 'MATEM2-10'],
           obmep: ['6ano:fracao-como-porcentagem-e-como-probabilidade:fracao-como-probabilidade', '2em:introducao-a-probabilidade'],
