@@ -639,6 +639,12 @@ roda "leitor voltar --envenenado-continua-depois-do-toque" node "_teste/testa_le
 roda "leitor voltar --envenenado-nao-some"         node "_teste/testa_leitor_voltar.js" --envenenado-nao-some
 roda "leitor voltar --envenenado-aparece-na-rolagem" node "_teste/testa_leitor_voltar.js" --envenenado-aparece-na-rolagem
 roda "leitor voltar --controle-pai"                node "_teste/testa_leitor_voltar.js" --controle-pai
+# F10 (#202): o redesenho atrasado de outra aula nao toma o dominio ativo, e a marca
+# feita depois de chegar um registro da nuvem fica no banco; os venenos tiram cada conserto.
+roda "dominio troca de aula" node "_teste/testa_dominio_troca_aula.js"
+roda "dominio troca de aula --envenenado-sequestro" node "_teste/testa_dominio_troca_aula.js" --envenenado-sequestro
+roda "dominio troca de aula --envenenado-rebase-velho" node "_teste/testa_dominio_troca_aula.js" --envenenado-rebase-velho
+roda "dominio troca de aula --envenenado-bloco-guardado" node "_teste/testa_dominio_troca_aula.js" --envenenado-bloco-guardado
 # Fatia 7 do leitor: texto selecionavel sobre a pagina. Na p. 206 a camada de
 # texto existe, arrastar pela linha desenhada e copiar traz "Exercicio 206", a
 # caneta (pen) nao seleciona, so as paginas desenhadas tem texto vivo e o

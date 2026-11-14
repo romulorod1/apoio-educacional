@@ -154,7 +154,7 @@ const ASSUNTO_ACERVO = { id: 'acervo-mat-funcoes', titulo: 'Funções: domínio 
   conf('a aula abriu', abriu, true);
   const linha = await esperar('linha do assunto', () => pag.evaluate(() => {
     const l = Array.from(document.querySelectorAll('#corpo-modal-aula .item-assunto-aula')).find(x => /Funções: domínio e imagem/.test(x.textContent));
-    return l ? { nome: l.querySelector('.nome').textContent, botoes: Array.from(l.querySelectorAll('button')).map(b => b.textContent.trim()).join(',') } : null;
+    return l ? { nome: l.querySelector('.nome').textContent, botoes: Array.from(l.querySelectorAll('button:not(.opcao-dominio)')).map(b => b.textContent.trim()).join(',') } : null;
   }), v => !!v, 8000);
   conf('o assunto aparece com o título gravado', linha.valor && linha.valor.nome, 'Funções: domínio e imagem');
   conf('sem botão Material (só o Tirar de sempre)', linha.valor && linha.valor.botoes, 'Tirar');
