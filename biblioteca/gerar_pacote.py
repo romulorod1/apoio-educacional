@@ -2325,10 +2325,22 @@ def caracteres_que_o_pdf_nao_desenha(texto):
     return fora
 
 
+def sem_chave_repetida(pares):
+    """object_pairs_hook do json.load: o json.load sozinho fica com o ULTIMO
+    valor de uma chave repetida, calado; aqui a chave repetida, em qualquer
+    nivel, e erro (ValueError, que quem le transforma em recusa)."""
+    vistas = set()
+    for k, _ in pares:
+        if k in vistas:
+            raise ValueError('chave %r repetida no mesmo objeto' % k)
+        vistas.add(k)
+    return dict(pares)
+
+
 def ler_gabarito_externo(caminho):
     try:
         with io.open(caminho, encoding='utf-8') as f:
-            dados = json.load(f)
+            dados = json.load(f, object_pairs_hook=sem_chave_repetida)
     except (OSError, ValueError) as e:
         raise SystemExit('erro: --gabarito-externo %s: nao consegui ler o json (%s)' % (caminho, e))
     if not isinstance(dados, list):
@@ -2509,12 +2521,16 @@ def confere_versao_do_pymupdf(versao=None):
 # contrato (manifest com hash de todo arquivo, zip deterministico, secao 8j).
 # "cadernos-sme-sp" (C5, biblioteca/cadernos_sme.py) sao os Cadernos de Apoio e
 # Aprendizagem da SME-SP, 2o ao 9o ano, com o assunto de cada atividade lido de
-# um csv de vinculos (--vinculos), feito por leitura.
-TIPOS_DE_FONTE = ('portal', 'mirim', 'enem', 'livros', 'cadernos-sme-sp')
+# um csv de vinculos (--vinculos), feito por leitura. "lista-curada"
+# (biblioteca/lista_curada.py) nao acha nada: cada item vem declarado num json
+# de fora do repositorio (--itens-curados), com o assunto, os subitens e a
+# caixa do recorte em pontos do PDF.
+TIPOS_DE_FONTE = ('portal', 'mirim', 'enem', 'livros', 'cadernos-sme-sp', 'lista-curada')
 # o que cada tipo exige; o resto da linha de comando vale para todos
 OBRIGATORIOS_POR_FONTE = {'portal': ('pdfs', 'serie', 'curadoria'), 'mirim': ('pdfs', 'serie', 'curadoria'),
                           'enem': ('pdfs', 'serie', 'curadoria'), 'livros': ('planilha', 'rotulo'),
-                          'cadernos-sme-sp': ('pdfs', 'vinculos', 'curadoria')}
+                          'cadernos-sme-sp': ('pdfs', 'vinculos', 'curadoria'),
+                          'lista-curada': ('itens_curados',)}
 
 
 def principal(argv=None):
@@ -2528,8 +2544,11 @@ def principal(argv=None):
                          'PDF/matematica/obmep-mirim, com --serie m1 ou m2) ou enem (a pasta PDF/provas/enem, com '
                          '--serie 3em) ou livros (a planilha dos livros, com --planilha e --rotulo) ou '
                          'cadernos-sme-sp (a pasta PDF/matematica/cadernos-apoio-sme-sp, com --vinculos; --serie '
-                         'opcional, por exemplo 2ano,3ano)')
+                         'opcional, por exemplo 2ano,3ano) ou lista-curada (os itens declarados num json, com '
+                         '--itens-curados)')
     ap.add_argument('--vinculos', help='com --fonte cadernos-sme-sp: o csv id;tema;exclusao;quem;justificativa')
+    ap.add_argument('--itens-curados', help='com --fonte lista-curada: o json com a fonte e os itens (assunto, '
+                    'subitens e recorte de cada um); ver biblioteca/lista_curada.py')
     ap.add_argument('--pdfs', help='a pasta dos PDFs (com --fonte livros: a pasta de onde a coluna Arquivo parte; '
                                    'padrao, a pasta da planilha)')
     ap.add_argument('--serie')
@@ -2580,7 +2599,7 @@ def principal(argv=None):
     ap.add_argument('--fontes-negrito', help='pedacos de nome de fonte negrito, separados por virgula '
                     '(padrao %s)' % ','.join(FONTES_NEGRITO))
     a = ap.parse_args(argv)
-    faltam = ['--' + o for o in OBRIGATORIOS_POR_FONTE[a.fonte] if not getattr(a, o)]
+    faltam = ['--' + o.replace('_', '-') for o in OBRIGATORIOS_POR_FONTE[a.fonte] if not getattr(a, o)]
     if faltam:
         ap.error('com --fonte %s, faltam: %s' % (a.fonte, ', '.join(faltam)))
     so_livros = [o for o, v in (('--planilha', a.planilha), ('--rotulo', a.rotulo), ('--materia', a.materia),
@@ -2589,11 +2608,31 @@ def principal(argv=None):
         raise SystemExit('erro: %s so vale com --fonte livros' % ', '.join(so_livros))
     if a.fonte != 'cadernos-sme-sp' and a.vinculos:
         raise SystemExit('erro: --vinculos so vale com --fonte cadernos-sme-sp')
+    if a.fonte != 'lista-curada' and a.itens_curados:
+        raise SystemExit('erro: --itens-curados so vale com --fonte lista-curada')
     if a.fonte == 'livros' and a.gabarito_externo:
         raise SystemExit('erro: --gabarito-externo nao vale com --fonte livros (livro nao tem item)')
     if a.fonte == 'livros' and a.so_com_resposta:
         raise SystemExit('erro: --so-com-resposta não vale com --fonte livros (livro não tem item)')
     gab = ler_gabarito_externo(a.gabarito_externo) if a.gabarito_externo else None
+    if a.fonte == 'lista-curada':
+        # tudo vem do json: pasta de PDFs, serie, modulos e as opcoes do
+        # detector do Portal nao teriam efeito, e efeito calado e pior que recusa
+        extras = [o for o, v in (('--kits', a.kits), ('--listas', a.listas), ('--listas-aula', a.listas_aula),
+                                 ('--lista-de-base', a.lista_de_base), ('--modulos', a.modulos),
+                                 ('--anterior', a.anterior), ('--fontes-negrito', a.fontes_negrito),
+                                 ('--pdfs', a.pdfs), ('--serie', a.serie)) if v]
+        if extras:
+            raise SystemExit('erro: %s nao vale com --fonte lista-curada' % ', '.join(extras))
+        import lista_curada
+        manifest, rel, trab = lista_curada.gerar(a.itens_curados, a.versao, a.saida, a.curadoria, a.trabalho,
+                                                 a.gerado_em, a.commit, not a.sem_zip, gabarito_externo=gab,
+                                                 so_com_resposta=a.so_com_resposta)
+        print(json.dumps({'contagens': manifest['contagens'], 'privado': manifest['privado'], 'zip': rel['zip'],
+                          'bytes_por_tipo': rel['bytes_por_tipo'], 'excluidos': len(rel['excluidos']),
+                          'tema_de_outro_ano': len(rel['tema_de_outro_ano']), 'segundos': rel['segundos'],
+                          'trabalho': trab}, ensure_ascii=False, indent=1))
+        return
     if a.fonte == 'cadernos-sme-sp':
         extras = [o for o, v in (('--kits', a.kits), ('--listas', a.listas), ('--listas-aula', a.listas_aula),
                                  ('--lista-de-base', a.lista_de_base), ('--modulos', a.modulos),
