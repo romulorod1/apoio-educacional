@@ -22,11 +22,15 @@
  *      nome que não é sha256, extensão trocada, a raiz do bucket e o caminho
  *      de outra conta;
  *   7. os limites prontos para a escrita (livroValido e pacoteValido) fazem o
- *      que o cabeçalho diz: numa CÓPIA das regras, servida só ao emulador,
- *      com a escrita da dona aberta por eles, o PDF, o EPUB e o pacote certos
- *      passam; o tipo trocado, o arquivo vazio, o nome que não é sha256, a
- *      outra conta e a remoção são negados. O storage.rules do repositório
- *      nunca é tocado.
+ *      que o cabeçalho diz. Eles moram no storage.rules SÓ COMO COMENTÁRIO,
+ *      entre o INÍCIO e o FIM das funções guardadas (função que nenhuma regra
+ *      chama dá aviso no console do Firebase). A prova monta uma CÓPIA das
+ *      regras, servida só ao emulador, tirando o comentário das funções
+ *      guardadas (o mesmo texto do arquivo, sem cópia própria que possa
+ *      divergir) e abrindo a escrita da dona por elas: o PDF, o EPUB e o
+ *      pacote certos passam; o tipo trocado, o arquivo vazio, o nome que não
+ *      é sha256, a outra conta e a remoção são negados. O storage.rules do
+ *      repositório nunca é tocado.
  *
  * Venenos (a prova TEM de ver o defeito e passa dizendo que viu):
  *   --envenenado-outra-conta  a leitura vale para qualquer conta com login
@@ -74,6 +78,21 @@ const VENENOS = {
   '--envenenado-leitor-le': ['allow get: if dona(uid) && nomeDeLivro(arquivo);', 1,
     'allow get: if (dona(uid) || (entrou() && request.auth.uid in firestore.get(/databases/(default)/documents/usuarios/$(uid)/config/leitores).data.uids)) && nomeDeLivro(arquivo);']
 };
+// as funções guardadas como comentário (livroValido e pacoteValido): as linhas
+// entre o INÍCIO e o FIM, sem o "// " do começo, voltam a ser regra ativa
+const INICIO = '// INÍCIO das funções guardadas', FIM = '// FIM das funções guardadas';
+function descomenta(texto) {
+  let dentro = false;
+  const saida = [];
+  for (const l of texto.split('\n')) {
+    if (l.trim() === INICIO) { dentro = true; continue; }
+    if (l.trim() === FIM) { dentro = false; continue; }
+    saida.push(dentro ? l.replace(/^(\s*)\/\/ ?/, '$1') : l);
+  }
+  return saida.join('\n');
+}
+// as regras ativas, sem os comentários de linha (os textos das regras não têm "//")
+const semComentarios = texto => texto.split('\n').map(l => l.split('//')[0]).join('\n');
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && !VENENOS[a]);
 const REGRAS_SERVIDAS = MODO ? REGRAS.split(VENENOS[MODO][0]).join(VENENOS[MODO][2]) : REGRAS;
@@ -198,6 +217,13 @@ const sintetico = (rotulo, n) => Buffer.from(rotulo + ' ' + 'x'.repeat(n));
   conf('o cabeçalho do storage.rules documenta os três caminhos',
     ['usuarios/{uid}/livros/{sha256}.pdf', 'usuarios/{uid}/livros/{sha256}.epub', 'usuarios/{uid}/pacotes/{sha256}.zip'].every(s => REGRAS.indexOf(s) !== -1), true);
   conf('as regras sem veneno nunca leem o Firestore (o observador não lê o Storage)', /firestore\.(get|exists)\(/.test(REGRAS), false);
+  // os limites da escrita moram só no comentário (função sem uso dá aviso no console do Firebase)
+  conf('o INÍCIO e o FIM das funções guardadas aparecem uma vez cada',
+    (REGRAS.split(INICIO).length - 1) + '|' + (REGRAS.split(FIM).length - 1), '1|1');
+  conf('nas regras ativas não há livroValido nem pacoteValido (só no comentário)',
+    /livroValido|pacoteValido/.test(semComentarios(REGRAS)), false);
+  conf('tirado o comentário, as duas funções voltam a ser regra ativa',
+    ['function livroValido(arquivo) {', 'function pacoteValido(arquivo) {'].every(s => semComentarios(descomenta(REGRAS)).indexOf(s) !== -1), true);
   if (falhas) return fim();
   conf('as portas da prova estão livres (nenhum emulador de outra rodada)', await portasLivres(), true);
   if (falhas) return fim();
@@ -332,8 +358,9 @@ const sintetico = (rotulo, n) => Buffer.from(rotulo + ' ' + 'x'.repeat(n));
   secao('7. Os limites prontos para a escrita (livroValido e pacoteValido) funcionam');
   // as regras do emulador são trocadas por uma cópia com a escrita aberta PELOS LIMITES (nunca o storage.rules do
   // repositório): o emulador relê o arquivo sozinho; a prova espera a troca valer antes de conferir
-  // (a primeira escrita fechada é a dos livros, a segunda a dos pacotes; a regra final é "read, write")
-  const ABERTA = REGRAS_SERVIDAS
+  // (a primeira escrita fechada é a dos livros, a segunda a dos pacotes; a regra final é "read, write").
+  // As funções vêm do comentário do próprio storage.rules: a cópia tira o "// " delas.
+  const ABERTA = descomenta(REGRAS_SERVIDAS)
     .replace('nomeDeLivro(arquivo);\n      allow write: if false;', 'nomeDeLivro(arquivo);\n      allow write: if dona(uid) && livroValido(arquivo);')
     .replace('nomeDePacote(arquivo);\n      allow write: if false;', 'nomeDePacote(arquivo);\n      allow write: if dona(uid) && pacoteValido(arquivo);');
   if (MODO === '--envenenado-escrita' || MODO === '--envenenado-nome-livre') {

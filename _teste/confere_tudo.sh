@@ -199,7 +199,19 @@ ${2:-}"
     pulados=$((pulados + 1))
     return
   fi
-  saida=$("$@" 2>&1) || true
+  codigo=0
+  saida=$("$@" 2>&1) || codigo=$?
+  # A prova que precisa de um recurso que so existe nesta maquina (o
+  # compilador do Firebase pela credencial do gcloud, por exemplo) e que nao o
+  # acha sai com 77 e uma linha "PULADA: motivo". Nao e aprovacao nem falha: e
+  # conferencia pulada, como a lista de nomes que falta no confere_privacidade.
+  # Sem a linha PULADA, o 77 segue o caminho de sempre e reprova.
+  if [ "$codigo" = "77" ] && printf '%s\n' "$saida" | grep -q '^ *PULADA:'; then
+    printf '  INSTAVEL %-23s pulada: %s\n' "$nome" \
+      "$(printf '%s\n' "$saida" | sed -n 's/^ *PULADA: //p' | head -1 | cut -c1-90)"
+    pulada=1
+    return 0
+  fi
   n=$(quantas_falhas "$saida")
   ruim=0
   [ -n "$n" ] && [ "$n" != "0" ] && ruim=1
@@ -1722,6 +1734,16 @@ roda "envio retomavel --envenenado-retoma-no-byte-errado" python _teste/testa_en
 roda "envio retomavel --envenenado-308-sem-limite" python _teste/testa_envio_retomavel.py --envenenado-308-sem-limite
 roda "envio retomavel --envenenado-sem-precondicao" python _teste/testa_envio_retomavel.py --envenenado-sem-precondicao
 roda "envio retomavel --envenenado-reenvia"     python _teste/testa_envio_retomavel.py --envenenado-reenvia
+# As regras do Storage no COMPILADOR DE VERDADE do Firebase (API Firebase
+# Rules, projects.test sem casos: so compila, nunca publica). O emulador nao
+# mostra os avisos que o console mostra: em 14/11/2026 o storage.rules do
+# PR #229 passava no emulador e dava 11 avisos no console, nas duas funcoes
+# que nenhuma regra chamava. Qualquer aviso ou erro reprova. O veneno tira o
+# comentario das funcoes guardadas e o compilador TEM de acusar. Precisa da
+# credencial do gcloud da configuracao separada (.gcloud-nath): sem ela, no
+# CI por exemplo, sai PULADA (INSTAVEL), nunca ok.
+roda "storage no compilador do Firebase"        python _teste/testa_compilador_storage.py
+roda "storage no compilador --envenenado-funcoes-soltas" python _teste/testa_compilador_storage.py --envenenado-funcoes-soltas
 # C15.1: o tipo de fonte livros, sobre livros sinteticos (tres PDF, um EPUB e um
 # arquivo de 161 MB): o teto de 160 MB nos dois lados da fronteira (o grande
 # recusado, listado no relatorio e nunca aberto) e igual ao do aplicativo, o
