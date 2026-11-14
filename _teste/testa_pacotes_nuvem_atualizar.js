@@ -587,7 +587,7 @@ async function tocarSemEfeito(pag) {
   conf('e caiu perto do prazo, sem ficar presa', levou >= PRAZO_DA_PROVA_MS && levou < PRAZO_DA_PROVA_MS * 6, true);
   const rP = await caixa(pag);
   conf('o resumo conta a parada como falha e o seguinte como entrou', rP.resumo, 'Pacotes da nuvem: 1 entrou, 1 não entrou.');
-  conf('a linha do pacote parado diz que a internet caiu', /^falhou\|matematica-sintetico-parado-v1\.zip\|.*a internet caiu no meio do download\./.test(rP.linhas[0] || ''), true);
+  conf('a linha do pacote parado diz que a internet caiu', /^falhou\|matematica-sintetico-parado-v1\.zip\|[\s\S]*a internet caiu no meio do download\./.test(rP.linhas[0] || ''), true);
   conf('o parado não entrou, e o seguinte entrou', /parado/.test(await lerPacotes(pag)) + '|' + /matematica-sintetico-segue@1/.test(await lerPacotes(pag)), 'false|true');
   conf('a linha de Ajustes', tP.linha, 'Biblioteca conferida hoje às HH:MM · nenhum livro com mapa novo · 1 pacote de exercícios novo · 1 pacote não entrou; toque de novo para tentar');
 
