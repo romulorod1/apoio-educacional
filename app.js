@@ -3431,13 +3431,19 @@
       // rolagem DIRETA: a suave atravessava as páginas do caminho, desenhava cada uma
       // e deixava o temporizador gravar posições intermediárias depois de soltar
       if (leitor && leitor.continuo) {
+        // o ponto de onde o arrasto saiu é a volta do salto (fatia 6), uma vez por arrasto
+        if (!leitor.origemDoArrasto) leitor.origemDoArrasto = origemDoSalto();
         leitor.arrastandoAte = Date.now() + LEITOR_ARRASTO_MS;
         irAProximaPaginaDoLeitor(+this.value, false, true);
       }
     });
-    // ao soltar a barra: aí sim a posição do livro é gravada, uma vez
+    // ao soltar a barra: aí sim a posição do livro é gravada, uma vez, e o salto entra na pilha
     $('#leitor-slider-pagina').addEventListener('change', function () {
-      if (!leitor || !leitor.continuo || typeof leitor.opcoes.aoMudarPagina !== 'function') return;
+      if (!leitor || !leitor.continuo) return;
+      var origem = leitor.origemDoArrasto;
+      leitor.origemDoArrasto = null;
+      guardarSaltoDoLeitor(origem, leitor.pagina);
+      if (typeof leitor.opcoes.aoMudarPagina !== 'function') return;
       try { leitor.opcoes.aoMudarPagina(leitor.pagina); } catch (e) { /* posição é auxiliar */ }
     });
     $('#epub-anterior').addEventListener('click', function () { andarNoEpub(-1); });
@@ -26445,9 +26451,109 @@
       return false;
     }
     fecharSumarioDoLeitor();
-    if (leitor.continuo) irAProximaPaginaDoLeitor(destino, false);
+    if (leitor.continuo) saltarNoLeitor(destino);
     else { leitor.pagina = destino; desenharPaginaDoLeitor(true); }
     return true;
+  }
+
+  /* VOLTAR PARA ONDE EU ESTAVA (fatia 6 do leitor). Cada SALTO de navegação
+   * (o Sumário, o "Ir p." e a barra de página) guarda o ponto de onde ela
+   * saiu: a página do meio da tela e o lugar dentro dela, a mesma âncora do
+   * zoom e do giro. Por 10 s aparece "Voltar à p. 45"; o toque leva de volta
+   * ao mesmo trecho, e a pílula SOME: oferecer em seguida o salto anterior
+   * ("Voltar à p. 10") mostraria um destino que ela não reconhece naquele
+   * momento. A pilha continua guardada e a pílula só reaparece no próximo
+   * salto, com a volta desse salto novo. Rolar, a pinça, o zoom, o giro e o Anterior e Próxima não são
+   * salto: são leitura, e não mexem na pilha.
+   * A pilha vive só no leitor aberto (memória da sessão): fechar o livro a
+   * esquece, nada vai para o banco, e a posição gravada continua a da leitura
+   * (a volta é uma ida como outra, e grava a página onde ela chegou). */
+  var LEITOR_VOLTA_MS = 10000;
+  var LEITOR_SALTOS_MAX = 50;
+  var leitorVoltaTimer = null;
+
+  function origemDoSalto() {
+    return leitor && leitor.continuo && leitor.paginas ? ancoraDoLeitorContinuo(leitor) : null;
+  }
+
+  // o salto direto, com a volta guardada
+  function saltarNoLeitor(destino) {
+    var origem = origemDoSalto();
+    var r = irAProximaPaginaDoLeitor(destino, false);
+    guardarSaltoDoLeitor(origem, destino);
+    return r;
+  }
+
+  function guardarSaltoDoLeitor(origem, destino) {
+    if (!leitor || !origem || origem.n === destino) return;
+    leitor.saltos = leitor.saltos || [];
+    leitor.saltos.push(origem);
+    if (leitor.saltos.length > LEITOR_SALTOS_MAX) leitor.saltos.shift();
+    mostrarVoltaDoLeitor();
+  }
+
+  function botaoDeVoltaDoLeitor() {
+    var b = $('#leitor-voltar-salto');
+    if (b) return b;
+    var corpo = $('#corpo-modal-leitor-pdf');
+    if (!corpo || !corpo.parentNode) return null;
+    /* Uma faixa de altura zero logo abaixo da área de leitura: o botão flutua
+     * por cima do pé da página, sem empurrar nada e sem rolar junto. */
+    b = el('button', { type: 'button', class: 'btn principal leitor-voltar-salto', id: 'leitor-voltar-salto',
+      hidden: 'hidden', aoClick: voltarDoSaltoDoLeitor });
+    var faixa = el('div', { class: 'leitor-voltar-faixa' }, [b]);
+    corpo.parentNode.insertBefore(faixa, corpo.nextSibling);
+    return b;
+  }
+
+  // o rótulo diz a página como ela a conhece: a impressa, quando o livro tem
+  function rotuloDaVoltaDoLeitor(n) {
+    var meta = leitor && leitor.opcoes && leitor.opcoes.livro ? leitor.opcoes.livro.meta : null;
+    var imp = meta ? Biblioteca.paginaImpressa(meta, n) : null;
+    return 'Voltar à p. ' + (imp !== null && imp !== undefined ? imp : n);
+  }
+
+  // mostra a volta do salto do topo da pilha por 10 s; sem pilha, some
+  function mostrarVoltaDoLeitor() {
+    clearTimeout(leitorVoltaTimer);
+    leitorVoltaTimer = null;
+    var b = botaoDeVoltaDoLeitor();
+    if (!b) return;
+    var topo = leitor && leitor.saltos && leitor.saltos.length ? leitor.saltos[leitor.saltos.length - 1] : null;
+    if (!topo) { b.hidden = true; return; }
+    trocarComIcone(b, 'undo', rotuloDaVoltaDoLeitor(topo.n));
+    b.hidden = false;
+    leitorVoltaTimer = setTimeout(esconderVoltaDoLeitor, LEITOR_VOLTA_MS);
+  }
+
+  function esconderVoltaDoLeitor() {
+    clearTimeout(leitorVoltaTimer);
+    leitorVoltaTimer = null;
+    var b = $('#leitor-voltar-salto');
+    if (b) b.hidden = true;
+  }
+
+  function voltarDoSaltoDoLeitor() {
+    if (!leitor || !leitor.continuo || !leitor.saltos || !leitor.saltos.length) { esconderVoltaDoLeitor(); return; }
+    // "ponto", e não "ancora": a linha voltarParaAncoraDoLeitor(estado, ancora) é
+    // âncora única de veneno da prova da fatia 3 (testa_biblioteca_livros_tela)
+    var estado = leitor, ponto = estado.saltos.pop();
+    var corpo = $('#corpo-modal-leitor-pdf');
+    fecharSumarioDoLeitor();
+    var desenho = irAProximaPaginaDoLeitor(ponto.n, false);
+    // o mesmo trecho no meio, e não o alto da página
+    voltarParaAncoraDoLeitor(estado, ponto);
+    estado.ultimoTopo = corpo.scrollTop;
+    var posto = corpo.scrollTop;
+    /* Se a página, ao ser desenhada, tiver outra proporção que a guardada, a
+     * caixa muda de altura: o ponto se refaz, a não ser que ela já tenha rolado. */
+    desenho.then(function () {
+      if (estado === leitor && corpo.scrollTop === posto) {
+        voltarParaAncoraDoLeitor(estado, ponto);
+        estado.ultimoTopo = corpo.scrollTop;
+      }
+    });
+    esconderVoltaDoLeitor(); // a volta feita, a pílula some
   }
 
   function fecharSumarioDoLeitor() {
@@ -26467,7 +26573,7 @@
       fecharSumarioDoLeitor();
       if (!leitor || !leitor.doc) return;
       var destino = Math.max(1, Math.min(leitor.total, e.pagina));
-      if (leitor.continuo) irAProximaPaginaDoLeitor(destino, false);
+      if (leitor.continuo) saltarNoLeitor(destino);
       else { leitor.pagina = destino; desenharPaginaDoLeitor(true); }
     }, meta);
     lista.hidden = false;
@@ -27375,6 +27481,8 @@
     leitorRolarDestinoTimer = null;
     zerarGestosDoLeitor();
     if (leitor && leitor.paginas) leitor.paginas.forEach(liberarPaginaContinua);
+    // a pilha de saltos (fatia 6) vai embora com o leitor
+    esconderVoltaDoLeitor();
     leitor = null;
     fecharSumarioDoLeitor();
     esconderCobre('pdf');

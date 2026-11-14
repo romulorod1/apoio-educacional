@@ -628,6 +628,17 @@ roda "leitor nitidez --envenenado-sem-detalhe"      node "_teste/testa_leitor_ni
 roda "leitor nitidez --envenenado-sem-teto"         node "_teste/testa_leitor_nitidez.js" --envenenado-sem-teto
 roda "leitor nitidez --envenenado-direcao-errada"   node "_teste/testa_leitor_nitidez.js" --envenenado-direcao-errada
 roda "leitor nitidez --envenenado-sem-meia-densidade" node "_teste/testa_leitor_nitidez.js" --envenenado-sem-meia-densidade
+# Fatia 6 do leitor: voltar para onde eu estava. Depois do Sumario, do Ir p. e
+# da barra de pagina aparece por 10 s "Voltar a p. 45", e o toque volta ao
+# mesmo trecho no meio (24 px) e a pilula some, ate o proximo salto;
+# rolar, o zoom e a Proxima nao sao salto. Um veneno por criterio, e o
+# controle no commit pai (a39e13f), onde os criterios tem de falhar.
+roda "leitor voltar"                               node "_teste/testa_leitor_voltar.js"
+roda "leitor voltar --envenenado-volta-no-topo"    node "_teste/testa_leitor_voltar.js" --envenenado-volta-no-topo
+roda "leitor voltar --envenenado-continua-depois-do-toque" node "_teste/testa_leitor_voltar.js" --envenenado-continua-depois-do-toque
+roda "leitor voltar --envenenado-nao-some"         node "_teste/testa_leitor_voltar.js" --envenenado-nao-some
+roda "leitor voltar --envenenado-aparece-na-rolagem" node "_teste/testa_leitor_voltar.js" --envenenado-aparece-na-rolagem
+roda "leitor voltar --controle-pai"                node "_teste/testa_leitor_voltar.js" --controle-pai
 # Fatia 7 do leitor: texto selecionavel sobre a pagina. Na p. 206 a camada de
 # texto existe, arrastar pela linha desenhada e copiar traz "Exercicio 206", a
 # caneta (pen) nao seleciona, so as paginas desenhadas tem texto vivo e o

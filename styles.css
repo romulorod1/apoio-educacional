@@ -2223,6 +2223,16 @@ button.alvo-rascunho:hover { background: var(--soft); }
 .leitor-pdf-pagina .textLayer ::selection { background: var(--selecao-no-livro); }
 .leitor-pdf-pagina .textLayer br::selection { background: transparent; }
 .leitor-pdf-pagina-vazia { width: 100%; height: 100%; background: var(--branco); }
+/* "Voltar à p. 45" (fatia 6): depois de um salto, flutua por cima do pé da
+   área de leitura, no meio, por 10 s, como o aviso de uma linha com uma ação
+   (benchmark 2.5 e 5.3). A faixa tem altura zero: não empurra a página nem a
+   barra, e o botão não rola junto com o livro. Alvo de 48 px (padrão 8). */
+.leitor-voltar-faixa { position: relative; flex: 0 0 0; height: 0; z-index: 2; }
+.leitor-voltar-salto { position: absolute; left: 50%; bottom: 1rem; transform: translateX(-50%);
+  min-height: var(--alvo); min-width: var(--alvo); padding: 0 1.25rem; border-radius: var(--alvo);
+  white-space: nowrap; box-shadow: var(--sombra-forte); }
+.leitor-voltar-salto:active { transform: translateX(-50%) translateY(1px); }
+.leitor-voltar-salto[hidden] { display: none; }
 /* A frase do C3 ("Escolha a página e toque em...") fica colada embaixo da
    barra, de ponta a ponta, sem rolar junto com a página. */
 .leitor-pdf-dica { flex-shrink: 0; margin: 0; border-radius: 0; border-width: 0 0 1px; }
