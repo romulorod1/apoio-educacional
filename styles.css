@@ -2296,6 +2296,8 @@ button.alvo-rascunho:hover { background: var(--soft); }
 /* fase 1c: a linha da biblioteca na nuvem, com o botão ao lado (quebra quando falta largura) */
 #biblioteca-nuvem .livros-nuvem { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 10px; }
 #biblioteca-nuvem .livros-nuvem .ajuda { margin: 0; min-width: 12rem; overflow-wrap: anywhere; }
+/* as duas últimas palavras de cada pedaço da linha andam juntas: nenhuma fica sozinha na linha de baixo */
+#livros-nuvem-estado .junto { white-space: nowrap; }
 #lista-instalados-biblioteca > summary {
   cursor: pointer;
   color: inherit;

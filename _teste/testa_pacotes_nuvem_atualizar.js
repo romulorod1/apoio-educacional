@@ -51,7 +51,15 @@
  *  6f. um download por vez: com um pacote chegando, o toque no livro da
  *      nuvem espera; com um livro baixando, o Atualizar espera;
  *  6g. o tablet SEM livro e sem pacote tem o Atualizar a biblioteca, e os
- *      pacotes chegam; a falha da conferência dos livros não impede os pacotes;
+ *      pacotes chegam; a falha da conferência dos livros não impede os pacotes,
+ *      e a linha de Ajustes leva a hora deste toque, sem os números de antes;
+ *  6h. os acabamentos da revisão: com a série andando, o Importar biblioteca
+ *      fica desligado e o zip escolhido não entra; com o zip entrando, o
+ *      Atualizar espera; a identidade de cada pacote fica guardada assim que
+ *      ele chega; o pacote removido com outro nome no catálogo não volta (o
+ *      manifest o reconhece); a marca da remoção que não coube vira aviso;
+ *  0b. sem a conta da nuvem (e no observador, seção 6), as frases do Drive de
+ *      antes: a do cartão dos livros e a da pergunta do Remover livro;
  *   7. o nome e o título do pacote privado não aparecem em pedido nenhum, e
  *      todo pedido ao Storage foi um GET ?alt=media com "Authorization:
  *      Firebase", pelo caminho com o sha256, sem token e sem metadados;
@@ -66,7 +74,19 @@
  *   --envenenado-pacote-removido-volta  sem a marca da remoção: o pacote que
  *                                 ela removeu volta na mesma versão (6b vê);
  *   --envenenado-sem-livro-sem-botao  o Atualizar a biblioteca só aparece com
- *                                 livro no tablet, como antes (6g vê).
+ *                                 livro no tablet, como antes (6g vê);
+ *   --envenenado-livros-baixa-sempre  o pacote de livros do mapa pacotes baixa
+ *                                 a cada toque (6d vê);
+ *   --envenenado-sem-conferir-espaco  sem a conta do espaço antes de baixar
+ *                                 (6e vê);
+ *   --envenenado-sem-vez-unica    o Atualizar baixa pacote com o livro da
+ *                                 Estante baixando (6f vê);
+ *   --envenenado-livros-param-pacotes  a falha da conferência dos livros para
+ *                                 os pacotes (6g vê);
+ *   --envenenado-importar-durante-serie  o zip escolhido com a série andando
+ *                                 entra por cima dela (6h vê);
+ *   --envenenado-removido-por-outro-nome  a importação da nuvem não confere a
+ *                                 marca pelo manifest (6h vê).
  *
  * Precisa do firebase-tools (FIREBASE_TOOLS) e de um JDK 21 em JAVA_HOME,
  * como o testa_livros_nuvem_baixar.js. Portas: 9081 (app), 9082 (auth), 9083
@@ -107,9 +127,18 @@ const VENENOS = {
   '--envenenado-pacote-sem-hash': ['if (doArquivo !== e.sha256) throw', 'if (false) throw'],
   '--envenenado-pacote-para-tudo': ['return pausaCurta().then(function () { return proximo(i + 1); });',
     "return res.estado === 'falhou' ? null : pausaCurta().then(function () { return proximo(i + 1); });"],
-  '--envenenado-sem-livro-sem-botao': ['    if (!podeAtualizarABiblioteca()) return;', '    if (!podeAtualizarABiblioteca() || !quantosLivros) return;'],
+  '--envenenado-sem-livro-sem-botao': ['    if (!pode) return;', '    if (!pode || !quantosLivros) return;'],
   '--envenenado-pacote-removido-volta': ["if (typeof aqui !== 'number' && typeof removidos[id.pacote] === 'number' && removidos[id.pacote] >= id.versao) { r.removidos++; return; }",
-    'if (false) { r.removidos++; return; }']
+    'if (false) { r.removidos++; return; }'],
+  // os acabamentos da revisão do #233
+  '--envenenado-livros-baixa-sempre': ["if (c && c.conteudo === 'livros') { r.livros++; return; }", 'if (false) { r.livros++; return; }'],
+  '--envenenado-sem-conferir-espaco': ['if (espaco && espaco.quota && espaco.quota - (espaco.usage || 0) < e.tamanho * 2 + FOLGA_DA_BAIXA) {', 'if (false) {'],
+  '--envenenado-sem-vez-unica': ["if (baixaDaNuvem) { avisar('Espere o livro terminar de baixar; depois toque em Atualizar a biblioteca de novo.'); return Promise.resolve(null); }",
+    "if (false) { avisar('Espere o livro terminar de baixar; depois toque em Atualizar a biblioteca de novo.'); return Promise.resolve(null); }"],
+  '--envenenado-livros-param-pacotes': ['erroDosLivros = e; return undefined; })', 'erroDosLivros = e; return null; })'],
+  '--envenenado-importar-durante-serie': ["if (importandoBiblioteca || trazendoPacotes) { avisar('Espere a biblioteca terminar de atualizar; depois importe o pacote de novo.'); return; }",
+    "if (false) { avisar('Espere a biblioteca terminar de atualizar; depois importe o pacote de novo.'); return; }"],
+  '--envenenado-removido-por-outro-nome': ["return typeof v === 'number' && typeof manifest.versao === 'number' && v >= manifest.versao;", 'return false;']
 };
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && !VENENOS[a]);
@@ -175,7 +204,11 @@ const ZIP = {
   devagar: pacoteRenomeado('m2', 'matematica-sintetico-devagar', 'devagar', 'Pacote devagar sintético'),
   livrosZip: pacoteDeLivros('livros-sintetico-no-mapa', ['livro-do-mapa'], 1),
   parado: pacoteRenomeado('m1', 'matematica-sintetico-parado', 'parado', 'Pacote parado sintético'),
-  segue: pacoteRenomeado('m2', 'matematica-sintetico-segue', 'segue', 'Pacote que segue sintético')
+  segue: pacoteRenomeado('m2', 'matematica-sintetico-segue', 'segue', 'Pacote que segue sintético'),
+  simultaneo: pacoteRenomeado('m1', 'matematica-sintetico-simultaneo', 'simultaneo', 'Pacote simultâneo sintético'),
+  acabA: pacoteRenomeado('m1', 'matematica-sintetico-acab-a', 'acaba', 'Pacote A sintético'),
+  acabB: pacoteRenomeado('m2', 'matematica-sintetico-acab-b', 'acabb', 'Pacote B sintético'),
+  acabC: pacoteRenomeado('m1', 'matematica-sintetico-acab-c', 'acabc', 'Pacote C sintético')
 };
 // o que NUNCA pode sair do tablet num pedido: o id e o título do pacote privado
 const PRIVADOS = ['privado-sintetico-licenca', 'Coleção privada sintética', 'privado:2099'];
@@ -479,8 +512,35 @@ async function tocarSemEfeito(pag) {
   conf('os quatro zips entraram pelo Importar biblioteca', zips.ok && /4 entraram/.test(zips.valor.texto), true);
   conf('o tablet tem o ENEM v1, o Mirim 2 v1, o Banco v2 e a sondagem v1', await lerPacotes(pag),
     'matematica-sintetico-banco-n2@2,matematica-sintetico-enem-3em@1,matematica-sintetico-mirim-m2@1,matematica-sintetico-sondagem-9ano@1');
+  /* 0b. As frases do Drive. Antes de entrar na nuvem o tablet não baixa dela
+   * (podeBaixarDaNuvem): o cartão dos livros e a pergunta do Remover livro
+   * ficam como eram antes do #233. A seção 6 confere o observador. */
+  const frasesDosLivros = () => pag.evaluate(() => {
+    let pergunta = null;
+    const c0 = window.confirm;
+    window.confirm = m => { pergunta = m; return false; };
+    const b = document.querySelector('[data-remover-livro="livro-do-tablet"]');
+    try { if (b) b.click(); } finally { window.confirm = c0; }
+    return { ajuda: (document.querySelector('#livros-de-onde') || {}).textContent || '', pergunta: pergunta || '',
+      alto: (document.querySelector('#biblioteca-de-onde') || {}).textContent || '' };
+  });
+  const DRIVE_AJUDA = 'Os livros ficam só neste tablet: a cópia de segurança não os leva. Para usar num tablet novo, importe o pacote de livros de novo do Drive.';
+  const DRIVE_PERGUNTA = 'Tirar "Livro sintético do tablet" deste tablet?\n\nPara ler de novo, é só importar o pacote de livros outra vez do Drive. O lugar onde você parou ' +
+    'neste livro não fica guardado.\n\nVoltam ';
+  const fs0 = await frasesDosLivros();
+  conf('0b. sem a nuvem, o cartão dos livros diz a frase do Drive de antes', fs0.ajuda, DRIVE_AJUDA);
+  conf('0b. sem a nuvem, a pergunta do Remover livro é a de antes', fs0.pergunta.slice(0, DRIVE_PERGUNTA.length), DRIVE_PERGUNTA);
+  conf('0b. e o livro continua no tablet (ela respondeu que não)', await pag.evaluate(() => Store.listarLivros().then(l => l.length)), 1);
   conf('entrou na nuvem com a conta de teste da dona', await entrar(pag, 'dona@exemplo.test', 'senha-da-dona-1'), true);
   conf('nada foi baixado do Storage antes do toque', await totalStorage(pag), 0);
+  // com a conta dela, o tablet baixa da nuvem: as frases novas (o controle do 0b)
+  await H.irParaAba(pag, 'hoje');
+  await H.irParaAba(pag, 'ajustes');
+  const fs1 = (await esperar('o cartão dos livros refeito com a conta', () => frasesDosLivros(), v => /Estante/.test(v.ajuda), 10000)).valor;
+  conf('0b. com a conta, o cartão dos livros fala da Estante', fs1.ajuda,
+    'Os livros ficam neste tablet: a cópia de segurança não os leva. Os que estão na sua nuvem aparecem na Estante e baixam com um toque, um por vez.');
+  conf('0b. com a conta, a pergunta do Remover livro diz os dois caminhos', /se ele estiver na sua nuvem, toque nele na Estante; se não, importe o pacote de livros outra vez do Drive\./.test(fs1.pergunta), true);
+  conf('0b. com a conta, o alto do cartão fala do Atualizar a biblioteca', /chegam pelo Atualizar a biblioteca/.test(fs1.alto), true);
 
   secao('1. O primeiro toque: um por vez, a falha de um não para os outros');
   repasse.cortarSha = SHA.m1;
@@ -599,6 +659,11 @@ async function tocarSemEfeito(pag) {
   await H.irParaAba(pag, 'hoje');
   await H.irParaAba(pag, 'ajustes');
   conf('para o observador, o Atualizar a biblioteca nem aparece', await existe(pag, '#livros-nuvem-atualizar'), false);
+  const fsO = (await esperar('o cartão dos livros do observador', () => frasesDosLivros(), v => !!v.ajuda, 10000)).valor;
+  conf('para o observador, o cartão dos livros diz a frase do Drive de antes', fsO.ajuda, DRIVE_AJUDA);
+  conf('para o observador, a pergunta do Remover livro é a de antes', fsO.pergunta.slice(0, DRIVE_PERGUNTA.length), DRIVE_PERGUNTA);
+  conf('para o observador, o alto do cartão fala só do Drive', fsO.alto,
+    'Os pacotes ficam guardados no Google Drive. A cópia de segurança não leva os pacotes: num tablet novo, importe de novo do Drive.');
   conf('o observador e o celular não pediram nada ao Storage, e nada entrou', ((await totalStorage(pag)) - n6) + '|' + /trocado/.test(await lerPacotes(pag)), '0|false');
   await pag.evaluate(() => { Nuvem.estado = window.__estado0; });
   await H.irParaAba(pag, 'hoje');
@@ -624,7 +689,8 @@ async function tocarSemEfeito(pag) {
   const nR = await pedidosDe(pag, SHA.trocado);
   const tR = await atualizar(pag, 'o toque depois da remoção terminou');
   if (MODO === '--envenenado-pacote-removido-volta') {
-    conf('VENENO visto: o pacote que ela removeu voltou na mesma versão', ((await pedidosDe(pag, SHA.trocado)) - nR) + '|' + /matematica-sintetico-trocado@1/.test(await lerPacotes(pag)), '1|true');
+    // a importação confere a marca de novo pelo manifest (6h): sem a do planejamento, o removido já baixa de novo à toa
+    conf('VENENO visto: o pacote que ela removeu baixou de novo na mesma versão', (await pedidosDe(pag, SHA.trocado)) - nR >= 1, true);
     return fim();
   }
   conf('o pacote removido não baixou de novo e não voltou', ((await pedidosDe(pag, SHA.trocado)) - nR) + '|' + /trocado/.test(await lerPacotes(pag)), '0|false');
@@ -675,6 +741,10 @@ async function tocarSemEfeito(pag) {
   const nL = await pedidosDe(pag, SHA.livrosZip);
   conf('o pacote de livros baixou uma vez e foi importado como o zip faria', nL + '|' + await pag.evaluate(() => Store.lerLivro('livro-do-mapa').then(r => !!r)), '1|true');
   const tL = await atualizar(pag, 'o segundo toque com o pacote de livros terminou');
+  if (MODO === '--envenenado-livros-baixa-sempre') {
+    conf('VENENO visto: o pacote de livros baixou de novo no toque seguinte', (await pedidosDe(pag, SHA.livrosZip)) - nL >= 1, true);
+    return fim();
+  }
   conf('no toque seguinte, o pacote de livros não baixa mais (o sha256 já diz que é de livros)', (await pedidosDe(pag, SHA.livrosZip)) - nL, 0);
   conf('e não é contado como pacote de exercícios novo', /nenhum pacote de exercícios novo$/.test(tL.linha), true);
 
@@ -688,6 +758,10 @@ async function tocarSemEfeito(pag) {
   await atualizar(pag, 'o toque sem espaço terminou');
   await pag.evaluate(() => { Store.estimarEspaco = window.__estimar0; });
   const rE = await caixa(pag);
+  if (MODO === '--envenenado-sem-conferir-espaco') {
+    conf('VENENO visto: sem a conta do espaço, o pacote baixou mesmo sem espaço', await pedidosDe(pag, SHA.espaco) >= 1, true);
+    return fim();
+  }
   conf('sem espaço, o pacote não baixou nem entrou', (await pedidosDe(pag, SHA.espaco)) + '|' + /espaco/.test(await lerPacotes(pag)), '0|false');
   conf('o resumo diz que falta espaço', rE.resumo + ' | ' + /falta espaço no tablet para este pacote\./.test(rE.linhas.join(' ')), 'Pacotes da nuvem: 1 não entrou. | true');
 
@@ -716,13 +790,20 @@ async function tocarSemEfeito(pag) {
   conf('com os pacotes chegando, o toque no livro avisa e não baixa', avisoA + '|' + await pedidosDe(pag, SHA_LIVRO_NUVEM),
     'Espere a biblioteca terminar de atualizar; depois toque no livro de novo.|0');
   // b) o livro baixando devagar: o Atualizar espera
-  catalogo6 = Object.assign({}, catalogo6, { 'matematica-sintetico-parado': ['parado', 1] });
+  // um pacote novo no catálogo: sem a vez única, o Atualizar o baixaria junto com o livro
+  catalogo6 = Object.assign({}, catalogo6, { 'matematica-sintetico-simultaneo': ['simultaneo', 1] });
+  await publicar(U, catalogo6, true);
   repasse.lentoSha = SHA_LIVRO_NUVEM; repasse.lentoDoSha = 25;
   await clicar(pag, cartaoX);
   await esperar('o livro começou a baixar', () => pedidosDe(pag, SHA_LIVRO_NUVEM), v => v >= 1, 20000);
   const nB = await totalStorage(pag);
   await limparAviso(pag);
   await clicar(pag, '#livros-nuvem-atualizar');
+  if (MODO === '--envenenado-sem-vez-unica') {
+    const junto = await esperar('o pacote novo baixou com o livro baixando', () => pedidosDe(pag, SHA.simultaneo), v => v >= 1, 30000);
+    conf('VENENO visto: com o livro baixando, o Atualizar baixou um pacote junto', junto.ok, true);
+    return fim();
+  }
   const avisoB = await esperar('o aviso de esperar o livro', () => textoDoAviso(pag), v => /livro/.test(v), 20000);
   conf('com o livro baixando, o Atualizar avisa e não baixa pacote nenhum', avisoB.valor + '|' + ((await totalStorage(pag)) - nB),
     'Espere o livro terminar de baixar; depois toque em Atualizar a biblioteca de novo.|0');
@@ -753,13 +834,119 @@ async function tocarSemEfeito(pag) {
     Nuvem.lerCatalogo = function () { if (uma) { uma = false; return Promise.reject(new Error('falha de teste')); } return c0.apply(this, arguments); };
   });
   await limparAviso(pag);
+  // a linha de antes, de outro dia e com números de livros: nada dela pode ficar ao lado dos pacotes deste toque
+  await pag.evaluate(() => {
+    const v = JSON.parse(localStorage.getItem('apoio-educacional:biblioteca-nuvem') || '{}');
+    localStorage.setItem('apoio-educacional:biblioteca-nuvem', JSON.stringify(Object.assign(v, { quando: '2026-01-02T10:00:00.000Z', trocados: 3, naoEstao: 2, semCatalogo: false })));
+  });
   const tG = await atualizar(pag, 'o toque no tablet sem livro terminou');
   const pacotesG = await lerPacotes(pag);
+  if (MODO === '--envenenado-livros-param-pacotes') {
+    conf('VENENO visto: a falha da conferência dos livros parou os pacotes (nada chegou ao tablet vazio)', pacotesG, '');
+    return fim();
+  }
   conf('os pacotes de exercícios do catálogo chegaram ao tablet vazio', ['banco-n2@1', 'enem-3em@1', 'mirim-m1@1', 'mirim-m2@2', 'trocado@2', 'segue@1', 'devagar@1', 'espaco@1']
     .every(x => pacotesG.indexOf('matematica-sintetico-' + x) !== -1) && /privado-sintetico-licenca@1/.test(pacotesG), true);
   conf('a falha da conferência dos livros não parou os pacotes, e o aviso diz das duas', await textoDoAviso(pag),
     'Não consegui conferir os livros agora; os pacotes de exercícios foram conferidos. Tente de novo daqui a pouco.');
   conf('a linha diz os pacotes novos', /pacotes de exercícios novos/.test(tG.linha), true);
+  conf('a linha leva a hora deste toque e diz que os livros ficaram sem conferir, sem os números de antes',
+    /^Biblioteca conferida hoje às HH:MM · os livros não foram conferidos agora · \d+ pacotes de exercícios novos$/.test(tG.linha), true);
+
+  secao('6h. Os acabamentos: o Importar na série, a identidade a cada pacote, o removido de outro nome, a marca que não coube');
+  // a) a série andando (o B baixa devagar, depois do A): o Importar desligado, o zip escolhido não entra
+  const catalogoH = Object.assign({}, catalogo6, { 'matematica-sintetico-acab-a': ['acabA', 1], 'matematica-sintetico-acab-b': ['acabB', 1] });
+  await publicar(U, catalogoH, true);
+  repasse.lentoSha = SHA.acabB; repasse.lentoDoSha = 200;
+  await H.irParaAba(pag, 'ajustes');
+  await pag.evaluate(() => { document.querySelector('#cartao-biblioteca').hidden = false; });
+  await limparAviso(pag);
+  await clicar(pag, '#livros-nuvem-atualizar');
+  await esperar('o pacote B começou a baixar', () => pedidosDe(pag, SHA.acabB), v => v >= 1, 30000);
+  conf('6h. com a série andando, o Importar biblioteca está desligado', await pag.evaluate(() => document.querySelector('#importar-biblioteca').disabled), true);
+  const idDoA = await pag.evaluate((u, sha) => {
+    const v = JSON.parse(localStorage.getItem('apoio-educacional:pacotes-da-nuvem') || 'null');
+    const c = v && v.contas && v.contas[u] && v.contas[u].porSha && v.contas[u].porSha[sha];
+    return c ? c.pacote + '@' + c.versao : '';
+  }, U, SHA.acabA);
+  conf('6h. a identidade do A ficou guardada assim que ele chegou, com o B ainda baixando', idDoA, 'matematica-sintetico-acab-a@1');
+  const entradaH = await pag.$('#arquivo-biblioteca');
+  await entradaH.uploadFile(salvar('acab-c-durante', ZIP.acabC));
+  const avisoH = await esperar('o aviso de esperar a série', () => textoDoAviso(pag), v => /importe o pacote de novo/.test(v), 10000);
+  await esperar('a série terminou', () => pag.evaluate(() => !/Da nuvem, /.test(document.querySelector('#estado-importacao-biblioteca').innerText) &&
+    !document.querySelector('#livros-nuvem-atualizar').disabled && !document.querySelector('#importar-biblioteca').disabled), v => v === true, 90000);
+  repasse.lentoSha = null;
+  if (MODO === '--envenenado-importar-durante-serie') {
+    const entrouC = await esperar('o zip escolhido na série entrou', () => lerPacotes(pag), v => /matematica-sintetico-acab-c@1/.test(v), 30000);
+    conf('VENENO visto: o zip escolhido com a série andando entrou por cima dela', entrouC.ok, true);
+    return fim();
+  }
+  conf('6h. o zip escolhido com a série andando não entrou, e o aviso diz para esperar', avisoH.valor + '|' + /acab-c/.test(await lerPacotes(pag)),
+    'Espere a biblioteca terminar de atualizar; depois importe o pacote de novo.|false');
+  conf('6h. a série trouxe o A e o B, e o Importar voltou', /matematica-sintetico-acab-a@1/.test(await lerPacotes(pag)) + '|' + /matematica-sintetico-acab-b@1/.test(await lerPacotes(pag)) + '|' +
+    await pag.evaluate(() => document.querySelector('#importar-biblioteca').disabled), 'true|true|false');
+
+  // b) o zip escolhido à mão entrando (a gravação demora): o Atualizar espera e diz
+  await pag.evaluate(() => {
+    window.__gravar0 = Store.gravarPacoteBiblioteca;
+    Store.gravarPacoteBiblioteca = function () { const a = arguments; return new Promise(r => setTimeout(r, 3000)).then(() => window.__gravar0.apply(Store, a)); };
+  });
+  await pag.evaluate(() => { document.querySelector('#estado-importacao-biblioteca').innerHTML = ''; });
+  await entradaH.uploadFile(salvar('acab-c-a-mao', ZIP.acabC));
+  await esperar('a importação à mão começou', () => pag.evaluate(() => document.querySelector('#importar-biblioteca').disabled), v => v === true, 10000);
+  const nH = await totalStorage(pag);
+  await limparAviso(pag);
+  await clicar(pag, '#livros-nuvem-atualizar');
+  const avisoM = await esperar('o aviso de esperar a importação', () => textoDoAviso(pag), v => !!v, 10000);
+  conf('6h. com o zip entrando, o Atualizar espera, diz, e não pede nada ao Storage', avisoM.valor + '|' + ((await totalStorage(pag)) - nH),
+    'Espere a importação terminar; depois toque em Atualizar a biblioteca de novo.|0');
+  await esperar('a importação à mão terminou', () => pag.evaluate(() => !document.querySelector('#importar-biblioteca').disabled), v => v === true, 30000);
+  await pag.evaluate(() => { Store.gravarPacoteBiblioteca = window.__gravar0; });
+  conf('6h. e o zip entrou', /matematica-sintetico-acab-c@1/.test(await lerPacotes(pag)), true);
+
+  // c) o pacote removido cujo nome no catálogo não é o do manifest, sem a identidade guardada: não volta
+  const marcaDe = id => pag.evaluate((u, i) => {
+    const v = JSON.parse(localStorage.getItem('apoio-educacional:pacotes-da-nuvem') || 'null');
+    const c = v && v.contas && v.contas[u];
+    return c && c.removidos && i in c.removidos ? c.removidos[i] : null;
+  }, U, id);
+  conf('6h. a sondagem (no catálogo com outro nome) está no tablet', /matematica-sintetico-sondagem-9ano@1/.test(await lerPacotes(pag)), true);
+  conf('6h. ela removeu a sondagem pelo Remover de Ajustes', (await removerPelaTela('matematica-sintetico-sondagem-9ano')).ok, true);
+  conf('6h. a marca fica pela identidade de dentro do zip', await marcaDe('matematica-sintetico-sondagem-9ano'), 1);
+  // o tablet esqueceu quem é aquele sha256 (o registro limpo, outro aparelho): o planejamento só tem o nome do catálogo
+  await pag.evaluate((u, sha) => {
+    const v = JSON.parse(localStorage.getItem('apoio-educacional:pacotes-da-nuvem'));
+    delete v.contas[u].porSha[sha];
+    localStorage.setItem('apoio-educacional:pacotes-da-nuvem', JSON.stringify(v));
+  }, U, SHA.sond1);
+  const nS = await pedidosDe(pag, SHA.sond1);
+  const tS = await atualizar(pag, 'o toque com o removido de outro nome terminou');
+  if (MODO === '--envenenado-removido-por-outro-nome') {
+    conf('VENENO visto: o pacote removido, com outro nome no catálogo, voltou', /matematica-sintetico-sondagem-9ano@1/.test(await lerPacotes(pag)), true);
+    return fim();
+  }
+  conf('6h. o removido de outro nome baixou no máximo uma vez e não voltou; a marca ficou', ((await pedidosDe(pag, SHA.sond1)) - nS <= 1) + '|' +
+    /sondagem-9ano/.test(await lerPacotes(pag)) + '|' + await marcaDe('matematica-sintetico-sondagem-9ano'), 'true|false|1');
+  conf('6h. e não é contado como novo nem aparece no resumo', / · nenhum pacote de exercícios novo$/.test(tS.linha) + '|' + (await caixa(pag)).resumo, 'true|');
+  const nS2 = await pedidosDe(pag, SHA.sond1);
+  await atualizar(pag, 'o toque seguinte com o removido de outro nome terminou');
+  conf('6h. no toque seguinte ele nem baixa (o sha256 já diz quem ele é)', (await pedidosDe(pag, SHA.sond1)) - nS2, 0);
+
+  // d) a marca da remoção que não cabe no armazenamento do navegador vira aviso
+  await pag.evaluate(() => {
+    window.__setItem0 = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k) {
+      if (k === 'apoio-educacional:pacotes-da-nuvem') throw new DOMException('cheio', 'QuotaExceededError');
+      return window.__setItem0.apply(this, arguments);
+    };
+  });
+  await limparAviso(pag);
+  const tiradoA = await removerPelaTela('matematica-sintetico-acab-a');
+  const avisoQ = await esperar('o aviso da remoção', () => textoDoAviso(pag), v => !!v, 10000);
+  await pag.evaluate(() => { Storage.prototype.setItem = window.__setItem0; });
+  conf('6h. com o armazenamento cheio, a série sai e o aviso diz que a marca não coube', tiradoA.ok + '|' +
+    /^Série removida do tablet\. Voltaram .+\. O tablet está sem espaço para guardar que você a tirou: o Atualizar a biblioteca pode trazê-la de volta\.$/.test(avisoQ.valor), 'true|true');
+  conf('6h. e a marca, de fato, não ficou', await marcaDe('matematica-sintetico-acab-a'), null);
 
   secao('7. O nome do privado não sai do tablet; só o GET pelo sha256');
   const vazou = pedidosDaPagina.filter(p => PRIVADOS.some(n => p.indexOf(n) !== -1) || /privado-sintetico/i.test(decodeURIComponent(p)));

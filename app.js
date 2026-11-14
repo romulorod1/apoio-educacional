@@ -17014,6 +17014,12 @@
     return atual && atual.versao >= manifest.versao ? atual.versao : null;
   }
 
+  // o pacote que veio da nuvem e que ela tinha tirado do tablet: não grava, e não entra no resumo da série
+  function resultadoDoRemovido(manifest) {
+    return { estado: 'pulou', motivo: 'removido', versaoNova: manifest.versao, classe: 'faixa-aviso',
+      linhas: ['Você tirou este pacote do tablet. Nada foi mudado.'] };
+  }
+
   function resultadoDePulo(versaoAtual, nova) {
     var igual = versaoAtual === nova;
     return {
@@ -17066,6 +17072,8 @@
      * sempre, inteiro, porque são milhares de SVG pequenos. */
     return Biblioteca.espiarPacote(arquivo).then(function (espiado) {
       if (espiado) { ctx.nome = nomeDoPacote(espiado.manifest, arquivo); ctx.identidade = identidadeDoPacote(espiado.manifest); }
+      // da nuvem: o pacote que ela tirou do tablet não volta, pelo nome de DENTRO do zip (o do catálogo pode ser outro)
+      if (espiado && removidoPorEla(ctx, espiado.manifest)) { var tirado = new Error('removido'); tirado.puloAntesDeLer = resultadoDoRemovido(espiado.manifest); throw tirado; }
       return puloAntesDeLer(espiado && espiado.manifest).then(function (pulo) {
         if (pulo) { var pulou = new Error('pulou'); pulou.puloAntesDeLer = pulo; throw pulou; }
         if (espiado && espiado.manifest.conteudo === 'livros') {
@@ -17091,6 +17099,8 @@
       aberto = a;
       ctx.nome = nomeDoPacote(a.manifest, arquivo);
       ctx.identidade = identidadeDoPacote(a.manifest);
+      // a mesma marca, quando a espiada não leu o manifest
+      if (removidoPorEla(ctx, a.manifest)) { var tirado = new Error('removido'); tirado.puloAntesDeLer = resultadoDoRemovido(a.manifest); throw tirado; }
       /* Pacote de livros (C15.1): outro depósito e outra conta (livro a
        * livro, store.gravarLivros). Sai daqui pelo catch, com a marca
        * LIVROS_IMPORTADOS, para não passar pelos passos dos exercícios. */
@@ -17176,6 +17186,10 @@
     var arquivos = Array.prototype.slice.call(ev.target.files || []);
     ev.target.value = '';
     if (!arquivos.length) return;
+    /* Os pacotes da nuvem (o Atualizar a biblioteca) estão chegando, ou outra
+     * importação anda: o botão já fica desligado, e o seletor que estava
+     * aberto antes não começa uma segunda importação por cima. */
+    if (importandoBiblioteca || trazendoPacotes) { avisar('Espere a biblioteca terminar de atualizar; depois importe o pacote de novo.'); return; }
     if (typeof Zip === 'undefined' || !Zip.suportado()) {
       mostrarEstadoImportacao('faixa-aviso', linhasDaRecusa({ recusa: true, tipo: 'navegador' }));
       return;
@@ -17412,8 +17426,14 @@
     }
     return Store.removerPacoteBiblioteca(p.pacote).then(function (contas) {
       // o Atualizar a biblioteca não o traz de volta nesta versão (PR 4 da nuvem)
-      if (contas.achou) anotarPacoteRemovido(p.pacote, p.versao);
+      var marcou = contas.achou ? anotarPacoteRemovido(p.pacote, p.versao) : true;
       if (!contas.achou) { avisar('Este pacote já não estava no tablet.'); }
+      /* A marca que não coube (o armazenamento do navegador cheio) não se perde
+       * calada: ela fica sabendo que o Atualizar pode trazer a série de volta. */
+      else if (!marcou) {
+        avisar('Série removida do tablet. Voltaram ' + espaco + '. O tablet está sem espaço para guardar que você a tirou: ' +
+          'o Atualizar a biblioteca pode trazê-la de volta.');
+      }
       /* Remover não tem Desfazer: o caminho de volta é importar de novo, e o
        * aviso diz isso na hora, em vez de deixá-la procurar. */
       else { avisar('Série removida do tablet. Voltaram ' + espaco + '. Para usar de novo, importe o pacote do Drive.'); }
@@ -18123,8 +18143,9 @@
       return v && v.contas && typeof v.contas === 'object' ? v : { contas: {} };
     } catch (e) { return { contas: {} }; }
   }
+  // devolve se gravou: a marca da remoção que não coube (o armazenamento do navegador cheio) vira aviso
   function guardarRegistroDosPacotesDaNuvem(reg) {
-    try { localStorage.setItem(CHAVE_PACOTES_DA_NUVEM, JSON.stringify(reg)); } catch (e) { /* só poupa um download */ }
+    try { localStorage.setItem(CHAVE_PACOTES_DA_NUVEM, JSON.stringify(reg)); return true; } catch (e) { return false; }
   }
   function daConta(reg, uid) {
     var c = reg.contas[uid];
@@ -18156,13 +18177,25 @@
     var est = typeof Nuvem === 'object' && Nuvem && typeof Nuvem.estado === 'function' ? Nuvem.estado() : null;
     return est && est.entrada && est.entrada.uid ? est.entrada.uid : '';
   }
-  // ela removeu o pacote do tablet: a marca fica na conta que está aqui agora
+  /* Ela removeu o pacote do tablet: a marca fica na conta que está aqui agora,
+   * pela identidade de DENTRO do zip (o registro do tablet guarda o
+   * manifest.pacote e a versão), e é por ela que o planejamento e a
+   * importação da nuvem conferem. Devolve false quando a marca não coube no
+   * armazenamento do navegador, para o Remover avisar. */
   function anotarPacoteRemovido(pacote, versao) {
-    if (typeof pacote !== 'string' || !pacote || typeof versao !== 'number') return;
+    if (typeof pacote !== 'string' || !pacote || typeof versao !== 'number') return true;
     var reg = registroDosPacotesDaNuvem();
     var c = daConta(reg, contaDaNuvemAgora());
     if (!(c.removidos[pacote] >= versao)) c.removidos[pacote] = versao;
-    guardarRegistroDosPacotesDaNuvem(reg);
+    return guardarRegistroDosPacotesDaNuvem(reg);
+  }
+  /* A importação que veio da nuvem confere a marca pelo manifest que o zip
+   * mostrou: o nome do catálogo diferente do manifest (e o sha256 ainda sem
+   * identidade guardada) baixa uma vez, mas não traz de volta o que ela tirou. */
+  function removidoPorEla(ctx, manifest) {
+    if (!ctx || !ctx.removidos || !manifest || typeof manifest.pacote !== 'string') return false;
+    var v = ctx.removidos[manifest.pacote];
+    return typeof v === 'number' && typeof manifest.versao === 'number' && v >= manifest.versao;
   }
   // o pacote entrou de novo (o zip à mão, ou uma versão mais nova da nuvem): a marca sai, em todas as contas
   function esquecerPacoteRemovido(pacote) {
@@ -18217,8 +18250,9 @@
   /* Um pacote: baixa, confere o sha256 e importa pelo caminho do zip.
    * NUNCA rejeita: devolve a linha do resumo, com a identidade que o zip
    * mostrou (quando chegou a ser lido). */
-  function trazerUmPacoteDaNuvem(e, n, total) {
-    var ctx = { nome: e.nome, identidade: null };
+  function trazerUmPacoteDaNuvem(e, n, total, removidos) {
+    // removidos: a marca do que ela tirou do tablet, que a importação confere pelo manifest
+    var ctx = { nome: e.nome, identidade: null, removidos: removidos || {} };
     var arquivo = e.nome + '-v' + e.versao + '.zip';
     var mostrar = function (linhas) {
       mostrarEstadoImportacao('faixa-info', ['Da nuvem, ' + n + ' de ' + total + ': ' + ctx.nome].concat(linhas, ['Deixe a tela ligada até terminar.']));
@@ -18260,65 +18294,84 @@
   /* Os pacotes novos da nuvem, um por vez. Devolve a conta { entraram,
    * falharam, iguais, invalidos }, ou null quando não há o que conferir
    * (sem pacotes no catálogo, ou o aparelho não traz pacotes). */
-  function trazerPacotesDaNuvem(indice) {
+  /* opcoes.livrosFalharam: a conferência dos mapas dos livros não deu certo
+   * neste toque. A linha de Ajustes então leva a hora DESTE toque e diz que os
+   * livros ficaram sem conferir, em vez da hora e dos números da conferência
+   * de antes ao lado dos pacotes de agora. */
+  function trazerPacotesDaNuvem(indice, opcoes) {
     if (trazendoPacotes) return trazendoPacotes;
     if (!podeBaixarDaNuvem() || typeof Nuvem.baixarPacoteDaNuvem !== 'function' || typeof Zip === 'undefined' || !Zip.suportado()) return Promise.resolve(null);
     if (importandoBiblioteca) { avisar('Espere a importação terminar para trazer os pacotes da nuvem.'); return Promise.resolve(null); }
     // um download por vez no tablet: o livro da Estante (#232) que está baixando termina antes
     if (baixaDaNuvem) { avisar('Espere o livro terminar de baixar; depois toque em Atualizar a biblioteca de novo.'); return Promise.resolve(null); }
+    var livrosFalharam = !!(opcoes && opcoes.livrosFalharam);
     var uid = Nuvem.estado().entrada.uid;
     var conta = { entraram: 0, falharam: 0, iguais: 0, invalidos: 0 };
-    var botao = $('#importar-biblioteca');
     var soltaATela = null;
+    /* O Importar biblioteca fica desligado da leitura do catálogo ao fim da
+     * série: duas importações juntas disputariam a memória e a mesma caixa do
+     * andamento. O seletor que já estava aberto é barrado em importarBiblioteca. */
+    var botao = $('#importar-biblioteca');
+    if (botao) botao.disabled = true;
     var libera = function () {
-      if (!soltaATela) return;
-      soltaATela();
-      soltaATela = null;
-      importandoBiblioteca = false;
+      if (soltaATela) {
+        soltaATela();
+        soltaATela = null;
+        importandoBiblioteca = false;
+      }
       if (botao) botao.disabled = false;
     };
     trazendoPacotes = Promise.all([indice ? Promise.resolve(indice) : Nuvem.lerCatalogo(), Store.listarPacotesBiblioteca()]).then(function (r) {
       var pacotes = r[0] && r[0].pacotes && typeof r[0].pacotes === 'object' ? r[0].pacotes : null;
       if (!pacotes) return null;
       var conhecidos = pacotesConhecidosDaNuvem(uid);
-      var escolha = pacotesParaTrazer(pacotes, r[1], conhecidos, uid, pacotesRemovidosDaNuvem(uid));
+      var removidos = pacotesRemovidosDaNuvem(uid);
+      var escolha = pacotesParaTrazer(pacotes, r[1], conhecidos, uid, removidos);
       conta.iguais = escolha.iguais;
       conta.invalidos = escolha.invalidos;
       // o resumo de antes (de outro toque ou de um zip) sai: o que fica na tela é o deste toque
       mostrarEstadoImportacao('', []);
       if (!escolha.trazer.length) return conta;
       importandoBiblioteca = true;
-      if (botao) botao.disabled = true;
       soltaATela = manterTelaLigada();
       var caixa = $('#estado-importacao-biblioteca');
       if (caixa && typeof caixa.scrollIntoView === 'function') caixa.scrollIntoView({ block: 'nearest' });
       var total = escolha.trazer.length, resultados = [];
-      var proximo = function (i) {
-        if (i >= total) return Promise.resolve();
-        return trazerUmPacoteDaNuvem(escolha.trazer[i], i + 1, total).then(function (res) {
-          resultados.push(res);
-          if (res.identidade) conhecidos[res.sha256] = res.identidade;
-          // quem abrir a aba Biblioteca no meio já vê o que entrou
-          if (res.exercicios && res.estado === 'entrou') { temPacoteBiblioteca = true; desenharPacotesBiblioteca(); }
-          return pausaCurta().then(function () { return proximo(i + 1); });
-        });
-      };
-      return proximo(0).then(function () {
-        // só fica a identidade dos zips que o catálogo ainda tem
+      // só fica a identidade dos zips que o catálogo ainda tem
+      var guardarConhecidos = function () {
         var ficam = {};
         Object.keys(pacotes).forEach(function (nome) {
           var sha = pacotes[nome] && pacotes[nome].sha256;
           if (sha && conhecidos[sha]) ficam[sha] = conhecidos[sha];
         });
         guardarPacotesConhecidosDaNuvem(uid, ficam);
-        resultados.forEach(function (x) {
+      };
+      var proximo = function (i) {
+        if (i >= total) return Promise.resolve();
+        return trazerUmPacoteDaNuvem(escolha.trazer[i], i + 1, total, removidos).then(function (res) {
+          resultados.push(res);
+          /* a identidade fica guardada a CADA pacote, e não só no fim: o
+           * aplicativo fechado no meio da série não baixa de novo o que já
+           * chegou a mostrar quem é */
+          if (res.identidade) { conhecidos[res.sha256] = res.identidade; guardarConhecidos(); }
+          // quem abrir a aba Biblioteca no meio já vê o que entrou
+          if (res.exercicios && res.estado === 'entrou') { temPacoteBiblioteca = true; desenharPacotesBiblioteca(); }
+          return pausaCurta().then(function () { return proximo(i + 1); });
+        });
+      };
+      return proximo(0).then(function () {
+        guardarConhecidos();
+        // o que ela tirou do tablet e o manifest reconheceu não entra no resumo: é como no planejamento
+        var doResumo = resultados.filter(function (x) { return x.motivo !== 'removido'; });
+        doResumo.forEach(function (x) {
           if (x.estado === 'entrou' && x.exercicios) conta.entraram++;
           else if (x.estado === 'falhou') conta.falharam++;
           else conta.iguais++;
         });
         libera();
         // o resumo vem primeiro: um erro ao refazer a aba não pode escondê-lo
-        mostrarResumoDaSerie(resultados, 'Pacotes da nuvem');
+        if (doResumo.length) mostrarResumoDaSerie(doResumo, 'Pacotes da nuvem');
+        else mostrarEstadoImportacao('', []);
         if (resultados.some(function (x) { return x.exercicios && x.estado === 'entrou'; })) {
           try { desenharPacotesBiblioteca(); bibliotecaMudou(); } catch (e) { /* a aba se refaz na próxima abertura */ }
         }
@@ -18328,7 +18381,10 @@
       libera();
       trazendoPacotes = null;
       if (c) {
-        var est = estadoDaBibliotecaNuvem() || { quando: new Date().toISOString() };
+        var agora = new Date().toISOString();
+        var est = estadoDaBibliotecaNuvem() || { quando: agora };
+        // sem a conferência dos livros neste toque, a hora e os números de antes saem: fica a marca dos já conferidos
+        if (livrosFalharam) est = { quando: agora, livrosSemConferir: true, conferidos: est.conferidos || {} };
         est.pacotes = { entraram: c.entraram, falharam: c.falharam, iguais: c.iguais, invalidos: c.invalidos };
         guardarEstadoDaBibliotecaNuvem(est);
         desenharEstadoDaBibliotecaNuvem();
@@ -18357,7 +18413,9 @@
     var hoje = new Date();
     var dia = d.toDateString() === hoje.toDateString() ? 'hoje' : 'em ' + ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2);
     var partes = ['Biblioteca conferida ' + dia + ' às ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2)];
-    if (!est.semCatalogo) partes.push(est.trocados ? est.trocados + ' ' + palavraPlural(est.trocados, 'livro com mapa novo', 'livros com mapa novo') : 'nenhum livro com mapa novo');
+    // a conferência dos livros falhou no toque que trouxe os pacotes: a hora é a do toque, e a linha não repete os números de antes
+    if (est.livrosSemConferir) partes.push('os livros não foram conferidos agora');
+    else if (!est.semCatalogo) partes.push(est.trocados ? est.trocados + ' ' + palavraPlural(est.trocados, 'livro com mapa novo', 'livros com mapa novo') : 'nenhum livro com mapa novo');
     if (est.naoEstao) partes.push(est.naoEstao + ' ' + palavraPlural(est.naoEstao, 'livro ainda não está', 'livros ainda não estão') + ' neste tablet');
     if (est.chegam) partes.push(est.chegam + ' ' + palavraPlural(est.chegam, 'livro chega', 'livros chegam') + ' com a próxima versão (arquivo diferente)');
     if (est.invalidos) partes.push(est.invalidos + ' ' + palavraPlural(est.invalidos, 'livro não pôde ser conferido', 'livros não puderam ser conferidos'));
@@ -18376,9 +18434,24 @@
     return partes.join(' · ');
   }
 
+  /* A linha em pedaços: as duas últimas palavras de cada pedaço (com o "·"
+   * que vem depois) não se separam na quebra, para nenhuma palavra ficar
+   * sozinha no começo da linha de baixo. O texto (textContent) é o mesmo. */
+  function preencherLinhaDaBiblioteca(linha, texto) {
+    linha.textContent = '';
+    var pedacos = texto.split(' · ');
+    pedacos.forEach(function (p, i) {
+      var fim = i < pedacos.length - 1 ? ' ·' : '';
+      var u = p.lastIndexOf(' ');
+      var corte = u > 0 ? p.lastIndexOf(' ', u - 1) : -1;
+      if (corte > 0) linha.appendChild(document.createTextNode(p.slice(0, corte + 1)));
+      linha.appendChild(el('span', { class: 'junto', texto: (corte > 0 ? p.slice(corte + 1) : p) + fim }));
+      if (fim) linha.appendChild(document.createTextNode(' '));
+    });
+  }
   function desenharEstadoDaBibliotecaNuvem() {
     var linha = $('#livros-nuvem-estado');
-    if (linha) linha.textContent = textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem());
+    if (linha) preencherLinhaDaBiblioteca(linha, textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem()));
   }
 
   var SEM_INTERNET_NA_BIBLIOTECA = 'Sem internet agora. Quando ela voltar, toque em Atualizar a biblioteca de novo. Nada mudou no tablet.';
@@ -18392,7 +18465,15 @@
     if (modoCelular || aparelhoSoLe()) { avisar('A biblioteca se atualiza no tablet.'); return Promise.resolve(); }
     // sem internet, nada é pedido: a frase calma, e o tablet fica como está
     if (navigator.onLine === false) { avisar(SEM_INTERNET_NA_BIBLIOTECA); return Promise.resolve(); }
+    // o zip que ela escolheu à mão está entrando: o Atualizar espera, e diz (a série da nuvem tem a própria guarda)
+    if (importandoBiblioteca && !trazendoPacotes) { avisar('Espere a importação terminar; depois toque em Atualizar a biblioteca de novo.'); return Promise.resolve(); }
     if (botao) botao.disabled = true;
+    // o botão pode ter sido redesenhado no meio (a lista dos livros se refaz): solta o que está na tela agora
+    var solta = function () {
+      if (botao) botao.disabled = false;
+      var agora = $('#livros-nuvem-atualizar');
+      if (agora) agora.disabled = false;
+    };
     /* Os mapas dos livros e os pacotes são duas conferências: a falha da
      * primeira não impede a segunda, e o aviso diz das duas. */
     var erroDosLivros = null;
@@ -18401,17 +18482,17 @@
       // PR 4: os pacotes de exercícios novos, pelo índice que a conferência acabou de ler (se ela chegou a ler)
       var indice = catalogoDaConferencia;
       catalogoDaConferencia = null;
-      return trazerPacotesDaNuvem(indice).then(null, function (e) {
+      return trazerPacotesDaNuvem(indice, { livrosFalharam: !!erroDosLivros }).then(null, function (e) {
         if (erroDosLivros) return null;   // o mesmo motivo, provavelmente: diz uma vez só
         throw e;
       });
     }).then(function (pacotes) {
-      if (botao) botao.disabled = false;
+      solta();
       if (!erroDosLivros) return;
       avisar(pacotes ? 'Não consegui conferir os livros agora; os pacotes de exercícios foram conferidos. Tente de novo daqui a pouco.'
         : fraseDoErroDaBiblioteca(erroDosLivros));
     }, function (e) {
-      if (botao) botao.disabled = false;
+      solta();
       catalogoDaConferencia = null;
       avisar(fraseDoErroDaBiblioteca(e));
     });
@@ -18428,10 +18509,20 @@
     var caixa = $('#biblioteca-nuvem');
     if (!caixa) return;
     caixa.innerHTML = '';
-    if (!podeAtualizarABiblioteca()) return;
+    var pode = podeAtualizarABiblioteca();
+    // a frase do alto do cartão: sem o botão, a do Drive, como antes da nuvem
+    var deOnde = $('#biblioteca-de-onde');
+    if (deOnde) {
+      deOnde.textContent = pode ? 'Os pacotes que estão na sua nuvem chegam pelo Atualizar a biblioteca; os outros, importe do Google Drive. A cópia de segurança não leva os pacotes.'
+        : 'Os pacotes ficam guardados no Google Drive. A cópia de segurança não leva os pacotes: num tablet novo, importe de novo do Drive.';
+    }
+    if (!pode) return;
+    // o botão tem o tamanho do Importar biblioteca e do Exportar, logo abaixo; com a série andando, ele nasce desligado
+    var linha = el('div', { class: 'ajuda cresce', id: 'livros-nuvem-estado' });
+    preencherLinhaDaBiblioteca(linha, textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem()));
     caixa.appendChild(el('div', { class: 'livros-nuvem', id: 'livros-nuvem' }, [
-      el('div', { class: 'ajuda cresce', id: 'livros-nuvem-estado', texto: textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem()) }),
-      el('button', { type: 'button', class: 'btn pequeno', id: 'livros-nuvem-atualizar', texto: 'Atualizar a biblioteca',
+      linha,
+      el('button', { type: 'button', class: 'btn', id: 'livros-nuvem-atualizar', texto: 'Atualizar a biblioteca', disabled: !!trazendoPacotes,
         aoClick: function () { tocarAtualizarBiblioteca($('#livros-nuvem-atualizar')); } })
     ]));
   }
@@ -18475,8 +18566,10 @@
         el('div', { class: 'u-peso-seminegrito', texto: 'Livros neste tablet' }),
         el('div', { class: 'livros-total', id: 'livros-total', 'data-bytes': String(total),
           texto: lista.length + (lista.length === 1 ? ' livro, ' : ' livros, ') + Biblioteca.mb(total) + ' no total' }),
-        el('div', { class: 'ajuda u-margem-0-0-6', texto: 'Os livros ficam neste tablet: a cópia de segurança não os leva. Os que estão na sua nuvem ' +
-            'aparecem na Estante e baixam com um toque, um por vez.' })
+        // o aparelho que não baixa da nuvem (o celular, o observador, sem a conta) fica com a frase de antes, a do Drive
+        el('div', { class: 'ajuda u-margem-0-0-6', id: 'livros-de-onde', texto: podeBaixarDaNuvem()
+          ? 'Os livros ficam neste tablet: a cópia de segurança não os leva. Os que estão na sua nuvem aparecem na Estante e baixam com um toque, um por vez.'
+          : 'Os livros ficam só neste tablet: a cópia de segurança não os leva. Para usar num tablet novo, importe o pacote de livros de novo do Drive.' })
       ].concat(linhas)));
     }).catch(function () { quantosLivros = 0; livrosDoTablet = []; livrosDoTabletMudaram(); if (caixa) caixa.innerHTML = ''; });
   }
@@ -18487,9 +18580,12 @@
     /* Como ele volta: o livro que veio da nuvem, ou que a Estante já sabe que
      * está na nuvem dela, volta pela Estante com um toque. Sem essa certeza
      * (o catálogo não é lido aqui), a frase diz os dois caminhos. */
-    var naNuvem = podeBaixarDaNuvem() && (l.pacote === 'nuvem' || !!(livrosNaNuvem && livrosNaNuvem.livros && livrosNaNuvem.livros[l.id]));
+    var baixa = podeBaixarDaNuvem();
+    var naNuvem = baixa && (l.pacote === 'nuvem' || !!(livrosNaNuvem && livrosNaNuvem.livros && livrosNaNuvem.livros[l.id]));
+    // o aparelho que não baixa da nuvem fica com a pergunta de antes: o caminho de volta dele é o Drive
     var volta = naNuvem ? 'Para ler de novo, toque nele na Estante: ele está na sua nuvem e baixa de novo com um toque.'
-      : 'Para ler de novo: se ele estiver na sua nuvem, toque nele na Estante; se não, importe o pacote de livros outra vez do Drive.';
+      : baixa ? 'Para ler de novo: se ele estiver na sua nuvem, toque nele na Estante; se não, importe o pacote de livros outra vez do Drive.'
+      : 'Para ler de novo, é só importar o pacote de livros outra vez do Drive.';
     if (!confirmar('Tirar "' + tituloDoLivro(l.meta) + '" deste tablet?\n\n' +
         volta + ' O lugar onde você parou ' +
         'neste livro não fica guardado.\n\nVoltam ' + espaco + ' de espaço.')) {
