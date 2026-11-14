@@ -1,7 +1,7 @@
 """Prova do tipo de fonte lista-curada (biblioteca/lista_curada.py), sem navegador, com venenos.
 
     python biblioteca/_prova_lista_curada.py [--sem-navegador]
-        sobre uma fonte INVENTADA que a propria prova desenha na hora: oito
+        sobre uma fonte INVENTADA que a propria prova desenha na hora: nove
         PDFs sinteticos e o json de itens curados que aponta para eles.
 
     python biblioteca/_prova_lista_curada.py --contra-main [--ref origin/main]
@@ -65,9 +65,13 @@ Travas:
                   antes, recusa as figuras claras; medir contra o branco aceita
                   o creme; medir so contra o papel aceita o branco do painel)
   confere         o cabecalho corrido (a mesma linha no alto de cada pagina)
-                  que a caixa pega acima do texto esperado nao reprova o item,
-                  nem o primeiro bloco do PDF de uma pagina so (veneno: so a
-                  ordem natural do PDF reprova); sao recusados a ultima linha
+                  que a caixa pega acima do texto esperado nao reprova o item
+                  (veneno: so a ordem natural do PDF reprova); no PDF de uma
+                  pagina so nao ha folga: o titulo da pagina unica acima do
+                  texto e o item vizinho de uma linha numa caixa alta sao
+                  recusados (veneno: a regra do 17dfb6a, que aceitava o
+                  primeiro bloco da pagina unica, deixa os dois passarem);
+                  sao recusados tambem a ultima linha
                   do item de antes ("Resposta: ____"), o item de antes de uma
                   linha, a pagina trocada com um titulo de uma linha, o titulo
                   que nao se repete, a caixa alta demais com o item de antes
@@ -879,12 +883,26 @@ def regra_dos_18_pt_da_caixa(docs, ps):
     return out
 
 
+def cabecalho_de_17dfb6a(doc, pno, bbox, linha):
+    """A regra do 17dfb6a, que no PDF de uma pagina so aceitava o primeiro
+    bloco de uma linha na faixa do alto. So para o veneno."""
+    faixa = lista_curada.faixa_de_cabecalho(doc[pno])
+    alvo = lista_curada.so_letras(linha)
+    if not alvo or bbox[1] < faixa.y0 - 0.01 or bbox[3] > faixa.y1 + 0.01:
+        return False
+    if doc.page_count == 1:
+        todos = lista_curada.blocos_de_texto(doc[pno])
+        return bool(todos) and len(todos[0][1]) == 1 and lista_curada.so_letras(todos[0][1][0]) == alvo
+    return False
+
+
 def confere_cabecalho(temp, pdfs, placar):
     """caderno-g.pdf: p. 1 a 3 com o cabecalho corrido no alto, o item 7.1 na
     p. 2; p. 4 a pagina trocada (um gabarito) com titulo de uma linha no alto e
     o texto esperado logo abaixo; p. 5 a ultima linha do item de antes
     ("Resposta: ____") no alto; p. 6 um item de antes de uma linha no alto.
-    caderno-i.pdf: uma pagina so, com titulo e o item."""
+    caderno-i.pdf: uma pagina so, com titulo e o item. caderno-j.pdf: uma
+    pagina so, com um item vizinho de uma linha no alto e o item abaixo."""
     cab = 'Caderno de exercicios, unidade 7'
     doc = pymupdf.open()
     for primeira, resto_ in (([cab], ['Atividade 6.9', 'Quanto e 5 vezes 5?']),
@@ -904,6 +922,11 @@ def confere_cabecalho(temp, pdfs, placar):
     linhas(p, 60, 45, ['Lista avulsa de exercicios'])
     linhas(p, 60, 85, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
     salvar(doc, os.path.join(pdfs, 'caderno-i.pdf'))
+    doc = pymupdf.open()
+    p = doc.new_page(width=W, height=H)
+    linhas(p, 60, 45, ['7.0) Quanto e 2 + 2? ____'])
+    linhas(p, 60, 85, ['Atividade 7.1', 'Quanto e 6 vezes 7?'])
+    salvar(doc, os.path.join(pdfs, 'caderno-j.pdf'))
 
     def item(pdf, pag, nome):
         return um_item(pdfs, 'confere_' + nome, {'id': '5ano:7.1', 'serie': '5ano', 'tema_app': 'MAT05-02',
@@ -912,11 +935,21 @@ def confere_cabecalho(temp, pdfs, placar):
                                                   'confere': 'Atividade 7.1 Quanto e 6',
                                                   'recorte': {'pdf': pdf, 'pagina': pag, 'rect': [50, 32, 400, 130]}})
     corrido = item('caderno-g.pdf', 2, 'corrido')
-    sozinho = item('caderno-i.pdf', 1, 'pagina_unica')
-    for nome, c in (('cabecalho corrido acima do texto esperado vale', corrido),
-                    ('primeiro bloco do PDF de uma pagina so vale', sozinho)):
-        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'cab_' + nome.split()[0]), gravar_zip=False))
-        placar.conferir('confere: ' + nome, [r] if r else [])
+    r = recusa_do_gerador(lambda: gerar(corrido, os.path.join(temp, 'cab_corrido'), gravar_zip=False))
+    placar.conferir('confere: cabecalho corrido acima do texto esperado vale', [r] if r else [])
+    # PDF de uma pagina so: nenhuma folga, nem para o titulo da pagina
+    unicas = (('titulo da pagina unica acima do texto esperado', item('caderno-i.pdf', 1, 'pagina_unica')),
+              ('pagina unica com item vizinho de uma linha numa caixa alta', item('caderno-j.pdf', 1, 'vizinho_unica')))
+    antes_cab = lista_curada.e_cabecalho_da_pagina
+    for k, (nome, c) in enumerate(unicas):
+        r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'unica_%d' % k), gravar_zip=False))
+        placar.conferir('confere: ' + nome, [r] if r else [], True, 'não começa por confere')
+        lista_curada.e_cabecalho_da_pagina = cabecalho_de_17dfb6a
+        try:
+            r = recusa_do_gerador(lambda: gerar(c, os.path.join(temp, 'unica_v%d' % k), gravar_zip=False))
+        finally:
+            lista_curada.e_cabecalho_da_pagina = antes_cab
+        placar.conferir('confere: a regra do 17dfb6a, na %s' % nome, [] if r else ['a caixa passou'], True, 'passou')
     antes = lista_curada.comecos_do_recorte
     lista_curada.comecos_do_recorte = lambda docs, ps: antes(docs, ps)[:1]
     try:
