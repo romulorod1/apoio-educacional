@@ -76,8 +76,11 @@ if (MODO === '--envenenado-some-sem-material') trocas['/app.js'] = APP.split(ANC
 if (MODO === '--envenenado-tudo-apagado') trocas['/app.js'] = APP.split(ANCORA_APAGADO).join('m.tem = false;');
 if (MODO === '--envenenado-estante-nao-abre') trocas['/app.js'] = APP.split(ANCORA_ESTANTE).join("aoClick: function () {} }, [\n        capaDoLivro(l),");
 if (MODO === '--controle-pai') {
-  // o commit pai: a main de onde a fatia saiu (merge-base, para não depender de onde a main andou depois)
-  const base = execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: H.RAIZ, encoding: 'utf8' }).trim();
+  /* o commit pai FIXO: a main de logo antes da P3 entrar (e1929b9, o #219).
+   * Não o merge-base com a origin/main: depois do merge da P3, na main e em
+   * todo PR que a traz, o merge-base já tem a tela nova, e o controle deixa
+   * de ver o que deve ver. Mesma solução do testa_leitor_voltar (PAI fixo). */
+  const base = 'e1929b9';
   for (const arq of ['app.js', 'styles.css', 'index.html']) {
     trocas['/' + arq] = execFileSync('git', ['show', base + ':' + arq], { cwd: H.RAIZ, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   }
