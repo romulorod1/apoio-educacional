@@ -1,7 +1,7 @@
 """Prova do tipo de fonte lista-curada (biblioteca/lista_curada.py), sem navegador, com venenos.
 
     python biblioteca/_prova_lista_curada.py [--sem-navegador]
-        sobre uma fonte INVENTADA que a propria prova desenha na hora: dois
+        sobre uma fonte INVENTADA que a propria prova desenha na hora: cinco
         PDFs sinteticos e o json de itens curados que aponta para eles.
 
     python biblioteca/_prova_lista_curada.py --contra-main [--ref origin/main]
@@ -41,6 +41,17 @@ Travas:
                   linha de comando, --itens-curados com outra fonte e --pdfs
                   ou --serie com esta. Cada veneno so conta se o gerador parar
                   PELO motivo esperado
+  paginas         a pagina girada (/Rotate 90, 180 e 270) e recusada; o MediaBox
+                  fora da origem recorta certo e sem nota; o CropBox fora de
+                  um MediaBox fora da origem e acertado, com nota, e desenhado
+                  certo; a caixa em branco e a caixa minuscula sao recusadas;
+                  o confere pega a pagina trocada por uma
+  empilhado       o SVG de varios pedacos, desenhado pelo MuPDF, tem cada
+                  pedaco no seu lugar (veneno: a pilha na ordem trocada)
+  tracos          travessao no nome da fonte nao chega ao pacote (veneno: sem
+                  o sem_tracos); travessao em subitem e recusado
+  privado no repo privado true com a saida dentro do repositorio e recusado
+                  antes de gravar nada
   gabarito        --gabarito-externo com --so-com-resposta pela linha de
                   comando: so fica item com gabarito, o numero e o de sem a
                   opcao, as contagens e o relatorio batem, a busca esquece o
@@ -124,44 +135,70 @@ def fazer_pdfs(pasta):
     linhas(p, 60, 80, ['Atividade 3.1', 'Quanto e 3 vezes 4?'])
     doc.xref_set_key(p.xref, 'CropBox', '[-30 -30 625 872]')
     salvar(doc, os.path.join(pasta, 'caderno-c.pdf'))
+    # caderno-d.pdf: tres paginas giradas (90, 180, 270)
+    doc = pymupdf.open()
+    for giro in (90, 180, 270):
+        p = doc.new_page(width=W, height=H)
+        linhas(p, 60, 80, ['Atividade girada %d' % giro, 'Quanto e 2 mais 2?'])
+        p.set_rotation(giro)
+    salvar(doc, os.path.join(pasta, 'caderno-d.pdf'))
+    # caderno-e.pdf: p. 1 com o MediaBox fora da origem; p. 2 com ele fora da
+    # origem e o CropBox passando dele dos quatro lados
+    doc = pymupdf.open()
+    for k in range(2):
+        p = doc.new_page(width=W, height=H)
+        doc.xref_set_key(p.xref, 'MediaBox', '[100 100 695 942]')
+        if k == 1:
+            doc.xref_set_key(p.xref, 'CropBox', '[70 70 725 972]')
+        p = doc.reload_page(p)
+        linhas(p, 60, 80, ['Atividade 5.%d' % (k + 1), 'Quanto e 9 menos 4?'])
+    salvar(doc, os.path.join(pasta, 'caderno-e.pdf'))
     return pasta
 
 
 def json_da_amostra(privado=False, nome=NOME, id_fonte=ID_FONTE):
+    js = _json_da_amostra(privado, nome)
+    js['fonte']['id'] = id_fonte
+    for it in js['itens']:
+        it['id'] = id_fonte + it['id'][len(ID_FONTE):]
+    return js
+
+
+def _json_da_amostra(privado, nome):
     return {
-        'fonte': {'id': id_fonte, 'nome': nome, 'url': 'https://exemplo.invalid/coletanea',
+        'fonte': {'id': ID_FONTE, 'nome': nome, 'url': 'https://exemplo.invalid/coletanea',
                   'licenca': 'licença inventada para a prova',
                   'atribuicao': '{fonte}, {serie}, {paginas}, "{titulo}" ({arquivo}).', 'privado': privado},
         'itens': [
-            {'id': 'inv:3ano:1.1', 'serie': '3ano', 'tema_app': 'MAT03-01',
+            {'id': 'coletanea-inventada:3ano:1.1', 'serie': '3ano', 'tema_app': 'MAT03-01',
              'modulo': {'slug': 'numeros', 'titulo': 'Números'}, 'titulo': 'Atividade 1.1',
-             'subitens': ['A', 'B'],
+             'subitens': ['A', 'B'], 'confere': 'Atividade 1.1 Quantas bolinhas',
              'recorte': {'pdf': 'caderno-a.pdf', 'pagina': 1, 'rect': [50, 62, 300, 220]}},
-            {'id': 'inv:3ano:1.2', 'serie': '3ano', 'tema_app': 'MAT03-01',
+            {'id': 'coletanea-inventada:3ano:1.2', 'serie': '3ano', 'tema_app': 'MAT03-01',
              'modulo': {'slug': 'numeros', 'titulo': 'Números'}, 'titulo': 'Atividade 1.2',
-             'subitens': ['único'],
+             'subitens': ['único'], 'confere': 'ATIVIDADE 1.2: complete a sequência',
              'recorte': {'pdf': 'caderno-a.pdf', 'pedacos': [{'pagina': 2, 'rect': [50, 685, 300, 730]},
                                                             {'pagina': 3, 'rect': [50, 65, 300, 110]}]}},
             # o assunto de outro ano (o 4o), o mais proximo: vale e o relatorio diz
-            {'id': 'inv:4ano:2.1', 'serie': '4ano', 'tema_app': 'MAT05-01',
+            {'id': 'coletanea-inventada:4ano:2.1', 'serie': '4ano', 'tema_app': 'MAT05-01',
              'modulo': {'slug': 'contas', 'titulo': 'Contas'}, 'titulo': 'Atividade 2.1', 'subitens': [],
              'recorte': {'pdf': 'caderno-b.pdf', 'pagina': 1, 'rect': [50, 62, 300, 110]}},
-            {'id': 'inv:4ano:2.2', 'serie': '4ano', 'tema_app': 'MAT04-01',
+            {'id': 'coletanea-inventada:4ano:2.2', 'serie': '4ano', 'tema_app': 'MAT04-01',
              'modulo': {'slug': 'contas', 'titulo': 'Contas'}, 'titulo': 'Atividade 2.2', 'subitens': [],
              'recorte': {'pdf': 'caderno-b.pdf', 'pagina': 1, 'rect': [50, 282, 300, 330]}},
             # a pagina com o CropBox fora do MediaBox, recortada de beira a beira (como o
             # PDF real em que isto apareceu): sem acertar, o CropBox do recorte sai do MediaBox
-            {'id': 'inv:5ano:3.1', 'serie': '5ano', 'tema_app': 'MAT05-02',
+            {'id': 'coletanea-inventada:5ano:3.1', 'serie': '5ano', 'tema_app': 'MAT05-02',
              'modulo': {'slug': 'contas', 'titulo': 'Contas'}, 'titulo': 'Atividade 3.1', 'subitens': [],
              'recorte': {'pdf': 'caderno-c.pdf', 'pagina': 1, 'rect': [0, 62, 595, 110]}},
         ]}
 
 
 GABARITO = [
-    {'id_item': 'inv:3ano:1.1', 'subitem': 'A', 'resposta': '3', 'origem': 'agente-conferido'},
-    {'id_item': 'inv:3ano:1.1', 'subitem': 'B', 'resposta': '5', 'origem': 'agente-conferido'},
-    {'id_item': 'inv:4ano:2.2', 'subitem': None, 'resposta': '24', 'origem': 'agente-conferido'},
-    {'id_item': 'inv:5ano:3.1', 'subitem': None, 'resposta': '12', 'origem': 'agente-conferido'},
+    {'id_item': 'coletanea-inventada:3ano:1.1', 'subitem': 'A', 'resposta': '3', 'origem': 'agente-conferido'},
+    {'id_item': 'coletanea-inventada:3ano:1.1', 'subitem': 'B', 'resposta': '5', 'origem': 'agente-conferido'},
+    {'id_item': 'coletanea-inventada:4ano:2.2', 'subitem': None, 'resposta': '24', 'origem': 'agente-conferido'},
+    {'id_item': 'coletanea-inventada:5ano:3.1', 'subitem': None, 'resposta': '12', 'origem': 'agente-conferido'},
 ]
 
 
@@ -234,8 +271,8 @@ def trava_texto(p):
         if VIZINHO.lower() in it['texto']:
             erros.append('%s: o texto tem o vizinho de fora da caixa' % it['id'])
     t = {i['id']: i['texto'] for i in p.itens}
-    for iid, pedaco in (('inv:3ano:1.1', 'quantas bolinhas'), ('inv:3ano:1.2', 'complete a sequencia'),
-                        ('inv:3ano:1.2', 'qual e a regra'), ('inv:4ano:2.1', 'calcule 25')):
+    for iid, pedaco in (('coletanea-inventada:3ano:1.1', 'quantas bolinhas'), ('coletanea-inventada:3ano:1.2', 'complete a sequencia'),
+                        ('coletanea-inventada:3ano:1.2', 'qual e a regra'), ('coletanea-inventada:4ano:2.1', 'calcule 25')):
         if iid in t and pedaco not in t[iid]:
             erros.append('%s: o texto nao tem %r' % (iid, pedaco))
     ids_busca = {r['i'] for r in p.busca['temas']}
@@ -246,24 +283,29 @@ def trava_texto(p):
 
 
 def trava_desenho(p, pdfs, limite=0.002):
-    """O SVG de cada pedaco, desenhado pelo MuPDF, igual a pagina na caixa."""
+    """O SVG de cada item, desenhado pelo MuPDF, igual a pagina em cada caixa; no
+    empilhado, cada pedaco no seu lugar da pilha (a altura dos de cima mais a folga)."""
     erros = []
     for it in p.itens:
         ps = pg.pedacos(it, 'enunciado')
-        if len(ps) != 1:
-            continue
-        z = ps[0]
         svg = p.bytes_de(it['assets']['enunciado'])
         s = pymupdf.open(stream=svg, filetype='svg')
-        a = s[0].get_pixmap(dpi=72, colorspace=pymupdf.csGRAY)
         doc = pymupdf.open(os.path.join(pdfs, it['origem']['arquivo']))
-        b = doc[z['pagina'] - 1].get_pixmap(dpi=72, colorspace=pymupdf.csGRAY, clip=pymupdf.Rect(z['bbox']))
-        if (a.width, a.height) != (b.width, b.height):
-            erros.append('%s: SVG %dx%d, caixa %dx%d' % (it['id'], a.width, a.height, b.width, b.height))
-            continue
-        dif = sum(1 for x, y in zip(a.samples, b.samples) if abs(x - y) > 64) / float(max(1, len(a.samples)))
-        if dif > limite:
-            erros.append('%s: o SVG difere da pagina em %.2f%% dos pixels' % (it['id'], 100 * dif))
+        for _ in range(doc.page_count):
+            lista_curada.acertar_cropbox(doc, _, [])
+        y = 0.0
+        for k, z in enumerate(ps):
+            r = pymupdf.Rect(z['bbox'])
+            a = s[0].get_pixmap(dpi=72, colorspace=pymupdf.csGRAY, clip=pymupdf.Rect(0, y, r.width, y + r.height))
+            b = doc[z['pagina'] - 1].get_pixmap(dpi=72, colorspace=pymupdf.csGRAY, clip=r)
+            y += r.height + gp.FOLGA_PILHA
+            if (a.width, a.height) != (b.width, b.height):
+                erros.append('%s pedaco %d: SVG %dx%d, caixa %dx%d' % (it['id'], k + 1, a.width, a.height, b.width,
+                                                                        b.height))
+                continue
+            dif = sum(1 for x, w in zip(a.samples, b.samples) if abs(x - w) > 64) / float(max(1, len(a.samples)))
+            if dif > limite:
+                erros.append('%s pedaco %d: o SVG difere da pagina em %.2f%% dos pixels' % (it['id'], k + 1, 100 * dif))
         doc.close()
         s.close()
     return erros
@@ -271,7 +313,7 @@ def trava_desenho(p, pdfs, limite=0.002):
 
 def trava_relatorio(p):
     t = p.relatorio.get('tema_de_outro_ano')
-    if t != [{'id': 'inv:4ano:2.1', 'serie': '4ano', 'tema': 'MAT05-01', 'serie_do_tema': '05'}]:
+    if t != [{'id': 'coletanea-inventada:4ano:2.1', 'serie': '4ano', 'tema': 'MAT05-01', 'serie_do_tema': '05'}]:
         return ['tema_de_outro_ano %r' % t]
     return []
 
@@ -329,20 +371,20 @@ def venenos_de_validacao(temp, pdfs, placar):
          'campos desconhecidos: coluna')
     caso('pagina e pedacos juntos', lambda j: j['itens'][1]['recorte'].update(pagina=2),
          'campos desconhecidos: pagina')
-    caso('PDF que nao existe', lambda j: j['itens'][2]['recorte'].update(pdf='sumiu.pdf'), 'nao existe')
+    caso('PDF que nao existe', lambda j: j['itens'][2]['recorte'].update(pdf='sumiu.pdf'), 'não existe')
     caso('pagina 0', lambda j: j['itens'][0]['recorte'].update(pagina=0), 'fora do PDF')
     caso('pagina depois da ultima', lambda j: j['itens'][1]['recorte']['pedacos'][1].update(pagina=4),
          'fora do PDF')
     caso('pagina que nao e inteiro', lambda j: j['itens'][0]['recorte'].update(pagina='1'), 'inteiro')
     caso('rect fora da pagina (direita)', lambda j: j['itens'][0]['recorte'].update(rect=[50, 62, 600, 220]),
-         'sai da pagina')
+         'sai da página')
     caso('rect fora da pagina (acima)', lambda j: j['itens'][3]['recorte'].update(rect=[50, -5, 300, 330]),
-         'sai da pagina')
+         'sai da página')
     caso('rect invertido', lambda j: j['itens'][0]['recorte'].update(rect=[300, 62, 50, 220]), 'invertido')
     caso('rect com tres numeros', lambda j: j['itens'][0]['recorte'].update(rect=[50, 62, 300]), '[x0, y0, x1, y1]')
-    caso('id repetido', lambda j: j['itens'][3].update(id='inv:3ano:1.1'), 'repetido')
+    caso('id repetido', lambda j: j['itens'][3].update(id='coletanea-inventada:3ano:1.1'), 'repetido')
     caso('tema_app fora do catalogo', lambda j: j['itens'][0].update(tema_app='MAT03-99'),
-         'nao esta no banco/topicos/matematica.json')
+         'não está no banco/topicos/matematica.json')
     caso('subitens que nao e lista', lambda j: j['itens'][0].update(subitens='A, B'), 'lista de textos')
     caso('subitens com numero', lambda j: j['itens'][0].update(subitens=['A', 2]), 'lista de textos')
     caso('subitens repetidos', lambda j: j['itens'][0].update(subitens=['A', 'A']), 'repetidos')
@@ -352,10 +394,34 @@ def venenos_de_validacao(temp, pdfs, placar):
     caso('atribuicao com campo que nao existe', lambda j: j['fonte'].update(atribuicao='{fonte}, {editora}'),
          'atribuicao com {editora}')
     caso('privado que nao e booleano', lambda j: j['fonte'].update(privado='sim'), 'true ou false')
-    caso('serie fora do formato', lambda j: j['itens'][0].update(serie='3'), 'nao e 1ano a 9ano')
-    caso('modulo com dois titulos', lambda j: j['itens'][1]['modulo'].update(titulo='Outro'), 'ja veio com o titulo')
-    caso('fonte.id que nao e slug', lambda j: j['fonte'].update(id='Coletanea Inventada'), 'nao e slug')
+    caso('serie fora do formato', lambda j: j['itens'][0].update(serie='3'), 'não é 1ano a 9ano')
+    caso('modulo com dois titulos', lambda j: j['itens'][1]['modulo'].update(titulo='Outro'), 'já veio com o título')
+    caso('fonte.id que nao e slug', lambda j: j['fonte'].update(id='Coletanea Inventada'), 'não é slug')
     caso('item sem recorte', lambda j: j['itens'][0].pop('recorte'), 'faltam recorte')
+    for k, giro in enumerate((90, 180, 270), 1):
+        caso('pagina girada %d' % giro, lambda j, k=k: j['itens'][2]['recorte'].update(pdf='caderno-d.pdf', pagina=k),
+             '/Rotate %d' % giro)
+    caso('caixa em branco', lambda j: j['itens'][0]['recorte'].update(rect=[50, 400, 300, 600]), 'caixa em branco')
+    caso('caixa minuscula', lambda j: j['itens'][0]['recorte'].update(rect=[60, 70, 62, 72]), 'menos de 5 pt')
+    caso('confere com a pagina trocada por uma', lambda j: j['itens'][0]['recorte'].update(pagina=2),
+         'não começa por confere')
+    caso('confere vazio', lambda j: j['itens'][0].update(confere=' '), 'confere tem de ser um texto')
+    caso('atribuicao com formato', lambda j: j['fonte'].update(atribuicao='{fonte:>30}'), 'formato ou conversão')
+    caso('atribuicao com conversao', lambda j: j['fonte'].update(atribuicao='{titulo!r}'), 'formato ou conversão')
+    caso('atribuicao com formato aninhado', lambda j: j['fonte'].update(atribuicao='{fonte:{x}}'),
+         'formato ou conversão')
+    caso('id com espaco', lambda j: j['itens'][0].update(id='coletanea-inventada:3ano 1.1'), 'caractere que não vale')
+    caso('id com quebra de linha', lambda j: j['itens'][0].update(id='coletanea-inventada:3ano\n1.1'),
+         'caractere que não vale')
+    caso('id sem o prefixo da fonte', lambda j: j['itens'][0].update(id='outra:3ano:1.1'), 'não começa por')
+
+    def id_de_modulo(j):
+        j['fonte']['id'] = '3ano'
+        for it in j['itens']:
+            it['id'] = '3ano:' + it['id'].split(':', 1)[1]
+        j['itens'][0]['id'] = '3ano:numeros'
+    caso('id igual ao do documento de modulo', id_de_modulo, 'documento de módulo')
+    caso('subitem com travessao', lambda j: j['itens'][0].update(subitens=['A', 'B \u2013 C']), 'travessão')
 
     # a linha de comando: --itens-curados so com esta fonte, e esta fonte sem --pdfs nem --serie
     c = gravar_json(os.path.join(pdfs, 'boa.json'), boa)
@@ -382,7 +448,7 @@ def venenos_de_validacao(temp, pdfs, placar):
 
 def trava_gabarito_so_com_resposta(q, p):
     erros = []
-    ficam = {'inv:3ano:1.1', 'inv:4ano:2.2', 'inv:5ano:3.1'}
+    ficam = {'coletanea-inventada:3ano:1.1', 'coletanea-inventada:4ano:2.2', 'coletanea-inventada:5ano:3.1'}
     if {i['id'] for i in q.itens} != ficam:
         erros.append('ficaram %r, e com gabarito so %r' % (sorted(i['id'] for i in q.itens), sorted(ficam)))
     num_sem = {i['id']: i['numero'] for i in p.itens}
@@ -392,16 +458,16 @@ def trava_gabarito_so_com_resposta(q, p):
         g = it.get('gabarito') or {}
         if g.get('origem') != 'agente-conferido' or not g.get('respostas'):
             erros.append('%s: sem o gabarito de fora' % it['id'])
-    subs = [r['subitem'] for r in (next((i for i in q.itens if i['id'] == 'inv:3ano:1.1'), {}).get('gabarito') or {})
+    subs = [r['subitem'] for r in (next((i for i in q.itens if i['id'] == 'coletanea-inventada:3ano:1.1'), {}).get('gabarito') or {})
             .get('respostas', [])]
     if subs != ['A', 'B']:
-        erros.append('inv:3ano:1.1: subitens do gabarito %r fora da ordem do item' % subs)
+        erros.append('coletanea-inventada:3ano:1.1: subitens do gabarito %r fora da ordem do item' % subs)
     c = q.manifest['contagens']
     if (c.get('itens'), c.get('itens_com_gabarito_agente'), c.get('itens_com_gabarito_agente_parcial'),
             c.get('itens_sem_resposta_excluidos')) != (3, 3, 0, 2):
         erros.append('contagens %r' % c)
     tirados = sorted(e['id'] for e in q.relatorio.get('sem_resposta') or [])
-    if tirados != ['inv:3ano:1.2', 'inv:4ano:2.1']:
+    if tirados != ['coletanea-inventada:3ano:1.2', 'coletanea-inventada:4ano:2.1']:
         erros.append('sem_resposta do relatorio %r' % tirados)
     if q.relatorio.get('tema_de_outro_ano'):
         erros.append('tema_de_outro_ano ainda cita o item tirado: %r' % q.relatorio['tema_de_outro_ano'])
@@ -441,7 +507,7 @@ def gabarito_so_com_resposta(temp, pdfs, placar, p):
                     [] if (c['itens'], c.get('itens_com_gabarito_agente')) == (5, 3) else ['contagens %r' % c])
     # gabarito para item que nao existe na lista: recusado como nas outras fontes
     ruim = gravar_json(os.path.join(temp, 'gabarito_ruim.json'),
-                       GABARITO + [{'id_item': 'inv:9ano:9.9', 'subitem': None, 'resposta': '1',
+                       GABARITO + [{'id_item': 'coletanea-inventada:9ano:9.9', 'subitem': None, 'resposta': '1',
                                     'origem': 'agente-conferido'}])
     r = recusa_do_gerador(lambda: pelo_principal(['--fonte', 'lista-curada', '--itens-curados', js, '--versao', '1',
                                                   '--saida', t2 + '_zip', '--trabalho', t2 + 'r', '--sem-zip',
@@ -482,8 +548,8 @@ def amostra(temp, placar):
     placar.conferir('lista curada: caixa que pega o vizinho', trava_texto(pg.Pacote(os.path.join(temp, 'v_vizinho'), pdfs)),
                     True, 'vizinho')
     q = pg.copia(p, temp, 'v_svg_trocado')
-    it = next(i for i in q.itens if i['id'] == 'inv:4ano:2.2')
-    outro = next(i for i in q.itens if i['id'] == 'inv:4ano:2.1')
+    it = next(i for i in q.itens if i['id'] == 'coletanea-inventada:4ano:2.2')
+    outro = next(i for i in q.itens if i['id'] == 'coletanea-inventada:4ano:2.1')
     pg.regravar_asset(q, it['assets']['enunciado'], q.bytes_de(outro['assets']['enunciado']))
     placar.conferir('lista curada: SVG de outro recorte do mesmo tamanho', trava_desenho(q, pdfs), True, 'difere')
     # privado: o manifest diz o que o json diz
@@ -515,12 +581,97 @@ def amostra(temp, placar):
         gerar(c, os.path.join(temp, 'v_cropbox'), gravar_zip=False)
         r = trava_desenho(pg.Pacote(os.path.join(temp, 'v_cropbox'), pdfs))
     except Exception as e:  # noqa: BLE001
-        r = ['inv:5ano:3.1: sem acertar o CropBox o gerador quebra: %s' % e]
+        r = ['coletanea-inventada:5ano:3.1: sem acertar o CropBox o gerador quebra: %s' % e]
     finally:
         lista_curada.acertar_cropbox = antes
-    placar.conferir('lista curada: CropBox fora do MediaBox sem acertar', r, True, 'inv:5ano:3.1')
+    placar.conferir('lista curada: CropBox fora do MediaBox sem acertar', r, True, 'coletanea-inventada:5ano:3.1')
+    casos_de_pagina(temp, pdfs, placar)
+    tracos_e_repositorio(temp, pdfs, placar)
+    pilha_trocada(temp, pdfs, c, placar)
+    paginas_no_texto(placar)
     venenos_de_validacao(temp, pdfs, placar)
     gabarito_so_com_resposta(temp, pdfs, placar, p)
+
+
+def um_item(pdfs, nome, item):
+    js = json_da_amostra()
+    js['itens'] = [dict(item, id=ID_FONTE + ':' + item['id'])]
+    return gravar_json(os.path.join(pdfs, nome + '.json'), js)
+
+
+def casos_de_pagina(temp, pdfs, placar):
+    # MediaBox fora da origem: recorta certo, sem acerto nem nota
+    for k, nome, notas_esperadas in ((1, 'mediabox_deslocado', 0), (2, 'cropbox_fora_do_deslocado', 1)):
+        c = um_item(pdfs, nome, {'id': '5ano:5.%d' % k, 'serie': '5ano', 'tema_app': 'MAT05-02',
+                                 'modulo': {'slug': 'contas', 'titulo': 'Contas'}, 'titulo': 'Atividade 5.%d' % k,
+                                 'subitens': [], 'confere': 'Atividade 5.%d' % k,
+                                 'recorte': {'pdf': 'caderno-e.pdf', 'pagina': k, 'rect': [0, 20, 595, 110]}})
+        t = os.path.join(temp, nome)
+        r = recusa_do_gerador(lambda: gerar(c, t, gravar_zip=False))
+        if r:
+            placar.conferir('pagina: %s' % nome, ['recusado: %s' % r])
+            continue
+        q = pg.Pacote(t, pdfs)
+        notas = [n for n in q.relatorio['notas'] if 'CropBox' in n]
+        placar.conferir('pagina: %s, desenho certo e %d nota de CropBox' % (nome, notas_esperadas),
+                        trava_desenho(q, pdfs) + ([] if len(notas) == notas_esperadas else ['notas %r' % notas]))
+
+
+def tracos_e_repositorio(temp, pdfs, placar):
+    # travessao no nome da fonte nao chega ao pacote
+    js = json_da_amostra(nome='Coletânea \u2014 Inventada')
+    c = gravar_json(os.path.join(pdfs, 'travessao.json'), js)
+    gerar(c, os.path.join(temp, 'travessao'), gravar_zip=False)
+    placar.conferir('tracos: travessao no nome da fonte vira hifen', pg.trava_tracos(pg.Pacote(os.path.join(temp, 'travessao'), pdfs)))
+    antes = lista_curada.sem_tracos
+    lista_curada.sem_tracos = lambda t: t
+    try:
+        gerar(c, os.path.join(temp, 'v_travessao'), gravar_zip=False)
+    finally:
+        lista_curada.sem_tracos = antes
+    placar.conferir('tracos: sem o sem_tracos', pg.trava_tracos(pg.Pacote(os.path.join(temp, 'v_travessao'), pdfs)),
+                    True, 'travessao')
+    # privado true com a saida dentro do repositorio: recusado antes de gravar
+    cp = gravar_json(os.path.join(pdfs, 'privado_repo.json'), json_da_amostra(privado=True))
+    dentro = os.path.join(RAIZ, '_saida_privada_da_prova')
+    r = recusa_do_gerador(lambda: lista_curada.gerar(cp, 1, dentro, trabalho=os.path.join(temp, 'fora'),
+                                                     gerado_em=GERADO_EM, commit='amostra', gravar_zip=True))
+    criou = os.path.exists(dentro)
+    if criou:
+        shutil.rmtree(dentro, ignore_errors=True)
+    placar.conferir('privado no repo: --saida dentro do repositorio', ([r] if r else []) +
+                    (['dentro do repositório: criou a pasta'] if criou else []), True, 'dentro do repositório')
+    r = recusa_do_gerador(lambda: lista_curada.gerar(cp, 1, os.path.join(temp, 'fora_zip'),
+                                                     trabalho=os.path.join(dentro, 'trabalho'), gerado_em=GERADO_EM,
+                                                     commit='amostra', gravar_zip=False))
+    criou = os.path.exists(dentro)
+    if criou:
+        shutil.rmtree(dentro, ignore_errors=True)
+    placar.conferir('privado no repo: pasta de trabalho dentro do repositorio', ([r] if r else []) +
+                    (['dentro do repositório: criou a pasta'] if criou else []), True, 'dentro do repositório')
+    # privado false dentro do repositorio nao e assunto desta regra: so o controle de que a regra e do privado
+    placar.conferir('privado no repo: a regra so vale para privado',
+                    [] if not lista_curada.dentro_do_repositorio(temp) and lista_curada.dentro_do_repositorio(dentro)
+                    else ['dentro_do_repositorio errou'])
+
+
+def pilha_trocada(temp, pdfs, c, placar):
+    antes = gp.empilhar
+    gp.empilhar = lambda svgs, meds: antes(list(reversed(svgs)), list(reversed(meds)))
+    try:
+        gerar(c, os.path.join(temp, 'v_pilha'), gravar_zip=False)
+    finally:
+        gp.empilhar = antes
+    q = pg.Pacote(os.path.join(temp, 'v_pilha'), pdfs)
+    placar.conferir('empilhado: pilha na ordem trocada', trava_desenho(q, pdfs), True, 'pedaco 1')
+
+
+def paginas_no_texto(placar):
+    casos = {(12,): 'p. 12', (12, 13): 'p. 12 a 13', (12, 13, 14): 'p. 12 a 14', (12, 15): 'p. 12 e 15',
+             (12, 14, 15): 'p. 12, 14 e 15'}
+    erros = ['%r deu %r' % (k, lista_curada.texto_das_paginas(list(k))) for k, v in casos.items()
+             if lista_curada.texto_das_paginas(list(k)) != v]
+    placar.conferir('paginas: seguidas com "a", com buraco com "e"', erros)
 
 
 # ------------------------------------------------------------------ byte a byte contra a main
