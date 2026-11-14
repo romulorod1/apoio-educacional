@@ -17138,6 +17138,8 @@
       andamento(['Gravando a biblioteca no tablet...']);
       return Store.gravarPacoteBiblioteca(aberto);
     }).then(function (registro) {
+      // o pacote voltou ao tablet: a marca de que ela o removeu (PR 4 da nuvem) sai
+      esquecerPacoteRemovido(registro.manifest.pacote);
       return {
         estado: 'entrou', exercicios: true, classe: 'faixa-info',
         linhas: ['Biblioteca importada.'].concat(Biblioteca.resumo(registro.manifest, registro.bytes))
@@ -17407,6 +17409,8 @@
       return Promise.resolve();
     }
     return Store.removerPacoteBiblioteca(p.pacote).then(function (contas) {
+      // o Atualizar a biblioteca não o traz de volta nesta versão (PR 4 da nuvem)
+      if (contas.achou) anotarPacoteRemovido(p.pacote, p.versao);
       if (!contas.achou) { avisar('Este pacote já não estava no tablet.'); }
       /* Remover não tem Desfazer: o caminho de volta é importar de novo, e o
        * aviso diz isso na hora, em vez de deixá-la procurar. */
@@ -18055,6 +18059,10 @@
    * uma vez, a importação o reconhece pelo manifest e não grava nada ("já
    * estava"), e daí em diante o sha256 já diz quem ele é.
    *
+   * O PACOTE QUE ELA REMOVEU não volta: a remoção fica anotada (por conta,
+   * com a versão removida), e só uma versão mais nova no catálogo o traz de
+   * novo. Importar o zip à mão apaga a marca.
+   *
    * A falha de um pacote vira linha do resumo, e os outros seguem. O resumo
    * no fim é o mesmo da importação de vários arquivos. Só no tablet, com a
    * conta dela (podeBaixarDaNuvem, a mesma porta dos livros da nuvem): o
@@ -18065,25 +18073,80 @@
   var trazendoPacotes = null;
   var catalogoDaConferencia = null;   // o índice que a conferência dos livros acabou de ler, para não ler duas vezes
   function inteiroPositivo(v) { return typeof v === 'number' && isFinite(v) && v > 0 && Math.floor(v) === v; }
-  // a identidade que cada zip da nuvem mostrou ao chegar, pelo sha256 dele: { sha256: { pacote, versao } }
-  function pacotesConhecidosDaNuvem(uid) {
+  /* O registro deste aparelho, POR CONTA (a chave é o uid; '' é a remoção
+   * feita sem conta na nuvem, que vale para qualquer conta):
+   *   { contas: { uid: { porSha: { sha256: { pacote, versao } }, removidos: { pacote: versao } } } }
+   * porSha: a identidade que cada zip da nuvem mostrou ao chegar;
+   * removidos: o pacote que ELA tirou do tablet, e a versão que tirou. O
+   * Atualizar a biblioteca não o traz de volta nessa versão nem numa mais
+   * velha; só uma versão mais nova no catálogo o traz. Importar o pacote à
+   * mão (o zip) apaga a marca. */
+  function registroDosPacotesDaNuvem() {
     try {
       var v = JSON.parse(localStorage.getItem(CHAVE_PACOTES_DA_NUVEM) || 'null');
-      return v && v.uid === uid && v.porSha && typeof v.porSha === 'object' ? v.porSha : {};
-    } catch (e) { return {}; }
+      return v && v.contas && typeof v.contas === 'object' ? v : { contas: {} };
+    } catch (e) { return { contas: {} }; }
+  }
+  function guardarRegistroDosPacotesDaNuvem(reg) {
+    try { localStorage.setItem(CHAVE_PACOTES_DA_NUVEM, JSON.stringify(reg)); } catch (e) { /* só poupa um download */ }
+  }
+  function daConta(reg, uid) {
+    var c = reg.contas[uid];
+    if (!c || typeof c !== 'object') c = reg.contas[uid] = {};
+    if (!c.porSha || typeof c.porSha !== 'object') c.porSha = {};
+    if (!c.removidos || typeof c.removidos !== 'object') c.removidos = {};
+    return c;
+  }
+  function pacotesConhecidosDaNuvem(uid) {
+    return daConta(registroDosPacotesDaNuvem(), uid).porSha;
   }
   function guardarPacotesConhecidosDaNuvem(uid, porSha) {
-    try { localStorage.setItem(CHAVE_PACOTES_DA_NUVEM, JSON.stringify({ uid: uid, porSha: porSha })); } catch (e) { /* só poupa um download */ }
+    var reg = registroDosPacotesDaNuvem();
+    daConta(reg, uid).porSha = porSha;
+    guardarRegistroDosPacotesDaNuvem(reg);
+  }
+  // as remoções que valem para esta conta: as dela e as feitas sem conta, a maior versão de cada pacote
+  function pacotesRemovidosDaNuvem(uid) {
+    var reg = registroDosPacotesDaNuvem(), r = {};
+    [daConta(reg, ''), daConta(reg, uid)].forEach(function (c) {
+      Object.keys(c.removidos).forEach(function (p) {
+        var v = c.removidos[p];
+        if (typeof v === 'number' && !(r[p] >= v)) r[p] = v;
+      });
+    });
+    return r;
+  }
+  function contaDaNuvemAgora() {
+    var est = typeof Nuvem === 'object' && Nuvem && typeof Nuvem.estado === 'function' ? Nuvem.estado() : null;
+    return est && est.entrada && est.entrada.uid ? est.entrada.uid : '';
+  }
+  // ela removeu o pacote do tablet: a marca fica na conta que está aqui agora
+  function anotarPacoteRemovido(pacote, versao) {
+    if (typeof pacote !== 'string' || !pacote || typeof versao !== 'number') return;
+    var reg = registroDosPacotesDaNuvem();
+    var c = daConta(reg, contaDaNuvemAgora());
+    if (!(c.removidos[pacote] >= versao)) c.removidos[pacote] = versao;
+    guardarRegistroDosPacotesDaNuvem(reg);
+  }
+  // o pacote entrou de novo (o zip à mão, ou uma versão mais nova da nuvem): a marca sai, em todas as contas
+  function esquecerPacoteRemovido(pacote) {
+    var reg = registroDosPacotesDaNuvem(), mudou = false;
+    Object.keys(reg.contas).forEach(function (uid) {
+      var c = reg.contas[uid];
+      if (c && c.removidos && Object.prototype.hasOwnProperty.call(c.removidos, pacote)) { delete c.removidos[pacote]; mudou = true; }
+    });
+    if (mudou) guardarRegistroDosPacotesDaNuvem(reg);
   }
 
   /* Do catálogo, os pacotes a trazer (em ordem de nome), e a conta dos que já
    * estão e dos que vieram fora da forma. Nada é baixado aqui. */
-  function pacotesParaTrazer(pacotes, instalados, conhecidos, uid) {
+  function pacotesParaTrazer(pacotes, instalados, conhecidos, uid, removidos) {
+    removidos = removidos || {};
     var versaoAqui = Object.create(null);
     (instalados || []).forEach(function (p) {
       if (p && typeof p.pacote === 'string' && typeof p.versao === 'number') versaoAqui[p.pacote] = p.versao;
     });
-    var r = { trazer: [], iguais: 0, invalidos: 0 };
+    var r = { trazer: [], iguais: 0, invalidos: 0, removidos: 0 };
     Object.keys(pacotes || {}).sort().forEach(function (nome) {
       var e = pacotes[nome];
       if (e && e.retiradoEm) return;
@@ -18093,6 +18156,8 @@
       var id = c && typeof c.pacote === 'string' && typeof c.versao === 'number' ? c : { pacote: nome, versao: e.versao };
       var aqui = versaoAqui[id.pacote];
       if (typeof aqui === 'number' && aqui >= id.versao) { r.iguais++; return; }
+      // ela tirou este pacote do tablet: só uma versão mais nova que a removida volta
+      if (typeof aqui !== 'number' && typeof removidos[id.pacote] === 'number' && removidos[id.pacote] >= id.versao) { r.removidos++; return; }
       r.trazer.push({ nome: nome, versao: e.versao, sha256: e.sha256, tamanho: e.tamanho, caminhoNuvem: e.caminhoNuvem });
     });
     return r;
@@ -18168,7 +18233,7 @@
       var pacotes = r[0] && r[0].pacotes && typeof r[0].pacotes === 'object' ? r[0].pacotes : null;
       if (!pacotes) return null;
       var conhecidos = pacotesConhecidosDaNuvem(uid);
-      var escolha = pacotesParaTrazer(pacotes, r[1], conhecidos, uid);
+      var escolha = pacotesParaTrazer(pacotes, r[1], conhecidos, uid, pacotesRemovidosDaNuvem(uid));
       conta.iguais = escolha.iguais;
       conta.invalidos = escolha.invalidos;
       // o resumo de antes (de outro toque ou de um zip) sai: o que fica na tela é o deste toque
@@ -18331,8 +18396,8 @@
         el('div', { class: 'u-peso-seminegrito', texto: 'Livros neste tablet' }),
         el('div', { class: 'livros-total', id: 'livros-total', 'data-bytes': String(total),
           texto: lista.length + (lista.length === 1 ? ' livro, ' : ' livros, ') + Biblioteca.mb(total) + ' no total' }),
-        el('div', { class: 'ajuda u-margem-0-0-6', texto: 'Os livros ficam só neste tablet: a cópia de segurança não os leva. Para usar num tablet novo, ' +
-            'importe o pacote de livros de novo do Drive.' }),
+        el('div', { class: 'ajuda u-margem-0-0-6', texto: 'Os livros ficam neste tablet: a cópia de segurança não os leva. Os que estão na sua nuvem ' +
+            'aparecem na Estante e baixam com um toque, um por vez.' }),
         // fase 1c: o mapa novo dos livros chega pelo catálogo da nuvem, sem baixar livro nenhum
         el('div', { class: 'livros-nuvem', id: 'livros-nuvem' }, [
           el('div', { class: 'ajuda cresce', id: 'livros-nuvem-estado', texto: textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem()) }),

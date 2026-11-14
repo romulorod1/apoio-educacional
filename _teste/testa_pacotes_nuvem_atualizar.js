@@ -41,6 +41,9 @@
  *   5. sem internet: a frase calma, e nenhum pedido;
  *   6. o observador e o celular não trazem nada; de volta à conta dela, o
  *      mesmo toque traz (o controle);
+ *  6b. o pacote que ela REMOVEU (o Remover de Ajustes) não volta na mesma
+ *      versão (nenhum download); a versão mais nova no catálogo volta; o zip
+ *      importado à mão apaga a marca, e daí o pacote perdido volta;
  *   7. o nome e o título do pacote privado não aparecem em pedido nenhum, e
  *      todo pedido ao Storage foi um GET ?alt=media com "Authorization:
  *      Firebase", pelo caminho com o sha256, sem token e sem metadados;
@@ -51,7 +54,9 @@
  *                                 tablet já tem baixa de novo (1 vê);
  *   --envenenado-pacote-sem-hash  a conferência do sha256 é pulada: o pacote
  *                                 de sha256 errado entra (1 vê);
- *   --envenenado-pacote-para-tudo a falha de um pacote para os outros (1 vê).
+ *   --envenenado-pacote-para-tudo a falha de um pacote para os outros (1 vê);
+ *   --envenenado-pacote-removido-volta  sem a marca da remoção: o pacote que
+ *                                 ela removeu volta na mesma versão (6b vê).
  *
  * Precisa do firebase-tools (FIREBASE_TOOLS) e de um JDK 21 em JAVA_HOME,
  * como o testa_livros_nuvem_baixar.js. Portas: 9081 (app), 9082 (auth), 9083
@@ -89,7 +94,9 @@ const VENENOS = {
     'if (false) { r.iguais++; return; }'],
   '--envenenado-pacote-sem-hash': ['if (doArquivo !== e.sha256) throw', 'if (false) throw'],
   '--envenenado-pacote-para-tudo': ['return pausaCurta().then(function () { return proximo(i + 1); });',
-    "return res.estado === 'falhou' ? null : pausaCurta().then(function () { return proximo(i + 1); });"]
+    "return res.estado === 'falhou' ? null : pausaCurta().then(function () { return proximo(i + 1); });"],
+  '--envenenado-pacote-removido-volta': ["if (typeof aqui !== 'number' && typeof removidos[id.pacote] === 'number' && removidos[id.pacote] >= id.versao) { r.removidos++; return; }",
+    'if (false) { r.removidos++; return; }']
 };
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && !VENENOS[a]);
@@ -103,8 +110,8 @@ const hex = b => crypto.createHash('sha256').update(b).digest('hex');
 /* Um pacote de prova (Mirim ou ENEM) com OUTRA identidade: o id do pacote, os
  * ids dos exercícios (para não repetir os do pacote de origem) e o nome da
  * fonte trocados, e o manifest refeito com os hashes novos. */
-function pacoteRenomeado(serie, pacote, prefixo, fonte) {
-  const g = Sintetico.gerarProva(null, { serie, versao: 1 });
+function pacoteRenomeado(serie, pacote, prefixo, fonte, versao) {
+  const g = Sintetico.gerarProva(null, { serie, versao: versao || 1 });
   const arquivos = {};
   Object.keys(g.arquivos).forEach(n => {
     let dados = g.arquivos[n].dados;
@@ -126,6 +133,7 @@ const ZIP = {
   m2v2: Sintetico.gerarProva(null, { serie: 'm2', versao: 2 }).zip,
   sond1: Sintetico.gerarSondagem(null, { versao: 1 }).zip,
   trocado: pacoteRenomeado('m2', 'matematica-sintetico-trocado', 'trocado', 'Pacote trocado sintético'),
+  trocado2: pacoteRenomeado('m2', 'matematica-sintetico-trocado', 'trocado', 'Pacote trocado sintético', 2),
   privado: pacoteRenomeado('m1', 'privado-sintetico-licenca', 'privado', 'Coleção privada sintética')
 };
 // o que NUNCA pode sair do tablet num pedido: o id e o título do pacote privado
@@ -512,6 +520,44 @@ async function tocarSemEfeito(pag) {
   const t6 = await atualizar(pag, 'de volta à conta dela, o toque terminou');
   conf('de volta à conta dela, o mesmo toque traz o pacote (o controle)', ((await totalStorage(pag)) - n6) + '|' + /matematica-sintetico-trocado@1/.test(await lerPacotes(pag)), '1|true');
   conf('e a linha diz que ele entrou', t6.linha, 'Biblioteca conferida hoje às HH:MM · nenhum livro com mapa novo · 1 pacote de exercícios novo');
+
+  secao('6b. O pacote que ela removeu não volta na mesma versão');
+  const removerPelaTela = async id => {
+    await H.irParaAba(pag, 'ajustes');
+    await pag.evaluate(() => { document.querySelector('#cartao-biblioteca').hidden = false; document.querySelector('#lista-instalados-biblioteca').open = true; });
+    await esperar('o Remover do pacote está à vista', () => existe(pag, '[data-remover-pacote="' + id + '"]'), v => v === true, 10000);
+    await clicar(pag, '[data-remover-pacote="' + id + '"]');
+    return esperar('o pacote saiu do tablet', () => lerPacotes(pag), v => v.indexOf(id + '@') === -1, 10000);
+  };
+  const marca = () => pag.evaluate((u, id) => {
+    const v = JSON.parse(localStorage.getItem('apoio-educacional:pacotes-da-nuvem') || 'null');
+    const c = v && v.contas && v.contas[u];
+    return c && c.removidos && id in c.removidos ? c.removidos[id] : null;
+  }, U, 'matematica-sintetico-trocado');
+  conf('ela removeu o pacote pelo Remover de Ajustes', (await removerPelaTela('matematica-sintetico-trocado')).ok, true);
+  conf('a remoção ficou anotada na conta dela, com a versão', await marca(), 1);
+  const nR = await pedidosDe(pag, SHA.trocado);
+  const tR = await atualizar(pag, 'o toque depois da remoção terminou');
+  if (MODO === '--envenenado-pacote-removido-volta') {
+    conf('VENENO visto: o pacote que ela removeu voltou na mesma versão', ((await pedidosDe(pag, SHA.trocado)) - nR) + '|' + /matematica-sintetico-trocado@1/.test(await lerPacotes(pag)), '1|true');
+    return fim();
+  }
+  conf('o pacote removido não baixou de novo e não voltou', ((await pedidosDe(pag, SHA.trocado)) - nR) + '|' + /trocado/.test(await lerPacotes(pag)), '0|false');
+  conf('a linha não conta o removido como novo', tR.linha, 'Biblioteca conferida hoje às HH:MM · nenhum livro com mapa novo · nenhum pacote de exercícios novo');
+  await publicar(U, Object.assign({}, consertado, { 'matematica-sintetico-trocado': ['trocado2', 2] }));
+  await atualizar(pag, 'o toque com a versão nova terminou');
+  conf('a versão mais nova que a removida volta', ((await pedidosDe(pag, SHA.trocado2))) + '|' + /matematica-sintetico-trocado@2/.test(await lerPacotes(pag)), '1|true');
+  conf('e a marca da remoção saiu', await marca(), null);
+  await removerPelaTela('matematica-sintetico-trocado');
+  conf('removida de novo, a marca volta, agora com a versão 2', await marca(), 2);
+  const aMao2 = await importarZips(pag, [salvar('trocado-v2-a-mao', ZIP.trocado2)]);
+  conf('o zip importado à mão entra', /Biblioteca importada/.test(aMao2.valor.texto) && /matematica-sintetico-trocado@2/.test(await lerPacotes(pag)), true);
+  conf('o zip importado à mão apaga a marca', await marca(), null);
+  // o pacote sai sem o Remover dela (sem marca): o toque o traz de volta
+  await pag.evaluate(() => Store.removerPacoteBiblioteca('matematica-sintetico-trocado'));
+  const n2 = await pedidosDe(pag, SHA.trocado2);
+  await atualizar(pag, 'o toque sem a marca terminou');
+  conf('sem a marca, o toque traz o pacote de volta', ((await pedidosDe(pag, SHA.trocado2)) - n2) + '|' + /matematica-sintetico-trocado@2/.test(await lerPacotes(pag)), '1|true');
 
   secao('7. O nome do privado não sai do tablet; só o GET pelo sha256');
   const vazou = pedidosDaPagina.filter(p => PRIVADOS.some(n => p.indexOf(n) !== -1) || /privado-sintetico/i.test(decodeURIComponent(p)));
