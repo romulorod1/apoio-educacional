@@ -16999,7 +16999,9 @@
    * escolhido ou da nuvem (PR 4). null quando o manifest não diz. */
   function identidadeDoPacote(manifest) {
     if (!manifest || typeof manifest.pacote !== 'string' || !manifest.pacote || typeof manifest.versao !== 'number') return null;
-    return { pacote: manifest.pacote, versao: manifest.versao };
+    var id = { pacote: manifest.pacote, versao: manifest.versao };
+    if (manifest.conteudo === 'livros') id.conteudo = 'livros';
+    return id;
   }
   // o nome vem do pacote: um nome enorme não pode tomar a tela
   function curto(t) { return t.length > 120 ? t.slice(0, 117) + '...' : t; }
@@ -17138,8 +17140,8 @@
       andamento(['Gravando a biblioteca no tablet...']);
       return Store.gravarPacoteBiblioteca(aberto);
     }).then(function (registro) {
-      // o pacote voltou ao tablet: a marca de que ela o removeu (PR 4 da nuvem) sai
-      esquecerPacoteRemovido(registro.manifest.pacote);
+      // o pacote voltou ao tablet: a marca de que ela o removeu (PR 4 da nuvem) sai; o registro local estragado não muda o resultado
+      try { esquecerPacoteRemovido(registro.manifest.pacote); } catch (e) { /* a gravação já entrou */ }
       return {
         estado: 'entrou', exercicios: true, classe: 'faixa-info',
         linhas: ['Biblioteca importada.'].concat(Biblioteca.resumo(registro.manifest, registro.bytes))
@@ -17848,6 +17850,8 @@
   }
   function baixarDaNuvemPeloToque(id) {
     if (baixaDaNuvem) return outraBaixaEmCurso(id);
+    // os pacotes da nuvem (PR 4) estão chegando: um download por vez no tablet
+    if (trazendoPacotes) { avisar('Espere a biblioteca terminar de atualizar; depois toque no livro de novo.'); return Promise.resolve(false); }
     var e = livrosNaNuvem && livrosNaNuvem.livros ? livrosNaNuvem.livros[id] : null;
     if (!e || !podeBaixarDaNuvem()) return Promise.resolve(false);
     if (navigator.onLine === false) {
@@ -18134,12 +18138,14 @@
   }
   // o pacote entrou de novo (o zip à mão, ou uma versão mais nova da nuvem): a marca sai, em todas as contas
   function esquecerPacoteRemovido(pacote) {
-    var reg = registroDosPacotesDaNuvem(), mudou = false;
-    Object.keys(reg.contas).forEach(function (uid) {
-      var c = reg.contas[uid];
-      if (c && c.removidos && Object.prototype.hasOwnProperty.call(c.removidos, pacote)) { delete c.removidos[pacote]; mudou = true; }
-    });
-    if (mudou) guardarRegistroDosPacotesDaNuvem(reg);
+    try {
+      var reg = registroDosPacotesDaNuvem(), mudou = false;
+      Object.keys(reg.contas).forEach(function (uid) {
+        var c = reg.contas[uid];
+        if (c && c.removidos && typeof c.removidos === 'object' && Object.prototype.hasOwnProperty.call(c.removidos, pacote)) { delete c.removidos[pacote]; mudou = true; }
+      });
+      if (mudou) guardarRegistroDosPacotesDaNuvem(reg);
+    } catch (e) { /* o registro local estragado: a marca fica, e só poupa um download */ }
   }
 
   /* Do catálogo, os pacotes a trazer (em ordem de nome), e a conta dos que já
@@ -18150,13 +18156,15 @@
     (instalados || []).forEach(function (p) {
       if (p && typeof p.pacote === 'string' && typeof p.versao === 'number') versaoAqui[p.pacote] = p.versao;
     });
-    var r = { trazer: [], iguais: 0, invalidos: 0, removidos: 0 };
+    var r = { trazer: [], iguais: 0, invalidos: 0, removidos: 0, livros: 0 };
     Object.keys(pacotes || {}).sort().forEach(function (nome) {
       var e = pacotes[nome];
       if (e && e.retiradoEm) return;
       if (!e || typeof e !== 'object' || !/^[0-9a-f]{64}$/.test(String(e.sha256 || '')) || !inteiroPositivo(e.versao) ||
         !inteiroPositivo(e.tamanho) || e.caminhoNuvem !== 'usuarios/' + uid + '/pacotes/' + e.sha256 + '.zip') { r.invalidos++; return; }
       var c = conhecidos[e.sha256];
+      // um pacote de LIVROS que o publicador pôs em pacotes (ele não abre o zip): os livros vêm pela Estante
+      if (c && c.conteudo === 'livros') { r.livros++; return; }
       var id = c && typeof c.pacote === 'string' && typeof c.versao === 'number' ? c : { pacote: nome, versao: e.versao };
       var aqui = versaoAqui[id.pacote];
       if (typeof aqui === 'number' && aqui >= id.versao) { r.iguais++; return; }
@@ -18197,7 +18205,13 @@
       mostrar(['Baixando · ' + p + '%']);
     };
     andou(0, e.tamanho);
-    return Nuvem.baixarPacoteDaNuvem(e.caminhoNuvem, { tamanho: e.tamanho, aoProgresso: andou }).then(function (bytes) {
+    // o espaço, como na baixa do livro (#232): o zip, a cópia que a importação lê e a folga
+    return Store.estimarEspaco().catch(function () { return null; }).then(function (espaco) {
+      if (espaco && espaco.quota && espaco.quota - (espaco.usage || 0) < e.tamanho * 2 + FOLGA_DA_BAIXA) {
+        throw Object.assign(new Error('sem espaço'), { codigo: 'SEM_ESPACO' });
+      }
+      return Nuvem.baixarPacoteDaNuvem(e.caminhoNuvem, { tamanho: e.tamanho, aoProgresso: andou });
+    }).then(function (bytes) {
       mostrar(['Conferindo o arquivo...']);
       return Store.sha256Hex(bytes).then(function (doArquivo) {
         if (doArquivo !== e.sha256) throw Object.assign(new Error('O pacote baixado não confere com o catálogo.'), { codigo: 'HASH_DIFERENTE' });
@@ -18222,6 +18236,8 @@
     if (trazendoPacotes) return trazendoPacotes;
     if (!podeBaixarDaNuvem() || typeof Nuvem.baixarPacoteDaNuvem !== 'function' || typeof Zip === 'undefined' || !Zip.suportado()) return Promise.resolve(null);
     if (importandoBiblioteca) { avisar('Espere a importação terminar para trazer os pacotes da nuvem.'); return Promise.resolve(null); }
+    // um download por vez no tablet: o livro da Estante (#232) que está baixando termina antes
+    if (baixaDaNuvem) { avisar('Espere o livro terminar de baixar; depois toque em Atualizar a biblioteca de novo.'); return Promise.resolve(null); }
     var uid = Nuvem.estado().entrada.uid;
     var conta = { entraram: 0, falharam: 0, iguais: 0, invalidos: 0 };
     var botao = $('#importar-biblioteca');
@@ -18268,7 +18284,7 @@
         });
         guardarPacotesConhecidosDaNuvem(uid, ficam);
         resultados.forEach(function (x) {
-          if (x.estado === 'entrou') conta.entraram++;
+          if (x.estado === 'entrou' && x.exercicios) conta.entraram++;
           else if (x.estado === 'falhou') conta.falharam++;
           else conta.iguais++;
         });
@@ -18338,27 +18354,38 @@
   }
 
   var SEM_INTERNET_NA_BIBLIOTECA = 'Sem internet agora. Quando ela voltar, toque em Atualizar a biblioteca de novo. Nada mudou no tablet.';
+  function fraseDoErroDaBiblioteca(e) {
+    var codigo = e && e.codigo;
+    return codigo === 'SEM_REDE' ? SEM_INTERNET_NA_BIBLIOTECA : codigo === 'SEM_SESSAO' ? 'Entre na nuvem para atualizar a biblioteca.'
+      : PEDE_ENTRAR_DE_NOVO[codigo] ? 'A entrada na nuvem venceu. Entre de novo para atualizar a biblioteca.' : 'Não consegui conferir a biblioteca agora. Tente de novo daqui a pouco.';
+  }
   function tocarAtualizarBiblioteca(botao) {
+    // o celular e o observador não atualizam, com ou sem internet
+    if (modoCelular || aparelhoSoLe()) { avisar('A biblioteca se atualiza no tablet.'); return Promise.resolve(); }
     // sem internet, nada é pedido: a frase calma, e o tablet fica como está
     if (navigator.onLine === false) { avisar(SEM_INTERNET_NA_BIBLIOTECA); return Promise.resolve(); }
     if (botao) botao.disabled = true;
-    return atualizarBibliotecaDaNuvem().then(function (est) {
-      if (est === null) {
-        if (modoCelular || aparelhoSoLe()) avisar('A biblioteca se atualiza no tablet.');
-        return null;
-      }
-      // PR 4: depois dos mapas, os pacotes de exercícios novos, pelo índice que a conferência acabou de ler
+    /* Os mapas dos livros e os pacotes são duas conferências: a falha da
+     * primeira não impede a segunda, e o aviso diz das duas. */
+    var erroDosLivros = null;
+    return atualizarBibliotecaDaNuvem().then(null, function (e) { erroDosLivros = e; return undefined; }).then(function (est) {
+      if (est === null) return null;
+      // PR 4: os pacotes de exercícios novos, pelo índice que a conferência acabou de ler (se ela chegou a ler)
       var indice = catalogoDaConferencia;
       catalogoDaConferencia = null;
-      return trazerPacotesDaNuvem(indice);
-    }).then(function () {
+      return trazerPacotesDaNuvem(indice).then(null, function (e) {
+        if (erroDosLivros) return null;   // o mesmo motivo, provavelmente: diz uma vez só
+        throw e;
+      });
+    }).then(function (pacotes) {
       if (botao) botao.disabled = false;
+      if (!erroDosLivros) return;
+      avisar(pacotes ? 'Não consegui conferir os livros agora; os pacotes de exercícios foram conferidos. Tente de novo daqui a pouco.'
+        : fraseDoErroDaBiblioteca(erroDosLivros));
     }, function (e) {
       if (botao) botao.disabled = false;
       catalogoDaConferencia = null;
-      var codigo = e && e.codigo;
-      avisar(codigo === 'SEM_REDE' ? SEM_INTERNET_NA_BIBLIOTECA : codigo === 'SEM_SESSAO' ? 'Entre na nuvem para atualizar a biblioteca.'
-        : PEDE_ENTRAR_DE_NOVO[codigo] ? 'A entrada na nuvem venceu. Entre de novo para atualizar a biblioteca.' : 'Não consegui conferir a biblioteca agora. Tente de novo daqui a pouco.');
+      avisar(fraseDoErroDaBiblioteca(e));
     });
   }
 
@@ -18382,7 +18409,24 @@
       }
       if (!caixa) return;
       caixa.innerHTML = '';
-      if (!lista.length) return;
+      /* Sem livro no tablet, o cartão ainda aparece no aparelho que traz da
+       * nuvem (não o celular nem o observador): é nele que mora o Atualizar a
+       * biblioteca, por onde chegam os pacotes e o mapa dos livros. */
+      var semLivroComNuvem = !lista.length && !modoCelular && !aparelhoSoLe() && temNuvem();
+      if (!lista.length && !semLivroComNuvem) return;
+      var blocoDaNuvem = el('div', { class: 'livros-nuvem', id: 'livros-nuvem' }, [
+        el('div', { class: 'ajuda cresce', id: 'livros-nuvem-estado', texto: textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem()) }),
+        el('button', { type: 'button', class: 'btn pequeno', id: 'livros-nuvem-atualizar', texto: 'Atualizar a biblioteca',
+          aoClick: function () { tocarAtualizarBiblioteca($('#livros-nuvem-atualizar')); } })
+      ]);
+      if (!lista.length) {
+        caixa.appendChild(el('div', { class: 'cartao compacto u-margem-baixo-10', id: 'cartao-livros', 'data-sem-livros': 'sim' }, [
+          el('div', { class: 'u-peso-seminegrito', texto: 'Livros neste tablet' }),
+          el('div', { class: 'ajuda u-margem-0-0-6', texto: 'Nenhum livro neste tablet. Os que estão na sua nuvem aparecem na Estante e baixam com um toque, um por vez.' }),
+          blocoDaNuvem
+        ]));
+        return;
+      }
       var total = lista.reduce(function (s, l) { return s + (l.bytes || 0); }, 0);
       var linhas = lista.map(function (l) {
         return el('div', { class: 'item-lista livro-linha', 'data-livro': l.id }, [
@@ -18403,11 +18447,7 @@
         el('div', { class: 'ajuda u-margem-0-0-6', texto: 'Os livros ficam neste tablet: a cópia de segurança não os leva. Os que estão na sua nuvem ' +
             'aparecem na Estante e baixam com um toque, um por vez.' }),
         // fase 1c: o mapa novo dos livros chega pelo catálogo da nuvem, sem baixar livro nenhum
-        el('div', { class: 'livros-nuvem', id: 'livros-nuvem' }, [
-          el('div', { class: 'ajuda cresce', id: 'livros-nuvem-estado', texto: textoDoEstadoDaBibliotecaNuvem(estadoDaBibliotecaNuvem()) }),
-          el('button', { type: 'button', class: 'btn pequeno', id: 'livros-nuvem-atualizar', texto: 'Atualizar a biblioteca',
-            aoClick: function () { tocarAtualizarBiblioteca($('#livros-nuvem-atualizar')); } })
-        ])
+        blocoDaNuvem
       ].concat(linhas)));
     }).catch(function () { quantosLivros = 0; livrosDoTablet = []; livrosDoTabletMudaram(); if (caixa) caixa.innerHTML = ''; });
   }

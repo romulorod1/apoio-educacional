@@ -1327,6 +1327,7 @@ roda "pacotes da nuvem, atualizar --envenenado-pacote-duplica" node "_teste/test
 roda "pacotes da nuvem, atualizar --envenenado-pacote-sem-hash" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-pacote-sem-hash
 roda "pacotes da nuvem, atualizar --envenenado-pacote-para-tudo" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-pacote-para-tudo
 roda "pacotes da nuvem, atualizar --envenenado-pacote-removido-volta" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-pacote-removido-volta
+roda "pacotes da nuvem, atualizar --envenenado-sem-livro-sem-botao" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-sem-livro-sem-botao
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
