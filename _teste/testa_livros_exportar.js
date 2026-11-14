@@ -51,10 +51,11 @@
  *
  * Cancelar o compartilhar não baixa o arquivo (o entregarArquivo):
  *  4b. "Só gerar PDF, sem anexar": cancelar a janela do Android (AbortError)
- *      não baixa nada; outra falha (NotAllowedError) baixa; sem o
- *      compartilhar no aparelho, baixa; compartilhado, não baixa;
+ *      não baixa nada e avisa "Envio cancelado."; outra falha
+ *      (NotAllowedError) baixa; sem o compartilhar no aparelho, baixa;
+ *      compartilhado, não baixa nem avisa;
  *  4c. o mesmo cancelar noutro lugar que usa o entregarArquivo, o "Abrir fora
- *      do aplicativo" do leitor de PDF: nada baixa.
+ *      do aplicativo" do leitor de PDF: nada baixa, e o mesmo aviso.
  *
  *   --prints <pasta>   grava três prints: a janela de exportar, a primeira
  *                      página do PDF gerado e a página do gabarito, as duas
@@ -94,7 +95,7 @@ const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
 const GUARDA_FORA = "return Store.salvarExportado(id, { nome: arquivo.nome, tipo: 'application/pdf', blob: arquivo.blob })";
 if (MODO === '--envenenado-pdf-na-copia') trocas['/app.js'] = APP.split(GUARDA_FORA).join(GUARDA_FORA.replace('salvarExportado', 'salvarAnexo'));
 // sem esta linha, o catch do entregarArquivo volta ao de antes: qualquer falha do compartilhar baixa
-const CANCELOU = "if (e && e.name === 'AbortError') return; // ela cancelou: nada sai do tablet";
+const CANCELOU = "if (e && e.name === 'AbortError') { avisar('Envio cancelado.'); return; } // ela cancelou: nada sai do tablet";
 if (MODO === '--envenenado-cancelar-baixa') trocas['/app.js'] = APP.split(CANCELOU).join('');
 const amb = H.criarAmbiente(PORTA, 'nath_c15c_exportar', trocas);
 
@@ -205,6 +206,7 @@ async function exportar(pag, botao) {
 async function armarCompartilhar(pag, jeito) {
   await pag.evaluate(j => {
     window.__saidas = [];
+    const aviso = document.querySelector('#aviso-texto'); if (aviso) aviso.textContent = '';
     if (!window.__clicarDeVerdade) {
       window.__clicarDeVerdade = HTMLAnchorElement.prototype.click;
       HTMLAnchorElement.prototype.click = function () {
@@ -227,6 +229,7 @@ async function saidasDepois(pag) {
   return pag.evaluate(() => window.__saidas.slice());
 }
 const downloads = s => s.filter(x => /^download:/.test(x)).length;
+const textoDoAviso = pag => pag.evaluate(() => (document.querySelector('#aviso-texto') || {}).textContent || '');
 const lerDados = pag => pag.evaluate(() => Store.carregar());
 const anexosDoLivro = pag => lerDados(pag).then(d => ((d.aulas.filter(a => a.id === 'au1')[0] || {}).anexos || []).filter(a => a.livro));
 async function anexarNaAula(pag, antes) {
@@ -455,6 +458,7 @@ function printarPdf(bytes, indice, nome) {
     const s = await saidasDepois(p);
     console.log('   ' + jeito + ': ' + s.join(' | '));
     await esperar('a janela de exportar fechou', () => janela(p), v => v === null, 5000);
+    s.aviso = await textoDoAviso(p);
     return s;
   };
   const sAbort = await soGerar('AbortError');
@@ -464,14 +468,17 @@ function printarPdf(bytes, indice, nome) {
       sAbort.length + ' | ' + downloads(sAbort), '2 | 1');
     throw Object.assign(new Error('fim'), { fimDoVeneno: true });
   }
-  conf('cancelou (AbortError): o compartilhar abriu e nada baixou',
-    sAbort.length + ' | ' + /^share:.*\.pdf$/.test(sAbort[0]) + ' | ' + downloads(sAbort), '1 | true | 0');
+  conf('cancelou (AbortError): o compartilhar abriu, nada baixou e o aviso diz "Envio cancelado."',
+    sAbort.length + ' | ' + /^share:.*\.pdf$/.test(sAbort[0]) + ' | ' + downloads(sAbort) + ' | ' + sAbort.aviso,
+    '1 | true | 0 | Envio cancelado.');
   const sNega = await soGerar('NotAllowedError');
-  conf('outra falha (NotAllowedError): baixa, como antes', downloads(sNega) + ' | ' + /^share:/.test(sNega[0]), '1 | true');
+  conf('outra falha (NotAllowedError): o compartilhar e o download, como antes',
+    sNega.length + ' | ' + /^share:/.test(sNega[0]) + ' | ' + downloads(sNega), '2 | true | 1');
   const sSem = await soGerar('sem');
   conf('sem o compartilhar no aparelho: baixa', sSem.length + ' | ' + downloads(sSem), '1 | 1');
   const sOk = await soGerar('ok');
-  conf('compartilhou: nada baixou', sOk.length + ' | ' + downloads(sOk), '1 | 0');
+  conf('compartilhou: nada baixou e nada de "Envio cancelado."',
+    sOk.length + ' | ' + downloads(sOk) + ' | ' + /Envio cancelado/.test(sOk.aviso), '1 | 0 | false');
   await fecharModal(p, 'modal-leitor-pdf');
 
   // ================================================================
@@ -493,8 +500,8 @@ function printarPdf(bytes, indice, nome) {
   await p.evaluate(() => document.querySelector('#leitor-abrir-fora').click());
   const sFora = await saidasDepois(p);
   console.log('   abrir fora: ' + sFora.join(' | '));
-  conf('cancelou no "Abrir fora": o compartilhar abriu e nada baixou', sFora.join(' | ') + ' | ' + downloads(sFora),
-    'share:quebrado_teste.pdf | 0');
+  conf('cancelou no "Abrir fora": o compartilhar abriu, nada baixou e o aviso diz "Envio cancelado."',
+    sFora.join(' | ') + ' | ' + downloads(sFora) + ' | ' + (await textoDoAviso(p)), 'share:quebrado_teste.pdf | 0 | Envio cancelado.');
   await fecharModal(p, 'modal-aula');
 
   // ================================================================

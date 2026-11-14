@@ -2728,7 +2728,7 @@
       var arquivo = new File([blob], nome, { type: blob.type });
       if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
         navigator.share({ files: [arquivo], title: titulo || nome }).catch(function (e) {
-          if (e && e.name === 'AbortError') return; // ela cancelou: nada sai do tablet
+          if (e && e.name === 'AbortError') { avisar('Envio cancelado.'); return; } // ela cancelou: nada sai do tablet
           baixar(nome, blob); // outra falha: baixa, como antes
         });
         return;
@@ -2749,7 +2749,9 @@
    * Por que não o entregarArquivo de sempre: ele só abre o compartilhar e,
    * quando o prazo do toque vence durante a montagem do PDF
    * (NotAllowedError), baixa o arquivo escondido. Cancelar (AbortError) não
-   * baixa mais nada lá também, mas a janela some junto. Aqui o compartilhar
+   * baixa mais nada lá também, só avisa "Envio cancelado.": o Chromium diz
+   * AbortError também em algumas falhas do próprio compartilhar, e a janela
+   * de onde ela veio já fechou. Aqui o compartilhar
    * nasce do próprio toque no botão e a janela continua aberta até ela
    * fechar. O entregarArquivo serve o resto do aplicativo (Fechamento,
    * Proposta, Exportar páginas do livro e os outros).
