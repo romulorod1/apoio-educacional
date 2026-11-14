@@ -1899,31 +1899,84 @@
    * Confere aqui só a forma: o caminho tem de ser um livro DESTA conta
    * (usuarios/<uid>/livros/<sha256>.pdf ou .epub) e o tamanho, o do catálogo;
    * vir a mais é recusa, e vir a menos (a rede caiu, a conexão fechou antes)
-   * também. Os bytes só saem daqui inteiros, num Uint8Array do tamanho certo.
-   * O sha256 quem confere é quem guarda (app.js), antes de guardar: o arquivo
-   * pela metade, ou outro arquivo, nunca vira livro.
-   * opcoes: { tamanho, aoProgresso(recebidos, total) }. */
+   * também. O sha256 quem confere é quem guarda (app.js), antes de guardar: o
+   * arquivo pela metade, ou outro arquivo, nunca vira livro.
+   *
+   * A MEMÓRIA (revisão das lentes): o livro pode ter 200 MB, e o tablet mata a
+   * aba que segura três cópias dele. O corpo chega em pedaços, que viram um
+   * Blob a cada JUNTAR_BYTES (o Blob do navegador mora fora da memória do
+   * JavaScript, e juntar Blobs não copia os bytes): nunca há mais que um lote
+   * de pedaços na mão. Sai daqui um Blob, do tipo do arquivo; o sha256 dele é
+   * calculado por trechos (Store.sha256Hex aceita o Blob).
+   *
+   * O PRAZO (revisão das lentes): na rede fraca a conexão para sem erro. Sem
+   * nenhum byte por PRAZO_SEM_DADOS_MS (desde o pedido, e de novo a cada
+   * pedaço: a baixa lenta que anda nunca cai), a baixa é abortada e falha com
+   * PARADO, e ela pode tocar de novo. Quem chama pode cancelar pelo
+   * opcoes.sinal (um AbortSignal): a baixa para e falha com CANCELADO.
+   *
+   * opcoes: { tamanho, aoProgresso(recebidos, total), sinal }. Devolve um Blob
+   * com os bytes inteiros. baixarDoStorage(caminho, opcoes, padrao) é a mesma
+   * baixa para outro padrão de caminho (o pacote do PR 4). */
   var CAMINHO_DE_LIVRO = /^usuarios\/([^\/]+)\/livros\/[0-9a-f]{64}\.(pdf|epub)$/;
+  var TIPOS_DO_STORAGE = { pdf: 'application/pdf', epub: 'application/epub+zip', zip: 'application/zip' };
+  var JUNTAR_BYTES = 4 * 1024 * 1024;
+  var PRAZO_SEM_DADOS_MS = 30000;
   function erroDaBaixa(codigo, frase) {
     var e = new Error(frase);
     e.codigo = codigo;
     return e;
   }
-  function baixarLivroDaNuvem(caminho, opcoes) {
+  function baixarLivroDaNuvem(caminho, opcoes) { return baixarDoStorage(caminho, opcoes, CAMINHO_DE_LIVRO); }
+  function baixarDoStorage(caminho, opcoes, padrao) {
     opcoes = opcoes || {};
     var total = opcoes.tamanho;
     var aoProgresso = typeof opcoes.aoProgresso === 'function' ? opcoes.aoProgresso : function () {};
     if (!sessao || !sessao.uid) return Promise.reject(erro('TOKEN_EXPIRED'));
-    var m = CAMINHO_DE_LIVRO.exec(String(caminho || ''));
+    var m = padrao.exec(String(caminho || ''));
     if (!m || m[1] !== sessao.uid) return Promise.reject(erroDaBaixa('CAMINHO_INVALIDO', 'Este livro não é desta conta.'));
     if (typeof total !== 'number' || !isFinite(total) || total <= 0 || Math.floor(total) !== total) {
       return Promise.reject(erroDaBaixa('TAMANHO_INVALIDO', 'O catálogo não diz o tamanho deste livro.'));
     }
     if (!online()) return Promise.reject(semRede());
+    var sinal = opcoes.sinal || null;
+    if (sinal && sinal.aborted) return Promise.reject(erroDaBaixa('CANCELADO', 'A baixa foi cancelada.'));
+    var tipo = TIPOS_DO_STORAGE[String(caminho).split('.').pop()] || 'application/octet-stream';
     var url = PONTAS.storage + '/v0/b/' + encodeURIComponent(CONFIGURACAO.storageBucket) + '/o/' +
       encodeURIComponent(caminho) + '?alt=media';
+    // o prazo menor é só da prova, pela configuração do emulador
+    var prazoMs = (root.NUVEM_EMULADOR && root.NUVEM_EMULADOR.prazoSemDadosMs) || PRAZO_SEM_DADOS_MS;
+    var controle = typeof AbortController === 'function' ? new AbortController() : null;
+    var motivo = null;   // por que a baixa foi abortada: 'PARADO' ou 'CANCELADO'
+    var prazo = null;
+    var parar = function (codigo) {
+      if (motivo) return;
+      motivo = codigo;
+      clearTimeout(prazo);
+      if (controle) controle.abort();
+    };
+    var parou = function () { parar('PARADO'); };
+    var armarPrazo = function () {
+      clearTimeout(prazo);
+      if (prazoMs > 0) prazo = setTimeout(parou, prazoMs);
+    };
+    var aoCancelar = function () { parar('CANCELADO'); };
+    if (sinal) sinal.addEventListener('abort', aoCancelar);
+    var soltar = function () {
+      clearTimeout(prazo);
+      if (sinal) sinal.removeEventListener('abort', aoCancelar);
+    };
+    // a falha de rede depois de um aborto é o aborto, com o motivo dele
+    var falhaDeRede = function () {
+      if (motivo === 'CANCELADO') return erroDaBaixa('CANCELADO', 'A baixa foi cancelada.');
+      if (motivo === 'PARADO') return erroDaBaixa('PARADO', 'A internet parou de mandar o livro.');
+      return semRede();
+    };
+    armarPrazo();
     return tokenValido().then(function (token) {
-      return fetch(url, { headers: { Authorization: 'Firebase ' + token }, cache: 'no-store' }).catch(function () { throw semRede(); });
+      if (motivo) throw falhaDeRede();
+      return fetch(url, { headers: { Authorization: 'Firebase ' + token }, cache: 'no-store', signal: controle ? controle.signal : undefined })
+        .catch(function () { throw falhaDeRede(); });
     }).then(function (r) {
       if (!r.ok) {
         var e = r.status === 401 ? erro('TOKEN_EXPIRED') : r.status === 403 ? erro('PERMISSION_DENIED') :
@@ -1933,37 +1986,43 @@
         if (r.body && r.body.cancel) r.body.cancel().catch(function () { /* nada a ler */ });
         throw e;
       }
-      var bytes = new Uint8Array(total);
+      armarPrazo();
       var recebidos = 0;
+      var pedacos = [], noLote = 0, partes = [];
       aoProgresso(0, total);
       if (!r.body || typeof r.body.getReader !== 'function') {
-        return r.arrayBuffer().then(function (buf) {
-          if (buf.byteLength !== total) throw erroDaBaixa('INCOMPLETO', 'O livro não chegou inteiro.');
-          bytes.set(new Uint8Array(buf));
+        return r.blob().then(function (b) {
+          if (b.size !== total) throw erroDaBaixa(b.size > total ? 'TAMANHO_DIFERENTE' : 'INCOMPLETO', 'O livro não chegou inteiro.');
           aoProgresso(total, total);
-          return bytes;
-        }, function () { throw semRede(); });
+          return b.slice(0, b.size, tipo);
+        }, function () { throw falhaDeRede(); });
       }
       var leitor = r.body.getReader();
       var ler = function () {
         return leitor.read().then(function (pedaco) {
+          if (motivo) throw falhaDeRede();
           if (pedaco.done) {
             if (recebidos !== total) throw erroDaBaixa('INCOMPLETO', 'O livro não chegou inteiro.');
-            return bytes;
+            partes.push(new Blob(pedacos));
+            pedacos = [];
+            return new Blob(partes, { type: tipo });
           }
+          armarPrazo();
           var v = pedaco.value;
           if (recebidos + v.length > total) {
             leitor.cancel().catch(function () { /* já parou */ });
             throw erroDaBaixa('TAMANHO_DIFERENTE', 'O arquivo da nuvem não tem o tamanho do catálogo.');
           }
-          bytes.set(v, recebidos);
+          pedacos.push(v);
+          noLote += v.length;
           recebidos += v.length;
+          if (noLote >= JUNTAR_BYTES) { partes.push(new Blob(pedacos)); pedacos = []; noLote = 0; }
           aoProgresso(recebidos, total);
           return ler();
-        }, function () { throw semRede(); });
+        }, function () { throw falhaDeRede(); });
       };
       return ler();
-    });
+    }).then(function (b) { soltar(); return b; }, function (e) { soltar(); throw e; });
   }
 
   /* Os livros do catálogo que a Estante mostra "na nuvem" (o meta conferido

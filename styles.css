@@ -4106,6 +4106,10 @@ body.modo-celular, body.modo-familia { padding-left: 0; }
 .bibl-nuvem-estado .bibl-pequena.bibl-nuvem-falha { color: var(--aviso-texto); }
 .bibl-nuvem-estado .bibl-progresso { max-width: 8.25rem; }
 .bibl-nuvem-estado .bibl-progresso-reservado { visibility: hidden; }
+/* o cartão da nuvem: o livro e, embaixo, o lugar do Cancelar, sempre reservado */
+.bibl-nuvem-cartao { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bibl-nuvem-acoes { min-height: var(--alvo); }
+.bibl-nuvem-cancelar-oculto { visibility: hidden; }
 .bibl-exercicios { padding: 8px; border: 1px dashed var(--fio); border-radius: var(--raio); }
 .bibl-vazio { margin: 12px 0 0; }
 .bibl-exercicios-titulo { margin-top: 20px; }

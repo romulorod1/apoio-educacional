@@ -1278,7 +1278,10 @@ roda "regras do storage --envenenado-nome-livre"   node "_teste/testa_storage_re
 # getDownloadURL nunca entra (nas fontes e nos pedidos). Revisao: a cor da
 # capa e do livro; o mesmo arquivo com outro id nao aparece; o corpo curto e
 # o longo nao viram livro; a cota que acaba; a conta trocada no meio; o
-# observador e o celular de verdade. Os venenos: a
+# observador e o celular de verdade. Segunda revisao: o prazo sem dados (a
+# baixa parada), o Cancelar, o toque logo depois de guardar, a memoria viva
+# abaixo de metade do livro (48 MB) e o livro tirado que volta "na nuvem".
+# Os venenos: a
 # conferencia do sha256 pulada, guardar antes de conferir e a falta da guarda
 # do toque repetido.
 # Portas 9071 a 9078.
@@ -1289,6 +1292,9 @@ roda "livros da nuvem, baixar --envenenado-baixa-dois" node "_teste/testa_livros
 roda "livros da nuvem, baixar --envenenado-aceita-curto" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-aceita-curto
 roda "livros da nuvem, baixar --envenenado-cor-pela-posicao" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-cor-pela-posicao
 roda "livros da nuvem, baixar --envenenado-grava-na-conta-nova" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-grava-na-conta-nova
+roda "livros da nuvem, baixar --envenenado-sem-prazo" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-sem-prazo
+roda "livros da nuvem, baixar --envenenado-cancelar-nao-solta" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-cancelar-nao-solta
+roda "livros da nuvem, baixar --envenenado-copia-inteira" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-copia-inteira
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve

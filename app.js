@@ -17834,8 +17834,12 @@
       return Promise.resolve(false);
     }
     delete falhasDaBaixa[id];
-    var baixa = baixaDaNuvem = { id: id, recebidos: 0, total: e.tamanho, fase: 'baixando', promessa: null };
+    var baixa = baixaDaNuvem = { id: id, recebidos: 0, total: e.tamanho, fase: 'baixando', promessa: null, cancelada: false,
+      controle: typeof AbortController === 'function' ? new AbortController() : null };
     atualizarCartoesDaNuvem();
+    var seCancelou = function () {
+      if (baixa.cancelada) throw Object.assign(new Error('A baixa foi cancelada.'), { codigo: 'CANCELADO' });
+    };
     baixa.promessa = Store.estimarEspaco().catch(function () { return null; }).then(function (espaco) {
       if (espaco && espaco.quota) {
         var livre = espaco.quota - (espaco.usage || 0);
@@ -17844,29 +17848,38 @@
       }
       return Store.tornarPersistente().catch(function () { return false; });
     }).then(function () {
-      return Nuvem.baixarLivroDaNuvem(e.caminhoNuvem, { tamanho: e.tamanho, aoProgresso: function (n) {
-        baixa.recebidos = n;
-        atualizarCartoesDaNuvem();
-      } });
-    }).then(function (bytes) {
+      seCancelou();
+      return Nuvem.baixarLivroDaNuvem(e.caminhoNuvem, { tamanho: e.tamanho, sinal: baixa.controle ? baixa.controle.signal : null,
+        aoProgresso: function (n) {
+          baixa.recebidos = n;
+          atualizarCartoesDaNuvem();
+        } });
+    }).then(function (arquivo) {
+      seCancelou();
       baixa.fase = 'conferindo';
       atualizarCartoesDaNuvem();
-      return conferirLivroBaixado(bytes, e).then(function () { return guardarLivroBaixado(bytes, e); });
+      return conferirLivroBaixado(arquivo, e).then(function () { seCancelou(); return guardarLivroBaixado(arquivo, e); });
     }).then(function (r) {
-      baixaDaNuvem = null;
+      /* a vaga da baixa só se solta DEPOIS de a Estante se refazer: até lá o
+       * cartão "Na nuvem" ainda está à vista, e o toque nele devolve esta
+       * mesma baixa em vez de começar outra (revisão das lentes) */
+      var soltar = function (v) { baixaDaNuvem = null; return v; };
       if (r && r.mesmoArquivo) {
         avisar('Este livro já está no tablet, com outro nome: ' + r.mesmoArquivo.titulo + '.');
-        return Promise.resolve(desenharLivrosDaBiblioteca()).then(function () { return false; });
+        return Promise.resolve(desenharLivrosDaBiblioteca()).then(function () { return soltar(false); }, function () { return soltar(false); });
       }
       // a cor que o cartão "Na nuvem" mostrava fica sendo a do livro
       var mapa = lerMapaDasCores();
       if (mapa && typeof mapa[id] !== 'number') { mapa[id] = CORES_DAS_CAPAS.indexOf(corDaCapaDe(id)); guardarMapaDasCores(); }
       avisar(tituloDoLivro(e.meta) + ' está no tablet. Toque nele para abrir.');
       return Promise.resolve(desenharLivrosAjustes()).catch(function () { /* a lista de Ajustes se refaz ao abrir */ })
-        .then(desenharLivrosDaBiblioteca).then(function () { return true; });
+        .then(function () { atualizarResumoInstaladosBiblioteca(); return desenharLivrosDaBiblioteca(); })
+        .then(function () { return soltar(true); }, function () { return soltar(true); });
     }, function (err) {
       baixaDaNuvem = null;
       var motivo = motivoDaFalhaDaBaixa(err);
+      // cancelar não é falha: o cartão volta a "toque para baixar"
+      if (motivo === 'cancelada') { delete falhasDaBaixa[id]; atualizarCartoesDaNuvem(); return false; }
       falhasDaBaixa[id] = motivo;
       if (motivo === 'sem-espaco') {
         avisar('O tablet está sem espaço para este livro: ele precisa de ' + Biblioteca.mb(err && err.precisa || e.tamanho * 2) +
@@ -17878,21 +17891,31 @@
     });
     return baixa.promessa;
   }
-  // o sha256 do arquivo inteiro contra o do catálogo; o que não confere não é guardado
+  // o Cancelar do cartão: a baixa para, nada é guardado, e a vaga se solta
+  function cancelarBaixaDaNuvem(id) {
+    var baixa = baixaDaNuvem;
+    if (!baixa || baixa.id !== id || baixa.fase !== 'baixando') return;
+    baixa.cancelada = true; if (baixa.controle) baixa.controle.abort();
+  }
+  /* o sha256 do arquivo inteiro contra o do catálogo; o que não confere não é
+   * guardado. O arquivo vem como Blob, e o hash é por trechos (Store.sha256Hex) */
   function conferirLivroBaixado(bytes, e) {
     return Store.sha256Hex(bytes).then(function (h) {
       if (h !== e.sha256) throw Object.assign(new Error('O arquivo baixado não confere com o catálogo.'), { codigo: 'HASH_DIFERENTE' });
     });
   }
-  function guardarLivroBaixado(bytes, e) {
-    var blob = new Blob([bytes], { type: e.formato === 'epub' ? 'application/epub+zip' : 'application/pdf' });
+  function guardarLivroBaixado(arquivo, e) {
+    var tipo = e.formato === 'epub' ? 'application/epub+zip' : 'application/pdf';
+    // o Blob que veio da nuvem vai como está (fatiar com outro tipo não copia os bytes)
+    var blob = arquivo instanceof Blob ? (arquivo.type === tipo ? arquivo : arquivo.slice(0, arquivo.size, tipo)) : new Blob([arquivo], { type: tipo });
     return Store.gravarLivroDaNuvem({ meta: e.meta, blob: blob, sha256: e.sha256, metaHash: e.metaHash, metaVersao: e.metaVersao });
   }
   function motivoDaFalhaDaBaixa(err) {
     var c = err && err.codigo;
     if (c === 'SEM_ESPACO' || (err && err.name === 'QuotaExceededError')) return 'sem-espaco';
     if (c === 'HASH_DIFERENTE' || c === 'TAMANHO_DIFERENTE') return 'conferencia';
-    if (c === 'SEM_REDE' || c === 'INCOMPLETO') return navigator.onLine === false ? 'sem-rede' : 'rede';
+    if (c === 'CANCELADO') return 'cancelada';
+    if (c === 'SEM_REDE' || c === 'INCOMPLETO' || c === 'PARADO') return navigator.onLine === false ? 'sem-rede' : 'rede';
     if (PEDE_ENTRAR_DE_NOVO[c]) return 'entrar';
     if (c === 'PERMISSION_DENIED' || c === 'CAMINHO_INVALIDO') return 'permissao';
     if (c === 'NAO_ESTA_NA_NUVEM') return 'ausente';
@@ -17935,19 +17958,37 @@
   function atualizarCartoesDaNuvem() {
     Array.prototype.forEach.call(document.querySelectorAll('[data-nuvem]'), function (c) {
       var id = c.getAttribute('data-nuvem');
+      var baixando = !!(baixaDaNuvem && baixaDaNuvem.id === id && baixaDaNuvem.fase === 'baixando');
+      var cancelar = c.querySelector('.bibl-nuvem-cancelar');
+      if (cancelar) cancelar.classList.toggle('bibl-nuvem-cancelar-oculto', !baixando);
       var velha = c.querySelector('.bibl-nuvem-estado');
       var nova = linhaDoLivroNaNuvem(id);
       if (velha && velha.getAttribute('data-nuvem-estado') === nova.getAttribute('data-nuvem-estado') &&
         velha.textContent === nova.textContent) return;
       if (velha) velha.parentNode.replaceChild(nova, velha);
-      c.setAttribute('aria-busy', baixaDaNuvem && baixaDaNuvem.id === id ? 'true' : 'false');
+      var botao = c.querySelector('.bibl-livro-cartao');
+      if (botao) botao.setAttribute('aria-busy', baixaDaNuvem && baixaDaNuvem.id === id ? 'true' : 'false');
     });
   }
+  /* O cartão do livro da nuvem: o botão do livro (o toque baixa) e, embaixo,
+   * o lugar do Cancelar, sempre reservado (o botão só aparece enquanto baixa:
+   * a linha de baixo não anda). */
   function cartaoDoLivroNaNuvem(l) {
+    var baixando = !!(baixaDaNuvem && baixaDaNuvem.id === l.id && baixaDaNuvem.fase === 'baixando');
+    return el('div', { class: 'bibl-nuvem-cartao', 'data-nuvem': l.id }, [
+      botaoDoLivroNaNuvem(l),
+      el('div', { class: 'bibl-nuvem-acoes' }, [
+        el('button', { type: 'button', class: 'btn pequeno bibl-nuvem-cancelar' + (baixando ? '' : ' bibl-nuvem-cancelar-oculto'),
+          'data-cancelar-nuvem': l.id, texto: 'Cancelar', 'aria-label': 'Cancelar a baixa de ' + tituloDoLivro(l.meta),
+          aoClick: function () { cancelarBaixaDaNuvem(l.id); } })
+      ])
+    ]);
+  }
+  function botaoDoLivroNaNuvem(l) {
     var tipo = tipoDoMaterial(l.meta);
     var capa = capaDoLivro(l);
     capa.classList.add('na-nuvem');
-    return el('button', { type: 'button', class: 'bibl-livro-cartao bibl-na-nuvem', 'data-nuvem': l.id,
+    return el('button', { type: 'button', class: 'bibl-livro-cartao bibl-na-nuvem',
       'aria-label': 'Baixar ' + tituloDoLivro(l.meta) + ' da nuvem para o tablet',
       aoClick: function () { baixarDaNuvemPeloToque(l.id); } }, [
       capa,
@@ -18076,6 +18117,8 @@
     return Store.removerLivro(l.id).then(function (contas) {
       if (!contas.achou) avisar('Este livro já não estava no tablet.');
       else avisar('Livro removido do tablet. Voltaram ' + espaco + '.');
+      // o livro que saiu e está no catálogo volta a aparecer "na nuvem" já, e não na conferência seguinte
+      if (contas.achou && podeBaixarDaNuvem()) conferirLivrosNaNuvem(true);
       return desenharLivrosAjustes();
     }, function () {
       avisar('Não consegui remover o livro agora. Nada foi mudado.');

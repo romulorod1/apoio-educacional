@@ -59,7 +59,17 @@
  *   --envenenado-cor-pela-posicao  a cor da capa volta a ser a da posição: o
  *                                livro que já estava muda de cor (3 vê);
  *   --envenenado-grava-na-conta-nova  a lista da conta de antes é guardada
- *                                para a conta que entrou no meio (9 vê).
+ *                                para a conta que entrou no meio (9 vê);
+ *   --envenenado-sem-prazo       a baixa que para sem erro nunca cai (3c vê);
+ *   --envenenado-cancelar-nao-solta  o Cancelar não para a baixa (3d vê);
+ *   --envenenado-copia-inteira   a baixa segura o livro inteiro na memória
+ *                                (8b vê, pela memória viva).
+ *
+ * As seções da revisão das lentes: 3c (a baixa que PARA no meio, sem erro, com
+ * a conexão aberta, cai no prazo sem dados, curto só nesta prova), 3d (o
+ * Cancelar), 4 (o toque logo depois de guardar não baixa de novo), 8b (a
+ * memória viva durante a baixa de um livro de 48 MB fica abaixo de metade do
+ * livro) e 8c (o livro tirado do tablet volta "na nuvem" na hora).
  *
  * Precisa do firebase-tools (FIREBASE_TOOLS) e de um JDK 21 em JAVA_HOME,
  * como o testa_storage_regras.js. Portas: 9071 (app), 9072 (auth), 9073
@@ -88,7 +98,9 @@ const DOCS = FS + '/v1/projects/' + PROJETO + '/databases/(default)/documents';
 const FIREBASE = process.env.FIREBASE_TOOLS ||
   'C:/Users/romul/ferramentas/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js';
 const JAVA_HOME = process.env.JAVA_HOME || '';
-const CFG = { auth: AUTH, firestore: FS, projectId: PROJETO, storage: REPASSE, bucket: BUCKET };
+// o prazo sem dados da baixa, curto SÓ nesta prova (o do aplicativo é de 30 s), pela configuração do emulador
+const PRAZO_DA_PROVA_MS = 2500;
+const CFG = { auth: AUTH, firestore: FS, projectId: PROJETO, storage: REPASSE, bucket: BUCKET, prazoSemDadosMs: PRAZO_DA_PROVA_MS };
 
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 const NUVEM = fs.readFileSync(path.join(H.RAIZ, 'nuvem.js'), 'utf8').replace(/\r\n/g, '\n');
@@ -97,13 +109,19 @@ const FONTES = { app: ['/app.js', APP], nuvem: ['/nuvem.js', NUVEM] };
 // cada veneno: uma ou mais trocas [fonte, trecho, troca]
 const VENENOS = {
   '--envenenado-sem-hash': [['app', 'if (h !== e.sha256) throw', 'if (false) throw']],
-  '--envenenado-guarda-parcial': [['app', 'return conferirLivroBaixado(bytes, e).then(function () { return guardarLivroBaixado(bytes, e); });',
-    'return guardarLivroBaixado(bytes, e).then(function () { return conferirLivroBaixado(bytes, e); });']],
+  '--envenenado-guarda-parcial': [['app', 'return conferirLivroBaixado(arquivo, e).then(function () { seCancelou(); return guardarLivroBaixado(arquivo, e); });',
+    'return guardarLivroBaixado(arquivo, e).then(function () { return conferirLivroBaixado(arquivo, e); });']],
   '--envenenado-baixa-dois': [['app', '    if (baixaDaNuvem) return outraBaixaEmCurso(id);\n', '']],
   // o corpo que fecha limpo, mas curto, passa pela conta do tamanho
   '--envenenado-aceita-curto': [['nuvem', "            if (recebidos !== total) throw erroDaBaixa('INCOMPLETO', 'O livro não chegou inteiro.');\n", '']],
   // a cor da capa volta a ser a da posição na lista
   '--envenenado-cor-pela-posicao': [['app', 'cor: cores[l.id] };', 'cor: CORES_DAS_CAPAS[i % CORES_DAS_CAPAS.length] };']],
+  // a baixa que para sem erro nunca cai: sem o prazo sem dados
+  '--envenenado-sem-prazo': [['nuvem', "      if (prazoMs > 0) prazo = setTimeout(parou, prazoMs);\n", '']],
+  // o Cancelar não para a baixa (nem a marca como cancelada): ela segue e guarda
+  '--envenenado-cancelar-nao-solta': [['app', "    baixa.cancelada = true; if (baixa.controle) baixa.controle.abort();\n", '']],
+  // a baixa segura o livro inteiro na memória: os pedaços nunca viram Blob no caminho
+  '--envenenado-copia-inteira': [['nuvem', "          if (noLote >= JUNTAR_BYTES) { partes.push(new Blob(pedacos)); pedacos = []; noLote = 0; }\n", '']],
   // a lista da conta de antes é guardada (e mostrada) na conta que entrou no meio da conferência
   '--envenenado-grava-na-conta-nova': [['app', '      if (!mesmaConta()) return false;\n', ''],
     ['nuvem', "if (!sessao || !sessao.uid || typeof uid !== 'string' || !uid || uid !== sessao.uid) return Promise.resolve(null);\n    return gravarEstado('livrosNaNuvem', Object.assign({}, v, { uid: uid }));",
@@ -160,7 +178,9 @@ const ARQ = {
   'local-l': pdfMinimo(4, 'Livro local', 0),
   'local-m': pdfMinimo(4, 'Outro livro local', 0),
   'sem-arquivo': pdfMinimo(3, 'Sem arquivo', 0),
-  'retirado-r': pdfMinimo(3, 'Retirado', 0)
+  'retirado-r': pdfMinimo(3, 'Retirado', 0),
+  // o livro grande da medida de memória (seção 8b): 48 MB
+  'nuvem-grande': pdfMinimo(3, 'Livro grande', 48 * 1024 * 1024)
 };
 // o sha256 que o catálogo diz de cada livro; o do "falso" é o de OUTRO conteúdo (o arquivo no Storage não confere)
 const SHA = {};
@@ -171,7 +191,8 @@ ARQ['nuvem-dup'] = ARQ['local-l'];
 SHA['nuvem-dup'] = SHA['local-l'];
 const TITULOS = { 'nuvem-a': 'Álgebra na nuvem', 'nuvem-b': 'Bloco de geometria', 'nuvem-c': 'Caderno de frações',
   'nuvem-falso': 'Dicionário trocado', 'local-l': 'Estatística do tablet', 'local-m': 'Frações do tablet',
-  'nuvem-dup': 'Mesmo arquivo com outro nome', 'sem-arquivo': 'Sem arquivo na nuvem', 'retirado-r': 'Retirado do catálogo' };
+  'nuvem-dup': 'Mesmo arquivo com outro nome', 'sem-arquivo': 'Sem arquivo na nuvem', 'retirado-r': 'Retirado do catálogo',
+  'nuvem-grande': 'Zoologia em volume grande' };
 function meta(id) {
   return { id, formato: 'pdf', arquivo: 'livros/' + id + '.pdf', hash: 'sha256:' + SHA[id], bytes: ARQ[id].length,
     titulo: TITULOS[id], materia: 'matematica', materia_nome: 'Matemática', segmento: 'Fundamental II', series: ['08'],
@@ -179,7 +200,7 @@ function meta(id) {
     sumario: [{ n: 1, nivel: 1, titulo: 'Primeiro capítulo', pagina: 1 }, { n: 2, nivel: 1, titulo: 'Segundo capítulo', pagina: 3 }],
     sumario_origem: 'marcadores', mapa: [], mapa_origem: 'nenhum', mapa_nota: 'Sem mapa de capítulos.' };
 }
-const NA_NUVEM = ['nuvem-a', 'nuvem-b', 'nuvem-c', 'nuvem-falso'];
+const NA_NUVEM = ['nuvem-a', 'nuvem-b', 'nuvem-c', 'nuvem-falso', 'nuvem-grande'];
 const caminho = (uid, id) => 'usuarios/' + uid + '/livros/' + SHA[id] + '.pdf';
 
 /* ---------- o emulador ---------- */
@@ -233,7 +254,7 @@ function derrubarEmulador() {
 
 /* ---------- o repasse do Storage: conta, corta e segura ---------- */
 // cortarApos: derruba a conexão; encurtar: fecha LIMPO depois de n bytes (o tamanho diz n); alongar: manda n bytes a mais
-const repasse = { pedidos: [], cortarApos: null, lento: 0, encurtar: null, alongar: null };
+const repasse = { pedidos: [], cortarApos: null, lento: 0, encurtar: null, alongar: null, pararApos: null, parados: [] };
 const servidorRepasse = http.createServer((req, res) => {
   if (req.method !== 'OPTIONS') repasse.pedidos.push({ metodo: req.method, url: req.url, autor: req.headers.authorization || '', quando: Date.now() });
   const cab = Object.assign({}, req.headers, { host: '127.0.0.1:' + PORTA_ST });
@@ -252,10 +273,12 @@ const servidorRepasse = http.createServer((req, res) => {
       const cabV = Object.assign({}, volta.headers, { 'content-length': String(corpo.length) });
       delete cabV['transfer-encoding'];
       res.writeHead(200, cabV);
-      const corte = repasse.cortarApos, lento = repasse.lento;
+      const corte = repasse.cortarApos, lento = repasse.lento, parar = repasse.pararApos;
       const PASSO = 32 * 1024;
       for (let i = 0; i < corpo.length; i += PASSO) {
         if (corte !== null && i >= corte) { res.socket.destroy(); return; }
+        // a rede fraca: o corpo para no meio e a conexão fica ABERTA, sem erro (o repasse a guarda para fechar no fim)
+        if (parar !== null && i >= parar) { repasse.parados.push(res); return; }
         res.write(corpo.subarray(i, Math.min(corpo.length, i + PASSO)));
         if (lento) await pausa(lento);
       }
@@ -271,7 +294,10 @@ const servidorRepasse = http.createServer((req, res) => {
 const pedidosDe = async (pag, id) => (await pag.evaluate(() => window.__pedidosStorage.slice())).filter(u => u.indexOf(SHA[id]) !== -1).length;
 
 // o fim de toda rodada derruba o emulador e o repasse antes de sair
-const fim = () => derrubarEmulador().then(() => new Promise(r => servidorRepasse.close(() => r()))).then(() => H.fim(amb)());
+const fim = () => {
+  repasse.parados.forEach(r => { try { r.socket.destroy(); } catch (e) { /* já caiu */ } });
+  return derrubarEmulador().then(() => new Promise(r => servidorRepasse.close(() => r()))).then(() => H.fim(amb)());
+};
 
 /* ---------- a nuvem de teste: a conta, o catálogo e os arquivos ---------- */
 const conta = (email, senha) => fetch(AUTH + '/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake', { method: 'POST',
@@ -443,15 +469,15 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   conf('o livro do tablet continua lá, como sempre', await existe(pag, '[data-livro="local-l"]') + '|' + await existe(pag, '[data-nuvem="local-l"]'), 'true|false');
   conf('o livro sem arquivo na nuvem e o retirado não aparecem', await existe(pag, '[data-nuvem="sem-arquivo"]') + '|' + await existe(pag, '[data-nuvem="retirado-r"]'), 'false|false');
   conf('o cartão diz, pequeno, que está na nuvem', await estadoDoCartao(pag, 'nuvem-a'), 'na-nuvem|Na nuvem · toque para baixar');
-  conf('o cartão diz o que o toque faz, para o leitor de tela', await pag.evaluate(() => document.querySelector('[data-nuvem="nuvem-a"]').getAttribute('aria-label')),
+  conf('o cartão diz o que o toque faz, para o leitor de tela', await pag.evaluate(() => document.querySelector('[data-nuvem="nuvem-a"] > .bibl-livro-cartao').getAttribute('aria-label')),
     'Baixar Álgebra na nuvem da nuvem para o tablet');
   conf('a capa do livro da nuvem é a clara', await pag.evaluate(() => !!document.querySelector('[data-nuvem="nuvem-a"] .bibl-capa.na-nuvem')), true);
   conf('a contagem da seção diz quantos estão na nuvem', await pag.evaluate(() => (document.querySelector('#bib-livros-contagem') || {}).textContent || ''),
-    '2 materiais, 1 disciplina · 4 livros na nuvem');
+    '2 materiais, 1 disciplina · 5 livros na nuvem');
   conf('mostrar não baixou nada do Storage', repasse.pedidos.length, 0);
   conf('o livro do catálogo com o MESMO arquivo de um livro do tablet (outro id) não aparece', await existe(pag, '[data-nuvem="nuvem-dup"]'), false);
   conf('os da nuvem ficam entre os do tablet, em ordem de título', await ordemDaGrade(pag),
-    'nuvem:nuvem-a,nuvem:nuvem-b,nuvem:nuvem-c,nuvem:nuvem-falso,livro:local-l,livro:local-m');
+    'nuvem:nuvem-a,nuvem:nuvem-b,nuvem:nuvem-c,nuvem:nuvem-falso,livro:local-l,livro:local-m,nuvem:nuvem-grande');
   const coresAntes = await coresDaGrade(pag);
   // a cor de hoje (pela posição em ordem de título) fica com os livros que ela já tem
   conf('os livros que já estavam no tablet ficam com a cor de sempre', coresAntes['local-l'] + '|' + coresAntes['local-m'], 'var(--capa-alfa)|var(--capa-beta)');
@@ -462,7 +488,7 @@ const paginaDesenhada = pag => pag.evaluate(() => {
     JSON.stringify({ entrou: false, jaEstava: false, mesmoArquivo: { id: 'local-l', titulo: 'Estatística do tablet' }, bytes: ARQ['local-l'].length }) + '|false');
 
   secao('2. O sha256 errado é recusado, e nada é guardado');
-  await clicar(pag, '[data-nuvem="nuvem-falso"]');
+  await clicar(pag, '[data-nuvem="nuvem-falso"] > .bibl-livro-cartao');
   const falso = await esperar('o livro de sha256 errado terminou', () => estadoDoCartao(pag, 'nuvem-falso'),
     v => /^(conferencia|outro|rede)\|/.test(v) || v === 'sem cartão', 20000);
   const guardadoFalso = await livroGuardado(pag, 'nuvem-falso');
@@ -477,7 +503,7 @@ const paginaDesenhada = pag => pag.evaluate(() => {
 
   secao('3. A baixa interrompida não guarda nada; a seguinte baixa com andamento, guarda e abre');
   repasse.cortarApos = 200 * 1024;
-  await clicar(pag, '[data-nuvem="nuvem-a"]');
+  await clicar(pag, '[data-nuvem="nuvem-a"] > .bibl-livro-cartao');
   const caiu = await esperar('a baixa interrompida terminou', () => estadoDoCartao(pag, 'nuvem-a'), v => /^(rede|outro|conferencia)\|/.test(v), 20000);
   conf('o cartão diz que a internet caiu no meio, e que o toque tenta de novo', caiu.valor, 'rede|A internet caiu no meio. Toque para tentar de novo.');
   conf('a metade não virou livro', await livroGuardado(pag, 'nuvem-a'), null);
@@ -496,7 +522,7 @@ const paginaDesenhada = pag => pag.evaluate(() => {
     window.__amostra = new MutationObserver(anotar);
     window.__amostra.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });
   });
-  await clicar(pag, '[data-nuvem="nuvem-a"]');
+  await clicar(pag, '[data-nuvem="nuvem-a"] > .bibl-livro-cartao');
   const chegou = await esperar('o livro baixado virou livro do tablet', () => pag.evaluate(() =>
     !!document.querySelector('[data-livro="nuvem-a"]') && !document.querySelector('[data-nuvem="nuvem-a"]')), v => v === true, 30000);
   const andamento = await pag.evaluate(() => { window.__amostra.disconnect(); return window.__andamento; });
@@ -527,12 +553,12 @@ const paginaDesenhada = pag => pag.evaluate(() => {
     coresAntes['local-l'] + '|' + coresAntes['local-m']);
   conf('o livro baixado ficou com a cor que o cartão "Na nuvem" mostrava', coresDepois['nuvem-a'], coresAntes['nuvem-a']);
   conf('e no mesmo lugar: nenhum livro andou na Estante', await ordemDaGrade(pag),
-    'livro:nuvem-a,nuvem:nuvem-b,nuvem:nuvem-c,nuvem:nuvem-falso,livro:local-l,livro:local-m');
+    'livro:nuvem-a,nuvem:nuvem-b,nuvem:nuvem-c,nuvem:nuvem-falso,livro:local-l,livro:local-m,nuvem:nuvem-grande');
 
   secao('3b. O corpo curto e o corpo longo não viram livro');
   await pag.evaluate(() => { window.__codigos = []; });
   repasse.encurtar = 8000;
-  await clicar(pag, '[data-nuvem="nuvem-falso"]');
+  await clicar(pag, '[data-nuvem="nuvem-falso"] > .bibl-livro-cartao');
   await esperar('a baixa curta terminou', () => pag.evaluate(() => window.__codigos.length), v => v === 1, 20000);
   repasse.encurtar = null;
   const curto = await pag.evaluate(() => window.__codigos[0]);
@@ -544,28 +570,85 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   conf('e o cartão diz que a internet caiu, sem guardar nada', await estadoDoCartao(pag, 'nuvem-falso') + '|' + await livroGuardado(pag, 'nuvem-falso'),
     'rede|A internet caiu no meio. Toque para tentar de novo.|null');
   repasse.alongar = 1000;
-  await clicar(pag, '[data-nuvem="nuvem-falso"]');
+  await clicar(pag, '[data-nuvem="nuvem-falso"] > .bibl-livro-cartao');
   await esperar('a baixa longa terminou', () => pag.evaluate(() => window.__codigos.length), v => v === 2, 20000);
   repasse.alongar = null;
   conf('o corpo maior que o catálogo é recusado no meio (TAMANHO_DIFERENTE)', await pag.evaluate(() => window.__codigos[1]), 'TAMANHO_DIFERENTE');
   conf('e o cartão diz que o arquivo veio diferente, sem guardar nada', await estadoDoCartao(pag, 'nuvem-falso') + '|' + await livroGuardado(pag, 'nuvem-falso'),
     'conferencia|O arquivo veio diferente do catálogo e não foi guardado. Toque para tentar de novo.|null');
 
-  secao('4. Dois toques seguidos começam uma baixa só; outro livro espera');
+  secao('3c. A baixa que para no meio, sem erro, solta a vaga no prazo, e tentar de novo funciona');
+  await abrirEstante(pag);
+  await pag.evaluate(() => { window.__codigos = []; });
+  repasse.pararApos = 96 * 1024;
+  await clicar(pag, '[data-nuvem="nuvem-b"] > .bibl-livro-cartao');
+  await esperar('a baixa parada começou', () => estadoDoCartao(pag, 'nuvem-b'), v => /^baixando\|/.test(v), 10000);
+  const parada = await esperar('a baixa parada caiu no prazo', () => estadoDoCartao(pag, 'nuvem-b'), v => /^rede\|/.test(v), PRAZO_DA_PROVA_MS * 4);
+  repasse.pararApos = null;
+  if (MODO === '--envenenado-sem-prazo') {
+    conf('VENENO visto: a baixa parada ficou presa em "Baixando" depois do prazo', /^baixando\|/.test(await estadoDoCartao(pag, 'nuvem-b')), true);
+    return fim();
+  }
+  conf('sem bytes por mais que o prazo, o cartão volta a ser baixável, com a frase da rede', parada.valor, 'rede|A internet caiu no meio. Toque para tentar de novo.');
+  conf('o motivo é a baixa parada (PARADO), e nada foi guardado', await pag.evaluate(() => window.__codigos.join(',')) + '|' + await livroGuardado(pag, 'nuvem-b'), 'PARADO|null');
+  conf('a vaga ficou livre: o Cancelar sumiu', await pag.evaluate(() => document.querySelector('[data-cancelar-nuvem="nuvem-b"]').classList.contains('bibl-nuvem-cancelar-oculto')), true);
+
+  secao('3d. O Cancelar no meio da baixa não guarda nada e solta a vaga');
+  await limparAviso(pag);
+  repasse.lento = 250;
+  await clicar(pag, '[data-nuvem="nuvem-b"] > .bibl-livro-cartao');
+  await esperar('a baixa a cancelar andou', () => estadoDoCartao(pag, 'nuvem-b'), v => { const m = /Baixando · (\d+)%/.exec(v); return !!m && Number(m[1]) >= 10; }, 15000);
+  conf('enquanto baixa, o Cancelar está à vista', await pag.evaluate(() => !document.querySelector('[data-cancelar-nuvem="nuvem-b"]').classList.contains('bibl-nuvem-cancelar-oculto')), true);
+  await clicar(pag, '[data-cancelar-nuvem="nuvem-b"]');
+  const cancelada = await esperar('o cartão voltou depois do Cancelar', () => estadoDoCartao(pag, 'nuvem-b'), v => /^na-nuvem\|/.test(v), 5000);
+  await pausa(5000);   // o tempo de a baixa inteira terminar, se o Cancelar não a tivesse parado
+  repasse.lento = 0;
+  if (MODO === '--envenenado-cancelar-nao-solta') {
+    conf('VENENO visto: o Cancelar não parou a baixa (o livro ficou guardado, ou o cartão continuou baixando)',
+      !cancelada.ok || (await livroGuardado(pag, 'nuvem-b')) !== null, true);
+    return fim();
+  }
+  conf('depois do Cancelar o cartão volta a "toque para baixar", sem aviso de erro', cancelada.valor, 'na-nuvem|Na nuvem · toque para baixar');
+  conf('e nada foi guardado', await livroGuardado(pag, 'nuvem-b'), null);
+
+  secao('4. Dois toques seguidos começam uma baixa só; outro livro espera; o toque logo depois de terminar não baixa de novo');
   await abrirEstante(pag);
   await limparAviso(pag);
   repasse.lento = 60;
-  await pag.evaluate(() => { const c = document.querySelector('[data-nuvem="nuvem-b"]'); c.click(); c.click(); });
+  const antesB = await pedidosDe(pag, 'nuvem-b');
+  /* logo depois de guardar, quando a tela começa a se refazer (a primeira leitura
+   * da lista de livros depois da gravação) e o cartão "Na nuvem" ainda está à
+   * vista, ela toca de novo nele */
+  await pag.evaluate(() => {
+    window.__tocouDepois = null;
+    let armado = false;
+    const g0 = Store.gravarLivroDaNuvem, l0 = Store.listarLivros;
+    Store.gravarLivroDaNuvem = function () {
+      return g0.apply(this, arguments).then(r => { armado = true; Store.gravarLivroDaNuvem = g0; return r; });
+    };
+    Store.listarLivros = function () {
+      if (armado) {
+        armado = false;
+        Store.listarLivros = l0;
+        const b = document.querySelector('[data-nuvem="nuvem-b"] > .bibl-livro-cartao');
+        window.__tocouDepois = !!b;
+        if (b) b.click();
+      }
+      return l0.apply(this, arguments);
+    };
+  });
+  await pag.evaluate(() => { const c = document.querySelector('[data-nuvem="nuvem-b"] > .bibl-livro-cartao'); c.click(); c.click(); });
   await esperar('a baixa do segundo livro começou', () => estadoDoCartao(pag, 'nuvem-b'), v => /^baixando\|/.test(v), 10000);
-  await clicar(pag, '[data-nuvem="nuvem-c"]');
+  await clicar(pag, '[data-nuvem="nuvem-c"] > .bibl-livro-cartao');
   const umPorVez = await textoDoAviso(pag);
   await esperar('o segundo livro entrou', () => existe(pag, '[data-livro="nuvem-b"]'), v => v === true, 30000);
-  await pausa(500);
+  await pausa(1500);
   if (MODO === '--envenenado-baixa-dois') {
-    conf('VENENO visto: dois toques começaram duas baixas', await pedidosDe(pag, 'nuvem-b'), 2);
+    conf('VENENO visto: dois toques começaram duas baixas', (await pedidosDe(pag, 'nuvem-b')) - antesB >= 2, true);
     return fim();
   }
-  conf('dois toques seguidos: uma baixa só', await pedidosDe(pag, 'nuvem-b'), 1);
+  conf('dois toques seguidos, e mais um logo depois de guardar: uma baixa só', (await pedidosDe(pag, 'nuvem-b')) - antesB, 1);
+  conf('o toque logo depois de guardar foi dado no cartão "Na nuvem" ainda à vista', await pag.evaluate(() => window.__tocouDepois), true);
   conf('o toque noutro livro durante a baixa avisa e não baixa', umPorVez + '|' + await pedidosDe(pag, 'nuvem-c'), 'Um livro por vez: espere o que está baixando terminar.|0');
   conf('o segundo livro está guardado inteiro', JSON.parse(await livroGuardado(pag, 'nuvem-b')).sha, SHA['nuvem-b']);
   conf('o livro de fora continua na nuvem, pronto para o toque', await estadoDoCartao(pag, 'nuvem-c'), 'na-nuvem|Na nuvem · toque para baixar');
@@ -575,7 +658,7 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   await pag.setOfflineMode(true);
   const semRede = await esperar('o cartão percebeu a falta de internet', () => estadoDoCartao(pag, 'nuvem-c'), v => /^sem-rede\|/.test(v), 5000);
   conf('sem internet, o cartão diz que não baixa agora', semRede.valor, 'sem-rede|Sem internet agora; toque de novo quando ela voltar.');
-  await clicar(pag, '[data-nuvem="nuvem-c"]');
+  await clicar(pag, '[data-nuvem="nuvem-c"] > .bibl-livro-cartao');
   await pausa(600);
   conf('o toque sem internet não pede nada à rede e não guarda nada', await pedidosDe(pag, 'nuvem-c') + '|' + await livroGuardado(pag, 'nuvem-c'), '0|null');
   conf('e o cartão continua dizendo o mesmo', await estadoDoCartao(pag, 'nuvem-c'), 'sem-rede|Sem internet agora; toque de novo quando ela voltar.');
@@ -589,7 +672,7 @@ const paginaDesenhada = pag => pag.evaluate(() => {
     window.__estimar0 = Store.estimarEspaco;
     Store.estimarEspaco = () => Promise.resolve({ quota: 100 * 1024 * 1024, usage: 100 * 1024 * 1024 - 2048 });
   });
-  await clicar(pag, '[data-nuvem="nuvem-c"]');
+  await clicar(pag, '[data-nuvem="nuvem-c"] > .bibl-livro-cartao');
   const cheio = await esperar('o cartão diz da falta de espaço', () => estadoDoCartao(pag, 'nuvem-c'), v => /^sem-espaco\|/.test(v), 5000);
   conf('o cartão diz que falta espaço', cheio.valor, 'sem-espaco|Falta espaço no tablet para este livro.');
   conf('o aviso diz quanto falta e o que fazer', /^O tablet está sem espaço para este livro: ele precisa de .+ e há .+ livres\. Libere espaço no tablet/.test(await textoDoAviso(pag)), true);
@@ -605,7 +688,7 @@ const paginaDesenhada = pag => pag.evaluate(() => {
       return window.__put0.apply(this, arguments);
     };
   });
-  await clicar(pag, '[data-nuvem="nuvem-c"]');
+  await clicar(pag, '[data-nuvem="nuvem-c"] > .bibl-livro-cartao');
   const cota = await esperar('o cartão diz da cota', () => estadoDoCartao(pag, 'nuvem-c'), v => /^sem-espaco\|/.test(v), 20000);
   await pag.evaluate(() => { IDBObjectStore.prototype.put = window.__put0; });
   conf('a cota que acaba na gravação diz que falta espaço', cota.valor, 'sem-espaco|Falta espaço no tablet para este livro.');
@@ -623,7 +706,7 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   await pag.evaluate(() => { Nuvem.estado = window.__estado0; });
   await abrirEstante(pag);
   conf('de volta à conta dela, os da nuvem voltam (o controle)', (await esperar('os cartões voltaram', () => cartoesDaNuvem(pag), v => !!v, 10000)).valor,
-    'nuvem-c,nuvem-falso');
+    'nuvem-c,nuvem-falso,nuvem-grande');
 
   secao('8. O getDownloadURL nunca entra');
   const doStorage = repasse.pedidos;
@@ -631,10 +714,58 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   conf('todo pedido ao Storage foi um GET ?alt=media com Authorization: Firebase <idToken>, sem token na URL', fora.map(p => p.metodo + ' ' + p.url).join(' ; '), '');
   conf('nenhum pedido leu os metadados do objeto (onde mora o token do getDownloadURL)', doStorage.filter(p => !/alt=media/.test(p.url)).length, 0);
   const daPagina = await pag.evaluate(() => window.__pedidosStorage.slice());
-  conf('a página pediu ao Storage só as sete baixas (o falso três vezes, o A duas, o B e o C da cota), todas pelo ?alt=media', daPagina.length + '|' +
-    daPagina.every(u => /\?alt=media$/.test(u) && !/token=/.test(u)), '7|true');
+  conf('a página pediu ao Storage só as nove baixas (o falso três vezes, o A duas, o B três e o C da cota), todas pelo ?alt=media', daPagina.length + '|' +
+    daPagina.every(u => /\?alt=media$/.test(u) && !/token=/.test(u)), '9|true');
   conf('todo fetch da página chegou ao repasse (a conta dele não é menor)', doStorage.length >= daPagina.length, true);
   conf('ninguém chamou getDownloadURL na página', await pag.evaluate(() => !!window.__chamouGetDownloadURL), false);
+
+  secao('8b. A memória: baixar um livro de ' + Math.round(ARQ['nuvem-grande'].length / 1048576) + ' MB não segura o livro inteiro na memória');
+  /* A memória VIVA da página (o heap do JavaScript mais os ArrayBuffers, depois de
+   * uma coleta de lixo pedida pela própria prova), medida a cada passo da baixa,
+   * da conferência e da gravação. O limite é metade do livro: a baixa junta os
+   * pedaços em Blobs de 4 MB e o hash lê trechos de 1 MB, e quem segura o livro
+   * inteiro (a cópia de antes, ou os pedaços todos) passa de uma vez o tamanho. */
+  const N = ARQ['nuvem-grande'].length;
+  const cdp = await pag.target().createCDPSession();
+  await cdp.send('HeapProfiler.enable');
+  const vivo = async () => {
+    await cdp.send('HeapProfiler.collectGarbage');
+    const u = await cdp.send('Runtime.getHeapUsage');
+    return (u.usedSize || 0) + (u.backingStorageSize || 0);
+  };
+  conf('o Chrome diz a memória dos ArrayBuffers (backingStorageSize), além do heap', typeof (await cdp.send('Runtime.getHeapUsage')).backingStorageSize, 'number');
+  await abrirEstante(pag);
+  const base = await vivo();
+  repasse.lento = 3;
+  await clicar(pag, '[data-nuvem="nuvem-grande"] > .bibl-livro-cartao');
+  let pico = base, amostras = 0;
+  const fimGrande = Date.now() + 120000;
+  while (Date.now() < fimGrande) {
+    pico = Math.max(pico, await vivo());
+    amostras++;
+    if (await existe(pag, '[data-livro="nuvem-grande"]') || /^(rede|conferencia|outro|sem-espaco)\|/.test(await estadoDoCartao(pag, 'nuvem-grande'))) break;
+    await pausa(60);
+  }
+  repasse.lento = 0;
+  const acima = pico - base;
+  console.log('   memória viva: base ' + (base / 1048576).toFixed(1) + ' MB, pico ' + (pico / 1048576).toFixed(1) + ' MB, acima da base ' +
+    (acima / 1048576).toFixed(1) + ' MB (' + (acima / N).toFixed(2) + ' vezes o livro de ' + (N / 1048576).toFixed(1) + ' MB), ' + amostras + ' amostras');
+  if (MODO === '--envenenado-copia-inteira') {
+    conf('VENENO visto: a baixa segurou o livro inteiro na memória (o pico passou de metade do livro)', acima > 0.5 * N, true);
+    return fim();
+  }
+  conf('o livro grande entrou no tablet, inteiro e conferido', JSON.parse(await livroGuardado(pag, 'nuvem-grande') || '{}').sha, SHA['nuvem-grande']);
+  conf('o pico da memória viva acima da base ficou abaixo de metade do livro', acima < 0.5 * N, true);
+  conf('a medida teve amostras durante a baixa', amostras >= 5, true);
+
+  secao('8c. O livro que ela tira do tablet volta a aparecer "na nuvem" na hora');
+  await H.irParaAba(pag, 'ajustes');
+  await esperar('a lista de livros de Ajustes', () => existe(pag, '[data-remover-livro="local-l"]'), v => v === true, 10000);
+  await clicar(pag, '[data-remover-livro="local-l"]');
+  await esperar('o livro saiu do tablet', () => pag.evaluate(() => Store.lerLivro('local-l').then(l => !l)), v => v === true, 10000);
+  await abrirEstante(pag);
+  const voltouNaNuvem = await esperar('o livro tirado voltou como "na nuvem"', () => existe(pag, '[data-nuvem="local-l"]'), v => v === true, 10000);
+  conf('o livro tirado do tablet, que está no catálogo, aparece "na nuvem" sem esperar a conferência seguinte', voltouNaNuvem.ok, true);
 
   secao('9. A conta troca no meio da conferência: a outra conta não vê nada da primeira');
   const outra = await conta('outra@exemplo.test', 'senha-da-outra-1');

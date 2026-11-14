@@ -1523,6 +1523,7 @@
     return typeof crypto !== 'undefined' && !!(crypto.subtle && crypto.subtle.digest) && typeof TextEncoder !== 'undefined';
   }
   function sha256Hex(entrada) {
+    if (typeof Blob !== 'undefined' && entrada instanceof Blob) return sha256DoBlob(entrada);
     if (!temWebCrypto()) return Promise.reject(Object.assign(new Error('Este navegador não tem o WebCrypto que a folha na nuvem precisa.'), { codigo: 'SEM_WEBCRYPTO' }));
     var bytes = typeof entrada === 'string' ? new TextEncoder().encode(entrada) : entrada;
     return crypto.subtle.digest('SHA-256', bytes).then(function (buf) {
@@ -1530,6 +1531,28 @@
       for (var i = 0; i < v.length; i++) s += (v[i] < 16 ? '0' : '') + v[i].toString(16);
       return s;
     });
+  }
+  /* O SHA-256 DE UM BLOB, por trechos de 1 MB (o livro que veio da nuvem, PR 3
+   * da biblioteca na nuvem): o crypto.subtle só calcula de uma vez, com uma
+   * cópia do arquivo inteiro na memória, e o livro pode ter 200 MB. O cálculo
+   * por partes é o da importação dos livros (Biblioteca.Sha256, conferido
+   * contra o crypto.subtle no testa_livros.js); nunca há mais que um trecho na
+   * mão. Sem ele (o Store lido sozinho, numa prova), o caminho de sempre. */
+  var TRECHO_DO_HASH = 1024 * 1024;
+  function sha256DoBlob(blob) {
+    var B = typeof Biblioteca !== 'undefined' ? Biblioteca : null;
+    if (!B || typeof B.Sha256 !== 'function') return blob.arrayBuffer().then(function (ab) { return sha256Hex(new Uint8Array(ab)); });
+    var sha = new B.Sha256(), pos = 0, total = blob.size;
+    var proximo = function () {
+      if (pos >= total) return Promise.resolve(sha.fim());
+      var ate = Math.min(total, pos + TRECHO_DO_HASH);
+      return blob.slice(pos, ate).arrayBuffer().then(function (ab) {
+        sha.atualizar(new Uint8Array(ab));
+        pos = ate;
+        return proximo();
+      });
+    };
+    return proximo();
   }
   /* O hash da página para o estado local: null sem WebCrypto (a página conta
    * como mudada a cada gravação e fica na fila, sem subir). */
