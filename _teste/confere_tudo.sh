@@ -1243,13 +1243,15 @@ roda "biblioteca na nuvem, metas --envenenado-junta-as-contas" node "_teste/test
 # caminho fora dos permitidos e negado; os limites prontos para a escrita
 # (200 MiB o livro, 100 MiB o pacote, pelo tipo) conferidos numa copia das
 # regras. Os venenos: a leitura por qualquer conta, a leitura sem login, a
-# escrita da dona e o observador que le pela leitura cruzada do Firestore.
+# escrita da dona, o observador que le pela leitura cruzada do Firestore e a
+# leitura que nao confere o nome do arquivo.
 # Portas 9051 a 9056.
 roda "regras do storage"                            node "_teste/testa_storage_regras.js"
 roda "regras do storage --envenenado-outra-conta"   node "_teste/testa_storage_regras.js" --envenenado-outra-conta
 roda "regras do storage --envenenado-sem-login"     node "_teste/testa_storage_regras.js" --envenenado-sem-login
 roda "regras do storage --envenenado-escrita"       node "_teste/testa_storage_regras.js" --envenenado-escrita
 roda "regras do storage --envenenado-leitor-le"     node "_teste/testa_storage_regras.js" --envenenado-leitor-le
+roda "regras do storage --envenenado-nome-livre"   node "_teste/testa_storage_regras.js" --envenenado-nome-livre
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve

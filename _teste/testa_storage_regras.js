@@ -33,6 +33,8 @@
  *                             (2 e 4 veem);
  *   --envenenado-sem-login    a leitura vale até sem login (2, 3 e 4 veem);
  *   --envenenado-escrita      a dona grava pelo aplicativo (5 vê);
+ *   --envenenado-nome-livre   a leitura da dona não confere o nome do arquivo
+ *                             (sha256 e extensão da pasta): 6 vê;
  *   --envenenado-leitor-le    o observador da lista de leitores lê os livros,
  *                             pela leitura cruzada do Firestore (4 vê; prova
  *                             que o observador da seção 4 é de verdade).
@@ -68,6 +70,7 @@ const VENENOS = {
   '--envenenado-outra-conta': ['allow get: if dona(uid) && nomeDe', 2, 'allow get: if entrou() && nomeDe'],
   '--envenenado-sem-login': ['allow get: if dona(uid) && nomeDe', 2, 'allow get: if true && nomeDe'],
   '--envenenado-escrita': ['      allow write: if false;\n', 2, '      allow write: if dona(uid);\n'],
+  '--envenenado-nome-livre': [') && nomeDe', 2, ') || false && nomeDe'],
   '--envenenado-leitor-le': ['allow get: if dona(uid) && nomeDeLivro(arquivo);', 1,
     'allow get: if (dona(uid) || (entrou() && request.auth.uid in firestore.get(/databases/(default)/documents/usuarios/$(uid)/config/leitores).data.uids)) && nomeDeLivro(arquivo);']
 };
@@ -316,7 +319,7 @@ const sintetico = (rotulo, n) => Buffer.from(rotulo + ' ' + 'x'.repeat(n));
   // os quatro primeiros nomes errados moram nas pastas de livros e de pacotes: a escrita aberta (veneno) os aceitaria
   const NA_PASTA = ['nome de livro que não é sha256', 'sha256 em maiúsculas', 'livro com extensão de pacote', 'pacote com extensão de livro'];
   for (const [rot, [c, t]] of Object.entries(FORA)) {
-    conf('a dona não lê: ' + rot, (await ler(c, dona)).status, 403);
+    caso('a dona não lê: ' + rot, (await ler(c, dona)).status, 403, NA_PASTA.indexOf(rot) !== -1 ? ['--envenenado-nome-livre'] : [], 200);
     caso('a dona não grava: ' + rot, (await gravar(c, OUTROS, t, dona)).status, 403, NA_PASTA.indexOf(rot) !== -1 ? ESC : [], 200);
   }
   conf('a dona não lista a raiz do bucket', (await listar('', dona)).status, 403);
@@ -333,8 +336,8 @@ const sintetico = (rotulo, n) => Buffer.from(rotulo + ' ' + 'x'.repeat(n));
   const ABERTA = REGRAS_SERVIDAS
     .replace('nomeDeLivro(arquivo);\n      allow write: if false;', 'nomeDeLivro(arquivo);\n      allow write: if dona(uid) && livroValido(arquivo);')
     .replace('nomeDePacote(arquivo);\n      allow write: if false;', 'nomeDePacote(arquivo);\n      allow write: if dona(uid) && pacoteValido(arquivo);');
-  if (MODO === '--envenenado-escrita') {
-    conf('(no modo da escrita aberta, a seção 7 não roda: as regras servidas já estão trocadas)', true, true);
+  if (MODO === '--envenenado-escrita' || MODO === '--envenenado-nome-livre') {
+    conf('(neste veneno a seção 7 não roda: as regras servidas já estão trocadas)', true, true);
   } else {
     conf('a cópia com a escrita aberta pelos limites foi montada', ABERTA !== REGRAS_SERVIDAS && ABERTA.split('Valido(arquivo);').length - 1, 2);
     fs.writeFileSync(path.join(PASTA, 'storage.rules'), ABERTA);
