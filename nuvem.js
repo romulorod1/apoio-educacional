@@ -1922,12 +1922,16 @@
   var TIPOS_DO_STORAGE = { pdf: 'application/pdf', epub: 'application/epub+zip', zip: 'application/zip' };
   var JUNTAR_BYTES = 4 * 1024 * 1024;
   var PRAZO_SEM_DADOS_MS = 30000;
+  // o pacote de exercícios (PR 4): usuarios/<uid>/pacotes/<sha256>.zip, o caminho que o publicador grava
+  var CAMINHO_DE_PACOTE = /^usuarios\/([^\/]+)\/pacotes\/[0-9a-f]{64}\.zip$/;
   function erroDaBaixa(codigo, frase) {
     var e = new Error(frase);
     e.codigo = codigo;
     return e;
   }
   function baixarLivroDaNuvem(caminho, opcoes) { return baixarDoStorage(caminho, opcoes, CAMINHO_DE_LIVRO); }
+  // o pacote de exercícios do catálogo (PR 4) baixa pela mesma baixa, com o caminho do pacote desta conta
+  function baixarPacoteDaNuvem(caminho, opcoes) { return baixarDoStorage(caminho, opcoes, CAMINHO_DE_PACOTE); }
   function baixarDoStorage(caminho, opcoes, padrao) {
     opcoes = opcoes || {};
     var total = opcoes.tamanho;
@@ -2042,7 +2046,7 @@
 
   root.Nuvem = {
     lerCatalogo: lerCatalogo, lerLivroDoCatalogo: lerLivroDoCatalogo,
-    baixarLivroDaNuvem: baixarLivroDaNuvem, lerLivrosNaNuvem: lerLivrosNaNuvem, guardarLivrosNaNuvem: guardarLivrosNaNuvem,
+    baixarLivroDaNuvem: baixarLivroDaNuvem, baixarPacoteDaNuvem: baixarPacoteDaNuvem, lerLivrosNaNuvem: lerLivrosNaNuvem, guardarLivrosNaNuvem: guardarLivrosNaNuvem,
     disponivel: disponivel, pronto: carregarEstado, estado: estado, aoMudar: aoMudar,
     entrar: entrar, sair: sair, esqueciASenha: esqueciASenha, trocarSenha: trocarSenha,
     enviarCopia: enviarCopia, listarCopias: listarCopias, baixarCopia: baixarCopia, restaurou: restaurou,

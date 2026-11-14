@@ -1295,6 +1295,21 @@ roda "livros da nuvem, baixar --envenenado-grava-na-conta-nova" node "_teste/tes
 roda "livros da nuvem, baixar --envenenado-sem-prazo" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-sem-prazo
 roda "livros da nuvem, baixar --envenenado-cancelar-nao-solta" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-cancelar-nao-solta
 roda "livros da nuvem, baixar --envenenado-copia-inteira" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-copia-inteira
+# Nuvem da biblioteca, PR 4 (14/11/2026): o toque em "Atualizar a biblioteca"
+# traz os pacotes de exercicios novos do catalogo (o mapa pacotes), um por
+# vez, e os importa pelo mesmo caminho do zip, contra o emulador do Auth, do
+# Firestore e do Storage, com as regras do repositorio: o pacote que o tablet
+# ja tem na mesma versao (ou mais nova) nao baixa; a versao nova troca a
+# velha como o zip; o sha256 errado e o download cortado nao entram, e o
+# toque seguinte tenta de novo; a falha de um nao para os outros; sem
+# internet, a frase calma; o observador e o celular nao trazem nada; o nome
+# do pacote privado nao sai em pedido nenhum. Os venenos: sem a conferencia
+# da versao, sem a do sha256, e a falha que para tudo.
+# Portas 9081 a 9088.
+roda "pacotes da nuvem, atualizar"                 node "_teste/testa_pacotes_nuvem_atualizar.js"
+roda "pacotes da nuvem, atualizar --envenenado-pacote-duplica" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-pacote-duplica
+roda "pacotes da nuvem, atualizar --envenenado-pacote-sem-hash" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-pacote-sem-hash
+roda "pacotes da nuvem, atualizar --envenenado-pacote-para-tudo" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-pacote-para-tudo
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
