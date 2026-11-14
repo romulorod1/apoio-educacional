@@ -1653,11 +1653,11 @@ roda "lista curada da biblioteca"               python biblioteca/_prova_lista_c
 # sem Range, queda no meio com consulta de estado, 410, 412 e ifGenerationMatch,
 # o 308 que nunca avanca) contra um Cloud Storage FALSO em http.server, mais os
 # nomes dos pacotes e o teto do indice. Sem Chrome nem emulador: roda no --rapido.
-roda "envio retomavel do publicador"            python biblioteca/_prova_envio_retomavel.py
-roda "envio retomavel --envenenado-retoma-no-byte-errado" python biblioteca/_prova_envio_retomavel.py --envenenado-retoma-no-byte-errado
-roda "envio retomavel --envenenado-308-sem-limite" python biblioteca/_prova_envio_retomavel.py --envenenado-308-sem-limite
-roda "envio retomavel --envenenado-sem-precondicao" python biblioteca/_prova_envio_retomavel.py --envenenado-sem-precondicao
-roda "envio retomavel --envenenado-reenvia"     python biblioteca/_prova_envio_retomavel.py --envenenado-reenvia
+roda "envio retomavel do publicador"            python _teste/testa_envio_retomavel.py
+roda "envio retomavel --envenenado-retoma-no-byte-errado" python _teste/testa_envio_retomavel.py --envenenado-retoma-no-byte-errado
+roda "envio retomavel --envenenado-308-sem-limite" python _teste/testa_envio_retomavel.py --envenenado-308-sem-limite
+roda "envio retomavel --envenenado-sem-precondicao" python _teste/testa_envio_retomavel.py --envenenado-sem-precondicao
+roda "envio retomavel --envenenado-reenvia"     python _teste/testa_envio_retomavel.py --envenenado-reenvia
 # C15.1: o tipo de fonte livros, sobre livros sinteticos (tres PDF, um EPUB e um
 # arquivo de 161 MB): o teto de 160 MB nos dois lados da fronteira (o grande
 # recusado, listado no relatorio e nunca aberto) e igual ao do aplicativo, o

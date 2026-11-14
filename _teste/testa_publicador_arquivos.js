@@ -58,7 +58,7 @@
  *
  * O envio retomável em pedaços (308, Range, consulta de estado, 410, 412 e o
  * ifGenerationMatch) não roda no emulador: a prova dele é a
- * biblioteca/_prova_envio_retomavel.py, contra um servidor falso.
+ * _teste/testa_envio_retomavel.py, contra um servidor falso.
  *
  * Precisa do firebase-tools fora do repositório (FIREBASE_TOOLS) e de um JDK
  * 21 em JAVA_HOME, como o testa_publicador_catalogo.js; sem eles, REPROVA

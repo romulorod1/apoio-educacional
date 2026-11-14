@@ -5,7 +5,7 @@ no primeiro PUT, ignora o ifGenerationMatch e não responde à consulta de
 estado); este servidor faz, e conta cada pedido, para a prova ver o que o
 cliente mandou.
 
-    python biblioteca/_prova_envio_retomavel.py [--envenenado-...]
+    python _teste/testa_envio_retomavel.py [--envenenado-...]
 
 O que se prova (arquivos sintéticos de ~700 KiB, pedaços de 256 KiB):
   1. (seção 2) o envio em três pedaços monta os bytes certos, nos começos certos, e a
@@ -47,7 +47,7 @@ import time
 import types
 import urllib.parse
 
-AQUI = os.path.dirname(os.path.abspath(__file__))
+AQUI = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'biblioteca')
 sys.path.insert(0, AQUI)
 PUBLICADOR = os.path.join(AQUI, 'publicar_catalogo.py')
 
