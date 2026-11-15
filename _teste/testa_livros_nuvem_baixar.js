@@ -66,7 +66,10 @@
  *                                (8b vê, pela memória viva);
  *   --envenenado-solta-antes-do-redesenho  a vaga da baixa se solta ANTES de
  *                                a Estante se refazer: o toque no cartão "Na
- *                                nuvem" ainda à vista começa outra baixa (4 vê).
+ *                                nuvem" ainda à vista começa outra baixa (4 vê);
+ *   --envenenado-camada-presa    a vaga se solta sem acertar os cartões: com a
+ *                                Estante que não se refez, a barra fica presa
+ *                                por cima da capa (8d vê).
  *
  * O acabamento (depois do #232): a seção 0 confere o sha256 por trechos
  * (Biblioteca.Sha256, pelo Store.sha256Hex num Blob) contra o
@@ -77,6 +80,11 @@
  * aviso "Download cancelado."; a 8b confere que o livro grande mostra
  * "Conferindo o livro..." com o andamento antes de "está no tablet", sem
  * mexer na grade.
+ *
+ * Os últimos ajustes: a 8b confere também que, depois da conferência, o cartão
+ * diz "Guardando o livro..." enquanto o livro é gravado no IndexedDB (e não
+ * fica parado no 100%); a 8d força a Estante a não se refazer uma vez, depois
+ * de guardar, e confere que a barra por cima da capa some mesmo assim.
  *
  * As seções da revisão das lentes: 3c (a baixa que PARA no meio, sem erro, com
  * a conexão aberta, cai no prazo sem dados, curto só nesta prova), 3d (o
@@ -123,8 +131,8 @@ const FONTES = { app: ['/app.js', APP], nuvem: ['/nuvem.js', NUVEM] };
 // cada veneno: uma ou mais trocas [fonte, trecho, troca]
 const VENENOS = {
   '--envenenado-sem-hash': [['app', 'if (h !== e.sha256) throw', 'if (false) throw']],
-  '--envenenado-guarda-parcial': [['app', 'return conferirLivroBaixado(arquivo, e, aoConferir).then(function () { seCancelou(); return guardarLivroBaixado(arquivo, e); });',
-    'return guardarLivroBaixado(arquivo, e).then(function () { return conferirLivroBaixado(arquivo, e, aoConferir); });']],
+  '--envenenado-guarda-parcial': [['app', 'return conferirLivroBaixado(arquivo, e, aoConferir).then(function () {',
+    'return guardarLivroBaixado(arquivo, e).then(function () { return conferirLivroBaixado(arquivo, e, aoConferir); }).then(function () {']],
   '--envenenado-baixa-dois': [['app', '    if (baixaDaNuvem) return outraBaixaEmCurso(id);\n', '']],
   // o corpo que fecha limpo, mas curto, passa pela conta do tamanho
   '--envenenado-aceita-curto': [['nuvem', "            if (recebidos !== total) throw erroDaBaixa('INCOMPLETO', 'O livro não chegou inteiro.');\n", '']],
@@ -137,8 +145,11 @@ const VENENOS = {
   // a baixa segura o livro inteiro na memória: os pedaços nunca viram Blob no caminho
   '--envenenado-copia-inteira': [['nuvem', "          if (noLote >= JUNTAR_BYTES) { partes.push(new Blob(pedacos)); pedacos = []; noLote = 0; }\n", '']],
   // a vaga da baixa se solta antes de a Estante se refazer: o toque no cartão ainda à vista começa outra baixa
-  '--envenenado-solta-antes-do-redesenho': [['app', 'var soltar = function (v) { baixaDaNuvem = null; return v; };',
-    'baixaDaNuvem = null; var soltar = function (v) { return v; };']],
+  '--envenenado-solta-antes-do-redesenho': [['app', 'var soltar = function (v) { baixaDaNuvem = null; atualizarCartoesDaNuvem(); return v; };',
+    'baixaDaNuvem = null; var soltar = function (v) { atualizarCartoesDaNuvem(); return v; };']],
+  // a vaga se solta sem acertar os cartões: se a Estante não se refaz, a barra fica por cima da capa
+  '--envenenado-camada-presa': [['app', 'var soltar = function (v) { baixaDaNuvem = null; atualizarCartoesDaNuvem(); return v; };',
+    'var soltar = function (v) { baixaDaNuvem = null; return v; };']],
   // a lista da conta de antes é guardada (e mostrada) na conta que entrou no meio da conferência
   '--envenenado-grava-na-conta-nova': [['app', '      if (!mesmaConta()) return false;\n', ''],
     ['nuvem', "if (!sessao || !sessao.uid || typeof uid !== 'string' || !uid || uid !== sessao.uid) return Promise.resolve(null);\n    return gravarEstado('livrosNaNuvem', Object.assign({}, v, { uid: uid }));",
@@ -897,6 +908,9 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   conf('e a conferência mostrou o andamento: passos entre 0 e 100%, crescendo',
     conferindo.some(x => Number(x[1][1]) > 0 && Number(x[1][1]) < 100) && conferindo.every((x, k) => k === 0 || Number(x[1][1]) >= Number(conferindo[k - 1][1][1])), true);
   conf('durante a conferência, a grade da Estante estava como antes da baixa', grande.leiaute, leiauteAntesDoGrande);
+  const guardando = grande.passos.indexOf('guardando|Guardando o livro...');
+  conf('depois da conferência, o cartão disse "Guardando o livro..." antes de "está no tablet"',
+    conferindo.length > 0 && guardando > conferindo[conferindo.length - 1][0] && noTablet > guardando, true);
 
   secao('8c. O livro que ela tira do tablet volta a aparecer "na nuvem" na hora');
   await H.irParaAba(pag, 'ajustes');
@@ -906,6 +920,61 @@ const paginaDesenhada = pag => pag.evaluate(() => {
   await abrirEstante(pag);
   const voltouNaNuvem = await esperar('o livro tirado voltou como "na nuvem"', () => existe(pag, '[data-nuvem="local-l"]'), v => v === true, 10000);
   conf('o livro tirado do tablet, que está no catálogo, aparece "na nuvem" sem esperar a conferência seguinte', voltouNaNuvem.ok, true);
+
+  secao('8d. A Estante que não se refaz depois de guardar não deixa a barra presa por cima da capa');
+  /* Uma vez só, o redesenho da Estante logo depois de guardar falha (a leitura
+   * da lista de livros pedida por desenharLivrosDaBiblioteca, a da baixa,
+   * lança na hora, e o redesenho falha sem tocar na Estante); o
+   * redesenho que o livrosDoTabletMudaram pede antes dele fica esperando, sem
+   * desenhar nada: o cartão "Na nuvem" fica onde estava, e a barra por cima
+   * da capa tem de sumir mesmo assim. O retrato do cartão é tirado logo depois da falha
+   * (na tarefa seguinte, quando a vaga já se soltou), antes de outro
+   * redesenho qualquer (a conferência do catálogo, ao fundo) refazer a
+   * Estante. */
+  await limparAviso(pag);
+  await pag.evaluate(() => {
+    window.__falhouRedesenho = false;
+    window.__retratoDoCartao = null;
+    const retrato = () => {
+      const c = document.querySelector('[data-nuvem="local-l"]');
+      const s = c && c.querySelector('.bibl-nuvem-sobre-capa');
+      const e = c && c.querySelector('[data-nuvem-estado]');
+      return JSON.stringify({ falhou: window.__falhouRedesenho, cartao: !!c, barra: !!s && !s.hidden, estado: e ? e.getAttribute('data-nuvem-estado') : null });
+    };
+    let armado = false;
+    const g0 = Store.gravarLivroDaNuvem, l0 = Store.listarLivros;
+    Store.gravarLivroDaNuvem = function () {
+      return g0.apply(this, arguments).then(r => { armado = true; Store.gravarLivroDaNuvem = g0; return r; });
+    };
+    Store.listarLivros = function () {
+      const pilha = new Error().stack || '';
+      if (armado && /desenharLivrosDaBiblioteca/.test(pilha) && /livrosDoTabletMudaram/.test(pilha)) return new Promise(() => {});
+      if (armado && /desenharLivrosDaBiblioteca/.test(pilha)) {
+        armado = false;
+        Store.listarLivros = l0;
+        window.__falhouRedesenho = true;
+        setTimeout(() => { window.__retratoDoCartao = retrato(); }, 0);
+        // a falha na hora (e não a promessa rejeitada, que o próprio redesenho trata limpando a Estante): o desenharLivrosDaBiblioteca falha inteiro
+        throw new Error('o redesenho da Estante falhou nesta prova');
+      }
+      return l0.apply(this, arguments);
+    };
+  });
+  await clicar(pag, '[data-nuvem="local-l"] > .bibl-livro-cartao');
+  const guardouL = await esperar('o livro tirado voltou ao tablet', () => textoDoAviso(pag), v => /está no tablet/.test(v), 30000);
+  conf('o livro voltou ao tablet (o aviso disse)', guardouL.ok, true);
+  const presa = (await esperar('o retrato do cartão depois da falha do redesenho', () => pag.evaluate(() => window.__retratoDoCartao), v => !!v, 10000)).valor;
+  if (MODO === '--envenenado-camada-presa') {
+    conf('VENENO visto: com a Estante sem se refazer, a barra ficou presa por cima da capa, no "Guardando o livro..."', presa,
+      JSON.stringify({ falhou: true, cartao: true, barra: true, estado: 'guardando' }));
+    return fim();
+  }
+  conf('o redesenho falhou de verdade e o cartão "Na nuvem" ficou à vista; a barra sumiu e o cartão voltou ao estado parado', presa,
+    JSON.stringify({ falhou: true, cartao: true, barra: false, estado: 'na-nuvem' }));
+  conf('o livro está guardado inteiro', JSON.parse(await livroGuardado(pag, 'local-l') || '{}').sha, SHA['local-l']);
+  await abrirEstante(pag);
+  const refez = await esperar('a Estante se refez', () => existe(pag, '[data-livro="local-l"]'), v => v === true, 10000);
+  conf('aberta de novo, a Estante mostra o livro no tablet', refez.ok, true);
 
   secao('9. A conta troca no meio da conferência: a outra conta não vê nada da primeira');
   const outra = await conta('outra@exemplo.test', 'senha-da-outra-1');

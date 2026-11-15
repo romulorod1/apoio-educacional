@@ -59,7 +59,9 @@
  *      ele chega; o pacote removido com outro nome no catálogo não volta (o
  *      manifest o reconhece); a marca da remoção que não coube vira aviso;
  *  0b. sem a conta da nuvem (e no observador, seção 6), as frases do Drive de
- *      antes: a do cartão dos livros e a da pergunta do Remover livro;
+ *      antes: a do alto do cartão da Biblioteca (a dos pacotes), a do cartão
+ *      dos livros e a da pergunta do Remover livro, as duas primeiras pela
+ *      mesma porta (podeBaixarDaNuvem), mesmo com o Atualizar à vista;
  *   7. o nome e o título do pacote privado não aparecem em pedido nenhum, e
  *      todo pedido ao Storage foi um GET ?alt=media com "Authorization:
  *      Firebase", pelo caminho com o sha256, sem token e sem metadados;
@@ -86,7 +88,11 @@
  *   --envenenado-importar-durante-serie  o zip escolhido com a série andando
  *                                 entra por cima dela (6h vê);
  *   --envenenado-removido-por-outro-nome  a importação da nuvem não confere a
- *                                 marca pelo manifest (6h vê).
+ *                                 marca pelo manifest (6h vê);
+ *   --envenenado-frase-por-podeatualizar  a frase do alto do cartão volta a
+ *                                 seguir o podeAtualizarABiblioteca: sem a
+ *                                 conta, ela fala da nuvem e desmente a dos
+ *                                 livros (0b vê).
  *
  * Precisa do firebase-tools (FIREBASE_TOOLS) e de um JDK 21 em JAVA_HOME,
  * como o testa_livros_nuvem_baixar.js. Portas: 9081 (app), 9082 (auth), 9083
@@ -138,7 +144,9 @@ const VENENOS = {
   '--envenenado-livros-param-pacotes': ['erroDosLivros = e; return undefined; })', 'erroDosLivros = e; return null; })'],
   '--envenenado-importar-durante-serie': ["if (importandoBiblioteca || trazendoPacotes) { avisar('Espere a biblioteca terminar de atualizar; depois importe o pacote de novo.'); return; }",
     "if (false) { avisar('Espere a biblioteca terminar de atualizar; depois importe o pacote de novo.'); return; }"],
-  '--envenenado-removido-por-outro-nome': ["return typeof v === 'number' && typeof manifest.versao === 'number' && v >= manifest.versao;", 'return false;']
+  '--envenenado-removido-por-outro-nome': ["return typeof v === 'number' && typeof manifest.versao === 'number' && v >= manifest.versao;", 'return false;'],
+  // os últimos ajustes: a frase do alto do cartão pela porta do botão, e não pela da nuvem de verdade
+  '--envenenado-frase-por-podeatualizar': ['var daNuvem = podeBaixarDaNuvem();   // a porta das duas frases', 'var daNuvem = podeAtualizarABiblioteca();']
 };
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && !VENENOS[a]);
@@ -527,7 +535,15 @@ async function tocarSemEfeito(pag) {
   const DRIVE_AJUDA = 'Os livros ficam só neste tablet: a cópia de segurança não os leva. Para usar num tablet novo, importe o pacote de livros de novo do Drive.';
   const DRIVE_PERGUNTA = 'Tirar "Livro sintético do tablet" deste tablet?\n\nPara ler de novo, é só importar o pacote de livros outra vez do Drive. O lugar onde você parou ' +
     'neste livro não fica guardado.\n\nVoltam ';
+  const DRIVE_ALTO = 'Os pacotes ficam guardados no Google Drive. A cópia de segurança não leva os pacotes: num tablet novo, importe de novo do Drive.';
   const fs0 = await frasesDosLivros();
+  if (MODO === '--envenenado-frase-por-podeatualizar') {
+    conf('VENENO visto: sem a conta, o alto do cartão fala do Atualizar a biblioteca e desmente a frase dos livros, que fala do Drive',
+      /chegam pelo Atualizar a biblioteca/.test(fs0.alto) && fs0.ajuda === DRIVE_AJUDA, true);
+    return fim();
+  }
+  conf('0b. sem a nuvem, o Atualizar a biblioteca está à vista (o botão segue a porta dele)', await pag.evaluate(() => !!document.querySelector('#livros-nuvem-atualizar')), true);
+  conf('0b. sem a nuvem, o alto do cartão diz a frase do Drive de antes', fs0.alto, DRIVE_ALTO);
   conf('0b. sem a nuvem, o cartão dos livros diz a frase do Drive de antes', fs0.ajuda, DRIVE_AJUDA);
   conf('0b. sem a nuvem, a pergunta do Remover livro é a de antes', fs0.pergunta.slice(0, DRIVE_PERGUNTA.length), DRIVE_PERGUNTA);
   conf('0b. e o livro continua no tablet (ela respondeu que não)', await pag.evaluate(() => Store.listarLivros().then(l => l.length)), 1);

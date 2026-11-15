@@ -17906,12 +17906,20 @@
       atualizarCartoesDaNuvem();
       // o sha256 de um livro de 200 MB leva alguns segundos no tablet: o cartão mostra o andamento da conferência
       var aoConferir = function (n) { baixa.conferidos = n; atualizarCartoesDaNuvem(); };
-      return conferirLivroBaixado(arquivo, e, aoConferir).then(function () { seCancelou(); return guardarLivroBaixado(arquivo, e); });
+      return conferirLivroBaixado(arquivo, e, aoConferir).then(function () {
+        seCancelou();
+        // gravar um livro grande no IndexedDB também leva uns segundos: o cartão diz que está guardando, e não fica no 100%
+        baixa.fase = 'guardando';
+        atualizarCartoesDaNuvem();
+        return guardarLivroBaixado(arquivo, e);
+      });
     }).then(function (r) {
       /* a vaga da baixa só se solta DEPOIS de a Estante se refazer: até lá o
        * cartão "Na nuvem" ainda está à vista, e o toque nele devolve esta
-       * mesma baixa em vez de começar outra (revisão das lentes) */
-      var soltar = function (v) { baixaDaNuvem = null; return v; };
+       * mesma baixa em vez de começar outra (revisão das lentes). Ao soltar,
+       * os cartões se acertam: se a Estante não se refez, a barra por cima
+       * da capa some mesmo assim (nada fica preso no "Guardando o livro...") */
+      var soltar = function (v) { baixaDaNuvem = null; atualizarCartoesDaNuvem(); return v; };
       if (r && r.mesmoArquivo) {
         avisar('Este livro já está no tablet, com outro nome: ' + r.mesmoArquivo.titulo + '.');
         return Promise.resolve(desenharLivrosDaBiblioteca()).then(function () { return soltar(false); }, function () { return soltar(false); });
@@ -17988,6 +17996,7 @@
         var conferido = baixaDaNuvem.total ? Math.min(100, Math.floor(baixaDaNuvem.conferidos * 100 / baixaDaNuvem.total)) : 0;
         return { chave: 'conferindo', texto: 'Conferindo o livro... ' + conferido + '%', pct: conferido };
       }
+      if (baixaDaNuvem.fase === 'guardando') return { chave: 'guardando', texto: 'Guardando o livro...', pct: 100 };
       var pct = baixaDaNuvem.total ? Math.min(100, Math.floor(baixaDaNuvem.recebidos * 100 / baixaDaNuvem.total)) : 0;
       return { chave: 'baixando', texto: 'Baixando · ' + pct + '%', pct: pct };
     }
@@ -18000,7 +18009,7 @@
   function linhaDoLivroNaNuvem(id) {
     var est = estadoDoLivroNaNuvem(id);
     return el('span', { class: 'bibl-nuvem-estado', 'data-nuvem-estado': est.chave, role: 'status' }, [
-      el('span', { class: 'bibl-pequena' + (est.chave === 'na-nuvem' || est.chave === 'baixando' || est.chave === 'conferindo' ? '' : ' bibl-nuvem-falha') },
+      el('span', { class: 'bibl-pequena' + (est.chave === 'na-nuvem' || est.chave === 'baixando' || est.chave === 'conferindo' || est.chave === 'guardando' ? '' : ' bibl-nuvem-falha') },
         [icone('cloud'), est.texto])
     ]);
   }
@@ -18022,7 +18031,7 @@
     var sobre = c.querySelector('.bibl-nuvem-sobre-capa');
     if (!sobre) return;
     var est = estadoDoLivroNaNuvem(id);
-    var ativa = est.chave === 'baixando' || est.chave === 'conferindo';
+    var ativa = est.chave === 'baixando' || est.chave === 'conferindo' || est.chave === 'guardando';
     sobre.hidden = !ativa;
     var i = sobre.querySelector('.bibl-progresso i');
     if (i) i.style.width = (ativa ? est.pct || 0 : 0) + '%';
@@ -18508,17 +18517,32 @@
    * traz da nuvem: nunca no celular nem no observador. Um lugar só, com os
    * mesmos ids (#livros-nuvem-estado e #livros-nuvem-atualizar). */
   function podeAtualizarABiblioteca() { return !modoCelular && !aparelhoSoLe() && temNuvem(); }
+  /* As duas frases de onde vêm as coisas (a do alto do cartão, dos pacotes, e
+   * a do cartão dos livros) seguem a MESMA porta: podeBaixarDaNuvem, a conta
+   * dela neste tablet. Sem a conta, as duas falam do Drive, como antes da
+   * nuvem, mesmo com o Atualizar a biblioteca à vista; entrar e sair da
+   * nuvem as acerta na hora (Nuvem.aoMudar, em iniciarNuvem). */
+  function fraseDosLivrosDeOnde(daNuvem) {
+    return daNuvem
+      ? 'Os livros ficam neste tablet: a cópia de segurança não os leva. Os que estão na sua nuvem aparecem na Estante e baixam com um toque, um por vez.'
+      : 'Os livros ficam só neste tablet: a cópia de segurança não os leva. Para usar num tablet novo, importe o pacote de livros de novo do Drive.';
+  }
+  function acertarFrasesDeOnde() {
+    var daNuvem = podeBaixarDaNuvem();   // a porta das duas frases
+    var pacotes = $('#biblioteca-de-onde');
+    if (pacotes) {
+      pacotes.textContent = daNuvem ? 'Os pacotes que estão na sua nuvem chegam pelo Atualizar a biblioteca; os outros, importe do Google Drive. A cópia de segurança não leva os pacotes.'
+        : 'Os pacotes ficam guardados no Google Drive. A cópia de segurança não leva os pacotes: num tablet novo, importe de novo do Drive.';
+    }
+    var livros = $('#livros-de-onde');
+    if (livros) livros.textContent = fraseDosLivrosDeOnde(daNuvem);
+  }
   function desenharAtualizarDaBiblioteca() {
     var caixa = $('#biblioteca-nuvem');
     if (!caixa) return;
     caixa.innerHTML = '';
     var pode = podeAtualizarABiblioteca();
-    // a frase do alto do cartão: sem o botão, a do Drive, como antes da nuvem
-    var deOnde = $('#biblioteca-de-onde');
-    if (deOnde) {
-      deOnde.textContent = pode ? 'Os pacotes que estão na sua nuvem chegam pelo Atualizar a biblioteca; os outros, importe do Google Drive. A cópia de segurança não leva os pacotes.'
-        : 'Os pacotes ficam guardados no Google Drive. A cópia de segurança não leva os pacotes: num tablet novo, importe de novo do Drive.';
-    }
+    acertarFrasesDeOnde();
     if (!pode) return;
     // o botão tem o tamanho do Importar biblioteca e do Exportar, logo abaixo; com a série andando, ele nasce desligado
     var linha = el('div', { class: 'ajuda cresce', id: 'livros-nuvem-estado' });
@@ -18570,9 +18594,7 @@
         el('div', { class: 'livros-total', id: 'livros-total', 'data-bytes': String(total),
           texto: lista.length + (lista.length === 1 ? ' livro, ' : ' livros, ') + Biblioteca.mb(total) + ' no total' }),
         // o aparelho que não baixa da nuvem (o celular, o observador, sem a conta) fica com a frase de antes, a do Drive
-        el('div', { class: 'ajuda u-margem-0-0-6', id: 'livros-de-onde', texto: podeBaixarDaNuvem()
-          ? 'Os livros ficam neste tablet: a cópia de segurança não os leva. Os que estão na sua nuvem aparecem na Estante e baixam com um toque, um por vez.'
-          : 'Os livros ficam só neste tablet: a cópia de segurança não os leva. Para usar num tablet novo, importe o pacote de livros de novo do Drive.' })
+        el('div', { class: 'ajuda u-margem-0-0-6', id: 'livros-de-onde', texto: fraseDosLivrosDeOnde(podeBaixarDaNuvem()) })
       ].concat(linhas)));
     }).catch(function () { quantosLivros = 0; livrosDoTablet = []; livrosDoTabletMudaram(); if (caixa) caixa.innerHTML = ''; });
   }
@@ -28791,6 +28813,8 @@
     if (!temNuvem()) { desenharNuvem(); return; }
     Nuvem.informar({ versaoApp: VERSAO, persistente: persistenciaConcedida });
     Nuvem.aoMudar(desenharNuvem);
+    // entrar e sair da nuvem trocam as frases de onde vêm os pacotes e os livros, no cartão da Biblioteca
+    Nuvem.aoMudar(acertarFrasesDeOnde);
     // o lembrete da cópia, na agenda, acompanha a fila (relida) e o último envio confirmado
     Nuvem.aoMudar(function () { if (lembreteNuvemPronta) relerFilaDoLembrete(); });
     // (guardado: o código de antes da fatia 3, servido pelas provas de subida de banco, não tem aoReceber)
