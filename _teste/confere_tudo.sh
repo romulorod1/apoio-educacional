@@ -1663,6 +1663,10 @@ roda "trilha vinculos corrigidos"                  node "_teste/testa_trilha_vin
 # trilha do zero espera o Voltar do seletor antes de abrir (o veneno abre antes).
 roda "trilha do zero e Voltar"                     node "_teste/testa_trilha_do_zero_voltar.js"
 roda "trilha do zero --envenenado-trilha-antes-do-voltar" node "_teste/testa_trilha_do_zero_voltar.js" --envenenado-trilha-antes-do-voltar
+# F5: os sinais do seletor de assunto dizem o mesmo que a pagina do assunto (a mesma
+# fonte, fontesDoAssuntoNoApp); o veneno le o modulo direto, como no #158.
+roda "seletor: sinais = pagina do assunto"         node "_teste/testa_seletor_sinais_navegador.js"
+roda "seletor --envenenado-sinais-do-modulo"      node "_teste/testa_seletor_sinais_navegador.js" --envenenado-sinais-do-modulo
 roda "preço descartado não vaza"                  node "_teste/testa_preco_cancelado.js"
 roda "ações de aula no fechamento"                node "_teste/testa_acoes_fechamento.js"
 # C9: o documento do ciclo na tela. A contagem do que abre sozinho (janelas,

@@ -13203,13 +13203,14 @@
       desenhar();
     });
     corpo.appendChild(el('div', { class: 'barra tema-busca' }, [campoBusca]));
-    /* Os sinais só existem nos assuntos de Matemática (onde a biblioteca tem
-     * módulos): a legenda só aparece quando há sinal na tela, para "apagado"
-     * nunca querer dizer "não se aplica". O sinal de OBMEP fica de fora até
-     * haver fonte confiável de listas por assunto (sinaisDoAssunto). */
+    /* Os sinais só existem nos assuntos de Matemática do índice (os que têm
+     * página do assunto): a legenda só aparece quando há sinal na tela, para
+     * "apagado" nunca querer dizer "não se aplica". Os três sinais dizem o
+     * mesmo que as seções da página do assunto (sinaisDoAssunto). */
     var legenda = el('div', { class: 'tema-legenda', id: 'tema-legenda', 'aria-label': 'Legenda dos materiais relacionados' }, [
       el('span', {}, [icone('book'), document.createTextNode('Teoria da biblioteca')]),
-      el('span', {}, [icone('exerc'), document.createTextNode('Exercícios')])
+      el('span', {}, [icone('exerc'), document.createTextNode('Exercícios')]),
+      el('span', {}, [icone('medal'), document.createTextNode('OBMEP')])
     ]);
     legenda.hidden = true;
     corpo.appendChild(legenda);
@@ -13241,7 +13242,8 @@
       return item;
     }
 
-    var ROTULOS_SINAL = { teoria: 'teoria da biblioteca', exercicios: 'exercícios' };
+    var ROTULOS_SINAL = { teoria: 'teoria da biblioteca', exercicios: 'exercícios', obmep: 'OBMEP' };
+    var ICONES_SINAL = { teoria: 'book', exercicios: 'exerc', obmep: 'medal' };
     function ehDeMatematica(assunto) {
       return !!assunto && (!assunto.disciplina || assunto.disciplina === Core.MATERIA_PADRAO);
     }
@@ -13250,11 +13252,13 @@
       var item = linha(titulo, detalhe, aoTocar);
       item._assuntoDisponibilidade = assunto;
       item._detalheBase = detalhe;
-      if (ehDeMatematica(assunto)) {
-        var sinais = el('span', { class: 'tema-sinais', 'aria-label': 'Materiais relacionados' }, [
-          el('span', { class: 'tema-sinal', 'data-tipo-sinal': 'teoria', 'aria-label': 'Sem ' + ROTULOS_SINAL.teoria, role: 'img' }, [icone('book')]),
-          el('span', { class: 'tema-sinal', 'data-tipo-sinal': 'exercicios', 'aria-label': 'Sem ' + ROTULOS_SINAL.exercicios, role: 'img' }, [icone('exerc')])
-        ]);
+      // só o assunto do índice (com id) tem página do assunto para os sinais repetirem
+      if (ehDeMatematica(assunto) && assunto.id) {
+        item.setAttribute('data-assunto-id', assunto.id);
+        var sinais = el('span', { class: 'tema-sinais', 'aria-label': 'Materiais relacionados' },
+          Object.keys(ROTULOS_SINAL).map(function (tipo) {
+            return el('span', { class: 'tema-sinal', 'data-tipo-sinal': tipo, 'aria-label': 'Sem ' + ROTULOS_SINAL[tipo], role: 'img' }, [icone(ICONES_SINAL[tipo])]);
+          }));
         // escondidos até a biblioteca carregar: sinal apagado antes de saber seria mentira
         sinais.hidden = true;
         item.appendChild(sinais);
@@ -13269,14 +13273,12 @@
     function disponibilidadeDoAssunto(assunto) {
       var chave = (assunto && (assunto.id || '')) + '|' + (assunto && (assunto.titulo || ''));
       if (Object.prototype.hasOwnProperty.call(memoDisponibilidade, chave)) return memoDisponibilidade[chave];
-      var r = { resumo: '', estado: { teoria: false, exercicios: false } };
+      var r = { resumo: '', estado: { teoria: false, exercicios: false, obmep: false } };
       if (bib && ehDeMatematica(assunto)) {
         var achado = moduloDoAssunto(assunto);
         var mod = achado && bib.modulos[achado.chave];
-        if (mod) {
-          r.resumo = resumoDisponibilidadeDoAssunto(assunto, mod);
-          r.estado = sinaisDoAssunto(assunto, mod);
-        }
+        if (mod) r.resumo = resumoDisponibilidadeDoAssunto(assunto, mod);
+        if (assunto.id) r.estado = sinaisDoAssunto(assunto);
       }
       memoDisponibilidade[chave] = r;
       return r;
@@ -20173,14 +20175,24 @@
     return partes.length ? 'Módulo relacionado no tablet: ' + mod.titulo + ' (' + partes.join(', ') + ')' : '';
   }
 
-  /* F5: os sinais do seletor de assunto da aula (teoria da biblioteca e
-   * exercícios), lidos direto do módulo do assunto, como no #158. É a ÚNICA
-   * fonte dos sinais: trocar para o fontesDoAssuntoNoApp, ou acrescentar o
-   * sinal de OBMEP, é mudar só aqui (decisões pendentes). */
-  function sinaisDoAssunto(assunto, mod) {
+  /* F5: os sinais do seletor de assunto da aula. A fonte é a MESMA da página
+   * do assunto (fontesDoAssuntoNoApp, com os mesmos argumentos que a
+   * montarPaginaDoAssunto passa), e cada sinal é uma seção do bloco "Teoria e
+   * exercícios" dela: teoria; exercícios (a lista de base ou os exercícios);
+   * OBMEP. Assim o seletor e a página nunca dizem coisas diferentes sobre o
+   * que existe. É a ÚNICA fonte dos sinais. */
+  function sinaisDoAssunto(assunto) {
+    var serie = null;
+    if (indiceTemas) {
+      for (var i = 0; i < indiceTemas.length; i++) {
+        if (indiceTemas[i].id === assunto.id) { serie = indiceTemas[i].serie || null; break; }
+      }
+    }
+    var f = (bib && assunto && assunto.id ? fontesDoAssuntoNoApp(assunto.id, null, serie) : null) || {};
     return {
-      teoria: !!(mod && mod.teorias && mod.teorias.length),
-      exercicios: !!(mod && contarItens(mod))
+      teoria: !!(f.teoria || []).length,
+      exercicios: !!f.listaBase || !!(f.exercicios || []).length,
+      obmep: !!(f.obmep || []).length
     };
   }
 

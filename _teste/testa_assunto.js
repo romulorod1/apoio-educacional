@@ -375,15 +375,16 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
       aulaVisivelAoFundo: document.querySelector('#modal-aula').classList.contains('aberto'),
       naoRepeteNome: !contexto || !contexto.textContent.includes(nome),
       legendaCoerente: !!legenda && legenda.hidden === !document.querySelector('#lista-assuntos .tema-sinais:not([hidden])'),
-      legendaSemObmep: !!legenda && !/OBMEP/.test(legenda.textContent),
-      semSinalObmep: !document.querySelector('[data-tipo-sinal="obmep"]'),
-      sinaisSoEmMatematica: Array.from(document.querySelectorAll('#lista-assuntos .tema-sinais')).every(s => s.children.length === 2)
+      legendaComObmep: !!legenda && /OBMEP/.test(legenda.textContent),
+      // os três sinais da página do assunto em toda linha que os tem: teoria, exercícios e OBMEP
+      tresSinais: Array.from(document.querySelectorAll('#lista-assuntos .tema-sinais')).every(s =>
+        Array.from(s.children).map(c => c.dataset.tipoSinal).join(',') === 'teoria,exercicios,obmep')
     };
   }, marcelo.nome);
   conf('o seletor abre em painel lateral mantendo a aula atrás', painelAssunto.lateral && painelAssunto.altura && painelAssunto.aulaVisivelAoFundo, true);
   conf('o contexto do seletor não repete o nome que já está no título', painelAssunto.naoRepeteNome, true);
-  conf('a legenda só aparece quando há sinal na tela, e sem OBMEP',
-    painelAssunto.legendaCoerente + '|' + painelAssunto.legendaSemObmep + '|' + painelAssunto.semSinalObmep + '|' + painelAssunto.sinaisSoEmMatematica, 'true|true|true|true');
+  conf('a legenda só aparece quando há sinal na tela, e diz teoria, exercícios e OBMEP',
+    painelAssunto.legendaCoerente + '|' + painelAssunto.legendaComObmep + '|' + painelAssunto.tresSinais, 'true|true|true');
 
   /* F5 (revisão): o Voltar do aparelho fecha SÓ o painel de assunto; a aula
    * atrás continua aberta E com a entrada dela no histórico, para o Voltar

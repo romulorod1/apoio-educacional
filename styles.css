@@ -742,10 +742,12 @@ label.campo-checkbox {
 .tema-legenda { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 10px; color: var(--muted); font-size: var(--letra-12); }
 .tema-legenda > span { display: inline-flex; align-items: center; gap: 4px; }
 .tema-legenda .ico { width: 14px; height: 14px; }
-.tema-sinais { display: grid; grid-template-columns: repeat(2, 16px); gap: 10px; flex: 0 0 auto; color: var(--muted); }
+.tema-sinais { display: grid; grid-template-columns: repeat(3, 16px); gap: 8px; flex: 0 0 auto; color: var(--muted); }
 .tema-sinal { width: 16px; height: 16px; display: grid; place-items: center; opacity: .24; }
 .tema-sinal.disponivel { opacity: 1; color: var(--navy); }
 .tema-sinal .ico { width: 14px; height: 14px; }
+/* o display acima venceria o atributo hidden: a legenda e os sinais escondidos somem de verdade */
+.tema-legenda[hidden], .tema-sinais[hidden] { display: none; }
 .irmao-aninhado { margin-left: 20px; width: calc(100% - 20px); }
 .dominio-assuntos-privado { margin-bottom: 8px; }
 .dominio-assunto-controles { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
