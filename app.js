@@ -33186,6 +33186,10 @@
         // o que ela disse no ajuste vem depois do pedido na conferência do conteúdo ("ainda não tem conteúdo" desfaz o aviso)
         // um item por ajuste, mesmo vazio, para o "Desfazer ajuste" tirar o dele
         p.textosDosAjustes.push(textoDoAjuste || '');
+        /* Tirar ou voltar a seção "Datas e conteúdo das provas": o app
+         * garante, mesmo quando o modelo não muda o campo (relato de
+         * 15/11/2026: "O plano ficou igual"), e as provas ficam. */
+        lido.plano = Planejamento.aplicarIntencaoDoQuadro(p.plano, lido.plano, textoDoAjuste);
         p.mudou = Planejamento.resumoDaMudanca(p.plano, lido.plano);
         p.ajustando = false;
         p.textoAjuste = '';
@@ -33257,7 +33261,6 @@
           desenharPlanejamento();
         }, !grava)
     ]));
-
     /* A conferência: o que a IA marcou e o que o app conferiu, UM aviso por
      * prova, num selo recolhível, na mesma linha do "Mudar algo?". O selo só
      * aparece com o aluno escolhido. Cada item é tocável e ACRESCENTA o dia ao

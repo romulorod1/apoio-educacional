@@ -1,0 +1,2 @@
+# Relato de 15/11/2026: pedir "Remover a seção datas e conteúdo das provas" dava "O plano ficou igual". Ela nota: é o pedido dela. Sem botão, por decisão do dono: a IA entende o pedido.
+No planejamento, peça em "O que mudar?" para tirar a seção "Datas e conteúdo das provas" (ou "só o calendário"): a folha sai só com o calendário, e as provas continuam nos dias. Para voltar, peça a seção de volta.
