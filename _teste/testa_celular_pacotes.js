@@ -45,6 +45,9 @@
  *      chega ao abrir e a Biblioteca se refaz por baixo (esquecerMinhasListas);
  *      o espelho das seleções anteriores (espelharAnteriores) NÃO chama
  *      gravarListaBiblioteca no celular;
+ *  6c. a falha que passa não fica anotada: a nuvem que não deixa (403) e a
+ *      falta de espaço ao gravar (QuotaExceededError) esperam, e o pacote
+ *      chega na abertura seguinte (a espera fica na memória);
  *   9. a troca de versão no meio de uma série do celular não pergunta nada (a
  *      pergunta da importação é do tablet), e nenhum aviso aparece na tela
  *      enquanto a série do celular anda;
@@ -138,7 +141,8 @@ const ZIP = {
   sond: Sintetico.gerarSondagem(null, { versao: 1 }).zip,
   banco: Sintetico.gerarBanco(null, { versao: 1 }).zip,
   ruim: Sintetico.gerarBanco(null, { versao: 2 }).zip,      // o catálogo diz outro sha256 para ele: nunca confere
-  tardio: Sintetico.gerarProva(null, { serie: '3em', versao: 1 }).zip   // entra no fim, devagar (seção 9)
+  tardio: Sintetico.gerarProva(null, { serie: '3em', versao: 1 }).zip,   // entra no fim, devagar (seção 9)
+  cheio: Sintetico.gerarBanco(null, { versao: 3 }).zip      // a nuvem nega, depois falta espaço, depois entra (6c)
 };
 const SHA = {};
 Object.keys(ZIP).forEach(k => { SHA[k] = hex(ZIP[k]); });
@@ -197,7 +201,7 @@ function derrubarEmulador() {
 }
 /* ---------- o repasse do Storage: conta os bytes e deixa um zip devagar ---------- */
 const http = require('http');
-const repasse = { lentoSha: null, enviados: {}, cortados: [], completos: [] };
+const repasse = { lentoSha: null, negarSha: null, enviados: {}, cortados: [], completos: [] };
 const servidorRepasse = http.createServer((req, res) => {
   const cab = Object.assign({}, req.headers, { host: '127.0.0.1:' + PORTA_ST });
   const ida = http.request({ host: '127.0.0.1', port: PORTA_ST, method: req.method, path: req.url, headers: cab }, volta => {
@@ -207,6 +211,13 @@ const servidorRepasse = http.createServer((req, res) => {
       return;
     }
     const sha = (/([0-9a-f]{64})\.zip/.exec(decodeURIComponent(req.url)) || [])[1] || '?';
+    // a nuvem que não deixa baixar este (as regras recusando): 403, como o Storage
+    if (repasse.negarSha === sha) {
+      volta.resume();
+      res.writeHead(403, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ error: { code: 403, message: 'Permission denied.' } }));
+      return;
+    }
     const partes = [];
     volta.on('data', p => partes.push(p));
     volta.on('end', async () => {
@@ -361,6 +372,12 @@ async function prepararPagina(pag, movel, rede) {
       get() { return store; },
       set(v) {
         if (v && typeof v.gravarListaBiblioteca === 'function' && !v.__embrulhado) {
+          // o aparelho cheio na hora de gravar o pacote (6c): o QuotaExceededError da transação
+          const gp = v.gravarPacoteBiblioteca;
+          v.gravarPacoteBiblioteca = function () {
+            if (localStorage.getItem('__cheio') === '1') return Promise.reject(new DOMException('cheio de teste', 'QuotaExceededError'));
+            return gp.apply(this, arguments);
+          };
           const g = v.gravarListaBiblioteca, a = v.apagarListaBiblioteca;
           v.gravarListaBiblioteca = function () { window.__listasChamadas++; return g.apply(this, arguments); };
           v.apagarListaBiblioteca = function () { window.__listasChamadas++; return a.apply(this, arguments); };
@@ -758,9 +775,43 @@ const PORTA_FECHADA = 'false,false,false,false,false,false,false,false,false,fal
   conf('(controle) a seleção anterior continua no diário do celular, sem ter ido para o depósito',
     await pagC.evaluate(() => JSON.parse(localStorage.getItem('apoio-educacional:bib-selecoes-anteriores') || '[]').length), 1);
 
+  secao('6c. A falha que passa (a nuvem nega, falta espaço ao gravar) espera, e o pacote chega na abertura seguinte');
+  const CATALOGO_6C = Object.assign({ 'matematica-sintetico-trocado': 'ruim', 'matematica-sintetico-cheio': 'cheio' }, CATALOGO_DONA);
+  conf('(arranjo) o pacote novo entrou no catálogo dela', (await publicar(U, CATALOGO_6C, true)).every(x => x === 200), true);
+  const doCheio = () => pagC.pedidosStorage.filter(u => u.indexOf(SHA.cheio) !== -1).length;
+  const falhouMarcado = sha => pagC.evaluate((u, x) => {
+    const v = JSON.parse(localStorage.getItem('apoio-educacional:pacotes-da-nuvem') || 'null');
+    const c = v && v.contas && v.contas[u] && v.contas[u].porSha && v.contas[u].porSha[x];
+    return !!c && typeof c.falhouEm === 'number';
+  }, U, sha);
+  const temCheio = async () => /matematica-sintetico-banco-n2@3/.test(await lerPacotes(pagC));
+  const reabrir = async rotulo => {
+    await pagC.goto(amb.ORIGEM + '/index.html', { waitUntil: 'domcontentloaded' });
+    await esperar(rotulo + ': a série começou', () => marca(pagC), v => /^(conferindo|trazendo )/.test(v || ''), 30000);
+    return (await esperar(rotulo + ': a série acabou', () => marca(pagC), v => ['prontos', 'faltam', 'falhou', 'parou', 'nada'].indexOf(v) >= 0, 60000)).valor;
+  };
+  // a) a nuvem nega (permissao): passa, sem marca
+  repasse.negarSha = SHA.cheio;
+  const a6 = await reabrir('com a nuvem negando');
+  conf('a nuvem negou: o pacote não entrou, e a falha não ficou anotada no sha256', a6 + '|' + doCheio() + '|' + await temCheio() + '|' + await falhouMarcado(SHA.cheio), 'faltam|1|false|false');
+  repasse.negarSha = null;
+  const n6c = pagC.pedidosStorage.length;
+  await pagC.evaluate(() => { window.__mudarRede('wifi'); });
+  await pausa(2500);
+  conf('logo depois, a mudança da conexão espera (a espera de 10 min): nada é pedido', pagC.pedidosStorage.length - n6c, 0);
+  // b) a abertura seguinte (a espera passou: ela fica na memória) tenta de novo; agora falta espaço ao gravar
+  await pagC.evaluate(() => { localStorage.setItem('__cheio', '1'); });
+  const b6 = await reabrir('com o aparelho cheio ao gravar');
+  conf('sem espaço ao gravar: baixou de novo, não entrou, e a falha não ficou anotada', b6 + '|' + doCheio() + '|' + await temCheio() + '|' + await falhouMarcado(SHA.cheio), 'faltam|2|false|false');
+  // c) o espaço voltou: a abertura seguinte o traz
+  await pagC.evaluate(() => { localStorage.removeItem('__cheio'); });
+  const c6x = await reabrir('com espaço de novo');
+  conf('com espaço de novo, a abertura seguinte trouxe o pacote', c6x + '|' + doCheio() + '|' + await temCheio(), 'prontos|3|true');
+  conf('e o de sha256 errado continua com uma baixa só, anotado', doRuim() + '|' + await falhouMarcado(SHA_RUIM_NO_CATALOGO), '1|true');
+
   secao('9. A troca de versão no meio de uma série do celular não pergunta nada');
   conf('(arranjo) o pacote que chega por último entrou no catálogo dela',
-    (await publicar(U, Object.assign({ 'matematica-sintetico-trocado': 'ruim', 'matematica-sintetico-tardio-3em': 'tardio' }, CATALOGO_DONA), true)).every(x => x === 200), true);
+    (await publicar(U, Object.assign({ 'matematica-sintetico-tardio-3em': 'tardio' }, CATALOGO_6C), true)).every(x => x === 200), true);
   repasse.lentoSha = SHA.tardio;
   repasse.enviados = {};
   const dialogos9 = pagC.dialogos.length;

@@ -17226,6 +17226,7 @@
       if (alheio) {
         var r2 = new Error('Repete conteúdo que já veio do pacote ' + alheio.pacote + '.');
         r2.recusa = true;
+        r2.repetido = true;   // o celular (A1) não baixa de novo o mesmo arquivo: ele repete sempre
         r2.tipo = 'defeito';
         throw r2;
       }
@@ -17268,7 +17269,7 @@
       if (e && e.puloAntesDeLer) return e.puloAntesDeLer;
       if (e && e.versaoAtual != null) return resultadoDePulo(e.versaoAtual, aberto.manifest.versao);
       var linhas = linhasDaRecusa(e);
-      return { estado: 'falhou', classe: 'faixa-aviso', linhas: linhas, porque: porqueDaRecusa(linhas) };
+      return { estado: 'falhou', classe: 'faixa-aviso', linhas: linhas, porque: porqueDaRecusa(linhas), repetido: !!(e && e.repetido) };
     });
   }
 
@@ -18369,14 +18370,16 @@
     outro: 'não baixou agora. Toque em Atualizar a biblioteca de novo para tentar.'
   };
 
-  /* A falha de REDE (sem rede, a baixa parada ou cortada, o Wi-Fi que caiu, a
-   * entrada vencida, o servidor ocupado; e a conta do espaço antes de baixar,
-   * que nem chega a baixar): o celular tenta de novo depois de uma espera que
-   * cresce (ESPERAS_DE_REDE_DO_CELULAR_MS). As outras são do próprio pacote (o
-   * sha256 que não confere, a nuvem que não deixa, o pacote ausente, e toda
-   * recusa da importação: o id que outro pacote já trouxe, a falta de espaço
-   * ao gravar): ficam anotadas por sha256 e nunca baixam de novo. */
-  var FALHAS_PASSAGEIRAS = { 'sem-rede': true, rede: true, cancelada: true, entrar: true, 'sem-espaco': true, outro: true };
+  /* No celular (A1), só DUAS falhas são do próprio arquivo e ficam anotadas
+   * por sha256, sem baixar de novo até o catálogo trazer outro sha256: o
+   * sha256 (ou o tamanho) que não confere com o catálogo, e o conteúdo
+   * repetido (o id que outro pacote já trouxe). Todas as outras passam: a
+   * rede, o Wi-Fi que caiu, a entrada vencida, o servidor ocupado, a nuvem que
+   * não deixa (permissao), o pacote ainda ausente, a falta de espaço (antes de
+   * baixar, na conta de 1,2 vez da importação ou o QuotaExceededError ao
+   * gravar) e a transação interrompida. Essas esperam a ESPERA DA REDE
+   * (ESPERAS_DE_REDE_DO_CELULAR_MS, na memória: 10 min, 1 h, 6 h), e a
+   * abertura seguinte do aplicativo tenta de novo. */
   /* Um pacote: baixa, confere o sha256 e importa pelo caminho do zip.
    * NUNCA rejeita: devolve a linha do resumo, com a identidade que o zip
    * mostrou (quando chegou a ser lido). */
@@ -18415,12 +18418,12 @@
     }).then(function (r) {
       return { nome: ctx.nome, arquivo: arquivo, estado: r.estado, motivo: r.motivo, versaoAtual: r.versaoAtual, versaoNova: r.versaoNova,
         porque: r.porque || null, errosLivros: r.errosLivros || null, exercicios: !!r.exercicios, identidade: ctx.identidade, sha256: e.sha256,
-        // a importação que recusou o pacote (repetido, defeito, sem espaço ao gravar) recusa de novo o mesmo arquivo
-        passageira: false };
+        // só o conteúdo repetido recusa sempre o mesmo arquivo; o resto (sem espaço, transação interrompida) passa
+        passageira: r.estado === 'falhou' && !r.repetido };
     }, function (err) {
       var motivo = motivoDaFalhaDaBaixa(err);
       return { nome: ctx.nome, arquivo: arquivo, estado: 'falhou', porque: { texto: FRASES_DO_PACOTE[motivo] || FRASES_DO_PACOTE.outro, detalhe: '' },
-        exercicios: false, identidade: null, sha256: e.sha256, passageira: FALHAS_PASSAGEIRAS[motivo] === true };
+        exercicios: false, identidade: null, sha256: e.sha256, passageira: motivo !== 'conferencia' };
     });
   }
 
@@ -18653,7 +18656,7 @@
     } }).then(function (c) {
       var fim = !c ? 'nada' : c.semEspaco ? 'sem-espaco' : c.parou ? 'parou' : c.falharam ? 'faltam' : 'prontos';
       if (c && c.falharamDeRede) {
-        // a rede falhou: 10 min, 1 h, 6 h
+        // uma falha que passa (a rede, o espaço, a permissão...): 10 min, 1 h, 6 h
         proximaConferenciaNoCelular = Date.now() + ESPERAS_DE_REDE_DO_CELULAR_MS[Math.min(falhasDeRedeSeguidasNoCelular, ESPERAS_DE_REDE_DO_CELULAR_MS.length - 1)];
         falhasDeRedeSeguidasNoCelular++;
       } else {
