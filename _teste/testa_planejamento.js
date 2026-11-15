@@ -257,6 +257,29 @@ const AGENDA = [{ data: '2026-11-10', hora: '11:00' }, { data: '2026-11-12', hor
   conf('o quadro "Datas e conteúdo das provas"', t.indexOf('Datas e conteúdo das provas') >= 0, true);
   conf('o incerto NUNCA vai para a folha', /incert|confira/i.test(junto), false);
 
+  /* A divisão dos dias no papel (feedback de uma família em 15/11/2026:
+   * "quando imprime fica difícil ver a divisão dos dias"). Cada dia DO
+   * PERÍODO é uma placa COR.soft com moldura no COR.fioForte (passa de 3:1
+   * contra o branco) a 0,8 pt e os 4 cantos arredondados (4 curvas "c"),
+   * pintada com "B"; o dia fora do período fica sem moldura. Conta pelos
+   * operadores do PDF: 12 dias (9 a 20/11) dão 12 placas; com moldura nos 2
+   * dias de fora seriam 14, e sem moldura, 0. */
+  const cor6 = c => c.map(v => v.toFixed(6)).join(' ');
+  const NUM = '[-\\d.]+';
+  const CURVA = '(?: ' + NUM + '){6} c';
+  const PLACA_DO_DIA = new RegExp(cor6(G.COR.soft) + ' rg ' + cor6(G.COR.fioForte) + ' RG 0\\.80 w ' + NUM + ' ' + NUM + ' m' +
+    '(?: ' + NUM + ' ' + NUM + ' l' + CURVA + '){4} h B', 'g');
+  const filetes = b => (Buffer.from(b).toString('latin1').match(PLACA_DO_DIA) || []).length;
+  conf('(arranjo) o fioForte passa de 3:1 contra o branco e a borda tem 0,8 pt', (() => {
+    const lin = v => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+    const L = 0.2126 * lin(G.COR.fioForte[0]) + 0.7152 * lin(G.COR.fioForte[1]) + 0.0722 * lin(G.COR.fioForte[2]);
+    return 1.05 / (L + 0.05) > 3;
+  })(), true);
+  conf('cada dia do período tem a placa com moldura forte e cantos redondos, e o dia fora dele não (12 dias, 12 placas)', filetes(r.bytes), 12);
+  conf('outro período: 9 a 13/11 (5 dias) dá 5 placas', filetes(P.desenharFolha(planoBase({ fim: '2026-11-13', provas: [] }), { nome: 'Ana', aulas: [] }, G).bytes), 5);
+  conf('nenhuma placa clara de dia sem moldura sobrou (o soft só aparece dentro da placa redonda)',
+    (Buffer.from(r.bytes).toString('latin1').match(new RegExp(cor6(G.COR.soft) + ' rg ' + NUM + ' ' + NUM + ' ' + NUM + ' ' + NUM + ' re f', 'g')) || []).length, 0);
+
   const semAgenda = textoDoPdf(P.desenharFolha(planoBase(), { nome: 'Ana', aulas: [] }, G).bytes);
   conf('agenda vazia: nenhuma "Aula com a Nath" (a aula nunca vem do modelo)', semAgenda.filter(x => /Aula com a Nath/.test(x)).length, 0);
   const conf2 = textoDoPdf(P.desenharFolha(planoBase({ extra: { aulaAConfirmar: ['2026-11-13', '2026-11-12'] } }), { nome: 'Ana', aulas: AGENDA }, G).bytes);
