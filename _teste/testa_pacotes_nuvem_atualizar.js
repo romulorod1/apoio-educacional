@@ -92,7 +92,10 @@
  *   --envenenado-frase-por-podeatualizar  a frase do alto do cartão volta a
  *                                 seguir o podeAtualizarABiblioteca: sem a
  *                                 conta, ela fala da nuvem e desmente a dos
- *                                 livros (0b vê).
+ *                                 livros (0b vê);
+ *   --envenenado-sem-ouvinte-das-frases  sem o Nuvem.aoMudar das frases:
+ *                                 entrar e sair da nuvem não as trocam até a
+ *                                 tela se refazer (0b vê, sem trocar de aba).
  *
  * Precisa do firebase-tools (FIREBASE_TOOLS) e de um JDK 21 em JAVA_HOME,
  * como o testa_livros_nuvem_baixar.js. Portas: 9081 (app), 9082 (auth), 9083
@@ -146,7 +149,9 @@ const VENENOS = {
     "if (false) { avisar('Espere a biblioteca terminar de atualizar; depois importe o pacote de novo.'); return; }"],
   '--envenenado-removido-por-outro-nome': ["return typeof v === 'number' && typeof manifest.versao === 'number' && v >= manifest.versao;", 'return false;'],
   // os últimos ajustes: a frase do alto do cartão pela porta do botão, e não pela da nuvem de verdade
-  '--envenenado-frase-por-podeatualizar': ['var daNuvem = podeBaixarDaNuvem();   // a porta das duas frases', 'var daNuvem = podeAtualizarABiblioteca();']
+  '--envenenado-frase-por-podeatualizar': ['var daNuvem = podeBaixarDaNuvem();   // a porta das duas frases', 'var daNuvem = podeAtualizarABiblioteca();'],
+  // entrar e sair da nuvem sem o ouvinte: as frases só se trocam quando a tela se refaz
+  '--envenenado-sem-ouvinte-das-frases': ['Nuvem.aoMudar(acertarFrasesDeOnde);', '']
 };
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && !VENENOS[a]);
@@ -548,6 +553,23 @@ async function tocarSemEfeito(pag) {
   conf('0b. sem a nuvem, a pergunta do Remover livro é a de antes', fs0.pergunta.slice(0, DRIVE_PERGUNTA.length), DRIVE_PERGUNTA);
   conf('0b. e o livro continua no tablet (ela respondeu que não)', await pag.evaluate(() => Store.listarLivros().then(l => l.length)), 1);
   conf('entrou na nuvem com a conta de teste da dona', await entrar(pag, 'dona@exemplo.test', 'senha-da-dona-1'), true);
+  /* As frases trocam na hora, SEM trocar de aba (o ouvinte Nuvem.aoMudar, e
+   * não o redesenho de Ajustes): logo depois de entrar, e logo depois de sair. */
+  const NUVEM_ALTO = 'Os pacotes que estão na sua nuvem chegam pelo Atualizar a biblioteca; os outros, importe do Google Drive. A cópia de segurança não leva os pacotes.';
+  const NUVEM_AJUDA = 'Os livros ficam neste tablet: a cópia de segurança não os leva. Os que estão na sua nuvem aparecem na Estante e baixam com um toque, um por vez.';
+  const frasesNaTela = () => pag.evaluate(() => [(document.querySelector('#biblioteca-de-onde') || {}).textContent || '',
+    (document.querySelector('#livros-de-onde') || {}).textContent || ''].join('|'));
+  const aposEntrar = await esperar('as frases da nuvem logo depois de entrar', frasesNaTela, v => v === NUVEM_ALTO + '|' + NUVEM_AJUDA, 5000);
+  if (MODO === '--envenenado-sem-ouvinte-das-frases') {
+    conf('VENENO visto: sem o ouvinte, logo depois de entrar as frases continuam as do Drive', aposEntrar.valor, DRIVE_ALTO + '|' + DRIVE_AJUDA);
+    return fim();
+  }
+  conf('0b. logo depois de entrar, sem trocar de aba, as duas frases falam da nuvem', aposEntrar.valor, NUVEM_ALTO + '|' + NUVEM_AJUDA);
+  await pag.evaluate(() => Nuvem.sair());
+  const aposSair = await esperar('as frases do Drive logo depois de sair', frasesNaTela, v => v === DRIVE_ALTO + '|' + DRIVE_AJUDA, 5000);
+  conf('0b. logo depois de sair, sem trocar de aba, as duas frases voltam às do Drive', aposSair.valor, DRIVE_ALTO + '|' + DRIVE_AJUDA);
+  conf('entrou de novo na nuvem com a conta de teste da dona', await entrar(pag, 'dona@exemplo.test', 'senha-da-dona-1'), true);
+  conf('0b. e entrar de novo as traz de volta, na hora', (await esperar('as frases da nuvem de novo', frasesNaTela, v => v === NUVEM_ALTO + '|' + NUVEM_AJUDA, 5000)).ok, true);
   conf('nada foi baixado do Storage antes do toque', await totalStorage(pag), 0);
   // com a conta dela, o tablet baixa da nuvem: as frases novas (o controle do 0b)
   await H.irParaAba(pag, 'hoje');

@@ -18529,13 +18529,11 @@
   }
   function acertarFrasesDeOnde() {
     var daNuvem = podeBaixarDaNuvem();   // a porta das duas frases
-    var pacotes = $('#biblioteca-de-onde');
-    if (pacotes) {
-      pacotes.textContent = daNuvem ? 'Os pacotes que estão na sua nuvem chegam pelo Atualizar a biblioteca; os outros, importe do Google Drive. A cópia de segurança não leva os pacotes.'
-        : 'Os pacotes ficam guardados no Google Drive. A cópia de segurança não leva os pacotes: num tablet novo, importe de novo do Drive.';
-    }
-    var livros = $('#livros-de-onde');
-    if (livros) livros.textContent = fraseDosLivrosDeOnde(daNuvem);
+    // o ouvinte roda a cada aviso da nuvem: o texto só é escrito quando muda
+    var trocar = function (no, texto) { if (no && no.textContent !== texto) no.textContent = texto; };
+    trocar($('#biblioteca-de-onde'), daNuvem ? 'Os pacotes que estão na sua nuvem chegam pelo Atualizar a biblioteca; os outros, importe do Google Drive. A cópia de segurança não leva os pacotes.'
+      : 'Os pacotes ficam guardados no Google Drive. A cópia de segurança não leva os pacotes: num tablet novo, importe de novo do Drive.');
+    trocar($('#livros-de-onde'), fraseDosLivrosDeOnde(daNuvem));
   }
   function desenharAtualizarDaBiblioteca() {
     var caixa = $('#biblioteca-nuvem');

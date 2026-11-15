@@ -1355,6 +1355,8 @@ roda "pacotes da nuvem, atualizar --envenenado-importar-durante-serie" node "_te
 roda "pacotes da nuvem, atualizar --envenenado-removido-por-outro-nome" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-removido-por-outro-nome
 # os ultimos ajustes: sem a conta, a frase do alto do cartao fala do Drive, como a dos livros
 roda "pacotes da nuvem, atualizar --envenenado-frase-por-podeatualizar" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-frase-por-podeatualizar
+# entrar e sair da nuvem trocam as frases na hora, sem trocar de aba
+roda "pacotes da nuvem, atualizar --envenenado-sem-ouvinte-das-frases" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-sem-ouvinte-das-frases
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
