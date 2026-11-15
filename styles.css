@@ -2296,6 +2296,8 @@ button.alvo-rascunho:hover { background: var(--soft); }
 /* fase 1c: a linha da biblioteca na nuvem, com o botão ao lado (quebra quando falta largura) */
 #biblioteca-nuvem .livros-nuvem { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 10px; }
 #biblioteca-nuvem .livros-nuvem .ajuda { margin: 0; min-width: 12rem; overflow-wrap: anywhere; }
+/* as duas últimas palavras de cada pedaço da linha andam juntas: nenhuma fica sozinha na linha de baixo */
+#livros-nuvem-estado .junto { white-space: nowrap; }
 #lista-instalados-biblioteca > summary {
   cursor: pointer;
   color: inherit;
@@ -4537,6 +4539,12 @@ h3.subtitulo.bte-titulo { margin: 6px 0 0; padding-bottom: 0; border-bottom: 0; 
 .pilula-perguntar:hover { background: var(--soft); }
 @media (max-width: 720px) {
   .pilula-perguntar { position: absolute; top: 8px; right: 64px; }
+  /* Com a pílula à vista, o nome do cabeçalho guarda o lugar dela e do olho
+     e, se não couber, termina em reticências, em vez de correr por baixo da pílula. A reserva tem uma parte
+     fixa (a posição, o olho, o ícone e as bordas, em px) e a do rótulo, que cresce com a letra do sistema
+     (em rem): com a letra normal ficam uns 12 px de folga, e com a letra a 120% também. */
+  .cabecalho:has(> .pilula-perguntar:not([hidden])) .marca { padding-right: calc(119px + 3.75rem); }
+  .cabecalho:has(> .pilula-perguntar:not([hidden])) .marca strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 }
 /* A porta do celular: a mesma pílula, presa no pé de Hoje, acima das abas,
    à direita (perto do polegar). O alto (a linha do dia) fica como era. */

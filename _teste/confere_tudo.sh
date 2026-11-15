@@ -1341,6 +1341,16 @@ roda "pacotes da nuvem, atualizar --envenenado-pacote-sem-hash" node "_teste/tes
 roda "pacotes da nuvem, atualizar --envenenado-pacote-para-tudo" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-pacote-para-tudo
 roda "pacotes da nuvem, atualizar --envenenado-pacote-removido-volta" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-pacote-removido-volta
 roda "pacotes da nuvem, atualizar --envenenado-sem-livro-sem-botao" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-sem-livro-sem-botao
+# Os acabamentos da revisao do #233 (14/11/2026): o pacote de livros que baixa
+# a cada toque, a baixa sem a conta do espaco, o Atualizar sem a vez unica com
+# o livro da Estante, a falha dos livros que para os pacotes, o zip escolhido
+# por cima da serie e o removido que volta com outro nome no catalogo.
+roda "pacotes da nuvem, atualizar --envenenado-livros-baixa-sempre" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-livros-baixa-sempre
+roda "pacotes da nuvem, atualizar --envenenado-sem-conferir-espaco" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-sem-conferir-espaco
+roda "pacotes da nuvem, atualizar --envenenado-sem-vez-unica" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-sem-vez-unica
+roda "pacotes da nuvem, atualizar --envenenado-livros-param-pacotes" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-livros-param-pacotes
+roda "pacotes da nuvem, atualizar --envenenado-importar-durante-serie" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-importar-durante-serie
+roda "pacotes da nuvem, atualizar --envenenado-removido-por-outro-nome" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-removido-por-outro-nome
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
