@@ -30,9 +30,11 @@
  *   7. a trava de transbordo da janela, a 360, 390 e 412 px, letra normal e
  *      130%, e o rodapé empilhado sem passar de 20% da altura.
  *
- * Veneno, que TEM de reprovar a parte 1:
- *   --envenenado-salva-duplo   o salvar sem a trava, sem desligar o botão e
- *                              com um id novo a cada toque.
+ * Venenos, que TÊM de reprovar a parte 1:
+ *   --envenenado-salva-duplo     o salvar sem a trava, sem desligar o botão e
+ *                                com um id novo a cada toque;
+ *   --envenenado-sem-preparando  o anexar sem o "Preparando" na tela e com o
+ *                                Montar ligado enquanto o print é reduzido.
  *
  * Porta 8971. O service worker é contornado (a interceptação do /api/ia é
  * pela página).
@@ -45,9 +47,10 @@ const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8971;
 const V_DUPLO = '--envenenado-salva-duplo';
-const MODO = process.argv.indexOf(V_DUPLO) >= 0 ? V_DUPLO : '';
+const V_PREPARANDO = '--envenenado-sem-preparando';
+const MODO = [V_DUPLO, V_PREPARANDO].filter(m => process.argv.indexOf(m) >= 0)[0] || '';
 function prop(rotulo, ok) {
-  if (MODO) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
+  if (MODO === V_DUPLO) return conf('VENENO visto: ' + rotulo + ', e quebrou', ok, false);
   return conf(rotulo, ok, true);
 }
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
@@ -57,11 +60,15 @@ const ANCORAS_DUPLO = [
   ['    if (botaoSalvar) botaoSalvar.disabled = true;', '']
 ];
 const APP_N = APP.replace(/\r\n/g, '\n');
-secao('0. As âncoras do veneno');
-ANCORAS_DUPLO.forEach(par => conf('âncora uma vez só no app.js: ' + par[0].trim().slice(0, 50), APP_N.split(par[0]).length, 2));
+const ANCORAS_PREPARANDO = [
+  ['        estadoPrints.hidden = false;\n', ''],
+  ['      montarBotao.disabled = !!(p.preparando || falta', '      montarBotao.disabled = !!(falta']
+];
+secao('0. As âncoras dos venenos');
+ANCORAS_DUPLO.concat(ANCORAS_PREPARANDO).forEach(par => conf('âncora uma vez só no app.js: ' + par[0].trim().slice(0, 50), APP_N.split(par[0]).length, 2));
 const trocas = {};
 if (MODO) {
-  trocas['/app.js'] = ANCORAS_DUPLO.reduce((t, par) => t.split(par[0]).join(par[1]), APP_N);
+  trocas['/app.js'] = (MODO === V_DUPLO ? ANCORAS_DUPLO : ANCORAS_PREPARANDO).reduce((t, par) => t.split(par[0]).join(par[1]), APP_N);
   conf('o app.js servido ficou diferente do repositório (' + MODO + ')', trocas['/app.js'] !== APP_N, true);
 }
 const amb = H.criarAmbiente(PORTA, 'perfil_planejamento_nav', trocas);
@@ -260,17 +267,29 @@ async function transbordo(pag) {
   await pag.type('#plan-texto', 'Provas de novembro. Uma matéria por dia.');
   conf('com texto, o Montar liga (o outro lado)', await pag.evaluate(() => document.querySelector('#plan-montar').disabled), false);
   // um print sintético de 2400 x 1200: tem de sair com no máximo 1568 px no lado maior, em JPEG
-  await pag.evaluate(() => new Promise(r => {
+  /* Estável por condição (sem depender de tempo): o "change" desenha o
+   * "Preparando" e desliga o Montar na hora, de forma síncrona, e a redução
+   * do print só termina depois (no onload da imagem, numa tarefa seguinte).
+   * Ler a tela num pag.evaluate À PARTE deixava a redução terminar antes da
+   * leitura, e a prova via o estado de depois (false,false), uma vez ou outra.
+   * Agora a leitura é feita no mesmo turno do dispatchEvent: nada da redução
+   * roda antes dela, e se o app deixar de mostrar o "Preparando" ou de
+   * segurar o Montar, a leitura vê (--envenenado-sem-preparando). */
+  const durantePreparo = await pag.evaluate(() => new Promise(r => {
     const c = document.createElement('canvas'); c.width = 2400; c.height = 1200;
     const x = c.getContext('2d'); x.fillStyle = '#ffffff'; x.fillRect(0, 0, 2400, 1200); x.fillStyle = '#1f3a5f'; x.font = '80px sans-serif'; x.fillText('Aviso sintético de prova', 100, 300);
     c.toBlob(b => {
       const dt = new DataTransfer(); dt.items.add(new File([b], 'aviso.png', { type: 'image/png' }));
-      const i = document.querySelector('#plan-arquivos'); i.files = dt.files; i.dispatchEvent(new Event('change')); r();
+      const i = document.querySelector('#plan-arquivos'); i.files = dt.files; i.dispatchEvent(new Event('change'));
+      const e = document.querySelector('#plan-preparando');
+      r([!!e && !e.hidden && /Preparando 0 de 1/.test(e.textContent), document.querySelector('#plan-montar').disabled]);
     }, 'image/png');
   }));
-  conf('enquanto o print é preparado, aparece "Preparando" e o Montar espera', await pag.evaluate(() => {
-    const e = document.querySelector('#plan-preparando'); return [!!e && !e.hidden && /Preparando 0 de 1/.test(e.textContent), document.querySelector('#plan-montar').disabled];
-  }), [true, true]);
+  if (MODO === V_PREPARANDO) {
+    conf('VENENO visto: enquanto o print é preparado, o "Preparando" sumiu e o Montar não espera (' + durantePreparo + ')', durantePreparo, [false, false]);
+    throw Object.assign(new Error('fim do modo envenenado'), { jaContado: true });
+  }
+  conf('enquanto o print é preparado, aparece "Preparando" e o Montar espera', durantePreparo, [true, true]);
   await esperar('o print apareceu', () => pag.evaluate(() => document.querySelectorAll('#plan-prints .plan-print').length), v => v === 1, 10000);
   conf('a miniatura é uma imagem à parte, de até 200 px, e o Montar volta', await pag.evaluate(() => new Promise(r => {
     const i = document.querySelector('#plan-prints img'); const v = () => r([Math.max(i.naturalWidth, i.naturalHeight) <= 200, document.querySelector('#plan-montar').disabled]);
