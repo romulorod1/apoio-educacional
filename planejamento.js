@@ -37,6 +37,9 @@
    * grade; acima de 6 semanas a folha não cabe numa página com legibilidade. */
   var MAX_DIAS = 42;
   var MAX_IMAGENS = 8;
+  /* A borda de cada dia da grade, em pt (o piso de espessura do filete que
+   * leva informação, pdf.js, COR.fioForte). */
+  var BORDA_DO_DIA = 0.8;
 
   // ================= o esquema do plano (saída estruturada) =================
 
@@ -936,6 +939,18 @@
         var c = cards[s][i];
         var x = MARG_E + colW * i;
         doc.retangulo(x + 1.5, topo - celH, colW - 3, celH - 3, c ? COR.soft : COR.branco);
+        /* A borda do dia (feedback de uma família em 15/11/2026: "quando
+         * imprime fica difícil ver a divisão dos dias"). O COR.soft sozinho
+         * some no papel; o COR.fioForte é o filete que leva informação e passa
+         * de 3:1 contra o branco, na espessura do piso (0,8 pt). Só nos dias do
+         * período: o dia fora dele segue sem moldura, como espaço vazio. */
+        if (c) {
+          var bx0 = x + 1.5, bx1 = x + colW - 1.5, by0 = topo - celH, by1 = topo - 3;
+          doc.linha(bx0, by0, bx1, by0, COR.fioForte, BORDA_DO_DIA);
+          doc.linha(bx1, by0, bx1, by1, COR.fioForte, BORDA_DO_DIA);
+          doc.linha(bx1, by1, bx0, by1, COR.fioForte, BORDA_DO_DIA);
+          doc.linha(bx0, by1, bx0, by0, COR.fioForte, BORDA_DO_DIA);
+        }
         var num = String(Number(d.slice(8, 10)));
         var w = doc.texto(num, x + 7, topo - 16, { tam: 12, bold: true, cor: c ? COR.navy : COR.fio }) || 0;
         // virada do mês no meio da grade: o dia 1 diz de que mês é

@@ -257,6 +257,22 @@ const AGENDA = [{ data: '2026-11-10', hora: '11:00' }, { data: '2026-11-12', hor
   conf('o quadro "Datas e conteúdo das provas"', t.indexOf('Datas e conteúdo das provas') >= 0, true);
   conf('o incerto NUNCA vai para a folha', /incert|confira/i.test(junto), false);
 
+  /* A divisão dos dias no papel (feedback de uma família em 15/11/2026:
+   * "quando imprime fica difícil ver a divisão dos dias"). Cada dia DO
+   * PERÍODO tem a moldura de 4 filetes no COR.fioForte (passa de 3:1 contra o
+   * branco) a 0,8 pt; o dia fora do período fica sem moldura. Conta pelos
+   * operadores do PDF: 12 dias (9 a 20/11) dão 48 filetes; com moldura nos 2
+   * dias de fora seriam 56, e sem moldura, 0. */
+  const FILETE_DO_DIA = new RegExp(G.COR.fioForte.map(v => v.toFixed(6)).join(' ') + ' RG 0\\.80 w [-\\d.]+ [-\\d.]+ m [-\\d.]+ [-\\d.]+ l S', 'g');
+  const filetes = b => (Buffer.from(b).toString('latin1').match(FILETE_DO_DIA) || []).length;
+  conf('(arranjo) o fioForte passa de 3:1 contra o branco e a borda tem 0,8 pt', (() => {
+    const lin = v => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+    const L = 0.2126 * lin(G.COR.fioForte[0]) + 0.7152 * lin(G.COR.fioForte[1]) + 0.0722 * lin(G.COR.fioForte[2]);
+    return 1.05 / (L + 0.05) > 3;
+  })(), true);
+  conf('cada dia do período tem a moldura forte, e o dia fora dele não (12 dias, 48 filetes)', filetes(r.bytes), 48);
+  conf('outro período: 9 a 13/11 (5 dias) dá 20 filetes', filetes(P.desenharFolha(planoBase({ fim: '2026-11-13', provas: [] }), { nome: 'Ana', aulas: [] }, G).bytes), 20);
+
   const semAgenda = textoDoPdf(P.desenharFolha(planoBase(), { nome: 'Ana', aulas: [] }, G).bytes);
   conf('agenda vazia: nenhuma "Aula com a Nath" (a aula nunca vem do modelo)', semAgenda.filter(x => /Aula com a Nath/.test(x)).length, 0);
   const conf2 = textoDoPdf(P.desenharFolha(planoBase({ extra: { aulaAConfirmar: ['2026-11-13', '2026-11-12'] } }), { nome: 'Ana', aulas: AGENDA }, G).bytes);
