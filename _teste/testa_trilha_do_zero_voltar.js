@@ -17,9 +17,18 @@
  * 3. A aula aberta e, por cima, o painel de assunto (à direita, a aula
  *    atrás): o 1º Voltar fecha só o painel, o 2º fecha a aula, e o 3º, na
  *    tela inicial, avisa "Toque em Voltar de novo para sair." sem sair.
+ * 3b. Os caminhos de todo dia: escolher o assunto no painel e Voltar (fecha
+ *    a aula, sem sair do app, e o Voltar seguinte é o aviso da raiz); fechar o
+ *    painel pelo X e pelo Cancelar e Voltar (fecha a aula); o fecharTudo (o
+ *    Desfazer, a releitura do disco) com o painel aberto. E a "Última aula"
+ *    de uma aula futura é a última que já aconteceu, e não a marcada entre
+ *    hoje e ela.
  * 4. Recarregar com o painel aberto (o Android descarta a aba): o app abre
  *    sem janela, o histórico não diz que há janela, e o 1º Voltar ainda é o
  *    aviso da raiz, sem sair do app.
+ *
+ * O app.js servido a esta prova ganha uma linha só dela, que expõe o
+ * fecharTudo (window.__provaFecharTudo): é ele que o Desfazer chama.
  *
  * Veneno --envenenado-trilha-antes-do-voltar: serve o app.js com a trilha
  * aberta logo depois do fecharModal, sem esperar o Voltar (como na 803b2e6).
@@ -35,13 +44,16 @@ const { conf, secao, esperar, pausa } = H;
 
 const VENENO = process.argv.indexOf('--envenenado-trilha-antes-do-voltar') >= 0;
 const ESPERA = "          fecharModal('modal-tema', function () { aoEscolher(t); });";
-const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8');
+const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 conf('(arranjo) a trilha espera o Voltar do seletor, num lugar só', APP.split(ESPERA).length, 2);
-const trocas = {};
+const FECHAR_TUDO = '  function fecharTudo() {\n';
+conf('(arranjo) o fecharTudo aparece uma vez no app.js', APP.split(FECHAR_TUDO).length, 2);
+let servido = APP.replace(FECHAR_TUDO, '  window.__provaFecharTudo = function () { fecharTudo(); };\n' + FECHAR_TUDO);
 if (VENENO) {
-  trocas['/app.js'] = APP.replace(ESPERA, "          fecharModal('modal-tema'); aoEscolher(t);");
-  conf('(veneno) o app.js servido abre a trilha sem esperar o Voltar', trocas['/app.js'] !== APP, true);
+  servido = servido.replace(ESPERA, "          fecharModal('modal-tema'); aoEscolher(t);");
+  conf('(veneno) o app.js servido abre a trilha sem esperar o Voltar', servido.indexOf(ESPERA) < 0, true);
 }
+const trocas = { '/app.js': servido };
 const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
 
 (async () => {
@@ -57,7 +69,9 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
       cobravel: true, notaTexto: '', notaPrivada: '', anexos: [] });
     // a aula de hoje, a última dada (09/11) e uma falta depois dela, que não conta como aula dada
     dados.aulas = [aula('f5_aula', Core.hojeIso(), 'realizada'), aula('f5_antes', '2026-11-09', 'realizada'),
-      aula('f5_falta', '2026-11-12', 'falta')];
+      aula('f5_falta', '2026-11-12', 'falta'),
+      // duas aulas marcadas à frente: abrindo a de 20/11, a de 18/11 ainda não aconteceu
+      aula('f5_meio', '2026-11-18', 'realizada'), aula('f5_futura', '2026-11-20', 'realizada')];
     dados.series = []; dados.resumos = [];
     await Store.salvar(dados);
   });
@@ -141,9 +155,9 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
     aula: document.querySelector('#modal-aula').classList.contains('aberto'),
     janelaNoHistorico: !!(history.state && history.state.apoioModal)
   }));
-  const abrirPainel = async () => {
+  const abrirPainel = async (aulaId) => {
     await H.irParaAba(p2, 'agenda');
-    await p2.evaluate(() => document.querySelector('[data-aula-id="f5_aula"]').click());
+    await p2.evaluate(i => document.querySelector('[data-aula-id="' + i + '"]').click(), aulaId || 'f5_aula');
     const aula = await esperar('a aula aberta', () => p2.evaluate(() => !!document.querySelector('#modal-aula.aberto #escolher-assunto')), Boolean, 8000);
     conf('(arranjo) a aula de hoje abriu, com o botão do assunto', aula.ok, true);
     await pausa(300);
@@ -158,12 +172,13 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
   const painel = await p2.evaluate(() => {
     const r = document.querySelector('#modal-tema .modal').getBoundingClientRect();
     const c = document.querySelector('#tema-contexto');
+    const ano = c && c.querySelector('.tag');
     return { lateral: Math.abs(r.right - innerWidth) < 1 && r.left > innerWidth - 460 && Math.abs(r.height - innerHeight) < 1,
-      contexto: c ? c.textContent.replace(/\s+/g, ' ').trim() : '' };
+      contexto: c ? c.textContent.replace(/\s+/g, ' ').trim() : '', ano: ano ? ano.textContent.trim() : '' };
   });
   conf('o painel fica à direita, da altura da tela', painel.lateral, true);
   conf('o contexto diz a última aula dada, sem contar a falta (' + painel.contexto + ')', /Última aula: 09\/11/.test(painel.contexto), true);
-  conf('e o ano do aluno', /7/.test(painel.contexto), true);
+  conf('e o ano do aluno, na etiqueta', painel.ano, '7º ano');
   conf('com o painel aberto, o histórico tem a entrada dele', (await estado()).janelaNoHistorico, true);
 
   await p2.evaluate(() => history.back());
@@ -181,8 +196,68 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
   const v3 = await esperar('o aviso da raiz', avisos, v => /Toque em Voltar de novo para sair\./.test(v || ''), 4000);
   conf('3º Voltar, na tela inicial: o aviso de sair, e o app continua aberto', v3.ok && p2.url() === url, true);
 
+  secao('3b. Escolher, X, Cancelar e fecharTudo, cada um seguido do Voltar');
+  const urlRaiz = p2.url();
+  const voltarFechaAAula = async rotulo => {
+    await pausa(500);
+    await p2.evaluate(() => history.back());
+    const r = await esperar(rotulo, estado, v => !!v && !v.aula && !v.tema, 4000);
+    await pausa(300);
+    conf(rotulo + ': o Voltar fecha a aula, sem janela no histórico e sem sair do app',
+      r.ok && JSON.stringify(await estado()) + '|' + (p2.url() === urlRaiz),
+      JSON.stringify({ tema: false, aula: false, janelaNoHistorico: false }) + '|true');
+  };
+  const avisoDaRaiz = async rotulo => {
+    await p2.evaluate(() => { window.__avisos = []; history.back(); });
+    const r = await esperar(rotulo, avisos, v => /Toque em Voltar de novo para sair\./.test(v || ''), 4000);
+    conf(rotulo + ': o Voltar seguinte é o aviso da raiz, e o app continua aberto', r.ok && p2.url() === urlRaiz, true);
+    await pausa(4000); // a guarda da raiz volta depois do aviso (GUARDA_DA_SAIDA_MS)
+  };
+  await pausa(4000);
+  // escolher o assunto (o caminho de todo dia): o painel fecha, e a aula fica com a entrada dela
+  await abrirPainel();
+  await p2.evaluate(() => {
+    const c = document.querySelector('#assunto-outro');
+    c.value = 'Assunto escrito de teste'; c.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('#usar-assunto-outro').click();
+  });
+  const escolheu = await esperar('o painel fecha depois de escolher', estado, v => !!v && !v.tema && v.aula, 6000);
+  await pausa(500);
+  conf('escolher o assunto fecha o painel, e a aula fica aberta com a entrada dela no histórico',
+    escolheu.ok && JSON.stringify(await estado()), JSON.stringify({ tema: false, aula: true, janelaNoHistorico: true }));
+  await voltarFechaAAula('depois de escolher o assunto');
+  await avisoDaRaiz('depois de escolher o assunto');
+  // o X do painel
+  await abrirPainel();
+  await p2.evaluate(() => document.querySelector('#modal-tema .fechar').click());
+  const peloX = await esperar('o X fecha o painel', estado, v => !!v && !v.tema && v.aula, 4000);
+  conf('o X fecha só o painel', peloX.ok, true);
+  await voltarFechaAAula('depois do X');
+  // o Cancelar do painel
+  await abrirPainel();
+  await p2.evaluate(() => Array.from(document.querySelectorAll('#rodape-modal-tema button')).find(b => b.textContent.trim() === 'Cancelar').click());
+  const peloCancelar = await esperar('o Cancelar fecha o painel', estado, v => !!v && !v.tema && v.aula, 4000);
+  conf('o Cancelar fecha só o painel', peloCancelar.ok, true);
+  await voltarFechaAAula('depois do Cancelar');
+  // o fecharTudo com o painel aberto (o Desfazer, a releitura do disco)
+  await abrirPainel();
+  await p2.evaluate(() => window.__provaFecharTudo());
+  const tudo = await esperar('o fecharTudo', estado, v => !!v && !v.tema && !v.aula && !v.janelaNoHistorico, 4000);
+  await pausa(500);
+  conf('o fecharTudo com o painel aberto fecha painel e aula, e tira as duas entradas do histórico',
+    tudo.ok && JSON.stringify(await estado()) + '|' + (p2.url() === urlRaiz),
+    JSON.stringify({ tema: false, aula: false, janelaNoHistorico: false }) + '|true');
+  await avisoDaRaiz('depois do fecharTudo');
+  // a aula futura: a "Última aula" é a última que já aconteceu (hoje, 16/11), e não a de 18/11
+  await abrirPainel('f5_futura');
+  const futura = await p2.evaluate(() => (document.querySelector('#tema-contexto') || { textContent: '' }).textContent.replace(/\s+/g, ' ').trim());
+  conf('numa aula futura, a "Última aula" é a que já aconteceu, e não a marcada no meio (' + futura + ')',
+    /Última aula: 16\/11/.test(futura), true);
+  await p2.evaluate(() => history.back());
+  await esperar('o painel da futura fechado', estado, v => !!v && !v.tema, 4000);
+  await voltarFechaAAula('aula futura');
+
   secao('4. Recarregar com o painel aberto: sem janela, e a raiz continua guardada');
-  await pausa(4000); // a guarda da raiz volta depois do aviso (GUARDA_DA_SAIDA_MS)
   // o estado em que o documento novo NASCEU, lido antes de o app rodar: é a condição da prova
   await p2.evaluateOnNewDocument(() => {
     window.__estadoAoNascer = (history.state && history.state.apoioModal) || null;

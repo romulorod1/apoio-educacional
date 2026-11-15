@@ -742,12 +742,14 @@ label.campo-checkbox {
 .tema-legenda { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 10px; color: var(--muted); font-size: var(--letra-12); }
 .tema-legenda > span { display: inline-flex; align-items: center; gap: 4px; }
 .tema-legenda .ico { width: 14px; height: 14px; }
-.tema-sinais { display: grid; grid-template-columns: repeat(3, 16px); gap: 8px; flex: 0 0 auto; color: var(--muted); }
-.tema-sinal { width: 16px; height: 16px; display: grid; place-items: center; opacity: .24; }
-.tema-sinal.disponivel { opacity: 1; color: var(--navy); }
+.tema-sinais { display: flex; gap: 8px; flex: 0 0 auto; align-self: flex-start; margin-top: 3px; color: var(--navy); }
+.tema-sinal { width: 16px; height: 16px; display: grid; place-items: center; }
 .tema-sinal .ico { width: 14px; height: 14px; }
+/* O alto do seletor de assunto (contexto, busca e legenda) fica preso no alto
+   da janela centrada, por cima da lista que rola (o recuo é o do corpo). */
+.tema-topo { position: sticky; top: -18px; z-index: 2; margin: -18px -18px 0; padding: 18px 18px 2px; background: var(--branco); }
 /* o display acima venceria o atributo hidden: a legenda e os sinais escondidos somem de verdade */
-.tema-legenda[hidden], .tema-sinais[hidden] { display: none; }
+.tema-legenda[hidden], .tema-sinais[hidden], .tema-sinal[hidden] { display: none; }
 .irmao-aninhado { margin-left: 20px; width: calc(100% - 20px); }
 .dominio-assuntos-privado { margin-bottom: 8px; }
 .dominio-assunto-controles { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
@@ -924,9 +926,8 @@ table.dados tr.total td { font-weight: 600; color: var(--navy); background: var(
     pointer-events: auto;
   }
   #corpo-modal-tema.seletor-assunto { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-  #corpo-modal-tema.seletor-assunto > .barra { flex: 0 0 auto; }
+  #corpo-modal-tema.seletor-assunto > .tema-topo { flex: 0 0 auto; position: static; }
   #lista-assuntos { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
-  #lista-assuntos .item-assunto { align-items: flex-start; }
 }
 .fechar {
   border: none;

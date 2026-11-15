@@ -13174,19 +13174,27 @@
     corpo.classList.add('seletor-assunto');
 
     var anoDoAluno = aluno && Core.anoEscolarDe(aluno);
-    // a última aula que aconteceu antes desta: cancelada e falta não contam como aula dada
+    /* A última aula que aconteceu antes desta: cancelada e falta não contam
+     * como aula dada, e a marcada para depois de hoje ainda não aconteceu
+     * (abrindo uma aula futura, a do meio da semana não é "última"). */
     var chaveDaAula = function (a) { return a.data + ' ' + (a.hora || ''); };
+    var hoje = Core.hojeIso();
     var aulaAnterior = db.aulas.filter(function (a) {
       var s = a.status || 'realizada';
       return a.alunoId === aula.alunoId && a.id !== aula.id && s !== 'cancelada' && s !== 'falta' &&
-        chaveDaAula(a) < chaveDaAula(aula);
+        a.data <= hoje && chaveDaAula(a) < chaveDaAula(aula);
     }).sort(function (a, b) { return chaveDaAula(b).localeCompare(chaveDaAula(a)); })[0];
     // o nome já está no título da janela ("Assunto da aula, Nome"): aqui, o ano e a última aula
     var contexto = [
       anoDoAluno ? el('span', { class: 'tag', texto: nomeDoAno(anoDoAluno) }) : null,
       aulaAnterior ? el('span', { class: 'tema-ultima-aula', texto: 'Última aula: ' + Core.ddmm(aulaAnterior.data) }) : null
     ].filter(Boolean);
-    if (contexto.length) corpo.appendChild(el('div', { class: 'tema-contexto', id: 'tema-contexto' }, contexto));
+    /* O alto do seletor (contexto, busca e legenda) fica preso no alto também
+     * na janela centrada: a legenda não some rolando, e os sinais continuam
+     * explicados. */
+    var topo = el('div', { class: 'tema-topo' });
+    corpo.appendChild(topo);
+    if (contexto.length) topo.appendChild(el('div', { class: 'tema-contexto', id: 'tema-contexto' }, contexto));
 
     var busca = '';
     var textoLivre = '';
@@ -13202,18 +13210,13 @@
       nivel = { tipo: 'raiz' };
       desenhar();
     });
-    corpo.appendChild(el('div', { class: 'barra tema-busca' }, [campoBusca]));
+    topo.appendChild(el('div', { class: 'barra tema-busca' }, [campoBusca]));
     /* Os sinais só existem nos assuntos de Matemática do índice (os que têm
-     * página do assunto): a legenda só aparece quando há sinal na tela, para
-     * "apagado" nunca querer dizer "não se aplica". Os três sinais dizem o
-     * mesmo que as seções da página do assunto (sinaisDoAssunto). */
-    var legenda = el('div', { class: 'tema-legenda', id: 'tema-legenda', 'aria-label': 'Legenda dos materiais relacionados' }, [
-      el('span', {}, [icone('book'), document.createTextNode('Teoria da biblioteca')]),
-      el('span', {}, [icone('exerc'), document.createTextNode('Exercícios')]),
-      el('span', {}, [icone('medal'), document.createTextNode('OBMEP')])
-    ]);
-    legenda.hidden = true;
-    corpo.appendChild(legenda);
+     * página do assunto), e só o que existe aparece: a legenda só aparece
+     * quando há sinal na tela. Os três dizem o mesmo que as seções da página
+     * do assunto (sinaisDoAssunto). */
+    var legenda = legendaDosSinais();
+    topo.appendChild(legenda);
 
     var lista = el('div', { id: 'lista-assuntos' });
     corpo.appendChild(lista);
@@ -13242,8 +13245,6 @@
       return item;
     }
 
-    var ROTULOS_SINAL = { teoria: 'teoria da biblioteca', exercicios: 'exercícios', obmep: 'OBMEP' };
-    var ICONES_SINAL = { teoria: 'book', exercicios: 'exerc', obmep: 'medal' };
     function ehDeMatematica(assunto) {
       return !!assunto && (!assunto.disciplina || assunto.disciplina === Core.MATERIA_PADRAO);
     }
@@ -13252,17 +13253,11 @@
       var item = linha(titulo, detalhe, aoTocar);
       item._assuntoDisponibilidade = assunto;
       item._detalheBase = detalhe;
-      // só o assunto do índice (com id) tem página do assunto para os sinais repetirem
-      if (ehDeMatematica(assunto) && assunto.id) {
+      // só o assunto de Matemática do índice tem página do assunto para os sinais repetirem
+      if (assuntoComPagina(assunto)) {
         item.setAttribute('data-assunto-id', assunto.id);
-        var sinais = el('span', { class: 'tema-sinais', 'aria-label': 'Materiais relacionados' },
-          Object.keys(ROTULOS_SINAL).map(function (tipo) {
-            return el('span', { class: 'tema-sinal', 'data-tipo-sinal': tipo, 'aria-label': 'Sem ' + ROTULOS_SINAL[tipo], role: 'img' }, [icone(ICONES_SINAL[tipo])]);
-          }));
-        // escondidos até a biblioteca carregar: sinal apagado antes de saber seria mentira
-        sinais.hidden = true;
-        item.appendChild(sinais);
-        item._sinaisTema = sinais;
+        item._sinaisTema = caixaDeSinais();
+        item.appendChild(item._sinaisTema);
       }
       return item;
     }
@@ -13275,7 +13270,7 @@
       if (Object.prototype.hasOwnProperty.call(memoDisponibilidade, chave)) return memoDisponibilidade[chave];
       var r = { resumo: '', estado: { teoria: false, exercicios: false, obmep: false } };
       if (bib && ehDeMatematica(assunto)) {
-        if (assunto.id) {
+        if (assuntoComPagina(assunto)) {
           /* O assunto do índice: os sinais E o texto da linha saem da mesma
            * fonte da página do assunto, e dizem o mesmo que ela. */
           var sinais = sinaisDoAssunto(assunto);
@@ -13299,14 +13294,7 @@
         var disp = disponibilidadeDoAssunto(item._assuntoDisponibilidade);
         var detalhe = item.querySelector('.detalhe');
         if (detalhe) detalhe.textContent = item._detalheBase + (disp.resumo ? ' · ' + disp.resumo : '');
-        if (!item._sinaisTema || !bib) return;
-        item._sinaisTema.hidden = false;
-        Array.prototype.forEach.call(item._sinaisTema.querySelectorAll('[data-tipo-sinal]'), function (sinal) {
-          var tipo = sinal.dataset.tipoSinal;
-          var ativo = !!disp.estado[tipo];
-          sinal.classList.toggle('disponivel', ativo);
-          sinal.setAttribute('aria-label', (ativo ? 'Tem ' : 'Sem ') + ROTULOS_SINAL[tipo]);
-        });
+        if (item._sinaisTema && bib) mostrarSinais(item._sinaisTema, disp.estado);
       });
       legenda.hidden = !lista.querySelector('.tema-sinais:not([hidden])');
     }
@@ -13419,6 +13407,8 @@
           function () { abrirMatematicaComoAssunto(aula, aluno); },
           true
         ));
+        // os recentes, acima, também ganham o texto e os sinais
+        atualizarDisponibilidadeVisivel();
       } else {
         var anoFallback = ultimoAnoEscolar || '06';
         var rotuloAno = nomeDoAno(anoFallback);
@@ -13671,6 +13661,9 @@
     }
 
     corpo.appendChild(el('div', { class: 'barra' }, [selSerie, campoBusca]));
+    // F5: a grade de quem escolhe (a aula e a trilha) tem os sinais da página do assunto, com a legenda
+    var legendaDaGrade = opcoes.aoEscolher ? legendaDosSinais() : null;
+    if (legendaDaGrade) corpo.appendChild(legendaDaGrade);
     var lista = el('div', { id: 'lista-temas' });
     corpo.appendChild(lista);
 
@@ -13721,6 +13714,7 @@
         anotarBuscaSemResultado(termo, 'temas de matemática');
       }
       if (!filtrados.length) {
+        if (legendaDaGrade) legendaDaGrade.hidden = true;
         lista.appendChild(el('div', { class: 'vazio' }, [
           el('p', { texto: termo ? 'Nenhum tema encontrado para essa busca.' : 'Nenhum tema nesta série.' })
         ]));
@@ -13743,9 +13737,12 @@
       filtrados.forEach(function (x) {
         var t = x.tema;
         var rotulo = typeof Busca !== 'undefined' && Busca.ROTULO ? Busca.ROTULO[x.onde] : '';
-        var disponivel = opcoes.aoEscolher ? resumoDisponibilidadeDoAssunto({
-          id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id)
-        }) : '';
+        var assuntoDoTema = { id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id) };
+        // F5: o assunto com página do assunto diz o mesmo que ela (sinaisDoAssunto); os outros, pelo módulo
+        var comPagina = opcoes.aoEscolher && assuntoComPagina(assuntoDoTema);
+        var disponivel = !opcoes.aoEscolher ? '' : comPagina ? (bib ? sinaisDoAssunto(assuntoDoTema).resumo : '')
+          : resumoDisponibilidadeDoAssunto(assuntoDoTema);
+        var sinaisDoTema = comPagina ? caixaDeSinais() : null;
         var linhaTema = el('div', { class: 'item-lista item-tema' }, [
           el('div', { class: 'cresce' }, [
             el('div', { class: 'nome' }, [
@@ -13767,6 +13764,7 @@
               texto: 'cerca de ' + t.duracaoMin + ' minutos · dificuldade ' + t.dificuldade + ' de 5'
             })
           ]),
+          sinaisDoTema,
           el('button', {
             type: 'button', class: 'btn pequeno principal',
             texto: opcoes.rotuloEscolher || 'Escolher',
@@ -13775,10 +13773,16 @@
               if (opcoes.aoEscolher) opcoes.aoEscolher(t);
             }
           })
-        ]);
+        ].filter(Boolean));
         linhaTema._temaDisponibilidade = t;
+        if (sinaisDoTema) {
+          linhaTema.setAttribute('data-assunto-id', t.id);
+          linhaTema._sinaisTema = sinaisDoTema;
+          if (bib) mostrarSinais(sinaisDoTema, sinaisDoAssunto(assuntoDoTema));
+        }
         lista.appendChild(linhaTema);
       });
+      if (legendaDaGrade) legendaDaGrade.hidden = !lista.querySelector('.tema-sinais:not([hidden])');
     }
 
     function atualizarDisponibilidadeVisivel() {
@@ -13787,12 +13791,17 @@
         if (!t) return;
         var detalhe = linhaTema.querySelector('.bib-disponibilidade-tema');
         if (!detalhe) return;
-        var disponivel = resumoDisponibilidadeDoAssunto({
-          id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id)
-        });
+        var assuntoDoTema = { id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id) };
+        var disponivel;
+        if (linhaTema._sinaisTema) {
+          var sinais = sinaisDoAssunto(assuntoDoTema);
+          mostrarSinais(linhaTema._sinaisTema, sinais);
+          disponivel = sinais.resumo;
+        } else disponivel = resumoDisponibilidadeDoAssunto(assuntoDoTema);
         detalhe.textContent = disponivel;
         detalhe.hidden = !disponivel;
       });
+      if (legendaDaGrade) legendaDaGrade.hidden = !lista.querySelector('.tema-sinais:not([hidden])');
     }
 
     selSerie.addEventListener('change', function () {
@@ -20190,13 +20199,34 @@
    * os exercícios); OBMEP. O texto nomeia as seções da página, na ordem dela.
    * Assim o seletor e a página nunca dizem coisas diferentes sobre o que
    * existe. É a ÚNICA fonte dos sinais e do texto. */
-  function sinaisDoAssunto(assunto) {
-    var serie = null;
-    if (indiceTemas) {
-      for (var i = 0; i < indiceTemas.length; i++) {
-        if (indiceTemas[i].id === assunto.id) { serie = indiceTemas[i].serie || null; break; }
-      }
+  /* A conta é feita UMA vez por assunto a cada carga da Biblioteca (e do
+   * índice): a busca do seletor redesenha a cada letra, com até 120 linhas, e
+   * cada fontesDoAssuntoNoApp percorre a Biblioteca inteira. Biblioteca ou
+   * índice novos (outro objeto) zeram o memo. */
+  var memoDosSinais = { bib: null, indice: null, serieDe: {}, porId: {} };
+  function memoDosSinaisAtual() {
+    if (memoDosSinais.bib !== bib || memoDosSinais.indice !== indiceTemas) {
+      var serieDe = {};
+      (indiceTemas || []).forEach(function (t) { serieDe[t.id] = t.serie || ''; });
+      memoDosSinais = { bib: bib, indice: indiceTemas, serieDe: serieDe, porId: {} };
     }
+    return memoDosSinais;
+  }
+  /* O assunto que tem página do assunto: de Matemática (sem disciplina vale
+   * como Matemática só se o id está no índice de Matemática) e com o id no
+   * índice. Só ele ganha sinais. */
+  function assuntoComPagina(assunto) {
+    if (!assunto || !assunto.id || !indiceTemas) return false;
+    if (assunto.disciplina && assunto.disciplina !== Core.MATERIA_PADRAO) return false;
+    return Object.prototype.hasOwnProperty.call(memoDosSinaisAtual().serieDe, assunto.id);
+  }
+  function sinaisDoAssunto(assunto) {
+    var memo = memoDosSinaisAtual();
+    if (Object.prototype.hasOwnProperty.call(memo.porId, assunto.id)) return memo.porId[assunto.id];
+    memo.porId[assunto.id] = contaDosSinais(assunto, memo.serieDe[assunto.id] || null);
+    return memo.porId[assunto.id];
+  }
+  function contaDosSinais(assunto, serie) {
     var f = (bib && assunto && assunto.id ? fontesDoAssuntoNoApp(assunto.id, null, serie) : null) || {};
     return {
       teoria: !!(f.teoria || []).length,
@@ -20204,6 +20234,40 @@
       obmep: !!(f.obmep || []).length,
       resumo: resumoDasFontesDoAssunto(f)
     };
+  }
+
+  /* Os sinais na linha: só os que existem aparecem (assunto sem nada, nenhum
+   * ícone), e a caixa toda fica escondida até a Biblioteca carregar. */
+  var ROTULOS_SINAL = { teoria: 'teoria da biblioteca', exercicios: 'exercícios', obmep: 'OBMEP' };
+  var ICONES_SINAL = { teoria: 'book', exercicios: 'exerc', obmep: 'medal' };
+  function caixaDeSinais() {
+    var caixa = el('span', { class: 'tema-sinais', 'aria-label': 'Materiais relacionados' },
+      Object.keys(ROTULOS_SINAL).map(function (tipo) {
+        return el('span', { class: 'tema-sinal', 'data-tipo-sinal': tipo, 'aria-label': 'Tem ' + ROTULOS_SINAL[tipo], role: 'img' },
+          [icone(ICONES_SINAL[tipo])]);
+      }));
+    caixa.hidden = true;
+    return caixa;
+  }
+  function mostrarSinais(caixa, estado) {
+    var algum = false;
+    Array.prototype.forEach.call(caixa.querySelectorAll('[data-tipo-sinal]'), function (sinal) {
+      var ativo = !!estado[sinal.dataset.tipoSinal];
+      sinal.classList.toggle('disponivel', ativo);
+      sinal.hidden = !ativo;
+      if (ativo) algum = true;
+    });
+    caixa.setAttribute('data-lidos', 'sim');
+    caixa.hidden = !algum;
+  }
+  function legendaDosSinais() {
+    var legenda = el('div', { class: 'tema-legenda', id: 'tema-legenda', 'aria-label': 'Legenda dos materiais relacionados' },
+      Object.keys(ROTULOS_SINAL).map(function (tipo) {
+        return el('span', {}, [icone(ICONES_SINAL[tipo]), document.createTextNode(
+          { teoria: 'Teoria da biblioteca', exercicios: 'Exercícios', obmep: 'OBMEP' }[tipo])]);
+      }));
+    legenda.hidden = true;
+    return legenda;
   }
 
   /* "No tablet: teoria, lista de base e exercícios (Equações do Segundo

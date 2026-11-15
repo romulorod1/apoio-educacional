@@ -17,12 +17,18 @@
  *
  * 1. O seletor abre com os sinais acesos; a legenda diz teoria, exercícios e
  *    OBMEP, e há na tela ao menos um assunto com cada sinal aceso (senão a
- *    conferência 2 não exercitaria nada).
- * 2. Para cada assunto com sinal na tela, a página do assunto, aberta pela
- *    Biblioteca como ela abre, tem exatamente as seções que o seletor acende,
- *    e o texto da linha ("No tablet: teoria, lista de base e exercícios")
- *    nomeia as mesmas seções, na ordem da página; sem seção, a linha não fala
- *    de material.
+ *    conferência 2 não exercitaria nada). Só o sinal que existe aparece
+ *    (assunto sem nada, nenhum ícone). Digitar na busca não refaz a conta:
+ *    a fontesDoAssuntoNoApp roda no máximo uma vez por assunto (contada no
+ *    app.js servido), e redigitar não a chama de novo. Na janela centrada
+ *    (800x1280), a legenda fica presa no alto quando a lista rola.
+ *    A grade "Ver todos os assuntos de Matemática", aberta dali, também tem
+ *    os sinais e o texto.
+ * 2. Para cada assunto com sinal no seletor e na grade, a página do assunto,
+ *    aberta pela Biblioteca como ela abre, tem exatamente as seções que o
+ *    seletor (e a grade) acende, e o texto da linha ("No tablet: teoria,
+ *    lista de base e exercícios") nomeia as mesmas seções, na ordem da
+ *    página; sem seção, a linha não fala de material.
  *
  * Veneno (TEM de ser visto: "VENENO visto"):
  *   --envenenado-sinais-do-modulo  o seletor lê o módulo do assunto direto
@@ -53,11 +59,15 @@ const DO_MODULO = "    var achado = bib ? moduloDoAssunto(assunto) : false;\n" +
   "    return { teoria: !!(mod && mod.teorias && mod.teorias.length), exercicios: !!(mod && contarItens(mod)), obmep: false,\n" +
   "      resumo: mod ? resumoDisponibilidadeDoAssunto(assunto, mod) : '' };\n";
 conf('(arranjo) a fonte dos sinais está num lugar só do app.js', APP.split(ANCORA).length, 2);
-const trocas = {};
+// a contagem das chamadas da fontesDoAssuntoNoApp, só no app.js servido a esta prova
+const ENTRADA_FONTES = '  function fontesDoAssuntoNoApp(assuntoId, vinculos, anoDoAssunto) {\n';
+conf('(arranjo) a fontesDoAssuntoNoApp aparece uma vez no app.js', APP.split(ENTRADA_FONTES).length, 2);
+let servido = APP.replace(ENTRADA_FONTES, ENTRADA_FONTES + '    window.__contaFontes = (window.__contaFontes || 0) + 1;\n');
 if (VENENO) {
-  trocas['/app.js'] = APP.replace(ANCORA, DO_MODULO);
-  conf('(veneno) o app.js servido lê o módulo direto', trocas['/app.js'].indexOf(ANCORA) < 0, true);
+  servido = servido.replace(ANCORA, DO_MODULO);
+  conf('(veneno) o app.js servido lê o módulo direto', servido.indexOf(ANCORA) < 0, true);
 }
+const trocas = { '/app.js': servido };
 const amb = H.criarAmbiente(8897, 'nath_f5_seletor_sinais', trocas);
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'f5_sinais_'));
 
@@ -123,22 +133,28 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
   await pausa(300);
   await pag.evaluate(() => document.querySelector('#escolher-assunto').click());
   const acesos = await esperar('os sinais do seletor', () => pag.evaluate(() =>
-    document.querySelectorAll('#lista-assuntos .tema-sinais:not([hidden])').length), n => n > 3, 20000);
-  conf('(arranjo) o seletor mostra os sinais depois de a biblioteca carregar', acesos.ok, true);
-  const seletor = await pag.evaluate(() => {
-    const porId = {};
-    Array.from(document.querySelectorAll('#lista-assuntos .item-assunto[data-assunto-id]')).forEach(l => {
+    document.querySelectorAll('#lista-assuntos .tema-sinais[data-lidos]').length), n => n > 3, 20000);
+  conf('(arranjo) o seletor lê os sinais depois de a biblioteca carregar', acesos.ok, true);
+  // os sinais de uma lista: o estado (pela classe), o texto, e o que está à vista de verdade
+  const lerSinais = (sel, selTexto) => pag.evaluate((sel, selTexto) => {
+    const porId = {}, visivelErrado = [];
+    Array.from(document.querySelectorAll(sel)).forEach(l => {
       const s = l.querySelector('.tema-sinais');
-      if (!s || s.hidden) return;
+      if (!s || !s.hasAttribute('data-lidos')) return;
       const est = {};
-      Array.from(s.querySelectorAll('[data-tipo-sinal]')).forEach(x => { est[x.dataset.tipoSinal] = x.classList.contains('disponivel'); });
-      const d = l.querySelector('.detalhe');
-      est.texto = d ? d.textContent : '';
+      Array.from(s.querySelectorAll('[data-tipo-sinal]')).forEach(x => {
+        est[x.dataset.tipoSinal] = x.classList.contains('disponivel');
+        const aVista = getComputedStyle(s).display !== 'none' && getComputedStyle(x).display !== 'none';
+        if (aVista !== est[x.dataset.tipoSinal]) visivelErrado.push(l.dataset.assuntoId + ':' + x.dataset.tipoSinal);
+      });
+      const d = l.querySelector(selTexto);
+      est.texto = d && !d.hidden ? d.textContent : '';
       porId[l.dataset.assuntoId] = est;
     });
     const legenda = document.querySelector('#tema-legenda');
-    return { porId, legenda: legenda && !legenda.hidden ? legenda.textContent.replace(/\s+/g, ' ').trim() : '' };
-  });
+    return { porId, visivelErrado, legenda: legenda && !legenda.hidden ? legenda.textContent.replace(/\s+/g, ' ').trim() : '' };
+  }, sel, selTexto);
+  const seletor = await lerSinais('#lista-assuntos .item-assunto[data-assunto-id]', '.detalhe');
   const ids = Object.keys(seletor.porId);
   console.log('   no seletor: ' + JSON.stringify(seletor.porId));
   conf('a legenda está à vista e diz teoria, exercícios e OBMEP',
@@ -149,6 +165,46 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
     });
   }
   conf('(arranjo) os assuntos de antes estão no seletor', ['MAT09-04', 'MAT07-01', 'MAT04-09'].every(id => ids.indexOf(id) >= 0), true);
+  conf('só o sinal que existe está à vista (assunto sem nada, nenhum ícone)', seletor.visivelErrado.join(', '), '');
+
+  /* A busca redesenha a cada letra: a conta dos sinais não pode ser refeita.
+   * No máximo uma chamada por assunto novo, e redigitar não chama de novo. */
+  const digitar = async termos => {
+    const vistos = new Set();
+    for (const t of termos) {
+      await pag.evaluate(v => { const i = document.querySelector('#busca-assunto'); i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); }, t);
+      await pausa(250);
+      (await pag.evaluate(() => Array.from(document.querySelectorAll('#lista-assuntos [data-assunto-id]')).map(l => l.dataset.assuntoId)))
+        .forEach(id => vistos.add(id));
+    }
+    return vistos;
+  };
+  await pag.evaluate(() => { window.__contaFontes = 0; });
+  const vistos = await digitar(['e', 'eq', 'equ', 'equa', 'equaç']);
+  const chamadas1 = await pag.evaluate(() => window.__contaFontes);
+  const novos = Array.from(vistos).filter(id => ids.indexOf(id) < 0).length;
+  console.log('   digitando: ' + vistos.size + ' assuntos na tela, ' + novos + ' novos, ' + chamadas1 + ' chamadas');
+  conf('(arranjo) a busca mostrou assuntos com sinal', vistos.size > 3, true);
+  conf('digitando, a fontesDoAssuntoNoApp roda no máximo uma vez por assunto novo', chamadas1 <= novos, true);
+  await digitar(['', 'e', 'eq', 'equ', 'equa', 'equaç']);
+  conf('redigitando, nenhuma chamada nova', await pag.evaluate(() => window.__contaFontes), chamadas1);
+  await digitar(['']);
+
+  /* Na janela centrada (tablet em pé), a legenda fica presa no alto quando a
+   * lista rola: os ícones nunca ficam sem explicação. */
+  await pag.setViewport({ width: 800, height: 1280, hasTouch: true });
+  await pausa(400);
+  const preso = await pag.evaluate(() => {
+    const corpo = document.querySelector('#corpo-modal-tema');
+    corpo.scrollTop = corpo.scrollHeight;
+    const rc = corpo.getBoundingClientRect(), rl = document.querySelector('#tema-legenda').getBoundingClientRect();
+    return { rolou: corpo.scrollTop > 200, legendaNoAlto: rl.top >= rc.top - 1 && rl.bottom <= rc.top + 220 && rl.height > 0 };
+  });
+  conf('em 800x1280, com a lista rolada, a legenda continua no alto da janela', preso.rolou + '|' + preso.legendaNoAlto, 'true|true');
+  await pag.evaluate(() => { document.querySelector('#corpo-modal-tema').scrollTop = 0; });
+  await pag.setViewport({ width: 1280, height: 1000, hasTouch: true });
+  await pausa(400);
+
   /* Numa tela sem sinal (os assuntos de outra matéria), a legenda e os sinais
    * somem DE VERDADE: o display da regra deles não pode vencer o hidden. */
   await pag.evaluate(() => {
@@ -166,6 +222,29 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
   }), v => !!v, 8000);
   conf('em outra matéria, a legenda escondida não aparece na tela', semSinal.ok && (semSinal.valor || {}).legenda, 'true:none');
   conf('e nenhum sinal à vista', semSinal.ok && (semSinal.valor || {}).sinaisVisiveis, 0);
+  // de volta à raiz do seletor, pelo Voltar da tela da matéria
+  await pag.evaluate(() => {
+    const b = Array.from(document.querySelectorAll('#lista-assuntos button')).find(x => x.textContent.trim() === 'Voltar');
+    if (b) b.click();
+  });
+  await esperar('a raiz do seletor', () => pag.evaluate(() => !!document.querySelector('#lista-assuntos .item-assunto[data-assunto-id]')), Boolean, 5000);
+
+  /* A grade "Ver todos os assuntos de Matemática", aberta do seletor da aula:
+   * os mesmos sinais e o mesmo texto da página do assunto. */
+  await pag.evaluate(() => {
+    const l = Array.from(document.querySelectorAll('#lista-assuntos .item-assunto')).find(x =>
+      /^Ver todos os assuntos de Matemática/.test(x.querySelector('.nome').textContent));
+    if (l) l.click();
+  });
+  const gradeAberta = await esperar('a grade de temas', () => pag.evaluate(() =>
+    document.querySelectorAll('#lista-temas .item-tema .tema-sinais[data-lidos]').length), n => n > 3, 10000);
+  conf('(arranjo) a grade "Ver todos os assuntos de Matemática" abriu com os sinais lidos', gradeAberta.ok, true);
+  const grade = await lerSinais('#lista-temas .item-tema[data-assunto-id]', '.bib-disponibilidade-tema');
+  const idsGrade = Object.keys(grade.porId);
+  console.log('   na grade: ' + JSON.stringify(grade.porId));
+  conf('(arranjo) a grade tem o MAT04-09, o da OBMEP', idsGrade.indexOf('MAT04-09') >= 0, true);
+  conf('na grade, a legenda está à vista', /OBMEP/.test(grade.legenda), true);
+  conf('na grade, só o sinal que existe está à vista', grade.visivelErrado.join(', '), '');
   // o Voltar fecha o painel e depois a aula
   await pag.evaluate(() => history.back());
   await esperar('o painel fechado', () => pag.evaluate(() => !document.querySelector('#modal-tema.aberto')), Boolean, 4000);
@@ -182,7 +261,8 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
     const m = {}; a.forEach(t => { m[t.id] = t.pt.titulo; }); return m;
   }));
   const diferentes = [], textosDiferentes = [];
-  for (const id of ids) {
+  const todos = ids.concat(idsGrade.filter(id => ids.indexOf(id) < 0));
+  for (const id of todos) {
     await H.irParaAba(pag, 'biblioteca');
     await pag.evaluate(() => { const v = document.querySelector('#bib-corpo .bib-assunto .bib-voltar'); if (v) v.click(); });
     await pag.evaluate(t => { const i = document.querySelector('#busca-biblioteca'); i.value = t; i.dispatchEvent(new Event('input', { bubbles: true })); }, tituloDe[id]);
@@ -201,11 +281,14 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
     const secoes = pagina.valor || [];
     const naPagina = {};
     Object.keys(SECOES_DO_SINAL).forEach(t => { naPagina[t] = SECOES_DO_SINAL[t].some(s => secoes.indexOf(s) >= 0); });
-    const igual = linha.ok && pagina.ok && Object.keys(naPagina).every(t => naPagina[t] === !!seletor.porId[id][t]);
-    const textoIgual = linha.ok && pagina.ok && textoBate(seletor.porId[id].texto, secoes);
-    console.log('   ' + id + ': seletor ' + JSON.stringify(seletor.porId[id]) + ' | página ' + JSON.stringify(secoes));
-    if (!igual) diferentes.push(id + ' (seletor ' + JSON.stringify(seletor.porId[id]) + ', página ' + JSON.stringify(naPagina) + ')');
-    if (!textoIgual) textosDiferentes.push(id + ' (linha "' + seletor.porId[id].texto + '", página ' + JSON.stringify(secoes) + ')');
+    [['seletor', seletor.porId[id]], ['grade', grade.porId[id]]].forEach(([onde, est]) => {
+      if (!est) return;
+      const igual = linha.ok && pagina.ok && Object.keys(naPagina).every(t => naPagina[t] === !!est[t]);
+      const textoIgual = linha.ok && pagina.ok && textoBate(est.texto, secoes);
+      console.log('   ' + id + ' (' + onde + '): ' + JSON.stringify(est) + ' | página ' + JSON.stringify(secoes));
+      if (!igual) diferentes.push(id + ' no ' + onde + ' (' + JSON.stringify(est) + ', página ' + JSON.stringify(naPagina) + ')');
+      if (!textoIgual) textosDiferentes.push(id + ' no ' + onde + ' (linha "' + est.texto + '", página ' + JSON.stringify(secoes) + ')');
+    });
     await pag.evaluate(() => { const v = document.querySelector('#bib-corpo .bib-assunto .bib-voltar'); if (v) v.click(); });
     await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); if (i && i.value) { i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); } });
     await pausa(300);
@@ -216,8 +299,8 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
     conf('VENENO visto: o texto da linha bate com a página do assunto, e quebrou (' + textosDiferentes.join('; ') + ')',
       textosDiferentes.length === 0, false);
   } else {
-    conf('os sinais do seletor batem com as seções da página do assunto em ' + ids.length + ' assuntos', diferentes.join('; '), '');
-    conf('o texto de cada linha nomeia as mesmas seções da página, nos ' + ids.length + ' assuntos', textosDiferentes.join('; '), '');
+    conf('os sinais do seletor e da grade batem com as seções da página do assunto em ' + todos.length + ' assuntos', diferentes.join('; '), '');
+    conf('o texto de cada linha (seletor e grade) nomeia as mesmas seções da página, nos ' + todos.length + ' assuntos', textosDiferentes.join('; '), '');
     conf('(arranjo) há linha com texto de material', ids.some(id => /No tablet: /.test(seletor.porId[id].texto)), true);
   }
   conf('não houve erro de página', pag.errosDePagina.join(' | '), '');
