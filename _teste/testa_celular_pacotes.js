@@ -38,10 +38,16 @@
  *      catálogo é relido (o intervalo de dez minutos), e nada baixa;
  *      um pacote de livros marcado no catálogo nem baixa nem entra na conta
  *      do espaço (o tamanho dele, enorme, não barra os outros);
+ *  6b. o pacote que falha sempre (o sha256 do catálogo não confere) baixa
+ *      uma vez só: a falha fica anotada por sha256, as mudanças da conexão e
+ *      a abertura seguinte não o baixam de novo, e os outros entram;
  *   7. a escrita escondida: com os pacotes no celular, a cópia nova do tablet
  *      chega ao abrir e a Biblioteca se refaz por baixo (esquecerMinhasListas);
  *      o espelho das seleções anteriores (espelharAnteriores) NÃO chama
  *      gravarListaBiblioteca no celular;
+ *   9. a troca de versão no meio de uma série do celular não pergunta nada (a
+ *      pergunta da importação é do tablet), e nenhum aviso aparece na tela
+ *      enquanto a série do celular anda;
  *   8. depois de tudo, as recusas de sempre continuam, e nenhum erro de página.
  *
  * Venenos (a prova TEM de ver o defeito e passa dizendo que viu):
@@ -51,6 +57,8 @@
  *                                 conferir a lista da porta 'biblioteca', que
  *                                 abriria para qualquer depósito (2 vê, pela
  *                                 sonda que abre pela própria trava);
+ *   --envenenado-pacote-falho-em-laco  sem a anotação da falha: o pacote que
+ *                                 falha sempre baixa de novo a cada abertura (6b vê);
  *   --envenenado-continua-sem-wifi  o Wi-Fi que cai no meio não corta a baixa:
  *                                 o pacote chega pelos dados móveis (4b vê);
  *   --envenenado-baixa-sem-wifi   a conferência do Wi-Fi diz sempre que sim:
@@ -102,6 +110,8 @@ const VENENOS = {
     "    if (modo === 'readwrite' && soLeitura && porta === 'biblioteca' && !portaDaBibliotecaAceita(nomes)) throw erroSoLeitura();\n", ''],
   '--envenenado-continua-sem-wifi': ['/app.js',
     'if (controleDaBaixaDoCelular && !celularNoWifi()) controleDaBaixaDoCelular.abort();', ''],
+  '--envenenado-pacote-falho-em-laco': ['/app.js',
+    "if (pularFalhos && c && typeof c.falhouEm === 'number') { r.falhos++; return; }", ''],
   '--envenenado-baixa-sem-wifi': ['/app.js',
     "return !!c && c.saveData !== true && (c.type === 'wifi' || c.type === 'ethernet');", 'return true;'],
   '--envenenado-observador-baixa': ['/app.js',
@@ -126,13 +136,17 @@ const ZIP = {
   m1: Sintetico.gerarProva(null, { serie: 'm1', versao: 1 }).zip,
   m2: Sintetico.gerarProva(null, { serie: 'm2', versao: 1 }).zip,
   sond: Sintetico.gerarSondagem(null, { versao: 1 }).zip,
-  banco: Sintetico.gerarBanco(null, { versao: 1 }).zip
+  banco: Sintetico.gerarBanco(null, { versao: 1 }).zip,
+  ruim: Sintetico.gerarBanco(null, { versao: 2 }).zip,      // o catálogo diz outro sha256 para ele: nunca confere
+  tardio: Sintetico.gerarProva(null, { serie: '3em', versao: 1 }).zip   // entra no fim, devagar (seção 9)
 };
 const SHA = {};
 Object.keys(ZIP).forEach(k => { SHA[k] = hex(ZIP[k]); });
 const CATALOGO_DONA = { 'matematica-sintetico-mirim-m1': 'm1', 'matematica-sintetico-mirim-m2': 'm2', 'matematica-sintetico-sondagem-9ano': 'sond' };
 // o observador também tem um catálogo na conta DELE: o veneno que o deixa baixar tem o que baixar
 const CATALOGO_OBS = { 'matematica-sintetico-banco-n2': 'banco' };
+// o sha256 que o catálogo diz para o zip ruim, e que não é o do arquivo guardado no caminho dele
+const SHA_RUIM_NO_CATALOGO = hex(Buffer.from('o catálogo diz este, e o arquivo é outro'));
 const caminho = (uid, sha) => 'usuarios/' + uid + '/pacotes/' + sha + '.zip';
 
 /* ---------- o emulador ---------- */
@@ -241,8 +255,9 @@ async function publicar(uid, qual, comLivros) {
   const pacotes = {}, status = [];
   for (const nome of Object.keys(qual)) {
     const k = qual[nome];
-    pacotes[nome] = { versao: 1, sha256: SHA[k], tamanho: ZIP[k].length, caminhoNuvem: caminho(uid, SHA[k]), publicadoEm: '2026-11-15T10:00:00-03:00' };
-    status.push(await subirArquivo(caminho(uid, SHA[k]), ZIP[k]));
+    const sha = k === 'ruim' ? SHA_RUIM_NO_CATALOGO : SHA[k];
+    pacotes[nome] = { versao: 1, sha256: sha, tamanho: ZIP[k].length, caminhoNuvem: caminho(uid, sha), publicadoEm: '2026-11-15T10:00:00-03:00' };
+    status.push(await subirArquivo(caminho(uid, sha), ZIP[k]));
   }
   if (comLivros) {
     // o catálogo que já diz que é de livros, com um tamanho que nenhum aparelho tem livre: nem baixa, nem conta no espaço
@@ -264,7 +279,8 @@ async function prepararPagina(pag, movel, rede) {
   else await pag.setViewport({ width: 1280, height: 800 });
   pag.errosDePagina = [];
   pag.on('pageerror', e => pag.errosDePagina.push(e.message));
-  pag.on('dialog', async d => { try { await d.accept(); } catch (e) { /* ok */ } });
+  pag.dialogos = [];
+  pag.on('dialog', async d => { pag.dialogos.push(d.message()); try { await d.accept(); } catch (e) { /* ok */ } });
   // os pedidos que saem: ao Storage (os zips) e a leitura do catálogo
   pag.pedidosStorage = [];
   pag.leiturasCatalogo = 0;
@@ -308,6 +324,28 @@ async function prepararPagina(pag, movel, rede) {
       const e0 = navigator.storage.estimate.bind(navigator.storage);
       navigator.storage.estimate = () => { const x = ler() || {}; return x.quota ? Promise.resolve({ quota: x.quota, usage: 0 }) : e0(); };
     }
+    // cada valor da marca escondida do andamento, desde o começo do documento
+    window.__marcas = [];
+    document.addEventListener('DOMContentLoaded', () => {
+      const c = document.querySelector('#modo-celular');
+      if (!c) return;
+      new MutationObserver(() => { const v = c.getAttribute('data-pacotes'); if (window.__marcas[window.__marcas.length - 1] !== v) window.__marcas.push(v); })
+        .observe(c, { attributes: true, attributeFilter: ['data-pacotes'] });
+    });
+    // cada aviso que aparece na tela, com a marca do andamento dos pacotes naquela hora
+    document.addEventListener('DOMContentLoaded', () => {
+      const alvo = document.querySelector('#aviso-texto');
+      if (!alvo) return;
+      new MutationObserver(() => {
+        const t = (alvo.textContent || '').trim();
+        if (!t) return;
+        const c = document.querySelector('#modo-celular');
+        let l = [];
+        try { l = JSON.parse(sessionStorage.getItem('__avisos') || '[]'); } catch (e) { l = []; }
+        l.push({ t, marca: c ? c.getAttribute('data-pacotes') : null });
+        try { sessionStorage.setItem('__avisos', JSON.stringify(l)); } catch (e) { /* ok */ }
+      }).observe(alvo, { childList: true, characterData: true, subtree: true });
+    });
     // as transações de escrita no banco do app, com os depósitos de cada uma
     window.__transacoes = [];
     const t0 = IDBDatabase.prototype.transaction;
@@ -489,7 +527,7 @@ const PORTA_FECHADA = 'false,false,false,false,false,false,false,false,false,fal
   conf('as contas sintéticas da dona e do observador existem no emulador', !!dona.localId && !!obs.localId, true);
   const U = dona.localId;
   conf('o catálogo e os zips sintéticos entraram na nuvem de teste (da dona e do observador)',
-    (await publicar(U, CATALOGO_DONA, true)).concat(await publicar(obs.localId, CATALOGO_OBS)).every(s => s === 200), true);
+    (await publicar(U, Object.assign({ 'matematica-sintetico-trocado': 'ruim' }, CATALOGO_DONA), true)).concat(await publicar(obs.localId, CATALOGO_OBS)).every(s => s === 200), true);
 
   secao('1. O tablet: a cópia sobe, e os pacotes chegam pelo Atualizar a biblioteca');
   const nav = await amb.subir();
@@ -630,32 +668,39 @@ const PORTA_FECHADA = 'false,false,false,false,false,false,false,false,false,fal
     repasse.cortados.indexOf(SHA.m1) >= 0 && repasse.completos.indexOf(SHA.m1) < 0, true);
   conf('nada foi gravado: nenhum pacote e nenhuma transação de pacote', (await lerPacotes(pagC)) + '|' +
     (await pagC.evaluate(() => window.__transacoes.filter(t => /biblioteca_/.test(t)).length)), '|0');
-  conf('a série parou ali, sem pedir o pacote seguinte', fimCorte.valor + '|' + pagC.pedidosStorage.filter(u => u.indexOf(SHA.m2) >= 0 || u.indexOf(SHA.sond) >= 0).length, 'parou|0');
+  conf('a série parou ali, sem pedir o pacote seguinte', fimCorte.valor + '|' + pagC.pedidosStorage.filter(u => u.indexOf(SHA.m2) >= 0 || u.indexOf(SHA.sond) >= 0 || u.indexOf(SHA_RUIM_NO_CATALOGO) >= 0).length, 'parou|0');
+
+  const n4b = pagC.pedidosStorage.length, c4b = pagC.leiturasCatalogo;
+  await pagC.evaluate(() => { window.__mudarRede('wifi'); });
+  await pausa(2500);
+  conf('o Wi-Fi que volta logo depois do corte espera (10 min, depois 1 h, depois 6 h): nem o catálogo é lido de novo',
+    (pagC.leiturasCatalogo - c4b) + '|' + (pagC.pedidosStorage.length - n4b) + '|' + await marca(pagC), '0|0|parou');
 
   secao('5. No Wi-Fi com espaço: os três pacotes chegam, iguais aos do tablet, e nada dela muda');
   pagC.pedidosStorage = [];
   const retrato1 = await retratoDela(pagC);
   conf('(antes) o que é dela no celular continua o da cópia', h(retrato1.tudo), h(retrato0.tudo));
-  await pagC.evaluate(() => {
-    window.__transacoes = [];
-    window.__marcas = [];
-    const c = document.querySelector('#modo-celular');
-    window.__olhaMarca = new MutationObserver(() => { const v = c.getAttribute('data-pacotes'); if (window.__marcas[window.__marcas.length - 1] !== v) window.__marcas.push(v); });
-    window.__olhaMarca.observe(c, { attributes: true, attributeFilter: ['data-pacotes'] });
-    window.__quota(0);
-    window.__mudarRede('wifi');
-    // a conexão muda de novo no meio: continua uma série só
-    setTimeout(() => window.__mudarRede('wifi'), 30);
-    setTimeout(() => window.__mudarRede('ethernet'), 120);
-  });
+  // a espera da rede fica na memória: a abertura do aplicativo começa a série
+  await pagC.evaluate(() => { window.__quota(0); });
+  await pagC.goto(amb.ORIGEM + '/index.html', { waitUntil: 'domcontentloaded' });
+  await esperar('a série da abertura começou', () => marca(pagC), v => /^(conferindo|trazendo )/.test(v || ''), 30000);
+  // a conexão muda de novo no meio: continua uma série só
+  await pagC.evaluate(() => { window.__mudarRede('wifi'); setTimeout(() => window.__mudarRede('wifi'), 30); setTimeout(() => window.__mudarRede('ethernet'), 120); });
   const chegou = await esperar('os três pacotes chegaram ao celular', () => marca(pagC), v => v === 'prontos' || v === 'faltam' || v === 'falhou' || v === 'parou', 90000);
   await pausa(1500);
-  conf('a série terminou com todos os pacotes', chegou.valor, 'prontos');
+  conf('a série terminou com os três bons dentro e só o de sha256 errado faltando', chegou.valor, 'faltam');
   conf('os três pacotes estão no celular', await lerPacotes(pagC), noTablet.valor);
-  const marcas = await pagC.evaluate(() => { window.__olhaMarca.disconnect(); return window.__marcas; });
-  conf('a marca escondida andou de um em um (' + marcas.join(' > ') + ')', ['trazendo 1/3', 'trazendo 2/3', 'trazendo 3/3', 'prontos'].every(m => marcas.indexOf(m) >= 0), true);
+  const marcas = await pagC.evaluate(() => window.__marcas.slice());
+  conf('a marca escondida andou de um em um (' + marcas.join(' > ') + ')', ['trazendo 1/4', 'trazendo 2/4', 'trazendo 3/4', 'trazendo 4/4', 'faltam'].every(m => marcas.indexOf(m) >= 0), true);
   const porZip = Object.keys(CATALOGO_DONA).map(n => pagC.pedidosStorage.filter(u => u.indexOf(SHA[CATALOGO_DONA[n]]) !== -1).length);
-  conf('uma série só: cada zip baixou uma vez, mesmo com a conexão mudando no meio', porZip.join(',') + '|' + pagC.pedidosStorage.length, '1,1,1|3');
+  const doRuim = () => pagC.pedidosStorage.filter(u => u.indexOf(SHA_RUIM_NO_CATALOGO) !== -1).length;
+  conf('uma série só: cada zip baixou uma vez, mesmo com a conexão mudando no meio (o de sha256 errado também)',
+    porZip.join(',') + '|' + doRuim() + '|' + pagC.pedidosStorage.length, '1,1,1|1|4');
+  conf('a falha do de sha256 errado ficou anotada por sha256, na conta dela', await pagC.evaluate((u, sha) => {
+    const v = JSON.parse(localStorage.getItem('apoio-educacional:pacotes-da-nuvem') || 'null');
+    const c = v && v.contas && v.contas[u] && v.contas[u].porSha && v.contas[u].porSha[sha];
+    return !!c && typeof c.falhouEm === 'number';
+  }, U, SHA_RUIM_NO_CATALOGO), true);
   const digitalC = await digitalDaBiblioteca(pagC);
   conf('os pacotes do celular são iguais aos do tablet (pacotes, itens, teoria e assets: ' + digitalC.n + ')', h(digitalC.tudo), h(digitalA.tudo));
   const trans = await pagC.evaluate(() => window.__transacoes.slice());
@@ -668,13 +713,13 @@ const PORTA_FECHADA = 'false,false,false,false,false,false,false,false,false,fal
   conf('dados, listas e mídias do celular ficaram idênticos (a imagem da folha da cópia continua lá)',
     h(retrato2.tudo) + '|' + retrato2.midias, h(retrato0.tudo) + '|mFolha');
 
-  secao('6. A conexão muda de novo, com tudo em dia: nada baixa outra vez');
+  secao('6. A conexão muda de novo, com tudo em dia (só falta o que falha sempre): nada baixa outra vez');
   const n6 = pagC.pedidosStorage.length, c6 = pagC.leiturasCatalogo;
   // o change que só troca a velocidade (downlink, rtt) dispara várias vezes seguidas
   await pagC.evaluate(() => { ['wifi', 'wifi', 'ethernet', 'wifi', 'wifi'].forEach((t, i) => setTimeout(() => window.__mudarRede(t), i * 200)); });
   await pausa(4000);
-  conf('cinco changes seguidos no Wi-Fi, com tudo em dia: no máximo uma leitura do catálogo, e nada baixou (' + (pagC.leiturasCatalogo - c6) + ' leituras)',
-    (pagC.leiturasCatalogo - c6 <= 1) + '|' + (pagC.pedidosStorage.length - n6), 'true|0');
+  conf('cinco changes seguidos no Wi-Fi depois do faltam: no máximo uma leitura do catálogo, e o de sha256 errado baixou exatamente uma vez (' + (pagC.leiturasCatalogo - c6) + ' leituras)',
+    (pagC.leiturasCatalogo - c6 <= 1) + '|' + (pagC.pedidosStorage.length - n6) + '|' + doRuim(), 'true|0|1');
   conf('o pacote de livros marcado no catálogo nunca foi pedido (nem no tablet), e o tamanho dele não barrou os outros',
     pagC.pedidosStorage.concat(pagA.pedidosStorage).filter(u => u.indexOf(SHA_LIVROS_MARCADO) >= 0).length, 0);
 
@@ -693,6 +738,12 @@ const PORTA_FECHADA = 'false,false,false,false,false,false,false,false,false,fal
   await abrirCelular(pagC);
   const trouxe = await esperar('o celular trouxe a cópia nova ao abrir', () => pagC.evaluate(() => (Nuvem.estado().ultimaCopia || {}).id || null), v => v === idNovo, 30000);
   conf('o celular trouxe a cópia nova ao abrir', trouxe.ok, true);
+  const aberto = await esperarMarca(pagC, 'a abertura conferiu os pacotes', ['prontos', 'faltam', 'falhou', 'parou'], 30000);
+  if (MODO === '--envenenado-pacote-falho-em-laco') {
+    conf('VENENO visto: a abertura baixou de novo o pacote que falha sempre (' + doRuim() + ' baixas)', doRuim() > 1, true);
+    return fim();
+  }
+  conf('6b. a abertura seguinte leu o catálogo, pulou o pacote que falha sempre e acabou em dia', aberto + '|' + doRuim(), 'prontos|1');
   // a restauração refaz a Biblioteca por baixo (esquecerMinhasListas), que relê as listas e chama o espelho
   await pausa(4000);
   const chamadas = await pagC.evaluate(() => window.__listasChamadas);
@@ -706,6 +757,31 @@ const PORTA_FECHADA = 'false,false,false,false,false,false,false,false,false,fal
   conf('os pacotes continuam no celular depois da restauração', await lerPacotes(pagC), noTablet.valor);
   conf('(controle) a seleção anterior continua no diário do celular, sem ter ido para o depósito',
     await pagC.evaluate(() => JSON.parse(localStorage.getItem('apoio-educacional:bib-selecoes-anteriores') || '[]').length), 1);
+
+  secao('9. A troca de versão no meio de uma série do celular não pergunta nada');
+  conf('(arranjo) o pacote que chega por último entrou no catálogo dela',
+    (await publicar(U, Object.assign({ 'matematica-sintetico-trocado': 'ruim', 'matematica-sintetico-tardio-3em': 'tardio' }, CATALOGO_DONA), true)).every(x => x === 200), true);
+  repasse.lentoSha = SHA.tardio;
+  repasse.enviados = {};
+  const dialogos9 = pagC.dialogos.length;
+  // a abertura zera o intervalo e começa a série (sem esperar a rede parar: a baixa devagar a mantém ocupada)
+  await pagC.goto(amb.ORIGEM + '/index.html', { waitUntil: 'domcontentloaded' });
+  const andando = await esperar('o pacote do fim está chegando, devagar', () => repasse.enviados[SHA.tardio] || 0, v => v >= 1024, 40000);
+  const marca9 = await marca(pagC);
+  conf('(arranjo) a série do celular estava andando (marca: ' + marca9 + ')', andando.ok && /^trazendo /.test(marca9 || ''), true);
+  // outra janela ativou a versão nova: o controllerchange passa pela mesma conferência do "Atualizar"
+  await pagC.evaluate(() => { window.__antesDaTroca = true; navigator.serviceWorker.dispatchEvent(new Event('controllerchange')); });
+  await esperar('a página recarregou para a versão nova', () => pagC.evaluate(() => window.__antesDaTroca !== true && typeof Store === 'object'), v => v === true, 20000);
+  repasse.lentoSha = null;
+  await pausa(2000);
+  const novos = pagC.dialogos.slice(dialogos9);
+  conf('nenhuma pergunta apareceu no celular (a da importação é do tablet)', novos.join(' | '), '');
+  const avisos = await pagC.evaluate(() => { try { return JSON.parse(sessionStorage.getItem('__avisos') || '[]'); } catch (e) { return []; } });
+  const naSerie = avisos.filter(a => /^(trazendo |conferindo)/.test(a.marca || ''));
+  conf('nenhum aviso apareceu na tela enquanto a série do celular andava (' + avisos.length + ' avisos no total)', naSerie.map(a => a.t).join(' | '), '');
+  conf('nenhum aviso do celular falou da importação ou da biblioteca do tablet',
+    avisos.filter(a => /importa|Atualizar a biblioteca|O que já entrou/.test(a.t)).map(a => a.t).join(' | '), '');
+  await esperarMarca(pagC, 'a série da abertura acabou', ['prontos', 'faltam', 'falhou', 'parou'], 40000);
 
   secao('8. As recusas de sempre, a tela e os erros');
   conf('depois dos pacotes, o celular continua recusando listas, mídias, etiquetas, uso e remover pacote', await recusasDeSempre(pagC), RECUSAS);

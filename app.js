@@ -3201,7 +3201,8 @@
    * não vê resumo nenhum). Pergunta antes, como com a mudança não guardada. */
   var importandoBiblioteca = false;
   function prontoParaRecarregar() {
-    var depoisDaImportacao = importandoBiblioteca
+    // no celular (A1) não pergunta: a série dele é calada, o pacote pela metade se perde e volta no próximo gatilho
+    var depoisDaImportacao = importandoBiblioteca && !pacotesDoCelular && !modoCelular
       ? Promise.resolve(confirmar('A importação da biblioteca ainda está andando e para se o aplicativo atualizar agora. ' +
         'Atualizar mesmo assim? O que já entrou fica no tablet.'))
       : Promise.resolve(true);
@@ -18326,13 +18327,16 @@
 
   /* Do catálogo, os pacotes a trazer (em ordem de nome), e a conta dos que já
    * estão e dos que vieram fora da forma. Nada é baixado aqui. */
-  function pacotesParaTrazer(pacotes, instalados, conhecidos, uid, removidos) {
+  /* pularFalhos (o celular, A1): o sha256 que falhou pelo próprio pacote (a
+   * marca falhouEm no porSha, com o nome do catálogo) nunca baixa de novo; só
+   * o catálogo com OUTRO sha256 para o pacote, que é outro arquivo, baixa. */
+  function pacotesParaTrazer(pacotes, instalados, conhecidos, uid, removidos, pularFalhos) {
     removidos = removidos || {};
     var versaoAqui = Object.create(null);
     (instalados || []).forEach(function (p) {
       if (p && typeof p.pacote === 'string' && typeof p.versao === 'number') versaoAqui[p.pacote] = p.versao;
     });
-    var r = { trazer: [], iguais: 0, invalidos: 0, removidos: 0, livros: 0 };
+    var r = { trazer: [], iguais: 0, invalidos: 0, removidos: 0, livros: 0, falhos: 0 };
     Object.keys(pacotes || {}).sort().forEach(function (nome) {
       var e = pacotes[nome];
       if (e && e.retiradoEm) return;
@@ -18343,6 +18347,7 @@
       var c = conhecidos[e.sha256];
       // um pacote de LIVROS que o publicador pôs em pacotes (ele não abre o zip): os livros vêm pela Estante
       if (c && c.conteudo === 'livros') { r.livros++; return; }
+      if (pularFalhos && c && typeof c.falhouEm === 'number') { r.falhos++; return; }
       var id = c && typeof c.pacote === 'string' && typeof c.versao === 'number' ? c : { pacote: nome, versao: e.versao };
       var aqui = versaoAqui[id.pacote];
       if (typeof aqui === 'number' && aqui >= id.versao) { r.iguais++; return; }
@@ -18364,6 +18369,14 @@
     outro: 'não baixou agora. Toque em Atualizar a biblioteca de novo para tentar.'
   };
 
+  /* A falha de REDE (sem rede, a baixa parada ou cortada, o Wi-Fi que caiu, a
+   * entrada vencida, o servidor ocupado; e a conta do espaço antes de baixar,
+   * que nem chega a baixar): o celular tenta de novo depois de uma espera que
+   * cresce (ESPERAS_DE_REDE_DO_CELULAR_MS). As outras são do próprio pacote (o
+   * sha256 que não confere, a nuvem que não deixa, o pacote ausente, e toda
+   * recusa da importação: o id que outro pacote já trouxe, a falta de espaço
+   * ao gravar): ficam anotadas por sha256 e nunca baixam de novo. */
+  var FALHAS_PASSAGEIRAS = { 'sem-rede': true, rede: true, cancelada: true, entrar: true, 'sem-espaco': true, outro: true };
   /* Um pacote: baixa, confere o sha256 e importa pelo caminho do zip.
    * NUNCA rejeita: devolve a linha do resumo, com a identidade que o zip
    * mostrou (quando chegou a ser lido). */
@@ -18401,11 +18414,13 @@
       });
     }).then(function (r) {
       return { nome: ctx.nome, arquivo: arquivo, estado: r.estado, motivo: r.motivo, versaoAtual: r.versaoAtual, versaoNova: r.versaoNova,
-        porque: r.porque || null, errosLivros: r.errosLivros || null, exercicios: !!r.exercicios, identidade: ctx.identidade, sha256: e.sha256 };
+        porque: r.porque || null, errosLivros: r.errosLivros || null, exercicios: !!r.exercicios, identidade: ctx.identidade, sha256: e.sha256,
+        // a importação que recusou o pacote (repetido, defeito, sem espaço ao gravar) recusa de novo o mesmo arquivo
+        passageira: false };
     }, function (err) {
       var motivo = motivoDaFalhaDaBaixa(err);
       return { nome: ctx.nome, arquivo: arquivo, estado: 'falhou', porque: { texto: FRASES_DO_PACOTE[motivo] || FRASES_DO_PACOTE.outro, detalhe: '' },
-        exercicios: false, identidade: null, sha256: e.sha256 };
+        exercicios: false, identidade: null, sha256: e.sha256, passageira: FALHAS_PASSAGEIRAS[motivo] === true };
     });
   }
 
@@ -18456,7 +18471,7 @@
       if (!pacotes) return null;
       var conhecidos = pacotesConhecidosDaNuvem(uid);
       var removidos = pacotesRemovidosDaNuvem(uid);
-      var escolha = pacotesParaTrazer(pacotes, r[1], conhecidos, uid, removidos);
+      var escolha = pacotesParaTrazer(pacotes, r[1], conhecidos, uid, removidos, doCelular);
       conta.iguais = escolha.iguais;
       conta.invalidos = escolha.invalidos;
       // o resumo de antes (de outro toque ou de um zip) sai: o que fica na tela é o deste toque
@@ -18502,6 +18517,14 @@
            * aplicativo fechado no meio da série não baixa de novo o que já
            * chegou a mostrar quem é */
           if (res.identidade) { conhecidos[res.sha256] = res.identidade; guardarConhecidos(); }
+          // no celular, a falha do próprio pacote fica anotada por sha256: ele não baixa de novo a cada mudança da conexão
+          if (doCelular && res.estado === 'falhou') {
+            if (res.passageira) conta.falharamDeRede = (conta.falharamDeRede || 0) + 1;
+            else {
+              conhecidos[res.sha256] = Object.assign({}, conhecidos[res.sha256] || {}, { falhouEm: Date.now(), falhouNome: res.nome || escolha.trazer[i].nome });
+              guardarConhecidos();
+            }
+          }
           // quem abrir a aba Biblioteca no meio já vê o que entrou
           if (res.exercicios && res.estado === 'entrou') { temPacoteBiblioteca = true; desenharPacotesBiblioteca(); }
           return pausaCurta().then(function () { return proximo(i + 1); });
@@ -18596,13 +18619,18 @@
   }
   /* O INTERVALO: o `change` do navigator.connection dispara também quando só
    * a velocidade muda (downlink, rtt), e cada conferência lê o catálogo. Depois
-   * de uma série que acabou com tudo em dia ('prontos') ou sem nada a conferir
-   * ('nada'), a próxima espera dez minutos. O que não acabou assim (sem Wi-Fi,
-   * sem espaço, parou, faltou) confere de novo no próximo gatilho: o Wi-Fi que
-   * entra depois de 'sem-wifi' baixa na hora. A abertura do aplicativo começa
-   * a conta do zero. */
+   * de uma série que acabou em 'prontos', 'nada' ou 'faltam' (o que falta é o
+   * que falha sempre, anotado e pulado), a próxima espera dez minutos.
+   * A ESPERA DA REDE: a série com falha de rede (inclusive o Wi-Fi que caiu no
+   * meio) espera 10 min, depois 1 h, depois 6 h; a série que acaba sem falha de
+   * rede zera a conta. 'sem-wifi', 'sem-internet' e 'sem-espaco' não baixaram
+   * nada e conferem no próximo gatilho: o Wi-Fi que entra depois de 'sem-wifi'
+   * baixa na hora. Tudo fica na memória: a abertura do aplicativo começa do
+   * zero. */
   var INTERVALO_PACOTES_CELULAR_MS = 10 * 60 * 1000;
-  var pacotesEmDiaNoCelular = 0;   // quando a última série acabou em dia (Date.now), ou 0
+  var ESPERAS_DE_REDE_DO_CELULAR_MS = [10 * 60 * 1000, 60 * 60 * 1000, 6 * 60 * 60 * 1000];
+  var proximaConferenciaNoCelular = 0;   // antes deste instante (Date.now), nenhuma série começa
+  var falhasDeRedeSeguidasNoCelular = 0;
   /* O CORTE: o Chrome do Android pode passar uma baixa em curso (QUIC) do
    * Wi-Fi para os dados móveis sem errar nada. A conexão que muda (ou cai) no
    * meio da baixa e não é mais Wi-Fi a corta pelo sinal; o pacote pela metade
@@ -18617,15 +18645,21 @@
     if (pacotesDoCelular) return pacotesDoCelular;
     if (navigator.onLine === false) { marcarPacotesNoCelular('sem-internet'); return Promise.resolve(null); }
     if (!celularNoWifi()) { marcarPacotesNoCelular('sem-wifi'); return Promise.resolve(null); }
-    if (pacotesEmDiaNoCelular && Date.now() - pacotesEmDiaNoCelular < INTERVALO_PACOTES_CELULAR_MS) return Promise.resolve(null);
-    pacotesEmDiaNoCelular = 0;
+    if (Date.now() < proximaConferenciaNoCelular) return Promise.resolve(null);
     marcarPacotesNoCelular('conferindo');
     var seguir = function () { return modoCelular && navigator.onLine !== false && celularNoWifi() && celularTrazPacotes(); };
     pacotesDoCelular = trazerPacotesDaNuvem(null, { celular: true, seguir: seguir, aoAndar: function (n, total) {
       marcarPacotesNoCelular('trazendo ' + n + '/' + total);
     } }).then(function (c) {
       var fim = !c ? 'nada' : c.semEspaco ? 'sem-espaco' : c.parou ? 'parou' : c.falharam ? 'faltam' : 'prontos';
-      if (fim === 'nada' || fim === 'prontos') pacotesEmDiaNoCelular = Date.now();
+      if (c && c.falharamDeRede) {
+        // a rede falhou: 10 min, 1 h, 6 h
+        proximaConferenciaNoCelular = Date.now() + ESPERAS_DE_REDE_DO_CELULAR_MS[Math.min(falhasDeRedeSeguidasNoCelular, ESPERAS_DE_REDE_DO_CELULAR_MS.length - 1)];
+        falhasDeRedeSeguidasNoCelular++;
+      } else {
+        falhasDeRedeSeguidasNoCelular = 0;
+        if (fim === 'nada' || fim === 'prontos' || fim === 'faltam') proximaConferenciaNoCelular = Date.now() + INTERVALO_PACOTES_CELULAR_MS;
+      }
       marcarPacotesNoCelular(fim);
     }, function () {
       marcarPacotesNoCelular('falhou');

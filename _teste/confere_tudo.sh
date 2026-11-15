@@ -1383,6 +1383,9 @@ roda "celular, pacotes da nuvem --envenenado-observador-baixa" node "_teste/test
 # e a baixa que continua pelos dados moveis quando o Wi-Fi cai no meio.
 roda "celular, pacotes da nuvem --envenenado-porta-sem-conferir-lista" node "_teste/testa_celular_pacotes.js" --envenenado-porta-sem-conferir-lista
 roda "celular, pacotes da nuvem --envenenado-continua-sem-wifi" node "_teste/testa_celular_pacotes.js" --envenenado-continua-sem-wifi
+# (lente contra o pedido) o pacote que falha sempre fica anotado por sha256 e nao
+# baixa de novo a cada mudanca da conexao nem a cada abertura
+roda "celular, pacotes da nuvem --envenenado-pacote-falho-em-laco" node "_teste/testa_celular_pacotes.js" --envenenado-pacote-falho-em-laco
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
