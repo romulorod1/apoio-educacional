@@ -469,6 +469,38 @@ async function transbordo(pag) {
   conf('"Aluna: Zélia", "Prova Cambridge" e o "não enviado"', [t.indexOf('Aluna: Zélia') >= 0, t.join(' ').indexOf('Prova Cambridge') >= 0, t.indexOf('Conteúdo ainda não enviado pela escola.') >= 0], [true, true, true]);
   conf('a conferência do app NÃO vai para a folha', t.join(' ').indexOf('Nenhum dia de estudo') < 0, true);
 
+  /* Só o calendário (relato de 15/11/2026: "Remover a seção datas e conteúdo
+   * das provas" deu "O plano ficou igual"). O modelo falso devolve o plano
+   * IGUAL, como no relato: o app tira a seção mesmo assim. Depois, o seletor
+   * "Na folha:" põe e tira a seção sem a IA. */
+  conf('(arranjo) o seletor "Na folha:" está à vista, em "Calendário e provas"', await pag.evaluate(() => {
+    const s = document.querySelector('#plan-quadro [data-valor="com"]');
+    return [!!s, s && s.getAttribute('aria-checked'), (document.querySelector('#plan-quadro [data-valor="sem"]') || {}).textContent];
+  }), [true, 'true', 'Só o calendário']);
+  const antesQuadro = falso.pedidos.length;
+  falso.atraso = 0; falso.fila = []; falso.corpo = respostaFalsa(plano2);
+  await pag.evaluate(() => { document.querySelector('#plan-ajuste').value = ''; });
+  await pag.type('#plan-ajuste', 'Remover a seção datas e conteúdo das provas');
+  await clicar(pag, '#plan-ajustar');
+  await esperar('o ajuste da seção voltou', () => pag.evaluate(() => !document.querySelector('#plan-ajustando') && !!document.querySelector('#plan-mudou')).then(v => v && falso.pedidos.length === antesQuadro + 1), v => v === true, 30000);
+  conf('o pedido dela com o modelo devolvendo o plano igual: "Mudou: saiu a seção", e o seletor em "Só o calendário"', await pag.evaluate(() => [
+    document.querySelector('#plan-mudou span').textContent, document.querySelector('#plan-quadro [data-valor="sem"]').getAttribute('aria-checked')]),
+    ['Mudou: saiu a seção "Datas e conteúdo das provas".', 'true']);
+  const compartilhar = async () => {
+    await pag.evaluate(() => { window.__compartilhado = null; });
+    await clicar(pag, '#plan-compartilhar');
+    await esperar('o PDF foi compartilhado de novo', () => pag.evaluate(() => window.__compartilhado && window.__compartilhado.nome), v => !!v, 10000);
+    return textoDoPdf((await pag.evaluate(() => window.__compartilhado)).base64);
+  };
+  const tSem = await compartilhar();
+  conf('o PDF compartilhado sai sem a seção, com as provas nos dias', [tSem.indexOf('Datas e conteúdo das provas') >= 0, tSem.indexOf('Conteúdo ainda não enviado pela escola.') >= 0, tSem.join(' ').indexOf('Prova Cambridge') >= 0], [false, false, true]);
+  await clicar(pag, '#plan-quadro [data-valor="com"]');
+  const tCom = await compartilhar();
+  conf('"Calendário e provas" no seletor: a seção volta, sem chamar a IA', [tCom.indexOf('Datas e conteúdo das provas') >= 0, falso.pedidos.length, await pag.evaluate(() => document.querySelector('#plan-quadro [data-valor="com"]').getAttribute('aria-checked'))], [true, antesQuadro + 1, 'true']);
+  await clicar(pag, '#plan-quadro [data-valor="sem"]');
+  const tSem2 = await compartilhar();
+  conf('"Só o calendário" no seletor tira de novo, sem chamar a IA', [tSem2.indexOf('Datas e conteúdo das provas') >= 0, falso.pedidos.length], [false, antesQuadro + 1]);
+
   // de volta à ficha: o foco volta ao botão de origem, e o salvo está na lista
   await fecharPlanejamento(pag);
   conf('ao fechar, o foco volta ao "Novo planejamento"', await pag.evaluate(() => new Promise(r => setTimeout(() => r(document.activeElement && document.activeElement.id), 100))), 'plan-novo');
@@ -477,7 +509,7 @@ async function transbordo(pag) {
     ['Provas de novembro, de 16/11 a 27/11', true, true]);
   await clicar(pag, '#plan-secao .plan-item');
   await esperar('o salvo abre direto na prévia', () => temFolha(pag), v => v === true, 30000);
-  conf('e já diz "Salvo na ficha", sem pedido novo', [await pag.evaluate(() => document.querySelector('#plan-salvar').textContent), falso.pedidos.length], ['Salvo na ficha', antesTeto + 2]);
+  conf('e já diz "Salvo na ficha", sem pedido novo', [await pag.evaluate(() => document.querySelector('#plan-salvar').textContent), falso.pedidos.length], ['Salvo na ficha', antesQuadro + 1]);
   conf('no salvo, "Para qual aluno?" e o "Excluir este plano"', await pag.evaluate(() => [!!document.querySelector('#plan-quem #plan-alunos'), !!document.querySelector('#plan-excluir')]), [true, true]);
   await clicar(pag, '#plan-ampliar');
   await esperar('o leitor abriu do salvo', () => aberta(pag, 'modal-leitor-pdf'), v => v === true, 10000);

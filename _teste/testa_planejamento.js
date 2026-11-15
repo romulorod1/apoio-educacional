@@ -87,8 +87,8 @@ secao('1. O esquema serve à saída estruturada');
     Object.keys(n).forEach(k => andar(n[k], onde + '.' + k));
   })(P.ESQUEMA, 'ESQUEMA');
   conf('todo objeto tem additionalProperties:false e required com todas as propriedades, sem restrição que a API não aceita', ruins, []);
-  conf('os campos do plano são os do brief (mais tratamento e deManha)', Object.keys(P.ESQUEMA.properties).sort(),
-    ['alunoId', 'aulaAConfirmar', 'aulasExtras', 'aulasRemovidas', 'confiancaAluno', 'feriados', 'grade', 'observacoes', 'periodo', 'provas', 'tratamento']);
+  conf('os campos do plano são os do brief (mais tratamento, deManha e quadroDasProvas)', Object.keys(P.ESQUEMA.properties).sort(),
+    ['alunoId', 'aulaAConfirmar', 'aulasExtras', 'aulasRemovidas', 'confiancaAluno', 'feriados', 'grade', 'observacoes', 'periodo', 'provas', 'quadroDasProvas', 'tratamento']);
   conf('aulasRemovidas e aulasExtras são exigidas na saída (podem vir vazias), e a extra é { data, hora }', [
     P.ESQUEMA.required.indexOf('aulasRemovidas') >= 0, P.ESQUEMA.required.indexOf('aulasExtras') >= 0,
     P.ESQUEMA.properties.aulasExtras.items.required.slice().sort(), P.ESQUEMA.properties.aulasExtras.items.additionalProperties],
@@ -646,6 +646,72 @@ secao('12. O conteúdo escrito no pedido: o system, o esquema e a conferência d
   const longo = ('a prova de matematica e de ciencias nao sei o que cai mas tem que estudar bastante ').repeat(2000);
   const t0 = Date.now(); P.itensIncertos({ grade: [], provas: [prova('2026-11-24', 'Matemática', null), prova('2026-11-25', 'Ciências', null)] }, { texto: longo });
   conf('texto ditado de 170 mil letras: a conferência leva menos de 2 s', Date.now() - t0 < 2000, true);
+})();
+
+/* ---------- só o calendário: a seção "Datas e conteúdo das provas" sai ----------
+ * Relato de 15/11/2026: "Remover a seção datas e conteúdo das provas" deu "O
+ * plano ficou igual" (o plano não tinha como dizer "sem a seção"; quando deu
+ * certo, foi o modelo esvaziando "provas"). Agora: o campo quadroDasProvas, o
+ * seletor "Só o calendário" na prévia, e a rede do app depois do ajuste. */
+secao('só o calendário');
+(function () {
+  const QUADRO = 'Datas e conteúdo das provas';
+  const AGENDA = [{ data: '2026-11-10', hora: '11:00' }];
+  const com = P.desenharFolha(planoBase(), { nome: 'Ana', aulas: AGENDA }, G);
+  const sem = P.desenharFolha(planoBase({ extra: { quadroDasProvas: false } }), { nome: 'Ana', aulas: AGENDA }, G);
+  const tc = textoDoPdf(com.bytes), ts = textoDoPdf(sem.bytes);
+  conf('(arranjo) o plano sem o campo (salvo antes da opção) traz a seção', [P.temQuadroDasProvas(planoBase()), tc.indexOf(QUADRO) >= 0], [true, true]);
+  conf('quadroDasProvas false: a seção sai inteira (título, linhas e o "não enviado")', [ts.indexOf(QUADRO) >= 0, contar(ts, P.SEM_CONTEUDO), ts.indexOf('Cap. 3 (Rios): cap. 4 (Cidades).') >= 0], [false, 0, false]);
+  conf('as provas continuam nos dias do calendário, e a folha é uma página', [ts.join(' ').indexOf('Prova Cambridge') >= 0, ts.join(' ').indexOf('Prova de História') >= 0, ts.join(' ').indexOf('Prova de Science') >= 0, paginasDoPdf(sem.bytes)], [true, true, true, 1]);
+  conf('o resto da folha igual: as aulas e o "estudar:"', [contar(ts, 'Aula com a Nath'), contar(tc, 'Aula com a Nath'), ts.indexOf('estudar:') >= 0], [1, 1, true]);
+  /* O pé da grade: o y mais baixo das placas dos dias (o "m" de cada placa é
+   * o canto de baixo). Sem a seção, a grade usa o espaço dela. */
+  const peDaGrade = b => Math.min.apply(null, (Buffer.from(b).toString('latin1').match(/RG 0\.80 w [-\d.]+ ([-\d.]+) m(?: [-\d.]+){2} l/g) || ['RG 0.80 w 0 9999 m']).map(s => Number(/w [-\d.]+ ([-\d.]+) m/.exec(s)[1])));
+  conf('só o calendário: a grade desce mais de 100 pt na folha (o pé não fica vazio)', peDaGrade(com.bytes) - peDaGrade(sem.bytes) > 100, true);
+  conf('quadroDasProvas true é o mesmo que sem o campo', Buffer.from(P.desenharFolha(planoBase({ extra: { quadroDasProvas: true } }), { nome: 'Ana', aulas: AGENDA }, G).bytes).equals(Buffer.from(com.bytes)), true);
+  conf('quadroDasProvas que não é sim ou não é recusado', P.conferirPlano(planoBase({ extra: { quadroDasProvas: 'nao' } }), ['al-sint-1']), 'quadro das provas inválido');
+  conf('o esquema exige o campo e o sistema diz para nunca esvaziar "provas" ao tirar a seção',
+    [P.ESQUEMA.required.indexOf('quadroDasProvas') >= 0, P.ESQUEMA.properties.quadroDasProvas.type, /nunca esvazie "provas" para tirar a seção/.test(P.SISTEMA)], [true, 'boolean', true]);
+  conf('o plano que vai ao modelo no ajuste do salvo leva o campo (true no plano antigo)',
+    /"quadroDasProvas":true/.test(P.pedidoDeAjusteDoSalvo(planoBase(), 'x', { alunos: [], hoje: '2026-11-09', aulasDaAgenda: [] }).messages[0].content[0].text), true);
+
+  // a intenção no texto do ajuste
+  const casos = [
+    ['Remover a seção datas e conteúdo das provas', 'tirar'],
+    ['remove a seção datas e conteúdos das provas', 'tirar'],
+    ['tira o quadro das provas', 'tirar'],
+    ['Só o calendário', 'tirar'],
+    ['quero só o calendário, sem a tabela', 'tirar'],
+    ['não precisa da lista das provas', 'tirar'],
+    ['esconde a parte das datas e conteúdo', 'tirar'],
+    ['volta a seção das provas', 'voltar'],
+    ['mostra de novo a lista das provas', 'voltar'],
+    ['põe de volta o quadro das provas', 'voltar'],
+    ['põe Geografia no dia 21', null],
+    ['tira a prova de Science', null],
+    ['tira a aula com a Nath do dia 20', null],
+    ['muda o conteúdo da prova de História para cap. 5', null],
+    ['tirei sem querer, volta a seção das provas', null]
+  ];
+  conf('a intenção de cada pedido (15 frases, a primeira é a dela)', casos.map(([t]) => P.intencaoDoQuadro(t)), casos.map(([, r]) => r));
+
+  // a rede do app depois do ajuste
+  const antes = planoBase();
+  const igual = JSON.parse(JSON.stringify(antes));
+  const corrigido = P.aplicarIntencaoDoQuadro(antes, igual, 'Remover a seção datas e conteúdo das provas');
+  conf('o modelo devolveu o plano igual: o app tira a seção, e o resumo diz', [corrigido.quadroDasProvas, P.resumoDaMudanca(antes, corrigido)], [false, 'Mudou: saiu a seção "Datas e conteúdo das provas".']);
+  const esvaziado = JSON.parse(JSON.stringify(antes));
+  esvaziado.provas = []; esvaziado.grade.forEach(g => { g.prova = null; });
+  const salvo = P.aplicarIntencaoDoQuadro(antes, esvaziado, 'só o calendário');
+  conf('o modelo esvaziou "provas" e a prova dos dias: as provas de antes voltam, só a seção sai',
+    [salvo.quadroDasProvas, JSON.stringify(salvo.provas) === JSON.stringify(antes.provas), salvo.grade.filter(g => g.prova).length, antes.grade.filter(g => g.prova).length, P.resumoDaMudanca(antes, salvo)],
+    [false, true, 3, 3, 'Mudou: saiu a seção "Datas e conteúdo das provas".']);
+  const semSecao = Object.assign(JSON.parse(JSON.stringify(antes)), { quadroDasProvas: false });
+  const devolta = P.aplicarIntencaoDoQuadro(semSecao, JSON.parse(JSON.stringify(semSecao)), 'volta a seção das provas');
+  conf('voltar a seção: true, e o resumo diz', [devolta.quadroDasProvas, P.resumoDaMudanca(semSecao, devolta)], [true, 'Mudou: voltou a seção "Datas e conteúdo das provas".']);
+  const outro = JSON.parse(JSON.stringify(semSecao));
+  conf('outro pedido não mexe na seção (o mesmo objeto volta)', [P.aplicarIntencaoDoQuadro(semSecao, outro, 'põe Geografia no dia 21') === outro, outro.quadroDasProvas], [true, false]);
+  conf('controle: sem a rede, o plano igual dá "O plano ficou igual" (o relato)', P.resumoDaMudanca(antes, igual), 'O plano ficou igual.');
 })();
 
 console.log('\n' + passes + ' verificacoes passaram, ' + falhas + ' falharam');
