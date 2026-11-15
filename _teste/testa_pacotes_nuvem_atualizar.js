@@ -932,6 +932,20 @@ async function tocarSemEfeito(pag) {
   await atualizar(pag, 'o toque seguinte com o removido de outro nome terminou');
   conf('6h. no toque seguinte ele nem baixa (o sha256 já diz quem ele é)', (await pedidosDe(pag, SHA.sond1)) - nS2, 0);
 
+  // c2) a leitura que estoura na hora (erro síncrono) não deixa o Importar desligado até recarregar
+  await pag.evaluate(() => {
+    const l0 = Store.listarPacotesBiblioteca;
+    let uma = true;
+    Store.listarPacotesBiblioteca = function () { if (uma) { uma = false; throw new Error('falha síncrona de teste'); } return l0.apply(this, arguments); };
+  });
+  await limparAviso(pag);
+  await clicar(pag, '#livros-nuvem-atualizar');
+  const avisoS = await esperar('o aviso do erro', () => textoDoAviso(pag), v => !!v, 15000);
+  conf('6h. o erro síncrono chegou ao Atualizar como erro (a frase de tentar de novo)', avisoS.valor, 'Não consegui conferir a biblioteca agora. Tente de novo daqui a pouco.');
+  conf('6h. depois de um erro síncrono na leitura, o Importar e o Atualizar voltam a responder', await esperar('os botões soltos',
+    () => pag.evaluate(() => !document.querySelector('#importar-biblioteca').disabled && !document.querySelector('#livros-nuvem-atualizar').disabled),
+    v => v === true, 10000).then(r => r.ok), true);
+
   // d) a marca da remoção que não cabe no armazenamento do navegador vira aviso
   await pag.evaluate(() => {
     window.__setItem0 = Storage.prototype.setItem;

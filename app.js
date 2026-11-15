@@ -18321,7 +18321,10 @@
       }
       if (botao) botao.disabled = false;
     };
-    trazendoPacotes = Promise.all([indice ? Promise.resolve(indice) : Nuvem.lerCatalogo(), Store.listarPacotesBiblioteca()]).then(function (r) {
+    // as leituras entram DENTRO da corrente: um erro síncrono nelas cai no libera, e o Importar nunca fica desligado até recarregar
+    trazendoPacotes = Promise.resolve().then(function () {
+      return Promise.all([indice ? Promise.resolve(indice) : Nuvem.lerCatalogo(), Store.listarPacotesBiblioteca()]);
+    }).then(function (r) {
       var pacotes = r[0] && r[0].pacotes && typeof r[0].pacotes === 'object' ? r[0].pacotes : null;
       if (!pacotes) return null;
       var conhecidos = pacotesConhecidosDaNuvem(uid);
