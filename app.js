@@ -18338,6 +18338,8 @@
       if (e && e.retiradoEm) return;
       if (!e || typeof e !== 'object' || !/^[0-9a-f]{64}$/.test(String(e.sha256 || '')) || !inteiroPositivo(e.versao) ||
         !inteiroPositivo(e.tamanho) || e.caminhoNuvem !== 'usuarios/' + uid + '/pacotes/' + e.sha256 + '.zip') { r.invalidos++; return; }
+      // o catálogo que já diz que é um pacote de LIVROS: não baixa (o publicador de hoje não diz; aí vale o porSha, abaixo)
+      if (e.conteudo === 'livros') { r.livros++; return; }
       var c = conhecidos[e.sha256];
       // um pacote de LIVROS que o publicador pôs em pacotes (ele não abre o zip): os livros vêm pela Estante
       if (c && c.conteudo === 'livros') { r.livros++; return; }
@@ -18365,7 +18367,8 @@
   /* Um pacote: baixa, confere o sha256 e importa pelo caminho do zip.
    * NUNCA rejeita: devolve a linha do resumo, com a identidade que o zip
    * mostrou (quando chegou a ser lido). */
-  function trazerUmPacoteDaNuvem(e, n, total, removidos) {
+  // sinal (o celular, A1): o AbortSignal que corta a baixa quando o Wi-Fi cai no meio
+  function trazerUmPacoteDaNuvem(e, n, total, removidos, sinal) {
     // removidos: a marca do que ela tirou do tablet, que a importação confere pelo manifest
     var ctx = { nome: e.nome, identidade: null, removidos: removidos || {} };
     var arquivo = e.nome + '-v' + e.versao + '.zip';
@@ -18387,7 +18390,7 @@
       if (espaco && espaco.quota && espaco.quota - (espaco.usage || 0) < e.tamanho * 2 + FOLGA_DA_BAIXA) {
         throw Object.assign(new Error('sem espaço'), { codigo: 'SEM_ESPACO' });
       }
-      return Nuvem.baixarPacoteDaNuvem(e.caminhoNuvem, { tamanho: e.tamanho, aoProgresso: andou });
+      return Nuvem.baixarPacoteDaNuvem(e.caminhoNuvem, { tamanho: e.tamanho, aoProgresso: andou, sinal: sinal || null });
     }).then(function (bytes) {
       mostrar(['Conferindo o arquivo...']);
       return Store.sha256Hex(bytes).then(function (doArquivo) {
@@ -18488,7 +18491,12 @@
         // no celular, o Wi-Fi que caiu (ou a conta que saiu) para a série: o resto vem no próximo gatilho
         if (doCelular && opcoes.seguir && !opcoes.seguir()) { conta.parou = true; return Promise.resolve(); }
         if (opcoes && typeof opcoes.aoAndar === 'function') opcoes.aoAndar(i + 1, total);
-        return trazerUmPacoteDaNuvem(escolha.trazer[i], i + 1, total, removidos).then(function (res) {
+        /* no celular, a baixa leva um sinal: o Wi-Fi que cai no meio dela a corta
+         * (cortarBaixaSemWifi), e o pedaço que já chegou, só na memória, se perde */
+        controleDaBaixaDoCelular = doCelular && typeof AbortController === 'function' ? new AbortController() : null;
+        return trazerUmPacoteDaNuvem(escolha.trazer[i], i + 1, total, removidos,
+          controleDaBaixaDoCelular ? controleDaBaixaDoCelular.signal : null).then(function (res) {
+          controleDaBaixaDoCelular = null;
           resultados.push(res);
           /* a identidade fica guardada a CADA pacote, e não só no fim: o
            * aplicativo fechado no meio da série não baixa de novo o que já
@@ -18586,18 +18594,39 @@
     var caixa = $('#modo-celular');
     if (caixa) caixa.setAttribute('data-pacotes', estado);
   }
+  /* O INTERVALO: o `change` do navigator.connection dispara também quando só
+   * a velocidade muda (downlink, rtt), e cada conferência lê o catálogo. Depois
+   * de uma série que acabou com tudo em dia ('prontos') ou sem nada a conferir
+   * ('nada'), a próxima espera dez minutos. O que não acabou assim (sem Wi-Fi,
+   * sem espaço, parou, faltou) confere de novo no próximo gatilho: o Wi-Fi que
+   * entra depois de 'sem-wifi' baixa na hora. A abertura do aplicativo começa
+   * a conta do zero. */
+  var INTERVALO_PACOTES_CELULAR_MS = 10 * 60 * 1000;
+  var pacotesEmDiaNoCelular = 0;   // quando a última série acabou em dia (Date.now), ou 0
+  /* O CORTE: o Chrome do Android pode passar uma baixa em curso (QUIC) do
+   * Wi-Fi para os dados móveis sem errar nada. A conexão que muda (ou cai) no
+   * meio da baixa e não é mais Wi-Fi a corta pelo sinal; o pacote pela metade
+   * está só na memória, e nada é gravado. */
+  var controleDaBaixaDoCelular = null;
+  function cortarBaixaSemWifi() {
+    if (controleDaBaixaDoCelular && !celularNoWifi()) controleDaBaixaDoCelular.abort();
+  }
   var pacotesDoCelular = null;
   function pacotesNoCelular() {
     if (!modoCelular || !temNuvem() || !celularTrazPacotes()) return Promise.resolve(null);
     if (pacotesDoCelular) return pacotesDoCelular;
     if (navigator.onLine === false) { marcarPacotesNoCelular('sem-internet'); return Promise.resolve(null); }
     if (!celularNoWifi()) { marcarPacotesNoCelular('sem-wifi'); return Promise.resolve(null); }
+    if (pacotesEmDiaNoCelular && Date.now() - pacotesEmDiaNoCelular < INTERVALO_PACOTES_CELULAR_MS) return Promise.resolve(null);
+    pacotesEmDiaNoCelular = 0;
     marcarPacotesNoCelular('conferindo');
     var seguir = function () { return modoCelular && navigator.onLine !== false && celularNoWifi() && celularTrazPacotes(); };
     pacotesDoCelular = trazerPacotesDaNuvem(null, { celular: true, seguir: seguir, aoAndar: function (n, total) {
       marcarPacotesNoCelular('trazendo ' + n + '/' + total);
     } }).then(function (c) {
-      marcarPacotesNoCelular(!c ? 'nada' : c.semEspaco ? 'sem-espaco' : c.parou ? 'parou' : c.falharam ? 'faltam' : 'prontos');
+      var fim = !c ? 'nada' : c.semEspaco ? 'sem-espaco' : c.parou ? 'parou' : c.falharam ? 'faltam' : 'prontos';
+      if (fim === 'nada' || fim === 'prontos') pacotesEmDiaNoCelular = Date.now();
+      marcarPacotesNoCelular(fim);
     }, function () {
       marcarPacotesNoCelular('falhou');
     }).then(function () { pacotesDoCelular = null; });
@@ -29805,8 +29834,13 @@
     });
     // 12b A1: a conexão mudou (o Wi-Fi de casa entrou, ou caiu para os dados móveis)
     if (navigator.connection && typeof navigator.connection.addEventListener === 'function') {
-      navigator.connection.addEventListener('change', function () { if (modoCelular) pacotesNoCelular(); });
+      navigator.connection.addEventListener('change', function () {
+        if (!modoCelular) return;
+        cortarBaixaSemWifi();
+        pacotesNoCelular();
+      });
     }
+    window.addEventListener('offline', cortarBaixaSemWifi);
     window.addEventListener('offline', function () { if (modoCelular) desenharTopoCelular(); });
     setInterval(andarLinhaDeAgoraCelular, 60000); // a linha de agora, em Hoje (D6c)
     var tempo = null;

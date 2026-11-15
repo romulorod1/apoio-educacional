@@ -26,13 +26,18 @@
  *      sem internet e sem espaço: nada baixa (nenhum pedido ao Storage);
  *   4. o observador de outra conta, no Wi-Fi: nem lê o catálogo, nada baixa,
  *      e a porta fica fechada para ele;
+ *  4b. o Wi-Fi que cai NO MEIO de uma baixa (a conexão vira cellular) a
+ *      corta: o pedido é abortado, nada é gravado e a série para;
  *   5. no Wi-Fi com espaço: os três pacotes chegam, iguais aos do tablet, uma
  *      série só (cada zip baixa uma vez, mesmo com a conexão mudando de novo
  *      no meio); cada gravação do pacote é uma transação só com os quatro
  *      depósitos; `dados`, `biblioteca_listas` e `midias` (a imagem da folha,
  *      que veio na cópia) ficam idênticos, e nenhuma transação de escrita os
  *      toca durante a série;
- *   6. a conexão que muda de novo, com tudo em dia: nada baixa outra vez;
+ *   6. a conexão que muda de novo, várias vezes, com tudo em dia: nem o
+ *      catálogo é relido (o intervalo de dez minutos), e nada baixa;
+ *      um pacote de livros marcado no catálogo nem baixa nem entra na conta
+ *      do espaço (o tamanho dele, enorme, não barra os outros);
  *   7. a escrita escondida: com os pacotes no celular, a cópia nova do tablet
  *      chega ao abrir e a Biblioteca se refaz por baixo (esquecerMinhasListas);
  *      o espelho das seleções anteriores (espelharAnteriores) NÃO chama
@@ -42,6 +47,12 @@
  * Venenos (a prova TEM de ver o defeito e passa dizendo que viu):
  *   --envenenado-porta-aceita-dados  a porta da biblioteca aceita `dados` e
  *                                 `biblioteca_listas` (2 vê);
+ *   --envenenado-porta-sem-conferir-lista  a trava (transacao) deixa de
+ *                                 conferir a lista da porta 'biblioteca', que
+ *                                 abriria para qualquer depósito (2 vê, pela
+ *                                 sonda que abre pela própria trava);
+ *   --envenenado-continua-sem-wifi  o Wi-Fi que cai no meio não corta a baixa:
+ *                                 o pacote chega pelos dados móveis (4b vê);
  *   --envenenado-baixa-sem-wifi   a conferência do Wi-Fi diz sempre que sim:
  *                                 nos dados móveis, baixa (3 vê);
  *   --envenenado-observador-baixa a porta do app deixa de conferir que é o
@@ -52,7 +63,8 @@
  *
  * Precisa do firebase-tools (FIREBASE_TOOLS) e de um JDK 21 em JAVA_HOME.
  * Portas: 9121 (app), 9122 (auth), 9123 (storage), 9124 (firestore), 9125
- * (hub), 9126 (log), 9127 (websocket).
+ * (hub), 9126 (log), 9127 (websocket), 9128 (o repasse do Storage, que conta
+ * os bytes e deixa um zip devagar).
  */
 'use strict';
 const fs = require('fs');
@@ -64,17 +76,19 @@ const H = require('./_bib_navegador.js');
 const Sintetico = require('./_pacote_sintetico.js');
 const { conf, secao, esperar, pausa } = H;
 
-const PORTA_APP = 9121, PORTA_AUTH = 9122, PORTA_ST = 9123, PORTA_FS = 9124, PORTA_HUB = 9125, PORTA_LOG = 9126, PORTA_WS = 9127;
+const PORTA_APP = 9121, PORTA_AUTH = 9122, PORTA_ST = 9123, PORTA_FS = 9124, PORTA_HUB = 9125, PORTA_LOG = 9126, PORTA_WS = 9127,
+  PORTA_REPASSE = 9128;
 const PROJETO = 'demo-nath-celular-pacotes';
 const BUCKET = PROJETO + '.appspot.com';
 const AUTH = 'http://127.0.0.1:' + PORTA_AUTH;
 const FS = 'http://127.0.0.1:' + PORTA_FS;
 const ST = 'http://127.0.0.1:' + PORTA_ST;
+const REPASSE = 'http://127.0.0.1:' + PORTA_REPASSE;
 const DOCS = FS + '/v1/projects/' + PROJETO + '/databases/(default)/documents';
 const FIREBASE = process.env.FIREBASE_TOOLS ||
   'C:/Users/romul/ferramentas/firebase-tools/node_modules/firebase-tools/lib/bin/firebase.js';
 const JAVA_HOME = process.env.JAVA_HOME || '';
-const CFG = { auth: AUTH, firestore: FS, projectId: PROJETO, storage: ST, bucket: BUCKET };
+const CFG = { auth: AUTH, firestore: FS, projectId: PROJETO, storage: REPASSE, bucket: BUCKET };
 const DONA = { email: 'dona@exemplo.test', senha: 'senha-da-dona-1' };
 const OBS = { email: 'observador@exemplo.test', senha: 'senha-do-observador-1' };
 
@@ -84,6 +98,10 @@ const VENENOS = {
   '--envenenado-porta-aceita-dados': ['/store.js',
     "var DEPOSITOS_DA_PORTA_BIBLIOTECA = ['biblioteca_pacotes', 'biblioteca_itens', 'biblioteca_teoria', 'biblioteca_assets'];",
     "var DEPOSITOS_DA_PORTA_BIBLIOTECA = ['biblioteca_pacotes', 'biblioteca_itens', 'biblioteca_teoria', 'biblioteca_assets', 'dados', 'biblioteca_listas'];"],
+  '--envenenado-porta-sem-conferir-lista': ['/store.js',
+    "    if (modo === 'readwrite' && soLeitura && porta === 'biblioteca' && !portaDaBibliotecaAceita(nomes)) throw erroSoLeitura();\n", ''],
+  '--envenenado-continua-sem-wifi': ['/app.js',
+    'if (controleDaBaixaDoCelular && !celularNoWifi()) controleDaBaixaDoCelular.abort();', ''],
   '--envenenado-baixa-sem-wifi': ['/app.js',
     "return !!c && c.saveData !== true && (c.type === 'wifi' || c.type === 'ethernet');", 'return true;'],
   '--envenenado-observador-baixa': ['/app.js',
@@ -148,7 +166,7 @@ function subirEmulador() {
   }, v => v === true, 180000);
 }
 async function portasLivres() {
-  for (const u of [AUTH, FS, ST, 'http://127.0.0.1:' + PORTA_APP]) if (await fetch(u + '/').then(r => r.status).catch(() => 0)) return false;
+  for (const u of [AUTH, FS, ST, REPASSE, 'http://127.0.0.1:' + PORTA_APP]) if (await fetch(u + '/').then(r => r.status).catch(() => 0)) return false;
   return true;
 }
 function matarGrupo(sinal) {
@@ -163,7 +181,43 @@ function derrubarEmulador() {
     setTimeout(() => { if (process.platform !== 'win32') matarGrupo('SIGKILL'); resolve(); }, 8000);
   });
 }
-const fim = () => derrubarEmulador().then(() => H.fim(amb)());
+/* ---------- o repasse do Storage: conta os bytes e deixa um zip devagar ---------- */
+const http = require('http');
+const repasse = { lentoSha: null, enviados: {}, cortados: [], completos: [] };
+const servidorRepasse = http.createServer((req, res) => {
+  const cab = Object.assign({}, req.headers, { host: '127.0.0.1:' + PORTA_ST });
+  const ida = http.request({ host: '127.0.0.1', port: PORTA_ST, method: req.method, path: req.url, headers: cab }, volta => {
+    if (req.method === 'OPTIONS' || !/[?&]alt=media/.test(req.url) || volta.statusCode !== 200) {
+      res.writeHead(volta.statusCode, volta.headers);
+      volta.pipe(res);
+      return;
+    }
+    const sha = (/([0-9a-f]{64})\.zip/.exec(decodeURIComponent(req.url)) || [])[1] || '?';
+    const partes = [];
+    volta.on('data', p => partes.push(p));
+    volta.on('end', async () => {
+      const corpo = Buffer.concat(partes);
+      const cabV = Object.assign({}, volta.headers, { 'content-length': String(corpo.length) });
+      delete cabV['transfer-encoding'];
+      res.writeHead(200, cabV);
+      let caiu = false;
+      res.on('close', () => { if (!res.writableFinished) caiu = true; });
+      const devagar = repasse.lentoSha === sha;
+      for (let i = 0; i < corpo.length; i += 512) {
+        if (caiu) { repasse.cortados.push(sha); return; }
+        res.write(corpo.subarray(i, Math.min(corpo.length, i + 512)));
+        repasse.enviados[sha] = (repasse.enviados[sha] || 0) + Math.min(512, corpo.length - i);
+        if (devagar) await pausa(400);
+      }
+      if (caiu) { repasse.cortados.push(sha); return; }
+      res.end();
+      repasse.completos.push(sha);
+    });
+  });
+  ida.on('error', () => { try { res.socket.destroy(); } catch (e) { /* já caiu */ } });
+  req.pipe(ida);
+});
+const fim = () => derrubarEmulador().then(() => new Promise(r => servidorRepasse.close(() => r()))).then(() => H.fim(amb)());
 
 /* ---------- a nuvem de teste ---------- */
 const criarConta = (u) => fetch(AUTH + '/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake', { method: 'POST',
@@ -182,12 +236,18 @@ const gravarDoc = (rel, o) => fetch(DOCS + '/' + rel, { method: 'PATCH', headers
   body: JSON.stringify({ fields: valor(o).mapValue.fields }) }).then(r => r.status);
 const subirArquivo = (cam, bytes) => fetch(ST + '/upload/storage/v1/b/' + BUCKET + '/o?uploadType=media&name=' + encodeURIComponent(cam),
   { method: 'POST', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/zip' }, body: bytes }).then(r => r.status);
-async function publicar(uid, qual) {
+const SHA_LIVROS_MARCADO = hex(Buffer.from('um pacote de livros que nunca sobe'));
+async function publicar(uid, qual, comLivros) {
   const pacotes = {}, status = [];
   for (const nome of Object.keys(qual)) {
     const k = qual[nome];
     pacotes[nome] = { versao: 1, sha256: SHA[k], tamanho: ZIP[k].length, caminhoNuvem: caminho(uid, SHA[k]), publicadoEm: '2026-11-15T10:00:00-03:00' };
     status.push(await subirArquivo(caminho(uid, SHA[k]), ZIP[k]));
+  }
+  if (comLivros) {
+    // o catálogo que já diz que é de livros, com um tamanho que nenhum aparelho tem livre: nem baixa, nem conta no espaço
+    pacotes['livros-sintetico-marcado'] = { versao: 1, sha256: SHA_LIVROS_MARCADO, tamanho: 500 * 1024 * 1024 * 1024, conteudo: 'livros',
+      caminhoNuvem: caminho(uid, SHA_LIVROS_MARCADO), publicadoEm: '2026-11-15T10:00:00-03:00' };
   }
   status.push(await gravarDoc('usuarios/' + uid + '/config/catalogo', { versao: 1, publicadoEm: '2026-11-15T10:00:00-03:00', livros: {}, pacotes }));
   return status;
@@ -211,7 +271,7 @@ async function prepararPagina(pag, movel, rede) {
   pag.on('request', r => {
     const u = r.url();
     if (r.method() === 'OPTIONS') return;
-    if (u.indexOf(ST) === 0) pag.pedidosStorage.push(u);
+    if (u.indexOf(REPASSE) === 0) pag.pedidosStorage.push(u);
     if (u.indexOf(FS) === 0 && /config(\/|%2F)catalogo/.test(u)) pag.leiturasCatalogo++;
   });
   await pag.evaluateOnNewDocument(cfg => { window.NUVEM_EMULADOR = cfg; }, CFG);
@@ -394,6 +454,16 @@ const portaDiz = pag => pag.evaluate(da => [
   Store.portaDaBibliotecaAceita([])
 ].join(','), DA_PORTA);
 const PORTA_DA_DONA = 'true,true,false,false,false,false,false,false,false,false';
+// a sonda abre pela trava de verdade (transacao, com a porta 'biblioteca') e aborta na hora
+const sondaDiz = pag => pag.evaluate(async da => [
+  await Store.sondarPortaDaBiblioteca(da),
+  await Store.sondarPortaDaBiblioteca(['dados']),
+  await Store.sondarPortaDaBiblioteca('biblioteca_listas'),
+  await Store.sondarPortaDaBiblioteca(['midias']),
+  await Store.sondarPortaDaBiblioteca(da.concat(['midias'])),
+  await Store.sondarPortaDaBiblioteca(['biblioteca_etiquetas'])
+].join(','), DA_PORTA);
+const SONDA_DA_DONA = 'abriu,recusou,recusou,recusou,recusou,recusou';
 const PORTA_FECHADA = 'false,false,false,false,false,false,false,false,false,false';
 
 (async () => {
@@ -411,6 +481,7 @@ const PORTA_FECHADA = 'false,false,false,false,false,false,false,false,false,fal
   if (H.placar.falhas) return fim();
   conf('as portas do emulador e do app estão livres (nada de outra rodada responde nelas)', await portasLivres(), true);
   if (H.placar.falhas) return fim();
+  await new Promise((r, j) => { servidorRepasse.once('error', j); servidorRepasse.listen(PORTA_REPASSE, '127.0.0.1', r); });
   const subiu = await subirEmulador();
   if (!subiu.ok) throw new Error('o emulador não subiu');
   const dona = await criarConta(DONA);
@@ -418,7 +489,7 @@ const PORTA_FECHADA = 'false,false,false,false,false,false,false,false,false,fal
   conf('as contas sintéticas da dona e do observador existem no emulador', !!dona.localId && !!obs.localId, true);
   const U = dona.localId;
   conf('o catálogo e os zips sintéticos entraram na nuvem de teste (da dona e do observador)',
-    (await publicar(U, CATALOGO_DONA)).concat(await publicar(obs.localId, CATALOGO_OBS)).every(s => s === 200), true);
+    (await publicar(U, CATALOGO_DONA, true)).concat(await publicar(obs.localId, CATALOGO_OBS)).every(s => s === 200), true);
 
   secao('1. O tablet: a cópia sobe, e os pacotes chegam pelo Atualizar a biblioteca');
   const nav = await amb.subir();
@@ -472,6 +543,13 @@ const PORTA_FECHADA = 'false,false,false,false,false,false,false,false,false,fal
     return fim();
   }
   conf('a porta aceita só os quatro depósitos do pacote (nunca dados, listas, mídias, uso, etiquetas nem a mistura)', porta, PORTA_DA_DONA);
+  const sonda = await sondaDiz(pagC);
+  if (MODO === '--envenenado-porta-sem-conferir-lista') {
+    conf('VENENO visto: pela trava, a porta da biblioteca abriu para dados, listas e mídias (' + sonda + ')', /^abriu,abriu,abriu,abriu/.test(sonda), true);
+    return fim();
+  }
+  conf('pela própria trava (transacao), a porta abre para os quatro e recusa dados, listas, mídias, a mistura e etiquetas', sonda, SONDA_DA_DONA);
+  conf('e a sonda não gravou nada', h((await retratoDela(pagC)).tudo), h(retrato0.tudo));
   conf('o que o celular recusava continua recusado: listas, mídias (da folha e miniatura), etiquetas, uso e remover pacote', await recusasDeSempre(pagC), RECUSAS);
   conf('e nada mudou no que é dela', h((await retratoDela(pagC)).tudo), h(retrato0.tudo));
 
@@ -529,10 +607,33 @@ const PORTA_FECHADA = 'false,false,false,false,false,false,false,false,false,fal
   conf('o observador nem leu o catálogo, não pediu nada ao Storage e não tem pacote', pagD.leiturasCatalogo + '|' + pagD.pedidosStorage.length + '|' + await lerPacotes(pagD), '0|0|');
   conf('e a marca escondida do andamento nem aparece nele', await marca(pagD), null);
   conf('a porta da biblioteca fica fechada para o observador', await portaDiz(pagD), PORTA_FECHADA);
+  conf('e, pela própria trava, ela recusa até os quatro depósitos do pacote', await sondaDiz(pagD), 'recusou,recusou,recusou,recusou,recusou,recusou');
   conf('nenhum erro de página no observador', pagD.errosDePagina.join(' | '), '');
   await ctxD.close();
 
+  secao('4b. O Wi-Fi cai no meio da baixa: o pedido é cortado e nada é gravado');
+  repasse.lentoSha = SHA.m1;   // o primeiro da série, em ordem de nome
+  repasse.enviados = {}; repasse.cortados = []; repasse.completos = [];   // o tablet já baixou estes zips antes
+  await pagC.evaluate(() => { window.__transacoes = []; window.__quota(0); window.__mudarRede('wifi'); });
+  const meio = await esperar('o primeiro zip começou a chegar, devagar', () => repasse.enviados[SHA.m1] || 0, v => v >= 1024, 30000);
+  conf('(arranjo) a baixa do primeiro pacote estava no meio', meio.ok && (repasse.enviados[SHA.m1] || 0) < ZIP.m1.length, true);
+  await pagC.evaluate(() => { window.__mudarRede('cellular'); });
+  const fimCorte = await esperar('a série acabou depois da troca para os dados móveis', () => marca(pagC), v => ['parou', 'prontos', 'faltam', 'falhou'].indexOf(v) >= 0, 60000);
+  await pausa(1500);
+  repasse.lentoSha = null;
+  if (MODO === '--envenenado-continua-sem-wifi') {
+    conf('VENENO visto: o zip chegou inteiro pelos dados móveis e o pacote foi gravado', repasse.completos.indexOf(SHA.m1) >= 0 &&
+      /matematica-sintetico-mirim-m1@1/.test(await lerPacotes(pagC)), true);
+    return fim();
+  }
+  conf('a troca para os dados móveis cortou o pedido no meio (o repasse viu a conexão cair antes do fim)',
+    repasse.cortados.indexOf(SHA.m1) >= 0 && repasse.completos.indexOf(SHA.m1) < 0, true);
+  conf('nada foi gravado: nenhum pacote e nenhuma transação de pacote', (await lerPacotes(pagC)) + '|' +
+    (await pagC.evaluate(() => window.__transacoes.filter(t => /biblioteca_/.test(t)).length)), '|0');
+  conf('a série parou ali, sem pedir o pacote seguinte', fimCorte.valor + '|' + pagC.pedidosStorage.filter(u => u.indexOf(SHA.m2) >= 0 || u.indexOf(SHA.sond) >= 0).length, 'parou|0');
+
   secao('5. No Wi-Fi com espaço: os três pacotes chegam, iguais aos do tablet, e nada dela muda');
+  pagC.pedidosStorage = [];
   const retrato1 = await retratoDela(pagC);
   conf('(antes) o que é dela no celular continua o da cópia', h(retrato1.tudo), h(retrato0.tudo));
   await pagC.evaluate(() => {
@@ -568,9 +669,14 @@ const PORTA_FECHADA = 'false,false,false,false,false,false,false,false,false,fal
     h(retrato2.tudo) + '|' + retrato2.midias, h(retrato0.tudo) + '|mFolha');
 
   secao('6. A conexão muda de novo, com tudo em dia: nada baixa outra vez');
-  const n6 = pagC.pedidosStorage.length;
-  await pagC.evaluate(() => { document.querySelector('#modo-celular').removeAttribute('data-pacotes'); window.__mudarRede('wifi'); });
-  conf('a conferência seguinte não baixou nada', (await esperarMarca(pagC, 'conferiu com tudo em dia', ['prontos', 'faltam', 'falhou'])) + '|' + (pagC.pedidosStorage.length - n6), 'prontos|0');
+  const n6 = pagC.pedidosStorage.length, c6 = pagC.leiturasCatalogo;
+  // o change que só troca a velocidade (downlink, rtt) dispara várias vezes seguidas
+  await pagC.evaluate(() => { ['wifi', 'wifi', 'ethernet', 'wifi', 'wifi'].forEach((t, i) => setTimeout(() => window.__mudarRede(t), i * 200)); });
+  await pausa(4000);
+  conf('cinco changes seguidos no Wi-Fi, com tudo em dia: no máximo uma leitura do catálogo, e nada baixou (' + (pagC.leiturasCatalogo - c6) + ' leituras)',
+    (pagC.leiturasCatalogo - c6 <= 1) + '|' + (pagC.pedidosStorage.length - n6), 'true|0');
+  conf('o pacote de livros marcado no catálogo nunca foi pedido (nem no tablet), e o tamanho dele não barrou os outros',
+    pagC.pedidosStorage.concat(pagA.pedidosStorage).filter(u => u.indexOf(SHA_LIVROS_MARCADO) >= 0).length, 0);
 
   secao('7. A escrita escondida: o espelho das listas não grava no celular');
   // uma seleção anterior no diário do celular (localStorage), que o espelho copiaria para as listas

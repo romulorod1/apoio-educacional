@@ -338,6 +338,18 @@
     var lista = Array.isArray(nomes) ? nomes : [nomes];
     return celularEdita && lista.length > 0 && lista.every(function (n) { return DEPOSITOS_DA_PORTA_BIBLIOTECA.indexOf(n) >= 0; });
   }
+  /* A sonda da porta, para as provas: abre pela trava de verdade (transacao)
+   * uma transação de escrita pela porta 'biblioteca' com os depósitos pedidos
+   * e a aborta na hora, sem pedido nenhum dentro: nada é gravado. Responde
+   * 'abriu' ou 'recusou'. */
+  function sondarPortaDaBiblioteca(nomes) {
+    return abrir().then(function (b) {
+      var t;
+      try { t = transacao(b, nomes, 'readwrite', 'biblioteca'); } catch (e) { return e && e.soLeitura ? 'recusou' : 'erro: ' + (e && e.message); }
+      try { t.abort(); } catch (e) { /* já fechou */ }
+      return 'abriu';
+    });
+  }
   /* `porta`: true é a restauração da cópia e o recebimento (dado que vem da
    * nuvem); 'documento', 'fila' e 'historico' são as portas do celular da dona;
    * 'biblioteca' é a dos pacotes, que só vale com os depósitos de cima. */
@@ -3792,6 +3804,7 @@
     estaSoLendo: function () { return soLeitura; },
     celularEdita: function () { return soLeitura && celularEdita; },
     portaDaBibliotecaAceita: portaDaBibliotecaAceita,
+    sondarPortaDaBiblioteca: sondarPortaDaBiblioteca,
     SO_DESTE_TABLET: SO_DESTE_TABLET.slice(),
     /* Registros (N1): o que a sincronização e as provas leem. */
     AJUSTES_DO_APARELHO: AJUSTES_DO_APARELHO.slice(),

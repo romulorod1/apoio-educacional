@@ -1373,12 +1373,16 @@ roda "pacotes da nuvem, atualizar --envenenado-sem-ouvinte-das-frases" node "_te
 # so, sem tocar dados, listas nem midias (a imagem da folha da copia); o
 # espelho das listas nao grava no celular. Os venenos: a porta que aceita
 # dados ou listas, o download sem Wi-Fi, o observador que baixa e o celular
-# que grava lista. Portas 9121 a 9127.
+# que grava lista. Portas 9121 a 9128.
 roda "celular, pacotes da nuvem (A1)"              node "_teste/testa_celular_pacotes.js"
 roda "celular, pacotes da nuvem --envenenado-porta-aceita-dados" node "_teste/testa_celular_pacotes.js" --envenenado-porta-aceita-dados
 roda "celular, pacotes da nuvem --envenenado-celular-grava-lista" node "_teste/testa_celular_pacotes.js" --envenenado-celular-grava-lista
 roda "celular, pacotes da nuvem --envenenado-baixa-sem-wifi" node "_teste/testa_celular_pacotes.js" --envenenado-baixa-sem-wifi
 roda "celular, pacotes da nuvem --envenenado-observador-baixa" node "_teste/testa_celular_pacotes.js" --envenenado-observador-baixa
+# (revisao do #241) a trava que deixa de conferir a lista da porta 'biblioteca'
+# e a baixa que continua pelos dados moveis quando o Wi-Fi cai no meio.
+roda "celular, pacotes da nuvem --envenenado-porta-sem-conferir-lista" node "_teste/testa_celular_pacotes.js" --envenenado-porta-sem-conferir-lista
+roda "celular, pacotes da nuvem --envenenado-continua-sem-wifi" node "_teste/testa_celular_pacotes.js" --envenenado-continua-sem-wifi
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
