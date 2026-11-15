@@ -100,7 +100,7 @@ secao('4. Interface e ponto inicial em Matemática');
 conf('Campo de escrita livre "assunto-outro" presente', appJs.includes("id: 'assunto-outro'"), true);
 conf('Botão "usar-assunto-outro" presente', appJs.includes("id: 'usar-assunto-outro'"), true);
 conf('Campo de busca em qualquer matéria presente', appJs.includes("id: 'busca-assunto'"), true);
-conf('Bloco "Continuar trabalhando com este aluno" presente', appJs.includes("texto: 'Continuar trabalhando com este aluno'"), true);
+conf('Bloco dos assuntos recentes do aluno presente, com título próprio', appJs.includes("texto: 'Continuar de onde parou'"), true);
 conf('Título de Matemática contextualizado por ano presente', appJs.includes("'Sugestões de Matemática para o ' + rotuloAno"), true);
 conf('Aviso amigável quando ano não está cadastrado presente', appJs.includes('O ano escolar não está informado na ficha deste aluno'), true);
 conf('Atalho "Ver todos os assuntos de Matemática" presente', appJs.includes("'Ver todos os assuntos de Matemática ('"), true);
