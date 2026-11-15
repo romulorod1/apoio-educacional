@@ -45,6 +45,9 @@
  *     do seletor (como no #239) e fecha o painel inteiro. A 1b tem de cair.
  *   --envenenado-sem-enem-no-sinal  o sinal dos exercícios sem o ENEM: o
  *     assunto só com ENEM fica sem sinal, e a seção 3 tem de cair.
+ *   --envenenado-vizinhos-de-todos-os-sinais  cada sinal nomeia todos os
+ *     vizinhos do assunto: a teoria fala do vizinho que só deu exercícios, e
+ *     a seção 3 tem de cair.
  */
 'use strict';
 const fs = require('fs');
@@ -84,6 +87,17 @@ const VENENO_VOLTAR = process.argv.indexOf('--envenenado-voltar-fecha-seletor') 
  * acabamento). A linha nomeia o ENEM, a página tem a seção ENEM, e o sinal
  * fica apagado: a seção 3 tem de cair. */
 const VENENO_ENEM = process.argv.indexOf('--envenenado-sem-enem-no-sinal') >= 0;
+/* O quarto veneno: cada sinal nomeia TODOS os vizinhos do assunto, e não só
+ * os que deram material a ele (como no e0db370). A teoria que veio só de
+ * "Volume e unidades de medida" diria também "Volume do cilindro", que só deu
+ * exercícios: a seção 3 tem de cair. */
+const VENENO_VIZINHOS = process.argv.indexOf('--envenenado-vizinhos-de-todos-os-sinais') >= 0;
+const VIZINHOS_DO_SINAL = "      var vizinhosDoSinal = (estado.vizinhos || []).filter(function (v) { return porSinal.indexOf(v.id) >= 0; });\n";
+conf('(arranjo) os vizinhos de cada sinal saem num lugar só do app.js', APP.split(VIZINHOS_DO_SINAL).length, 2);
+if (VENENO_VIZINHOS) {
+  servido = servido.replace(VIZINHOS_DO_SINAL, '      var vizinhosDoSinal = estado.vizinhos || [];\n');
+  conf('(veneno) o app.js servido nomeia todos os vizinhos em todo sinal', servido.indexOf(VIZINHOS_DO_SINAL) < 0, true);
+}
 const ENEM_NO_SINAL = "    var exercicios = (f.listaBase ? [f.listaBase] : []).concat(f.exercicios || [], f.enem || []);\n";
 conf('(arranjo) o sinal dos exercícios junta o ENEM num lugar só do app.js', APP.split(ENEM_NO_SINAL).length, 2);
 if (VENENO_ENEM) {
@@ -127,7 +141,7 @@ function textoBate(texto, secoes) {
   if (i < 0) return false;
   // depois das seções: o módulo entre parênteses e, no material herdado, de onde ele vem
   const resto = texto.slice(i + esperado.length);
-  return /^( \([^)]+\))?(, de outro ano|, de assuntos? vizinhos?)?$/.test(resto);
+  return /^( \([^)]+\))?(, de outro ano|, de assuntos? vizinhos?|; [^;]+ de outro ano)?$/.test(resto);
 }
 // o sinal dos exercícios junta as três seções de exercício da página
 const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exercicios', 'enem'], obmep: ['obmep'] };
@@ -425,7 +439,9 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
     await pag.evaluate(() => {
       const mod = { chave: '9ano:prova', titulo: 'Módulo da prova' };
       window.__fontesDaProva = {
-        'MAT07-01': { assunto: 'MAT07-01', teoria: [], listaBase: null, obmep: [], enem: [],
+        // a teoria veio só do MAT06-12; os exercícios, dos dois vizinhos
+        'MAT07-01': { assunto: 'MAT07-01', listaBase: null, obmep: [], enem: [],
+          teoria: [{ id: 'prova:teo:2', tipo: 'teoria', titulo: 'Teoria 2', deVizinho: 'MAT06-12', modulo: mod }],
           exercicios: [{ id: 'prova:ex:1', tipo: 'exercicio', titulo: 'Exercício 1', deVizinho: 'MAT06-12', modulo: mod },
             { id: 'prova:ex:2', tipo: 'exercicio', titulo: 'Exercício 2', deVizinho: 'MAT09-12', modulo: mod }],
           vizinhos: [{ id: 'MAT06-12', titulo: 'Volume e unidades de medida', serie: '06' },
@@ -455,7 +471,7 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
       const texto = id => ((linha(id) || document).querySelector('.detalhe') || {}).textContent || '';
       const herdado = document.querySelector('#tema-legenda [data-legenda="herdado"]');
       return {
-        vizinho: sinal('MAT07-01', 'exercicios'), textoVizinho: texto('MAT07-01'),
+        vizinho: sinal('MAT07-01', 'exercicios'), textoVizinho: texto('MAT07-01'), teoriaDoVizinho: sinal('MAT07-01', 'teoria'),
         outroAno: sinal('MAT04-09', 'teoria'), proprio: sinal('MAT04-09', 'obmep'), textoOutroAno: texto('MAT04-09'),
         controle: sinal('MAT09-04', 'teoria') || sinal('MAT09-04', 'exercicios'),
         legenda: herdado && !herdado.hidden ? herdado.textContent.trim() : '',
@@ -471,6 +487,20 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
     const enemNaPagina = {};
     Object.keys(SECOES_DO_SINAL).forEach(t => { enemNaPagina[t] = SECOES_DO_SINAL[t].indexOf('enem') >= 0; });
     const enemIgual = Object.keys(enemNaPagina).every(t => enemNaPagina[t] === origem.enem[t]);
+    /* Cada sinal nomeia só os vizinhos que deram material a ELE: a teoria,
+     * que veio só de "Volume e unidades de medida", fica no singular e não fala
+     * de "Volume do cilindro", que só deu exercícios. */
+    const tv = origem.teoriaDoVizinho || {};
+    const teoriaCerta = tv.origem === 'vizinho' && /, de assunto vizinho: “Volume e unidades de medida” \(6º ano\)$/.test(tv.nome || '') &&
+      !/cilindro/i.test(tv.nome || '');
+    if (VENENO_VIZINHOS) {
+      conf('VENENO visto: a teoria nomeia só o vizinho que deu teoria, e quebrou (' + tv.nome + ')', teoriaCerta, false);
+      conf('não houve erro de página', pag.errosDePagina.join(' | '), '');
+      fs.rmSync(TMP, { recursive: true, force: true });
+      await H.fim(amb)();
+      return;
+    }
+    conf('a teoria nomeia só o vizinho que deu teoria, no singular, e não o que só deu exercícios (' + tv.nome + ')', teoriaCerta, true);
     if (VENENO_ENEM) {
       conf('VENENO visto: o assunto só com ENEM acende o sinal dos exercícios, e quebrou (' + JSON.stringify(origem.enem) + ')',
         enemIgual, false);
@@ -488,10 +518,12 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
       v.herdado + '|' + v.origem + '|' + v.traco + '|' +
       /de assuntos vizinhos: “Volume e unidades de medida” \(6º ano\) e “Volume do cilindro” \(9º ano\)/.test(v.nome || ''),
       'true|vizinho|dotted|true');
-    conf('o texto da linha diz que o material é de assuntos vizinhos (' + origem.textoVizinho + ')', /No tablet: exercícios \(Módulo da prova\), de assuntos vizinhos$/.test(origem.textoVizinho), true);
+    conf('o texto da linha diz que o material é de assuntos vizinhos (' + origem.textoVizinho + ')', /No tablet: teoria e exercícios \(Módulo da prova\), de assuntos vizinhos$/.test(origem.textoVizinho), true);
     conf('a teoria toda de outro ano tem o traço e diz isso', o.herdado + '|' + o.origem + '|' + /, de outro ano$/.test(o.nome || ''), 'true|outro-ano|true');
     conf('a OBMEP do próprio ano, na mesma linha, fica sem o traço', p.herdado + '|' + p.traco, 'false|none');
-    conf('o texto da linha com parte do próprio ano não diz "de outro ano"', /de outro ano/.test(origem.textoOutroAno), false);
+    // a linha diz qual parte é de outro ano, e não diz que tudo é
+    conf('o texto da linha diz que a teoria é de outro ano, e só ela (' + origem.textoOutroAno + ')',
+      /No tablet: teoria e OBMEP \(Módulo da prova\); teoria de outro ano$/.test(origem.textoOutroAno) && !/, de outro ano/.test(origem.textoOutroAno), true);
     conf('(controle) o assunto com material próprio fica sem o traço', !!origem.controle && c.herdado, false);
     conf('a legenda explica o traço, no plural do que está na tela (' + origem.legenda + ')', origem.legenda, 'De outro ano ou de assuntos vizinhos');
     await pag.evaluate(() => { window.__fontesDaProva = null; });

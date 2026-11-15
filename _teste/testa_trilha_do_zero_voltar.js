@@ -83,7 +83,10 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
       aula('f5_tarde', Core.hojeIso(), 'realizada', '15:00', [{ titulo: 'Leitura de texto de teste', fonte: 'livre', disciplina: 'portugues' }]),
       // duas aulas marcadas à frente: abrindo a de 20/11, a de 18/11 ainda não aconteceu
       aula('f5_meio', '2026-11-18', 'realizada', '10:00', [{ titulo: 'Assunto marcado à frente de teste', fonte: 'livre' }]),
-      aula('f5_futura', '2026-11-20', 'realizada')];
+      aula('f5_futura', '2026-11-20', 'realizada'),
+      // a aula de hoje de um aluno de cursinho (o selo do ano)
+      Object.assign(aula('f5_cur', Core.hojeIso(), 'realizada', '08:00'), { alunoId: 'f5_cursinho' })];
+    dados.alunos.push({ id: 'f5_cursinho', nome: 'Aluno Cursinho Teste', ativo: true, anoEscolar: 'cursinho', precos: [], trilhas: [] });
     dados.series = []; dados.resumos = [];
     await Store.salvar(dados);
   });
@@ -286,6 +289,13 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
   await p2.evaluate(() => history.back());
   await esperar('o painel da futura fechado', estado, v => !!v && !v.tema, 4000);
   await voltarFechaAAula('aula futura');
+  // o aluno de cursinho: o banco o lê como 3º médio, mas o selo diz o que está na ficha
+  await abrirPainel('f5_cur');
+  const seloCursinho = await p2.evaluate(() => ((document.querySelector('#tema-contexto .tag') || {}).textContent || '').trim());
+  conf('o aluno de cursinho tem o selo "No cursinho", e não "Está no 3º médio" (' + seloCursinho + ')', seloCursinho, 'No cursinho');
+  await p2.evaluate(() => history.back());
+  await esperar('o painel do cursinho fechado', estado, v => !!v && !v.tema, 4000);
+  await voltarFechaAAula('aluno de cursinho');
 
   secao('4. Recarregar com o painel aberto: sem janela, e a raiz continua guardada');
   // o estado em que o documento novo NASCEU, lido antes de o app rodar: é a condição da prova

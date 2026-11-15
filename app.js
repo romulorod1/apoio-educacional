@@ -13250,7 +13250,10 @@
      * dele, para não se confundir com o ano de um assunto de outra matéria) e
      * a última aula, com a matéria dela quando ela é certa. */
     var contexto = [
-      anoDoAluno ? el('span', { class: 'tag tema-ano-aluno', texto: 'Está no ' + nomeDoAno(anoDoAluno) }) : null,
+      /* O cursinho lê o banco como o 3º médio (Core.serieParaTemas), mas o selo
+       * diz o que está na ficha: "No cursinho", e não "Está no 3º médio". */
+      anoDoAluno ? el('span', { class: 'tag tema-ano-aluno', texto: anoEscolarCadastrado(aluno).ano === 'cursinho'
+        ? 'No cursinho' : 'Está no ' + nomeDoAno(anoDoAluno) }) : null,
       aulaAnterior ? el('span', { class: 'tema-ultima-aula', texto: 'Última aula' +
         (materiaAnterior ? ' de ' + materiaAnterior : '') + ': ' + Core.ddmm(aulaAnterior.data) }) : null
     ].filter(Boolean);
@@ -20480,8 +20483,19 @@
         return Array.isArray(v) ? v.length > 0 : !!v;
       }).map(function (x) { return x[1]; }),
       vizinhos: f.vizinhos || [],
+      // de qual vizinho veio o material de CADA sinal (o deVizinho de cada fonte)
+      vizinhosPorSinal: {
+        teoria: vizinhosDasFontes(f.teoria || []),
+        exercicios: vizinhosDasFontes(exercicios),
+        obmep: vizinhosDasFontes(f.obmep || [])
+      },
       resumo: resumoDasFontesDoAssunto(f)
     };
+  }
+  function vizinhosDasFontes(lista) {
+    var ids = [];
+    lista.forEach(function (x) { if (x && x.deVizinho && ids.indexOf(x.deVizinho) < 0) ids.push(x.deVizinho); });
+    return ids;
   }
   var SECOES_DOS_EXERCICIOS = [['listaBase', 'lista de base'], ['exercicios', 'exercícios'], ['enem', 'ENEM']];
   /* DE ONDE VEM o material de um sinal, com a mesma conta da página do
@@ -20523,14 +20537,19 @@
       if (ativo) algum = true;
       /* O sinal herdado (de assunto vizinho ou de outro ano) ganha um traço
        * pontilhado embaixo, e diz de onde vem no nome e no toque longo. */
-      var varios = origem[tipo] === 'vizinho' && (estado.vizinhos || []).length > 1;
+      /* Os vizinhos DESTE sinal: só os que deram material a ele. A teoria que
+       * veio de um vizinho só não nomeia o outro, que só deu exercícios, e o
+       * singular ou o plural sai desta lista. */
+      var porSinal = (estado.vizinhosPorSinal || {})[tipo] || [];
+      var vizinhosDoSinal = (estado.vizinhos || []).filter(function (v) { return porSinal.indexOf(v.id) >= 0; });
+      var varios = origem[tipo] === 'vizinho' && vizinhosDoSinal.length > 1;
       // a concordância do texto da linha: "de assuntos vizinhos" quando são vários
       var de = !ativo ? '' : varios ? 'de assuntos vizinhos' : DE_ONDE_SINAL[origem[tipo]] || '';
       sinal.classList.toggle('herdado', !!de);
       if (varios) sinal.setAttribute('data-varios', 'sim'); else sinal.removeAttribute('data-varios');
       if (de) sinal.setAttribute('data-origem', origem[tipo]); else sinal.removeAttribute('data-origem');
       var nome = tipo === 'exercicios' && secoes.length ? juntarComE(secoes) : ROTULOS_SINAL[tipo];
-      var vizinhos = de && origem[tipo] === 'vizinho' ? (estado.vizinhos || []).map(function (v) {
+      var vizinhos = de && origem[tipo] === 'vizinho' ? vizinhosDoSinal.map(function (v) {
         var ano = Core.ANOS_ESCOLARES[v.serie];
         return '“' + v.titulo + '”' + (ano ? ' (' + ano + ')' : '');
       }) : [];
@@ -20614,6 +20633,21 @@
     var todas = (f.teoria || []).concat(f.listaBase ? [f.listaBase] : [], f.exercicios || [], f.obmep || [], f.enem || []);
     var de = (f.vizinhos || []).length ? (f.vizinhos.length === 1 ? ', de assunto vizinho' : ', de assuntos vizinhos')
       : todas.length && todas.every(function (x) { return x && x.outroAno; }) ? ', de outro ano' : '';
+    /* Parte de outro ano: o grupo de um sinal que é todo de outro ano (o mesmo
+     * que leva o traço) diz isso no fim, como o vizinho diz: "; teoria de outro
+     * ano". */
+    if (!de) {
+      var exerc = (f.listaBase ? [f.listaBase] : []).concat(f.exercicios || [], f.enem || []);
+      var deOutroAno = [['teoria', f.teoria || []], [null, exerc], ['OBMEP', f.obmep || []]].filter(function (g) {
+        return g[1].length && origemDasFontes(g[1]) === 'outro-ano';
+      }).map(function (g) {
+        return g[0] || juntarComE(SECOES_DOS_EXERCICIOS.filter(function (x) {
+          var v = f[x[0]];
+          return Array.isArray(v) ? v.length > 0 : !!v;
+        }).map(function (x) { return x[1]; }));
+      });
+      if (deOutroAno.length) de = '; ' + juntarComE(deOutroAno) + ' de outro ano';
+    }
     return 'No tablet: ' + juntarComE(partes) + (nomes.length === 1 ? ' (' + nomes[0] + ')' : '') + de;
   }
 

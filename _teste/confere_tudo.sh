@@ -1696,6 +1696,9 @@ roda "seletor --envenenado-voltar-fecha-seletor"  node "_teste/testa_seletor_sin
 # F5 acabamento: o sinal dos exercicios junta lista de base, exercicios e ENEM;
 # o veneno tira o ENEM do sinal.
 roda "seletor --envenenado-sem-enem-no-sinal"     node "_teste/testa_seletor_sinais_navegador.js" --envenenado-sem-enem-no-sinal
+# F5 acabamento: cada sinal nomeia so os vizinhos que deram material a ele;
+# o veneno nomeia todos os vizinhos em todo sinal.
+roda "seletor --envenenado-vizinhos-de-todos-os-sinais" node "_teste/testa_seletor_sinais_navegador.js" --envenenado-vizinhos-de-todos-os-sinais
 roda "preço descartado não vaza"                  node "_teste/testa_preco_cancelado.js"
 roda "ações de aula no fechamento"                node "_teste/testa_acoes_fechamento.js"
 # C9: o documento do ciclo na tela. A contagem do que abre sozinho (janelas,
