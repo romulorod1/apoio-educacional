@@ -1007,6 +1007,7 @@ roda "rollback v4 --envenenado-registros-ressuscitam" node "_teste/testa_rollbac
 # (1f0b839), e o tipo novo seria apagado por ele (controle).
 roda "planejamento (fluxo, IA fase 2)"              node "_teste/testa_planejamento_navegador.js"
 roda "planejamento --envenenado-salva-duplo"       node "_teste/testa_planejamento_navegador.js" --envenenado-salva-duplo
+roda "planejamento --envenenado-sem-preparando"    node "_teste/testa_planejamento_navegador.js" --envenenado-sem-preparando
 roda "planejamento (registro e versao antiga)"      node "_teste/testa_planejamento_registro_navegador.js"
 roda "planejamento --envenenado-cascata-deixa-plano" node "_teste/testa_planejamento_registro_navegador.js" --envenenado-cascata-deixa-plano
 # IA, fase 3: o assistente no app (tablet e celular), com o /api/ia falso num roteiro
