@@ -1,0 +1,2 @@
+# Acabamento dos livros da nuvem: a conferência com andamento, o Cancelar download por cima da capa e o aviso ao cancelar.
+Ao baixar um livro da nuvem, o cartão mostra a conferência e o botão Cancelar download fica por cima da capa.

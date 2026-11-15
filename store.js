@@ -1522,8 +1522,8 @@
   function temWebCrypto() {
     return typeof crypto !== 'undefined' && !!(crypto.subtle && crypto.subtle.digest) && typeof TextEncoder !== 'undefined';
   }
-  function sha256Hex(entrada) {
-    if (typeof Blob !== 'undefined' && entrada instanceof Blob) return sha256DoBlob(entrada);
+  function sha256Hex(entrada, aoProgresso) {
+    if (typeof Blob !== 'undefined' && entrada instanceof Blob) return sha256DoBlob(entrada, aoProgresso);
     if (!temWebCrypto()) return Promise.reject(Object.assign(new Error('Este navegador não tem o WebCrypto que a folha na nuvem precisa.'), { codigo: 'SEM_WEBCRYPTO' }));
     var bytes = typeof entrada === 'string' ? new TextEncoder().encode(entrada) : entrada;
     return crypto.subtle.digest('SHA-256', bytes).then(function (buf) {
@@ -1535,13 +1535,22 @@
   /* O SHA-256 DE UM BLOB, por trechos de 1 MB (o livro que veio da nuvem, PR 3
    * da biblioteca na nuvem): o crypto.subtle só calcula de uma vez, com uma
    * cópia do arquivo inteiro na memória, e o livro pode ter 200 MB. O cálculo
-   * por partes é o da importação dos livros (Biblioteca.Sha256, conferido
-   * contra o crypto.subtle no testa_livros.js); nunca há mais que um trecho na
-   * mão. Sem ele (o Store lido sozinho, numa prova), o caminho de sempre. */
+   * por partes é o da importação dos livros (Biblioteca.Sha256), conferido
+   * contra o crypto.subtle.digest nas fronteiras do bloco de 64 bytes e do
+   * trecho de 1 MB (0, 55, 56, 63, 64, 65, 1 MB - 1, 1 MB e 1 MB + 1) na seção
+   * 0 do _teste/testa_livros_nuvem_baixar.js; nunca há mais que um trecho na
+   * mão. Sem ele (o Store lido sozinho, numa prova), o caminho de sempre.
+   * aoProgresso(lidos, total), se vier, é chamado depois de cada trecho: a
+   * conferência de um livro grande leva alguns segundos no tablet, e o cartão
+   * mostra o andamento dela. */
   var TRECHO_DO_HASH = 1024 * 1024;
-  function sha256DoBlob(blob) {
+  function sha256DoBlob(blob, aoProgresso) {
     var B = typeof Biblioteca !== 'undefined' ? Biblioteca : null;
-    if (!B || typeof B.Sha256 !== 'function') return blob.arrayBuffer().then(function (ab) { return sha256Hex(new Uint8Array(ab)); });
+    var avisa = typeof aoProgresso === 'function' ? aoProgresso : function () {};
+    if (!B || typeof B.Sha256 !== 'function') {
+      return blob.arrayBuffer().then(function (ab) { return sha256Hex(new Uint8Array(ab)); })
+        .then(function (h) { avisa(blob.size, blob.size); return h; });
+    }
     var sha = new B.Sha256(), pos = 0, total = blob.size;
     var proximo = function () {
       if (pos >= total) return Promise.resolve(sha.fim());
@@ -1549,6 +1558,7 @@
       return blob.slice(pos, ate).arrayBuffer().then(function (ab) {
         sha.atualizar(new Uint8Array(ab));
         pos = ate;
+        avisa(pos, total);
         return proximo();
       });
     };

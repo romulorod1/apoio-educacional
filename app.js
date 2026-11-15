@@ -17741,7 +17741,7 @@
   var livrosNaNuvem = null;          // { uid, quando, livros: { id: { id, sha256, tamanho, formato, caminhoNuvem, metaHash, metaVersao, meta } } }
   var livrosNaNuvemLidos = null;     // a leitura da lista guardada, uma vez por abertura
   var conferindoNaNuvem = null;
-  var baixaDaNuvem = null;           // a baixa em curso: { id, recebidos, total, fase, promessa }
+  var baixaDaNuvem = null;           // a baixa em curso: { id, recebidos, total, fase, conferidos, promessa }
   var falhasDaBaixa = Object.create(null);   // id -> o motivo da última tentativa que não deu certo
   // além do livro: os bytes na memória, o Blob montado e o registro convivem até a gravação
   var FOLGA_DA_BAIXA = 50 * 1024 * 1024;
@@ -17860,7 +17860,7 @@
       return Promise.resolve(false);
     }
     delete falhasDaBaixa[id];
-    var baixa = baixaDaNuvem = { id: id, recebidos: 0, total: e.tamanho, fase: 'baixando', promessa: null, cancelada: false,
+    var baixa = baixaDaNuvem = { id: id, recebidos: 0, total: e.tamanho, fase: 'baixando', conferidos: 0, promessa: null, cancelada: false,
       controle: typeof AbortController === 'function' ? new AbortController() : null };
     atualizarCartoesDaNuvem();
     var seCancelou = function () {
@@ -17884,7 +17884,9 @@
       seCancelou();
       baixa.fase = 'conferindo';
       atualizarCartoesDaNuvem();
-      return conferirLivroBaixado(arquivo, e).then(function () { seCancelou(); return guardarLivroBaixado(arquivo, e); });
+      // o sha256 de um livro de 200 MB leva alguns segundos no tablet: o cartão mostra o andamento da conferência
+      var aoConferir = function (n) { baixa.conferidos = n; atualizarCartoesDaNuvem(); };
+      return conferirLivroBaixado(arquivo, e, aoConferir).then(function () { seCancelou(); return guardarLivroBaixado(arquivo, e); });
     }).then(function (r) {
       /* a vaga da baixa só se solta DEPOIS de a Estante se refazer: até lá o
        * cartão "Na nuvem" ainda está à vista, e o toque nele devolve esta
@@ -17903,7 +17905,7 @@
       baixaDaNuvem = null;
       var motivo = motivoDaFalhaDaBaixa(err);
       // cancelar não é falha: o cartão volta a "toque para baixar"
-      if (motivo === 'cancelada') { delete falhasDaBaixa[id]; atualizarCartoesDaNuvem(); return false; }
+      if (motivo === 'cancelada') { delete falhasDaBaixa[id]; atualizarCartoesDaNuvem(); avisar('Download cancelado.'); return false; }
       falhasDaBaixa[id] = motivo;
       if (motivo === 'sem-espaco') {
         avisar('O tablet está sem espaço para este livro: ele precisa de ' + Biblioteca.mb(err && err.precisa || e.tamanho * 2) +
@@ -17922,9 +17924,10 @@
     baixa.cancelada = true; if (baixa.controle) baixa.controle.abort();
   }
   /* o sha256 do arquivo inteiro contra o do catálogo; o que não confere não é
-   * guardado. O arquivo vem como Blob, e o hash é por trechos (Store.sha256Hex) */
-  function conferirLivroBaixado(bytes, e) {
-    return Store.sha256Hex(bytes).then(function (h) {
+   * guardado. O arquivo vem como Blob, e o hash é por trechos (Store.sha256Hex),
+   * com o andamento a cada trecho */
+  function conferirLivroBaixado(bytes, e, aoProgresso) {
+    return Store.sha256Hex(bytes, aoProgresso).then(function (h) {
       if (h !== e.sha256) throw Object.assign(new Error('O arquivo baixado não confere com o catálogo.'), { codigo: 'HASH_DIFERENTE' });
     });
   }
@@ -17961,33 +17964,55 @@
   // o que o cartão de um livro da nuvem diz agora: { chave, texto, pct }
   function estadoDoLivroNaNuvem(id) {
     if (baixaDaNuvem && baixaDaNuvem.id === id) {
-      if (baixaDaNuvem.fase === 'conferindo') return { chave: 'conferindo', texto: 'Conferindo o arquivo...', pct: 100 };
+      if (baixaDaNuvem.fase === 'conferindo') {
+        var conferido = baixaDaNuvem.total ? Math.min(100, Math.floor(baixaDaNuvem.conferidos * 100 / baixaDaNuvem.total)) : 0;
+        return { chave: 'conferindo', texto: 'Conferindo o livro... ' + conferido + '%', pct: conferido };
+      }
       var pct = baixaDaNuvem.total ? Math.min(100, Math.floor(baixaDaNuvem.recebidos * 100 / baixaDaNuvem.total)) : 0;
       return { chave: 'baixando', texto: 'Baixando · ' + pct + '%', pct: pct };
     }
     var falha = falhasDaBaixa[id];
     if (!falha && navigator.onLine === false) falha = 'sem-rede';
     if (falha) return { chave: falha, texto: FRASES_DA_BAIXA[falha] || FRASES_DA_BAIXA.outro, pct: null };
-    return { chave: 'na-nuvem', texto: 'Na nuvem · toque para baixar', pct: null };
+    return { chave: 'na-nuvem', texto: FRASE_DA_NUVEM, pct: null };
   }
+  var FRASE_DA_NUVEM = 'Na nuvem · toque para baixar';
   function linhaDoLivroNaNuvem(id) {
     var est = estadoDoLivroNaNuvem(id);
-    var caixa = el('span', { class: 'bibl-nuvem-estado', 'data-nuvem-estado': est.chave, role: 'status' }, [
+    return el('span', { class: 'bibl-nuvem-estado', 'data-nuvem-estado': est.chave, role: 'status' }, [
       el('span', { class: 'bibl-pequena' + (est.chave === 'na-nuvem' || est.chave === 'baixando' || est.chave === 'conferindo' ? '' : ' bibl-nuvem-falha') },
         [icone('cloud'), est.texto])
     ]);
-    // a barra tem o lugar dela sempre (escondida fora da baixa): o andamento não empurra a linha de baixo
-    var barra = el('span', { class: 'bibl-progresso' + (est.pct === null ? ' bibl-progresso-reservado' : ''), 'aria-hidden': 'true' }, [el('i')]);
-    barra.firstChild.style.width = (est.pct || 0) + '%';
-    caixa.appendChild(barra);
-    return caixa;
+  }
+  /* A linha do estado tem, por baixo e invisível, a frase de "toque para
+   * baixar": a altura dela é sempre a maior das duas, e a frase mais curta da
+   * baixa não encolhe o cartão (nada sobe nem desce quando a baixa começa). */
+  function lugarDaLinhaDaNuvem(id) {
+    return el('span', { class: 'bibl-nuvem-linha' }, [
+      el('span', { class: 'bibl-nuvem-molde', 'aria-hidden': 'true' }, [
+        el('span', { class: 'bibl-pequena' }, [icone('cloud'), FRASE_DA_NUVEM])
+      ]),
+      linhaDoLivroNaNuvem(id)
+    ]);
+  }
+  /* A barra e o Cancelar download ficam POR CIMA da capa, e só enquanto baixa
+   * (os dois) ou confere (a barra): o cartão parado não reserva altura nenhuma
+   * para eles. */
+  function acertarSobreACapa(c, id) {
+    var sobre = c.querySelector('.bibl-nuvem-sobre-capa');
+    if (!sobre) return;
+    var est = estadoDoLivroNaNuvem(id);
+    var ativa = est.chave === 'baixando' || est.chave === 'conferindo';
+    sobre.hidden = !ativa;
+    var i = sobre.querySelector('.bibl-progresso i');
+    if (i) i.style.width = (ativa ? est.pct || 0 : 0) + '%';
+    var cancelar = sobre.querySelector('.bibl-nuvem-cancelar');
+    if (cancelar) cancelar.classList.toggle('bibl-nuvem-cancelar-oculto', est.chave !== 'baixando');
   }
   function atualizarCartoesDaNuvem() {
     Array.prototype.forEach.call(document.querySelectorAll('[data-nuvem]'), function (c) {
       var id = c.getAttribute('data-nuvem');
-      var baixando = !!(baixaDaNuvem && baixaDaNuvem.id === id && baixaDaNuvem.fase === 'baixando');
-      var cancelar = c.querySelector('.bibl-nuvem-cancelar');
-      if (cancelar) cancelar.classList.toggle('bibl-nuvem-cancelar-oculto', !baixando);
+      acertarSobreACapa(c, id);
       var velha = c.querySelector('.bibl-nuvem-estado');
       var nova = linhaDoLivroNaNuvem(id);
       if (velha && velha.getAttribute('data-nuvem-estado') === nova.getAttribute('data-nuvem-estado') &&
@@ -17997,19 +18022,22 @@
       if (botao) botao.setAttribute('aria-busy', baixaDaNuvem && baixaDaNuvem.id === id ? 'true' : 'false');
     });
   }
-  /* O cartão do livro da nuvem: o botão do livro (o toque baixa) e, embaixo,
-   * o lugar do Cancelar, sempre reservado (o botão só aparece enquanto baixa:
-   * a linha de baixo não anda). */
+  /* O cartão do livro da nuvem: o botão do livro (o toque baixa) e, por cima
+   * da capa dele, a barra e o Cancelar download. Ficam em posição absoluta
+   * dentro do cartão: nada embaixo dele, e a linha de baixo não anda quando a
+   * baixa começa ou termina. */
   function cartaoDoLivroNaNuvem(l) {
-    var baixando = !!(baixaDaNuvem && baixaDaNuvem.id === l.id && baixaDaNuvem.fase === 'baixando');
-    return el('div', { class: 'bibl-nuvem-cartao', 'data-nuvem': l.id }, [
+    var cartao = el('div', { class: 'bibl-nuvem-cartao', 'data-nuvem': l.id }, [
       botaoDoLivroNaNuvem(l),
-      el('div', { class: 'bibl-nuvem-acoes' }, [
-        el('button', { type: 'button', class: 'btn pequeno bibl-nuvem-cancelar' + (baixando ? '' : ' bibl-nuvem-cancelar-oculto'),
-          'data-cancelar-nuvem': l.id, texto: 'Cancelar', 'aria-label': 'Cancelar a baixa de ' + tituloDoLivro(l.meta),
+      el('div', { class: 'bibl-nuvem-sobre-capa', hidden: '' }, [
+        el('span', { class: 'bibl-progresso', 'aria-hidden': 'true' }, [el('i')]),
+        el('button', { type: 'button', class: 'btn pequeno bibl-nuvem-cancelar bibl-nuvem-cancelar-oculto',
+          'data-cancelar-nuvem': l.id, texto: 'Cancelar download', 'aria-label': 'Cancelar o download de ' + tituloDoLivro(l.meta),
           aoClick: function () { cancelarBaixaDaNuvem(l.id); } })
       ])
     ]);
+    acertarSobreACapa(cartao, l.id);
+    return cartao;
   }
   function botaoDoLivroNaNuvem(l) {
     var tipo = tipoDoMaterial(l.meta);
@@ -18024,7 +18052,7 @@
         el('span', { class: 'bibl-forte', texto: tituloDoLivro(l.meta) }),
         // o tamanho não se parte no fim da linha ("MB" sozinho embaixo): espaços inseparáveis
         el('span', { class: 'bibl-apoio', texto: [tamanhoDoLivro(l.meta), Biblioteca.mb(l.naNuvem.tamanho).replace(/ /g, ' ')].filter(Boolean).join(' · ') }),
-        linhaDoLivroNaNuvem(l.id)
+        lugarDaLinhaDaNuvem(l.id)
       ])
     ]);
   }
