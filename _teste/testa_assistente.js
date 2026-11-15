@@ -526,6 +526,61 @@ function respostaTexto(t) { return { ok: true, resposta: { stop_reason: 'end_tur
   conf('o calendário não usa travessão', /[–—]/.test(A.contextoDoAgora(HOJE, '11:00')), false);
   naoGravou('as 20 frases');
 
+  /* "Onde fica cada coisa" (relato da Nathália em 15/11/2026: "Onde eu faço o
+   * planejamento" teve como resposta "não sei dizer em qual tela"). O mapa
+   * vai no sistema dos dois (quem lê e quem grava); cada pergunta parecida
+   * acha no mapa a linha do assunto com o botão certo; e todo rótulo entre
+   * aspas no mapa existe na tela de hoje (app.js ou index.html), para o mapa
+   * não envelhecer calado. Controles: o sistema sem o bloco reprova os
+   * casos, e um rótulo inventado é pego. */
+  secao('onde fica cada coisa no aplicativo');
+  const fs = require('fs'), path = require('path');
+  const TELA = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8') + '\n' +
+    fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const INICIO_MAPA = 'Onde fica cada coisa no aplicativo';
+  function blocoDoMapa(sis) {
+    const linhas = sis.split('\n');
+    const i = linhas.findIndex(l => l.indexOf(INICIO_MAPA) === 0);
+    if (i < 0) return [];
+    const fim = linhas.findIndex((l, j) => j > i && l === '');
+    return linhas.slice(i, fim < 0 ? linhas.length : fim);
+  }
+  const CASOS_MAPA = [
+    ['Onde eu faço o planejamento', /^- Planejamento de estudos:/, ['Novo planejamento', 'Planejamentos de estudo', 'Alunos']],
+    ['Onde escrevo o feedback do mês?', /^- Feedback do mês:/, ['Escrever o feedback', 'Fechamento', 'Editar a mensagem do mês']],
+    ['Como marco que a família pagou?', /^- Marcar pagamento:/, ['Marcar como pago', 'Fechamento']],
+    ['Cadê a cópia de segurança?', /^- Cópia de segurança/, ['Ajustes']]
+  ];
+  function respondeOsCasos(sis) {
+    const mapa = blocoDoMapa(sis);
+    return CASOS_MAPA.map(([pergunta, assunto, botoes]) => {
+      const linha = mapa.filter(l => assunto.test(l))[0] || '';
+      return pergunta + ': ' + (linha && botoes.every(b => linha.indexOf(b) >= 0) ? 'acha' : 'NÃO acha');
+    });
+  }
+  const todosAcham = CASOS_MAPA.map(([pergunta]) => pergunta + ': acha');
+  function rotulosQueNaoExistem(mapa) {
+    const rotulos = [];
+    mapa.join('\n').replace(/"([^"]+)"/g, (m, r) => { rotulos.push(r); return m; });
+    const aspas = /"(onde eu faço\.\.\.|como eu\.\.\.|cadê\.\.\.)"/;
+    return rotulos.filter(r => !aspas.test('"' + r + '"') && TELA.indexOf(r) < 0);
+  }
+  const mapa = blocoDoMapa(A.SISTEMA);
+  conf('(arranjo) o mapa existe e tem as linhas dos assuntos', mapa.length >= 10, true);
+  conf('quem lê: cada pergunta acha no mapa a linha com o botão certo', respondeOsCasos(A.SISTEMA), todosAcham);
+  conf('quem grava: o mesmo mapa vai no sistema das propostas', [respondeOsCasos(A.SISTEMA_GRAVA), blocoDoMapa(A.SISTEMA_GRAVA).join('\n') === mapa.join('\n')], [todosAcham, true]);
+  conf('o mapa manda responder sem ferramenta e nunca dizer que não sabe a tela do que está nele',
+    /responda sem ferramenta/.test(mapa[0]) && /Nunca diga que não sabe a tela de algo que está aqui/.test(mapa[0]) && /sem inventar tela nem botão/.test(mapa[0]), true);
+  conf('o "ainda não faz" aponta para o mapa, nos dois sistemas',
+    [A.SISTEMA, A.SISTEMA_GRAVA].map(s => s.split('\n').filter(l => /^O que você ainda NÃO faz/.test(l)).every(l => /em que tela do aplicativo isso se faz \(pelo mapa abaixo\)/.test(l))), [true, true]);
+  conf('(arranjo) o mapa cita pelo menos 25 rótulos entre aspas', (mapa.join('\n').match(/"[^"]+"/g) || []).length >= 25, true);
+  conf('todo rótulo entre aspas no mapa existe na tela de hoje', rotulosQueNaoExistem(mapa), []);
+  conf('o mapa não tem travessão nem data', /[–—]|\d{4}-\d{2}-\d{2}/.test(mapa.join('\n')), false);
+  // controles
+  const semBloco = A.SISTEMA.split('\n').filter(l => mapa.indexOf(l) < 0).join('\n');
+  conf('controle: o sistema sem o bloco reprova os quatro casos', respondeOsCasos(semBloco).filter(r => /NÃO acha$/.test(r)).length, 4);
+  conf('controle: rótulo inventado no mapa é pego', rotulosQueNaoExistem(mapa.concat(['- Teste: toque em "Botão que não existe 7731".'])), ['Botão que não existe 7731']);
+
   console.log('\n' + passes + ' verificacoes passaram, ' + falhas + ' falharam');
   process.exit(falhas ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
