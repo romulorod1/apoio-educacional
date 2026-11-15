@@ -510,6 +510,11 @@ async function transbordo(pag) {
   await clicar(pag, '#plan-secao .plan-item');
   await esperar('o salvo abre direto na prévia', () => temFolha(pag), v => v === true, 30000);
   conf('e já diz "Salvo na ficha", sem pedido novo', [await pag.evaluate(() => document.querySelector('#plan-salvar').textContent), falso.pedidos.length], ['Salvo na ficha', antesQuadro + 1]);
+  // o ajuste "Remover a seção..." gravou o salvo sozinho: ele reabre em "Só o calendário"
+  conf('o salvo reabre em "Só o calendário" (a escolha foi gravada)', await pag.evaluate(() => {
+    const s = document.querySelector('#plan-quadro [data-valor="sem"]');
+    return [!!s, s && s.getAttribute('aria-checked')];
+  }), [true, 'true']);
   conf('no salvo, "Para qual aluno?" e o "Excluir este plano"', await pag.evaluate(() => [!!document.querySelector('#plan-quem #plan-alunos'), !!document.querySelector('#plan-excluir')]), [true, true]);
   await clicar(pag, '#plan-ampliar');
   await esperar('o leitor abriu do salvo', () => aberta(pag, 'modal-leitor-pdf'), v => v === true, 10000);

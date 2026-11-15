@@ -403,53 +403,93 @@
    * ela tenha tirado (o plano salvo antes da opção não tem o campo: sim). */
   function temQuadroDasProvas(plano) { return !plano || plano.quadroDasProvas !== false; }
 
-  /* O pedido de ajuste fala da seção das provas? "tirar": tirar, remover,
-   * esconder, apagar ou excluir a seção, o quadro, a tabela ou a lista "das
-   * provas" (ou "datas e conteúdo"), ou "só o calendário"; "voltar": pôr de
-   * volta, mostrar ou voltar a seção. null: o pedido é outro. É a rede de
-   * segurança do app quando o modelo não muda o campo (o relato de
-   * 15/11/2026: "Remover a seção datas e conteúdo das provas" deu "O plano
-   * ficou igual"). */
+  /* O pedido de ajuste fala da seção "Datas e conteúdo das provas" INTEIRA?
+   * "tirar", "voltar" ou null (o pedido é outro, ou o app não tem certeza: aí
+   * vale o que o modelo fez). É a rede de segurança do app quando o modelo não
+   * muda o campo (relato de 15/11/2026: "Remover a seção datas e conteúdo das
+   * provas" deu "O plano ficou igual"). Conservadora de propósito: o falso
+   * positivo desfaz o pedido dela; o falso negativo só deixa com o modelo.
+   *   - o alvo é a seção: "seção / quadro / tabela / lista / parte / bloco"
+   *     das provas, das datas ou "de baixo"; "datas e conteúdo"; "as provas de
+   *     baixo"; "esconde o quadro"; "só o calendário";
+   *   - null quando cita algo específico: um número (dia, parte, capítulo),
+   *     "a de Science", "prova de", "conteúdo de", dia da semana, "da manhã",
+   *     "calendário de dezembro";
+   *   - null com o "não" antes do verbo ("não tira", "não precisa tirar") e
+   *     com "mantém"; "não quero" e "não precisa da" querem dizer tirar;
+   *   - tirar e voltar na mesma frase: null. */
   function intencaoDoQuadro(texto) {
-    var t = String(texto || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ');
-    var soCalendario = /\bso (o |com o )?calendario\b|\bapenas (o )?calendario\b|\bsomente (o )?calendario\b/.test(t);
-    var secao = /(secao|quadro|tabela|lista|parte|bloco|campo)\b[^.;!?]{0,25}\b(das |de )?(datas|provas|conteudos?)\b|\bdatas e conteudos? das provas\b/.test(t);
-    if (!soCalendario && !secao) return null;
-    var nega = /\bnao (quero|precisa|mostr\w*|coloc\w*|poe|ponha|inclu\w*)\b/.test(t);
-    var tirar = soCalendario || nega ||
-      /\b(tir[aeo]\w*|remov\w*|exclu\w*|apag\w*|escond\w*|ocult\w*)\b|\bsem (a |o )?(secao|quadro|tabela|lista)\b/.test(t);
-    var voltar = /\b(volt\w*|de volta|devolv\w*|recoloc\w*|reinclu\w*)\b/.test(t) ||
-      (!nega && /\b(mostr\w*|inclu\w*|acrescent\w*|coloc\w*|poe|ponha)\b/.test(t));
-    // as duas coisas na mesma frase ("tirei sem querer, volta"): o modelo decide
+    var t = ' ' + String(texto || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9/ ]+/g, ' ').replace(/\s+/g, ' ') + ' ';
+    var soCalendario = /\b(so|apenas|somente) (com )?(o )?calendario\b/.test(t);
+    var alvo = soCalendario ||
+      /\b(secao|quadro|tabela|lista|parte|bloco)\b[a-z ]{0,25}\b(provas|datas|baixo|embaixo)\b/.test(t) ||
+      /\bdatas ?(e|\/) ?conteudos?\b/.test(t) ||
+      /\bprovas (de baixo|embaixo)\b/.test(t) ||
+      /^ \w+ (o|a) (quadro|tabela|secao) $/.test(t);
+    if (!alvo) return null;
+    // algo específico: o pedido é sobre uma prova, um dia ou um pedaço, não sobre a seção
+    if (/\d/.test(t) ||
+      /\b(a|o) de [a-z]+/.test(t) ||
+      /\bprova (de|da|do) [a-z]+/.test(t) ||
+      /\bconteudos? (de|da|do) [a-z]+/.test(t) ||
+      /\b(segunda|terca|quarta|quinta|sexta|sabado|domingo)\b/.test(t) ||
+      /\bda manha\b|\bda tarde\b/.test(t) ||
+      /\bcalendario (de|do|da) [a-z]+/.test(t)) return null;
+    if (/\bnao (\w+ ){0,2}(tir|retir|remov|apag|exclu|escond|ocult|mex)\w*/.test(t) || /\b(mant[ee]m|mantenh\w*|manter|deix\w* (o|a) (quadro|secao|tabela|lista))\b/.test(t)) return null;
+    var naoQuer = /\bnao (quero|precis\w* d[aeo]s?)\b/.test(t);
+    var tirar = soCalendario || naoQuer ||
+      /\b(tir[aeo]\w*|retir\w*|remov\w*|exclu\w*|apag\w*|escond\w*|ocult\w*)\b/.test(t) ||
+      /\bsem (a |o |as |os )?(secao|quadro|tabela|lista|provas)\b/.test(t);
+    var voltar = /\b(volt\w*|de volta|devolv\w*|recoloc\w*|reinclu\w*|de novo|novamente)\b/.test(t) ||
+      (!naoQuer && /\b(mostr\w*|inclu\w*|acrescent\w*|coloc\w*|poe|ponha|por)\b/.test(t));
     if (tirar && !voltar) return 'tirar';
     if (voltar && !tirar) return 'voltar';
     return null;
   }
 
-  /* Depois de um ajuste: o pedido falou da seção das provas, e o plano novo
-   * tem de obedecer. Tirar a seção é só o quadroDasProvas: se o modelo, em vez
-   * disso, esvaziou "provas" ou apagou a prova de algum dia, as provas de
-   * antes voltam (a seção sai, as provas ficam). Devolve o plano novo,
-   * corrigido (cópia rasa), ou o mesmo objeto quando não há o que mudar. */
+  /* Depois de um ajuste: a rede só age quando o pedido é, com certeza, sobre
+   * a seção inteira (intencaoDoQuadro) E o modelo não fez o que ela pediu:
+   *   - o plano voltou igual (fora o quadroDasProvas): o app põe o campo;
+   *   - para tirar, o modelo esvaziou "provas" (e talvez a prova dos dias) e
+   *     não mexeu em mais nada: as provas de antes voltam e o campo vai a
+   *     false (tirar a seção não apaga as provas).
+   * Em qualquer outro caso o modelo mudou algo de propósito, e o plano dele
+   * vale como veio. Devolve o plano corrigido (cópia rasa) ou o mesmo objeto. */
   function aplicarIntencaoDoQuadro(antes, depois, texto) {
     var quer = intencaoDoQuadro(texto);
     if (!quer || !antes || !depois) return depois;
-    var c = {};
-    Object.keys(depois).forEach(function (k) { c[k] = depois[k]; });
-    c.quadroDasProvas = quer !== 'tirar';
-    if (quer === 'tirar') {
-      if ((!Array.isArray(c.provas) || !c.provas.length) && Array.isArray(antes.provas) && antes.provas.length) c.provas = antes.provas;
-      var provaDe = {};
-      (antes.grade || []).forEach(function (g) { if (g && g.prova) provaDe[g.data] = g.prova; });
-      c.grade = (c.grade || []).map(function (g) {
-        if (!g || g.prova || !provaDe[g.data]) return g;
-        var n = {};
-        Object.keys(g).forEach(function (k) { n[k] = g[k]; });
-        n.prova = provaDe[g.data];
-        return n;
-      });
+    /* O pedido cita uma disciplina do plano ("remove Science da tabela das
+     * provas"): é sobre aquela prova, não sobre a seção. */
+    var sem = function (s) { return ' ' + String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim() + ' '; };
+    var dito = sem(texto);
+    var disciplinas = (antes.provas || []).concat(depois.provas || []).map(function (p) { return sem(p && p.disciplina).trim(); })
+      .concat((antes.grade || []).map(function (g) { return sem(g && g.prova).trim(); }))
+      .filter(function (d) { return d.length >= 2 && d !== 'provas' && d !== 'prova'; });
+    if (disciplinas.some(function (d) { return dito.indexOf(' ' + d + ' ') >= 0; })) return depois;
+    var alvo = quer === 'voltar';
+    if (temQuadroDasProvas(depois) === alvo) return depois; // o modelo já fez
+    var semCampo = function (pl, semProvas) {
+      var c = {};
+      Object.keys(pl).forEach(function (k) { if (k !== 'quadroDasProvas' && !(semProvas && k === 'provas')) c[k] = pl[k]; });
+      if (semProvas) c.grade = (pl.grade || []).map(function (g) { var n = {}; Object.keys(g || {}).forEach(function (k) { if (k !== 'prova') n[k] = g[k]; }); return n; });
+      return JSON.stringify(c);
+    };
+    var copia = function (pl) { var c = {}; Object.keys(pl).forEach(function (k) { c[k] = pl[k]; }); return c; };
+    if (semCampo(antes) === semCampo(depois)) {
+      var c = copia(depois);
+      c.quadroDasProvas = alvo;
+      return c;
     }
-    return c;
+    var esvaziou = (!Array.isArray(depois.provas) || !depois.provas.length) && Array.isArray(antes.provas) && antes.provas.length > 0;
+    if (quer === 'tirar' && esvaziou && semCampo(antes, true) === semCampo(depois, true)) {
+      var r = copia(depois);
+      r.provas = antes.provas;
+      r.grade = antes.grade;
+      r.quadroDasProvas = false;
+      return r;
+    }
+    return depois;
   }
 
   /* As listas de aula de um plano já conferido, arrumadas:
@@ -998,9 +1038,10 @@
       return { erro: 'O plano não cabe numa folha só. Encurte o período ou o texto das provas.' };
     }
     /* A sobra vai para as linhas, até 126 pt cada: a folha respira sem
-     * empurrar o quadro para fora. Só o calendário (sem o quadro), até 190 pt:
-     * a grade ocupa a folha em vez de deixar o pé vazio. */
-    var TETO_DA_LINHA = comQuadro ? 126 : 190;
+     * empurrar o quadro para fora. Só o calendário (ela tirou a seção), até
+     * 190 pt: a grade ocupa a folha em vez de deixar o pé vazio. */
+    // o plano sem provas e sem a escolha dela fica como sempre foi (126)
+    var TETO_DA_LINHA = temQuadroDasProvas(plano) ? 126 : 190;
     var alturas = alturaMin.slice();
     var sobra = disponivel - somaMin;
     for (var volta = 0; volta < 8 && sobra > 0.5; volta++) {
