@@ -1,0 +1,1 @@
+# Nuvem da biblioteca: sem a conta da nuvem, a frase do alto do cartão da Biblioteca fala do Drive, como a dos livros; o livro grande mostra "Guardando o livro..." enquanto é gravado; e a barra por cima da capa nunca fica presa.

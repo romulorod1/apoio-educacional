@@ -1323,6 +1323,8 @@ roda "livros da nuvem, baixar --envenenado-sem-prazo" node "_teste/testa_livros_
 roda "livros da nuvem, baixar --envenenado-cancelar-nao-solta" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-cancelar-nao-solta
 roda "livros da nuvem, baixar --envenenado-copia-inteira" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-copia-inteira
 roda "livros da nuvem, baixar --envenenado-solta-antes-do-redesenho" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-solta-antes-do-redesenho
+# os ultimos ajustes: a Estante que nao se refaz nao deixa a barra presa por cima da capa
+roda "livros da nuvem, baixar --envenenado-camada-presa" node "_teste/testa_livros_nuvem_baixar.js" --envenenado-camada-presa
 # Nuvem da biblioteca, PR 4 (14/11/2026): o toque em "Atualizar a biblioteca"
 # traz os pacotes de exercicios novos do catalogo (o mapa pacotes), um por
 # vez, e os importa pelo mesmo caminho do zip, contra o emulador do Auth, do
@@ -1351,6 +1353,10 @@ roda "pacotes da nuvem, atualizar --envenenado-sem-vez-unica" node "_teste/testa
 roda "pacotes da nuvem, atualizar --envenenado-livros-param-pacotes" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-livros-param-pacotes
 roda "pacotes da nuvem, atualizar --envenenado-importar-durante-serie" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-importar-durante-serie
 roda "pacotes da nuvem, atualizar --envenenado-removido-por-outro-nome" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-removido-por-outro-nome
+# os ultimos ajustes: sem a conta, a frase do alto do cartao fala do Drive, como a dos livros
+roda "pacotes da nuvem, atualizar --envenenado-frase-por-podeatualizar" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-frase-por-podeatualizar
+# entrar e sair da nuvem trocam as frases na hora, sem trocar de aba
+roda "pacotes da nuvem, atualizar --envenenado-sem-ouvinte-das-frases" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-sem-ouvinte-das-frases
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
