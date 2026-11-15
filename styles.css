@@ -737,6 +737,20 @@ label.campo-checkbox {
 }
 .item-lista .cresce { flex: 1; min-width: 0; }
 .item-lista .nome { font-weight: 600; color: var(--navy); }
+.tema-contexto { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 8px; color: var(--navy); }
+.tema-ultima-aula { color: var(--muted); font-size: var(--letra-14); }
+.tema-legenda { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 10px; color: var(--muted); font-size: var(--letra-12); }
+.tema-legenda > span { display: inline-flex; align-items: center; gap: 4px; }
+.tema-legenda .ico { width: 14px; height: 14px; }
+.tema-sinais { display: flex; gap: 8px; flex: 0 0 auto; align-self: flex-start; margin-top: 3px; color: var(--navy); }
+.tema-sinal { width: 16px; height: 16px; display: grid; place-items: center; }
+.tema-sinal .ico { width: 14px; height: 14px; }
+/* O alto do seletor de assunto (contexto, busca e legenda) fica preso no alto
+   da janela centrada, por cima da lista que rola (o recuo é o do corpo). */
+.tema-topo { position: sticky; top: -18px; z-index: 2; margin: -18px -18px 0; padding: 18px 18px 2px; background: var(--branco); }
+/* o display acima venceria o atributo hidden: a legenda e os sinais escondidos somem de verdade */
+.tema-legenda[hidden], .tema-sinais[hidden], .tema-sinal[hidden] { display: none; }
+.irmao-aninhado { margin-left: 20px; width: calc(100% - 20px); }
 .dominio-assuntos-privado { margin-bottom: 8px; }
 .dominio-assunto-controles { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .dominio-assunto-controles .segmentado { gap: 4px; }
@@ -891,6 +905,29 @@ table.dados tr.total td { font-weight: 600; color: var(--navy); background: var(
     padding: 12px 0;
   }
   .janela-aula-coluna .bloco-grupo-aula { margin-bottom: 10px; }
+
+  /* F5: só o seletor de assunto da aula (classe posta em abrirAssunto e
+     desenharEscolhaAssunto): o seletor de temas da trilha usa o mesmo modal e
+     o mesmo corpo, e segue no modal de sempre, com o corpo rolando. */
+  #modal-tema.seletor-da-aula {
+    align-items: stretch;
+    justify-content: flex-end;
+    padding: 0;
+    background: var(--navy-a12);
+    pointer-events: auto;
+  }
+  #modal-tema.seletor-da-aula .modal {
+    width: min(448px, 100vw);
+    max-width: none;
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+    pointer-events: auto;
+  }
+  #corpo-modal-tema.seletor-assunto { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  #corpo-modal-tema.seletor-assunto > .tema-topo { flex: 0 0 auto; position: static; }
+  #lista-assuntos { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
 }
 .fechar {
   border: none;

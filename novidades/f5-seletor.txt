@@ -1,0 +1,1 @@
+Ao escolher o assunto da aula, você vê o ano do aluno, a data da última aula e se há teoria, exercícios e OBMEP de cada assunto de Matemática.
