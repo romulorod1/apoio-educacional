@@ -436,7 +436,8 @@
       /\b(segunda|terca|quarta|quinta|sexta|sabado|domingo)\b/.test(t) ||
       /\bda manha\b|\bda tarde\b/.test(t) ||
       /\bcalendario (de|do|da) [a-z]+/.test(t)) return null;
-    if (/\bnao (\w+ ){0,2}(tir|retir|remov|apag|exclu|escond|ocult|mex)\w*/.test(t) || /\b(mant[ee]m|mantenh\w*|manter|deix\w* (o|a) (quadro|secao|tabela|lista))\b/.test(t)) return null;
+    t = t.replace(/\bpor favor\b/g, ' ').replace(/\s+/g, ' '); // "por favor" não é pedido de pôr
+    if (/\b(nao|nunca|jamais|nem) (\w+ ){0,2}(tir|retir|remov|apag|exclu|escond|ocult|mex)\w*/.test(t) || /\b(mant[ee]m|mantenh\w*|manter|deix\w* (o|a) (quadro|secao|tabela|lista))\b/.test(t)) return null;
     var naoQuer = /\bnao (quero|precis\w* d[aeo]s?)\b/.test(t);
     var tirar = soCalendario || naoQuer ||
       /\b(tir[aeo]\w*|retir\w*|remov\w*|exclu\w*|apag\w*|escond\w*|ocult\w*)\b/.test(t) ||

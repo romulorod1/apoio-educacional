@@ -33261,22 +33261,6 @@
           desenharPlanejamento();
         }, !grava)
     ]));
-    /* A seção "Datas e conteúdo das provas": no toque, sem a IA e sem
-     * internet. "Só o calendário" tira a seção; as provas continuam nos dias
-     * e no plano, e voltam com um toque. Só aparece quando há provas. */
-    if (pl.provas && pl.provas.length) {
-      lado.appendChild(el('div', { class: 'plan-linha', id: 'plan-secao-provas' }, [
-        el('span', { class: 'plan-rotulo', texto: 'Na folha:' }),
-        seletorUnico('plan-quadro', 'O que vai na folha', [{ valor: 'com', rotulo: 'Calendário e provas' }, { valor: 'sem', rotulo: 'Só o calendário' }],
-          Planejamento.temQuadroDasProvas(pl) ? 'com' : 'sem', function (v) {
-            pl.quadroDasProvas = v === 'com';
-            p.mudouDesdeSalvar = true;
-            desenharPlanejamento();
-            anunciar(v === 'com' ? 'A seção Datas e conteúdo das provas voltou para a folha.' : 'A folha ficou só com o calendário.');
-          }, !grava)
-      ]));
-    }
-
     /* A conferência: o que a IA marcou e o que o app conferiu, UM aviso por
      * prova, num selo recolhível, na mesma linha do "Mudar algo?". O selo só
      * aparece com o aluno escolhido. Cada item é tocável e ACRESCENTA o dia ao

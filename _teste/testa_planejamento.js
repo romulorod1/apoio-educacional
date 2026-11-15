@@ -718,6 +718,8 @@ secao('só o calendário');
   conf('as 47 frases da revisão do #244: nenhuma errada', daRevisao.filter(([t, r]) => P.intencaoDoQuadro(t) !== r).map(([t]) => t), []);
   conf('veneno: o "não" antes do verbo nunca dispara tirar (5 jeitos)',
     ['não tira a seção das provas', 'não precisa tirar a seção das provas', 'não remove o quadro das provas', 'nao apaga a tabela das provas', 'não vamos tirar a lista das provas'].map(t => P.intencaoDoQuadro(t)), [null, null, null, null, null]);
+  conf('"nunca", "jamais" e "nem" antes do verbo também não tiram', ['nunca tira a seção das provas', 'jamais remova o quadro das provas', 'nem apaga a tabela das provas'].map(t => P.intencaoDoQuadro(t)), [null, null, null]);
+  conf('"por favor" não conta como voltar', ['Remover a seção datas e conteúdo das provas, por favor', 'por favor, só o calendário', 'por favor volta a seção das provas'].map(t => P.intencaoDoQuadro(t)), ['tirar', 'tirar', 'voltar']);
 
   // a rede do app depois do ajuste
   const antes = planoBase();
