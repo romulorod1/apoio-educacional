@@ -13275,10 +13275,18 @@
       if (Object.prototype.hasOwnProperty.call(memoDisponibilidade, chave)) return memoDisponibilidade[chave];
       var r = { resumo: '', estado: { teoria: false, exercicios: false, obmep: false } };
       if (bib && ehDeMatematica(assunto)) {
-        var achado = moduloDoAssunto(assunto);
-        var mod = achado && bib.modulos[achado.chave];
-        if (mod) r.resumo = resumoDisponibilidadeDoAssunto(assunto, mod);
-        if (assunto.id) r.estado = sinaisDoAssunto(assunto);
+        if (assunto.id) {
+          /* O assunto do índice: os sinais E o texto da linha saem da mesma
+           * fonte da página do assunto, e dizem o mesmo que ela. */
+          var sinais = sinaisDoAssunto(assunto);
+          r.estado = sinais;
+          r.resumo = sinais.resumo;
+        } else {
+          // o assunto sem id (escrito por ela, ou registro antigo) não tem página: vale o módulo pelo título
+          var achado = moduloDoAssunto(assunto);
+          var mod = achado && bib.modulos[achado.chave];
+          if (mod) r.resumo = resumoDisponibilidadeDoAssunto(assunto, mod);
+        }
       }
       memoDisponibilidade[chave] = r;
       return r;
@@ -20175,12 +20183,13 @@
     return partes.length ? 'Módulo relacionado no tablet: ' + mod.titulo + ' (' + partes.join(', ') + ')' : '';
   }
 
-  /* F5: os sinais do seletor de assunto da aula. A fonte é a MESMA da página
-   * do assunto (fontesDoAssuntoNoApp, com os mesmos argumentos que a
-   * montarPaginaDoAssunto passa), e cada sinal é uma seção do bloco "Teoria e
-   * exercícios" dela: teoria; exercícios (a lista de base ou os exercícios);
-   * OBMEP. Assim o seletor e a página nunca dizem coisas diferentes sobre o
-   * que existe. É a ÚNICA fonte dos sinais. */
+  /* F5: os sinais do seletor de assunto da aula e o texto da linha. A fonte é
+   * a MESMA da página do assunto (fontesDoAssuntoNoApp, com os mesmos
+   * argumentos que a montarPaginaDoAssunto passa), e cada sinal é uma seção do
+   * bloco "Teoria e exercícios" dela: teoria; exercícios (a lista de base ou
+   * os exercícios); OBMEP. O texto nomeia as seções da página, na ordem dela.
+   * Assim o seletor e a página nunca dizem coisas diferentes sobre o que
+   * existe. É a ÚNICA fonte dos sinais e do texto. */
   function sinaisDoAssunto(assunto) {
     var serie = null;
     if (indiceTemas) {
@@ -20192,8 +20201,29 @@
     return {
       teoria: !!(f.teoria || []).length,
       exercicios: !!f.listaBase || !!(f.exercicios || []).length,
-      obmep: !!(f.obmep || []).length
+      obmep: !!(f.obmep || []).length,
+      resumo: resumoDasFontesDoAssunto(f)
     };
+  }
+
+  /* "No tablet: teoria, lista de base e exercícios (Equações do Segundo
+   * Grau)": as seções da página do assunto, com o nome do módulo da teoria e
+   * dos exercícios quando é um só (é por ele que ela acha o material na
+   * Biblioteca). Sem seção nenhuma, nada: o sinal apagado já diz. */
+  var NOMES_DAS_SECOES_DO_ASSUNTO = [['teoria', 'teoria'], ['listaBase', 'lista de base'], ['exercicios', 'exercícios'],
+    ['obmep', 'OBMEP'], ['enem', 'ENEM']];
+  function resumoDasFontesDoAssunto(f) {
+    var partes = NOMES_DAS_SECOES_DO_ASSUNTO.filter(function (s) {
+      var v = f[s[0]];
+      return Array.isArray(v) ? v.length > 0 : !!v;
+    }).map(function (s) { return s[1]; });
+    if (!partes.length) return '';
+    var modulos = {};
+    (f.teoria || []).concat(f.listaBase ? [f.listaBase] : [], f.exercicios || []).forEach(function (x) {
+      if (x && x.modulo && x.modulo.titulo) modulos[x.modulo.titulo] = true;
+    });
+    var nomes = Object.keys(modulos);
+    return 'No tablet: ' + juntarComE(partes) + (nomes.length === 1 ? ' (' + nomes[0] + ')' : '');
   }
 
   function plural(n, um, varios) { return n + ' ' + (n === 1 ? um : varios); }

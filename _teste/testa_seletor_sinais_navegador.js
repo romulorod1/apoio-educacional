@@ -19,12 +19,15 @@
  *    OBMEP, e há na tela ao menos um assunto com cada sinal aceso (senão a
  *    conferência 2 não exercitaria nada).
  * 2. Para cada assunto com sinal na tela, a página do assunto, aberta pela
- *    Biblioteca como ela abre, tem exatamente as seções que o seletor acende.
+ *    Biblioteca como ela abre, tem exatamente as seções que o seletor acende,
+ *    e o texto da linha ("No tablet: teoria, lista de base e exercícios")
+ *    nomeia as mesmas seções, na ordem da página; sem seção, a linha não fala
+ *    de material.
  *
  * Veneno (TEM de ser visto: "VENENO visto"):
  *   --envenenado-sinais-do-modulo  o seletor lê o módulo do assunto direto
- *     (como no #158): teoria do módulo, itens do módulo, e nada de OBMEP. A
- *     conferência 2 tem de cair.
+ *     (como no #158): teoria do módulo, itens do módulo, nada de OBMEP, e o
+ *     texto "Módulo relacionado no tablet". A conferência 2 tem de cair.
  */
 'use strict';
 const fs = require('fs');
@@ -41,12 +44,14 @@ const ANCORA = "    var f = (bib && assunto && assunto.id ? fontesDoAssuntoNoApp
   "    return {\n" +
   "      teoria: !!(f.teoria || []).length,\n" +
   "      exercicios: !!f.listaBase || !!(f.exercicios || []).length,\n" +
-  "      obmep: !!(f.obmep || []).length\n" +
+  "      obmep: !!(f.obmep || []).length,\n" +
+  "      resumo: resumoDasFontesDoAssunto(f)\n" +
   "    };\n";
 const DO_MODULO = "    var achado = bib ? moduloDoAssunto(assunto) : false;\n" +
   "    var mod = achado && bib.modulos[achado.chave];\n" +
   "    void serie;\n" +
-  "    return { teoria: !!(mod && mod.teorias && mod.teorias.length), exercicios: !!(mod && contarItens(mod)), obmep: false };\n";
+  "    return { teoria: !!(mod && mod.teorias && mod.teorias.length), exercicios: !!(mod && contarItens(mod)), obmep: false,\n" +
+  "      resumo: mod ? resumoDisponibilidadeDoAssunto(assunto, mod) : '' };\n";
 conf('(arranjo) a fonte dos sinais está num lugar só do app.js', APP.split(ANCORA).length, 2);
 const trocas = {};
 if (VENENO) {
@@ -68,6 +73,18 @@ async function importar(pag, arquivo) {
   return (r.valor || [''])[0];
 }
 
+const NOMES_DAS_SECOES = { teoria: 'teoria', 'lista-base': 'lista de base', exercicios: 'exercícios', obmep: 'OBMEP', enem: 'ENEM' };
+const juntarComE = p => p.length < 2 ? p.join('') : p.slice(0, -1).join(', ') + ' e ' + p[p.length - 1];
+// o texto que a linha tem de ter, dito pelas seções da página (o nome do módulo, entre parênteses, é opcional)
+function textoBate(texto, secoes) {
+  const nomes = secoes.map(s => NOMES_DAS_SECOES[s]).filter(Boolean);
+  if (!nomes.length) return !/No tablet|Módulo relacionado/.test(texto);
+  const esperado = 'No tablet: ' + juntarComE(nomes);
+  const i = texto.indexOf(esperado);
+  if (i < 0) return false;
+  const resto = texto.slice(i + esperado.length);
+  return resto === '' || /^ \([^)]+\)$/.test(resto);
+}
 const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exercicios'], obmep: ['obmep'] };
 
 (async () => {
@@ -115,6 +132,8 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
       if (!s || s.hidden) return;
       const est = {};
       Array.from(s.querySelectorAll('[data-tipo-sinal]')).forEach(x => { est[x.dataset.tipoSinal] = x.classList.contains('disponivel'); });
+      const d = l.querySelector('.detalhe');
+      est.texto = d ? d.textContent : '';
       porId[l.dataset.assuntoId] = est;
     });
     const legenda = document.querySelector('#tema-legenda');
@@ -162,7 +181,7 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
     const a = Array.isArray(d) ? d : (d.temas || d.itens || Object.values(d).find(Array.isArray));
     const m = {}; a.forEach(t => { m[t.id] = t.pt.titulo; }); return m;
   }));
-  const diferentes = [];
+  const diferentes = [], textosDiferentes = [];
   for (const id of ids) {
     await H.irParaAba(pag, 'biblioteca');
     await pag.evaluate(() => { const v = document.querySelector('#bib-corpo .bib-assunto .bib-voltar'); if (v) v.click(); });
@@ -183,8 +202,10 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
     const naPagina = {};
     Object.keys(SECOES_DO_SINAL).forEach(t => { naPagina[t] = SECOES_DO_SINAL[t].some(s => secoes.indexOf(s) >= 0); });
     const igual = linha.ok && pagina.ok && Object.keys(naPagina).every(t => naPagina[t] === !!seletor.porId[id][t]);
+    const textoIgual = linha.ok && pagina.ok && textoBate(seletor.porId[id].texto, secoes);
     console.log('   ' + id + ': seletor ' + JSON.stringify(seletor.porId[id]) + ' | página ' + JSON.stringify(secoes));
     if (!igual) diferentes.push(id + ' (seletor ' + JSON.stringify(seletor.porId[id]) + ', página ' + JSON.stringify(naPagina) + ')');
+    if (!textoIgual) textosDiferentes.push(id + ' (linha "' + seletor.porId[id].texto + '", página ' + JSON.stringify(secoes) + ')');
     await pag.evaluate(() => { const v = document.querySelector('#bib-corpo .bib-assunto .bib-voltar'); if (v) v.click(); });
     await pag.evaluate(() => { const i = document.querySelector('#busca-biblioteca'); if (i && i.value) { i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); } });
     await pausa(300);
@@ -192,8 +213,12 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
   if (VENENO) {
     conf('VENENO visto: os sinais do seletor batem com a página do assunto, e quebrou (' + diferentes.join('; ') + ')',
       diferentes.length === 0, false);
+    conf('VENENO visto: o texto da linha bate com a página do assunto, e quebrou (' + textosDiferentes.join('; ') + ')',
+      textosDiferentes.length === 0, false);
   } else {
     conf('os sinais do seletor batem com as seções da página do assunto em ' + ids.length + ' assuntos', diferentes.join('; '), '');
+    conf('o texto de cada linha nomeia as mesmas seções da página, nos ' + ids.length + ' assuntos', textosDiferentes.join('; '), '');
+    conf('(arranjo) há linha com texto de material', ids.some(id => /No tablet: /.test(seletor.porId[id].texto)), true);
   }
   conf('não houve erro de página', pag.errosDePagina.join(' | '), '');
   fs.rmSync(TMP, { recursive: true, force: true });
