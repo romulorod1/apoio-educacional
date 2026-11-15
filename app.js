@@ -1594,6 +1594,11 @@
   var proximoModalHistorico = 0;
   var fechandoPorVoltar = false;
   var retornoProgramado = null;
+  /* F5: o nível do seletor de assunto que o Voltar do aparelho sobe (uma
+   * matéria, um grupo, a grade de Matemática). Quem desenha o seletor põe aqui
+   * uma função que devolve o passo para cima, ou null na raiz (aí o Voltar
+   * fecha o painel, como antes). */
+  var subirNivelDoSeletor = null;
 
   window.addEventListener('popstate', function (ev) {
     if (retornoProgramado) {
@@ -1674,6 +1679,16 @@
       // permanece aberto e precisa conservar seu estado de Voltar.
       history.pushState({ apoioModal: topo.token }, '');
       fecharEditorNota();
+      return;
+    }
+    /* F5: dentro do seletor de assunto, o Voltar sobe um nível, como o Voltar
+     * da própria tela (o grupo volta à matéria, a matéria e a grade de
+     * Matemática voltam à raiz); só na raiz ele fecha o painel. A entrada do
+     * painel volta, como nas outras janelas que ficam abertas. */
+    var subirSeletor = topo.id === 'modal-tema' && typeof subirNivelDoSeletor === 'function' ? subirNivelDoSeletor() : null;
+    if (subirSeletor) {
+      history.pushState({ apoioModal: topo.token }, '');
+      subirSeletor();
       return;
     }
     pilhaModalHistorico.pop();
@@ -11505,6 +11520,7 @@
    * o que muda é o que acontece ao escolher. Ele abre POR CIMA da trilha, e ao
    * fechar a trilha continua atrás, do jeito que ela deixou. */
   function escolherTemaDeMatematica(aluno, titulo, aoEscolher, temTrilhaAtras) {
+    subirNivelDoSeletor = null; // na trilha, o Voltar fecha o seletor e devolve a trilha
     $('#titulo-modal-tema').textContent = titulo;
     // o painel lateral é do seletor da aula; o da trilha fica no modal de sempre
     $('#modal-tema').classList.remove('seletor-da-aula');
@@ -12967,6 +12983,7 @@
     var aluno = alunoPorId(aula.alunoId);
 
     $('#titulo-modal-tema').textContent = 'Assunto da aula' + (aluno ? ', ' + aluno.nome : '');
+    subirNivelDoSeletor = null; // carregando, não há nível para subir
     // no tablet deitado, o seletor da aula abre como painel à direita, com a aula atrás
     $('#modal-tema').classList.add('seletor-da-aula');
     var corpo = $('#corpo-modal-tema');
@@ -13164,6 +13181,40 @@
     return true;
   }
 
+  /* F5: a última aula dada deste aluno antes desta. Cancelada e falta não
+   * contam como aula dada, e a aula só aconteceu quando a data E o horário
+   * dela já passaram: a das 15h de hoje, às 11h, ainda não é "última" (a aula
+   * sem horário, de hoje, também não). Abrindo uma aula futura, a marcada no
+   * meio da semana não conta. */
+  function ultimaAulaDada(aula) {
+    var chaveDaAula = function (a) { return a.data + ' ' + (a.hora || ''); };
+    var agora = new Date();
+    var hoje = Core.hojeIso();
+    var horaAgora = pad2(agora.getHours()) + ':' + pad2(agora.getMinutes());
+    var jaAconteceu = function (a) {
+      if (!a.data) return false;
+      if (a.data !== hoje) return a.data < hoje;
+      return !!a.hora && a.hora <= horaAgora;
+    };
+    return db.aulas.filter(function (a) {
+      var s = a.status || 'realizada';
+      return a.alunoId === aula.alunoId && a.id !== aula.id && s !== 'cancelada' && s !== 'falta' &&
+        jaAconteceu(a) && chaveDaAula(a) < chaveDaAula(aula);
+    }).sort(function (a, b) { return chaveDaAula(b).localeCompare(chaveDaAula(a)); })[0] || null;
+  }
+
+  /* A matéria da aula, quando os assuntos dela são todos de uma matéria só (o
+   * assunto sem matéria vale como Matemática, por legado). Sem assunto, ou
+   * com mais de uma matéria, null: aí a linha diz só a data. */
+  function materiaUnicaDaAula(a) {
+    var chaves = {};
+    (a.temas || []).forEach(function (t) {
+      if (t && (t.titulo || t.id)) chaves[t.disciplina || Core.MATERIA_PADRAO] = true;
+    });
+    var lista = Object.keys(chaves);
+    return lista.length === 1 ? rotuloDisciplina(lista[0]) || null : null;
+  }
+
   function desenharEscolhaAssunto(aula, aluno) {
     var corpo = $('#corpo-modal-tema');
     var rodape = $('#rodape-modal-tema');
@@ -13175,20 +13226,15 @@
     corpo.classList.add('seletor-assunto');
 
     var anoDoAluno = aluno && Core.anoEscolarDe(aluno);
-    /* A última aula que aconteceu antes desta: cancelada e falta não contam
-     * como aula dada, e a marcada para depois de hoje ainda não aconteceu
-     * (abrindo uma aula futura, a do meio da semana não é "última"). */
-    var chaveDaAula = function (a) { return a.data + ' ' + (a.hora || ''); };
-    var hoje = Core.hojeIso();
-    var aulaAnterior = db.aulas.filter(function (a) {
-      var s = a.status || 'realizada';
-      return a.alunoId === aula.alunoId && a.id !== aula.id && s !== 'cancelada' && s !== 'falta' &&
-        a.data <= hoje && chaveDaAula(a) < chaveDaAula(aula);
-    }).sort(function (a, b) { return chaveDaAula(b).localeCompare(chaveDaAula(a)); })[0];
-    // o nome já está no título da janela ("Assunto da aula, Nome"): aqui, o ano e a última aula
+    var aulaAnterior = ultimaAulaDada(aula);
+    var materiaAnterior = aulaAnterior ? materiaUnicaDaAula(aulaAnterior) : null;
+    /* O nome já está no título da janela ("Assunto da aula, Nome"): aqui, o
+     * ano do aluno (dito como dele, para não se confundir com o ano de um
+     * assunto de outra matéria) e a última aula, com a matéria dela. */
     var contexto = [
-      anoDoAluno ? el('span', { class: 'tag', texto: nomeDoAno(anoDoAluno) }) : null,
-      aulaAnterior ? el('span', { class: 'tema-ultima-aula', texto: 'Última aula: ' + Core.ddmm(aulaAnterior.data) }) : null
+      anoDoAluno ? el('span', { class: 'tag tema-ano-aluno', texto: 'Aluno do ' + nomeDoAno(anoDoAluno) }) : null,
+      aulaAnterior ? el('span', { class: 'tema-ultima-aula', texto: 'Última aula' +
+        (materiaAnterior ? ' de ' + materiaAnterior : '') + ': ' + Core.ddmm(aulaAnterior.data) }) : null
     ].filter(Boolean);
     /* O alto do seletor (contexto, busca e legenda) fica preso no alto também
      * na janela centrada: a legenda não some rolando, e os sinais continuam
@@ -13233,6 +13279,16 @@
       campoBusca.value = '';
       desenhar();
     }
+    /* O Voltar do aparelho sobe o mesmo nível que o Voltar da tela: o grupo
+     * volta à matéria, a matéria volta à raiz, e na raiz não há para onde
+     * subir (o Voltar fecha o painel). */
+    subirNivelDoSeletor = function () {
+      if (!lista.isConnected) return null;
+      var d = nivel.d;
+      if (nivel.tipo === 'grupo') return function () { irPara({ tipo: 'disciplina', d: d }); };
+      if (nivel.tipo === 'disciplina') return function () { irPara({ tipo: 'raiz' }); };
+      return null;
+    };
 
     /* Linha inteira clicável: em tablet, alvo grande vale mais que botão. */
     function linha(titulo, detalhe, aoTocar, comSeta) {
@@ -13297,7 +13353,7 @@
         if (detalhe) detalhe.textContent = item._detalheBase + (disp.resumo ? ' · ' + disp.resumo : '');
         if (item._sinaisTema && bib) mostrarSinais(item._sinaisTema, disp.estado);
       });
-      legenda.hidden = !lista.querySelector('.tema-sinais:not([hidden])');
+      atualizarLegendaDosSinais(legenda, lista);
     }
 
     function voltarPara(rotulo, titulo, aoTocar) {
@@ -13329,7 +13385,7 @@
       else if (nivel.tipo === 'grupo') desenharGrupo(nivel.d, nivel.g);
       else desenharRaiz();
       // a legenda só com sinal na tela (a busca e a raiz podem não ter nenhum)
-      legenda.hidden = !lista.querySelector('.tema-sinais:not([hidden])');
+      atualizarLegendaDosSinais(legenda, lista);
     }
 
     function desenharRaiz() {
@@ -13479,7 +13535,8 @@
         irPara({ tipo: 'disciplina', d: d });
       }));
       (g.blocos || []).forEach(function (b) {
-        lista.appendChild(el('div', { class: 'bloco-exercicios', texto: b.titulo }));
+        // o título do grupo manda na hierarquia: mais forte que os assuntos de dentro dele
+        lista.appendChild(el('div', { class: 'bloco-exercicios tema-grupo-titulo', texto: b.titulo }));
         (b.topicos || []).forEach(function (titulo, i) {
           var item = linha(titulo, '', function () {
             registrarAssunto(aula, itemDeTopico({
@@ -13602,6 +13659,7 @@
       rotuloEscolher: 'Usar',
       rotuloVoltar: 'Voltar',
       voltar: function () { desenharEscolhaAssunto(aula, aluno); },
+      voltarPeloAparelho: true,
       aoEscolher: function (t) {
         registrarAssunto(aula, {
           id: t.id, titulo: t.pt.titulo, fonte: 'banco', disciplina: materiaDoTemaId(t.id)
@@ -13620,6 +13678,12 @@
     corpo.innerHTML = '';
     rodape.innerHTML = '';
     corpo.classList.remove('seletor-assunto'); // a lista de temas rola com o corpo
+    /* A grade aberta do seletor da aula ("Ver todos os assuntos de
+     * Matemática") é um nível dele: o Voltar do aparelho volta à raiz do
+     * seletor, como o Voltar da tela. Na trilha, o Voltar fecha o seletor. */
+    subirNivelDoSeletor = opcoes.voltarPeloAparelho && opcoes.voltar ? function () {
+      return lista.isConnected ? opcoes.voltar : null;
+    } : null;
 
     if (opcoes.voltar) {
       corpo.appendChild(el('div', { class: 'barra u-margem-baixo-8' }, [
@@ -13715,7 +13779,7 @@
         anotarBuscaSemResultado(termo, 'temas de matemática');
       }
       if (!filtrados.length) {
-        if (legendaDaGrade) legendaDaGrade.hidden = true;
+        if (legendaDaGrade) atualizarLegendaDosSinais(legendaDaGrade, lista);
         lista.appendChild(el('div', { class: 'vazio' }, [
           el('p', { texto: termo ? 'Nenhum tema encontrado para essa busca.' : 'Nenhum tema nesta série.' })
         ]));
@@ -13783,7 +13847,7 @@
         }
         lista.appendChild(linhaTema);
       });
-      if (legendaDaGrade) legendaDaGrade.hidden = !lista.querySelector('.tema-sinais:not([hidden])');
+      if (legendaDaGrade) atualizarLegendaDosSinais(legendaDaGrade, lista);
     }
 
     function atualizarDisponibilidadeVisivel() {
@@ -13802,7 +13866,7 @@
         detalhe.textContent = disponivel;
         detalhe.hidden = !disponivel;
       });
-      if (legendaDaGrade) legendaDaGrade.hidden = !lista.querySelector('.tema-sinais:not([hidden])');
+      if (legendaDaGrade) atualizarLegendaDosSinais(legendaDaGrade, lista);
     }
 
     selSerie.addEventListener('change', function () {
@@ -20382,18 +20446,44 @@
   }
   function contaDosSinais(assunto, serie) {
     var f = (bib && assunto && assunto.id ? fontesDoAssuntoNoApp(assunto.id, null, serie) : null) || {};
+    // o sinal dos exercícios junta as seções de exercício da página: a lista de base, os exercícios e o ENEM
+    var exercicios = (f.listaBase ? [f.listaBase] : []).concat(f.exercicios || [], f.enem || []);
     return {
       teoria: !!(f.teoria || []).length,
-      exercicios: !!f.listaBase || !!(f.exercicios || []).length,
+      exercicios: !!exercicios.length,
       obmep: !!(f.obmep || []).length,
+      origem: {
+        teoria: origemDasFontes(f.teoria || []),
+        exercicios: origemDasFontes(exercicios),
+        obmep: origemDasFontes(f.obmep || [])
+      },
+      secoesDosExercicios: SECOES_DOS_EXERCICIOS.filter(function (x) {
+        var v = f[x[0]];
+        return Array.isArray(v) ? v.length > 0 : !!v;
+      }).map(function (x) { return x[1]; }),
+      vizinhos: f.vizinhos || [],
       resumo: resumoDasFontesDoAssunto(f)
     };
   }
+  var SECOES_DOS_EXERCICIOS = [['listaBase', 'lista de base'], ['exercicios', 'exercícios'], ['enem', 'ENEM']];
+  /* DE ONDE VEM o material de um sinal, com a mesma conta da página do
+   * assunto: herdado dos vizinhos declarados (a linha "Este assunto ainda não
+   * tem material próprio") ou todo de outro ano (a marca ", de outro ano").
+   * Basta um material próprio do ano para o sinal valer como próprio. */
+  function origemDasFontes(lista) {
+    if (!lista.length) return null;
+    if (lista.every(function (x) { return x && x.deVizinho; })) return 'vizinho';
+    if (lista.every(function (x) { return x && x.outroAno; })) return 'outro-ano';
+    return 'proprio';
+  }
 
   /* Os sinais na linha: só os que existem aparecem (assunto sem nada, nenhum
-   * ícone), e a caixa toda fica escondida até a Biblioteca carregar. */
-  var ROTULOS_SINAL = { teoria: 'teoria da biblioteca', exercicios: 'exercícios', obmep: 'OBMEP' };
+   * ícone), e a caixa toda fica escondida até a Biblioteca carregar. Os nomes
+   * são os do texto da linha e das seções da página: teoria; lista de base,
+   * exercícios ou ENEM; OBMEP. */
+  var ROTULOS_SINAL = { teoria: 'teoria', exercicios: 'lista de base ou exercícios', obmep: 'OBMEP' };
   var ICONES_SINAL = { teoria: 'book', exercicios: 'exerc', obmep: 'medal' };
+  var DE_ONDE_SINAL = { 'outro-ano': 'de outro ano', vizinho: 'de assunto vizinho' };
   function caixaDeSinais() {
     var caixa = el('span', { class: 'tema-sinais', 'aria-label': 'Materiais relacionados' },
       Object.keys(ROTULOS_SINAL).map(function (tipo) {
@@ -20405,29 +20495,85 @@
   }
   function mostrarSinais(caixa, estado) {
     var algum = false;
+    var origem = estado.origem || {};
+    var secoes = estado.secoesDosExercicios || [];
     Array.prototype.forEach.call(caixa.querySelectorAll('[data-tipo-sinal]'), function (sinal) {
-      var ativo = !!estado[sinal.dataset.tipoSinal];
+      var tipo = sinal.dataset.tipoSinal;
+      var ativo = !!estado[tipo];
       sinal.classList.toggle('disponivel', ativo);
       sinal.hidden = !ativo;
       if (ativo) algum = true;
+      /* O sinal herdado (de assunto vizinho ou de outro ano) ganha um traço
+       * pontilhado embaixo, e diz de onde vem no nome e no toque longo. */
+      var de = ativo ? DE_ONDE_SINAL[origem[tipo]] || '' : '';
+      sinal.classList.toggle('herdado', !!de);
+      if (de) sinal.setAttribute('data-origem', origem[tipo]); else sinal.removeAttribute('data-origem');
+      var nome = tipo === 'exercicios' && secoes.length ? juntarComE(secoes) : ROTULOS_SINAL[tipo];
+      var vizinhos = de && origem[tipo] === 'vizinho' ? (estado.vizinhos || []).map(function (v) {
+        var ano = Core.ANOS_ESCOLARES[v.serie];
+        return '“' + v.titulo + '”' + (ano ? ' (' + ano + ')' : '');
+      }) : [];
+      var texto = 'Tem ' + nome + (de ? ', ' + de : '') + (vizinhos.length ? ': ' + juntarComE(vizinhos) : '');
+      sinal.setAttribute('aria-label', texto);
+      sinal.setAttribute('title', texto);
     });
     caixa.setAttribute('data-lidos', 'sim');
+    caixa.setAttribute('data-secoes-exercicios', secoes.join('|'));
     caixa.hidden = !algum;
   }
+  var NOMES_DA_LEGENDA = { teoria: 'Teoria', exercicios: 'Lista de base ou exercícios', obmep: 'OBMEP' };
   function legendaDosSinais() {
     var legenda = el('div', { class: 'tema-legenda', id: 'tema-legenda', 'aria-label': 'Legenda dos materiais relacionados' },
       Object.keys(ROTULOS_SINAL).map(function (tipo) {
-        return el('span', {}, [icone(ICONES_SINAL[tipo]), document.createTextNode(
-          { teoria: 'Teoria da biblioteca', exercicios: 'Exercícios', obmep: 'OBMEP' }[tipo])]);
-      }));
+        return el('span', { 'data-legenda': tipo }, [icone(ICONES_SINAL[tipo]),
+          el('span', { class: 'tema-legenda-nome', texto: NOMES_DA_LEGENDA[tipo] })]);
+      }).concat([el('span', { 'data-legenda': 'herdado', hidden: true }, [
+        el('span', { class: 'tema-legenda-herdado', 'aria-hidden': 'true' }),
+        el('span', { class: 'tema-legenda-nome', texto: 'De outro ano ou de assunto vizinho' })])]));
     legenda.hidden = true;
     return legenda;
+  }
+  /* A legenda explica o que está na tela: cada entrada aparece quando há na
+   * lista um sinal dela aceso; o nome dos exercícios junta as seções que os
+   * textos das linhas nomeiam (lista de base, exercícios, ENEM); e a do traço
+   * pontilhado só vem com um sinal herdado à vista. */
+  function atualizarLegendaDosSinais(legenda, lista) {
+    var caixas = Array.prototype.filter.call(lista.querySelectorAll('.tema-sinais[data-lidos]'), function (c) { return !c.hidden; });
+    var acesos = {}, secoes = {}, de = {};
+    caixas.forEach(function (c) {
+      Array.prototype.forEach.call(c.querySelectorAll('[data-tipo-sinal]'), function (x) {
+        if (x.hidden) return;
+        acesos[x.dataset.tipoSinal] = true;
+        if (x.dataset.origem) de[x.dataset.origem] = true;
+      });
+      (c.getAttribute('data-secoes-exercicios') || '').split('|').forEach(function (n) { if (n) secoes[n] = true; });
+    });
+    var maiuscula = function (t) { return t.charAt(0).toUpperCase() + t.slice(1); };
+    Array.prototype.forEach.call(legenda.querySelectorAll('[data-legenda]'), function (e) {
+      var tipo = e.getAttribute('data-legenda');
+      var nome = e.querySelector('.tema-legenda-nome');
+      if (tipo === 'herdado') {
+        var quais = Object.keys(DE_ONDE_SINAL).filter(function (k) { return de[k]; }).map(function (k) { return DE_ONDE_SINAL[k]; });
+        e.hidden = !quais.length;
+        if (quais.length) nome.textContent = maiuscula(quais.join(' ou '));
+        return;
+      }
+      e.hidden = !acesos[tipo];
+      if (tipo === 'exercicios') {
+        var n = SECOES_DOS_EXERCICIOS.map(function (x) { return x[1]; }).filter(function (k) { return secoes[k]; });
+        if (!n.length) { nome.textContent = NOMES_DA_LEGENDA.exercicios; return; }
+        nome.textContent = maiuscula(n.length < 2 ? n[0] : n.slice(0, -1).join(', ') + ' ou ' + n[n.length - 1]);
+      }
+    });
+    legenda.hidden = !caixas.length;
   }
 
   /* "No tablet: teoria, lista de base e exercícios (Equações do Segundo
    * Grau)": as seções da página do assunto, com o nome do módulo da teoria e
    * dos exercícios quando é um só (é por ele que ela acha o material na
-   * Biblioteca). Sem seção nenhuma, nada: o sinal apagado já diz. */
+   * Biblioteca). Sem seção nenhuma, nada: o sinal apagado já diz. O material
+   * herdado dos vizinhos, ou todo de outro ano, diz isso no fim, como a
+   * página do assunto diz. */
   var NOMES_DAS_SECOES_DO_ASSUNTO = [['teoria', 'teoria'], ['listaBase', 'lista de base'], ['exercicios', 'exercícios'],
     ['obmep', 'OBMEP'], ['enem', 'ENEM']];
   function resumoDasFontesDoAssunto(f) {
@@ -20441,7 +20587,10 @@
       if (x && x.modulo && x.modulo.titulo) modulos[x.modulo.titulo] = true;
     });
     var nomes = Object.keys(modulos);
-    return 'No tablet: ' + juntarComE(partes) + (nomes.length === 1 ? ' (' + nomes[0] + ')' : '');
+    var todas = (f.teoria || []).concat(f.listaBase ? [f.listaBase] : [], f.exercicios || [], f.obmep || [], f.enem || []);
+    var de = (f.vizinhos || []).length ? (f.vizinhos.length === 1 ? ', de assunto vizinho' : ', de assuntos vizinhos')
+      : todas.length && todas.every(function (x) { return x && x.outroAno; }) ? ', de outro ano' : '';
+    return 'No tablet: ' + juntarComE(partes) + (nomes.length === 1 ? ' (' + nomes[0] + ')' : '') + de;
   }
 
   function plural(n, um, varios) { return n + ' ' + (n === 1 ? um : varios); }

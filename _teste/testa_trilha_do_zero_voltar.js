@@ -65,11 +65,15 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
   await pag.evaluate(async () => {
     const dados = await Store.carregar();
     dados.alunos = [{ id: 'f5_delta', nome: 'Aluno Delta Teste', ativo: true, anoEscolar: '07', precos: [], trilhas: [] }];
-    const aula = (id, data, status) => ({ id, alunoId: 'f5_delta', data, hora: '10:00', duracaoMin: 60, status,
-      cobravel: true, notaTexto: '', notaPrivada: '', anexos: [] });
+    const aula = (id, data, status, hora, temas) => ({ id, alunoId: 'f5_delta', data, hora: hora || '10:00', duracaoMin: 60, status,
+      cobravel: true, notaTexto: '', notaPrivada: '', anexos: [], temas: temas || [] });
     // a aula de hoje, a última dada (09/11) e uma falta depois dela, que não conta como aula dada
-    dados.aulas = [aula('f5_aula', Core.hojeIso(), 'realizada'), aula('f5_antes', '2026-11-09', 'realizada'),
+    dados.aulas = [aula('f5_aula', Core.hojeIso(), 'realizada', '10:00',
+      [{ id: 'MAT07-01', titulo: 'Assunto de Matemática de teste', fonte: 'banco', disciplina: 'matematica' }]),
+      aula('f5_antes', '2026-11-09', 'realizada'),
       aula('f5_falta', '2026-11-12', 'falta'),
+      // a das 15h de hoje, de Português: às 11h ela ainda não aconteceu, e não é a "última aula"
+      aula('f5_tarde', Core.hojeIso(), 'realizada', '15:00', [{ titulo: 'Leitura de texto de teste', fonte: 'livre', disciplina: 'portugues' }]),
       // duas aulas marcadas à frente: abrindo a de 20/11, a de 18/11 ainda não aconteceu
       aula('f5_meio', '2026-11-18', 'realizada'), aula('f5_futura', '2026-11-20', 'realizada')];
     dados.series = []; dados.resumos = [];
@@ -178,7 +182,8 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
   });
   conf('o painel fica à direita, da altura da tela', painel.lateral, true);
   conf('o contexto diz a última aula dada, sem contar a falta (' + painel.contexto + ')', /Última aula: 09\/11/.test(painel.contexto), true);
-  conf('e o ano do aluno, na etiqueta', painel.ano, '7º ano');
+  conf('e o ano do aluno, na etiqueta, dito como dele', painel.ano, 'Aluno do 7º ano');
+  conf('a última aula sem assunto diz só a data', /Última aula: 09\/11/.test(painel.contexto) && !/Última aula de/.test(painel.contexto), true);
   conf('com o painel aberto, o histórico tem a entrada dele', (await estado()).janelaNoHistorico, true);
 
   await p2.evaluate(() => history.back());
@@ -248,11 +253,12 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
     tudo.ok && JSON.stringify(await estado()) + '|' + (p2.url() === urlRaiz),
     JSON.stringify({ tema: false, aula: false, janelaNoHistorico: false }) + '|true');
   await avisoDaRaiz('depois do fecharTudo');
-  // a aula futura: a "Última aula" é a última que já aconteceu (hoje, 16/11), e não a de 18/11
+  /* a aula futura: a "Última aula" é a última que já aconteceu (hoje, 16/11, às 10h, de Matemática), e não a de
+   * 18/11 nem a das 15h de hoje (de Português), que às 11h ainda não aconteceu: a data E o horário contra agora */
   await abrirPainel('f5_futura');
   const futura = await p2.evaluate(() => (document.querySelector('#tema-contexto') || { textContent: '' }).textContent.replace(/\s+/g, ' ').trim());
-  conf('numa aula futura, a "Última aula" é a que já aconteceu, e não a marcada no meio (' + futura + ')',
-    /Última aula: 16\/11/.test(futura), true);
+  conf('numa aula futura, a "Última aula" é a que já aconteceu, com a matéria dela, e não a das 15h de hoje (' + futura + ')',
+    /Última aula de Matemática: 16\/11/.test(futura), true);
   await p2.evaluate(() => history.back());
   await esperar('o painel da futura fechado', estado, v => !!v && !v.tema, 4000);
   await voltarFechaAAula('aula futura');

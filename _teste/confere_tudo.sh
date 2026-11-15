@@ -1690,6 +1690,9 @@ roda "trilha do zero --envenenado-trilha-antes-do-voltar" node "_teste/testa_tri
 # fonte, fontesDoAssuntoNoApp); o veneno le o modulo direto, como no #158.
 roda "seletor: sinais = pagina do assunto"         node "_teste/testa_seletor_sinais_navegador.js"
 roda "seletor --envenenado-sinais-do-modulo"      node "_teste/testa_seletor_sinais_navegador.js" --envenenado-sinais-do-modulo
+# F5 acabamento: dentro de "Outras materias", o Voltar do aparelho sobe um nivel;
+# o veneno fecha o painel inteiro, como no #239.
+roda "seletor --envenenado-voltar-fecha-seletor"  node "_teste/testa_seletor_sinais_navegador.js" --envenenado-voltar-fecha-seletor
 roda "preço descartado não vaza"                  node "_teste/testa_preco_cancelado.js"
 roda "ações de aula no fechamento"                node "_teste/testa_acoes_fechamento.js"
 # C9: o documento do ciclo na tela. A contagem do que abre sozinho (janelas,

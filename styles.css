@@ -741,16 +741,26 @@ label.campo-checkbox {
 .tema-ultima-aula { color: var(--muted); font-size: var(--letra-14); }
 .tema-legenda { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; margin: 2px 0 10px; color: var(--muted); font-size: var(--letra-12); }
 .tema-legenda > span { display: inline-flex; align-items: center; gap: 4px; }
-.tema-legenda .ico { width: 14px; height: 14px; }
-.tema-sinais { display: flex; gap: 8px; flex: 0 0 auto; align-self: flex-start; margin-top: 3px; color: var(--navy); }
-.tema-sinal { width: 16px; height: 16px; display: grid; place-items: center; }
-.tema-sinal .ico { width: 14px; height: 14px; }
+.tema-legenda .ico { width: 16px; height: 16px; }
+/* F5: o ano é o do aluno, dito com todas as letras e com o contraste do texto */
+.tag.tema-ano-aluno { background: var(--acao-clara); color: var(--navy); }
+.tema-sinais { display: flex; gap: 8px; flex: 0 0 auto; align-self: flex-start; margin-top: 2px; color: var(--navy); }
+.tema-sinal { width: 20px; height: 20px; display: grid; place-items: center; }
+.tema-sinal .ico { width: 18px; height: 18px; }
+/* o sinal herdado (de outro ano ou de assunto vizinho): um traço pontilhado embaixo, explicado na legenda */
+.tema-sinal.herdado { border-bottom: 2px dotted var(--muted); }
+.tema-legenda-herdado { display: inline-block; width: 16px; height: 8px; border-bottom: 2px dotted var(--muted); }
 /* O alto do seletor de assunto (contexto, busca e legenda) fica preso no alto
    da janela centrada, por cima da lista que rola (o recuo é o do corpo). */
-.tema-topo { position: sticky; top: -18px; z-index: 2; margin: -18px -18px 0; padding: 18px 18px 2px; background: var(--branco); }
+.tema-topo { position: sticky; top: -18px; z-index: 2; margin: -18px -18px 0; padding: 18px 18px 2px; background: var(--branco);
+  /* um fio e uma sombra leve embaixo: a lista que rola passa POR BAIXO do alto, e não parece cortada */
+  border-bottom: 1px solid var(--fio); box-shadow: 0 4px 6px -4px var(--navy-a18); }
 /* o display acima venceria o atributo hidden: a legenda e os sinais escondidos somem de verdade */
-.tema-legenda[hidden], .tema-sinais[hidden], .tema-sinal[hidden] { display: none; }
+.tema-legenda[hidden], .tema-legenda > span[hidden], .tema-sinais[hidden], .tema-sinal[hidden] { display: none; }
 .irmao-aninhado { margin-left: 20px; width: calc(100% - 20px); }
+/* os subtópicos: o título do grupo manda, e as linhas de dentro dele ficam no peso do texto */
+.bloco-exercicios.tema-grupo-titulo { font-size: var(--letra-16); color: var(--navy); }
+.irmao-aninhado .nome { font-weight: var(--peso-normal); }
 .dominio-assuntos-privado { margin-bottom: 8px; }
 .dominio-assunto-controles { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .dominio-assunto-controles .segmentado { gap: 4px; }

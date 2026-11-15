@@ -30,10 +30,19 @@
  *    lista de base e exercícios") nomeia as mesmas seções, na ordem da
  *    página; sem seção, a linha não fala de material.
  *
- * Veneno (TEM de ser visto: "VENENO visto"):
+ * 1b. O Voltar do aparelho dentro de "Outras matérias" sobe um nível: do
+ *    grupo à matéria, da matéria à raiz do seletor, com o painel aberto e a
+ *    entrada dele no histórico; da grade de Matemática, volta à raiz.
+ * 3. O sinal herdado (do vizinho, ou todo de outro ano) diz de onde vem, como
+ *    a página do assunto: traço pontilhado, nome do sinal, fim do texto da
+ *    linha e a entrada da legenda.
+ *
+ * Venenos (TÊM de ser vistos: "VENENO visto"):
  *   --envenenado-sinais-do-modulo  o seletor lê o módulo do assunto direto
  *     (como no #158): teoria do módulo, itens do módulo, nada de OBMEP, e o
  *     texto "Módulo relacionado no tablet". A conferência 2 tem de cair.
+ *   --envenenado-voltar-fecha-seletor  o Voltar do aparelho não sobe o nível
+ *     do seletor (como no #239) e fecha o painel inteiro. A 1b tem de cair.
  */
 'use strict';
 const fs = require('fs');
@@ -46,13 +55,8 @@ const { conf, secao, pausa, esperar } = H;
 
 const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 const VENENO = process.argv.indexOf('--envenenado-sinais-do-modulo') >= 0;
-const ANCORA = "    var f = (bib && assunto && assunto.id ? fontesDoAssuntoNoApp(assunto.id, null, serie) : null) || {};\n" +
-  "    return {\n" +
-  "      teoria: !!(f.teoria || []).length,\n" +
-  "      exercicios: !!f.listaBase || !!(f.exercicios || []).length,\n" +
-  "      obmep: !!(f.obmep || []).length,\n" +
-  "      resumo: resumoDasFontesDoAssunto(f)\n" +
-  "    };\n";
+// a linha que lê a fonte dos sinais: o veneno põe no lugar dela a leitura do módulo, que devolve antes
+const ANCORA = "    var f = (bib && assunto && assunto.id ? fontesDoAssuntoNoApp(assunto.id, null, serie) : null) || {};\n";
 const DO_MODULO = "    var achado = bib ? moduloDoAssunto(assunto) : false;\n" +
   "    var mod = achado && bib.modulos[achado.chave];\n" +
   "    void serie;\n" +
@@ -62,7 +66,24 @@ conf('(arranjo) a fonte dos sinais está num lugar só do app.js', APP.split(ANC
 // a contagem das chamadas da fontesDoAssuntoNoApp, só no app.js servido a esta prova
 const ENTRADA_FONTES = '  function fontesDoAssuntoNoApp(assuntoId, vinculos, anoDoAssunto) {\n';
 conf('(arranjo) a fontesDoAssuntoNoApp aparece uma vez no app.js', APP.split(ENTRADA_FONTES).length, 2);
-let servido = APP.replace(ENTRADA_FONTES, ENTRADA_FONTES + '    window.__contaFontes = (window.__contaFontes || 0) + 1;\n');
+/* A seção 3 (de onde vem o sinal) dá a dois assuntos fontes feitas à mão,
+ * com material herdado do vizinho ou de outro ano: o acervo sintético não tem
+ * esse caso. Só no app.js servido a esta prova, e só para os ids pedidos. */
+let servido = APP.replace(ENTRADA_FONTES, ENTRADA_FONTES + '    window.__contaFontes = (window.__contaFontes || 0) + 1;\n' +
+  '    if (window.__fontesDaProva && window.__fontesDaProva[assuntoId]) return JSON.parse(JSON.stringify(window.__fontesDaProva[assuntoId]));\n');
+const ENTRADA_MEMO = '  function memoDosSinaisAtual() {\n';
+conf('(arranjo) o memo dos sinais aparece uma vez no app.js', APP.split(ENTRADA_MEMO).length, 2);
+servido = servido.replace(ENTRADA_MEMO, ENTRADA_MEMO + '    if (window.__zerarSinais) { window.__zerarSinais = false; memoDosSinais.bib = null; }\n');
+/* O outro veneno: o app.js servido sem o passo do seletor no Voltar do
+ * aparelho (como no #239). Dentro de "Outras matérias", o Voltar fecha o
+ * painel inteiro, e a seção 1b tem de cair. */
+const VENENO_VOLTAR = process.argv.indexOf('--envenenado-voltar-fecha-seletor') >= 0;
+const PASSO_DO_SELETOR = "    var subirSeletor = topo.id === 'modal-tema' && typeof subirNivelDoSeletor === 'function' ? subirNivelDoSeletor() : null;\n";
+conf('(arranjo) o Voltar do seletor sobe o nível num lugar só do app.js', APP.split(PASSO_DO_SELETOR).length, 2);
+if (VENENO_VOLTAR) {
+  servido = servido.replace(PASSO_DO_SELETOR, '    var subirSeletor = null;\n');
+  conf('(veneno) o app.js servido fecha o painel no Voltar', servido.indexOf(PASSO_DO_SELETOR) < 0, true);
+}
 if (VENENO) {
   servido = servido.replace(ANCORA, DO_MODULO);
   conf('(veneno) o app.js servido lê o módulo direto', servido.indexOf(ANCORA) < 0, true);
@@ -92,10 +113,12 @@ function textoBate(texto, secoes) {
   const esperado = 'No tablet: ' + juntarComE(nomes);
   const i = texto.indexOf(esperado);
   if (i < 0) return false;
+  // depois das seções: o módulo entre parênteses e, no material herdado, de onde ele vem
   const resto = texto.slice(i + esperado.length);
-  return resto === '' || /^ \([^)]+\)$/.test(resto);
+  return /^( \([^)]+\))?(, de outro ano|, de assuntos? vizinhos?)?$/.test(resto);
 }
-const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exercicios'], obmep: ['obmep'] };
+// o sinal dos exercícios junta as três seções de exercício da página
+const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exercicios', 'enem'], obmep: ['obmep'] };
 
 (async () => {
   secao('0. O acervo sintético');
@@ -152,13 +175,34 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
       porId[l.dataset.assuntoId] = est;
     });
     const legenda = document.querySelector('#tema-legenda');
-    return { porId, visivelErrado, legenda: legenda && !legenda.hidden ? legenda.textContent.replace(/\s+/g, ' ').trim() : '' };
+    // a legenda à vista, entrada por entrada (a entrada escondida não conta)
+    const entradas = legenda ? Array.from(legenda.querySelectorAll('[data-legenda]')).filter(e => !e.hidden) : [];
+    return { porId, visivelErrado, legenda: legenda && !legenda.hidden
+      ? entradas.map(e => e.textContent.replace(/\s+/g, ' ').trim()).join(' · ') : '' };
   }, sel, selTexto);
   const seletor = await lerSinais('#lista-assuntos .item-assunto[data-assunto-id]', '.detalhe');
   const ids = Object.keys(seletor.porId);
   console.log('   no seletor: ' + JSON.stringify(seletor.porId));
-  conf('a legenda está à vista e diz teoria, exercícios e OBMEP',
-    /Teoria da biblioteca/.test(seletor.legenda) && /Exercícios/.test(seletor.legenda) && /OBMEP/.test(seletor.legenda), true);
+  /* A legenda usa as palavras do texto das linhas ("No tablet: teoria, lista
+   * de base e exercícios"): teoria; lista de base ou exercícios; OBMEP. */
+  conf('a legenda está à vista e diz teoria, lista de base ou exercícios, e OBMEP (' + seletor.legenda + ')',
+    /(^| )Teoria( |$)/.test(seletor.legenda) && /Lista de base|Exercícios/.test(seletor.legenda) &&
+    /OBMEP/.test(seletor.legenda) && !/biblioteca/i.test(seletor.legenda), true);
+  // toda seção de exercício que o texto de uma linha nomeia está no nome da legenda
+  const semLegenda = await pag.evaluate(() => {
+    const nome = ((document.querySelector('#tema-legenda [data-legenda="exercicios"]') || {}).textContent || '').toLowerCase();
+    const textos = Array.from(document.querySelectorAll('#lista-assuntos .item-assunto .detalhe')).map(d => d.textContent);
+    return ['lista de base', 'exercícios', 'ENEM'].filter(s => textos.some(t => new RegExp('No tablet: [^·]*' + s).test(t)) &&
+      nome.indexOf(s.toLowerCase()) < 0);
+  });
+  conf('a legenda explica toda seção de exercício que o texto das linhas nomeia', semLegenda.join(', '), '');
+  // cada sinal aceso tem uma entrada na legenda, e a entrada sem sinal na tela não aparece
+  const legendaCasa = await pag.evaluate(() => {
+    const acesos = new Set(Array.from(document.querySelectorAll('#lista-assuntos .tema-sinal')).filter(x => !x.hidden).map(x => x.dataset.tipoSinal));
+    return Array.from(document.querySelectorAll('#tema-legenda [data-legenda]')).filter(e => e.dataset.legenda !== 'herdado')
+      .every(e => e.hidden === !acesos.has(e.dataset.legenda));
+  });
+  conf('a legenda mostra só a entrada de sinal que está na tela', legendaCasa, true);
   if (!VENENO) {
     ['teoria', 'exercicios', 'obmep'].forEach(tipo => {
       conf('(arranjo) há na tela um assunto com o sinal de ' + tipo + ' aceso', ids.some(id => seletor.porId[id][tipo]), true);
@@ -222,11 +266,56 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
   }), v => !!v, 8000);
   conf('em outra matéria, a legenda escondida não aparece na tela', semSinal.ok && (semSinal.valor || {}).legenda, 'true:none');
   conf('e nenhum sinal à vista', semSinal.ok && (semSinal.valor || {}).sinaisVisiveis, 0);
-  // de volta à raiz do seletor, pelo Voltar da tela da matéria
+  /* 1b. O VOLTAR DO APARELHO SOBE UM NÍVEL dentro do seletor (como #179 e
+   * #199: a entrada do painel volta ao histórico). Da matéria, um grupo; do
+   * grupo, o Voltar devolve a matéria; da matéria, a raiz; só na raiz ele
+   * fecha o painel, e a aula atrás continua aberta. */
+  secao('1b. Dentro de "Outras matérias", o Voltar do aparelho sobe um nível');
+  const ondeEsta = () => pag.evaluate(() => ({
+    tema: document.querySelector('#modal-tema').classList.contains('aberto'),
+    aula: document.querySelector('#modal-aula').classList.contains('aberto'),
+    titulo: ((document.querySelector('#lista-assuntos .barra h3') || {}).textContent || '').trim(),
+    raiz: !!document.querySelector('#lista-assuntos #assunto-outro'),
+    noHistorico: !!(history.state && history.state.apoioModal)
+  }));
+  const materia = await ondeEsta();
+  await pag.evaluate(() => { const l = document.querySelector('#lista-assuntos .item-assunto'); if (l) l.click(); });
+  const grupo = await esperar('um grupo da matéria', ondeEsta, v => !!v && v.titulo !== materia.titulo && v.titulo.indexOf(materia.titulo + ', ') === 0, 5000);
+  conf('(arranjo) a matéria abre um grupo (' + (grupo.valor || {}).titulo + ')', grupo.ok, true);
+  await pag.evaluate(() => history.back());
+  const v1 = await esperar('o 1º Voltar', ondeEsta, v => !!v && (v.titulo === materia.titulo || !v.tema), 4000);
+  const p1 = v1.valor || {};
+  await pausa(300);
+  await pag.evaluate(() => history.back());
+  const v2 = await esperar('o 2º Voltar', ondeEsta, v => !!v && (v.raiz || !v.tema), 4000);
+  const p2 = v2.valor || {};
+  await pausa(300);
+  const voltaCerta = p1.tema && p1.titulo === materia.titulo && p1.noHistorico && p2.tema && p2.raiz && p2.noHistorico;
+  if (VENENO_VOLTAR) {
+    conf('VENENO visto: o Voltar no grupo devolve a matéria e depois a raiz, com o painel aberto, e quebrou (' +
+      JSON.stringify([p1, p2]) + ')', voltaCerta, false);
+    conf('não houve erro de página', pag.errosDePagina.join(' | '), '');
+    fs.rmSync(TMP, { recursive: true, force: true });
+    await H.fim(amb)();
+    return;
+  }
+  conf('no grupo, o 1º Voltar do aparelho devolve a matéria, com o painel e a entrada dele', p1.tema + '|' + p1.titulo + '|' + p1.noHistorico,
+    'true|' + materia.titulo + '|true');
+  conf('na matéria, o 2º Voltar devolve a raiz do seletor, com o painel aberto', p2.tema + '|' + p2.raiz + '|' + p2.noHistorico, 'true|true|true');
+  conf('a aula atrás continua aberta', p2.aula, true);
+  // e a grade de Matemática, aberta da raiz: o Voltar devolve a raiz
   await pag.evaluate(() => {
-    const b = Array.from(document.querySelectorAll('#lista-assuntos button')).find(x => x.textContent.trim() === 'Voltar');
-    if (b) b.click();
+    const l = Array.from(document.querySelectorAll('#lista-assuntos .item-assunto')).find(x =>
+      /^Ver todos os assuntos de Matemática/.test(x.querySelector('.nome').textContent));
+    if (l) l.click();
   });
+  await esperar('a grade aberta', () => pag.evaluate(() => !!document.querySelector('#lista-temas .item-tema')), Boolean, 8000);
+  await pag.evaluate(() => history.back());
+  const v3 = await esperar('o Voltar da grade', () => pag.evaluate(() => ({
+    tema: document.querySelector('#modal-tema').classList.contains('aberto'),
+    raiz: !!document.querySelector('#lista-assuntos #assunto-outro')
+  })), v => !!v && (v.raiz || !v.tema), 4000);
+  conf('na grade de Matemática, o Voltar do aparelho devolve a raiz do seletor', JSON.stringify(v3.valor), JSON.stringify({ tema: true, raiz: true }));
   await esperar('a raiz do seletor', () => pag.evaluate(() => !!document.querySelector('#lista-assuntos .item-assunto[data-assunto-id]')), Boolean, 5000);
 
   /* A grade "Ver todos os assuntos de Matemática", aberta do seletor da aula:
@@ -245,7 +334,10 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
   conf('(arranjo) a grade tem o MAT04-09, o da OBMEP', idsGrade.indexOf('MAT04-09') >= 0, true);
   conf('na grade, a legenda está à vista', /OBMEP/.test(grade.legenda), true);
   conf('na grade, só o sinal que existe está à vista', grade.visivelErrado.join(', '), '');
-  // o Voltar fecha o painel e depois a aula
+  // o Voltar devolve a raiz do seletor, depois fecha o painel e depois a aula
+  await pag.evaluate(() => history.back());
+  await esperar('a raiz do seletor', () => pag.evaluate(() => !!document.querySelector('#lista-assuntos #assunto-outro')), Boolean, 4000);
+  await pausa(300);
   await pag.evaluate(() => history.back());
   await esperar('o painel fechado', () => pag.evaluate(() => !document.querySelector('#modal-tema.aberto')), Boolean, 4000);
   await pausa(300);
@@ -302,6 +394,66 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
     conf('os sinais do seletor e da grade batem com as seções da página do assunto em ' + todos.length + ' assuntos', diferentes.join('; '), '');
     conf('o texto de cada linha (seletor e grade) nomeia as mesmas seções da página, nos ' + todos.length + ' assuntos', textosDiferentes.join('; '), '');
     conf('(arranjo) há linha com texto de material', ids.some(id => /No tablet: /.test(seletor.porId[id].texto)), true);
+  }
+
+  /* 3. DE ONDE VEM O SINAL. A página do assunto diz quando o material é
+   * herdado dos vizinhos ("Este assunto ainda não tem material próprio") ou de
+   * outro ano (", de outro ano"); o seletor diz o mesmo, calmo: um traço
+   * pontilhado sob o sinal, explicado na legenda, o nome do sinal com a origem
+   * e o fim do texto da linha. As fontes de dois assuntos são feitas à mão
+   * (o acervo sintético não tem o caso): o MAT07-01 com exercícios só do
+   * vizinho MAT06-12, e o MAT04-09 com a teoria toda de outro ano e a OBMEP do
+   * próprio ano. */
+  if (!VENENO) {
+    secao('3. O sinal herdado diz de onde vem, como a página do assunto');
+    await H.irParaAba(pag, 'agenda');
+    await pag.evaluate(() => {
+      const mod = { chave: '9ano:prova', titulo: 'Módulo da prova' };
+      window.__fontesDaProva = {
+        'MAT07-01': { assunto: 'MAT07-01', teoria: [], listaBase: null, obmep: [], enem: [],
+          exercicios: [{ id: 'prova:ex:1', tipo: 'exercicio', titulo: 'Exercício 1', deVizinho: 'MAT06-12', modulo: mod }],
+          vizinhos: [{ id: 'MAT06-12', titulo: 'Volume e unidades de medida', serie: '06' }] },
+        'MAT04-09': { assunto: 'MAT04-09', listaBase: null, exercicios: [], enem: [], vizinhos: [],
+          teoria: [{ id: 'prova:teo:1', tipo: 'teoria', titulo: 'Teoria 1', outroAno: true, modulo: mod }],
+          obmep: [{ id: 'prova:ob:1', tipo: 'exercicio', titulo: 'OBMEP 1', outroAno: false }] }
+      };
+      window.__zerarSinais = true;
+      document.querySelector('[data-aula-id="f5_hoje"]').click();
+    });
+    await esperar('a aula aberta', () => pag.evaluate(() => !!document.querySelector('#modal-aula.aberto #escolher-assunto')), Boolean, 10000);
+    await pausa(300);
+    await pag.evaluate(() => document.querySelector('#escolher-assunto').click());
+    await esperar('os sinais', () => pag.evaluate(() => document.querySelectorAll('#lista-assuntos .tema-sinais[data-lidos]').length), n => n > 3, 20000);
+    await pausa(300);
+    const origem = await pag.evaluate(() => {
+      const linha = id => document.querySelector('#lista-assuntos .item-assunto[data-assunto-id="' + id + '"]');
+      const sinal = (id, tipo) => {
+        const s = linha(id) && linha(id).querySelector('[data-tipo-sinal="' + tipo + '"]');
+        if (!s || s.hidden) return null;
+        return { herdado: s.classList.contains('herdado'), origem: s.dataset.origem || '', nome: s.getAttribute('aria-label'),
+          traco: getComputedStyle(s).borderBottomStyle };
+      };
+      const texto = id => ((linha(id) || document).querySelector('.detalhe') || {}).textContent || '';
+      const herdado = document.querySelector('#tema-legenda [data-legenda="herdado"]');
+      return {
+        vizinho: sinal('MAT07-01', 'exercicios'), textoVizinho: texto('MAT07-01'),
+        outroAno: sinal('MAT04-09', 'teoria'), proprio: sinal('MAT04-09', 'obmep'), textoOutroAno: texto('MAT04-09'),
+        controle: sinal('MAT09-04', 'teoria') || sinal('MAT09-04', 'exercicios'),
+        legenda: herdado && !herdado.hidden ? herdado.textContent.trim() : ''
+      };
+    });
+    console.log('   ' + JSON.stringify(origem));
+    const v = origem.vizinho || {}, o = origem.outroAno || {}, p = origem.proprio || {}, c = origem.controle || {};
+    conf('o sinal herdado do vizinho tem o traço pontilhado e diz de qual assunto veio',
+      v.herdado + '|' + v.origem + '|' + v.traco + '|' + /de assunto vizinho: “Volume e unidades de medida” \(6º ano\)/.test(v.nome || ''),
+      'true|vizinho|dotted|true');
+    conf('o texto da linha diz que o material é de assunto vizinho (' + origem.textoVizinho + ')', /No tablet: exercícios \(Módulo da prova\), de assunto vizinho$/.test(origem.textoVizinho), true);
+    conf('a teoria toda de outro ano tem o traço e diz isso', o.herdado + '|' + o.origem + '|' + /, de outro ano$/.test(o.nome || ''), 'true|outro-ano|true');
+    conf('a OBMEP do próprio ano, na mesma linha, fica sem o traço', p.herdado + '|' + p.traco, 'false|none');
+    conf('o texto da linha com parte do próprio ano não diz "de outro ano"', /de outro ano/.test(origem.textoOutroAno), false);
+    conf('(controle) o assunto com material próprio fica sem o traço', !!origem.controle && c.herdado, false);
+    conf('a legenda explica o traço, só com o sinal herdado na tela (' + origem.legenda + ')', origem.legenda, 'De outro ano ou de assunto vizinho');
+    await pag.evaluate(() => { window.__fontesDaProva = null; });
   }
   conf('não houve erro de página', pag.errosDePagina.join(' | '), '');
   fs.rmSync(TMP, { recursive: true, force: true });
