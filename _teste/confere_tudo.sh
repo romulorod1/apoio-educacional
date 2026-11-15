@@ -1693,6 +1693,9 @@ roda "seletor --envenenado-sinais-do-modulo"      node "_teste/testa_seletor_sin
 # F5 acabamento: dentro de "Outras materias", o Voltar do aparelho sobe um nivel;
 # o veneno fecha o painel inteiro, como no #239.
 roda "seletor --envenenado-voltar-fecha-seletor"  node "_teste/testa_seletor_sinais_navegador.js" --envenenado-voltar-fecha-seletor
+# F5 acabamento: o sinal dos exercicios junta lista de base, exercicios e ENEM;
+# o veneno tira o ENEM do sinal.
+roda "seletor --envenenado-sem-enem-no-sinal"     node "_teste/testa_seletor_sinais_navegador.js" --envenenado-sem-enem-no-sinal
 roda "preço descartado não vaza"                  node "_teste/testa_preco_cancelado.js"
 roda "ações de aula no fechamento"                node "_teste/testa_acoes_fechamento.js"
 # C9: o documento do ciclo na tela. A contagem do que abre sozinho (janelas,

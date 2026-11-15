@@ -13122,9 +13122,10 @@
     });
     var daTrilha = saida.length;
 
-    db.aulas.filter(function (a) {
-      return a.alunoId === aula.alunoId && a.id !== aula.id;
-    }).sort(function (a, b) { return b.data.localeCompare(a.data); })
+    /* "já dado em" só vale para aula que já foi dada (aulasJaDadas, a regra da
+     * "Última aula"): a aula marcada à frente, a das 15h de hoje às 11h, a
+     * cancelada e a falta não deram assunto nenhum, e a aberta nunca entra. */
+    aulasJaDadas(aula).sort(function (a, b) { return b.data.localeCompare(a.data); })
       .forEach(function (a) {
         if (saida.length >= daTrilha + 5) return;
         Core.temasDaAula(a).forEach(function (t) {
@@ -13188,29 +13189,45 @@
    * meio da semana não conta. */
   function ultimaAulaDada(aula) {
     var chaveDaAula = function (a) { return a.data + ' ' + (a.hora || ''); };
-    var agora = new Date();
-    var hoje = Core.hojeIso();
-    var horaAgora = pad2(agora.getHours()) + ':' + pad2(agora.getMinutes());
-    var jaAconteceu = function (a) {
-      if (!a.data) return false;
-      if (a.data !== hoje) return a.data < hoje;
-      return !!a.hora && a.hora <= horaAgora;
-    };
-    return db.aulas.filter(function (a) {
-      var s = a.status || 'realizada';
-      return a.alunoId === aula.alunoId && a.id !== aula.id && s !== 'cancelada' && s !== 'falta' &&
-        jaAconteceu(a) && chaveDaAula(a) < chaveDaAula(aula);
+    return aulasJaDadas(aula).filter(function (a) {
+      return chaveDaAula(a) < chaveDaAula(aula);
     }).sort(function (a, b) { return chaveDaAula(b).localeCompare(chaveDaAula(a)); })[0] || null;
   }
 
-  /* A matéria da aula, quando os assuntos dela são todos de uma matéria só (o
-   * assunto sem matéria vale como Matemática, por legado). Sem assunto, ou
-   * com mais de uma matéria, null: aí a linha diz só a data. */
-  function materiaUnicaDaAula(a) {
-    var chaves = {};
-    (a.temas || []).forEach(function (t) {
-      if (t && (t.titulo || t.id)) chaves[t.disciplina || Core.MATERIA_PADRAO] = true;
+  /* As aulas deste aluno que JÁ FORAM DADAS, fora a que está aberta: nem
+   * cancelada, nem falta, e com a data e o horário já passados (a de hoje sem
+   * horário ainda não conta). É a regra da "Última aula" e do "já dado em" das
+   * sugestões: uma aula marcada à frente, ou a das 15h de hoje às 11h, ainda
+   * não deu assunto nenhum. */
+  function aulasJaDadas(aula) {
+    var agora = new Date();
+    var hoje = Core.hojeIso();
+    var horaAgora = pad2(agora.getHours()) + ':' + pad2(agora.getMinutes());
+    return db.aulas.filter(function (a) {
+      var s = a.status || 'realizada';
+      if (a.alunoId !== aula.alunoId || a.id === aula.id || s === 'cancelada' || s === 'falta' || !a.data) return false;
+      if (a.data !== hoje) return a.data < hoje;
+      return !!a.hora && a.hora <= horaAgora;
     });
+  }
+
+  /* A matéria da aula, só quando ela é CERTA: todo assunto da aula tem a
+   * matéria escrita, ou um id do banco que diz a matéria, e é uma só. O
+   * assunto escrito à mão na raiz do seletor não leva matéria (itemLivre), e
+   * "Redação dissertativa" não pode virar "aula de Matemática": sem certeza,
+   * null, e a linha diz só a data. Lê pelo Core.temasDaAula, que cobre a aula
+   * antiga com um só aula.tema. */
+  function materiaUnicaDaAula(a) {
+    var temas = Core.temasDaAula(a).filter(function (t) { return t && (t.titulo || t.id); });
+    if (!temas.length) return null;
+    var chaves = {};
+    for (var i = 0; i < temas.length; i++) {
+      var t = temas[i];
+      var doBanco = t.id ? Core.materiaDoTema(t.id) : null;
+      var chave = t.disciplina || (doBanco && doBanco.id) || null;
+      if (!chave) return null;
+      chaves[chave] = true;
+    }
     var lista = Object.keys(chaves);
     return lista.length === 1 ? rotuloDisciplina(lista[0]) || null : null;
   }
@@ -13229,10 +13246,11 @@
     var aulaAnterior = ultimaAulaDada(aula);
     var materiaAnterior = aulaAnterior ? materiaUnicaDaAula(aulaAnterior) : null;
     /* O nome já está no título da janela ("Assunto da aula, Nome"): aqui, o
-     * ano do aluno (dito como dele, para não se confundir com o ano de um
-     * assunto de outra matéria) e a última aula, com a matéria dela. */
+     * ano do aluno ("Está no 9º ano", sem supor menino ou menina, e dito como
+     * dele, para não se confundir com o ano de um assunto de outra matéria) e
+     * a última aula, com a matéria dela quando ela é certa. */
     var contexto = [
-      anoDoAluno ? el('span', { class: 'tag tema-ano-aluno', texto: 'Aluno do ' + nomeDoAno(anoDoAluno) }) : null,
+      anoDoAluno ? el('span', { class: 'tag tema-ano-aluno', texto: 'Está no ' + nomeDoAno(anoDoAluno) }) : null,
       aulaAnterior ? el('span', { class: 'tema-ultima-aula', texto: 'Última aula' +
         (materiaAnterior ? ' de ' + materiaAnterior : '') + ': ' + Core.ddmm(aulaAnterior.data) }) : null
     ].filter(Boolean);
@@ -20505,8 +20523,11 @@
       if (ativo) algum = true;
       /* O sinal herdado (de assunto vizinho ou de outro ano) ganha um traço
        * pontilhado embaixo, e diz de onde vem no nome e no toque longo. */
-      var de = ativo ? DE_ONDE_SINAL[origem[tipo]] || '' : '';
+      var varios = origem[tipo] === 'vizinho' && (estado.vizinhos || []).length > 1;
+      // a concordância do texto da linha: "de assuntos vizinhos" quando são vários
+      var de = !ativo ? '' : varios ? 'de assuntos vizinhos' : DE_ONDE_SINAL[origem[tipo]] || '';
       sinal.classList.toggle('herdado', !!de);
+      if (varios) sinal.setAttribute('data-varios', 'sim'); else sinal.removeAttribute('data-varios');
       if (de) sinal.setAttribute('data-origem', origem[tipo]); else sinal.removeAttribute('data-origem');
       var nome = tipo === 'exercicios' && secoes.length ? juntarComE(secoes) : ROTULOS_SINAL[tipo];
       var vizinhos = de && origem[tipo] === 'vizinho' ? (estado.vizinhos || []).map(function (v) {
@@ -20545,6 +20566,7 @@
         if (x.hidden) return;
         acesos[x.dataset.tipoSinal] = true;
         if (x.dataset.origem) de[x.dataset.origem] = true;
+        if (x.dataset.varios) de.varios = true;
       });
       (c.getAttribute('data-secoes-exercicios') || '').split('|').forEach(function (n) { if (n) secoes[n] = true; });
     });
@@ -20553,7 +20575,9 @@
       var tipo = e.getAttribute('data-legenda');
       var nome = e.querySelector('.tema-legenda-nome');
       if (tipo === 'herdado') {
-        var quais = Object.keys(DE_ONDE_SINAL).filter(function (k) { return de[k]; }).map(function (k) { return DE_ONDE_SINAL[k]; });
+        var quais = Object.keys(DE_ONDE_SINAL).filter(function (k) { return de[k]; }).map(function (k) {
+          return k === 'vizinho' && de.varios ? 'de assuntos vizinhos' : DE_ONDE_SINAL[k];
+        });
         e.hidden = !quais.length;
         if (quais.length) nome.textContent = maiuscula(quais.join(' ou '));
         return;

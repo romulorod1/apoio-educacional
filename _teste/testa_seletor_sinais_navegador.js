@@ -43,6 +43,8 @@
  *     texto "Módulo relacionado no tablet". A conferência 2 tem de cair.
  *   --envenenado-voltar-fecha-seletor  o Voltar do aparelho não sobe o nível
  *     do seletor (como no #239) e fecha o painel inteiro. A 1b tem de cair.
+ *   --envenenado-sem-enem-no-sinal  o sinal dos exercícios sem o ENEM: o
+ *     assunto só com ENEM fica sem sinal, e a seção 3 tem de cair.
  */
 'use strict';
 const fs = require('fs');
@@ -78,6 +80,16 @@ servido = servido.replace(ENTRADA_MEMO, ENTRADA_MEMO + '    if (window.__zerarSi
  * aparelho (como no #239). Dentro de "Outras matérias", o Voltar fecha o
  * painel inteiro, e a seção 1b tem de cair. */
 const VENENO_VOLTAR = process.argv.indexOf('--envenenado-voltar-fecha-seletor') >= 0;
+/* O terceiro veneno: o sinal dos exercícios sem o ENEM (como antes do
+ * acabamento). A linha nomeia o ENEM, a página tem a seção ENEM, e o sinal
+ * fica apagado: a seção 3 tem de cair. */
+const VENENO_ENEM = process.argv.indexOf('--envenenado-sem-enem-no-sinal') >= 0;
+const ENEM_NO_SINAL = "    var exercicios = (f.listaBase ? [f.listaBase] : []).concat(f.exercicios || [], f.enem || []);\n";
+conf('(arranjo) o sinal dos exercícios junta o ENEM num lugar só do app.js', APP.split(ENEM_NO_SINAL).length, 2);
+if (VENENO_ENEM) {
+  servido = servido.replace(ENEM_NO_SINAL, "    var exercicios = (f.listaBase ? [f.listaBase] : []).concat(f.exercicios || []);\n");
+  conf('(veneno) o app.js servido tira o ENEM do sinal', servido.indexOf(ENEM_NO_SINAL) < 0, true);
+}
 const PASSO_DO_SELETOR = "    var subirSeletor = topo.id === 'modal-tema' && typeof subirNivelDoSeletor === 'function' ? subirNivelDoSeletor() : null;\n";
 conf('(arranjo) o Voltar do seletor sobe o nível num lugar só do app.js', APP.split(PASSO_DO_SELETOR).length, 2);
 if (VENENO_VOLTAR) {
@@ -353,7 +365,8 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
     const m = {}; a.forEach(t => { m[t.id] = t.pt.titulo; }); return m;
   }));
   const diferentes = [], textosDiferentes = [];
-  const todos = ids.concat(idsGrade.filter(id => ids.indexOf(id) < 0));
+  // no veneno do ENEM, a seção 2 (que não tem ENEM no acervo sintético) não roda: a 3 é que tem de cair
+  const todos = VENENO_ENEM ? [] : ids.concat(idsGrade.filter(id => ids.indexOf(id) < 0));
   for (const id of todos) {
     await H.irParaAba(pag, 'biblioteca');
     await pag.evaluate(() => { const v = document.querySelector('#bib-corpo .bib-assunto .bib-voltar'); if (v) v.click(); });
@@ -393,7 +406,7 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
   } else {
     conf('os sinais do seletor e da grade batem com as seções da página do assunto em ' + todos.length + ' assuntos', diferentes.join('; '), '');
     conf('o texto de cada linha (seletor e grade) nomeia as mesmas seções da página, nos ' + todos.length + ' assuntos', textosDiferentes.join('; '), '');
-    conf('(arranjo) há linha com texto de material', ids.some(id => /No tablet: /.test(seletor.porId[id].texto)), true);
+    if (!VENENO_ENEM) conf('(arranjo) há linha com texto de material', ids.some(id => /No tablet: /.test(seletor.porId[id].texto)), true);
   }
 
   /* 3. DE ONDE VEM O SINAL. A página do assunto diz quando o material é
@@ -402,8 +415,10 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
    * pontilhado sob o sinal, explicado na legenda, o nome do sinal com a origem
    * e o fim do texto da linha. As fontes de dois assuntos são feitas à mão
    * (o acervo sintético não tem o caso): o MAT07-01 com exercícios só do
-   * vizinho MAT06-12, e o MAT04-09 com a teoria toda de outro ano e a OBMEP do
-   * próprio ano. */
+   * os vizinhos MAT06-12 e MAT09-12 (o plural concorda), o MAT04-09 com a
+   * teoria toda de outro ano e a OBMEP do próprio ano, e o MAT09-07 só com
+   * ENEM: o acervo sintético só tem ENEM no 3º médio, e esta aluna é do 4º
+   * ano, então é aqui que o sinal de exercícios encontra a seção ENEM. */
   if (!VENENO) {
     secao('3. O sinal herdado diz de onde vem, como a página do assunto');
     await H.irParaAba(pag, 'agenda');
@@ -411,8 +426,12 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
       const mod = { chave: '9ano:prova', titulo: 'Módulo da prova' };
       window.__fontesDaProva = {
         'MAT07-01': { assunto: 'MAT07-01', teoria: [], listaBase: null, obmep: [], enem: [],
-          exercicios: [{ id: 'prova:ex:1', tipo: 'exercicio', titulo: 'Exercício 1', deVizinho: 'MAT06-12', modulo: mod }],
-          vizinhos: [{ id: 'MAT06-12', titulo: 'Volume e unidades de medida', serie: '06' }] },
+          exercicios: [{ id: 'prova:ex:1', tipo: 'exercicio', titulo: 'Exercício 1', deVizinho: 'MAT06-12', modulo: mod },
+            { id: 'prova:ex:2', tipo: 'exercicio', titulo: 'Exercício 2', deVizinho: 'MAT09-12', modulo: mod }],
+          vizinhos: [{ id: 'MAT06-12', titulo: 'Volume e unidades de medida', serie: '06' },
+            { id: 'MAT09-12', titulo: 'Volume do cilindro', serie: '09' }] },
+        'MAT09-07': { assunto: 'MAT09-07', teoria: [], listaBase: null, exercicios: [], obmep: [], vizinhos: [],
+          enem: [{ id: 'enem:2099:1', tipo: 'exercicio', titulo: 'Questão 1', fonte: 'enem' }] },
         'MAT04-09': { assunto: 'MAT04-09', listaBase: null, exercicios: [], enem: [], vizinhos: [],
           teoria: [{ id: 'prova:teo:1', tipo: 'teoria', titulo: 'Teoria 1', outroAno: true, modulo: mod }],
           obmep: [{ id: 'prova:ob:1', tipo: 'exercicio', titulo: 'OBMEP 1', outroAno: false }] }
@@ -439,21 +458,85 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
         vizinho: sinal('MAT07-01', 'exercicios'), textoVizinho: texto('MAT07-01'),
         outroAno: sinal('MAT04-09', 'teoria'), proprio: sinal('MAT04-09', 'obmep'), textoOutroAno: texto('MAT04-09'),
         controle: sinal('MAT09-04', 'teoria') || sinal('MAT09-04', 'exercicios'),
-        legenda: herdado && !herdado.hidden ? herdado.textContent.trim() : ''
+        legenda: herdado && !herdado.hidden ? herdado.textContent.trim() : '',
+        enem: { teoria: !!sinal('MAT09-07', 'teoria'), exercicios: !!sinal('MAT09-07', 'exercicios'), obmep: !!sinal('MAT09-07', 'obmep'),
+          nome: (sinal('MAT09-07', 'exercicios') || {}).nome || '', texto: texto('MAT09-07') },
+        legendaExercicios: ((document.querySelector('#tema-legenda [data-legenda="exercicios"]') || {}).textContent || '').trim(),
+        ano: ((document.querySelector('#tema-contexto .tag') || {}).textContent || '').trim()
       };
     });
     console.log('   ' + JSON.stringify(origem));
+    /* O ENEM: a página teria só a seção ENEM; o sinal tem de ser o dos
+     * exercícios (SECOES_DO_SINAL), o texto nomeia o ENEM e a legenda também. */
+    const enemNaPagina = {};
+    Object.keys(SECOES_DO_SINAL).forEach(t => { enemNaPagina[t] = SECOES_DO_SINAL[t].indexOf('enem') >= 0; });
+    const enemIgual = Object.keys(enemNaPagina).every(t => enemNaPagina[t] === origem.enem[t]);
+    if (VENENO_ENEM) {
+      conf('VENENO visto: o assunto só com ENEM acende o sinal dos exercícios, e quebrou (' + JSON.stringify(origem.enem) + ')',
+        enemIgual, false);
+      conf('não houve erro de página', pag.errosDePagina.join(' | '), '');
+      fs.rmSync(TMP, { recursive: true, force: true });
+      await H.fim(amb)();
+      return;
+    }
+    conf('o assunto só com ENEM acende o sinal dos exercícios, como a seção ENEM da página (' + JSON.stringify(origem.enem) + ')', enemIgual, true);
+    conf('o texto da linha nomeia o ENEM, e o nome do sinal também', textoBate(origem.enem.texto, ['enem']) + '|' + /ENEM/.test(origem.enem.nome), 'true|true');
+    conf('a legenda dos exercícios nomeia o ENEM que está na tela (' + origem.legendaExercicios + ')', /ENEM/.test(origem.legendaExercicios), true);
+    conf('o ano da aluna, sem supor menino ou menina (' + origem.ano + ')', origem.ano, 'Está no 4º ano');
     const v = origem.vizinho || {}, o = origem.outroAno || {}, p = origem.proprio || {}, c = origem.controle || {};
-    conf('o sinal herdado do vizinho tem o traço pontilhado e diz de qual assunto veio',
-      v.herdado + '|' + v.origem + '|' + v.traco + '|' + /de assunto vizinho: “Volume e unidades de medida” \(6º ano\)/.test(v.nome || ''),
+    conf('o sinal herdado de dois vizinhos tem o traço pontilhado, concorda no plural e diz de quais veio',
+      v.herdado + '|' + v.origem + '|' + v.traco + '|' +
+      /de assuntos vizinhos: “Volume e unidades de medida” \(6º ano\) e “Volume do cilindro” \(9º ano\)/.test(v.nome || ''),
       'true|vizinho|dotted|true');
-    conf('o texto da linha diz que o material é de assunto vizinho (' + origem.textoVizinho + ')', /No tablet: exercícios \(Módulo da prova\), de assunto vizinho$/.test(origem.textoVizinho), true);
+    conf('o texto da linha diz que o material é de assuntos vizinhos (' + origem.textoVizinho + ')', /No tablet: exercícios \(Módulo da prova\), de assuntos vizinhos$/.test(origem.textoVizinho), true);
     conf('a teoria toda de outro ano tem o traço e diz isso', o.herdado + '|' + o.origem + '|' + /, de outro ano$/.test(o.nome || ''), 'true|outro-ano|true');
     conf('a OBMEP do próprio ano, na mesma linha, fica sem o traço', p.herdado + '|' + p.traco, 'false|none');
     conf('o texto da linha com parte do próprio ano não diz "de outro ano"', /de outro ano/.test(origem.textoOutroAno), false);
     conf('(controle) o assunto com material próprio fica sem o traço', !!origem.controle && c.herdado, false);
-    conf('a legenda explica o traço, só com o sinal herdado na tela (' + origem.legenda + ')', origem.legenda, 'De outro ano ou de assunto vizinho');
+    conf('a legenda explica o traço, no plural do que está na tela (' + origem.legenda + ')', origem.legenda, 'De outro ano ou de assuntos vizinhos');
     await pag.evaluate(() => { window.__fontesDaProva = null; });
+
+    /* 4. SUBIR, ESCOLHER, VOLTAR. Na matéria, um grupo; o Voltar do aparelho
+     * sobe à matéria; dali, o grupo de novo e um assunto escolhido. O painel
+     * fecha, a aula fica com a entrada dela, e o Voltar seguinte fecha a aula
+     * sem sair do aplicativo. */
+    secao('4. Subir um nível, escolher o assunto, e o Voltar seguinte fecha a aula');
+    const urlDoApp = pag.url();
+    await pag.evaluate(() => {
+      const blocos = Array.from(document.querySelectorAll('#lista-assuntos .bloco-exercicios'));
+      const outras = blocos.find(x => x.textContent.trim() === 'Outras matérias');
+      let e = outras && outras.nextElementSibling;
+      while (e && !e.classList.contains('item-assunto')) e = e.nextElementSibling;
+      if (e) e.click();
+    });
+    const naMateria = await esperar('a matéria', () => pag.evaluate(() => ((document.querySelector('#lista-assuntos .barra h3') || {}).textContent || '').trim()), Boolean, 5000);
+    const abrirGrupo = () => pag.evaluate(() => { const l = document.querySelector('#lista-assuntos .item-assunto'); if (l) l.click(); });
+    await abrirGrupo();
+    await esperar('o grupo', () => pag.evaluate(() => !!document.querySelector('#lista-assuntos .irmao-aninhado')), Boolean, 5000);
+    await pag.evaluate(() => history.back());
+    const subiu = await esperar('o Voltar sobe à matéria', () => pag.evaluate(t =>
+      !!document.querySelector('#modal-tema.aberto') && ((document.querySelector('#lista-assuntos .barra h3') || {}).textContent || '').trim() === t,
+    naMateria.valor), Boolean, 4000);
+    conf('(arranjo) o Voltar subiu do grupo à matéria', subiu.ok, true);
+    await pausa(300);
+    await abrirGrupo();
+    await esperar('o grupo de novo', () => pag.evaluate(() => !!document.querySelector('#lista-assuntos .irmao-aninhado')), Boolean, 5000);
+    const escolhido = await pag.evaluate(() => { const l = document.querySelector('#lista-assuntos .irmao-aninhado'); const t = l.querySelector('.nome').textContent; l.click(); return t; });
+    const estadoAula = () => pag.evaluate(() => ({
+      tema: document.querySelector('#modal-tema').classList.contains('aberto'),
+      aula: document.querySelector('#modal-aula').classList.contains('aberto'),
+      noHistorico: !!(history.state && history.state.apoioModal)
+    }));
+    const fechou = await esperar('o painel fecha depois de escolher', estadoAula, e => !!e && !e.tema && e.aula, 6000);
+    await pausa(600);
+    conf('escolher "' + escolhido + '" fecha o painel, e a aula fica com a entrada dela', fechou.ok && JSON.stringify(await estadoAula()),
+      JSON.stringify({ tema: false, aula: true, noHistorico: true }));
+    await pag.evaluate(() => history.back());
+    const aulaFechou = await esperar('o Voltar fecha a aula', estadoAula, e => !!e && !e.aula, 4000);
+    await pausa(500);
+    conf('o Voltar seguinte fecha a aula, sem janela no histórico e sem sair do aplicativo',
+      aulaFechou.ok && JSON.stringify(await estadoAula()) + '|' + (pag.url() === urlDoApp) + '|' + !!(await pag.$('#abas')),
+      JSON.stringify({ tema: false, aula: false, noHistorico: false }) + '|true|true');
   }
   conf('não houve erro de página', pag.errosDePagina.join(' | '), '');
   fs.rmSync(TMP, { recursive: true, force: true });
