@@ -37,6 +37,10 @@
    * grade; acima de 6 semanas a folha não cabe numa página com legibilidade. */
   var MAX_DIAS = 42;
   var MAX_IMAGENS = 8;
+  /* A borda de cada dia da grade, em pt (o piso de espessura do filete que
+   * leva informação, pdf.js, COR.fioForte), e o raio dos cantos. */
+  var BORDA_DO_DIA = 0.8;
+  var RAIO_DO_DIA = 6;
 
   // ================= o esquema do plano (saída estruturada) =================
 
@@ -48,7 +52,7 @@
   var ESQUEMA = {
     type: 'object',
     additionalProperties: false,
-    required: ['alunoId', 'confiancaAluno', 'tratamento', 'periodo', 'grade', 'provas', 'aulaAConfirmar', 'aulasRemovidas', 'aulasExtras', 'feriados', 'observacoes'],
+    required: ['alunoId', 'confiancaAluno', 'tratamento', 'periodo', 'grade', 'provas', 'quadroDasProvas', 'aulaAConfirmar', 'aulasRemovidas', 'aulasExtras', 'feriados', 'observacoes'],
     properties: {
       alunoId: textoOuNulo('O id do aluno, copiado da lista de alunos. null se não der para saber.'),
       confiancaAluno: { type: 'string', enum: ['alta', 'baixa'] },
@@ -83,6 +87,7 @@
           }
         }
       },
+      quadroDasProvas: { type: 'boolean', description: 'true: a folha traz, abaixo do calendário, a seção "Datas e conteúdo das provas". false só quando ela pedir para tirar essa seção (só o calendário). Tirar a seção não tira as provas: "provas" e a "prova" de cada dia continuam iguais.' },
       aulaAConfirmar: { type: 'array', items: DATA, description: 'Datas em que ela pediu "Aula com a Nath?". Vazio se ela não pediu.' },
       aulasRemovidas: { type: 'array', items: DATA, description: 'Datas em que ela pediu para tirar da folha a aula com a Nath que está na agenda. Só muda a folha. Vazio se ela não pediu.' },
       aulasExtras: {
@@ -146,6 +151,7 @@
     '- "feriados": as datas de feriado ou de dia sem aula na escola que o aviso ou o pedido citam. Vazio se não há.',
     '',
     'Ajustes: depois do primeiro plano, ela pode pedir mudanças ("põe Geografia no dia 21", "tira a aula com a Nath do dia 20", "põe aula com a Nath no dia 21 às 10h"). Devolva o plano INTEIRO de novo, mudando só o que ela pediu. Tirar ou pôr aula com a Nath é com "aulasRemovidas" e "aulasExtras" (regra 6).',
+    'A seção "Datas e conteúdo das provas" (o quadro abaixo do calendário): "quadroDasProvas" é true no primeiro plano. Quando ela pedir para tirar, remover ou esconder essa seção, o quadro, a tabela ou a lista das provas, ou pedir "só o calendário", devolva "quadroDasProvas": false e mantenha "provas" e a "prova" de cada dia da grade exatamente como estavam: nunca esvazie "provas" para tirar a seção. Quando ela pedir a seção de volta, true. Nos outros ajustes, mantenha como estava.',
     'Quando a mensagem traz "Plano atual, como está na folha", parta dele: é o estado que vale, mesmo onde a sua resposta anterior diz outra coisa (o aplicativo arruma as listas de aula e guarda o que ela escolheu na tela).',
     'Observações: frases curtas, só o que ela precisa conferir. Nada de explicar o que você fez.'
   ].join('\n');
@@ -333,6 +339,7 @@
     if (per.fim < per.inicio) return 'período ao contrário';
     if (diasEntre(per.inicio, per.fim) + 1 > MAX_DIAS) return 'período longo demais';
     var dentro = function (d) { return dataValida(d) && d >= per.inicio && d <= per.fim; };
+    if ('quadroDasProvas' in plano && typeof plano.quadroDasProvas !== 'boolean') return 'quadro das provas inválido';
     if (!Array.isArray(plano.grade)) return 'grade ausente';
     var vistas = {};
     for (var i = 0; i < plano.grade.length; i++) {
@@ -387,7 +394,103 @@
     Object.keys(plano).forEach(function (k) { c[k] = plano[k]; });
     if (!Array.isArray(c.aulasRemovidas)) c.aulasRemovidas = [];
     if (!Array.isArray(c.aulasExtras)) c.aulasExtras = [];
+    // o plano salvo antes da seção opcional mostrava o quadro
+    if (typeof c.quadroDasProvas !== 'boolean') c.quadroDasProvas = true;
     return c;
+  }
+
+  /* A folha traz a seção "Datas e conteúdo das provas"? Sim, a não ser que
+   * ela tenha tirado (o plano salvo antes da opção não tem o campo: sim). */
+  function temQuadroDasProvas(plano) { return !plano || plano.quadroDasProvas !== false; }
+
+  /* O pedido de ajuste fala da seção "Datas e conteúdo das provas" INTEIRA?
+   * "tirar", "voltar" ou null (o pedido é outro, ou o app não tem certeza: aí
+   * vale o que o modelo fez). É a rede de segurança do app quando o modelo não
+   * muda o campo (relato de 15/11/2026: "Remover a seção datas e conteúdo das
+   * provas" deu "O plano ficou igual"). Conservadora de propósito: o falso
+   * positivo desfaz o pedido dela; o falso negativo só deixa com o modelo.
+   *   - o alvo é a seção: "seção / quadro / tabela / lista / parte / bloco"
+   *     das provas, das datas ou "de baixo"; "datas e conteúdo"; "as provas de
+   *     baixo"; "esconde o quadro"; "só o calendário";
+   *   - null quando cita algo específico: um número (dia, parte, capítulo),
+   *     "a de Science", "prova de", "conteúdo de", dia da semana, "da manhã",
+   *     "calendário de dezembro";
+   *   - null com o "não" antes do verbo ("não tira", "não precisa tirar") e
+   *     com "mantém"; "não quero" e "não precisa da" querem dizer tirar;
+   *   - tirar e voltar na mesma frase: null. */
+  function intencaoDoQuadro(texto) {
+    var t = ' ' + String(texto || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9/ ]+/g, ' ').replace(/\s+/g, ' ') + ' ';
+    var soCalendario = /\b(so|apenas|somente) (com )?(o )?calendario\b/.test(t);
+    var alvo = soCalendario ||
+      /\b(secao|quadro|tabela|lista|parte|bloco)\b[a-z ]{0,25}\b(provas|datas|baixo|embaixo)\b/.test(t) ||
+      /\bdatas ?(e|\/) ?conteudos?\b/.test(t) ||
+      /\bprovas (de baixo|embaixo)\b/.test(t) ||
+      /^ \w+ (o|a) (quadro|tabela|secao) $/.test(t);
+    if (!alvo) return null;
+    // algo específico: o pedido é sobre uma prova, um dia ou um pedaço, não sobre a seção
+    if (/\d/.test(t) ||
+      /\b(a|o) de [a-z]+/.test(t) ||
+      /\bprova (de|da|do) [a-z]+/.test(t) ||
+      /\bconteudos? (de|da|do) [a-z]+/.test(t) ||
+      /\b(segunda|terca|quarta|quinta|sexta|sabado|domingo)\b/.test(t) ||
+      /\bda manha\b|\bda tarde\b/.test(t) ||
+      /\bcalendario (de|do|da) [a-z]+/.test(t)) return null;
+    t = t.replace(/\bpor favor\b/g, ' ').replace(/\s+/g, ' '); // "por favor" não é pedido de pôr
+    if (/\b(nao|nunca|jamais|nem) (\w+ ){0,2}(tir|retir|remov|apag|exclu|escond|ocult|mex)\w*/.test(t) || /\b(mant[ee]m|mantenh\w*|manter|deix\w* (o|a) (quadro|secao|tabela|lista))\b/.test(t)) return null;
+    var naoQuer = /\bnao (quero|precis\w* d[aeo]s?)\b/.test(t);
+    var tirar = soCalendario || naoQuer ||
+      /\b(tir[aeo]\w*|retir\w*|remov\w*|exclu\w*|apag\w*|escond\w*|ocult\w*)\b/.test(t) ||
+      /\bsem (a |o |as |os )?(secao|quadro|tabela|lista|provas)\b/.test(t);
+    var voltar = /\b(volt\w*|de volta|devolv\w*|recoloc\w*|reinclu\w*|de novo|novamente)\b/.test(t) ||
+      (!naoQuer && /\b(mostr\w*|inclu\w*|acrescent\w*|coloc\w*|poe|ponha|por)\b/.test(t));
+    if (tirar && !voltar) return 'tirar';
+    if (voltar && !tirar) return 'voltar';
+    return null;
+  }
+
+  /* Depois de um ajuste: a rede só age quando o pedido é, com certeza, sobre
+   * a seção inteira (intencaoDoQuadro) E o modelo não fez o que ela pediu:
+   *   - o plano voltou igual (fora o quadroDasProvas): o app põe o campo;
+   *   - para tirar, o modelo esvaziou "provas" (e talvez a prova dos dias) e
+   *     não mexeu em mais nada: as provas de antes voltam e o campo vai a
+   *     false (tirar a seção não apaga as provas).
+   * Em qualquer outro caso o modelo mudou algo de propósito, e o plano dele
+   * vale como veio. Devolve o plano corrigido (cópia rasa) ou o mesmo objeto. */
+  function aplicarIntencaoDoQuadro(antes, depois, texto) {
+    var quer = intencaoDoQuadro(texto);
+    if (!quer || !antes || !depois) return depois;
+    /* O pedido cita uma disciplina do plano ("remove Science da tabela das
+     * provas"): é sobre aquela prova, não sobre a seção. */
+    var sem = function (s) { return ' ' + String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim() + ' '; };
+    var dito = sem(texto);
+    var disciplinas = (antes.provas || []).concat(depois.provas || []).map(function (p) { return sem(p && p.disciplina).trim(); })
+      .concat((antes.grade || []).map(function (g) { return sem(g && g.prova).trim(); }))
+      .filter(function (d) { return d.length >= 2 && d !== 'provas' && d !== 'prova'; });
+    if (disciplinas.some(function (d) { return dito.indexOf(' ' + d + ' ') >= 0; })) return depois;
+    var alvo = quer === 'voltar';
+    if (temQuadroDasProvas(depois) === alvo) return depois; // o modelo já fez
+    var semCampo = function (pl, semProvas) {
+      var c = {};
+      Object.keys(pl).forEach(function (k) { if (k !== 'quadroDasProvas' && !(semProvas && k === 'provas')) c[k] = pl[k]; });
+      if (semProvas) c.grade = (pl.grade || []).map(function (g) { var n = {}; Object.keys(g || {}).forEach(function (k) { if (k !== 'prova') n[k] = g[k]; }); return n; });
+      return JSON.stringify(c);
+    };
+    var copia = function (pl) { var c = {}; Object.keys(pl).forEach(function (k) { c[k] = pl[k]; }); return c; };
+    if (semCampo(antes) === semCampo(depois)) {
+      var c = copia(depois);
+      c.quadroDasProvas = alvo;
+      return c;
+    }
+    var esvaziou = (!Array.isArray(depois.provas) || !depois.provas.length) && Array.isArray(antes.provas) && antes.provas.length > 0;
+    if (quer === 'tirar' && esvaziou && semCampo(antes, true) === semCampo(depois, true)) {
+      var r = copia(depois);
+      r.provas = antes.provas;
+      r.grade = antes.grade;
+      r.quadroDasProvas = false;
+      return r;
+    }
+    return depois;
   }
 
   /* As listas de aula de um plano já conferido, arrumadas:
@@ -758,6 +861,9 @@
     });
     if (JSON.stringify(antes.provas) !== JSON.stringify(depois.provas) && !acoes.some(function (x) { return /prova/.test(x); })) acoes.push('mudou o quadro das provas');
     if (JSON.stringify(antes.periodo) !== JSON.stringify(depois.periodo)) acoes.push('mudou o período');
+    if (temQuadroDasProvas(antes) !== temQuadroDasProvas(depois)) {
+      acoes.push(temQuadroDasProvas(depois) ? 'voltou a seção "Datas e conteúdo das provas"' : 'saiu a seção "Datas e conteúdo das provas"');
+    }
     if (!acoes.length) return 'O plano ficou igual.';
     var frase = juntarComE(acoes.slice(0, 4)) + (acoes.length > 4 ? ' e mais ' + (acoes.length - 4) + (acoes.length - 4 === 1 ? ' mudança' : ' mudanças') : '');
     return 'Mudou: ' + frase + '.';
@@ -841,6 +947,24 @@
    * são da agenda do app, com as exceções do plano (aulasRemovidas e
    * aulasExtras, que mudam só a folha); o `genero` ('a' ou 'o') só vale
    * quando o plano não traz o tratamento. */
+  /* A placa de um dia do período: o fundo COR.soft e a moldura COR.fioForte
+   * num caminho só, com os cantos arredondados por Bézier (k = 0,5523, o
+   * quarto de círculo) e pintado com "B" (preenche e contorna). Não usa o
+   * doc.retangulo de propósito: a placa não é branca, então não entra na
+   * conta da marca d'água (pdf.js, Doc.prototype.retangulo). */
+  function placaDoDia(doc, x, y, w, h, PDFGen) {
+    var r = Math.min(RAIO_DO_DIA, w / 2, h / 2), k = 0.5523 * r;
+    var n = function (v) { return v.toFixed(2); };
+    var cor = function (c) { return c.map(function (v) { return v.toFixed(6); }).join(' '); };
+    var x1 = x + w, y1 = y + h;
+    doc.op(cor(PDFGen.COR.soft) + ' rg ' + cor(PDFGen.COR.fioForte) + ' RG ' + BORDA_DO_DIA.toFixed(2) + ' w ' +
+      n(x + r) + ' ' + n(y) + ' m ' +
+      n(x1 - r) + ' ' + n(y) + ' l ' + n(x1 - r + k) + ' ' + n(y) + ' ' + n(x1) + ' ' + n(y + r - k) + ' ' + n(x1) + ' ' + n(y + r) + ' c ' +
+      n(x1) + ' ' + n(y1 - r) + ' l ' + n(x1) + ' ' + n(y1 - r + k) + ' ' + n(x1 - r + k) + ' ' + n(y1) + ' ' + n(x1 - r) + ' ' + n(y1) + ' c ' +
+      n(x + r) + ' ' + n(y1) + ' l ' + n(x + r - k) + ' ' + n(y1) + ' ' + n(x) + ' ' + n(y1 - r + k) + ' ' + n(x) + ' ' + n(y1 - r) + ' c ' +
+      n(x) + ' ' + n(y + r) + ' l ' + n(x) + ' ' + n(y + r - k) + ' ' + n(x + r - k) + ' ' + n(y) + ' ' + n(x + r) + ' ' + n(y) + ' c h B');
+  }
+
   function desenharFolha(plano, opcoes, PDFGen) {
     opcoes = opcoes || {};
     if (!PDFGen || !PDFGen.Doc) return { erro: 'sem gerador de PDF' };
@@ -906,24 +1030,29 @@
     });
     doc.y -= 12;
 
-    var alturaQuadro = provas.length ? 30 + 4 + linhasQuadro.reduce(function (s, l) { return s + l.h; }, 0) : 0;
+    /* Sem a seção (só o calendário), o espaço dela vai para a grade. */
+    var comQuadro = temQuadroDasProvas(plano) && provas.length > 0;
+    var alturaQuadro = comQuadro ? 30 + 4 + linhasQuadro.reduce(function (s, l) { return s + l.h; }, 0) : 0;
     var disponivel = doc.y - LIMITE - alturaQuadro - 4;
     var somaMin = alturaMin.reduce(function (s, h) { return s + h; }, 0);
     if (somaMin > disponivel) {
       return { erro: 'O plano não cabe numa folha só. Encurte o período ou o texto das provas.' };
     }
     /* A sobra vai para as linhas, até 126 pt cada: a folha respira sem
-     * empurrar o quadro para fora. */
+     * empurrar o quadro para fora. Só o calendário (ela tirou a seção), até
+     * 190 pt: a grade ocupa a folha em vez de deixar o pé vazio. */
+    // o plano sem provas e sem a escolha dela fica como sempre foi (126)
+    var TETO_DA_LINHA = temQuadroDasProvas(plano) ? 126 : 190;
     var alturas = alturaMin.slice();
     var sobra = disponivel - somaMin;
     for (var volta = 0; volta < 8 && sobra > 0.5; volta++) {
-      var crescem = alturas.filter(function (h) { return h < 126; }).length;
+      var crescem = alturas.filter(function (h) { return h < TETO_DA_LINHA; }).length;
       if (!crescem) break;
       var parte = sobra / crescem;
       sobra = 0;
       alturas = alturas.map(function (h) {
-        if (h >= 126) return h;
-        var nova = Math.min(126, h + parte);
+        if (h >= TETO_DA_LINHA) return h;
+        var nova = Math.min(TETO_DA_LINHA, h + parte);
         sobra += h + parte - nova;
         return nova;
       });
@@ -935,7 +1064,14 @@
       dias.forEach(function (d, i) {
         var c = cards[s][i];
         var x = MARG_E + colW * i;
-        doc.retangulo(x + 1.5, topo - celH, colW - 3, celH - 3, c ? COR.soft : COR.branco);
+        /* A borda do dia (feedback de uma família em 15/11/2026: "quando
+         * imprime fica difícil ver a divisão dos dias"). O COR.soft sozinho
+         * some no papel; o COR.fioForte é o filete que leva informação e passa
+         * de 3:1 contra o branco, na espessura do piso (0,8 pt), com os cantos
+         * arredondados (pedido do dono). Só nos dias do período: o dia fora
+         * dele segue placa branca, sem moldura, como espaço vazio. */
+        if (c) placaDoDia(doc, x + 1.5, topo - celH, colW - 3, celH - 3, PDFGen);
+        else doc.retangulo(x + 1.5, topo - celH, colW - 3, celH - 3, COR.branco);
         var num = String(Number(d.slice(8, 10)));
         var w = doc.texto(num, x + 7, topo - 16, { tam: 12, bold: true, cor: c ? COR.navy : COR.fio }) || 0;
         // virada do mês no meio da grade: o dia 1 diz de que mês é
@@ -964,7 +1100,7 @@
       doc.y = topo - celH;
     });
 
-    if (provas.length) {
+    if (comQuadro) {
       doc.y -= 4 + 26;
       doc.texto('Datas e conteúdo das provas', MARG_E, doc.y, { tam: 11.5, bold: true, cor: COR.navy });
       doc.y -= 4;
@@ -1000,6 +1136,9 @@
     lerResposta: lerResposta,
     conferirPlano: conferirPlano,
     normalizarAulas: normalizarAulas,
+    temQuadroDasProvas: temQuadroDasProvas,
+    intencaoDoQuadro: intencaoDoQuadro,
+    aplicarIntencaoDoQuadro: aplicarIntencaoDoQuadro,
     aulasNaFolha: aulasNaFolha,
     horaValida: horaValida,
     desenharFolha: desenharFolha,
