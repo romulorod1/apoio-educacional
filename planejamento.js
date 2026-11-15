@@ -38,8 +38,9 @@
   var MAX_DIAS = 42;
   var MAX_IMAGENS = 8;
   /* A borda de cada dia da grade, em pt (o piso de espessura do filete que
-   * leva informação, pdf.js, COR.fioForte). */
+   * leva informação, pdf.js, COR.fioForte), e o raio dos cantos. */
   var BORDA_DO_DIA = 0.8;
+  var RAIO_DO_DIA = 6;
 
   // ================= o esquema do plano (saída estruturada) =================
 
@@ -844,6 +845,24 @@
    * são da agenda do app, com as exceções do plano (aulasRemovidas e
    * aulasExtras, que mudam só a folha); o `genero` ('a' ou 'o') só vale
    * quando o plano não traz o tratamento. */
+  /* A placa de um dia do período: o fundo COR.soft e a moldura COR.fioForte
+   * num caminho só, com os cantos arredondados por Bézier (k = 0,5523, o
+   * quarto de círculo) e pintado com "B" (preenche e contorna). Não usa o
+   * doc.retangulo de propósito: a placa não é branca, então não entra na
+   * conta da marca d'água (pdf.js, Doc.prototype.retangulo). */
+  function placaDoDia(doc, x, y, w, h, PDFGen) {
+    var r = Math.min(RAIO_DO_DIA, w / 2, h / 2), k = 0.5523 * r;
+    var n = function (v) { return v.toFixed(2); };
+    var cor = function (c) { return c.map(function (v) { return v.toFixed(6); }).join(' '); };
+    var x1 = x + w, y1 = y + h;
+    doc.op(cor(PDFGen.COR.soft) + ' rg ' + cor(PDFGen.COR.fioForte) + ' RG ' + BORDA_DO_DIA.toFixed(2) + ' w ' +
+      n(x + r) + ' ' + n(y) + ' m ' +
+      n(x1 - r) + ' ' + n(y) + ' l ' + n(x1 - r + k) + ' ' + n(y) + ' ' + n(x1) + ' ' + n(y + r - k) + ' ' + n(x1) + ' ' + n(y + r) + ' c ' +
+      n(x1) + ' ' + n(y1 - r) + ' l ' + n(x1) + ' ' + n(y1 - r + k) + ' ' + n(x1 - r + k) + ' ' + n(y1) + ' ' + n(x1 - r) + ' ' + n(y1) + ' c ' +
+      n(x + r) + ' ' + n(y1) + ' l ' + n(x + r - k) + ' ' + n(y1) + ' ' + n(x) + ' ' + n(y1 - r + k) + ' ' + n(x) + ' ' + n(y1 - r) + ' c ' +
+      n(x) + ' ' + n(y + r) + ' l ' + n(x) + ' ' + n(y + r - k) + ' ' + n(x + r - k) + ' ' + n(y) + ' ' + n(x + r) + ' ' + n(y) + ' c h B');
+  }
+
   function desenharFolha(plano, opcoes, PDFGen) {
     opcoes = opcoes || {};
     if (!PDFGen || !PDFGen.Doc) return { erro: 'sem gerador de PDF' };
@@ -938,19 +957,14 @@
       dias.forEach(function (d, i) {
         var c = cards[s][i];
         var x = MARG_E + colW * i;
-        doc.retangulo(x + 1.5, topo - celH, colW - 3, celH - 3, c ? COR.soft : COR.branco);
         /* A borda do dia (feedback de uma família em 15/11/2026: "quando
          * imprime fica difícil ver a divisão dos dias"). O COR.soft sozinho
          * some no papel; o COR.fioForte é o filete que leva informação e passa
-         * de 3:1 contra o branco, na espessura do piso (0,8 pt). Só nos dias do
-         * período: o dia fora dele segue sem moldura, como espaço vazio. */
-        if (c) {
-          var bx0 = x + 1.5, bx1 = x + colW - 1.5, by0 = topo - celH, by1 = topo - 3;
-          doc.linha(bx0, by0, bx1, by0, COR.fioForte, BORDA_DO_DIA);
-          doc.linha(bx1, by0, bx1, by1, COR.fioForte, BORDA_DO_DIA);
-          doc.linha(bx1, by1, bx0, by1, COR.fioForte, BORDA_DO_DIA);
-          doc.linha(bx0, by1, bx0, by0, COR.fioForte, BORDA_DO_DIA);
-        }
+         * de 3:1 contra o branco, na espessura do piso (0,8 pt), com os cantos
+         * arredondados (pedido do dono). Só nos dias do período: o dia fora
+         * dele segue placa branca, sem moldura, como espaço vazio. */
+        if (c) placaDoDia(doc, x + 1.5, topo - celH, colW - 3, celH - 3, PDFGen);
+        else doc.retangulo(x + 1.5, topo - celH, colW - 3, celH - 3, COR.branco);
         var num = String(Number(d.slice(8, 10)));
         var w = doc.texto(num, x + 7, topo - 16, { tam: 12, bold: true, cor: c ? COR.navy : COR.fio }) || 0;
         // virada do mês no meio da grade: o dia 1 diz de que mês é

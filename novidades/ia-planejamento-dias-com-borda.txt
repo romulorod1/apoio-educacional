@@ -1,2 +1,2 @@
 # Feedback de uma família em 15/11/2026: impresso, ficava difícil ver a divisão dos dias. Uma linha, porque ela repassou.
-No PDF do planejamento, cada dia ganhou uma borda mais escura, que aparece bem também na impressão.
+No PDF do planejamento, cada dia ganhou uma borda mais escura, de cantos arredondados, que aparece bem também na impressão.
