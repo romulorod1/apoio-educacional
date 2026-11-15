@@ -18413,9 +18413,18 @@
    * neste toque. A linha de Ajustes então leva a hora DESTE toque e diz que os
    * livros ficaram sem conferir, em vez da hora e dos números da conferência
    * de antes ao lado dos pacotes de agora. */
+  /* opcoes.celular (12b, parte A1): a série do celular da dona, que anda
+   * sozinha e calada (pacotesNoCelular): a porta é a do celular
+   * (celularTrazPacotes, e não podeBaixarDaNuvem), nenhum aviso aparece, a
+   * tela não fica presa ligada, os pacotes só vêm se couberem TODOS
+   * (espacoParaOsPacotes), opcoes.seguir() é conferido antes de cada pacote (o
+   * Wi-Fi que caiu para a série) e opcoes.aoAndar(n, total) diz o andamento. */
   function trazerPacotesDaNuvem(indice, opcoes) {
     if (trazendoPacotes) return trazendoPacotes;
-    if (!podeBaixarDaNuvem() || typeof Nuvem.baixarPacoteDaNuvem !== 'function' || typeof Zip === 'undefined' || !Zip.suportado()) return Promise.resolve(null);
+    var doCelular = !!(opcoes && opcoes.celular);
+    if (!(doCelular ? celularTrazPacotes() : podeBaixarDaNuvem()) || typeof Nuvem.baixarPacoteDaNuvem !== 'function' || typeof Zip === 'undefined' || !Zip.suportado()) return Promise.resolve(null);
+    // a série do celular não disputa com outra importação, e não diz nada: tenta de novo no próximo gatilho
+    if (doCelular && (importandoBiblioteca || baixaDaNuvem)) return Promise.resolve(null);
     if (importandoBiblioteca) { avisar('Espere a importação terminar para trazer os pacotes da nuvem.'); return Promise.resolve(null); }
     // um download por vez no tablet: o livro da Estante (#232) que está baixando termina antes
     if (baixaDaNuvem) { avisar('Espere o livro terminar de baixar; depois toque em Atualizar a biblioteca de novo.'); return Promise.resolve(null); }
@@ -18450,10 +18459,20 @@
       // o resumo de antes (de outro toque ou de um zip) sai: o que fica na tela é o deste toque
       mostrarEstadoImportacao('', []);
       if (!escolha.trazer.length) return conta;
+      // no celular: todos de uma vez, e só se couberem todos; senão nenhum baixa
+      if (doCelular) {
+        return espacoParaOsPacotes(escolha.trazer).then(function (cabe) {
+          if (!cabe) { conta.semEspaco = true; return conta; }
+          return trazerASerie();
+        });
+      }
+      return trazerASerie();
+      function trazerASerie() {
       importandoBiblioteca = true;
-      soltaATela = manterTelaLigada();
+      // o soltaATela também é a marca de que a série começou (libera): no celular ele não prende a tela
+      soltaATela = doCelular ? function () {} : manterTelaLigada();
       var caixa = $('#estado-importacao-biblioteca');
-      if (caixa && typeof caixa.scrollIntoView === 'function') caixa.scrollIntoView({ block: 'nearest' });
+      if (!doCelular && caixa && typeof caixa.scrollIntoView === 'function') caixa.scrollIntoView({ block: 'nearest' });
       var total = escolha.trazer.length, resultados = [];
       // só fica a identidade dos zips que o catálogo ainda tem
       var guardarConhecidos = function () {
@@ -18466,6 +18485,9 @@
       };
       var proximo = function (i) {
         if (i >= total) return Promise.resolve();
+        // no celular, o Wi-Fi que caiu (ou a conta que saiu) para a série: o resto vem no próximo gatilho
+        if (doCelular && opcoes.seguir && !opcoes.seguir()) { conta.parou = true; return Promise.resolve(); }
+        if (opcoes && typeof opcoes.aoAndar === 'function') opcoes.aoAndar(i + 1, total);
         return trazerUmPacoteDaNuvem(escolha.trazer[i], i + 1, total, removidos).then(function (res) {
           resultados.push(res);
           /* a identidade fica guardada a CADA pacote, e não só no fim: o
@@ -18495,10 +18517,12 @@
         }
         return conta;
       });
+      }
     }).then(function (c) {
       libera();
       trazendoPacotes = null;
-      if (c) {
+      // a linha de Ajustes é do tablet: a série do celular não a escreve
+      if (c && !doCelular) {
         var agora = new Date().toISOString();
         var est = estadoDaBibliotecaNuvem() || { quando: agora };
         // sem a conferência dos livros neste toque, a hora e os números de antes saem: fica a marca dos já conferidos
@@ -18514,6 +18538,70 @@
       throw e;
     });
     return trazendoPacotes;
+  }
+
+  /* OS PACOTES NO CELULAR DA DONA (12b, parte A1, desenho aprovado em 15/11).
+   * Os exercícios, a teoria e os gabaritos não vão na cópia de segurança, e
+   * sem eles o celular não tem lista para ver nem PDF. Aqui o celular DELA (a
+   * marca de celular com a conta dela; nunca o observador de outra conta, nem
+   * o celular sem conta) traz da nuvem todos os pacotes do catálogo, pela
+   * MESMA série do Atualizar a biblioteca (trazerPacotesDaNuvem, com a
+   * conferência da versão, do sha256 e a marca dos removidos), sem pedir nada
+   * a ela e sem mudar tela nenhuma. A gravação entra no store.js pela porta
+   * 'biblioteca', que só aceita os quatro depósitos do pacote: `midias`,
+   * `dados` e as listas dela ficam como a cópia os deixou.
+   *
+   * SÓ NO WI-FI: são uns 400 MB. O navegador diz o tipo da conexão em
+   * navigator.connection.type ('wifi', 'cellular'...), no Chrome do Android.
+   * O effectiveType NÃO serve: ele mede a velocidade ('4g'), e um 4G bom
+   * parece Wi-Fi. Sem o type (o Safari do iPhone, o Chrome do computador, o
+   * tipo 'unknown'), ou com a economia de dados ligada (saveData), não baixa:
+   * na dúvida, o plano de dados dela fica intacto. O cabo ('ethernet') conta
+   * como Wi-Fi.
+   *
+   * QUANDO: ao abrir (no fim da busca da cópia mais nova), logo depois de
+   * trazer a primeira cópia, ao voltar o sinal e quando a conexão muda. Uma
+   * série por vez, nunca sem internet, e antes de cada pacote o Wi-Fi é
+   * conferido de novo. O andamento fica num atributo escondido
+   * (#modo-celular[data-pacotes]); a linha que ela vê é da parte A2. */
+  function celularTrazPacotes() {
+    return celularEdita() && !Nuvem.estado().observador && typeof Nuvem.baixarPacoteDaNuvem === 'function';
+  }
+  function celularNoWifi() {
+    var c = navigator.connection;
+    return !!c && c.saveData !== true && (c.type === 'wifi' || c.type === 'ethernet');
+  }
+  /* Todos os pacotes que faltam têm de caber juntos, cada um duas vezes (o zip
+   * e o que a importação grava), mais a folga da baixa; cada pacote ainda passa
+   * pela conta dele, na baixa e na importação. Sem a estimativa do navegador,
+   * não baixa. */
+  function espacoParaOsPacotes(trazer) {
+    var soma = trazer.reduce(function (s, e) { return s + e.tamanho; }, 0);
+    return Store.estimarEspaco().catch(function () { return null; }).then(function (espaco) {
+      if (!espaco || !espaco.quota) return false;
+      return espaco.quota - (espaco.usage || 0) >= soma * 2 + FOLGA_DA_BAIXA;
+    });
+  }
+  function marcarPacotesNoCelular(estado) {
+    var caixa = $('#modo-celular');
+    if (caixa) caixa.setAttribute('data-pacotes', estado);
+  }
+  var pacotesDoCelular = null;
+  function pacotesNoCelular() {
+    if (!modoCelular || !temNuvem() || !celularTrazPacotes()) return Promise.resolve(null);
+    if (pacotesDoCelular) return pacotesDoCelular;
+    if (navigator.onLine === false) { marcarPacotesNoCelular('sem-internet'); return Promise.resolve(null); }
+    if (!celularNoWifi()) { marcarPacotesNoCelular('sem-wifi'); return Promise.resolve(null); }
+    marcarPacotesNoCelular('conferindo');
+    var seguir = function () { return modoCelular && navigator.onLine !== false && celularNoWifi() && celularTrazPacotes(); };
+    pacotesDoCelular = trazerPacotesDaNuvem(null, { celular: true, seguir: seguir, aoAndar: function (n, total) {
+      marcarPacotesNoCelular('trazendo ' + n + '/' + total);
+    } }).then(function (c) {
+      marcarPacotesNoCelular(!c ? 'nada' : c.semEspaco ? 'sem-espaco' : c.parou ? 'parou' : c.falharam ? 'faltam' : 'prontos');
+    }, function () {
+      marcarPacotesNoCelular('falhou');
+    }).then(function () { pacotesDoCelular = null; });
+    return pacotesDoCelular;
   }
 
   // na abertura, no máximo uma vez por hora, e só com a constante ligada
@@ -23031,6 +23119,7 @@
   }
   function espelharUmaVez() {
     if (!minhasListasLidas) return null;
+    if (aparelhoSoLe()) return null;   // 12b A1: o celular só lê as listas, e o espelho grava; nada aqui
     var novas = selecoesAnteriores().filter(function (x) {
       return !minhasListas.some(function (l) { return mesmaLista(l, x); });
     }).map(function (x) {
@@ -29510,7 +29599,10 @@
         /* N1 (fatia 3): logo DEPOIS da cópia, em série, chegam os registros mais
          * novos que ela (a restauração zerou o cursor). Só recebe: o envio do que
          * a restauração enfileirou fica para os gatilhos de sempre. */
-        return Nuvem.receberRegistros();
+        return Nuvem.receberRegistros().then(function () {
+          // 12b A1: o celular que acabou de ganhar a marca traz os pacotes (no Wi-Fi)
+          if (ficaCelular) pacotesNoCelular();
+        });
       });
     }).catch(function (e) {
       botao.disabled = false;
@@ -29709,7 +29801,12 @@
     window.addEventListener('online', function () {
       if (celularEdita()) Nuvem.sincronizarSeDevido({ versaoApp: VERSAO, motivo: 'sinal' });
       if (modoCelular) desenharTopoCelular();
+      if (modoCelular) pacotesNoCelular(); // 12b A1: o sinal voltou; os pacotes só vêm se for Wi-Fi
     });
+    // 12b A1: a conexão mudou (o Wi-Fi de casa entrou, ou caiu para os dados móveis)
+    if (navigator.connection && typeof navigator.connection.addEventListener === 'function') {
+      navigator.connection.addEventListener('change', function () { if (modoCelular) pacotesNoCelular(); });
+    }
     window.addEventListener('offline', function () { if (modoCelular) desenharTopoCelular(); });
     setInterval(andarLinhaDeAgoraCelular, 60000); // a linha de agora, em Hoje (D6c)
     var tempo = null;
@@ -30021,6 +30118,8 @@
     }).then(function () {
       celularBuscando = false;
       desenharTopoCelular();
+      // 12b A1: com a cópia em dia, os pacotes de exercícios (só no Wi-Fi, só no celular dela)
+      pacotesNoCelular();
     });
   }
 

@@ -319,13 +319,31 @@
   var celularEdita = false;
   function somenteLeitura(ligar) { soLeitura = !!ligar; }
   function celularQueEdita(ligar) { celularEdita = !!ligar; }
-  var PORTAS_DO_CELULAR = { documento: true, fila: true, historico: true };
+  var PORTAS_DO_CELULAR = { documento: true, fila: true, historico: true, biblioteca: true };
   function erroSoLeitura() {
     return Object.assign(new Error('Este aparelho só lê. Para mudar alguma coisa, use o tablet.'), { soLeitura: true });
   }
+  /* A PORTA DA BIBLIOTECA (12b, parte A1): o celular da dona traz os pacotes
+   * de exercícios da nuvem e os grava aqui. É uma porta estreita, e a trava
+   * confere a LISTA DE DEPÓSITOS da transação, e não só o nome da porta: ela
+   * abre só para uma transação que tenha um ou mais destes quatro depósitos e
+   * nenhum outro. Fica de fora `midias`, que a cópia de segurança também usa
+   * (as imagens das folhas): no celular, a importação do pacote não apaga nem
+   * grava miniatura (gravarPacoteBiblioteca, lá embaixo). Ficam de fora também
+   * `dados`, `biblioteca_listas`, `biblioteca_uso` e `biblioteca_etiquetas`,
+   * que são dela e só chegam ao celular pela cópia. O observador de outra
+   * conta nunca a ganha (celularEdita). */
+  var DEPOSITOS_DA_PORTA_BIBLIOTECA = ['biblioteca_pacotes', 'biblioteca_itens', 'biblioteca_teoria', 'biblioteca_assets'];
+  function portaDaBibliotecaAceita(nomes) {
+    var lista = Array.isArray(nomes) ? nomes : [nomes];
+    return celularEdita && lista.length > 0 && lista.every(function (n) { return DEPOSITOS_DA_PORTA_BIBLIOTECA.indexOf(n) >= 0; });
+  }
   /* `porta`: true é a restauração da cópia e o recebimento (dado que vem da
-   * nuvem); 'documento', 'fila' e 'historico' são as portas do celular da dona. */
+   * nuvem); 'documento', 'fila' e 'historico' são as portas do celular da dona;
+   * 'biblioteca' é a dos pacotes, que só vale com os depósitos de cima. */
   function transacao(b, nomes, modo, porta) {
+    // a porta da biblioteca confere a lista antes; daí em diante ela é uma das portas do celular
+    if (modo === 'readwrite' && soLeitura && porta === 'biblioteca' && !portaDaBibliotecaAceita(nomes)) throw erroSoLeitura();
     if (modo === 'readwrite' && soLeitura && porta !== true && !(celularEdita && PORTAS_DO_CELULAR[porta])) throw erroSoLeitura();
     return b.transaction(nomes, modo);
   }
@@ -2552,7 +2570,13 @@
   function gravarPacoteBiblioteca(aberto) {
     var m = aberto.manifest;
     var chave = m.pacote, versao = m.versao;
-    var DEPOSITOS = ['biblioteca_pacotes', 'biblioteca_itens', 'biblioteca_teoria', 'biblioteca_assets', 'midias'];
+    /* No aparelho que só lê (o celular da dona, A1), pela porta da biblioteca:
+     * só os quatro depósitos do pacote. `midias` nem entra na transação, porque
+     * ali moram também as imagens da cópia de segurança, e o celular nunca
+     * guardou miniatura para apagar (a gravação dela é recusada no celular). */
+    var noCelular = soLeitura;
+    var DEPOSITOS = noCelular ? DEPOSITOS_DA_PORTA_BIBLIOTECA.slice()
+      : ['biblioteca_pacotes', 'biblioteca_itens', 'biblioteca_teoria', 'biblioteca_assets', 'midias'];
     // Os Blobs nascem antes da transação: nada assíncrono pode ficar no meio dela.
     var assets = aberto.assets.map(function (a) {
       return {
@@ -2573,7 +2597,7 @@
     };
     return abrir().then(function (b) {
       return new Promise(function (resolve, reject) {
-        var t = transacao(b, DEPOSITOS, 'readwrite');
+        var t = transacao(b, DEPOSITOS, 'readwrite', noCelular ? 'biblioteca' : undefined);
         var recusa = null;
         var pacotes = t.objectStore('biblioteca_pacotes');
         var req = pacotes.get(chave);
@@ -2607,7 +2631,8 @@
               c.continue();
             };
           });
-          // miniaturas da versão anterior: o desenho pode ter mudado
+          // miniaturas da versão anterior: o desenho pode ter mudado (no celular, não há)
+          if (noCelular) return;
           var pref = PREFIXO_MINIATURA + chave + '@';
           t.objectStore('midias').delete(IDBKeyRange.bound(pref, pref + '￿'));
         };
@@ -3766,6 +3791,7 @@
     aoMudar: aoMudar, somenteLeitura: somenteLeitura, celularQueEdita: celularQueEdita,
     estaSoLendo: function () { return soLeitura; },
     celularEdita: function () { return soLeitura && celularEdita; },
+    portaDaBibliotecaAceita: portaDaBibliotecaAceita,
     SO_DESTE_TABLET: SO_DESTE_TABLET.slice(),
     /* Registros (N1): o que a sincronização e as provas leem. */
     AJUSTES_DO_APARELHO: AJUSTES_DO_APARELHO.slice(),

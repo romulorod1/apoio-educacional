@@ -1363,6 +1363,22 @@ roda "pacotes da nuvem, atualizar --envenenado-removido-por-outro-nome" node "_t
 roda "pacotes da nuvem, atualizar --envenenado-frase-por-podeatualizar" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-frase-por-podeatualizar
 # entrar e sair da nuvem trocam as frases na hora, sem trocar de aba
 roda "pacotes da nuvem, atualizar --envenenado-sem-ouvinte-das-frases" node "_teste/testa_pacotes_nuvem_atualizar.js" --envenenado-sem-ouvinte-das-frases
+# 12b, parte A1 (15/11/2026): o celular DA DONA traz os pacotes de exercicios
+# da nuvem sozinho, so no Wi-Fi (navigator.connection.type) e com espaco para
+# todos, pela mesma serie do #233, e grava pela porta 'biblioteca' do store.js,
+# que so aceita os quatro depositos do pacote. Contra o emulador do Auth, do
+# Firestore e do Storage, com as regras do repositorio, a 390x844: nos dados
+# moveis, sem o tipo, sem internet e sem espaco nada baixa; o observador nem
+# le o catalogo; no Wi-Fi os pacotes chegam iguais aos do tablet, uma serie
+# so, sem tocar dados, listas nem midias (a imagem da folha da copia); o
+# espelho das listas nao grava no celular. Os venenos: a porta que aceita
+# dados ou listas, o download sem Wi-Fi, o observador que baixa e o celular
+# que grava lista. Portas 9121 a 9127.
+roda "celular, pacotes da nuvem (A1)"              node "_teste/testa_celular_pacotes.js"
+roda "celular, pacotes da nuvem --envenenado-porta-aceita-dados" node "_teste/testa_celular_pacotes.js" --envenenado-porta-aceita-dados
+roda "celular, pacotes da nuvem --envenenado-celular-grava-lista" node "_teste/testa_celular_pacotes.js" --envenenado-celular-grava-lista
+roda "celular, pacotes da nuvem --envenenado-baixa-sem-wifi" node "_teste/testa_celular_pacotes.js" --envenenado-baixa-sem-wifi
+roda "celular, pacotes da nuvem --envenenado-observador-baixa" node "_teste/testa_celular_pacotes.js" --envenenado-observador-baixa
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve
