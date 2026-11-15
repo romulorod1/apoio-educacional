@@ -180,7 +180,7 @@
     '- Feedback do mês: no tablet, Fechamento, no cartão do aluno, "Escrever o feedback"; no celular, Fechar mês, "Editar a mensagem do mês" (é o mesmo texto).',
     '- PDF do mês e envio para a família: no tablet, Fechamento, "Preparar e enviar" no cartão do aluno, ou "Enviar para todas as famílias"; no celular, a aba Enviar.',
     '- Marcar pagamento: Fechamento (no celular, Fechar mês), no cartão do aluno, "Marcar como pago".',
-    '- Aluno novo: Alunos, "+ Novo aluno" (no celular, "Cadastrar aluno"). Responsável, telefone e endereço: na ficha do aluno (no celular, "Editar ficha").',
+    '- Aluno novo: Alunos, "+ Novo aluno" (no celular, "Cadastrar aluno"). Telefone, endereço e contato da família: na ficha do aluno (no celular, "Editar ficha").',
     '- Valor por hora e aula que se repete: só no tablet. Na ficha do aluno, aba Valores ("+ Adicionar valor"; em "Aulas que se repetem", "Encerrar"). Criar a repetição: no +, "Repetir toda semana".',
     '- Livros, exercícios e listas: no tablet, Biblioteca (a busca no alto; os livros, o "Continuar lendo" e Minhas listas no botão Estante). No celular os livros não abrem. Anexar PDF ou foto na aula: abra a aula no tablet, "Anexar PDF" ou "Anexar foto".',
     '- Cópia de segurança, nuvem, trocar senha, sair da conta e "Atualizar a biblioteca": no tablet, Ajustes.'

@@ -576,6 +576,11 @@ function respostaTexto(t) { return { ok: true, resposta: { stop_reason: 'end_tur
   conf('(arranjo) o mapa cita pelo menos 25 rótulos entre aspas', (mapa.join('\n').match(/"[^"]+"/g) || []).length >= 25, true);
   conf('todo rótulo entre aspas no mapa existe na tela de hoje', rotulosQueNaoExistem(mapa), []);
   conf('o mapa não tem travessão nem data', /[–—]|\d{4}-\d{2}-\d{2}/.test(mapa.join('\n')), false);
+  /* A prova de privacidade do navegador (testa_assistente_navegador.js)
+   * reprova o pedido que contenha "Responsável", o marcador do dado do
+   * responsável; o sistema vai em todo pedido, então não pode ter a palavra
+   * (o #240 caiu nela no CI). A mesma guarda aqui, antes do navegador. */
+  conf('os dois sistemas não têm "Responsável" (a prova de privacidade do navegador acusaria)', [/Responsável/.test(A.SISTEMA), /Responsável/.test(A.SISTEMA_GRAVA)], [false, false]);
   // controles
   const semBloco = A.SISTEMA.split('\n').filter(l => mapa.indexOf(l) < 0).join('\n');
   conf('controle: o sistema sem o bloco reprova os quatro casos', respondeOsCasos(semBloco).filter(r => /NÃO acha$/.test(r)).length, 4);
