@@ -22311,9 +22311,14 @@
     return disciplinaDoMapa(meta) === a.disciplina && (a.eixo !== 'ano' || Biblioteca.livroDoAno(meta, a.serie));
   }
   function serieDoAssunto(a) { return a.eixo === 'ano' ? nomeDoAno(a.serie) : (a.serieNome || a.serie || ''); }
+  /* O nome da matéria: o do Core; sem ele, o do assunto; sem os dois, o do
+   * índice de tópicos (banco/topicos/indice.json). A chave do índice que o
+   * Core não tem ("filosofia-sociologia", a do mapa dos livros de filosofia e
+   * de sociologia) sai "Filosofia e Sociologia", e não a chave crua (12c). */
   function nomeDaDisciplina(id, a) {
     var m = Core.materiaPorId(id);
-    return (m && m.rotulo) || (a && a.disciplinaNome) || id;
+    var doIndice = (indiceTopicos || []).filter(function (d) { return d && d.chave === id; })[0];
+    return (m && m.rotulo) || (a && a.disciplinaNome) || (doIndice && doIndice.nome) || id;
   }
   /* Quantos livros têm vínculo registrado para cada assunto: um passe pelos
    * mapas. Conta também o livro de ano vizinho cujo mapa liga o assunto da
