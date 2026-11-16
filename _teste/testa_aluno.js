@@ -134,8 +134,8 @@ conf('a metade da tarde vê a metade da manhã',
 conf('a aula de outro aluno não entra',
   Core.ultimoEncontro(bancoUm, 'a2', aula({ alunoId: 'a2', data: '2026-09-01' })), 'null');
 
-/* UMA REGRA SÓ DA AULA ANTERIOR (polimento da 12b): a mesma do "Na última
- * aula" da janela, do relato do celular e da "Última aula" do seletor (F5).
+/* UMA REGRA SÓ DA AULA ANTERIOR (polimento da 12b): a mesma do "No último
+ * relato" da janela, do "Último relato" do celular e do seletor (F5).
  * Só o que JÁ ACONTECEU: às 11h, a aula das 15h de hoje (com anotação
  * adiantada) e a marcada no meio da semana não são onde os dois pararam. */
 const AS_11H = new Date(2026, 8, 1, 11, 0);
@@ -183,7 +183,7 @@ if (VENENO_SEM_HORA) {
 }
 conf('a ficha do celular às 18h: o último relato é o da aula de hoje sem horário, e não o da semana passada',
   fichaSemHora && fichaSemHora.aulaId + '|' + fichaSemHora.oQueRendeu, 's1|Dada ao meio-dia, sem horário.');
-conf('a segunda aula do dia (19h) vê a de hoje sem horário, relatada, no "Na última aula"',
+conf('a segunda aula do dia (19h) vê a de hoje sem horário, relatada, no "No último relato"',
   Core.ultimoEncontro(bancoSemHora, 'a1', bancoSemHora.aulas[2], AS_18H).aulaId, 's1');
 conf('a aula de hoje sem horário: com o relato escrito, aconteceu; sem nada, ou com só o assunto anotado de antemão, ainda não',
   [Core.aulaJaAconteceu(bancoSemHora.aulas[1], AS_18H), Core.aulaJaAconteceu(bancoSemHora.aulas[3], AS_18H),

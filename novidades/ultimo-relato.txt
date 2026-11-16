@@ -1,0 +1,2 @@
+# Último relato: as etiquetas da aula anterior na janela da aula do tablet e na folha da aula do celular dizem o que a regra mede.
+Na janela da aula e na folha da aula do celular, a aula anterior agora aparece como "Último relato", com a data da última aula que tem registro.

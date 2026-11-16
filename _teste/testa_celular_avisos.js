@@ -11,7 +11,7 @@
  *      (auditoria de UX de 09/11);
  *   2. "Falta registrar como foi": a aula dada e já acabada dos últimos 7
  *      dias sem registro pelo critério do tablet (Core.aulaTemRegistro, o do
- *      "Relato da aula anterior"); a registrada, a falta e a cancelada não
+ *      "Último relato"); a registrada, a falta e a cancelada não
  *      aparecem; o toque abre o "Registrar como foi" daquela aula, e depois
  *      de salvar o aviso some;
  *   3. a família em aberto (a lista de pendentes do lote 3) vira aviso de
