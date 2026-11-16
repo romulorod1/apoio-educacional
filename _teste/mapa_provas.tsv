@@ -64,7 +64,6 @@ _teste/versao_publicada.js	-
 novidades/*	-
 _teste/testa_livros_impressa.js	-
 _teste/testa_chaves_capitulos.py	-
-_teste/testa_estabilidade_publicador.py	-
 _teste/testa_*.js	-
 _teste/hooks/*	-
 # Mexe em como o portao roda tudo: a bateria inteira.
