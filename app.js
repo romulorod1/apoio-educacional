@@ -11938,7 +11938,7 @@
       el('div', { class: 'barra u-margem-baixo-6' }, [
         el('span', {
           class: 'rotulo-ultimo',
-          texto: 'Na última aula, ' + Core.ddmmaaaa(u.data) + ', ' + u.diaSemana
+          texto: 'No último relato, ' + Core.ddmmaaaa(u.data) + ', ' + u.diaSemana
         }),
         el('span', { class: 'cresce' }),
         el('button', {
@@ -13221,8 +13221,8 @@
   }
 
   /* F5: a última aula deste aluno antes desta, pela REGRA ÚNICA da "aula
-   * anterior" (Core.ultimoEncontro, polimento da 12b): a mesma aula do "Na
-   * última aula" que a janela da aula mostra logo atrás do seletor. Cancelada
+   * anterior" (Core.ultimoEncontro, polimento da 12b): a mesma aula do "No
+   * último relato" que a janela da aula mostra logo atrás do seletor. Cancelada
    * e falta não contam, e a aula só aconteceu quando a data E o horário dela
    * já passaram: a das 15h de hoje, às 11h, ainda não é "última" (a aula sem
    * horário, de hoje, também não). Abrindo uma aula futura, a marcada no meio
@@ -31040,7 +31040,7 @@
 
   /* "Sem registro": a aula dos últimos 7 dias (hoje e os seis de antes),
    * dada (realizada ou reposição) e já acabada, sem registro pelo critério
-   * do tablet (Core.aulaTemRegistro, o do "Relato da aula anterior"). A
+   * do tablet (Core.aulaTemRegistro, o do "Último relato"). A
    * falta e a cancelada não têm o que registrar. */
   var DIAS_DO_FALTA_REGISTRAR = 7;
   function aulaPedeRegistroCelular(a, hoje, agora) {
@@ -31632,7 +31632,7 @@
     /* O relato da aula ANTERIOR num quadro à parte, com a data no rótulo: solto
      * logo abaixo do nome, parecia o desta aula. */
     if (u) {
-      var linhas = [el('div', { class: 'rotulo-ultimo', texto: 'Relato da aula anterior (' + Core.ddmm(u.data) + ')' })];
+      var linhas = [el('div', { class: 'rotulo-ultimo', texto: 'Último relato (' + Core.ddmm(u.data) + ')' })];
       if (u.assuntos.length) linhas.push(el('div', {}, [el('strong', { texto: 'Assunto: ' }), document.createTextNode(u.assuntos.join('; '))]));
       linhas.push(el('div', {}, [document.createTextNode(u.oQueRendeu || 'Sem relato escrito.')]));
       caixa.appendChild(el('div', { class: 'cel-ultimo cel-aula-anterior', id: 'cel-aula-anterior' }, linhas));
@@ -31642,7 +31642,7 @@
     }
     var notas = [];
     if ((a.notaPrivada || '').trim()) notas.push(['Desta aula', a.notaPrivada.trim()]);
-    if (u && u.soMinha) notas.push(['Da última aula', u.soMinha]);
+    if (u && u.soMinha) notas.push(['Do último relato', u.soMinha]);
     if (notas.length) {
       var texto = el('div', { class: 'so-minha-anterior cel-so-minha', hidden: 'hidden' }, notas.map(function (n) {
         return el('div', {}, [el('strong', { texto: 'Nota só minha (' + n[0].toLowerCase() + '): ' }), document.createTextNode(n[1])]);

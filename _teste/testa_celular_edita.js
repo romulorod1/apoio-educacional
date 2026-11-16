@@ -715,7 +715,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   conf('a altura segue a escala proporcional: 1h30 ocupa 78 px e 1h ocupa 52 px (' + bloco.altura + ' e ' + bloco.altura60 + ' px)',
     bloco.altura === 78 && bloco.altura60 === 52, true);
   conf('a reposição se vê pela cor e pelo nome', bloco.reposicao, true);
-  conf('o bloco não repete o relato da última aula (ele fica na folha)', /Na última aula|Rendeu bem/.test(bloco.texto), false);
+  conf('o bloco não repete o relato da última aula (ele fica na folha)', /último relato|Rendeu bem/i.test(bloco.texto), false);
   /* (revisão) hoje, o que já passou não é livre; e a aula de agora e a próxima levam o nome. */
   const hojeLivre = await pagC.evaluate(() => {
     const d = new Date(), agora = d.getHours() * 60 + d.getMinutes();
@@ -738,7 +738,7 @@ const REF_JUNHO = { linhas: 10, horas: '10:30', total: 'R$ 1.050,00' };
   secao('3b. O toque no bloco abre a folha de baixo, com botões grandes');
   conf('o toque no bloco de hoje abre a folha da aula', await abrirFolha(pagC, 'aula-hoje'), true);
   const naFolha = await texto(pagC, '#cel-folha');
-  conf('a folha traz o relato da aula ANTERIOR num quadro à parte, com a data no rótulo', /^Relato da aula anterior \(\d\d\/\d\d\)/.test((await texto(pagC, '#cel-folha #cel-aula-anterior')) || '') &&
+  conf('a folha traz o relato da aula ANTERIOR num quadro à parte, com a data no rótulo', /^Último relato \(\d\d\/\d\d\)/.test((await texto(pagC, '#cel-folha #cel-aula-anterior')) || '') &&
     /Rendeu bem/.test((await texto(pagC, '#cel-aula-anterior')) || ''), true);
   conf('o botão do relato diz que é desta aula', await texto(pagC, '#cel-folha-registrar'), 'Escrever como foi esta aula');
   conf('(revisão) Cancelar fica numa linha só dele, a 16 px ou mais de qualquer outro botão de ação', await pagC.evaluate(() => {

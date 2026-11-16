@@ -516,16 +516,16 @@ const ONTEM = RELOGIO.dia(-1);
       !!hora && hora.getBoundingClientRect().left < b.getBoundingClientRect().left; }), true);
   /* D6c: o bloco não repete o relato da última aula; o lembrete, a última aula
    * e a nota só minha ficam na folha que o toque no bloco abre. */
-  conf('Hoje: o bloco não repete o relato da última aula', /Na última aula|Rendeu bem em frações/.test(hojeTexto), false);
+  conf('Hoje: o bloco não repete o relato da última aula', /último relato|Rendeu bem em frações/i.test(hojeTexto), false);
   await clicar(pagB, '#cel-tempo .cel-bloco[data-aula="aula-hoje"]');
   const folhaTexto = (await texto(pagB, '#cel-folha')) || '';
   conf('a folha da aula: o lembrete do mapeamento', /Lembrete: Prioridades: Frações antes da prova/.test(folhaTexto), true);
-  conf('a folha da aula: o relato da aula anterior, num quadro rotulado com a data', /^Relato da aula anterior \(\d\d\/\d\d\)/.test((await texto(pagB, '#cel-aula-anterior')) || '') &&
+  conf('a folha da aula: o relato da aula anterior, num quadro rotulado com a data', /^Último relato \(\d\d\/\d\d\)/.test((await texto(pagB, '#cel-aula-anterior')) || '') &&
     /Rendeu bem em frações/.test(folhaTexto), true);
   conf('a folha da aula: a nota só minha nasce fechada', await pagB.evaluate(() => document.querySelector('#cel-folha .cel-so-minha').hidden), true);
   await clicar(pagB, '#cel-folha .cel-ver-nota');
-  conf('a folha da aula: um toque abre a nota só minha', await pagB.evaluate(() =>
-    !document.querySelector('#cel-folha .cel-so-minha').hidden && /Mãe pediu para falar da prova/.test(document.querySelector('#cel-folha .cel-so-minha').textContent)), true);
+  conf('a folha da aula: um toque abre a nota só minha, rotulada pelo último relato', await pagB.evaluate(() =>
+    !document.querySelector('#cel-folha .cel-so-minha').hidden && /Nota só minha \(do último relato\): Mãe pediu para falar da prova/.test(document.querySelector('#cel-folha .cel-so-minha').textContent)), true);
   await clicar(pagB, '#cel-folha-fechar');
   const telas = { hoje: null, alunos: null, fechamento: null, enviar: null }; // (D6c, lote 2) a aba Alunos
   for (const t of Object.keys(telas)) {
