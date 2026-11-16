@@ -32536,7 +32536,7 @@
       var sinaisDe = function (a) { return bib && assuntoComPagina(a) ? sinaisDoAssunto(a) : null; };
       var temMaterial = function (a) { var s = sinaisDe(a); return !!(s && (s.teoria || s.exercicios || s.obmep)); };
       achados = achados.filter(temMaterial).concat(achados.filter(function (a) { return !temMaterial(a); }));
-      // os sinais do #239 (a mesma sinaisDoAssunto), e a legenda uma vez, no alto, só se algum aparecer
+      // os sinais do #239 (a mesma sinaisDoAssunto), e a legenda uma vez, no alto, com o que está aceso (atualizarLegendaDosSinais, #242)
       var legenda = legendaDosSinais();
       legenda.id = 'cel-bib-legenda';
       miolo.appendChild(legenda);
@@ -32547,7 +32547,6 @@
         if (estado) {
           sinais = caixaDeSinais();
           mostrarSinais(sinais, estado);
-          if (!sinais.hidden) legenda.hidden = false;
         }
         var outraMateria = a.disciplina && a.disciplina !== Core.MATERIA_PADRAO;
         var detalhe = [outraMateria ? nomeDaDisciplina(a.disciplina, a) : '', serieDoAssunto(a),
@@ -32561,9 +32560,14 @@
       if (achados.length > ASSUNTOS_NA_BUSCA_DO_CELULAR) {
         var resto = achados.slice(ASSUNTOS_NA_BUSCA_DO_CELULAR);
         var ver = el('button', { type: 'button', class: 'btn cel-bib-mais', texto: 'Ver os outros ' + resto.length,
-          aoClick: function () { resto.forEach(function (a) { lista.insertBefore(linha(a), ver); }); ver.remove(); } });
+          aoClick: function () {
+            resto.forEach(function (a) { lista.insertBefore(linha(a), ver); });
+            ver.remove();
+            atualizarLegendaDosSinais(legenda, lista);
+          } });
         lista.appendChild(ver);
       }
+      atualizarLegendaDosSinais(legenda, lista);
     }
     var t = listasParaMostrar();
     var dasListas = t.dela.concat(t.doAplicativo).filter(function (l) { return listaCasaComABusca(l, termo); });
