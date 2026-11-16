@@ -4795,3 +4795,6 @@ body.modo-celular .celular .cel-bib-pe-pdf .btn:disabled { opacity: 1; color: va
 .bib-pdf-acoes-celular { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-left: 0; }
 .bib-pdf-acoes-celular [data-acao="compartilhar"] { grid-column: 1 / -1; }
 .bib-pdf-acoes-celular .bib-pdf-acao { min-width: 0; min-height: var(--alvo-celular); white-space: normal; justify-content: center; }
+/* o gabarito é dela: o rótulo em cima do nome e a linha calma embaixo */
+.bib-pdf-so-voce { display: block; margin-bottom: 2px; color: var(--navy); font-size: var(--letra-14); }
+.bib-pdf-aviso-gabarito { margin: 4px 0 0; font-size: var(--letra-14); line-height: 1.4; color: var(--novidades-subtitulo); }

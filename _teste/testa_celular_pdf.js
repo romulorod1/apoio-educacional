@@ -415,6 +415,8 @@ async function printar(pag, nome) {
   await pausa(500);
   let ps = await pdfsDosCartoes(cel);
   conf('cada cartão tem o botão PDF, com o nome escrito', ps.map(p => p.tem + ':' + p.texto).join(','), ps.map(() => 'true:PDF').join(','));
+  conf('o botão PDF do cartão tem o ícone do documento, e não o de compartilhar (o toque monta o PDF e abre a janela)', await cel.evaluate(() =>
+    Array.from(document.querySelectorAll('#cel-bib-miolo [data-acao="pdf"] svg')).map(s => s.getAttribute('data-icone-nome')).filter((x, i, a) => a.indexOf(x) === i).join(',')), 'folha');
   conf('trazendo: o PDF da lista completa aceso; o da que espera exercício e o da vazia apagados, como o Ver lista',
     ['lista-revisao', 'lista-desafio', 'lista-area', 'lista-grande'].map(id => porId(ps, id).apagado + '/' + porId(ps, id).verApagado).join(','),
     'false/false,true/true,true/true,false/false');
@@ -470,6 +472,23 @@ async function printar(pag, nome) {
     j1.itens.map(i => i.botoes.map(b => b.acao + ':' + b.texto + (b.principal ? '*' : '')).join(',')).join(' | '),
     'compartilhar:Compartilhar*,baixar:Baixar,ver:Ver | compartilhar:Compartilhar,baixar:Baixar,ver:Ver');
   conf('nada fala em imprimir', /imprim/i.test(await textoDa(cel, '#modal-bib-compartilhar')), false);
+  conf('o gabarito diz que é só dela, com a linha calma, e a lista não leva nada disso', await cel.evaluate(() => {
+    const g = document.querySelector('#modal-bib-compartilhar .bib-pdf-item[data-parte="gabarito"]');
+    const l = document.querySelector('#modal-bib-compartilhar .bib-pdf-item[data-parte="lista"]');
+    return [(g.querySelector('.bib-pdf-so-voce') || {}).textContent, (g.querySelector('.bib-pdf-aviso-gabarito') || {}).textContent,
+      !!l.querySelector('.bib-pdf-so-voce, .bib-pdf-aviso-gabarito'), g.querySelector('[data-acao="compartilhar"]').classList.contains('principal')].join('|');
+  }), 'Gabarito: só para você|Não envie ao aluno.|false|false');
+  conf('o nome do arquivo quebra nos sublinhados: a última linha nunca fica só com o "pdf"', await cel.evaluate(() =>
+    Array.from(document.querySelectorAll('#modal-bib-compartilhar .bib-compartilhar-nome')).map(n => {
+      const r = document.createRange();
+      const ultimo = n.lastChild;
+      r.setStart(ultimo, Math.max(0, ultimo.textContent.length - 3)); r.setEnd(ultimo, ultimo.textContent.length);
+      const fim = r.getBoundingClientRect();
+      const linhas = Array.from(n.getClientRects ? (() => { const t = document.createRange(); t.selectNodeContents(n); return t.getClientRects(); })() : []);
+      const daUltima = linhas.filter(x => Math.abs(x.top - fim.top) < 2);
+      const largura = daUltima.reduce((m, x) => Math.max(m, x.right), 0) - daUltima.reduce((m, x) => Math.min(m, x.left), 1e9);
+      return n.querySelectorAll('wbr').length > 0 && largura > fim.width * 3;
+    }).join(',')), 'true,true');
   const g1 = await geometriaDaJanela(cel);
   await printar(cel, '390x844_3_pdf_pronto.png');
   if (MODO === '--envenenado-pdf-pronto-tres-numa-linha') {
@@ -537,6 +556,13 @@ async function printar(pag, nome) {
   conf('o pé fica preso rente ao fim da área que rola, com "PDF da lista" aceso na linha inteira',
     [pe.sticky, pe.rola, pe.rente, pe.texto, pe.aceso, pe.largura].join('|'), 'sticky|true|true|PDF da lista|true|true');
   await printar(cel, '390x844_2_ver_lista_pe.png');
+  await cel.evaluate(() => { const c = document.querySelector('#cel-conteudo'); c.scrollTop = c.scrollHeight; });
+  await pausa(300);
+  conf('rolando até o fim, o último exercício fica inteiro acima do pé', await cel.evaluate(() => {
+    const ex = Array.from(document.querySelectorAll('.cel-bib-ver-lista .cel-bib-ex'));
+    const ultimo = ex[ex.length - 1].getBoundingClientRect(), pe = document.querySelector('#cel-bib-pe-pdf').getBoundingClientRect();
+    return ultimo.bottom <= pe.top + 1 && ultimo.top >= document.querySelector('#cel-conteudo').getBoundingClientRect().top - 1;
+  }), true);
   await cel.evaluate(() => { const c = document.querySelector('#cel-conteudo'); c.scrollTop = c.scrollHeight / 2; });
   await pausa(300);
   conf('rolando até o meio, o pé continua rente ao fim', await cel.evaluate(() =>

@@ -2897,8 +2897,24 @@
            * janela, que continua aberta embaixo, em vez de baixar sozinho */
           abrirFora: function () { avisar('O PDF continua aqui para compartilhar ou baixar.'); } });
       }, false, 'Ver'));
+      /* No celular, o nome do arquivo quebra nos sublinhados (a 390 px, o
+       * "pdf" ficava sozinho na segunda linha), e o gabarito diz de quem é:
+       * "Gabarito: só para você", com a linha "Não envie ao aluno." O
+       * Compartilhar dele continua (ela pode mandar a si mesma ou a outro
+       * aparelho), sem destaque. */
+      var nomeVisto = el('div', { class: 'nome bib-compartilhar-nome' }, noCelular
+        ? a.nome.split('_').reduce(function (partes, p, i) {
+          if (i) { partes.push('_'); partes.push(el('wbr')); }
+          partes.push(p);
+          return partes;
+        }, [])
+        : [a.nome]);
+      var doGabarito = noCelular && parte === 'gabarito' ? [
+        el('strong', { class: 'bib-pdf-so-voce', id: 'bib-pdf-so-voce', texto: 'Gabarito: só para você' }),
+        el('p', { class: 'bib-pdf-aviso-gabarito', id: 'bib-pdf-aviso-gabarito', texto: 'Não envie ao aluno.' })
+      ] : [];
       corpo.appendChild(el('div', { class: 'item-lista bib-pdf-item' + (noCelular ? ' bib-pdf-item-celular' : ''), 'data-parte': parte }, [
-        el('div', { class: 'cresce' }, [el('div', { class: 'nome bib-compartilhar-nome', texto: a.nome })]),
+        el('div', { class: 'cresce' }, doGabarito.slice(0, 1).concat([nomeVisto], doGabarito.slice(1))),
         el('div', { class: 'bib-pdf-acoes' + (noCelular ? ' bib-pdf-acoes-celular' : '') }, acoes)
       ]));
     });
@@ -27423,7 +27439,7 @@
             aoClick: function () { if (typeof cx.verLista === 'function') cx.verLista(base); } }),
           // o PDF da lista de base (o celular, 12b A3), quando quem desenha o oferece
           typeof cx.pdfDaLista === 'function' ? el('button', { type: 'button', class: 'btn principal bte-lista-pdf', 'data-acao': 'pdf',
-            icone: 'compartilhar', texto: 'PDF', 'aria-label': 'PDF da lista de base',
+            icone: 'folha', texto: 'PDF', 'aria-label': 'PDF da lista de base',
             aoClick: function () { cx.pdfDaLista(base); } }) : null
         ] : [
           el('button', { type: 'button', class: 'btn bte-lista-ver', icone: 'olho', texto: 'Ver',
@@ -32676,7 +32692,7 @@
   }
   function botaoPdfDaListaCelular(alvo, texto, nome, apagado, idDoMotivo) {
     return el('button', { type: 'button', class: 'btn principal', 'data-acao': 'pdf',
-      icone: 'compartilhar', texto: texto, 'aria-label': texto + (nome ? ': ' + nome : ''),
+      icone: 'folha', texto: texto, 'aria-label': texto + (nome ? ': ' + nome : ''),
       disabled: apagado ? 'disabled' : null, 'aria-describedby': apagado && idDoMotivo ? idDoMotivo : null,
       aoClick: function () { pdfDaListaCelular(alvo); } });
   }
