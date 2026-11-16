@@ -66,6 +66,9 @@
  *   --envenenado-pacote-pelo-prefixo  o pacote do exercício volta a ser só o
  *                         começo do id ("banco:", "mirim:"), e o do Banco n3 que
  *                         ainda vem parece retirado do n2 que está aqui (9c vê);
+ *   --envenenado-nao-tem-antes-de-prontos  o assunto sem material diz "não
+ *                         tem" antes de a série ficar pronta (9 vê, no caso
+ *                         b, o primeiro em que a série não está pronta);
  *   --envenenado-diz-que-sumiu  o cartão do celular usa a conta do tablet, que
  *                         diz que o exercício não está mais na biblioteca (3
  *                         vê, em todos os valores da marca).
@@ -108,6 +111,8 @@ const VENENOS = {
     "    if (estadoDosExerciciosNoCelular().qual === 'no-tablet') return 'no-tablet';\n    return fraseDosExerciciosNoCelular() ? 'chegando' : 'sem-pacote';\n"],
   '--envenenado-pacote-pelo-prefixo': ['/app.js',
     '    var fonte = partes[0];\n    if (fonte === \'banco\')', '    return partes[0];\n    var fonte = partes[0];\n    if (fonte === \'banco\')'],
+  '--envenenado-nao-tem-antes-de-prontos': ['/app.js',
+    "    if (e.qual !== 'prontos') return 'A teoria e os exercícios deste assunto ainda podem chegar a este celular.';\n", ''],
   '--envenenado-diz-que-sumiu': ['/app.js',
     'return fraseDoCartaoNoCelular(e, r.vazia);   // nunca o "não está mais na biblioteca" do tablet (r.conta)', 'return r.conta;']
 };
@@ -422,7 +427,8 @@ async function printar(pag, nome) {
     const tab = await novaPagina(ctxMisto);
     await tab.setViewport({ width: 1280, height: 800 });
     await H.abrirApp(tab, amb.ORIGEM);
-    const zips = [['banco-n2.zip', z => Sintetico.gerarBanco(z)], ['mirim-m2.zip', z => Sintetico.gerarProva(z, { serie: 'm2' })]];
+    const zips = [['banco-n2.zip', z => Sintetico.gerarBanco(z)], ['mirim-m2.zip', z => Sintetico.gerarProva(z, { serie: 'm2' })],
+      ['cadernos.zip', z => Sintetico.gerarCadernos(z)], ['enem.zip', z => Sintetico.gerarProva(z, { serie: '3em' })]];
     let ok = true;
     for (const [nome, gerar] of zips) {
       const z = path.join(TMP, nome);
@@ -452,7 +458,7 @@ async function printar(pag, nome) {
     await tab.close();
     return Object.assign(r, { importou: ok });
   })();
-  conf('o misto: o Banco n2 e a Mirim m2 no aparelho, e três listas', s4.importou && s4.n2 && s4.m2 && s4.listas === 3, true);
+  conf('o misto: o Banco n2, a Mirim m2, os cadernos e o ENEM no aparelho, e três listas', s4.importou && s4.n2 && s4.m2 && s4.listas === 3, true);
 
   secao('2. O celular a 390 x 844: a aba Biblioteca, com o mesmo ícone');
   const cel = await celular(null, 390, 844);
@@ -630,7 +636,7 @@ async function printar(pag, nome) {
     const l = document.querySelector('#cel-bib-estado');
     // o corpo da página, sem a linha discreta (que fala das listas dela, e diz isso de propósito)
     const corpo = l && !l.hidden ? p.innerText.split(l.innerText).join('') : p.innerText;
-    return [/não cheg(ou|aram)/.test(corpo), l && !l.hidden ? l.innerText.trim() : null, (p.querySelector('.bte-faltam') || {}).textContent || ''].join('|');
+    return [/não cheg(ou|aram)|pode chegar/.test(corpo), l && !l.hidden ? l.innerText.trim() : null, (p.querySelector('.bte-faltam') || {}).textContent || ''].join('|');
   });
   if (MODO === '--envenenado-chegando-pelas-listas') {
     conf('VENENO visto: com uma lista dela incompleta, o assunto que tem o pacote aqui diz que o resto não chegou (' + casoC + ')', /^true\|/.test(casoC), true);
@@ -817,7 +823,7 @@ async function printar(pag, nome) {
     await abrirAssunto(pc, id);
     const t = await pc.evaluate(() => {
       const p = document.querySelector('.cel-bib-assunto');
-      return { chegou: /não cheg(ou|aram)/.test(p.innerText), vazio: (p.querySelector('.bte-vazio:not(.bte-faltam)') || {}).textContent || '',
+      return { chegou: /não cheg(ou|aram)|pode chegar/.test(p.innerText), vazio: (p.querySelector('.bte-vazio:not(.bte-faltam)') || {}).textContent || '',
         secoes: Array.from(p.querySelectorAll('.bte-secao')).map(x => x.dataset.secao).join(',') };
     });
     console.log('   ' + id + ' (' + await pc.evaluate(() => document.querySelector('#modo-celular').getAttribute('data-pacotes')) + '): ' + JSON.stringify(t));
@@ -842,8 +848,13 @@ async function printar(pag, nome) {
       b2.vazio === 'Este assunto não tem teoria nem exercícios neste celular.', true);
     return H.fim(amb)();
   }
+  if (MODO === '--envenenado-nao-tem-antes-de-prontos') {
+    conf('VENENO visto: sem Wi-Fi, com a série ainda andando, o assunto sem material diz que não tem (' + b2.vazio + ')',
+      b2.vazio === 'Este assunto não tem teoria nem exercícios neste celular.', true);
+    return H.fim(amb)();
+  }
   conf('(b) sem Wi-Fi, o assunto do pacote que está aqui: nada de chegar', b1.chegou, false);
-  conf('(b) sem Wi-Fi, o assunto do pacote que ainda não veio: ainda não chegou', b2.vazio, 'A teoria e os exercícios deste assunto ainda não chegaram a este celular.');
+  conf('(b) sem Wi-Fi, o assunto do pacote que ainda não veio: ainda pode chegar', b2.vazio, 'A teoria e os exercícios deste assunto ainda podem chegar a este celular.');
   conf('nenhum erro de página no perfil completo', pc.errosDePagina.join(' | '), '');
   await pc.close();
   for (const [w, hh] of [[390, 844], [412, 915]]) {
@@ -872,7 +883,7 @@ async function printar(pag, nome) {
       return [(p.querySelector('.bte-vazio') || {}).textContent, (p.querySelector('#cel-bib-estado') || {}).innerText, /no tablet|não est(á|ão) mais/.test(p.innerText)].join('|');
     });
     conf(w + ' px, o assunto antes dos pacotes, com a série andando: o material ainda não chegou, a linha do andamento, e nem "no tablet" nem "sumiu"',
-      sem, 'A teoria e os exercícios deste assunto ainda não chegaram a este celular.|' + FRASE.trazendo + '|false');
+      sem, 'A teoria e os exercícios deste assunto ainda podem chegar a este celular.|' + FRASE.trazendo + '|false');
     await printar(pv, w + 'x' + hh + '_6_assunto_sem_pacotes.png');
     await juntarEscritas(pv);
     conf('nenhum erro de página no perfil vazio a ' + w + ' px', pv.errosDePagina.join(' | '), '');
@@ -913,6 +924,26 @@ async function printar(pag, nome) {
     }
     if (andando) conf('(sem Wi-Fi) e a tela não diz que algo sumiu, fora o retirado', SUMIU.test(tela.split(ret.texto).join('')), false);
   }
+  /* A REGRA CONSERVADORA: os cadernos (7º ano) e o ENEM (3ª série) criam
+   * módulos com a série do Portal, e o Portal do 7º ano e o da 3ª série ainda
+   * vêm. Fora do "prontos", o assunto sem material ainda pode chegar; com a
+   * série pronta, não tem. */
+  const assuntoNoMisto = async (id, termo) => {
+    await clicar(pm, '#cel-abas .cel-aba[data-cel="hoje"]');
+    await pausa(300);
+    await irParaBiblioteca(pm, 3);
+    await buscar(pm, termo);
+    await abrirAssunto(pm, id);
+    return pm.evaluate(() => (document.querySelector('.cel-bib-assunto .bte-vazio:not(.bte-faltam)') || {}).textContent || '');
+  };
+  const NAO_TEM = 'Este assunto não tem teoria nem exercícios neste celular.';
+  await marcar(pm, 'sem-wifi');
+  const cad = await assuntoNoMisto('MAT07-01', 'números inteiros');
+  conf('sem Wi-Fi, os cadernos do 7º ano aqui e o Portal do 7º ano a caminho: o assunto sem material ainda pode chegar', cad, 'A teoria e os exercícios deste assunto ainda podem chegar a este celular.');
+  conf('sem Wi-Fi, o ENEM aqui e o Portal da 3ª série a caminho: o assunto sem material ainda pode chegar',
+    await assuntoNoMisto('MATEM3-01', 'geometria analítica ponto'), 'A teoria e os exercícios deste assunto ainda podem chegar a este celular.');
+  await marcar(pm, 'prontos');
+  conf('com a série pronta, o mesmo assunto sem material: não tem teoria nem exercícios neste celular', await assuntoNoMisto('MAT07-01', 'números inteiros'), NAO_TEM);
   await juntarEscritas(pm);
   conf('nenhum erro de página no perfil misto', pm.errosDePagina.join(' | '), '');
   await pm.close();
@@ -924,7 +955,7 @@ async function printar(pag, nome) {
   await buscar(pa);
   await abrirAssunto(pa);
   conf('(arranjo) antes do pacote, o assunto diz que ainda não chegou', await textoDa(pa, '.cel-bib-assunto .bte-vazio'),
-    'A teoria e os exercícios deste assunto ainda não chegaram a este celular.');
+    'A teoria e os exercícios deste assunto ainda podem chegar a este celular.');
   // o pacote chega ao aparelho (aqui pelo tablet do mesmo perfil), e a série avisa a tela, como a A1 faz
   const chegou = await semear(ctxVazio, true, []);
   conf('(arranjo) o pacote do 9º ano entrou no aparelho', chegou.importou, true);
@@ -932,7 +963,7 @@ async function printar(pag, nome) {
   const refeito = await esperar('o assunto se refez com o pacote', () => pa.evaluate(() =>
     !!document.querySelector('#cel-biblioteca.ativa .cel-bib-assunto .bte-secao[data-secao="teoria"]')), v => v === true, 15000);
   conf('o assunto aberto se refez sozinho com a teoria, sem "não chegou", e continua aberto', refeito.ok + '|' +
-    await pa.evaluate(() => /não cheg(ou|aram)/.test(document.querySelector('.cel-bib-assunto').innerText)) + '|' +
+    await pa.evaluate(() => /não cheg(ou|aram)|pode chegar/.test(document.querySelector('.cel-bib-assunto').innerText)) + '|' +
     await pa.evaluate(a => !!document.querySelector('.cel-bib-assunto[data-assunto="' + a + '"]'), ASSUNTO), 'true|false|true');
   await juntarEscritas(pa);
   conf('nenhum erro de página no assunto que se refez', pa.errosDePagina.join(' | '), '');

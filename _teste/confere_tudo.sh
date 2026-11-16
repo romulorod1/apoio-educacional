@@ -1402,6 +1402,8 @@ roda "celular, Biblioteca --envenenado-diz-que-sumiu" node "_teste/testa_celular
 roda "celular, Biblioteca --envenenado-chegando-pelas-listas" node "_teste/testa_celular_biblioteca.js" --envenenado-chegando-pelas-listas
 # (lente do caso dela) o pacote do exercicio pelo formato do id: o Banco e a Mirim repartem o comeco entre pacotes
 roda "celular, Biblioteca --envenenado-pacote-pelo-prefixo" node "_teste/testa_celular_biblioteca.js" --envenenado-pacote-pelo-prefixo
+# (regra conservadora) o assunto sem material so diz "nao tem" com a serie pronta
+roda "celular, Biblioteca --envenenado-nao-tem-antes-de-prontos" node "_teste/testa_celular_biblioteca.js" --envenenado-nao-tem-antes-de-prontos
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve

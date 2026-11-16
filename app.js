@@ -27418,7 +27418,7 @@
     ].filter(Boolean);
     if (faltam.length) {
       // no celular, com pacotes ainda a chegar, o que falta pode só não ter chegado
-      var frase = cx.aindaChegando ? 'O resto do material deste assunto ainda não chegou a este celular.'
+      var frase = cx.aindaChegando ? 'O resto do material deste assunto ainda pode chegar a este celular.'
         : 'Ainda sem ' + juntarComE(faltam) + ' para este assunto.';
       bloco.appendChild(el('p', { class: 'ajuda bte-vazio bte-faltam', texto: frase }));
     }
@@ -32403,13 +32403,16 @@
     if (!bib || !algoFaltaNoCelular()) return '';
     return FRASES_DO_QUE_FALTA[e.qual][0];
   }
-  /* A PÁGINA DO ASSUNTO DECIDE PELO ASSUNTO, e não pelas listas dela: o
-   * módulo do assunto no índice (banco/topicos) diz de que pacote vem o
-   * material dele. 'aqui': o pacote está no celular, e a seção que falta só
-   * não existe; 'chegando': o pacote não está, e a série dos pacotes ainda não
-   * acabou (anda, espera o Wi-Fi, parou ou deixou algum para trás); 'no-tablet':
-   * o celular não recebe pacotes; 'sem-pacote': nenhum pacote traz (o assunto
-   * sem módulo, ou a série que acabou sem ele). */
+  /* A PÁGINA DO ASSUNTO, PELA REGRA CONSERVADORA (revisão do #245): ela só
+   * diz que o assunto "não tem teoria nem exercícios neste celular" com a série
+   * dos pacotes PRONTA ('prontos'); em qualquer outro estado, o assunto sem
+   * material "ainda pode chegar". A série da chave do módulo não identifica o
+   * pacote (os cadernos, o ENEM e a lista curada criam módulos com a série do
+   * Portal), e por isso o pacote do módulo só serve para dizer que o material
+   * CHEGOU quando há material ('aqui': a seção que falta só não existe), e
+   * nunca para concluir que não tem. 'chegando': a série não acabou e o módulo
+   * não está aqui; 'no-tablet': o celular não recebe pacotes (fica no tablet);
+   * 'sem-pacote': a série está pronta sem o módulo dele. */
   var memoDosModulosDoIndice = { indice: null, porId: {} };
   function moduloDoIndiceDoAssunto(id) {
     if (memoDosModulosDoIndice.indice !== indiceTemas) {
@@ -32422,14 +32425,15 @@
   function chegadaDoAssuntoNoCelular(a) {
     var mod = moduloDoIndiceDoAssunto(a.id);
     if (mod && pacoteDoModuloNoCelular(mod)) return 'aqui';
-    if (!mod) return 'sem-pacote';
     var e = estadoDosExerciciosNoCelular();
     if (e.qual === 'no-tablet') return 'no-tablet';
     return e.qual === 'prontos' ? 'sem-pacote' : 'chegando';
   }
-  function fraseDoAssuntoSemMaterialNoCelular(chegada) {
-    if (chegada === 'no-tablet') return 'A teoria e os exercícios ficam no tablet.';
-    if (chegada === 'chegando') return 'A teoria e os exercícios deste assunto ainda não chegaram a este celular.';
+  // o assunto sem material nenhum: "não tem" só com a série pronta
+  function fraseDoAssuntoSemMaterialNoCelular() {
+    var e = estadoDosExerciciosNoCelular();
+    if (e.qual === 'no-tablet') return 'A teoria e os exercícios ficam no tablet.';
+    if (e.qual !== 'prontos') return 'A teoria e os exercícios deste assunto ainda podem chegar a este celular.';
     return 'Este assunto não tem teoria nem exercícios neste celular.';
   }
   function atualizarLinhaDosExercicios(linha) {
@@ -32704,7 +32708,7 @@
       verLista: function (base) { abrirListaCelular({ tipo: 'base', id: base.id, assunto: id }); },
       // escondida enquanto não falta nada; a marca dos pacotes a acende aqui também
       antesDoBloco: linhaDosExerciciosCelular(),
-      fraseDoVazio: fraseDoAssuntoSemMaterialNoCelular(chegada),
+      fraseDoVazio: fraseDoAssuntoSemMaterialNoCelular(),
       aindaChegando: chegada === 'chegando'
     } });
   }
