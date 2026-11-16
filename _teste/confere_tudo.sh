@@ -1405,6 +1405,18 @@ roda "celular, Biblioteca --envenenado-resto-pelo-pacote-do-modulo" node "_teste
 roda "celular, Biblioteca --envenenado-pacote-pelo-prefixo" node "_teste/testa_celular_biblioteca.js" --envenenado-pacote-pelo-prefixo
 # (regra conservadora) o assunto sem material so diz "nao tem" com a serie pronta
 roda "celular, Biblioteca --envenenado-nao-tem-antes-de-prontos" node "_teste/testa_celular_biblioteca.js" --envenenado-nao-tem-antes-de-prontos
+# 12b, parte A3 (16/11/2026): o PDF da lista no celular. O botao PDF no cartao,
+# na lista de base e preso no pe do Ver lista, apagado pela regra do cartao (e
+# tambem na lista que abre so com o que veio); a lista e o gabarito em arquivos
+# separados, pelo mesmo gerarEAnexar do tablet com op.soLer; o compartilhar
+# falso recebe dois arquivos, um por botao; a janela PDF pronto do celular
+# (Compartilhar na linha inteira, Baixar e Ver embaixo); o IndexedDB e o
+# localStorage iguais; a memoria com 20 exercicios e 2 paginas; a trava de
+# transbordo a 360, 390 e 412 px com a letra a 130%. Porta 9132.
+roda "celular, PDF da lista (A3)"                   node "_teste/testa_celular_pdf.js"
+roda "celular, PDF --envenenado-pdf-grava-no-celular" node "_teste/testa_celular_pdf.js" --envenenado-pdf-grava-no-celular
+roda "celular, PDF --envenenado-pdf-sem-gabarito-separado" node "_teste/testa_celular_pdf.js" --envenenado-pdf-sem-gabarito-separado
+roda "celular, PDF --envenenado-pdf-pronto-tres-numa-linha" node "_teste/testa_celular_pdf.js" --envenenado-pdf-pronto-tres-numa-linha
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve

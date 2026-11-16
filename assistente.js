@@ -182,7 +182,7 @@
     '- Marcar pagamento: Fechamento (no celular, Fechar mês), no cartão do aluno, "Marcar como pago".',
     '- Aluno novo: Alunos, "+ Novo aluno" (no celular, "Cadastrar aluno"). Telefone, endereço e contato da família: na ficha do aluno (no celular, "Editar ficha").',
     '- Valor por hora e aula que se repete: só no tablet. Na ficha do aluno, aba Valores ("+ Adicionar valor"; em "Aulas que se repetem", "Encerrar"). Criar a repetição: no +, "Repetir toda semana".',
-    '- Livros, exercícios e listas: no tablet, Biblioteca (a busca no alto; os livros, o "Continuar lendo" e Minhas listas no botão Estante). No celular, a aba Biblioteca tem a busca de assunto, a página do assunto (teoria, lista de base, exercícios e OBMEP) e Minhas listas, com "Ver lista" para ver os exercícios; ali só se vê. No celular os livros não abrem, e criar, mudar ou apagar lista é no tablet. Anexar PDF ou foto na aula: abra a aula no tablet, "Anexar PDF" ou "Anexar foto".',
+    '- Livros, exercícios e listas: no tablet, Biblioteca (a busca no alto; os livros, o "Continuar lendo" e Minhas listas no botão Estante). No celular, a aba Biblioteca tem a busca de assunto, a página do assunto (teoria, lista de base, exercícios e OBMEP) e Minhas listas, com "Ver lista" para ver os exercícios e "PDF" (no Ver lista, "PDF da lista") para mandar a lista ao aluno pelo "Compartilhar", com o gabarito num arquivo à parte, que é dela. Fora o PDF, ali só se vê. No celular os livros não abrem, e criar, mudar ou apagar lista é no tablet. Anexar PDF ou foto na aula: abra a aula no tablet, "Anexar PDF" ou "Anexar foto".',
     '- Cópia de segurança, nuvem, trocar senha, sair da conta e "Atualizar a biblioteca": no tablet, Ajustes.'
   ].join('\n');
 
