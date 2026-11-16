@@ -953,6 +953,13 @@
        ela. Está também na lista ARQUIVOS do sw.js, para gerar PDF sem sinal. -->
   <script src="fonte-unicode.js"></script>
   <script src="pdf.js"></script>
+  <!-- D2: as fórmulas em vetor. O tradutor do SVG do MathJax para o PDF e o
+       adaptador que o pdf.js procura (o global Formula). Os dois são pequenos
+       e não carregam o MathJax: ele só vem pelo Formula.pronto(), na primeira
+       vez que um documento tem fórmula, e fica no BAIXADOS do sw.js. Os dois
+       estão também na lista ARQUIVOS do sw.js. -->
+  <script src="svg-para-pdf.js"></script>
+  <script src="formula.js"></script>
   <script src="store.js"></script>
   <script src="zip.js"></script>
   <script src="biblioteca.js"></script>

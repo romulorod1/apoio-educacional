@@ -1,0 +1,3566 @@
+[
+  {
+    "id": "mat-ef2-operacoes-001",
+    "materia": "Matemática",
+    "serie": "2º ano EF",
+    "assunto": "Adição e subtração",
+    "latex": "5 + 3 = 8",
+    "onde": "ambos",
+    "nota": "Linha base: operadores binários e relação com espaçamento padrão."
+  },
+  {
+    "id": "mat-ef2-comparacao-001",
+    "materia": "Matemática",
+    "serie": "2º ano EF",
+    "assunto": "Sinais de comparação",
+    "latex": "12 > 9 \\quad 7 < 10 \\quad 8 = 8",
+    "onde": "ambos",
+    "nota": "Sinais de comparação lado a lado com \\quad; confere espaço de relação."
+  },
+  {
+    "id": "mat-ef2-fracoes-001",
+    "materia": "Matemática",
+    "serie": "2º ano EF",
+    "assunto": "Metade e terço",
+    "latex": "\\frac{1}{2} \\quad \\frac{1}{3}",
+    "onde": "enunciado",
+    "nota": "Fração simples em texto corrido: altura da linha não pode saltar."
+  },
+  {
+    "id": "mat-ef2-dinheiro-001",
+    "materia": "Matemática",
+    "serie": "2º ano EF",
+    "assunto": "Sistema monetário",
+    "latex": "\\text{R}\\$\\;2{,}50 + \\text{R}\\$\\;1{,}25 = \\text{R}\\$\\;3{,}75",
+    "onde": "ambos",
+    "nota": "Cifrão fora do \\text (dentro dele \\$ sai literal sem textmacros) e vírgula decimal protegida com {,}."
+  },
+  {
+    "id": "mat-ef2-horas-001",
+    "materia": "Matemática",
+    "serie": "2º ano EF",
+    "assunto": "Horas",
+    "latex": "8\\,\\text{h}\\,30\\,\\text{min}",
+    "onde": "ambos",
+    "nota": "Unidade em texto reto colada ao número com espaço fino."
+  },
+  {
+    "id": "mat-ef2-lacuna-001",
+    "materia": "Matemática",
+    "serie": "2º ano EF",
+    "assunto": "Número que falta",
+    "latex": "6 + \\square = 10",
+    "onde": "enunciado",
+    "nota": "Quadrado vazio do AMS como lacuna; precisa ter a altura de um algarismo."
+  },
+  {
+    "id": "mat-ef3-operacoes-001",
+    "materia": "Matemática",
+    "serie": "3º ano EF",
+    "assunto": "Multiplicação e divisão",
+    "latex": "3 \\times 4 = 12 \\qquad 15 \\div 3 = 5",
+    "onde": "ambos",
+    "nota": "Sinais \\times e \\div; o \\div some em fontes pobres."
+  },
+  {
+    "id": "mat-ef3-medidas-001",
+    "materia": "Matemática",
+    "serie": "3º ano EF",
+    "assunto": "Medidas de comprimento",
+    "latex": "1\\,\\text{m} = 100\\,\\text{cm}",
+    "onde": "ambos",
+    "nota": "Unidade reta, não itálica."
+  },
+  {
+    "id": "mat-ef3-medidas-002",
+    "materia": "Matemática",
+    "serie": "3º ano EF",
+    "assunto": "Medidas de massa",
+    "latex": "2\\,\\text{kg} = 2\\,000\\,\\text{g}",
+    "onde": "ambos",
+    "nota": "Separador de milhar brasileiro com espaço fino, sem ponto."
+  },
+  {
+    "id": "mat-ef3-fracoes-001",
+    "materia": "Matemática",
+    "serie": "3º ano EF",
+    "assunto": "Quarto de inteiro",
+    "latex": "\\frac{1}{4} \\text{ de } 20 = 5",
+    "onde": "ambos",
+    "nota": "Texto com espaços dentro de \\text no meio de expressão."
+  },
+  {
+    "id": "mat-ef3-lacuna-001",
+    "materia": "Matemática",
+    "serie": "3º ano EF",
+    "assunto": "Sequência com lacuna",
+    "latex": "2,\\ 4,\\ 6,\\ \\underline{\\phantom{00}},\\ 10",
+    "onde": "enunciado",
+    "nota": "Lacuna sublinhada com \\phantom; vírgula de lista com espaço explícito."
+  },
+  {
+    "id": "mat-ef4-fracoes-001",
+    "materia": "Matemática",
+    "serie": "4º ano EF",
+    "assunto": "Comparação de frações",
+    "latex": "\\frac{3}{4} > \\frac{1}{2}",
+    "onde": "ambos",
+    "nota": "Duas frações com relação entre elas, centradas no eixo."
+  },
+  {
+    "id": "mat-ef4-fracoes-002",
+    "materia": "Matemática",
+    "serie": "4º ano EF",
+    "assunto": "Frações equivalentes",
+    "latex": "\\frac{1}{3} = \\frac{2}{6} = \\frac{3}{9}",
+    "onde": "ambos",
+    "nota": "Cadeia de igualdades de frações."
+  },
+  {
+    "id": "mat-ef4-decimais-001",
+    "materia": "Matemática",
+    "serie": "4º ano EF",
+    "assunto": "Decimal e fração",
+    "latex": "0{,}5 = \\frac{1}{2} = \\frac{5}{10}",
+    "onde": "ambos",
+    "nota": "Vírgula decimal protegida ao lado de fração."
+  },
+  {
+    "id": "mat-ef4-porcentagem-001",
+    "materia": "Matemática",
+    "serie": "4º ano EF",
+    "assunto": "Porcentagem",
+    "latex": "25\\% = \\frac{25}{100} = \\frac{1}{4}",
+    "onde": "ambos",
+    "nota": "Sinal de porcentagem escapado."
+  },
+  {
+    "id": "mat-ef4-horas-001",
+    "materia": "Matemática",
+    "serie": "4º ano EF",
+    "assunto": "Subtração de horas",
+    "latex": "13\\,\\text{h}\\,45\\,\\text{min} - 9\\,\\text{h}\\,20\\,\\text{min} = 4\\,\\text{h}\\,25\\,\\text{min}",
+    "onde": "gabarito",
+    "nota": "Linha longa com seis unidades; testa quebra e largura em coluna estreita."
+  },
+  {
+    "id": "mat-ef4-medidas-001",
+    "materia": "Matemática",
+    "serie": "4º ano EF",
+    "assunto": "Perímetro",
+    "latex": "\\text{perímetro} = 4 + 4 + 3 + 3 = 14\\,\\text{cm}",
+    "onde": "gabarito",
+    "nota": "Palavra acentuada dentro de \\text; falha clássica de fonte sem acento."
+  },
+  {
+    "id": "mat-ef4-decimais-002",
+    "materia": "Matemática",
+    "serie": "4º ano EF",
+    "assunto": "Decimais na reta",
+    "latex": "0{,}1 < 0{,}25 < 0{,}3",
+    "onde": "ambos",
+    "nota": "Vírgula decimal em cadeia de desigualdades; sem {,} sairia espaço depois da vírgula."
+  },
+  {
+    "id": "mat-ef5-fracoes-001",
+    "materia": "Matemática",
+    "serie": "5º ano EF",
+    "assunto": "Número misto",
+    "latex": "2\\frac{1}{3}",
+    "onde": "ambos",
+    "nota": "Número misto: inteiro colado à fração, sem sinal entre eles."
+  },
+  {
+    "id": "mat-ef5-fracoes-002",
+    "materia": "Matemática",
+    "serie": "5º ano EF",
+    "assunto": "Misto para fração imprópria",
+    "latex": "2\\frac{1}{3} = \\frac{2 \\times 3 + 1}{3} = \\frac{7}{3}",
+    "onde": "gabarito",
+    "nota": "Misto seguido de fração com operação no numerador."
+  },
+  {
+    "id": "mat-ef5-porcentagem-001",
+    "materia": "Matemática",
+    "serie": "5º ano EF",
+    "assunto": "Porcentagem de valor",
+    "latex": "10\\% \\text{ de } \\text{R}\\$\\;80{,}00 = \\text{R}\\$\\;8{,}00",
+    "onde": "ambos",
+    "nota": "Porcentagem, texto e cifrão no mesmo trecho."
+  },
+  {
+    "id": "mat-ef5-medidas-001",
+    "materia": "Matemática",
+    "serie": "5º ano EF",
+    "assunto": "Área do retângulo",
+    "latex": "A = 5\\,\\text{cm} \\times 3\\,\\text{cm} = 15\\,\\text{cm}^2",
+    "onde": "gabarito",
+    "nota": "Expoente sobre unidade em texto."
+  },
+  {
+    "id": "mat-ef5-medidas-002",
+    "materia": "Matemática",
+    "serie": "5º ano EF",
+    "assunto": "Volume do paralelepípedo",
+    "latex": "V = 2\\,\\text{cm} \\times 3\\,\\text{cm} \\times 4\\,\\text{cm} = 24\\,\\text{cm}^3",
+    "onde": "gabarito",
+    "nota": "Expoente 3 em unidade, linha longa."
+  },
+  {
+    "id": "mat-ef5-comparacao-001",
+    "materia": "Matemática",
+    "serie": "5º ano EF",
+    "assunto": "Aproximação e diferença",
+    "latex": "3{,}98 \\approx 4 \\qquad 5 \\neq 6",
+    "onde": "ambos",
+    "nota": "Sinais \\approx e \\neq."
+  },
+  {
+    "id": "mat-ef5-decimais-001",
+    "materia": "Matemática",
+    "serie": "5º ano EF",
+    "assunto": "Decimal com ponto (Cambridge Primary)",
+    "latex": "3.25 + 1.5 = 4.75",
+    "onde": "ambos",
+    "nota": "Escola bilíngue usa ponto decimal; não pode virar vírgula nem ganhar espaço."
+  },
+  {
+    "id": "mat-ef5-fracoes-003",
+    "materia": "Matemática",
+    "serie": "5º ano EF",
+    "assunto": "Fraction of an amount (Cambridge Primary)",
+    "latex": "\\tfrac{3}{4} \\text{ of } 20 = 15",
+    "onde": "ambos",
+    "nota": "\\tfrac em linha de texto e texto em inglês."
+  },
+  {
+    "id": "mat-ef5-inteiros-001",
+    "materia": "Matemática",
+    "serie": "5º ano EF",
+    "assunto": "Negative numbers (Cambridge Primary)",
+    "latex": "-3 < 2 \\qquad -5 + 8 = 3",
+    "onde": "ambos",
+    "nota": "Sinal de menos unário no início: não pode virar hífen curto."
+  },
+  {
+    "id": "mat-ef5-horas-001",
+    "materia": "Matemática",
+    "serie": "5º ano EF",
+    "assunto": "Relógio digital (Cambridge Primary)",
+    "latex": "14{:}35 \\quad 2{:}15\\ \\text{p.m.}",
+    "onde": "ambos",
+    "nota": "Dois-pontos de hora protegido com {:}; sem isso o MathJax põe espaço de relação."
+  },
+  {
+    "id": "mat-ef5-angulos-001",
+    "materia": "Matemática",
+    "serie": "5º ano EF",
+    "assunto": "Ângulos (Cambridge Primary)",
+    "latex": "45^{\\circ} + 45^{\\circ} = 90^{\\circ}",
+    "onde": "ambos",
+    "nota": "Símbolo de grau como expoente \\circ."
+  },
+  {
+    "id": "mat-ef6-expressoes-001",
+    "materia": "Matemática",
+    "serie": "6º ano EF",
+    "assunto": "Expressão com chaves",
+    "latex": "\\{2 + [3 \\times (4 - 1)]\\} \\div 11 = 1",
+    "onde": "ambos",
+    "nota": "Chaves escapadas \\{ \\}; esquecer o escape some com elas."
+  },
+  {
+    "id": "mat-ef6-fracoes-001",
+    "materia": "Matemática",
+    "serie": "6º ano EF",
+    "assunto": "Divisão de frações",
+    "latex": "\\frac{2}{3} \\div \\frac{4}{9} = \\frac{2}{3} \\cdot \\frac{9}{4} = \\frac{3}{2}",
+    "onde": "gabarito",
+    "nota": "Inverte e multiplica: quatro frações em linha."
+  },
+  {
+    "id": "mat-ef6-fracoes-002",
+    "materia": "Matemática",
+    "serie": "6º ano EF",
+    "assunto": "Fração de fração",
+    "latex": "\\frac{\\frac{1}{2}}{\\frac{3}{4}}",
+    "onde": "enunciado",
+    "nota": "Fração sobre fração: o MathJax encolhe os níveis internos; conferir legibilidade."
+  },
+  {
+    "id": "mat-ef6-divisibilidade-001",
+    "materia": "Matemática",
+    "serie": "6º ano EF",
+    "assunto": "MMC e MDC",
+    "latex": "\\operatorname{mmc}(4, 6) = 12 \\qquad \\operatorname{mdc}(12, 18) = 6",
+    "onde": "ambos",
+    "nota": "Operador com nome reto via \\operatorname."
+  },
+  {
+    "id": "mat-ef6-decimais-001",
+    "materia": "Matemática",
+    "serie": "6º ano EF",
+    "assunto": "Dízima periódica",
+    "latex": "0{,}\\overline{3} = \\frac{1}{3} \\qquad 1{,}2\\overline{45}",
+    "onde": "ambos",
+    "nota": "Barra só sobre o período; ela não pode cobrir a vírgula."
+  },
+  {
+    "id": "mat-ef6-geometria-001",
+    "materia": "Matemática",
+    "serie": "6º ano EF",
+    "assunto": "Ângulo com chapéu largo",
+    "latex": "\\widehat{ABC} = 60^{\\circ}",
+    "onde": "ambos",
+    "nota": "\\widehat sobre três letras precisa esticar."
+  },
+  {
+    "id": "mat-ef6-geometria-002",
+    "materia": "Matemática",
+    "serie": "6º ano EF",
+    "assunto": "Reta, semirreta e segmento",
+    "latex": "\\overleftrightarrow{AB} \\quad \\overrightarrow{AB} \\quad \\overline{AB}",
+    "onde": "enunciado",
+    "nota": "Três adornos sobre as mesmas letras; seta dupla e simples."
+  },
+  {
+    "id": "mat-ef6-fracoes-003",
+    "materia": "Matemática",
+    "serie": "6º ano EF",
+    "assunto": "Fraction notation (Cambridge Lower Secondary)",
+    "latex": "\\frac{5}{6} - \\frac{1}{4} = \\frac{10}{12} - \\frac{3}{12} = \\frac{7}{12}",
+    "onde": "gabarito",
+    "nota": "Cadeia longa de frações em coluna estreita."
+  },
+  {
+    "id": "mat-ef6-expressoes-002",
+    "materia": "Matemática",
+    "serie": "6º ano EF",
+    "assunto": "Order of operations (Cambridge Lower Secondary)",
+    "latex": "3 + 4 \\times (5 - 2)^2 = 39",
+    "onde": "ambos",
+    "nota": "Potência sobre parêntese."
+  },
+  {
+    "id": "mat-ef7-inteiros-001",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Potência de negativo",
+    "latex": "(-2)^2 = 4 \\quad \\text{e} \\quad -2^2 = -4",
+    "onde": "ambos",
+    "nota": "Diferença entre (-2)^2 e -2^2: o expoente precisa ficar no lugar certo."
+  },
+  {
+    "id": "mat-ef7-racionais-001",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Potência de fração negativa",
+    "latex": "\\left(-\\frac{2}{3}\\right)^{2} = \\frac{4}{9}",
+    "onde": "gabarito",
+    "nota": "\\left( \\right) crescendo em volta da fração com expoente fora."
+  },
+  {
+    "id": "mat-ef7-equacoes-001",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Equação com frações",
+    "latex": "\\frac{x}{3} + \\frac{x}{4} = 7",
+    "onde": "enunciado",
+    "nota": "Variável em numerador."
+  },
+  {
+    "id": "mat-ef7-equacoes-002",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Resolução passo a passo",
+    "latex": "\\begin{aligned} 3(x - 2) &= 2x + 4 \\\\ 3x - 6 &= 2x + 4 \\\\ x &= 10 \\end{aligned}",
+    "onde": "gabarito",
+    "nota": "Gabarito com três linhas alinhadas no sinal de igual."
+  },
+  {
+    "id": "mat-ef7-inequacoes-001",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Inequação do 1º grau",
+    "latex": "2x - 3 > 5 \\;\\Rightarrow\\; x > 4",
+    "onde": "ambos",
+    "nota": "Seta de implicação com espaçamento."
+  },
+  {
+    "id": "mat-ef7-inequacoes-002",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Desigualdade inclinada",
+    "latex": "x \\geqslant -2 \\qquad y \\leqslant 5",
+    "onde": "ambos",
+    "nota": "Variante inclinada (AMS) comum nos livros brasileiros."
+  },
+  {
+    "id": "mat-ef7-proporcao-001",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Proporção",
+    "latex": "\\frac{a}{b} = \\frac{c}{d} \\iff a \\cdot d = b \\cdot c",
+    "onde": "ambos",
+    "nota": "Seta de equivalência longa."
+  },
+  {
+    "id": "mat-ef7-proporcao-002",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Regra de três",
+    "latex": "\\begin{array}{ccc} 3\\ \\text{kg} & \\longrightarrow & \\text{R}\\$\\;12{,}00 \\\\ 5\\ \\text{kg} & \\longrightarrow & x \\end{array}",
+    "onde": "ambos",
+    "nota": "Regra de três armada em array com setas longas."
+  },
+  {
+    "id": "mat-ef7-proporcao-003",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Razão com texto",
+    "latex": "\\text{velocidade} = \\frac{\\text{distância}}{\\text{tempo}}",
+    "onde": "ambos",
+    "nota": "Texto acentuado em numerador e denominador de fração."
+  },
+  {
+    "id": "mat-ef7-geometria-001",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Soma dos ângulos internos",
+    "latex": "\\hat{A} + \\hat{B} + \\hat{C} = 180^{\\circ}",
+    "onde": "ambos",
+    "nota": "Chapéu sobre letra maiúscula e grau."
+  },
+  {
+    "id": "mat-ef7-porcentagem-001",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Juros simples",
+    "latex": "J = C \\cdot i \\cdot t \\qquad M = C\\,(1 + i\\,t)",
+    "onde": "ambos",
+    "nota": "Fórmula de juros com espaço fino."
+  },
+  {
+    "id": "mat-ef7-angulos-001",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Graus, minutos e segundos",
+    "latex": "32^{\\circ}\\,15'\\,40''",
+    "onde": "ambos",
+    "nota": "Minuto e segundo com apóstrofo; duas plicas não podem colar no grau."
+  },
+  {
+    "id": "mat-ef7-angulos-002",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Grau digitado em Unicode",
+    "latex": "45° + 30° = 75°",
+    "onde": "ambos",
+    "nota": "Símbolo de grau Unicode direto: a fonte precisa ter o glifo."
+  },
+  {
+    "id": "mat-ef7-inteiros-002",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Directed numbers (Cambridge Lower Secondary)",
+    "latex": "-7 - (-3) = -4",
+    "onde": "ambos",
+    "nota": "Menos seguido de parêntese com menos."
+  },
+  {
+    "id": "mat-ef8-potencias-001",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Expoente negativo",
+    "latex": "2^{-3} = \\frac{1}{2^3} = \\frac{1}{8}",
+    "onde": "ambos",
+    "nota": "Expoente com sinal; potência dentro de denominador."
+  },
+  {
+    "id": "mat-ef8-potencias-002",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Expoente fracionário",
+    "latex": "a^{\\frac{m}{n}} = \\sqrt[n]{a^{m}}",
+    "onde": "ambos",
+    "nota": "Fração no expoente fica minúscula; raiz com índice."
+  },
+  {
+    "id": "mat-ef8-potencias-003",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Expoente fracionário numérico",
+    "latex": "8^{\\frac{2}{3}} = \\sqrt[3]{8^2} = 4",
+    "onde": "gabarito",
+    "nota": "Fração no expoente e índice 3."
+  },
+  {
+    "id": "mat-ef8-potencias-004",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Expoente fracionário com barra",
+    "latex": "27^{2/3} = 9",
+    "onde": "ambos",
+    "nota": "Forma alternativa do expoente com barra inclinada."
+  },
+  {
+    "id": "mat-ef8-notacao-cientifica-001",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Notação científica",
+    "latex": "0{,}000032 = 3{,}2 \\times 10^{-5}",
+    "onde": "ambos",
+    "nota": "Potência de 10 com expoente negativo."
+  },
+  {
+    "id": "mat-ef8-produtos-notaveis-001",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Quadrado da soma",
+    "latex": "(a + b)^2 = a^2 + 2ab + b^2",
+    "onde": "ambos",
+    "nota": "Produto notável básico."
+  },
+  {
+    "id": "mat-ef8-produtos-notaveis-002",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Cubo da soma",
+    "latex": "(a + b)^3 = a^3 + 3a^2b + 3ab^2 + b^3",
+    "onde": "ambos",
+    "nota": "Expoentes intercalados em monômios."
+  },
+  {
+    "id": "mat-ef8-fatoracao-001",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Trinômio quadrado perfeito",
+    "latex": "4x^2 + 12xy + 9y^2 = (2x + 3y)^2",
+    "onde": "gabarito",
+    "nota": "Coeficientes e duas variáveis."
+  },
+  {
+    "id": "mat-ef8-fatoracao-002",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Agrupamento",
+    "latex": "ax + bx + ay + by = x(a + b) + y(a + b) = (a + b)(x + y)",
+    "onde": "gabarito",
+    "nota": "Linha longa de fatoração por agrupamento."
+  },
+  {
+    "id": "mat-ef8-polinomios-001",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Soma de polinômios",
+    "latex": "(3x^2 - 2x + 1) + (x^3 - 4x^2 + 5x - 7) = x^3 - x^2 + 3x - 6",
+    "onde": "gabarito",
+    "nota": "Polinômios com vários termos; linha que tende a estourar."
+  },
+  {
+    "id": "mat-ef8-fracoes-algebricas-001",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Simplificação de fração algébrica",
+    "latex": "\\frac{x^2 - 1}{x + 1} = \\frac{(x + 1)(x - 1)}{x + 1} = x - 1",
+    "onde": "gabarito",
+    "nota": "Fração algébrica com produto no numerador."
+  },
+  {
+    "id": "mat-ef8-fracoes-algebricas-002",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Fração algébrica composta",
+    "latex": "\\dfrac{\\dfrac{1}{x} + \\dfrac{1}{y}}{\\dfrac{1}{xy}}",
+    "onde": "enunciado",
+    "nota": "Fração de frações em tamanho cheio com \\dfrac nos níveis internos."
+  },
+  {
+    "id": "mat-ef8-sistemas-001",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Sistema 2x2 com chave",
+    "latex": "\\begin{cases} x + y = 10 \\\\ x - y = 2 \\end{cases}",
+    "onde": "enunciado",
+    "nota": "Chave à esquerda via cases."
+  },
+  {
+    "id": "mat-ef8-sistemas-002",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Sistema com chave e array",
+    "latex": "\\left\\{\\begin{array}{l} 2x + 3y = 12 \\\\ x - y = 1 \\end{array}\\right.",
+    "onde": "enunciado",
+    "nota": "Chave manual com \\left\\{ e \\right. (delimitador vazio)."
+  },
+  {
+    "id": "mat-ef8-conjuntos-001",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Conjuntos numéricos",
+    "latex": "\\mathbb{N} \\subset \\mathbb{Z} \\subset \\mathbb{Q} \\subset \\mathbb{R}",
+    "onde": "ambos",
+    "nota": "Letras de quadro negro (blackboard bold)."
+  },
+  {
+    "id": "mat-ef8-conjuntos-002",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Pertinência",
+    "latex": "\\sqrt{2} \\notin \\mathbb{Q} \\qquad -3 \\in \\mathbb{Z}",
+    "onde": "ambos",
+    "nota": "\\notin com barra sobreposta."
+  },
+  {
+    "id": "mat-ef8-estatistica-001",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Média com somatório",
+    "latex": "\\bar{x} = \\frac{x_1 + x_2 + \\cdots + x_n}{n} = \\frac{1}{n}\\sum_{i=1}^{n} x_i",
+    "onde": "ambos",
+    "nota": "Somatório em linha: limites ao lado, não em cima."
+  },
+  {
+    "id": "mat-ef8-estatistica-002",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Média ponderada",
+    "latex": "\\bar{x}_p = \\frac{\\sum_{i=1}^{n} p_i\\,x_i}{\\sum_{i=1}^{n} p_i}",
+    "onde": "ambos",
+    "nota": "Somatórios dentro de numerador e denominador."
+  },
+  {
+    "id": "mat-ef8-potencias-005",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Index laws (Cambridge Lower Secondary)",
+    "latex": "\\frac{x^{7} \\times x^{-2}}{x^{3}} = x^{2}",
+    "onde": "gabarito",
+    "nota": "Expoentes e \\times em fração."
+  },
+  {
+    "id": "mat-ef9-equacoes-2grau-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Fórmula resolutiva",
+    "latex": "\\displaystyle x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
+    "onde": "ambos",
+    "nota": "Destaque: raiz longa dentro de numerador e sinal mais ou menos."
+  },
+  {
+    "id": "mat-ef9-equacoes-2grau-002",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Soma e produto das raízes",
+    "latex": "S = x_1 + x_2 = -\\frac{b}{a} \\qquad P = x_1 \\cdot x_2 = \\frac{c}{a}",
+    "onde": "ambos",
+    "nota": "Índices e frações com sinal."
+  },
+  {
+    "id": "mat-ef9-equacoes-2grau-003",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Raízes calculadas",
+    "latex": "x = \\frac{5 \\pm \\sqrt{1}}{4} \\;\\Rightarrow\\; x_1 = \\frac{3}{2},\\ x_2 = 1",
+    "onde": "gabarito",
+    "nota": "Gabarito com mais ou menos, implicação e lista."
+  },
+  {
+    "id": "mat-ef9-relacoes-metricas-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Relações métricas no triângulo retângulo",
+    "latex": "h^2 = m \\cdot n \\qquad b^2 = a \\cdot m \\qquad c^2 = a \\cdot n \\qquad a \\cdot h = b \\cdot c",
+    "onde": "ambos",
+    "nota": "Quatro relações em uma linha: quebra em coluna estreita."
+  },
+  {
+    "id": "mat-ef9-trigonometria-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Razões trigonométricas",
+    "latex": "\\operatorname{sen}\\alpha = \\frac{\\text{cateto oposto}}{\\text{hipotenusa}}",
+    "onde": "ambos",
+    "nota": "Seno brasileiro (sen) reto via \\operatorname; texto em fração."
+  },
+  {
+    "id": "mat-ef9-trigonometria-002",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Ângulos notáveis",
+    "latex": "\\operatorname{sen} 30^{\\circ} = \\frac{1}{2} \\quad \\cos 45^{\\circ} = \\frac{\\sqrt{2}}{2} \\quad \\operatorname{tg} 60^{\\circ} = \\sqrt{3}",
+    "onde": "ambos",
+    "nota": "Três valores notáveis; raiz dentro de fração."
+  },
+  {
+    "id": "mat-ef9-trigonometria-003",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Seno com macro própria",
+    "latex": "\\newcommand{\\sen}{\\operatorname{sen}} \\sen^2 30^{\\circ} + \\cos^2 30^{\\circ} = 1",
+    "onde": "ambos",
+    "nota": "\\newcommand dentro da expressão; \\sen não existe no MathJax e precisa da definição."
+  },
+  {
+    "id": "mat-ef9-radicais-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Simplificação de radical",
+    "latex": "\\sqrt{72} = \\sqrt{2^3 \\cdot 3^2} = 6\\sqrt{2}",
+    "onde": "gabarito",
+    "nota": "Potências dentro de raiz."
+  },
+  {
+    "id": "mat-ef9-radicais-002",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Racionalização com conjugado",
+    "latex": "\\frac{3}{\\sqrt{5} - \\sqrt{2}} = \\frac{3(\\sqrt{5} + \\sqrt{2})}{5 - 2} = \\sqrt{5} + \\sqrt{2}",
+    "onde": "gabarito",
+    "nota": "Duas raízes no denominador."
+  },
+  {
+    "id": "mat-ef9-radicais-003",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Raiz cúbica de negativo",
+    "latex": "\\sqrt[3]{-27} = -3 \\qquad \\sqrt[4]{16} = 2",
+    "onde": "ambos",
+    "nota": "Índice de raiz e sinal dentro."
+  },
+  {
+    "id": "mat-ef9-geometria-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Teorema de Tales",
+    "latex": "\\frac{\\overline{AB}}{\\overline{BC}} = \\frac{\\overline{DE}}{\\overline{EF}}",
+    "onde": "ambos",
+    "nota": "Barras de segmento dentro de numerador e denominador."
+  },
+  {
+    "id": "mat-ef9-geometria-002",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Arco de circunferência",
+    "latex": "\\overset{\\frown}{AB}",
+    "onde": "ambos",
+    "nota": "Arco em cima de duas letras via \\overset{\\frown}; o arco não estica."
+  },
+  {
+    "id": "mat-ef9-geometria-003",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Arco que estica",
+    "latex": "\\overparen{AB} = 80^{\\circ}",
+    "onde": "ambos",
+    "nota": "\\overparen estica sobre as letras (alternativa ao \\frown)."
+  },
+  {
+    "id": "mat-ef9-geometria-004",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Ângulo inscrito",
+    "latex": "\\alpha = \\frac{m(\\overset{\\frown}{AB})}{2}",
+    "onde": "ambos",
+    "nota": "Arco dentro de numerador."
+  },
+  {
+    "id": "mat-ef9-funcoes-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Vértice da parábola",
+    "latex": "x_v = -\\frac{b}{2a} \\qquad y_v = -\\frac{\\Delta}{4a}",
+    "onde": "ambos",
+    "nota": "Índice v e Delta em numerador."
+  },
+  {
+    "id": "mat-ef9-conjuntos-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Conjunto por propriedade",
+    "latex": "A = \\{x \\in \\mathbb{N} \\mid x < 5\\}",
+    "onde": "ambos",
+    "nota": "Chaves escapadas e barra de tal que \\mid."
+  },
+  {
+    "id": "mat-ef9-conjuntos-002",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "União e interseção",
+    "latex": "A \\cup B = \\{1, 2, 3, 4\\} \\qquad A \\cap B = \\varnothing",
+    "onde": "ambos",
+    "nota": "Vazio com \\varnothing."
+  },
+  {
+    "id": "mat-ef9-probabilidade-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Probabilidade clássica",
+    "latex": "P(A) = \\frac{n(A)}{n(\\Omega)}",
+    "onde": "ambos",
+    "nota": "Ômega maiúsculo em denominador."
+  },
+  {
+    "id": "mat-ef9-notacao-cientifica-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Standard form (IGCSE)",
+    "latex": "3.2 \\times 10^{4} \\qquad 4.05 \\times 10^{-3}",
+    "onde": "ambos",
+    "nota": "Notação com ponto decimal da escola bilíngue."
+  },
+  {
+    "id": "mat-ef9-decimais-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Recurring decimal com ponto em cima (IGCSE)",
+    "latex": "0.\\dot{4}\\dot{5} = \\frac{45}{99} = \\frac{5}{11} \\qquad 0.1\\dot{2}3\\dot{4}",
+    "onde": "ambos",
+    "nota": "Notação britânica de dízima: ponto sobre o primeiro e o último algarismo do período."
+  },
+  {
+    "id": "mat-ef9-limites-de-erro-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Bounds (IGCSE)",
+    "latex": "6.5 \\leqslant l < 7.5",
+    "onde": "ambos",
+    "nota": "Limites inferior e superior com desigualdade inclinada."
+  },
+  {
+    "id": "mat-ef9-conjuntos-003",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Universal set and complement (IGCSE)",
+    "latex": "\\mathscr{E} = \\{1, 2, \\ldots, 10\\} \\qquad n(A \\cap B') = 3",
+    "onde": "ambos",
+    "nota": "Conjunto universo em letra script e complemento com plica."
+  },
+  {
+    "id": "mat-ef9-funcoes-002",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Inverse and composite functions (IGCSE)",
+    "latex": "f^{-1}(x) = \\frac{x + 3}{2} \\qquad fg(x) = f(g(x))",
+    "onde": "ambos",
+    "nota": "Expoente -1 em f e composta sem bolinha (convenção britânica)."
+  },
+  {
+    "id": "mat-ef9-vetores-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Column vector (IGCSE)",
+    "latex": "\\overrightarrow{AB} = \\begin{pmatrix} 3 \\\\ -2 \\end{pmatrix}",
+    "onde": "ambos",
+    "nota": "Vetor coluna em parênteses ao lado de seta longa."
+  },
+  {
+    "id": "mat-ef9-vetores-002",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Vector in bold (IGCSE)",
+    "latex": "\\overrightarrow{AB} = \\mathbf{b} - \\mathbf{a} \\qquad |\\mathbf{a}| = \\sqrt{3^2 + 4^2} = 5",
+    "onde": "ambos",
+    "nota": "Vetor em negrito e módulo com barras."
+  },
+  {
+    "id": "mat-ef9-variacao-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Direct and inverse proportion (IGCSE)",
+    "latex": "y \\propto \\frac{1}{x^2} \\;\\Rightarrow\\; y = \\frac{k}{x^2}",
+    "onde": "ambos",
+    "nota": "Símbolo de proporcional."
+  },
+  {
+    "id": "mat-em1-conjuntos-001",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Intervalo à moda brasileira",
+    "latex": "]-\\infty, 3[ \\;\\cup\\; [5, +\\infty[",
+    "onde": "ambos",
+    "nota": "Colchetes invertidos para intervalo aberto; desequilíbrio proposital (sem \\left)."
+  },
+  {
+    "id": "mat-em1-conjuntos-002",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Intervalo com parênteses",
+    "latex": "(-2, 5] = \\{x \\in \\mathbb{R} \\mid -2 < x \\leq 5\\}",
+    "onde": "ambos",
+    "nota": "Notação de intervalo e de conjunto."
+  },
+  {
+    "id": "mat-em1-conjuntos-003",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Diferença e complementar",
+    "latex": "A - B = \\{x \\mid x \\in A \\text{ e } x \\notin B\\} \\qquad \\complement_U A",
+    "onde": "ambos",
+    "nota": "Complementar com \\complement e índice."
+  },
+  {
+    "id": "mat-em1-funcoes-001",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Definição de função",
+    "latex": "f\\colon \\mathbb{R} \\to \\mathbb{R},\\quad x \\mapsto x^2 - 1",
+    "onde": "ambos",
+    "nota": "\\colon com espaço certo e seta \\mapsto."
+  },
+  {
+    "id": "mat-em1-funcoes-002",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Domínio e imagem",
+    "latex": "D(f) = \\mathbb{R} \\qquad \\operatorname{Im}(f) = [-1, +\\infty[",
+    "onde": "ambos",
+    "nota": "Im reto (operatorname) e intervalo."
+  },
+  {
+    "id": "mat-em1-funcoes-003",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Domínio com restrição",
+    "latex": "f(x) = \\frac{\\sqrt{x - 2}}{x - 5} \\;\\Rightarrow\\; D(f) = \\{x \\in \\mathbb{R} \\mid x \\geq 2 \\text{ e } x \\neq 5\\}",
+    "onde": "gabarito",
+    "nota": "Linha longa com fração, raiz e conjunto."
+  },
+  {
+    "id": "mat-em1-funcoes-004",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Função definida por partes",
+    "latex": "f(x) = \\begin{cases} x^2, & \\text{se } x < 0 \\\\ 2x + 1, & \\text{se } 0 \\leq x \\leq 3 \\\\ 7, & \\text{se } x > 3 \\end{cases}",
+    "onde": "enunciado",
+    "nota": "Chave com três ramos e texto acentuável; alinhamento da coluna de condição."
+  },
+  {
+    "id": "mat-em1-funcoes-005",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Função modular",
+    "latex": "|x| = \\begin{cases} x, & x \\geq 0 \\\\ -x, & x < 0 \\end{cases}",
+    "onde": "ambos",
+    "nota": "Barras de módulo seguidas de chave."
+  },
+  {
+    "id": "mat-em1-funcoes-006",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Inequação modular",
+    "latex": "|2x - 1| < 3 \\iff -3 < 2x - 1 < 3 \\iff -1 < x < 2",
+    "onde": "gabarito",
+    "nota": "Dupla desigualdade com equivalências."
+  },
+  {
+    "id": "mat-em1-funcoes-007",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Inversa",
+    "latex": "y = \\frac{2x + 1}{x - 3} \\;\\Rightarrow\\; f^{-1}(x) = \\frac{3x + 1}{x - 2}",
+    "onde": "gabarito",
+    "nota": "Expoente -1 sobre f."
+  },
+  {
+    "id": "mat-em1-funcoes-008",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Estudo do sinal",
+    "latex": "f(x) > 0 \\iff x \\in\\, ]-\\infty, 1[\\, \\cup\\, ]4, +\\infty[",
+    "onde": "gabarito",
+    "nota": "Pertinência a intervalos com colchetes invertidos colados."
+  },
+  {
+    "id": "mat-em1-exponencial-001",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Equação exponencial",
+    "latex": "2^{x + 1} = 32 \\;\\Rightarrow\\; 2^{x + 1} = 2^{5} \\;\\Rightarrow\\; x = 4",
+    "onde": "gabarito",
+    "nota": "Expoente com soma."
+  },
+  {
+    "id": "mat-em1-exponencial-002",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Inequação exponencial",
+    "latex": "\\left(\\frac{1}{3}\\right)^{x} > 9",
+    "onde": "enunciado",
+    "nota": "Base fracionária com parênteses crescentes."
+  },
+  {
+    "id": "mat-em1-exponencial-003",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Exponencial com expoente fracionário de expressão",
+    "latex": "4^{\\frac{x - 1}{2}} = 8^{\\frac{x}{3}}",
+    "onde": "enunciado",
+    "nota": "Fração com binômio no expoente: legibilidade mínima."
+  },
+  {
+    "id": "mat-em1-logaritmo-001",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Definição de logaritmo",
+    "latex": "\\log_a b = x \\iff a^{x} = b",
+    "onde": "ambos",
+    "nota": "Base do log como índice."
+  },
+  {
+    "id": "mat-em1-logaritmo-002",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Logaritmo numérico",
+    "latex": "\\log_2 8 = 3 \\qquad \\log 1000 = 3 \\qquad \\ln e = 1",
+    "onde": "ambos",
+    "nota": "log, log decimal e ln."
+  },
+  {
+    "id": "mat-em1-logaritmo-003",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Propriedades",
+    "latex": "\\log_a (b \\cdot c) = \\log_a b + \\log_a c \\qquad \\log_a \\frac{b}{c} = \\log_a b - \\log_a c",
+    "onde": "ambos",
+    "nota": "Log de fração."
+  },
+  {
+    "id": "mat-em1-logaritmo-004",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Mudança de base",
+    "latex": "\\log_a b = \\frac{\\log_c b}{\\log_c a}",
+    "onde": "ambos",
+    "nota": "Logs no numerador e denominador."
+  },
+  {
+    "id": "mat-em1-logaritmo-005",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Base fracionária",
+    "latex": "\\log_{\\frac{1}{2}} x > 3",
+    "onde": "enunciado",
+    "nota": "Fração como índice da base: quase ilegível se não for tratada."
+  },
+  {
+    "id": "mat-em1-logaritmo-006",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Base e logaritmando compostos",
+    "latex": "\\log_{x - 1}(x^2 - 5x + 6) = 1",
+    "onde": "enunciado",
+    "nota": "Base com expressão no índice."
+  },
+  {
+    "id": "mat-em1-pa-001",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Termo geral da PA",
+    "latex": "a_n = a_1 + (n - 1)\\,r",
+    "onde": "ambos",
+    "nota": "Índices n e 1."
+  },
+  {
+    "id": "mat-em1-pa-002",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Soma da PA",
+    "latex": "S_n = \\frac{(a_1 + a_n)\\,n}{2}",
+    "onde": "ambos",
+    "nota": "Fração com índices."
+  },
+  {
+    "id": "mat-em1-pg-001",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Soma da PG finita",
+    "latex": "S_n = \\frac{a_1\\,(q^{n} - 1)}{q - 1},\\quad q \\neq 1",
+    "onde": "ambos",
+    "nota": "Potência no numerador."
+  },
+  {
+    "id": "mat-em1-pg-002",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Soma da PG infinita",
+    "latex": "S_{\\infty} = \\frac{a_1}{1 - q},\\quad |q| < 1",
+    "onde": "ambos",
+    "nota": "Infinito como índice."
+  },
+  {
+    "id": "mat-em1-pg-003",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Soma infinita como série",
+    "latex": "\\displaystyle \\sum_{n=1}^{\\infty} \\frac{1}{2^{n}} = \\frac{1}{2} + \\frac{1}{4} + \\frac{1}{8} + \\cdots = 1",
+    "onde": "ambos",
+    "nota": "Destaque: somatório com limites em cima e embaixo."
+  },
+  {
+    "id": "mat-em1-trigonometria-001",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Lei dos senos",
+    "latex": "\\frac{a}{\\operatorname{sen}\\hat{A}} = \\frac{b}{\\operatorname{sen}\\hat{B}} = \\frac{c}{\\operatorname{sen}\\hat{C}} = 2R",
+    "onde": "ambos",
+    "nota": "sen com chapéu no argumento, três frações."
+  },
+  {
+    "id": "mat-em1-trigonometria-002",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Área com seno",
+    "latex": "A = \\frac{1}{2}\\,a\\,b\\,\\operatorname{sen}\\hat{C}",
+    "onde": "ambos",
+    "nota": "Fração meio e seno."
+  },
+  {
+    "id": "mat-em1-trigonometria-003",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Sine and cosine rule (IGCSE)",
+    "latex": "\\frac{a}{\\sin A} = \\frac{b}{\\sin B} \\qquad a^2 = b^2 + c^2 - 2bc\\cos A",
+    "onde": "ambos",
+    "nota": "Convenção britânica sin no lugar de sen."
+  },
+  {
+    "id": "mat-em1-financeira-001",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Tempo por logaritmo",
+    "latex": "t = \\frac{\\log \\frac{M}{C}}{\\log(1 + i)}",
+    "onde": "gabarito",
+    "nota": "Fração dentro do argumento do log, dentro de fração."
+  },
+  {
+    "id": "mat-em1-funcoes-009",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Differentiation (IGCSE Extended)",
+    "latex": "y = 2x^{3} - 5x + 1 \\;\\Rightarrow\\; \\frac{\\mathrm{d}y}{\\mathrm{d}x} = 6x^{2} - 5",
+    "onde": "gabarito",
+    "nota": "d reto (convenção britânica) na notação de Leibniz."
+  },
+  {
+    "id": "mat-em2-trigonometria-001",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Radianos",
+    "latex": "\\pi\\ \\text{rad} = 180^{\\circ} \\qquad \\frac{5\\pi}{6}\\ \\text{rad} = 150^{\\circ}",
+    "onde": "ambos",
+    "nota": "Pi em numerador e unidade rad."
+  },
+  {
+    "id": "mat-em2-trigonometria-002",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Conjunto solução trigonométrico",
+    "latex": "S = \\left\\{x \\in \\mathbb{R} \\;\\middle|\\; x = \\frac{\\pi}{6} + 2k\\pi \\text{ ou } x = \\frac{5\\pi}{6} + 2k\\pi,\\ k \\in \\mathbb{Z}\\right\\}",
+    "onde": "gabarito",
+    "nota": "\\middle| com chaves crescentes em volta de frações; linha muito longa."
+  },
+  {
+    "id": "mat-em2-trigonometria-003",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Tangente e secante",
+    "latex": "\\operatorname{tg} x = \\frac{\\operatorname{sen} x}{\\cos x} \\qquad \\sec x = \\frac{1}{\\cos x}",
+    "onde": "ambos",
+    "nota": "sec do MathJax e sen definido à mão."
+  },
+  {
+    "id": "mat-em2-trigonometria-004",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Cotangente e cossecante",
+    "latex": "\\operatorname{cotg} x = \\frac{\\cos x}{\\operatorname{sen} x} \\qquad \\operatorname{cossec} x = \\frac{1}{\\operatorname{sen} x}",
+    "onde": "ambos",
+    "nota": "Nomes brasileiros cotg e cossec."
+  },
+  {
+    "id": "mat-em2-trigonometria-005",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Arco duplo",
+    "latex": "\\cos 2a = \\cos^2 a - \\operatorname{sen}^2 a = 2\\cos^2 a - 1 = 1 - 2\\operatorname{sen}^2 a",
+    "onde": "ambos",
+    "nota": "Três formas encadeadas."
+  },
+  {
+    "id": "mat-em2-trigonometria-006",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Tangente da soma",
+    "latex": "\\operatorname{tg}(a + b) = \\frac{\\operatorname{tg} a + \\operatorname{tg} b}{1 - \\operatorname{tg} a \\cdot \\operatorname{tg} b}",
+    "onde": "ambos",
+    "nota": "Fração com operatorname em cima e embaixo."
+  },
+  {
+    "id": "mat-em2-trigonometria-007",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Redução ao primeiro quadrante",
+    "latex": "\\operatorname{sen}\\left(\\frac{\\pi}{2} - x\\right) = \\cos x \\qquad \\cos(\\pi + x) = -\\cos x",
+    "onde": "ambos",
+    "nota": "Parênteses crescentes em volta de fração com pi."
+  },
+  {
+    "id": "mat-em2-trigonometria-008",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Função trigonométrica com período",
+    "latex": "f(x) = 2 + 3\\operatorname{sen}\\left(2x - \\frac{\\pi}{3}\\right),\\quad p = \\frac{2\\pi}{|2|} = \\pi",
+    "onde": "gabarito",
+    "nota": "Período com módulo em denominador."
+  },
+  {
+    "id": "mat-em2-matrizes-001",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Matriz genérica",
+    "latex": "A = (a_{ij})_{m \\times n}",
+    "onde": "ambos",
+    "nota": "Índice duplo e índice de dimensão."
+  },
+  {
+    "id": "mat-em2-matrizes-002",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Matriz 2x2 com colchetes",
+    "latex": "A = \\begin{bmatrix} 1 & -2 \\\\ 3 & 4 \\end{bmatrix}",
+    "onde": "ambos",
+    "nota": "bmatrix com negativo alinhado."
+  },
+  {
+    "id": "mat-em2-matrizes-003",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Matriz genérica com reticências",
+    "latex": "A = \\begin{bmatrix} a_{11} & a_{12} & \\cdots & a_{1n} \\\\ a_{21} & a_{22} & \\cdots & a_{2n} \\\\ \\vdots & \\vdots & \\ddots & \\vdots \\\\ a_{m1} & a_{m2} & \\cdots & a_{mn} \\end{bmatrix}",
+    "onde": "ambos",
+    "nota": "Reticências horizontal, vertical e diagonal; índices duplos."
+  },
+  {
+    "id": "mat-em2-matrizes-004",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Produto de matrizes",
+    "latex": "\\begin{bmatrix} 1 & 2 \\\\ 3 & 4 \\end{bmatrix} \\cdot \\begin{bmatrix} 5 \\\\ 6 \\end{bmatrix} = \\begin{bmatrix} 17 \\\\ 39 \\end{bmatrix}",
+    "onde": "gabarito",
+    "nota": "Três matrizes de alturas iguais em linha."
+  },
+  {
+    "id": "mat-em2-matrizes-005",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Inversa 2x2",
+    "latex": "A^{-1} = \\frac{1}{\\det A}\\begin{bmatrix} d & -b \\\\ -c & a \\end{bmatrix}",
+    "onde": "ambos",
+    "nota": "Fração ao lado de matriz."
+  },
+  {
+    "id": "mat-em2-matrizes-006",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Lei de formação",
+    "latex": "a_{ij} = \\begin{cases} 2i + j, & \\text{se } i = j \\\\ i - j, & \\text{se } i \\neq j \\end{cases}",
+    "onde": "enunciado",
+    "nota": "Chave com índices duplos."
+  },
+  {
+    "id": "mat-em2-determinantes-001",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Determinante 2x2",
+    "latex": "\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix} = ad - bc",
+    "onde": "ambos",
+    "nota": "Barras verticais de determinante."
+  },
+  {
+    "id": "mat-em2-determinantes-002",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Determinante com fração",
+    "latex": "\\begin{vmatrix} \\frac{1}{2} & 3 \\\\ -\\frac{2}{3} & 4 \\end{vmatrix} = 2 + 2 = 4",
+    "onde": "gabarito",
+    "nota": "Frações dentro de células de determinante aumentam a altura da linha."
+  },
+  {
+    "id": "mat-em2-determinantes-003",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Determinante com barras manuais",
+    "latex": "\\left| \\begin{array}{cc} x & 2 \\\\ 3 & x \\end{array} \\right| = 0 \\;\\Rightarrow\\; x = \\pm\\sqrt{6}",
+    "onde": "ambos",
+    "nota": "Barras feitas com \\left| \\right| em array."
+  },
+  {
+    "id": "mat-em2-sistemas-001",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Sistema 3x3 em cases",
+    "latex": "\\begin{cases} x + y + z = 6 \\\\ 2x - y + z = 3 \\\\ x + 2y - z = 2 \\end{cases}",
+    "onde": "enunciado",
+    "nota": "Três equações sem alinhamento."
+  },
+  {
+    "id": "mat-em2-sistemas-002",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Regra de Cramer",
+    "latex": "x = \\frac{D_x}{D},\\quad y = \\frac{D_y}{D},\\quad z = \\frac{D_z}{D}",
+    "onde": "ambos",
+    "nota": "Três frações com índices."
+  },
+  {
+    "id": "mat-em2-sistemas-003",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Sistema na forma matricial",
+    "latex": "\\begin{bmatrix} 1 & 1 & 1 \\\\ 2 & -1 & 1 \\\\ 1 & 2 & -1 \\end{bmatrix} \\begin{bmatrix} x \\\\ y \\\\ z \\end{bmatrix} = \\begin{bmatrix} 6 \\\\ 3 \\\\ 2 \\end{bmatrix}",
+    "onde": "ambos",
+    "nota": "Matriz 3x3 vezes coluna igual a coluna."
+  },
+  {
+    "id": "mat-em2-combinatoria-001",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Fatorial",
+    "latex": "n! = n \\cdot (n - 1) \\cdot (n - 2) \\cdots 2 \\cdot 1 \\qquad 0! = 1",
+    "onde": "ambos",
+    "nota": "Ponto de exclamação colado e \\cdots."
+  },
+  {
+    "id": "mat-em2-combinatoria-002",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Arranjo simples",
+    "latex": "A_{n,p} = \\frac{n!}{(n - p)!}",
+    "onde": "ambos",
+    "nota": "Índice duplo com vírgula."
+  },
+  {
+    "id": "mat-em2-combinatoria-003",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Combinação simples",
+    "latex": "C_{n,p} = \\binom{n}{p} = \\frac{n!}{p!\\,(n - p)!}",
+    "onde": "ambos",
+    "nota": "Binomial em linha e fração com fatoriais."
+  },
+  {
+    "id": "mat-em2-combinatoria-004",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Permutação com repetição",
+    "latex": "P_{10}^{(3,\\,2)} = \\frac{10!}{3!\\,2!}",
+    "onde": "ambos",
+    "nota": "Sobrescrito com parênteses e subscrito no mesmo P."
+  },
+  {
+    "id": "mat-em2-combinatoria-005",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Arranjo com índice em cima",
+    "latex": "A_{8}^{3} = 8 \\cdot 7 \\cdot 6 = 336",
+    "onde": "ambos",
+    "nota": "Notação de livro com índices em cima e embaixo."
+  },
+  {
+    "id": "mat-em2-combinatoria-006",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Relação de Stifel",
+    "latex": "\\binom{n}{p} + \\binom{n}{p + 1} = \\binom{n + 1}{p + 1}",
+    "onde": "ambos",
+    "nota": "Três binomiais."
+  },
+  {
+    "id": "mat-em2-combinatoria-007",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Binomial em destaque",
+    "latex": "\\displaystyle \\binom{7}{3} = \\frac{7!}{3!\\,4!} = 35",
+    "onde": "ambos",
+    "nota": "\\displaystyle muda o tamanho do binomial."
+  },
+  {
+    "id": "mat-em2-probabilidade-001",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Probabilidade condicional",
+    "latex": "P(A \\mid B) = \\frac{P(A \\cap B)}{P(B)}",
+    "onde": "ambos",
+    "nota": "Barra vertical de condição com espaço de relação."
+  },
+  {
+    "id": "mat-em2-probabilidade-002",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Evento complementar",
+    "latex": "P(\\bar{A}) = 1 - P(A)",
+    "onde": "ambos",
+    "nota": "Barra sobre letra maiúscula."
+  },
+  {
+    "id": "mat-em2-probabilidade-003",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Distribuição binomial",
+    "latex": "P(X = k) = \\binom{n}{k}\\,p^{k}\\,(1 - p)^{n - k}",
+    "onde": "ambos",
+    "nota": "Binomial com potências."
+  },
+  {
+    "id": "mat-em2-probabilidade-004",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Probabilidade numérica",
+    "latex": "P = \\frac{\\binom{4}{2} \\cdot \\binom{6}{1}}{\\binom{10}{3}} = \\frac{36}{120} = \\frac{3}{10}",
+    "onde": "gabarito",
+    "nota": "Binomiais dentro de numerador e denominador: alturas acumuladas."
+  },
+  {
+    "id": "mat-em2-binomio-001",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Binômio de Newton",
+    "latex": "\\displaystyle (x + a)^{n} = \\sum_{k=0}^{n} \\binom{n}{k}\\,x^{n-k}\\,a^{k}",
+    "onde": "ambos",
+    "nota": "Destaque: somatório com binomial."
+  },
+  {
+    "id": "mat-em2-binomio-002",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Termo geral",
+    "latex": "T_{k+1} = \\binom{n}{k}\\,a^{k}\\,x^{n-k}",
+    "onde": "ambos",
+    "nota": "Índice com soma."
+  },
+  {
+    "id": "mat-em2-binomio-003",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Soma dos coeficientes",
+    "latex": "\\sum_{k=0}^{n} \\binom{n}{k} = 2^{n}",
+    "onde": "ambos",
+    "nota": "Somatório em linha com binomial."
+  },
+  {
+    "id": "mat-em2-geometria-espacial-001",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Diagonal do paralelepípedo",
+    "latex": "d = \\sqrt{a^2 + b^2 + c^2}",
+    "onde": "ambos",
+    "nota": "Raiz com três termos."
+  },
+  {
+    "id": "mat-em2-geometria-espacial-002",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Tronco de cone",
+    "latex": "V = \\frac{\\pi h}{3}\\left(R^2 + R\\,r + r^2\\right)",
+    "onde": "ambos",
+    "nota": "Parênteses grandes."
+  },
+  {
+    "id": "mat-em2-estatistica-001",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Variância e desvio padrão",
+    "latex": "\\sigma^2 = \\frac{1}{n}\\sum_{i=1}^{n} (x_i - \\bar{x})^2 \\qquad \\sigma = \\sqrt{\\sigma^2}",
+    "onde": "ambos",
+    "nota": "Somatório com média barrada dentro."
+  },
+  {
+    "id": "mat-em2-estatistica-002",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Mediana e moda",
+    "latex": "\\tilde{x} = \\frac{x_{(n/2)} + x_{(n/2 + 1)}}{2} \\qquad \\mathrm{Mo} = 7",
+    "onde": "ambos",
+    "nota": "Til sobre x e índice com parênteses e fração."
+  },
+  {
+    "id": "mat-em3-geometria-analitica-001",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Distância entre pontos",
+    "latex": "d_{AB} = \\sqrt{(x_B - x_A)^2 + (y_B - y_A)^2}",
+    "onde": "ambos",
+    "nota": "Raiz longa com índices."
+  },
+  {
+    "id": "mat-em3-geometria-analitica-002",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Ponto médio",
+    "latex": "M = \\left(\\frac{x_A + x_B}{2},\\ \\frac{y_A + y_B}{2}\\right)",
+    "onde": "ambos",
+    "nota": "Par ordenado de frações."
+  },
+  {
+    "id": "mat-em3-geometria-analitica-003",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Coeficiente angular",
+    "latex": "m = \\frac{\\Delta y}{\\Delta x} = \\frac{y_B - y_A}{x_B - x_A} = \\operatorname{tg}\\alpha",
+    "onde": "ambos",
+    "nota": "Delta e tg."
+  },
+  {
+    "id": "mat-em3-geometria-analitica-004",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Distância de ponto a reta",
+    "latex": "d_{P,r} = \\frac{|a x_0 + b y_0 + c|}{\\sqrt{a^2 + b^2}}",
+    "onde": "ambos",
+    "nota": "Módulo no numerador e raiz no denominador."
+  },
+  {
+    "id": "mat-em3-geometria-analitica-005",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Condição de alinhamento",
+    "latex": "\\begin{vmatrix} x_A & y_A & 1 \\\\ x_B & y_B & 1 \\\\ x_C & y_C & 1 \\end{vmatrix} = 0",
+    "onde": "ambos",
+    "nota": "Determinante com índices."
+  },
+  {
+    "id": "mat-em3-geometria-analitica-006",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Equação da circunferência",
+    "latex": "(x - a)^2 + (y - b)^2 = r^2",
+    "onde": "ambos",
+    "nota": "Forma reduzida."
+  },
+  {
+    "id": "mat-em3-geometria-analitica-007",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Circunferência na forma geral",
+    "latex": "x^2 + y^2 - 4x + 6y - 12 = 0 \\;\\Rightarrow\\; C(2, -3),\\ r = 5",
+    "onde": "gabarito",
+    "nota": "Gabarito com centro e raio."
+  },
+  {
+    "id": "mat-em3-geometria-analitica-008",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Hipérbole e parábola",
+    "latex": "\\frac{(x - h)^2}{a^2} - \\frac{(y - k)^2}{b^2} = 1 \\qquad y^2 = 4px",
+    "onde": "ambos",
+    "nota": "Frações com binômio ao quadrado."
+  },
+  {
+    "id": "mat-em3-complexos-001",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Conjugado e módulo",
+    "latex": "\\bar{z} = a - bi \\qquad |z| = \\rho = \\sqrt{a^2 + b^2}",
+    "onde": "ambos",
+    "nota": "Barra sobre z, rô."
+  },
+  {
+    "id": "mat-em3-complexos-002",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Conjugado com barra longa",
+    "latex": "\\overline{z_1 + z_2} = \\overline{z_1} + \\overline{z_2}",
+    "onde": "ambos",
+    "nota": "\\overline sobre expressão com índice."
+  },
+  {
+    "id": "mat-em3-complexos-003",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Partes real e imaginária",
+    "latex": "\\operatorname{Re}(z) = a \\qquad \\operatorname{Im}(z) = b \\qquad \\arg(z) = \\theta",
+    "onde": "ambos",
+    "nota": "Re e Im retos (não o símbolo gótico padrão)."
+  },
+  {
+    "id": "mat-em3-complexos-004",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Divisão de complexos",
+    "latex": "\\frac{2 + 3i}{1 - i} = \\frac{(2 + 3i)(1 + i)}{(1 - i)(1 + i)} = -\\frac{1}{2} + \\frac{5}{2}i",
+    "onde": "gabarito",
+    "nota": "Cadeia com conjugado no denominador."
+  },
+  {
+    "id": "mat-em3-complexos-005",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Forma trigonométrica",
+    "latex": "z = \\rho\\,(\\cos\\theta + i\\operatorname{sen}\\theta)",
+    "onde": "ambos",
+    "nota": "Forma polar com sen."
+  },
+  {
+    "id": "mat-em3-complexos-006",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Primeira fórmula de De Moivre",
+    "latex": "z^{n} = \\rho^{n}\\,[\\cos(n\\theta) + i\\operatorname{sen}(n\\theta)]",
+    "onde": "ambos",
+    "nota": "Colchetes e potências."
+  },
+  {
+    "id": "mat-em3-polinomios-001",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Polinômio genérico",
+    "latex": "P(x) = a_n x^{n} + a_{n-1} x^{n-1} + \\cdots + a_1 x + a_0",
+    "onde": "ambos",
+    "nota": "Índices e expoentes compostos."
+  },
+  {
+    "id": "mat-em3-polinomios-002",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Relações de Girard",
+    "latex": "x_1 + x_2 + x_3 = -\\frac{b}{a} \\qquad x_1x_2 + x_1x_3 + x_2x_3 = \\frac{c}{a} \\qquad x_1x_2x_3 = -\\frac{d}{a}",
+    "onde": "ambos",
+    "nota": "Três relações longas em linha."
+  },
+  {
+    "id": "mat-em3-polinomios-003",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Dispositivo de Briot-Ruffini",
+    "latex": "\\begin{array}{c|cccc} 2 & 1 & -3 & 0 & 4 \\\\ \\hline & 1 & -1 & -2 & \\boxed{0} \\end{array}",
+    "onde": "gabarito",
+    "nota": "Array com barra vertical, \\hline e resto em caixa."
+  },
+  {
+    "id": "mat-em3-limites-001",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Limite com indeterminação",
+    "latex": "\\lim_{x \\to 2} \\frac{x^2 - 4}{x - 2} = \\lim_{x \\to 2}\\,(x + 2) = 4",
+    "onde": "gabarito",
+    "nota": "Limite em linha: x→2 fica embaixo só em display."
+  },
+  {
+    "id": "mat-em3-limites-002",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Limite em destaque",
+    "latex": "\\displaystyle \\lim_{x \\to 2} \\frac{x^2 - 4}{x - 2} = 4",
+    "onde": "ambos",
+    "nota": "Destaque: subscrito embaixo do lim."
+  },
+  {
+    "id": "mat-em3-limites-003",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Limite no infinito",
+    "latex": "\\displaystyle \\lim_{x \\to +\\infty} \\frac{3x^2 + 1}{x^2 - 5} = 3",
+    "onde": "ambos",
+    "nota": "Mais infinito no subscrito."
+  },
+  {
+    "id": "mat-em3-limites-004",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Limites laterais",
+    "latex": "\\lim_{x \\to 0^{+}} \\frac{1}{x} = +\\infty \\qquad \\lim_{x \\to 0^{-}} \\frac{1}{x} = -\\infty",
+    "onde": "ambos",
+    "nota": "Expoente sinal dentro do subscrito do lim."
+  },
+  {
+    "id": "mat-em3-limites-005",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Limite fundamental trigonométrico",
+    "latex": "\\displaystyle \\lim_{x \\to 0} \\frac{\\operatorname{sen} x}{x} = 1",
+    "onde": "ambos",
+    "nota": "sen dentro de limite."
+  },
+  {
+    "id": "mat-em3-limites-006",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Limite exponencial fundamental",
+    "latex": "\\displaystyle \\lim_{n \\to \\infty} \\left(1 + \\frac{1}{n}\\right)^{n} = e",
+    "onde": "ambos",
+    "nota": "Parênteses crescentes com expoente no limite."
+  },
+  {
+    "id": "mat-em3-limites-007",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Limite com limits forçado",
+    "latex": "\\lim\\limits_{x \\to 3} (2x + 1) = 7",
+    "onde": "ambos",
+    "nota": "\\limits em linha: subscrito embaixo mesmo fora do display."
+  },
+  {
+    "id": "mat-em3-derivadas-001",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Definição de derivada",
+    "latex": "\\displaystyle f'(x) = \\lim_{h \\to 0} \\frac{f(x + h) - f(x)}{h}",
+    "onde": "ambos",
+    "nota": "Linha na função e limite com fração."
+  },
+  {
+    "id": "mat-em3-derivadas-002",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Notação de Leibniz",
+    "latex": "\\frac{dy}{dx} \\qquad \\frac{d^{2}y}{dx^{2}} \\qquad \\frac{d}{dx}\\left(x^{n}\\right) = n\\,x^{n-1}",
+    "onde": "ambos",
+    "nota": "Segunda derivada com expoentes desencontrados no d."
+  },
+  {
+    "id": "mat-em3-derivadas-003",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Notação de linha",
+    "latex": "f'(x) \\qquad f''(x) \\qquad f'''(x) \\qquad f^{(4)}(x)",
+    "onde": "ambos",
+    "nota": "Plicas múltiplas e ordem entre parênteses."
+  },
+  {
+    "id": "mat-em3-derivadas-004",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Regra do quociente",
+    "latex": "\\left(\\frac{u}{v}\\right)' = \\frac{u'v - uv'}{v^2}",
+    "onde": "ambos",
+    "nota": "Plica depois de parêntese crescente."
+  },
+  {
+    "id": "mat-em3-derivadas-005",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Regra da cadeia",
+    "latex": "\\frac{dy}{dx} = \\frac{dy}{du} \\cdot \\frac{du}{dx}",
+    "onde": "ambos",
+    "nota": "Três frações de Leibniz."
+  },
+  {
+    "id": "mat-em3-derivadas-006",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Derivada no ponto",
+    "latex": "\\left.\\frac{df}{dx}\\right|_{x = 2} = 12",
+    "onde": "gabarito",
+    "nota": "Barra de avaliação com \\left. e subscrito."
+  },
+  {
+    "id": "mat-em3-derivadas-007",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Tabela de derivadas",
+    "latex": "(\\operatorname{sen} x)' = \\cos x \\qquad (e^{x})' = e^{x} \\qquad (\\ln x)' = \\frac{1}{x}",
+    "onde": "ambos",
+    "nota": "Plicas depois de parênteses com operatorname."
+  },
+  {
+    "id": "mat-em3-integrais-001",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Integral indefinida",
+    "latex": "\\int x^{n}\\,dx = \\frac{x^{n+1}}{n + 1} + C,\\quad n \\neq -1",
+    "onde": "ambos",
+    "nota": "Integral em linha com espaço fino antes de dx."
+  },
+  {
+    "id": "mat-em3-integrais-002",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Integral definida",
+    "latex": "\\displaystyle \\int_{0}^{1} x^{2}\\,dx = \\left[\\frac{x^{3}}{3}\\right]_{0}^{1} = \\frac{1}{3}",
+    "onde": "gabarito",
+    "nota": "Destaque: limites de integração e colchete de avaliação com índices."
+  },
+  {
+    "id": "mat-em3-integrais-003",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Integral trigonométrica",
+    "latex": "\\displaystyle \\int_{0}^{\\pi} \\operatorname{sen} x\\,dx = \\Big[-\\cos x\\Big]_{0}^{\\pi} = 2",
+    "onde": "gabarito",
+    "nota": "\\Big[ manual com limites."
+  },
+  {
+    "id": "mat-em3-integrais-004",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Área entre curvas",
+    "latex": "\\displaystyle A = \\int_{-1}^{2} \\left[(x + 2) - x^{2}\\right] dx = \\frac{9}{2}",
+    "onde": "gabarito",
+    "nota": "Limite inferior negativo."
+  },
+  {
+    "id": "mat-em3-vetores-001",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Vetor no espaço",
+    "latex": "\\vec{u} = (2, -1, 3) = 2\\vec{\\imath} - \\vec{\\jmath} + 3\\vec{k}",
+    "onde": "ambos",
+    "nota": "Seta sobre i e j sem pingo (\\imath, \\jmath)."
+  },
+  {
+    "id": "mat-em3-vetores-002",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Produto escalar",
+    "latex": "\\vec{u} \\cdot \\vec{v} = |\\vec{u}|\\,|\\vec{v}|\\cos\\theta",
+    "onde": "ambos",
+    "nota": "Módulos com seta dentro."
+  },
+  {
+    "id": "mat-em3-vetores-003",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Norma",
+    "latex": "\\|\\vec{v}\\| = \\sqrt{v_x^2 + v_y^2 + v_z^2}",
+    "onde": "ambos",
+    "nota": "Barra dupla de norma e índice com expoente."
+  },
+  {
+    "id": "mat-em3-vetores-004",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Vetor com versores",
+    "latex": "\\vec{v} = 3\\hat{\\imath} + 4\\hat{\\jmath} \\qquad |\\vec{v}| = 5",
+    "onde": "ambos",
+    "nota": "Chapéu sobre i e j sem pingo."
+  },
+  {
+    "id": "mat-ef6-estresse-001",
+    "materia": "Matemática",
+    "serie": "6º ano EF",
+    "assunto": "Expressão com quatro níveis de agrupamento",
+    "latex": "\\left\\{ 2 + \\left[ 3 - \\left( 4 - \\frac{1}{2} \\right) \\cdot 2 \\right] \\div \\frac{1}{4} \\right\\} \\cdot 3",
+    "onde": "enunciado",
+    "nota": "Estresse: chaves, colchetes e parênteses crescentes aninhados com fração no miolo."
+  },
+  {
+    "id": "mat-ef7-estresse-001",
+    "materia": "Matemática",
+    "serie": "7º ano EF",
+    "assunto": "Expressão numérica longa com frações",
+    "latex": "\\left[\\left(\\frac{2}{3} + \\frac{1}{6}\\right) \\div \\frac{5}{4} - \\left(\\frac{1}{2}\\right)^{2}\\right] \\cdot \\left\\{1 - \\left[\\frac{3}{4} - \\left(\\frac{1}{2} - \\frac{1}{8}\\right)\\right]\\right\\}",
+    "onde": "enunciado",
+    "nota": "Estresse: largura total maior que a coluna da folha; precisa quebrar ou reduzir."
+  },
+  {
+    "id": "mat-ef8-estresse-001",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Fração com quatro níveis",
+    "latex": "\\dfrac{1 + \\dfrac{1}{2 + \\dfrac{1}{3 + \\dfrac{1}{4}}}}{5}",
+    "onde": "enunciado",
+    "nota": "Estresse: quatro níveis de fração com \\dfrac; altura da linha da folha estoura."
+  },
+  {
+    "id": "mat-ef8-estresse-002",
+    "materia": "Matemática",
+    "serie": "8º ano EF",
+    "assunto": "Fração de frações com mistos",
+    "latex": "\\dfrac{2\\frac{1}{2} - 1\\frac{3}{4}}{\\frac{3}{8} + 1\\frac{1}{8}}",
+    "onde": "enunciado",
+    "nota": "Estresse: números mistos dentro de numerador e denominador."
+  },
+  {
+    "id": "mat-ef9-estresse-001",
+    "materia": "Matemática",
+    "serie": "9º ano EF",
+    "assunto": "Radicais aninhados",
+    "latex": "\\sqrt{2 + \\sqrt{2 + \\sqrt{2 + \\sqrt{2}}}}",
+    "onde": "enunciado",
+    "nota": "Estresse: quatro radicais aninhados; o traço de cada raiz precisa cobrir o conteúdo inteiro."
+  },
+  {
+    "id": "mat-em1-estresse-001",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Fração contínua",
+    "latex": "\\displaystyle 1 + \\cfrac{1}{1 + \\cfrac{1}{1 + \\cfrac{1}{1 + \\cdots}}}",
+    "onde": "enunciado",
+    "nota": "Estresse: \\cfrac em quatro níveis com reticências."
+  },
+  {
+    "id": "mat-em1-estresse-002",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Função por partes com quatro ramos",
+    "latex": "f(x) = \\begin{cases} -x^{2} + 1, & \\text{se } x < -1 \\\\ \\dfrac{x + 1}{2}, & \\text{se } -1 \\leq x < 1 \\\\ \\sqrt{x}, & \\text{se } 1 \\leq x \\leq 4 \\\\ \\log_{2} x, & \\text{se } x > 4 \\end{cases}",
+    "onde": "enunciado",
+    "nota": "Estresse: ramos com alturas diferentes (fração cheia, raiz, log com base)."
+  },
+  {
+    "id": "mat-em1-estresse-003",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Expressão longa em duas linhas",
+    "latex": "\\begin{aligned} S &= (1 + 2 + 3 + \\cdots + 50) + (51 + 52 + \\cdots + 100) \\\\ &= \\frac{(1 + 50) \\cdot 50}{2} + \\frac{(51 + 100) \\cdot 50}{2} = 1\\,275 + 3\\,775 = 5\\,050 \\end{aligned}",
+    "onde": "gabarito",
+    "nota": "Estresse: quebra explícita em duas linhas com aligned."
+  },
+  {
+    "id": "mat-em1-estresse-004",
+    "materia": "Matemática",
+    "serie": "1ª série EM",
+    "assunto": "Soma de Gauss com chaves",
+    "latex": "\\underbrace{1 + 2 + 3 + \\cdots + n}_{n \\text{ parcelas}} = \\overbrace{\\frac{n\\,(n + 1)}{2}}^{\\text{fórmula}}",
+    "onde": "ambos",
+    "nota": "Estresse: \\underbrace e \\overbrace com texto acentuado."
+  },
+  {
+    "id": "mat-em2-estresse-001",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Determinante 4x4",
+    "latex": "\\begin{vmatrix} 1 & 2 & 0 & -1 \\\\ 3 & -1 & 2 & 4 \\\\ 0 & 5 & -3 & 2 \\\\ -2 & 1 & 4 & 0 \\end{vmatrix}",
+    "onde": "enunciado",
+    "nota": "Estresse: matriz 4x4 com negativos desalinhando colunas."
+  },
+  {
+    "id": "mat-em2-estresse-002",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Matriz 4x4 em colchetes com frações",
+    "latex": "A = \\begin{bmatrix} \\frac{1}{2} & 0 & -\\frac{3}{4} & 1 \\\\ 2 & \\frac{5}{3} & 0 & -1 \\\\ 0 & 1 & \\sqrt{2} & \\frac{1}{8} \\\\ -\\frac{2}{5} & 3 & 1 & 0 \\end{bmatrix}",
+    "onde": "ambos",
+    "nota": "Estresse: células com frações e raiz em 4x4; altura das linhas irregular."
+  },
+  {
+    "id": "mat-em2-estresse-003",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Matriz aumentada do escalonamento",
+    "latex": "\\left[\\begin{array}{ccc|c} 1 & 1 & 1 & 6 \\\\ 0 & -3 & -1 & -9 \\\\ 0 & 0 & -\\frac{7}{3} & -7 \\end{array}\\right]",
+    "onde": "gabarito",
+    "nota": "Estresse: array com barra vertical entre colunas e fração na célula."
+  },
+  {
+    "id": "mat-em2-estresse-004",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Sistema 3x3 alinhado no igual",
+    "latex": "\\left\\{\\begin{alignedat}{4} 2x &{}+{}& 3y &{}-{}& z &{}={}& 5 \\\\ x &{}-{}& y &{}+{}& 2z &{}={}& -1 \\\\ -x &{}+{}& 4y &{}+{}& z &{}={}& 8 \\end{alignedat}\\right.",
+    "onde": "enunciado",
+    "nota": "Estresse: alignedat com colunas de sinais; variáveis alinhadas umas embaixo das outras."
+  },
+  {
+    "id": "mat-em2-estresse-005",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Escalonamento passo a passo",
+    "latex": "\\begin{aligned} L_2 &\\leftarrow L_2 - 2L_1 \\\\ L_3 &\\leftarrow L_3 - L_1 \\end{aligned} \\quad \\begin{bmatrix} 1 & 1 & 1 \\\\ 0 & -3 & -1 \\\\ 0 & 1 & -2 \\end{bmatrix}",
+    "onde": "gabarito",
+    "nota": "Estresse: aligned ao lado de matriz, setas de atribuição."
+  },
+  {
+    "id": "mat-em2-estresse-006",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Regra de Sarrus expandida",
+    "latex": "\\begin{vmatrix} 2 & 1 & 3 \\\\ 0 & -1 & 4 \\\\ 1 & 2 & 0 \\end{vmatrix} = (0 + 4 + 0) - (-3 + 16 + 0) = 4 - 13 = -9",
+    "onde": "gabarito",
+    "nota": "Estresse: determinante seguido de expansão longa."
+  },
+  {
+    "id": "mat-em2-estresse-007",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Cramer com determinantes em fração",
+    "latex": "x = \\dfrac{\\begin{vmatrix} 6 & 1 & 1 \\\\ 3 & -1 & 1 \\\\ 2 & 2 & -1 \\end{vmatrix}}{\\begin{vmatrix} 1 & 1 & 1 \\\\ 2 & -1 & 1 \\\\ 1 & 2 & -1 \\end{vmatrix}} = \\frac{-7}{7} \\cdot (-1) = 1",
+    "onde": "gabarito",
+    "nota": "Estresse: determinantes 3x3 no numerador e no denominador de uma fração."
+  },
+  {
+    "id": "mat-em2-estresse-008",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Binômio expandido com destaque",
+    "latex": "(2x - 1)^{4} = \\binom{4}{0}(2x)^{4} - \\binom{4}{1}(2x)^{3} + \\binom{4}{2}(2x)^{2} - \\binom{4}{3}(2x) + \\binom{4}{4} = 16x^{4} - 32x^{3} + 24x^{2} - 8x + 1",
+    "onde": "gabarito",
+    "nota": "Estresse: linha muito longa sem quebra explícita, com binomiais."
+  },
+  {
+    "id": "mat-em2-estresse-009",
+    "materia": "Matemática",
+    "serie": "2ª série EM",
+    "assunto": "Desvio padrão com raiz sobre fração",
+    "latex": "\\displaystyle \\sigma = \\sqrt{\\frac{\\sum_{i=1}^{n} f_i\\,(x_i - \\bar{x})^{2}}{\\sum_{i=1}^{n} f_i}}",
+    "onde": "ambos",
+    "nota": "Estresse: raiz alta sobre fração com somatórios em cima e embaixo."
+  },
+  {
+    "id": "mat-em3-estresse-001",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Raízes enésimas de complexo",
+    "latex": "w_k = \\sqrt[n]{\\rho}\\left[\\cos\\left(\\frac{\\theta + 2k\\pi}{n}\\right) + i\\operatorname{sen}\\left(\\frac{\\theta + 2k\\pi}{n}\\right)\\right],\\quad k = 0, 1, \\ldots, n - 1",
+    "onde": "ambos",
+    "nota": "Estresse: delimitadores crescentes aninhados, raiz com índice e linha longa."
+  },
+  {
+    "id": "mat-em3-estresse-002",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Área do triângulo por determinante",
+    "latex": "A = \\frac{1}{2}\\left|\\det\\begin{pmatrix} x_A & y_A & 1 \\\\ x_B & y_B & 1 \\\\ x_C & y_C & 1 \\end{pmatrix}\\right|",
+    "onde": "ambos",
+    "nota": "Estresse: barras de módulo crescentes em volta de pmatrix com índices."
+  },
+  {
+    "id": "mat-em3-estresse-003",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Limite com fração dentro de fração",
+    "latex": "\\displaystyle \\lim_{x \\to 0} \\frac{\\sqrt{1 + x} - 1}{x} = \\lim_{x \\to 0} \\frac{1}{\\sqrt{1 + x} + 1} = \\frac{1}{2}",
+    "onde": "gabarito",
+    "nota": "Estresse: limites em display com raiz no numerador e no denominador."
+  },
+  {
+    "id": "mat-em3-estresse-004",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Limite de quociente de frações",
+    "latex": "\\displaystyle \\lim_{x \\to 1} \\frac{\\dfrac{1}{x} - 1}{\\dfrac{1}{x^{2}} - 1}",
+    "onde": "enunciado",
+    "nota": "Estresse: limite com fração de frações em display."
+  },
+  {
+    "id": "mat-em3-estresse-005",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Limite no infinito com raiz",
+    "latex": "\\displaystyle \\lim_{x \\to +\\infty} \\left(\\sqrt{x^{2} + 3x} - x\\right) = \\lim_{x \\to +\\infty} \\frac{3x}{\\sqrt{x^{2} + 3x} + x} = \\frac{3}{2}",
+    "onde": "gabarito",
+    "nota": "Estresse: linha longa em display com dois limites."
+  },
+  {
+    "id": "mat-em3-estresse-006",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Integral dupla",
+    "latex": "\\displaystyle \\iint_{R} (x + y)\\,dA = \\int_{0}^{1}\\!\\!\\int_{0}^{x} (x + y)\\,dy\\,dx = \\frac{1}{2}",
+    "onde": "gabarito",
+    "nota": "Estresse: \\iint com região e integrais iteradas com espaço negativo."
+  },
+  {
+    "id": "mat-em3-estresse-007",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Derivada do quociente com cadeia",
+    "latex": "\\displaystyle \\frac{d}{dx}\\left[\\frac{\\operatorname{sen}(x^{2})}{e^{3x} + 1}\\right] = \\frac{2x\\cos(x^{2})\\,(e^{3x} + 1) - 3e^{3x}\\operatorname{sen}(x^{2})}{(e^{3x} + 1)^{2}}",
+    "onde": "gabarito",
+    "nota": "Estresse: fração larga em display com colchetes crescentes; tende a estourar a coluna."
+  },
+  {
+    "id": "mat-em3-estresse-008",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Produto vetorial por determinante",
+    "latex": "\\vec{u} \\times \\vec{v} = \\begin{vmatrix} \\vec{\\imath} & \\vec{\\jmath} & \\vec{k} \\\\ 2 & -1 & 3 \\\\ 1 & 4 & -2 \\end{vmatrix}",
+    "onde": "ambos",
+    "nota": "Estresse: setas dentro de células de determinante."
+  },
+  {
+    "id": "mat-em3-estresse-009",
+    "materia": "Matemática",
+    "serie": "3ª série EM",
+    "assunto": "Simplificação com cancelamento e cor",
+    "latex": "\\frac{\\cancel{(x - 2)}\\,(x + 2)}{\\cancel{(x - 2)}} = x + 2 \\qquad \\cancelto{0}{\\lim_{h \\to 0} h} \\qquad {\\color{red}{\\boxed{x = 4}}}",
+    "onde": "gabarito",
+    "nota": "Estresse: cancel, cancelto e color no gabarito; a impressão em preto e branco precisa manter o destaque legível."
+  },
+  {
+    "id": "fis-ef9-cinematica-001",
+    "materia": "Física",
+    "serie": "9º ano EF",
+    "assunto": "Velocidade média",
+    "latex": "v_m = \\frac{\\Delta s}{\\Delta t}",
+    "onde": "ambos",
+    "nota": "Delta em numerador e denominador."
+  },
+  {
+    "id": "fis-ef9-cinematica-002",
+    "materia": "Física",
+    "serie": "9º ano EF",
+    "assunto": "Conversão de unidades",
+    "latex": "72\\ \\text{km/h} = \\frac{72}{3{,}6}\\ \\text{m/s} = 20\\ \\text{m/s}",
+    "onde": "gabarito",
+    "nota": "Unidade com barra e vírgula decimal em denominador."
+  },
+  {
+    "id": "fis-ef9-dinamica-001",
+    "materia": "Física",
+    "serie": "9º ano EF",
+    "assunto": "Peso",
+    "latex": "P = m \\cdot g,\\quad g \\approx 9{,}8\\ \\text{m/s}^2",
+    "onde": "ambos",
+    "nota": "Unidade com expoente após barra: m/s²."
+  },
+  {
+    "id": "fis-ef9-eletricidade-001",
+    "materia": "Física",
+    "serie": "9º ano EF",
+    "assunto": "Lei de Ohm",
+    "latex": "U = R \\cdot i",
+    "onde": "ambos",
+    "nota": "Base."
+  },
+  {
+    "id": "fis-ef9-densidade-001",
+    "materia": "Física",
+    "serie": "9º ano EF",
+    "assunto": "Density (Cambridge Lower Secondary)",
+    "latex": "\\rho = \\frac{m}{V} \\qquad \\text{density} = \\frac{\\text{mass}}{\\text{volume}}",
+    "onde": "ambos",
+    "nota": "Rô e fração com palavras."
+  },
+  {
+    "id": "fis-ef9-pressao-001",
+    "materia": "Física",
+    "serie": "9º ano EF",
+    "assunto": "Pressure (Cambridge Lower Secondary)",
+    "latex": "p = \\frac{F}{A}\\quad (\\text{N/m}^{2} = \\text{Pa})",
+    "onde": "ambos",
+    "nota": "Unidade com expoente dentro de parênteses."
+  },
+  {
+    "id": "fis-ef9-energia-001",
+    "materia": "Física",
+    "serie": "9º ano EF",
+    "assunto": "Kinetic energy (IGCSE)",
+    "latex": "E_{\\text{k}} = \\tfrac{1}{2}mv^{2} \\qquad \\Delta E_{\\text{p}} = mg\\Delta h",
+    "onde": "ambos",
+    "nota": "Índice reto k e p, tfrac."
+  },
+  {
+    "id": "fis-em1-vetores-001",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Vetor com seta",
+    "latex": "\\vec{F} \\qquad \\overrightarrow{F_R} \\qquad \\vec{v}_0",
+    "onde": "ambos",
+    "nota": "Seta curta, seta longa sobre letra com índice, seta com índice fora."
+  },
+  {
+    "id": "fis-em1-vetores-002",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Módulo da resultante",
+    "latex": "|\\vec{R}| = \\sqrt{F_1^{2} + F_2^{2} + 2F_1F_2\\cos\\theta}",
+    "onde": "ambos",
+    "nota": "Índice e expoente na mesma letra dentro de raiz."
+  },
+  {
+    "id": "fis-em1-vetores-003",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Vetor em negrito",
+    "latex": "\\boldsymbol{F} = m\\boldsymbol{a} \\qquad \\boldsymbol{\\tau} = \\boldsymbol{r} \\times \\boldsymbol{F}",
+    "onde": "ambos",
+    "nota": "boldsymbol com letra grega."
+  },
+  {
+    "id": "fis-em1-cinematica-001",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Função horária do MRUV",
+    "latex": "s = s_0 + v_0\\,t + \\frac{a\\,t^{2}}{2}",
+    "onde": "ambos",
+    "nota": "Fração com expoente."
+  },
+  {
+    "id": "fis-em1-cinematica-002",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Equação de Torricelli",
+    "latex": "v^{2} = v_0^{2} + 2\\,a\\,\\Delta s",
+    "onde": "ambos",
+    "nota": "Índice e expoente empilhados em v_0^2."
+  },
+  {
+    "id": "fis-em1-cinematica-003",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Lançamento oblíquo",
+    "latex": "v_{0x} = v_0\\cos\\theta \\qquad v_{0y} = v_0\\operatorname{sen}\\theta",
+    "onde": "ambos",
+    "nota": "Índice duplo 0x e sen."
+  },
+  {
+    "id": "fis-em1-cinematica-004",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Alcance",
+    "latex": "\\displaystyle A = \\frac{v_0^{2}\\,\\operatorname{sen}(2\\theta)}{g}",
+    "onde": "ambos",
+    "nota": "Destaque."
+  },
+  {
+    "id": "fis-em1-cinematica-005",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Movimento circular",
+    "latex": "\\omega = \\frac{\\Delta\\varphi}{\\Delta t} = \\frac{2\\pi}{T} = 2\\pi f \\qquad v = \\omega R",
+    "onde": "ambos",
+    "nota": "Ômega e varphi."
+  },
+  {
+    "id": "fis-em1-dinamica-001",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Princípio fundamental vetorial",
+    "latex": "\\sum \\vec{F} = m\\,\\vec{a}",
+    "onde": "ambos",
+    "nota": "Somatório sem limites em linha com seta."
+  },
+  {
+    "id": "fis-em1-dinamica-002",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Resultante com somatório",
+    "latex": "\\vec{F}_R = \\sum_{i=1}^{n} \\vec{F}_i = m\\,\\vec{a}",
+    "onde": "ambos",
+    "nota": "Somatório com limites e setas com índice."
+  },
+  {
+    "id": "fis-em1-dinamica-003",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Atrito",
+    "latex": "F_{at} = \\mu \\cdot N \\qquad \\mu_e > \\mu_c",
+    "onde": "ambos",
+    "nota": "Índices at, e, c."
+  },
+  {
+    "id": "fis-em1-energia-001",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Energias potenciais",
+    "latex": "E_{pg} = m\\,g\\,h \\qquad E_{pel} = \\frac{k\\,x^{2}}{2}",
+    "onde": "ambos",
+    "nota": "Índices longos."
+  },
+  {
+    "id": "fis-em1-energia-002",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Conservação da energia mecânica",
+    "latex": "E_{m_A} = E_{m_B} \\;\\Rightarrow\\; m\\,g\\,h_A + \\frac{m\\,v_A^{2}}{2} = m\\,g\\,h_B + \\frac{m\\,v_B^{2}}{2}",
+    "onde": "gabarito",
+    "nota": "Índice dentro de índice (m_A em E)."
+  },
+  {
+    "id": "fis-em1-unidades-001",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Unidade de trabalho",
+    "latex": "1\\ \\text{J} = 1\\ \\text{N} \\cdot \\text{m} = 1\\ \\text{kg} \\cdot \\text{m}^{2}/\\text{s}^{2}",
+    "onde": "ambos",
+    "nota": "Unidade composta com ponto e barra."
+  },
+  {
+    "id": "fis-em1-impulso-001",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Impulso",
+    "latex": "\\vec{I} = \\vec{F} \\cdot \\Delta t = \\Delta\\vec{Q}",
+    "onde": "ambos",
+    "nota": "Seta após Delta."
+  },
+  {
+    "id": "fis-em1-impulso-002",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Quantidade de movimento",
+    "latex": "\\vec{Q} = m\\,\\vec{v} \\qquad [Q] = \\text{kg} \\cdot \\text{m/s}",
+    "onde": "ambos",
+    "nota": "Colchetes de unidade e kg·m/s."
+  },
+  {
+    "id": "fis-em1-impulso-003",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Conservação no choque",
+    "latex": "m_A\\,v_A + m_B\\,v_B = m_A\\,v'_A + m_B\\,v'_B",
+    "onde": "ambos",
+    "nota": "Plica seguida de índice (v'_A)."
+  },
+  {
+    "id": "fis-em1-impulso-004",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Coeficiente de restituição",
+    "latex": "e = \\frac{|v'_B - v'_A|}{|v_A - v_B|}",
+    "onde": "ambos",
+    "nota": "Plicas com índice dentro de módulo em fração."
+  },
+  {
+    "id": "fis-em1-gravitacao-001",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Lei da gravitação universal",
+    "latex": "F = G\\,\\frac{M\\,m}{d^{2}}",
+    "onde": "ambos",
+    "nota": "Base."
+  },
+  {
+    "id": "fis-em1-gravitacao-002",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Constante gravitacional",
+    "latex": "G = 6{,}67 \\times 10^{-11}\\ \\text{N} \\cdot \\text{m}^{2}/\\text{kg}^{2}",
+    "onde": "ambos",
+    "nota": "Potência de 10 negativa e unidade com dois expoentes."
+  },
+  {
+    "id": "fis-em1-gravitacao-003",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Terceira lei de Kepler",
+    "latex": "\\frac{T^{2}}{a^{3}} = k \\qquad \\frac{T_1^{2}}{R_1^{3}} = \\frac{T_2^{2}}{R_2^{3}}",
+    "onde": "ambos",
+    "nota": "Índice e expoente empilhados em fração."
+  },
+  {
+    "id": "fis-em1-hidrostatica-001",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Pressão hidrostática",
+    "latex": "p = p_0 + \\rho\\,g\\,h",
+    "onde": "ambos",
+    "nota": "Rô."
+  },
+  {
+    "id": "fis-em1-hidrostatica-002",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Empuxo",
+    "latex": "E = \\rho_L \\cdot V_{d} \\cdot g",
+    "onde": "ambos",
+    "nota": "Índices L e d."
+  },
+  {
+    "id": "fis-em1-hidrostatica-003",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Pressão atmosférica",
+    "latex": "1\\ \\text{atm} = 1{,}01 \\times 10^{5}\\ \\text{Pa} = 76\\ \\text{cmHg}",
+    "onde": "ambos",
+    "nota": "Unidades em texto e notação científica."
+  },
+  {
+    "id": "fis-em1-estatica-001",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Equilíbrio de corpo extenso",
+    "latex": "\\sum \\vec{F} = \\vec{0} \\qquad \\sum M_O = 0",
+    "onde": "ambos",
+    "nota": "Vetor nulo com seta."
+  },
+  {
+    "id": "fis-em1-cinematica-006",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Equations of motion (IGCSE)",
+    "latex": "a = \\frac{\\Delta v}{\\Delta t} \\qquad v^{2} = u^{2} + 2as",
+    "onde": "ambos",
+    "nota": "Convenção britânica com u para velocidade inicial."
+  },
+  {
+    "id": "fis-em1-unidades-002",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Unidades no SI à britânica (IGCSE)",
+    "latex": "9.8\\ \\mathrm{m\\,s^{-2}} \\qquad 1.5\\ \\mathrm{kg\\,m\\,s^{-1}}",
+    "onde": "ambos",
+    "nota": "Unidades com expoente negativo no lugar da barra."
+  },
+  {
+    "id": "fis-em2-termologia-001",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Escalas termométricas",
+    "latex": "\\frac{\\theta_C}{5} = \\frac{\\theta_F - 32}{9} = \\frac{T - 273}{5}",
+    "onde": "ambos",
+    "nota": "Três frações com índices."
+  },
+  {
+    "id": "fis-em2-termologia-002",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Grau Celsius",
+    "latex": "25\\ ^{\\circ}\\text{C} \\qquad 298\\ \\text{K} \\qquad 77\\ ^{\\circ}\\text{F}",
+    "onde": "ambos",
+    "nota": "Grau colado à letra C, Kelvin sem grau."
+  },
+  {
+    "id": "fis-em2-termologia-003",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Dilatação linear",
+    "latex": "\\Delta L = L_0 \\cdot \\alpha \\cdot \\Delta\\theta",
+    "onde": "ambos",
+    "nota": "Delta e letras gregas."
+  },
+  {
+    "id": "fis-em2-termologia-004",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Coeficiente com unidade",
+    "latex": "\\alpha = 1{,}2 \\times 10^{-5}\\ ^{\\circ}\\text{C}^{-1}",
+    "onde": "ambos",
+    "nota": "Unidade inversa com grau e expoente -1."
+  },
+  {
+    "id": "fis-em2-calorimetria-001",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Calor específico com unidade",
+    "latex": "c_{\\text{água}} = 1\\ \\text{cal/g} \\cdot {}^{\\circ}\\text{C}",
+    "onde": "ambos",
+    "nota": "Índice acentuado e grau após ponto."
+  },
+  {
+    "id": "fis-em2-calorimetria-002",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Equilíbrio térmico",
+    "latex": "\\sum Q = 0 \\;\\Rightarrow\\; Q_1 + Q_2 + Q_3 = 0",
+    "onde": "ambos",
+    "nota": "Somatório sem limites."
+  },
+  {
+    "id": "fis-em2-gases-001",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Equação geral dos gases",
+    "latex": "\\frac{p_1\\,V_1}{T_1} = \\frac{p_2\\,V_2}{T_2}",
+    "onde": "ambos",
+    "nota": "Índices."
+  },
+  {
+    "id": "fis-em2-gases-002",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Constante dos gases",
+    "latex": "R = 0{,}082\\ \\frac{\\text{atm} \\cdot \\text{L}}{\\text{mol} \\cdot \\text{K}} = 8{,}31\\ \\frac{\\text{J}}{\\text{mol} \\cdot \\text{K}}",
+    "onde": "ambos",
+    "nota": "Unidades como fração de textos."
+  },
+  {
+    "id": "fis-em2-termodinamica-001",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Rendimento de Carnot",
+    "latex": "\\eta = 1 - \\frac{T_2}{T_1} \\qquad \\eta = \\frac{\\tau}{Q_1}",
+    "onde": "ambos",
+    "nota": "Base."
+  },
+  {
+    "id": "fis-em2-optica-001",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Equação de Gauss",
+    "latex": "\\frac{1}{f} = \\frac{1}{p} + \\frac{1}{p'}",
+    "onde": "ambos",
+    "nota": "Plica em denominador."
+  },
+  {
+    "id": "fis-em2-optica-002",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Aumento linear",
+    "latex": "A = \\frac{i}{o} = -\\frac{p'}{p}",
+    "onde": "ambos",
+    "nota": "Sinal antes de fração com plica."
+  },
+  {
+    "id": "fis-em2-optica-003",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Vergência",
+    "latex": "V = \\frac{1}{f} \\quad (\\text{di} = \\text{m}^{-1})",
+    "onde": "ambos",
+    "nota": "Unidade inversa."
+  },
+  {
+    "id": "fis-em2-optica-004",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Lei de Snell",
+    "latex": "n_1 \\cdot \\operatorname{sen}\\theta_1 = n_2 \\cdot \\operatorname{sen}\\theta_2",
+    "onde": "ambos",
+    "nota": "sen com letra grega indexada."
+  },
+  {
+    "id": "fis-em2-optica-005",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Equação dos fabricantes",
+    "latex": "\\frac{1}{f} = \\left(\\frac{n_{\\text{lente}}}{n_{\\text{meio}}} - 1\\right)\\left(\\frac{1}{R_1} + \\frac{1}{R_2}\\right)",
+    "onde": "ambos",
+    "nota": "Parênteses crescentes com frações de texto."
+  },
+  {
+    "id": "fis-em2-optica-006",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Refractive index (IGCSE)",
+    "latex": "n = \\frac{\\sin i}{\\sin r} \\qquad n = \\frac{1}{\\sin c}",
+    "onde": "ambos",
+    "nota": "sin britânico."
+  },
+  {
+    "id": "fis-em2-ondas-001",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Efeito Doppler",
+    "latex": "f' = f\\,\\frac{v \\pm v_o}{v \\mp v_f}",
+    "onde": "ambos",
+    "nota": "Mais ou menos e menos ou mais."
+  },
+  {
+    "id": "fis-em2-ondas-002",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "MHS",
+    "latex": "x(t) = A\\cos(\\omega t + \\varphi_0) \\qquad T = 2\\pi\\sqrt{\\frac{m}{k}}",
+    "onde": "ambos",
+    "nota": "Raiz sobre fração após 2pi."
+  },
+  {
+    "id": "fis-em2-ondas-003",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Intensidade sonora",
+    "latex": "\\beta = 10 \\log \\frac{I}{I_0}\\ \\text{(dB)}",
+    "onde": "ambos",
+    "nota": "Log de fração e unidade em parênteses."
+  },
+  {
+    "id": "fis-em3-eletrostatica-001",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Lei de Coulomb",
+    "latex": "F = k\\,\\frac{|Q_1| \\cdot |Q_2|}{d^{2}}",
+    "onde": "ambos",
+    "nota": "Módulos no numerador."
+  },
+  {
+    "id": "fis-em3-eletrostatica-002",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Constante eletrostática",
+    "latex": "k_0 = 9 \\times 10^{9}\\ \\text{N} \\cdot \\text{m}^{2}/\\text{C}^{2} \\qquad k = \\frac{1}{4\\pi\\varepsilon_0}",
+    "onde": "ambos",
+    "nota": "Unidade N·m²/C² e épsilon zero."
+  },
+  {
+    "id": "fis-em3-eletrostatica-003",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Campo elétrico",
+    "latex": "\\vec{E} = \\frac{\\vec{F}}{q} \\qquad E = \\frac{k\\,|Q|}{d^{2}}",
+    "onde": "ambos",
+    "nota": "Setas em fração."
+  },
+  {
+    "id": "fis-em3-eletrostatica-004",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Unidade de campo",
+    "latex": "[E] = \\text{N/C} = \\text{V/m} = \\text{N} \\cdot \\text{C}^{-1}",
+    "onde": "ambos",
+    "nota": "C elevado a -1 em texto."
+  },
+  {
+    "id": "fis-em3-eletrostatica-005",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Potencial e trabalho",
+    "latex": "V = \\frac{k\\,Q}{d} \\qquad \\tau_{AB} = q\\,(V_A - V_B)",
+    "onde": "ambos",
+    "nota": "Índice duplo."
+  },
+  {
+    "id": "fis-em3-eletrostatica-006",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Capacitor",
+    "latex": "C = \\frac{Q}{U} \\qquad C = \\varepsilon\\,\\frac{A}{d} \\qquad E_{pot} = \\frac{C\\,U^{2}}{2}",
+    "onde": "ambos",
+    "nota": "Três fórmulas."
+  },
+  {
+    "id": "fis-em3-circuitos-001",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Associação em paralelo",
+    "latex": "\\frac{1}{R_{eq}} = \\frac{1}{R_1} + \\frac{1}{R_2} + \\frac{1}{R_3}",
+    "onde": "ambos",
+    "nota": "Frações com índices."
+  },
+  {
+    "id": "fis-em3-circuitos-002",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Energia em kWh",
+    "latex": "E = P \\cdot \\Delta t = 2\\ \\text{kW} \\cdot 3\\ \\text{h} = 6\\ \\text{kWh}",
+    "onde": "gabarito",
+    "nota": "Unidade composta kWh."
+  },
+  {
+    "id": "fis-em3-circuitos-003",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Leis de Kirchhoff",
+    "latex": "\\sum_{k} i_k = 0 \\qquad \\sum_{\\text{malha}} U = 0",
+    "onde": "ambos",
+    "nota": "Somatórios com índice em texto."
+  },
+  {
+    "id": "fis-em3-circuitos-004",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Potential divider (IGCSE)",
+    "latex": "\\frac{V_1}{V_2} = \\frac{R_1}{R_2} \\qquad V_{\\text{out}} = V_{\\text{in}}\\,\\frac{R_2}{R_1 + R_2}",
+    "onde": "ambos",
+    "nota": "Índices em texto inglês."
+  },
+  {
+    "id": "fis-em3-magnetismo-001",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Campo de fio retilíneo",
+    "latex": "B = \\frac{\\mu_0 \\cdot i}{2\\pi \\cdot r}",
+    "onde": "ambos",
+    "nota": "Mi zero."
+  },
+  {
+    "id": "fis-em3-magnetismo-002",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Permeabilidade do vácuo",
+    "latex": "\\mu_0 = 4\\pi \\times 10^{-7}\\ \\text{T} \\cdot \\text{m/A}",
+    "onde": "ambos",
+    "nota": "Unidade composta."
+  },
+  {
+    "id": "fis-em3-magnetismo-003",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Força magnética",
+    "latex": "F = |q| \\cdot v \\cdot B \\cdot \\operatorname{sen}\\theta \\qquad F = B \\cdot i \\cdot L \\cdot \\operatorname{sen}\\theta",
+    "onde": "ambos",
+    "nota": "Duas fórmulas longas."
+  },
+  {
+    "id": "fis-em3-magnetismo-004",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Força vetorial",
+    "latex": "\\vec{F} = q\\,\\vec{v} \\times \\vec{B}",
+    "onde": "ambos",
+    "nota": "Produto vetorial com setas."
+  },
+  {
+    "id": "fis-em3-magnetismo-005",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Fluxo e indução",
+    "latex": "\\Phi = B \\cdot A \\cdot \\cos\\theta \\qquad \\varepsilon = -\\frac{\\Delta\\Phi}{\\Delta t}",
+    "onde": "ambos",
+    "nota": "Fi maiúsculo e sinal de Lenz."
+  },
+  {
+    "id": "fis-em3-magnetismo-006",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Transformador",
+    "latex": "\\frac{U_p}{U_s} = \\frac{N_p}{N_s} = \\frac{i_s}{i_p}",
+    "onde": "ambos",
+    "nota": "Índices p e s."
+  },
+  {
+    "id": "fis-em3-moderna-001",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Equivalência massa e energia",
+    "latex": "E = m\\,c^{2}",
+    "onde": "ambos",
+    "nota": "Base."
+  },
+  {
+    "id": "fis-em3-moderna-002",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Energia do fóton",
+    "latex": "E = h\\,f = \\frac{h\\,c}{\\lambda}",
+    "onde": "ambos",
+    "nota": "Base."
+  },
+  {
+    "id": "fis-em3-moderna-003",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Constante de Planck",
+    "latex": "h = 6{,}63 \\times 10^{-34}\\ \\text{J} \\cdot \\text{s} = 4{,}14 \\times 10^{-15}\\ \\text{eV} \\cdot \\text{s}",
+    "onde": "ambos",
+    "nota": "Duas notações científicas e unidades compostas."
+  },
+  {
+    "id": "fis-em3-moderna-004",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Efeito fotoelétrico",
+    "latex": "E_{c,\\text{máx}} = h\\,f - \\phi",
+    "onde": "ambos",
+    "nota": "Índice com vírgula e texto acentuado."
+  },
+  {
+    "id": "fis-em3-moderna-005",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Modelo de Bohr",
+    "latex": "E_n = -\\frac{13{,}6}{n^{2}}\\ \\text{eV}",
+    "onde": "ambos",
+    "nota": "Decimal em numerador e unidade."
+  },
+  {
+    "id": "fis-em3-moderna-006",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Dilatação do tempo",
+    "latex": "\\Delta t = \\frac{\\Delta t_0}{\\sqrt{1 - \\frac{v^{2}}{c^{2}}}}",
+    "onde": "ambos",
+    "nota": "Fração dentro de raiz em denominador: três níveis com tamanho de texto."
+  },
+  {
+    "id": "fis-em3-moderna-007",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Half-life (IGCSE)",
+    "latex": "A = A_0\\left(\\tfrac{1}{2}\\right)^{t/t_{1/2}}",
+    "onde": "ambos",
+    "nota": "Expoente com índice que contém fração."
+  },
+  {
+    "id": "fis-em1-estresse-001",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Equação da trajetória",
+    "latex": "\\displaystyle y = x\\operatorname{tg}\\theta - \\frac{g\\,x^{2}}{2\\,v_0^{2}\\cos^{2}\\theta}",
+    "onde": "ambos",
+    "nota": "Estresse: expoente na função trigonométrica dentro de denominador em display."
+  },
+  {
+    "id": "fis-em1-estresse-002",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Sistema de blocos alinhado",
+    "latex": "\\left\\{\\begin{aligned} T - F_{at} &= m_A\\,a \\\\ P_B - T &= m_B\\,a \\end{aligned}\\right. \\;\\Rightarrow\\; a = \\frac{P_B - \\mu\\,m_A\\,g}{m_A + m_B}",
+    "onde": "gabarito",
+    "nota": "Estresse: sistema com chave e aligned seguido de fração ao lado."
+  },
+  {
+    "id": "fis-em1-estresse-003",
+    "materia": "Física",
+    "serie": "1ª série EM",
+    "assunto": "Conversão de unidades em cadeia",
+    "latex": "108\\ \\frac{\\text{km}}{\\text{h}} = 108 \\cdot \\frac{1\\,000\\ \\text{m}}{3\\,600\\ \\text{s}} = 30\\ \\frac{\\text{m}}{\\text{s}} \\qquad 1\\ \\frac{\\text{kg} \\cdot \\text{m}}{\\text{s}^{2}} = 1\\ \\text{N}",
+    "onde": "gabarito",
+    "nota": "Estresse: unidades como frações empilhadas e milhares com espaço fino."
+  },
+  {
+    "id": "fis-em2-estresse-001",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Lente com equação de Gauss resolvida",
+    "latex": "\\begin{aligned} \\frac{1}{f} &= \\frac{1}{p} + \\frac{1}{p'} \\\\ \\frac{1}{20} &= \\frac{1}{30} + \\frac{1}{p'} \\\\ \\frac{1}{p'} &= \\frac{3 - 2}{60} \\;\\Rightarrow\\; p' = 60\\ \\text{cm} \\end{aligned}",
+    "onde": "gabarito",
+    "nota": "Estresse: três linhas de frações alinhadas no igual."
+  },
+  {
+    "id": "fis-em2-estresse-002",
+    "materia": "Física",
+    "serie": "2ª série EM",
+    "assunto": "Calorimetria com mudança de fase",
+    "latex": "\\underbrace{m\\,c_{\\text{gelo}}\\,\\Delta\\theta_1}_{Q_1} + \\underbrace{m\\,L_f}_{Q_2} + \\underbrace{m\\,c_{\\text{água}}\\,\\Delta\\theta_2}_{Q_3} + \\underbrace{M\\,c_{\\text{água}}\\,(\\theta_e - 80)}_{Q_4} = 0",
+    "onde": "gabarito",
+    "nota": "Estresse: quatro chaves por baixo com índices em texto acentuado; linha larga."
+  },
+  {
+    "id": "fis-em3-estresse-001",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Associação mista de resistores",
+    "latex": "R_{eq} = R_1 + \\cfrac{1}{\\cfrac{1}{R_2} + \\cfrac{1}{R_3 + \\cfrac{R_4\\,R_5}{R_4 + R_5}}}",
+    "onde": "ambos",
+    "nota": "Estresse: fração de frações em quatro níveis com cfrac."
+  },
+  {
+    "id": "fis-em3-estresse-002",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Fator de Lorentz e energia relativística",
+    "latex": "\\displaystyle \\gamma = \\frac{1}{\\sqrt{1 - \\dfrac{v^{2}}{c^{2}}}} \\qquad E = \\gamma\\,m_0\\,c^{2} = \\frac{m_0\\,c^{2}}{\\sqrt{1 - \\left(\\dfrac{v}{c}\\right)^{2}}}",
+    "onde": "ambos",
+    "nota": "Estresse: raiz sobre fração cheia em denominador, parênteses crescentes dentro da raiz."
+  },
+  {
+    "id": "fis-em3-estresse-003",
+    "materia": "Física",
+    "serie": "3ª série EM",
+    "assunto": "Campo resultante de duas cargas",
+    "latex": "\\vec{E}_P = k\\left(\\frac{Q_1}{d_1^{2}}\\,\\hat{r}_1 + \\frac{Q_2}{d_2^{2}}\\,\\hat{r}_2\\right) \\qquad |\\vec{E}_P| = \\sqrt{E_1^{2} + E_2^{2} + 2E_1E_2\\cos\\alpha}",
+    "onde": "ambos",
+    "nota": "Estresse: chapéu sobre r com índice, setas com índice e raiz longa."
+  },
+  {
+    "id": "qui-ef9-substancias-001",
+    "materia": "Química",
+    "serie": "9º ano EF",
+    "assunto": "Substâncias simples e compostas",
+    "latex": "\\ce{O2} \\quad \\ce{O3} \\quad \\ce{CO2} \\quad \\ce{NaCl}",
+    "onde": "ambos",
+    "nota": "Vários \\ce na mesma expressão."
+  },
+  {
+    "id": "qui-ef9-reacoes-001",
+    "materia": "Química",
+    "serie": "9º ano EF",
+    "assunto": "Reação de síntese",
+    "latex": "\\ce{2H2 + O2 -> 2H2O}",
+    "onde": "ambos",
+    "nota": "Coeficientes e seta."
+  },
+  {
+    "id": "qui-ef9-atomo-001",
+    "materia": "Química",
+    "serie": "9º ano EF",
+    "assunto": "Representação do átomo",
+    "latex": "\\ce{^{23}_{11}Na}",
+    "onde": "ambos",
+    "nota": "Número de massa e atômico à esquerda, alinhados à direita."
+  },
+  {
+    "id": "qui-ef9-reacoes-002",
+    "materia": "Química",
+    "serie": "9º ano EF",
+    "assunto": "Word and symbol equation (Cambridge Lower Secondary)",
+    "latex": "\\text{magnesium} + \\text{oxygen} \\longrightarrow \\text{magnesium oxide} \\qquad \\ce{2Mg + O2 -> 2MgO}",
+    "onde": "ambos",
+    "nota": "Equação em palavras com seta longa ao lado da simbólica."
+  },
+  {
+    "id": "qui-ef9-atomo-002",
+    "materia": "Química",
+    "serie": "9º ano EF",
+    "assunto": "Íons simples",
+    "latex": "\\ce{Na+} \\quad \\ce{Cl-} \\quad \\ce{Mg^2+} \\quad \\ce{O^2-}",
+    "onde": "ambos",
+    "nota": "Cargas com e sem número."
+  },
+  {
+    "id": "qui-em1-atomo-001",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Íons com carga",
+    "latex": "\\ce{Fe^3+} \\quad \\ce{NH4+} \\quad \\ce{SO4^2-} \\quad \\ce{PO4^3-}",
+    "onde": "ambos",
+    "nota": "Índice e carga empilhados no mesmo elemento."
+  },
+  {
+    "id": "qui-em1-atomo-002",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Isótopos do carbono",
+    "latex": "\\ce{^{12}_{6}C} \\quad \\ce{^{13}_{6}C} \\quad \\ce{^{14}_{6}C}",
+    "onde": "ambos",
+    "nota": "Pré-índices com número de algarismos diferentes."
+  },
+  {
+    "id": "qui-em1-atomo-003",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Isótopo em LaTeX puro",
+    "latex": "{}^{235}_{\\phantom{0}92}\\mathrm{U}",
+    "onde": "ambos",
+    "nota": "Pré-índices sem mhchem: alinhamento à esquerda precisa de phantom; comparar com o \\ce."
+  },
+  {
+    "id": "qui-em1-atomo-004",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Íon com massa e carga",
+    "latex": "\\ce{^{40}_{20}Ca^2+}",
+    "onde": "ambos",
+    "nota": "Pré-índices e carga à direita no mesmo símbolo."
+  },
+  {
+    "id": "qui-em1-atomo-005",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Distribuição eletrônica",
+    "latex": "1s^{2}\\ 2s^{2}\\ 2p^{6}\\ 3s^{2}\\ 3p^{6}\\ 4s^{2}\\ 3d^{10}\\ 4p^{6}",
+    "onde": "ambos",
+    "nota": "Sequência de subníveis com expoente; letras s, p, d em itálico ou reto conforme o padrão."
+  },
+  {
+    "id": "qui-em1-atomo-006",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Distribuição com subnível reto",
+    "latex": "\\mathrm{1s^{2}\\,2s^{2}\\,2p^{6}\\,3s^{1}}",
+    "onde": "ambos",
+    "nota": "Mesma notação com letras retas."
+  },
+  {
+    "id": "qui-em1-atomo-007",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Distribuição abreviada",
+    "latex": "\\ce{_{26}Fe}\\colon\\ [\\ce{Ar}]\\ 4s^{2}\\ 3d^{6}",
+    "onde": "ambos",
+    "nota": "Cerne de gás nobre entre colchetes e número atômico à esquerda."
+  },
+  {
+    "id": "qui-em1-atomo-008",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Números quânticos",
+    "latex": "n = 3,\\quad \\ell = 2,\\quad m_\\ell = -1,\\quad m_s = +\\tfrac{1}{2}",
+    "onde": "ambos",
+    "nota": "ele cursivo \\ell e fração pequena."
+  },
+  {
+    "id": "qui-em1-ligacoes-001",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Hidrato",
+    "latex": "\\ce{CuSO4*5H2O}",
+    "onde": "ambos",
+    "nota": "Ponto de hidratação do mhchem."
+  },
+  {
+    "id": "qui-em1-funcoes-inorganicas-001",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Ionização de ácido",
+    "latex": "\\ce{H2SO4(aq) -> 2H+(aq) + SO4^2-(aq)}",
+    "onde": "ambos",
+    "nota": "Estados físicos e carga composta."
+  },
+  {
+    "id": "qui-em1-funcoes-inorganicas-002",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Dissociação de base",
+    "latex": "\\ce{Ca(OH)2(s) ->[\\ce{H2O}] Ca^2+(aq) + 2OH-(aq)}",
+    "onde": "ambos",
+    "nota": "Parênteses de grupo com índice e texto sobre a seta."
+  },
+  {
+    "id": "qui-em1-reacoes-001",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Estados físicos",
+    "latex": "\\ce{2H2(g) + O2(g) -> 2H2O(l)}",
+    "onde": "ambos",
+    "nota": "(g) e (l)."
+  },
+  {
+    "id": "qui-em1-reacoes-002",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Decomposição térmica",
+    "latex": "\\ce{CaCO3(s) ->[\\Delta] CaO(s) + CO2(g)}",
+    "onde": "ambos",
+    "nota": "Delta de calor sobre a seta."
+  },
+  {
+    "id": "qui-em1-reacoes-003",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Precipitado e gás",
+    "latex": "\\ce{AgNO3(aq) + NaCl(aq) -> AgCl v + NaNO3(aq)} \\qquad \\ce{Zn + 2HCl -> ZnCl2 + H2 ^}",
+    "onde": "ambos",
+    "nota": "Setas de precipitado e desprendimento do mhchem."
+  },
+  {
+    "id": "qui-em1-estequiometria-001",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Constante de Avogadro",
+    "latex": "N_A = 6{,}02 \\times 10^{23}\\ \\text{mol}^{-1}",
+    "onde": "ambos",
+    "nota": "Unidade com expoente negativo."
+  },
+  {
+    "id": "qui-em1-estequiometria-002",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Massa molar",
+    "latex": "M(\\ce{H2SO4}) = 2 \\cdot 1 + 32 + 4 \\cdot 16 = 98\\ \\text{g/mol}",
+    "onde": "gabarito",
+    "nota": "\\ce dentro de parênteses de função."
+  },
+  {
+    "id": "qui-em1-estequiometria-003",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Regra de três estequiométrica",
+    "latex": "\\begin{array}{rcl} 1\\ \\text{mol de } \\ce{CH4} & \\longrightarrow & 16\\ \\text{g} \\\\ x & \\longrightarrow & 40\\ \\text{g} \\end{array}",
+    "onde": "gabarito",
+    "nota": "\\ce dentro de array com texto."
+  },
+  {
+    "id": "qui-em1-estequiometria-004",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Fator de conversão",
+    "latex": "40\\ \\text{g de } \\ce{CH4} \\cdot \\frac{1\\ \\text{mol}}{16\\ \\text{g}} \\cdot \\frac{2\\ \\text{mol de } \\ce{O2}}{1\\ \\text{mol de } \\ce{CH4}} = 5\\ \\text{mol de } \\ce{O2}",
+    "onde": "gabarito",
+    "nota": "\\ce dentro de fração com texto; linha longa."
+  },
+  {
+    "id": "qui-em1-gases-001",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Equação de Clapeyron",
+    "latex": "p\\,V = n\\,R\\,T \\qquad R = 0{,}082\\ \\text{atm} \\cdot \\text{L} \\cdot \\text{mol}^{-1} \\cdot \\text{K}^{-1}",
+    "onde": "ambos",
+    "nota": "Unidade com dois expoentes negativos."
+  },
+  {
+    "id": "qui-em1-atomo-009",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Ionic half equation (IGCSE)",
+    "latex": "\\ce{Cu^2+(aq) + 2e- -> Cu(s)}",
+    "onde": "ambos",
+    "nota": "Elétron com carga no mhchem."
+  },
+  {
+    "id": "qui-em1-reacoes-004",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Ionic equation (IGCSE)",
+    "latex": "\\ce{Ba^2+(aq) + SO4^2-(aq) -> BaSO4(s)}",
+    "onde": "ambos",
+    "nota": "Duas cargas e estados."
+  },
+  {
+    "id": "qui-em1-atomo-010",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Electronic configuration (Cambridge)",
+    "latex": "2,8,8,1 \\qquad \\text{or} \\qquad 2.8.8.1",
+    "onde": "ambos",
+    "nota": "Notação de camadas: vírgula sem espaço extra e ponto."
+  },
+  {
+    "id": "qui-em2-solucoes-001",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Concentração comum",
+    "latex": "C = \\frac{m_1}{V}",
+    "onde": "ambos",
+    "nota": "Índice 1 do soluto."
+  },
+  {
+    "id": "qui-em2-solucoes-002",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Concentração em quantidade de matéria",
+    "latex": "\\mathfrak{M} = \\frac{n_1}{V} = \\frac{m_1}{M_1 \\cdot V}",
+    "onde": "ambos",
+    "nota": "M gótico de molaridade usado em livros brasileiros."
+  },
+  {
+    "id": "qui-em2-solucoes-003",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Concentração com unidade",
+    "latex": "[\\ce{NaCl}] = 0{,}5\\ \\text{mol/L} = 0{,}5\\ \\text{mol} \\cdot \\text{L}^{-1}",
+    "onde": "ambos",
+    "nota": "Colchete de concentração com \\ce dentro."
+  },
+  {
+    "id": "qui-em2-solucoes-004",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Título e partes por milhão",
+    "latex": "\\tau = \\frac{m_1}{m} \\qquad 1\\ \\text{ppm} = \\frac{1\\ \\text{g}}{10^{6}\\ \\text{g}}",
+    "onde": "ambos",
+    "nota": "Potência no denominador com unidade."
+  },
+  {
+    "id": "qui-em2-coligativas-001",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Pressão osmótica",
+    "latex": "\\pi = \\mathfrak{M} \\cdot R \\cdot T \\cdot i",
+    "onde": "ambos",
+    "nota": "Pi como pressão e M gótico."
+  },
+  {
+    "id": "qui-em2-termoquimica-001",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Entalpia de reação",
+    "latex": "\\ce{CH4(g) + 2O2(g) -> CO2(g) + 2H2O(l)} \\qquad \\Delta H = -890\\ \\text{kJ/mol}",
+    "onde": "ambos",
+    "nota": "Equação e entalpia na mesma linha."
+  },
+  {
+    "id": "qui-em2-termoquimica-002",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Entalpia padrão",
+    "latex": "\\Delta H^{\\circ}_{f} = \\sum H_{\\text{produtos}} - \\sum H_{\\text{reagentes}}",
+    "onde": "ambos",
+    "nota": "Grau e índice na mesma letra."
+  },
+  {
+    "id": "qui-em2-termoquimica-003",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Energia de ligação",
+    "latex": "\\Delta H = \\sum E_{\\text{ligações rompidas}} - \\sum E_{\\text{ligações formadas}}",
+    "onde": "ambos",
+    "nota": "Índices longos em texto."
+  },
+  {
+    "id": "qui-em2-cinetica-001",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Velocidade média",
+    "latex": "v_m = -\\frac{\\Delta[\\ce{A}]}{\\Delta t} = \\frac{\\Delta[\\ce{B}]}{\\Delta t}",
+    "onde": "ambos",
+    "nota": "Delta de concentração com \\ce em colchetes."
+  },
+  {
+    "id": "qui-em2-cinetica-002",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Lei da velocidade",
+    "latex": "v = k \\cdot [\\ce{A}]^{x} \\cdot [\\ce{B}]^{y}",
+    "onde": "ambos",
+    "nota": "Expoente sobre colchete de concentração."
+  },
+  {
+    "id": "qui-em2-cinetica-003",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Catalisador sobre a seta",
+    "latex": "\\ce{2H2O2(aq) ->[\\ce{MnO2}] 2H2O(l) + O2(g)}",
+    "onde": "ambos",
+    "nota": "Catalisador em \\ce sobre a seta."
+  },
+  {
+    "id": "qui-em2-cinetica-004",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Equação de Arrhenius",
+    "latex": "k = A \\cdot e^{-\\frac{E_a}{R\\,T}}",
+    "onde": "ambos",
+    "nota": "Fração com índice no expoente de e."
+  },
+  {
+    "id": "qui-em2-equilibrio-001",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Equilíbrio de Haber",
+    "latex": "\\ce{N2(g) + 3H2(g) <=> 2NH3(g)}",
+    "onde": "ambos",
+    "nota": "Seta dupla de equilíbrio."
+  },
+  {
+    "id": "qui-em2-equilibrio-002",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Constante de equilíbrio",
+    "latex": "\\displaystyle K_c = \\frac{[\\ce{NH3}]^{2}}{[\\ce{N2}] \\cdot [\\ce{H2}]^{3}}",
+    "onde": "ambos",
+    "nota": "Destaque: colchetes de concentração com expoentes em fração."
+  },
+  {
+    "id": "qui-em2-equilibrio-003",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Constante em pressões",
+    "latex": "K_p = \\frac{(p_{\\ce{NO2}})^{2}}{p_{\\ce{N2O4}}}",
+    "onde": "ambos",
+    "nota": "\\ce dentro de índice de p: mhchem em subscrito."
+  },
+  {
+    "id": "qui-em2-equilibrio-004",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Equilíbrio deslocado",
+    "latex": "\\ce{A + B <=>> C} \\qquad \\ce{A + B <<=> C}",
+    "onde": "ambos",
+    "nota": "Setas de equilíbrio desigual do mhchem."
+  },
+  {
+    "id": "qui-em2-equilibrio-ionico-001",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Constante de acidez",
+    "latex": "\\ce{CH3COOH <=> H+ + CH3COO-} \\qquad K_a = \\frac{[\\ce{H+}][\\ce{CH3COO-}]}{[\\ce{CH3COOH}]}",
+    "onde": "ambos",
+    "nota": "Fórmulas condensadas longas dentro de colchetes em fração."
+  },
+  {
+    "id": "qui-em2-equilibrio-ionico-002",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "pH e pOH",
+    "latex": "\\mathrm{pH} = -\\log[\\ce{H+}] \\qquad \\mathrm{pH} + \\mathrm{pOH} = 14",
+    "onde": "ambos",
+    "nota": "pH reto e log de colchete."
+  },
+  {
+    "id": "qui-em2-equilibrio-ionico-003",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Produto iônico da água",
+    "latex": "K_w = [\\ce{H+}] \\cdot [\\ce{OH-}] = 1{,}0 \\times 10^{-14}\\ (25\\ ^{\\circ}\\text{C})",
+    "onde": "ambos",
+    "nota": "Colchetes, notação científica e temperatura."
+  },
+  {
+    "id": "qui-em2-equilibrio-ionico-004",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Lei da diluição de Ostwald",
+    "latex": "K_i = \\frac{\\alpha^{2}\\,\\mathfrak{M}}{1 - \\alpha} \\approx \\alpha^{2}\\,\\mathfrak{M}",
+    "onde": "ambos",
+    "nota": "Alfa ao quadrado e M gótico."
+  },
+  {
+    "id": "qui-em2-equilibrio-ionico-005",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Produto de solubilidade",
+    "latex": "\\ce{Ag2CrO4(s) <=> 2Ag+(aq) + CrO4^2-(aq)} \\qquad K_{ps} = [\\ce{Ag+}]^{2}\\,[\\ce{CrO4^2-}]",
+    "onde": "ambos",
+    "nota": "Carga composta dentro de colchete com expoente ao lado."
+  },
+  {
+    "id": "qui-em2-eletroquimica-001",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Semirreação de redução",
+    "latex": "\\ce{Cu^2+(aq) + 2e- -> Cu(s)} \\qquad E^{\\circ}_{\\text{red}} = +0{,}34\\ \\text{V}",
+    "onde": "ambos",
+    "nota": "Potencial padrão com grau e índice."
+  },
+  {
+    "id": "qui-em2-eletroquimica-002",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Diferença de potencial",
+    "latex": "\\Delta E^{\\circ} = E^{\\circ}_{\\text{red, cátodo}} - E^{\\circ}_{\\text{red, ânodo}} = +1{,}10\\ \\text{V}",
+    "onde": "ambos",
+    "nota": "Índices em texto acentuado com vírgula."
+  },
+  {
+    "id": "qui-em2-eletroquimica-003",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Notação da pilha",
+    "latex": "\\ce{Zn(s) | Zn^2+(aq) || Cu^2+(aq) | Cu(s)}",
+    "onde": "ambos",
+    "nota": "Barras simples e dupla da notação de pilha no mhchem."
+  },
+  {
+    "id": "qui-em2-eletroquimica-004",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Número de oxidação",
+    "latex": "\\overset{+1}{\\ce{H}}\\,\\overset{+5}{\\ce{N}}\\,\\overset{-2}{\\ce{O3}}",
+    "onde": "ambos",
+    "nota": "Nox sobre cada elemento com \\overset."
+  },
+  {
+    "id": "qui-em2-eletroquimica-005",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Eletrólise e Faraday",
+    "latex": "Q = i \\cdot t \\qquad m = \\frac{M \\cdot i \\cdot t}{n \\cdot F} \\qquad 1\\ F = 96\\,500\\ \\text{C}",
+    "onde": "ambos",
+    "nota": "Milhar com espaço fino."
+  },
+  {
+    "id": "qui-em2-eletroquimica-006",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Eletrólise ígnea",
+    "latex": "\\ce{2NaCl(l) ->[\\text{eletrólise}] 2Na(l) + Cl2(g)}",
+    "onde": "ambos",
+    "nota": "Texto acentuado sobre a seta."
+  },
+  {
+    "id": "qui-em2-eletroquimica-007",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Electrolysis half equations (IGCSE)",
+    "latex": "\\text{cathode: } \\ce{2H+ + 2e- -> H2} \\qquad \\text{anode: } \\ce{2Cl- -> Cl2 + 2e-}",
+    "onde": "ambos",
+    "nota": "Texto inglês com \\ce."
+  },
+  {
+    "id": "qui-em2-equilibrio-005",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Reversible reaction (IGCSE)",
+    "latex": "\\ce{CoCl2.6H2O <=> CoCl2 + 6H2O}",
+    "onde": "ambos",
+    "nota": "Hidrato com ponto e equilíbrio."
+  },
+  {
+    "id": "qui-em2-gases-001",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Lei de Graham",
+    "latex": "\\frac{v_A}{v_B} = \\sqrt{\\frac{M_B}{M_A}}",
+    "onde": "ambos",
+    "nota": "Raiz sobre fração."
+  },
+  {
+    "id": "qui-em3-radioatividade-001",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Decaimento alfa",
+    "latex": "\\ce{^{238}_{92}U -> ^{234}_{90}Th + ^{4}_{2}He}",
+    "onde": "ambos",
+    "nota": "Três núcleos com pré-índices."
+  },
+  {
+    "id": "qui-em3-radioatividade-002",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Decaimento beta",
+    "latex": "\\ce{^{14}_{6}C -> ^{14}_{7}N + ^{0}_{-1}e}",
+    "onde": "ambos",
+    "nota": "Pré-índice negativo."
+  },
+  {
+    "id": "qui-em3-radioatividade-003",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Partículas com letra grega",
+    "latex": "\\ce{^{4}_{2}\\alpha} \\qquad \\ce{^{0}_{-1}\\beta} \\qquad \\ce{^{0}_{0}\\gamma}",
+    "onde": "ambos",
+    "nota": "Pré-índices em letra grega dentro de \\ce."
+  },
+  {
+    "id": "qui-em3-radioatividade-004",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Fissão nuclear",
+    "latex": "\\ce{^{235}_{92}U + ^{1}_{0}n -> ^{141}_{56}Ba + ^{92}_{36}Kr + 3^{1}_{0}n}",
+    "onde": "ambos",
+    "nota": "Coeficiente antes de núcleo com pré-índice."
+  },
+  {
+    "id": "qui-em3-radioatividade-005",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Decaimento exponencial",
+    "latex": "m = m_0 \\cdot \\left(\\frac{1}{2}\\right)^{\\frac{t}{P}}",
+    "onde": "ambos",
+    "nota": "Fração no expoente de parênteses crescentes."
+  },
+  {
+    "id": "qui-em3-organica-001",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Fórmula condensada do etanol",
+    "latex": "\\ce{CH3CH2OH}",
+    "onde": "ambos",
+    "nota": "Vários índices seguidos."
+  },
+  {
+    "id": "qui-em3-organica-002",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Fórmula com ligações",
+    "latex": "\\ce{CH3-CH2-CH3} \\qquad \\ce{CH2=CH2} \\qquad \\ce{HC#CH}",
+    "onde": "ambos",
+    "nota": "Ligações simples, dupla e tripla do mhchem."
+  },
+  {
+    "id": "qui-em3-organica-003",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Cadeia ramificada",
+    "latex": "\\ce{CH3-CH(CH3)-CH2-CH3}",
+    "onde": "ambos",
+    "nota": "Ramificação entre parênteses com índice."
+  },
+  {
+    "id": "qui-em3-organica-004",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Funções oxigenadas",
+    "latex": "\\ce{R-OH} \\quad \\ce{R-CHO} \\quad \\ce{R-CO-R'} \\quad \\ce{R-COOH} \\quad \\ce{R-COO-R'}",
+    "onde": "ambos",
+    "nota": "Radical genérico com plica."
+  },
+  {
+    "id": "qui-em3-organica-005",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Fórmula geral de hidrocarbonetos",
+    "latex": "\\ce{C_{n}H_{2n+2}} \\quad \\ce{C_{n}H_{2n}} \\quad \\ce{C_{n}H_{2n-2}}",
+    "onde": "ambos",
+    "nota": "Índices algébricos dentro do \\ce."
+  },
+  {
+    "id": "qui-em3-organica-006",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Esterificação",
+    "latex": "\\ce{CH3COOH + CH3CH2OH <=>[\\ce{H+}] CH3COOCH2CH3 + H2O}",
+    "onde": "ambos",
+    "nota": "Catalisador sobre seta de equilíbrio e fórmulas longas."
+  },
+  {
+    "id": "qui-em3-organica-007",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Hidrogenação catalítica",
+    "latex": "\\ce{CH2=CH2 + H2 ->[\\ce{Ni}][\\Delta] CH3-CH3}",
+    "onde": "ambos",
+    "nota": "Catalisador em cima e calor embaixo da seta."
+  },
+  {
+    "id": "qui-em3-organica-008",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Polimerização",
+    "latex": "n\\,\\ce{CH2=CH2} \\longrightarrow \\ce{-[CH2-CH2]_{n}-}",
+    "onde": "ambos",
+    "nota": "Unidade de repetição com índice n fora do colchete."
+  },
+  {
+    "id": "qui-em3-organica-009",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Saponificação",
+    "latex": "\\ce{(C17H35COO)3C3H5 + 3NaOH -> 3C17H35COONa + C3H5(OH)3}",
+    "onde": "ambos",
+    "nota": "Grupo entre parênteses com índice e fórmulas longas."
+  },
+  {
+    "id": "qui-em3-organica-010",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Homologous series (IGCSE)",
+    "latex": "\\ce{C_{n}H_{2n+1}OH} \\qquad \\ce{C_{n}H_{2n+1}COOH}",
+    "onde": "ambos",
+    "nota": "Fórmulas gerais da série homóloga."
+  },
+  {
+    "id": "qui-em3-organica-011",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Isomeria",
+    "latex": "\\ce{C4H10}\\colon\\ \\ce{CH3CH2CH2CH3} \\text{ e } \\ce{CH3CH(CH3)CH3}",
+    "onde": "ambos",
+    "nota": "Dois-pontos e isômeros."
+  },
+  {
+    "id": "qui-em1-estresse-001",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Combustão com coeficiente fracionário",
+    "latex": "\\ce{C8H18(l) + 25/2O2(g) -> 8CO2(g) + 9H2O(l)} \\qquad \\Delta H = -5\\,471\\ \\text{kJ/mol}",
+    "onde": "ambos",
+    "nota": "Estresse: coeficiente fracionário no mhchem (25/2 vira fração), estados e entalpia; linha longa."
+  },
+  {
+    "id": "qui-em1-estresse-002",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Oxirredução longa balanceada",
+    "latex": "\\ce{2KMnO4 + 16HCl -> 2KCl + 2MnCl2 + 5Cl2 + 8H2O}",
+    "onde": "ambos",
+    "nota": "Estresse: equação longa que precisa caber na coluna sem quebrar no meio de fórmula."
+  },
+  {
+    "id": "qui-em1-estresse-003",
+    "materia": "Química",
+    "serie": "1ª série EM",
+    "assunto": "Equação iônica com muitas cargas",
+    "latex": "\\ce{Cr2O7^2-(aq) + 6Fe^2+(aq) + 14H+(aq) -> 2Cr^3+(aq) + 6Fe^3+(aq) + 7H2O(l)}",
+    "onde": "ambos",
+    "nota": "Estresse: índice e carga empilhados em várias espécies com estados; muito larga."
+  },
+  {
+    "id": "qui-em2-estresse-001",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Lei de Hess com somas e coeficientes fracionários",
+    "latex": "\\begin{aligned} &\\ce{C(s) + O2(g) -> CO2(g)} && \\Delta H_1 = -394\\ \\text{kJ} \\\\ &\\ce{H2(g) + 1/2O2(g) -> H2O(l)} && \\Delta H_2 = -286\\ \\text{kJ} \\\\ &\\ce{CO2(g) + 2H2O(l) -> CH4(g) + 2O2(g)} && \\Delta H_3 = +890\\ \\text{kJ} \\end{aligned}",
+    "onde": "gabarito",
+    "nota": "Estresse: três equações alinhadas em aligned com coluna de entalpias e meio coeficiente."
+  },
+  {
+    "id": "qui-em2-estresse-002",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Constante de equilíbrio com muitas espécies",
+    "latex": "\\displaystyle K_c = \\frac{[\\ce{Fe^3+}]^{2}\\,[\\ce{Mn^2+}]\\,[\\ce{H2O}]^{4}}{[\\ce{Fe^2+}]^{2}\\,[\\ce{MnO4-}]\\,[\\ce{H+}]^{8}}",
+    "onde": "ambos",
+    "nota": "Estresse: cargas e índices dentro de colchetes com expoentes em fração de destaque."
+  },
+  {
+    "id": "qui-em2-estresse-003",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Tabela de equilíbrio com aproximação",
+    "latex": "K_a = \\frac{x^{2}}{\\mathfrak{M} - x} \\approx \\frac{x^{2}}{\\mathfrak{M}} \\;\\Rightarrow\\; x = [\\ce{H+}] = \\sqrt{K_a \\cdot \\mathfrak{M}} = \\sqrt{1{,}8 \\times 10^{-5} \\cdot 0{,}1} \\approx 1{,}34 \\times 10^{-3}",
+    "onde": "gabarito",
+    "nota": "Estresse: linha muito longa com raiz sobre notação científica."
+  },
+  {
+    "id": "qui-em2-estresse-004",
+    "materia": "Química",
+    "serie": "2ª série EM",
+    "assunto": "Seta com condições em cima e embaixo",
+    "latex": "\\ce{N2(g) + 3H2(g) <=>[\\text{Fe, 450 °C}][\\text{200 atm}] 2NH3(g)}",
+    "onde": "ambos",
+    "nota": "Estresse: texto com grau Unicode em cima e embaixo de seta de equilíbrio."
+  },
+  {
+    "id": "qui-em3-estresse-001",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Série radioativa encadeada",
+    "latex": "\\ce{^{238}_{92}U ->[\\alpha] ^{234}_{90}Th ->[\\beta^-] ^{234}_{91}Pa ->[\\beta^-] ^{234}_{92}U}",
+    "onde": "ambos",
+    "nota": "Estresse: quatro núcleos com pré-índices e partícula sobre cada seta."
+  },
+  {
+    "id": "qui-em3-estresse-002",
+    "materia": "Química",
+    "serie": "3ª série EM",
+    "assunto": "Reação orgânica em duas linhas",
+    "latex": "\\begin{aligned} &\\ce{CH3-CH2-CH2-OH ->[\\ce{K2Cr2O7}][\\ce{H+}] CH3-CH2-CHO} \\\\ &\\qquad \\ce{->[\\ce{K2Cr2O7}][\\ce{H+}] CH3-CH2-COOH} \\end{aligned}",
+    "onde": "ambos",
+    "nota": "Estresse: oxidação em duas etapas quebrada em duas linhas, \\ce sobre e sob a seta."
+  }
+]

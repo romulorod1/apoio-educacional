@@ -197,6 +197,12 @@ var ARQUIVOS = [
    * sem sinal voltaria a recusar a notação, porque o index.html pede o arquivo
    * e o cache não o teria. */
   './fonte-unicode.js',
+  /* As fórmulas em vetor (D2): o adaptador do pdf.js e o tradutor do SVG para
+   * o PDF, 30 KB juntos. O MathJax que eles usam (vendor/mathjax-4.1.3/, 2,5
+   * MB) NÃO entra aqui: só vem na primeira vez que um documento tem fórmula
+   * (Formula.pronto) e fica no BAIXADOS, como o leitor de PDF. */
+  './svg-para-pdf.js',
+  './formula.js',
   './store.js',
   './draw.js',
   /* O leitor de zip e a conferência do pacote da biblioteca. O pacote em si
@@ -645,12 +651,19 @@ function limparDepoisDaAbertura(selecionado) {
     .catch(function () { return null; });
 }
 
-/* O que é baixado durante o uso, e nunca da versão: as séries (até o B14) e o
- * leitor de PDF. Os caches de antes do D2 guardavam as séries junto com o
- * pacote; servi-las dali seria trocar a rede primeiro delas por cache primeiro. */
+/* O que é baixado durante o uso, e nunca da versão: as séries (até o B14), o
+ * leitor de PDF e, desde as fórmulas em vetor, o MathJax. Os caches de antes do
+ * D2 guardavam as séries junto com o pacote; servi-las dali seria trocar a rede
+ * primeiro delas por cache primeiro. */
 function baixadoDuranteOUso(caminho) {
-  return /\/banco\/serie-/.test(caminho) || /\/vendor\/pdfjs-[^\/]+\//.test(caminho);
+  return /\/banco\/serie-/.test(caminho) || VENDOR_DE_USO.test(caminho);
 }
+
+/* O vendor que chega no uso, com a versão no caminho: o leitor de PDF
+ * (vendor/pdfjs-<versão>/, C14) e o MathJax das fórmulas
+ * (vendor/mathjax-<versão>/, D2). Os dois do BAIXADOS antes da rede (veja o
+ * fetch). */
+var VENDOR_DE_USO = /\/vendor\/(pdfjs|mathjax)-[^\/]+\//;
 
 /* A LISTA QUE VALE É A DO CACHE DA JANELA, E NÃO A DESTE WORKER (D2b).
  *
@@ -706,12 +719,20 @@ self.addEventListener('fetch', function (e) {
    * há atualização a perguntar ao servidor. Com a rede primeiro, o tablet
    * conectado mas sem tráfego (o sinal de uma barrinha na casa da família)
    * esperava a rede sem prazo, com o leitor guardado ali do lado: a janela
-   * ficava em "Abrindo o PDF..." e não saía. */
-  if (/\/vendor\/pdfjs-[^\/]+\//.test(url.pathname)) {
+   * ficava em "Abrindo o PDF..." e não saía. O MathJax das fórmulas (D2) vai
+   * pelo mesmo caminho: a lista com fórmula gerada sem sinal sai do cache. */
+  if (VENDOR_DE_USO.test(url.pathname)) {
     e.respondWith(caches.open(BAIXADOS).then(function (baixados) {
       return baixados.match(e.request).then(function (achado) {
         if (achado) return achado;
-        return fetch(e.request).then(function (resposta) {
+        /* O MathJax vai pelo redeComPrazo, como o resto do que vem da rede: sem
+         * prazo, com o sinal de uma barrinha o <script> não acabava nem dava
+         * erro, e o Formula.pronto() ficava pendurado (a revisão do #256). O
+         * leitor de PDF segue sem prazo aqui de propósito: o prazo dele é o de
+         * 15 s do aplicativo, com o "Abrir fora", e 3 s aqui o cortaria antes
+         * (testa_leitor_pdf, 2b). */
+        var pedido = /\/vendor\/mathjax-/.test(url.pathname) ? redeComPrazo(e.request) : fetch(e.request);
+        return pedido.then(function (resposta) {
           if (resposta && resposta.status === 200 && resposta.type === 'basic') {
             var copia = resposta.clone();
             baixados.put(e.request, copia);
