@@ -1,0 +1,2 @@
+# F5 acabamento do seletor de assunto: o Voltar do aparelho sobe um nível dentro do seletor, o sinal herdado diz de onde vem, a última aula conta o horário e diz a matéria, o ano é dito como do aluno, a legenda usa as palavras do texto, e o topo fixo, os ícones e os subtópicos ficaram mais claros.
+No assunto da aula, o Voltar do tablet volta um passo dentro de Outras matérias, e a última aula aparece com a matéria.

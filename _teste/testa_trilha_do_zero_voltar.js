@@ -65,13 +65,28 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
   await pag.evaluate(async () => {
     const dados = await Store.carregar();
     dados.alunos = [{ id: 'f5_delta', nome: 'Aluno Delta Teste', ativo: true, anoEscolar: '07', precos: [], trilhas: [] }];
-    const aula = (id, data, status) => ({ id, alunoId: 'f5_delta', data, hora: '10:00', duracaoMin: 60, status,
-      cobravel: true, notaTexto: '', notaPrivada: '', anexos: [] });
+    const aula = (id, data, status, hora, temas) => ({ id, alunoId: 'f5_delta', data, hora: hora || '10:00', duracaoMin: 60, status,
+      cobravel: true, notaTexto: '', notaPrivada: '', anexos: [], temas: temas || [] });
     // a aula de hoje, a última dada (09/11) e uma falta depois dela, que não conta como aula dada
-    dados.aulas = [aula('f5_aula', Core.hojeIso(), 'realizada'), aula('f5_antes', '2026-11-09', 'realizada'),
-      aula('f5_falta', '2026-11-12', 'falta'),
+    /* A aula de 09/11 é antiga: só o aula.tema de antes, com o id do banco e
+     * sem matéria escrita (a matéria sai do id). A de hoje começa sem assunto, e
+     * a 3b grava nela um assunto escrito à mão na raiz, sem matéria: "Última
+     * aula de Matemática" seria mentira. A falta, a das 15h de hoje e a de 18/11
+     * têm assunto, e nenhuma delas foi dada: não entram em "já dado em". */
+    const antiga = aula('f5_antes', '2026-11-09', 'realizada');
+    delete antiga.temas;
+    antiga.tema = { id: 'MAT07-02', titulo: 'Assunto antigo de teste', fonte: 'banco' };
+    dados.aulas = [aula('f5_aula', Core.hojeIso(), 'realizada', '10:00'),
+      antiga,
+      aula('f5_falta', '2026-11-12', 'falta', '10:00', [{ titulo: 'Assunto da falta de teste', fonte: 'livre' }]),
+      // a das 15h de hoje, de Português: às 11h ela ainda não aconteceu, e não é a "última aula"
+      aula('f5_tarde', Core.hojeIso(), 'realizada', '15:00', [{ titulo: 'Leitura de texto de teste', fonte: 'livre', disciplina: 'portugues' }]),
       // duas aulas marcadas à frente: abrindo a de 20/11, a de 18/11 ainda não aconteceu
-      aula('f5_meio', '2026-11-18', 'realizada'), aula('f5_futura', '2026-11-20', 'realizada')];
+      aula('f5_meio', '2026-11-18', 'realizada', '10:00', [{ titulo: 'Assunto marcado à frente de teste', fonte: 'livre' }]),
+      aula('f5_futura', '2026-11-20', 'realizada'),
+      // a aula de hoje de um aluno de cursinho (o selo do ano)
+      Object.assign(aula('f5_cur', Core.hojeIso(), 'realizada', '08:00'), { alunoId: 'f5_cursinho' })];
+    dados.alunos.push({ id: 'f5_cursinho', nome: 'Aluno Cursinho Teste', ativo: true, anoEscolar: 'cursinho', precos: [], trilhas: [] });
     dados.series = []; dados.resumos = [];
     await Store.salvar(dados);
   });
@@ -174,11 +189,21 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
     const c = document.querySelector('#tema-contexto');
     const ano = c && c.querySelector('.tag');
     return { lateral: Math.abs(r.right - innerWidth) < 1 && r.left > innerWidth - 460 && Math.abs(r.height - innerHeight) < 1,
-      contexto: c ? c.textContent.replace(/\s+/g, ' ').trim() : '', ano: ano ? ano.textContent.trim() : '' };
+      contexto: c ? c.textContent.replace(/\s+/g, ' ').trim() : '', ano: ano ? ano.textContent.trim() : '',
+      linhas: Array.from(document.querySelectorAll('#lista-assuntos .item-assunto')).map(l => l.textContent.replace(/\s+/g, ' ').trim()) };
   });
   conf('o painel fica à direita, da altura da tela', painel.lateral, true);
-  conf('o contexto diz a última aula dada, sem contar a falta (' + painel.contexto + ')', /Última aula: 09\/11/.test(painel.contexto), true);
-  conf('e o ano do aluno, na etiqueta', painel.ano, '7º ano');
+  conf('o contexto diz a última aula dada, sem contar a falta, e a matéria pelo id do assunto antigo (' + painel.contexto + ')',
+    /Última aula de Matemática: 09\/11/.test(painel.contexto), true);
+  conf('e o ano do aluno, na etiqueta, sem supor menino ou menina', painel.ano, 'Está no 7º ano');
+  /* "já dado em": só aula dada. O assunto da aula antiga entra; o da falta, o
+   * das 15h de hoje e o de 18/11 não, e nenhum diz a data de hoje. */
+  const linhaDe = (linhas, t) => linhas.filter(l => l.indexOf(t) >= 0).join(' / ');
+  conf('o assunto da aula dada volta com "já dado em 09/11" (' + linhaDe(painel.linhas, 'Assunto antigo') + ')',
+    /Assunto antigo de teste.*já dado em 09\/11/.test(linhaDe(painel.linhas, 'Assunto antigo')), true);
+  conf('o assunto da falta, da aula das 15h de hoje e da de 18/11 não volta como "já dado"',
+    ['Assunto da falta', 'Leitura de texto de teste', 'Assunto marcado à frente'].map(t => linhaDe(painel.linhas, t)).join('').indexOf('já dado') >= 0
+      || painel.linhas.some(l => /já dado em 16\/11/.test(l)), false);
   conf('com o painel aberto, o histórico tem a entrada dele', (await estado()).janelaNoHistorico, true);
 
   await p2.evaluate(() => history.back());
@@ -248,14 +273,29 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
     tudo.ok && JSON.stringify(await estado()) + '|' + (p2.url() === urlRaiz),
     JSON.stringify({ tema: false, aula: false, janelaNoHistorico: false }) + '|true');
   await avisoDaRaiz('depois do fecharTudo');
-  // a aula futura: a "Última aula" é a última que já aconteceu (hoje, 16/11), e não a de 18/11
+  /* a aula futura: a "Última aula" é a última que já aconteceu (hoje, 16/11, às 10h), e não a de
+   * 18/11 nem a das 15h de hoje (de Português), que às 11h ainda não aconteceu: a data E o horário contra agora */
   await abrirPainel('f5_futura');
   const futura = await p2.evaluate(() => (document.querySelector('#tema-contexto') || { textContent: '' }).textContent.replace(/\s+/g, ' ').trim());
-  conf('numa aula futura, a "Última aula" é a que já aconteceu, e não a marcada no meio (' + futura + ')',
-    /Última aula: 16\/11/.test(futura), true);
+  /* A última aula é a das 10h de hoje, e só tem o assunto escrito à mão, sem
+   * matéria: a linha diz só a data, e não "de Português" (a das 15h, que não
+   * aconteceu) nem "de Matemática" (que seria mentira). */
+  conf('numa aula futura, a "Última aula" é a das 10h de hoje, e o assunto escrito sem matéria não vira matéria (' + futura + ')',
+    /Última aula: 16\/11/.test(futura) && !/Última aula de/.test(futura), true);
+  const linhasFutura = await p2.evaluate(() => Array.from(document.querySelectorAll('#lista-assuntos .item-assunto')).map(l => l.textContent.replace(/\s+/g, ' ').trim()));
+  conf('na aula futura, o assunto da aula das 10h de hoje é "já dado em 16/11", e o das 15h não volta',
+    /já dado em 16\/11/.test(linhasFutura.filter(l => l.indexOf('Assunto escrito de teste') >= 0).join('')) + '|' +
+    linhasFutura.some(l => l.indexOf('Leitura de texto de teste') >= 0), 'true|false');
   await p2.evaluate(() => history.back());
   await esperar('o painel da futura fechado', estado, v => !!v && !v.tema, 4000);
   await voltarFechaAAula('aula futura');
+  // o aluno de cursinho: o banco o lê como 3º médio, mas o selo diz o que está na ficha
+  await abrirPainel('f5_cur');
+  const seloCursinho = await p2.evaluate(() => ((document.querySelector('#tema-contexto .tag') || {}).textContent || '').trim());
+  conf('o aluno de cursinho tem o selo "No cursinho", e não "Está no 3º médio" (' + seloCursinho + ')', seloCursinho, 'No cursinho');
+  await p2.evaluate(() => history.back());
+  await esperar('o painel do cursinho fechado', estado, v => !!v && !v.tema, 4000);
+  await voltarFechaAAula('aluno de cursinho');
 
   secao('4. Recarregar com o painel aberto: sem janela, e a raiz continua guardada');
   // o estado em que o documento novo NASCEU, lido antes de o app rodar: é a condição da prova
