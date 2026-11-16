@@ -30164,7 +30164,8 @@
     soltarFolhaCelular();
     fecharMensagemCelular(); // o que ela escreveu já está no rascunho
     alunoCelular = null; // a aba Alunos volta à lista
-    celBib = { termo: '', assunto: null, lista: null }; // e a Biblioteca, ao começo (12b A2)
+    celBib = { termo: '', assunto: null, lista: null }; // e a Biblioteca, ao começo, com a busca limpa (12b A2)
+    celBibDesenhado = null;
     diaRoladoCelular = null; // voltando a Hoje, a linha do tempo rola até agora
     painelDosAvisosAberto = PAINEL_ABERTO_AO_CHEGAR; // e os avisos chegam recolhidos
     esconderAviso(); // o aviso de uma ação não segue para outra tela
@@ -32332,10 +32333,37 @@
   function motivoDaListaNoCelular(r, e) {
     return fraseDoCartaoNoCelular(e, r.vazia);   // nunca o "não está mais na biblioteca" do tablet (r.conta)
   }
+  /* DE QUE PACOTE É UM ID (exercício, página de teoria ou módulo), pelo
+   * começo dele: "9ano:equacoes-do-segundo-grau:..." é do módulo
+   * "9ano:equacoes-do-segundo-grau", que vem no pacote do 9º ano. O pacote
+   * está no celular quando o módulo está, ou quando há no aparelho qualquer
+   * coisa com o mesmo começo ("9ano:"). Com o pacote aqui, o que falta dele
+   * saiu do pacote (a curadoria) e NUNCA está a caminho; sem o pacote, ainda
+   * não chegou. */
+  var memoDasSeriesNoCelular = { bib: null, series: {} };
+  function seriesNoCelular() {
+    if (memoDasSeriesNoCelular.bib !== bib) {
+      var series = {};
+      if (bib) Object.keys(bib.itemPorId).concat(Object.keys(bib.teoriaPorId)).forEach(function (id) { series[String(id).split(':')[0]] = true; });
+      memoDasSeriesNoCelular = { bib: bib, series: series };
+    }
+    return memoDasSeriesNoCelular.series;
+  }
+  function pacoteDoIdNoCelular(id) {
+    if (!bib) return false;
+    var partes = String(id || '').split(':');
+    return temChave(bib.modulos, partes.slice(0, 2).join(':')) || seriesNoCelular()[partes[0]] === true;
+  }
+  // quantos exercícios e páginas da lista ainda vêm: os que não estão aqui e cujo pacote não está aqui
+  function aCaminhoDaLista(l) {
+    return (l.itens || []).concat(l.paginas || []).filter(function (id) {
+      return !(bib && bib.itemPorId[id]) && !paginaDeTeoriaPorId(id) && !pacoteDoIdNoCelular(id);
+    }).length;
+  }
   function algoFaltaNoCelular() {
     if (!bib || !bib.pacotes.length) return true;
     var t = listasParaMostrar();
-    return t.dela.concat(t.doAplicativo).some(function (l) { return validaDaSelecao(l).faltam > 0; });
+    return t.dela.concat(t.doAplicativo).some(function (l) { return aCaminhoDaLista(l) > 0; });
   }
   function fraseDosExerciciosNoCelular() {
     var e = estadoDosExerciciosNoCelular();
@@ -32343,15 +32371,33 @@
     if (!bib || !algoFaltaNoCelular()) return '';
     return FRASES_DO_QUE_FALTA[e.qual][0];
   }
-  /* A página do assunto diz "ainda não chegou" só quando a linha discreta diz
-   * que algo ainda vem (a mesma conta: fraseDosExerciciosNoCelular); com nada
-   * faltando, o assunto sem material diz que não tem material neste celular. */
-  function materialAindaChegaNoCelular() {
-    return estadoDosExerciciosNoCelular().qual !== 'no-tablet' && !!fraseDosExerciciosNoCelular();
+  /* A PÁGINA DO ASSUNTO DECIDE PELO ASSUNTO, e não pelas listas dela: o
+   * módulo do assunto no índice (banco/topicos) diz de que pacote vem o
+   * material dele. 'aqui': o pacote está no celular, e a seção que falta só
+   * não existe; 'chegando': o pacote não está, e a série dos pacotes ainda não
+   * acabou (anda, espera o Wi-Fi, parou ou deixou algum para trás); 'no-tablet':
+   * o celular não recebe pacotes; 'sem-pacote': nenhum pacote traz (o assunto
+   * sem módulo, ou a série que acabou sem ele). */
+  var memoDosModulosDoIndice = { indice: null, porId: {} };
+  function moduloDoIndiceDoAssunto(id) {
+    if (memoDosModulosDoIndice.indice !== indiceTemas) {
+      var porId = {};
+      (indiceTemas || []).forEach(function (t) { if (t && t.id && t.modulo) porId[t.id] = t.modulo; });
+      memoDosModulosDoIndice = { indice: indiceTemas, porId: porId };
+    }
+    return temChave(memoDosModulosDoIndice.porId, id) ? memoDosModulosDoIndice.porId[id] : null;
   }
-  function fraseDoAssuntoSemMaterialNoCelular() {
-    if (estadoDosExerciciosNoCelular().qual === 'no-tablet' && !(bib && bib.pacotes.length)) return 'A teoria e os exercícios ficam no tablet.';
-    if (materialAindaChegaNoCelular()) return 'A teoria e os exercícios deste assunto ainda não chegaram a este celular.';
+  function chegadaDoAssuntoNoCelular(a) {
+    var mod = moduloDoIndiceDoAssunto(a.id);
+    if (mod && pacoteDoIdNoCelular(mod)) return 'aqui';
+    if (!mod) return 'sem-pacote';
+    var e = estadoDosExerciciosNoCelular();
+    if (e.qual === 'no-tablet') return 'no-tablet';
+    return e.qual === 'prontos' ? 'sem-pacote' : 'chegando';
+  }
+  function fraseDoAssuntoSemMaterialNoCelular(chegada) {
+    if (chegada === 'no-tablet') return 'A teoria e os exercícios ficam no tablet.';
+    if (chegada === 'chegando') return 'A teoria e os exercícios deste assunto ainda não chegaram a este celular.';
     return 'Este assunto não tem teoria nem exercícios neste celular.';
   }
   function atualizarLinhaDosExercicios(linha) {
@@ -32378,6 +32424,12 @@
       if (!modoCelular || telaCelular !== 'biblioteca') return;
       var linha = $('#cel-bib-estado');
       if (linha) atualizarLinhaDosExercicios(linha);
+      // o assunto aberto se refaz quando o pacote dele chega (ou a série muda o que ele diz), na mesma rolagem
+      if (celBib.assunto && !celBib.lista && celBibAssuntoDesenhado && celBibAssuntoDesenhado !== retratoDoAssuntoNoCelular()) {
+        var c = $('#cel-conteudo');
+        desenharBibliotecaCelular(c ? c.scrollTop : 0);
+        return;
+      }
       var miolo = $('#cel-bib-miolo');
       if (!miolo || celBib.assunto || celBib.lista || String(celBib.termo || '').trim()) return;
       var area = $('#cel-conteudo'), rolagem = area ? area.scrollTop : 0;
@@ -32413,11 +32465,19 @@
     ]).then(function (r) { if (r[3]) celBibNomes = r[3]; return celBibNomes; });
   }
 
-  function desenharBibliotecaCelular() {
+  // o que o assunto aberto mostra depende de: quais pacotes estão aqui e o que a página diz da chegada
+  var celBibAssuntoDesenhado = null;
+  function retratoDoAssuntoNoCelular() {
+    var a = celBibNomes && celBib.assunto ? celBibNomes.porId[celBib.assunto] : null;
+    return a ? ((bib && bib.pacotes.length) || 0) + '|' + chegadaDoAssuntoNoCelular(a) : '';
+  }
+  // rolagem (opcional): a do assunto que se refaz no lugar
+  function desenharBibliotecaCelular(rolagem) {
     var caixa = $('#cel-biblioteca');
     if (!caixa) return;
     var vez = ++celBibVez;
     celBibDesenhado = lugarDesenhadoDaBibliotecaCelular();
+    celBibAssuntoDesenhado = null;
     caixa.innerHTML = '';
     if (!celBib.assunto && !celBib.lista) { desenharInicioBibliotecaCelular(caixa, vez); return; }
     caixa.appendChild(el('p', { class: 'ajuda', texto: celBib.lista ? 'Abrindo a lista...' : 'Abrindo o assunto...' }));
@@ -32426,6 +32486,8 @@
       caixa.innerHTML = '';
       if (celBib.lista) desenharVerListaCelular(caixa, nomes);
       else desenharAssuntoCelular(caixa, nomes);
+      var c = $('#cel-conteudo');
+      if (c && typeof rolagem === 'number') c.scrollTop = rolagem;
     });
   }
 
@@ -32500,17 +32562,19 @@
    * tempo, e o Ver lista. A lista com exercício fora do aparelho diz por quê,
    * numa linha curta, no lugar da conta; enquanto os pacotes andam, ou se não
    * há nada dela no aparelho, o Ver lista fica apagado. */
-  function cartaoDeListaCelular(l) {
-    var r = resumoDaMinhaLista(l);
+  // r (opcional): o resumo já feito neste desenho (a busca o faz uma vez por lista)
+  function cartaoDeListaCelular(l, r) {
+    r = r || resumoDaMinhaLista(l);
     var e = estadoDosExerciciosNoCelular();
-    var falta = r.v.faltam > 0;
+    // só o que ainda vem conta; o que saiu de um pacote que está aqui fica com a conta do tablet
+    var falta = aCaminhoDaLista(l) > 0;
     var apagado = r.vazia || (falta && !!ESTADOS_QUE_ANDAM[e.qual]);
     return el('div', { class: 'cartao cel-bib-lista' + (falta ? ' esperando' : ''), 'data-lista': l.id }, [
       el('strong', { class: 'cel-bib-lista-nome', texto: nomeDaMinhaLista(l) }),
       l.nivel ? el('span', { class: 'cel-bib-nivel', texto: 'Nível ' + nomeDoNivel(l.nivel) }) : null,
       r.assuntos.length ? el('div', { class: 'ajuda cel-bib-lista-assunto', texto: r.assuntos.join(', ') }) : null,
       falta ? el('div', { class: 'cel-bib-lista-motivo', texto: motivoDaListaNoCelular(r, e) })
-        : el('div', { class: 'ajuda cel-bib-lista-conta', texto: r.contaDoQueHa + r.textoTempo }),
+        : el('div', { class: 'ajuda cel-bib-lista-conta', texto: r.conta + r.textoTempo }),
       el('div', { class: 'cel-bib-lista-acoes' }, [
         el('button', { type: 'button', class: 'btn', 'data-acao': 'ver-lista', texto: 'Ver lista',
           disabled: apagado ? 'disabled' : null,
@@ -32522,10 +32586,10 @@
   /* As palavras da busca no nome da lista e nos assuntos dela, pela mesma
    * conta das raízes da busca de assunto (assuntosDaBusca): "equação" acha
    * "Equações do Segundo Grau". */
-  function listaCasaComABusca(l, termo) {
+  function listaCasaComABusca(l, termo, r) {
     var grupos = Busca.lerBusca(String(termo || '')).grupos.filter(function (g) { return g.length; });
     if (!grupos.length) return false;
-    var raizes = raizesDoTexto([nomeDaMinhaLista(l)].concat(resumoDaMinhaLista(l).assuntos).join(' '));
+    var raizes = raizesDoTexto([nomeDaMinhaLista(l)].concat((r || resumoDaMinhaLista(l)).assuntos).join(' '));
     return grupos.every(function (g) { return raizes.some(function (r) { return casaRaiz(g, r) > 0; }); });
   }
 
@@ -32577,10 +32641,12 @@
       atualizarLegendaDosSinais(legenda, lista);
     }
     var t = listasParaMostrar();
-    var dasListas = t.dela.concat(t.doAplicativo).filter(function (l) { return listaCasaComABusca(l, termo); });
+    // o resumo de cada lista, uma vez neste desenho: serve à conta da busca e ao cartão
+    var dasListas = t.dela.concat(t.doAplicativo).map(function (l) { return { l: l, r: resumoDaMinhaLista(l) }; })
+      .filter(function (x) { return listaCasaComABusca(x.l, termo, x.r); });
     if (dasListas.length) {
       miolo.appendChild(el('h3', { class: 'cel-bib-secao', texto: 'Nas suas listas' }));
-      dasListas.forEach(function (l) { miolo.appendChild(cartaoDeListaCelular(l)); });
+      dasListas.forEach(function (x) { miolo.appendChild(cartaoDeListaCelular(x.l, x.r)); });
     }
   }
 
@@ -32597,6 +32663,8 @@
       pagina.appendChild(el('p', { class: 'vazio', texto: nomes ? 'Este assunto não está no índice deste aplicativo.' : 'Não consegui abrir o índice de assuntos agora. Tente de novo daqui a pouco.' }));
       return;
     }
+    var chegada = chegadaDoAssuntoNoCelular(a);
+    celBibAssuntoDesenhado = retratoDoAssuntoNoCelular();
     montarPaginaDoAssunto(pagina, a, nomes, [], { celular: {
       rotuloVoltar: String(celBib.termo || '').trim() ? 'Voltar à busca' : 'Voltar',
       voltar: voltarDoAssuntoCelular,
@@ -32604,8 +32672,8 @@
       verLista: function (base) { abrirListaCelular({ tipo: 'base', id: base.id, assunto: id }); },
       // escondida enquanto não falta nada; a marca dos pacotes a acende aqui também
       antesDoBloco: linhaDosExerciciosCelular(),
-      fraseDoVazio: fraseDoAssuntoSemMaterialNoCelular(),
-      aindaChegando: materialAindaChegaNoCelular()
+      fraseDoVazio: fraseDoAssuntoSemMaterialNoCelular(chegada),
+      aindaChegando: chegada === 'chegando'
     } });
   }
 
@@ -32644,8 +32712,10 @@
       nivel = l.nivel ? nomeDoNivel(l.nivel) : '';
       itens = r.itens;
       paginas = r.paginas;
-      resumo = r.vazia ? '' : r.contaDoQueHa + r.textoTempo;
-      if (r.v.faltam) nota = motivoDaListaNoCelular(r, estadoDosExerciciosNoCelular());
+      var aCaminho = aCaminhoDaLista(l) > 0;
+      // o que ainda vem fica na nota; o que saiu de um pacote que está aqui, na conta do tablet
+      resumo = aCaminho ? (r.vazia ? '' : r.contaDoQueHa + r.textoTempo) : r.conta + r.textoTempo;
+      if (aCaminho) nota = motivoDaListaNoCelular(r, estadoDosExerciciosNoCelular());
     }
     if (caminho.length) {
       tela.appendChild(el('p', { class: 'bib-assunto-caminho' }, caminho.map(function (p, i) {

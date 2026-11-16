@@ -60,6 +60,9 @@
  *                         volta a ter a caixa "No material" (5 vê);
  *   --envenenado-celular-grava-ao-navegar  a miniatura volta a ser guardada no
  *                         celular, e andar pelas telas chama a gravação (8 vê);
+ *   --envenenado-chegando-pelas-listas  a página do assunto volta a decidir o
+ *                         "ainda não chegou" pelas listas dela, e não pelo
+ *                         pacote do assunto (9 vê, nos casos a, b e c);
  *   --envenenado-diz-que-sumiu  o cartão do celular usa a conta do tablet, que
  *                         diz que o exercício não está mais na biblioteca (3
  *                         vê, em todos os valores da marca).
@@ -89,13 +92,17 @@ const NOME_REAL = ((/<header class="cabecalho">[\s\S]*?<strong>([^<]+)<\/strong>
 const NOME_TESTE = 'Professora Teste';
 // a linha só da prova: o desenho de quando chega mudança da nuvem
 const ANCORA_GANCHO = '  function desenharTudo() {\n';
-const GANCHO = '  window.__provaRedesenhar = function () { desenharTudo(); };\n';
+const GANCHO = '  window.__provaRedesenhar = function () { desenharTudo(); };\n' +
+  '  window.__provaPacoteChegou = function () { bibliotecaMudou(); };\n';
 
 const VENENOS = {
   '--envenenado-celular-mostra-no-material': ['/app.js',
     '      if (cx.soLer) return null;   // 12b A2: o celular só lê, e a caixa "No material" mexe no material\n', ''],
   '--envenenado-celular-grava-ao-navegar': ['/app.js',
     '        if (aparelhoSoLe()) return dataUrl;   // 12b A2: no celular a miniatura só aparece, sem guardar: nada grava\n', ''],
+  '--envenenado-chegando-pelas-listas': ['/app.js',
+    "    var mod = moduloDoIndiceDoAssunto(a.id);\n    if (mod && pacoteDoIdNoCelular(mod)) return 'aqui';\n",
+    "    if (estadoDosExerciciosNoCelular().qual === 'no-tablet') return 'no-tablet';\n    return fraseDosExerciciosNoCelular() ? 'chegando' : 'sem-pacote';\n"],
   '--envenenado-diz-que-sumiu': ['/app.js',
     'return fraseDoCartaoNoCelular(e, r.vazia);   // nunca o "não está mais na biblioteca" do tablet (r.conta)', 'return r.conta;']
 };
@@ -189,7 +196,9 @@ async function semear(ctx, comPacote, listas, comMirim) {
       automatica: false, criadaEm: quando, editadaEm: quando });
     // a mais nova primeiro: a revisão (completa), a do desafio (com um exercício que ainda não chegou) e a de área (sem nenhum)
     if (quais.indexOf('revisao') >= 0) await lista('lista-revisao', 'Revisão de equações para a prova', 'regular', itens.slice(0, 4), pagina ? [pagina] : [], 1700000003000);
-    if (quais.indexOf('desafio') >= 0) await lista('lista-desafio', 'Equação do 2º grau, desafio', 'aprofundamento', [itens[4], '9ano:modulo-que-chega-depois:lista:ex:1'], [], 1700000002000);
+    if (quais.indexOf('desafio') >= 0) await lista('lista-desafio', 'Equação do 2º grau, desafio', 'aprofundamento', [itens[4], '7ano:modulo-que-chega-depois:lista:ex:1'], [], 1700000002000);
+    // um exercício que a curadoria tirou do pacote do 9º ano (o pacote está aqui): nunca "a caminho"
+    if (quais.indexOf('curadoria') >= 0) await lista('lista-curadoria', 'Lista com um exercício retirado', 'base', [itens[0], '9ano:equacoes-do-segundo-grau:lista-retirada:ex:99'], [], 1700000004000);
     if (quais.indexOf('area') >= 0) await lista('lista-area', 'Área de figuras planas', null, ['8ano:area-que-chega-depois:lista:ex:1', '8ano:area-que-chega-depois:lista:ex:2'], [], 1700000001000);
     return { pagina: !!pagina, listas: (await Store.listasDaBiblioteca()).length };
   }, listas);
@@ -397,8 +406,8 @@ async function printar(pag, nome) {
   const s1 = await semear(null, true, ['revisao', 'desafio', 'area']);
   conf('o principal: o pacote sintético, o aluno e as três listas (com uma página de teoria)', s1.importou && s1.pagina && s1.listas === 3, true);
   const ctxCompleto = await nav.createBrowserContext();
-  const s2 = await semear(ctxCompleto, true, ['revisao'], true);
-  conf('o completo: o pacote e só a lista completa', s2.importou && s2.listas === 1, true);
+  const s2 = await semear(ctxCompleto, true, ['revisao', 'curadoria'], true);
+  conf('o completo: o pacote, a Mirim 2, a lista completa e a com um exercício retirado', s2.importou && s2.listas === 2, true);
   const ctxVazio = await nav.createBrowserContext();
   const s3 = await semear(ctxVazio, false, ['revisao', 'desafio', 'area']);
   conf('o vazio: as três listas, sem pacote nenhum', s3.listas, 3);
@@ -568,6 +577,27 @@ async function printar(pag, nome) {
   });
   conf('a mudança da nuvem no assunto não leva a rolagem ao topo nem refaz a página', rolagem.split('|')[0] === rolagem.split('|')[1] && /\|true$/.test(rolagem), true);
   await cel.evaluate(() => { document.querySelector('#cel-conteudo').scrollTop = 0; });
+  await marcar(cel, 'faltam');
+  await pausa(600);
+  // a página desenhada de novo em faltam (volta à busca e abre outra vez)
+  await clicar(cel, '.cel-bib-assunto .bib-voltar');
+  await esperar('a busca de novo', () => naBusca(cel), v => /\|[1-9]/.test(v || ''), 8000);
+  await abrirAssunto(cel);
+  const casoC = await cel.evaluate(() => {
+    const p = document.querySelector('.cel-bib-assunto');
+    const l = document.querySelector('#cel-bib-estado');
+    // o corpo da página, sem a linha discreta (que fala das listas dela, e diz isso de propósito)
+    const corpo = l && !l.hidden ? p.innerText.split(l.innerText).join('') : p.innerText;
+    return [/não cheg(ou|aram)/.test(corpo), l && !l.hidden ? l.innerText.trim() : null, (p.querySelector('.bte-faltam') || {}).textContent || ''].join('|');
+  });
+  if (MODO === '--envenenado-chegando-pelas-listas') {
+    conf('VENENO visto: com uma lista dela incompleta, o assunto que tem o pacote aqui diz que o resto não chegou (' + casoC + ')', /^true\|/.test(casoC), true);
+    return H.fim(amb)();
+  }
+  conf('(c) faltam, com uma lista dela incompleta: o assunto com o pacote aqui não diz que algo não chegou, e a falta da OBMEP é a de sempre',
+    casoC, 'false|' + FRASE.parcial + '|Ainda sem questões da OBMEP para este assunto.');
+  await marcar(cel, 'prontos');
+  await pausa(400);
 
   secao('6. O Ver lista, e o Voltar do Android');
   conf('o Ver lista da lista de base abriu', await abrirBase(cel), true);
@@ -636,6 +666,11 @@ async function printar(pag, nome) {
   for (const t of ['equação', 'fração', 'pitágoras']) await digitar(hv, '#cel-bib-busca', t);
   await voltar(hv);
   conf('três buscas seguidas são um passo só: o Voltar devolve o começo', await noComeco(hv), true);
+  await buscar(hv);
+  await clicar(hv, '#cel-abas .cel-aba[data-cel="biblioteca"]');
+  await pausa(700);
+  conf('o toque na aba Biblioteca durante a busca leva ao começo, com o campo vazio e sem o Limpar',
+    (await noComeco(hv)) + '|' + await hv.evaluate(() => document.querySelector('#cel-bib-limpar').hidden), 'true|true');
   await buscar(hv);
   await clicar(hv, '#cel-bib-limpar');
   await pausa(700);
@@ -723,10 +758,16 @@ async function printar(pag, nome) {
   linhasCompleto.push(await linhaEstado(pc));
   conf('com a lista toda no aparelho: sem linha em prontos, sem Wi-Fi, faltam e sem marca; com a série andando, a linha do andamento',
     linhasCompleto.map(String).join(' | '), 'null | null | null | null | Trazendo os exercícios pelo Wi-Fi: 3 de 15.');
-  // com tudo no aparelho e fora do Wi-Fi (o caso de todo dia), nenhum assunto diz que algo não chegou
-  await marcar(pc, 'sem-wifi');
-  for (const [id, termo, rotulo] of [['MAT04-09', 'perímetro', 'com OBMEP (a Mirim 2) e sem teoria'], [ASSUNTO, TERMO, 'com teoria e lista, sem OBMEP'],
-    ['MAT09-01', 'números reais', 'sem material nenhum']]) {
+  /* (a) prontos, com uma lista que tem um exercício retirado pela curadoria (o
+   * pacote dele está aqui): nada diz "ainda não chegou", nem a linha, nem o
+   * assunto; o cartão fica com a conta do tablet, que é verdade. E o caso
+   * normal: os assuntos do pacote (com e sem OBMEP) sem nada de "chegou". */
+  await marcar(pc, 'prontos');
+  await pausa(400);
+  const cur = porId(await cartoes(pc), 'lista-curadoria');
+  conf('(a) prontos: a lista com o exercício retirado não espera nada (sem motivo, com a conta do tablet, Ver lista aceso) e não há linha',
+    [cur.motivo, /1 não está mais na biblioteca/.test(cur.texto), cur.apagado, await linhaEstado(pc)].map(String).join('|'), '|true|false|null');
+  const assuntoNoCompleto = async (id, termo) => {
     await clicar(pc, '#cel-abas .cel-aba[data-cel="hoje"]');
     await pausa(300);
     await irParaBiblioteca(pc, 1);
@@ -734,14 +775,33 @@ async function printar(pag, nome) {
     await abrirAssunto(pc, id);
     const t = await pc.evaluate(() => {
       const p = document.querySelector('.cel-bib-assunto');
-      return { chegou: /não cheg(ou|aram)/.test(p.innerText), linha: !!(document.querySelector('#cel-bib-estado') && !document.querySelector('#cel-bib-estado').hidden),
-        vazio: (p.querySelector('.bte-vazio:not(.bte-faltam)') || {}).textContent || '', secoes: Array.from(p.querySelectorAll('.bte-secao')).map(x => x.dataset.secao).join(',') };
+      return { chegou: /não cheg(ou|aram)/.test(p.innerText), vazio: (p.querySelector('.bte-vazio:not(.bte-faltam)') || {}).textContent || '',
+        secoes: Array.from(p.querySelectorAll('.bte-secao')).map(x => x.dataset.secao).join(',') };
     });
-    console.log('   ' + id + ': ' + JSON.stringify(t));
-    conf('sem Wi-Fi com tudo no aparelho, o assunto ' + rotulo + ' (' + id + '): nada diz que não chegou, e nenhuma linha', t.chegou + '|' + t.linha, 'false|false');
+    console.log('   ' + id + ' (' + await pc.evaluate(() => document.querySelector('#modo-celular').getAttribute('data-pacotes')) + '): ' + JSON.stringify(t));
+    return t;
+  };
+  for (const [id, termo, rotulo] of [['MAT04-09', 'perímetro', 'com OBMEP (a Mirim 2) e sem teoria'], [ASSUNTO, TERMO, 'com teoria e lista, sem OBMEP'],
+    ['MAT09-01', 'números reais', 'de um pacote que não veio (o do 8º ano)']]) {
+    const t = await assuntoNoCompleto(id, termo);
+    conf('(a) prontos, o assunto ' + rotulo + ' (' + id + '): nada diz que não chegou', t.chegou, false);
     if (id === 'MAT04-09') conf('(arranjo) o assunto da Mirim 2 tem a OBMEP', /obmep/.test(t.secoes), true);
-    if (id === 'MAT09-01') conf('o assunto sem material diz que não tem material neste celular', t.vazio, 'Este assunto não tem teoria nem exercícios neste celular.');
+    if (id === 'MAT09-01') conf('com a série pronta e sem o pacote dele, o assunto diz que não tem material neste celular', t.vazio, 'Este assunto não tem teoria nem exercícios neste celular.');
   }
+  /* (b) sem Wi-Fi, com as listas completas e um pacote ainda a vir: o assunto
+   * do pacote que está aqui não diz nada de chegar, e o do pacote que não
+   * está diz que ainda não chegou (e não que não tem material). */
+  await marcar(pc, 'sem-wifi');
+  await pausa(300);
+  const b1 = await assuntoNoCompleto(ASSUNTO, TERMO);
+  const b2 = await assuntoNoCompleto('MAT09-01', 'números reais');
+  if (MODO === '--envenenado-chegando-pelas-listas') {
+    conf('VENENO visto: sem Wi-Fi e com as listas completas, o assunto do pacote que não veio diz que não tem material (' + b2.vazio + ')',
+      b2.vazio === 'Este assunto não tem teoria nem exercícios neste celular.', true);
+    return H.fim(amb)();
+  }
+  conf('(b) sem Wi-Fi, o assunto do pacote que está aqui: nada de chegar', b1.chegou, false);
+  conf('(b) sem Wi-Fi, o assunto do pacote que ainda não veio: ainda não chegou', b2.vazio, 'A teoria e os exercícios deste assunto ainda não chegaram a este celular.');
   conf('nenhum erro de página no perfil completo', pc.errosDePagina.join(' | '), '');
   await pc.close();
   for (const [w, hh] of [[390, 844], [412, 915]]) {
@@ -776,6 +836,27 @@ async function printar(pag, nome) {
     conf('nenhum erro de página no perfil vazio a ' + w + ' px', pv.errosDePagina.join(' | '), '');
     await pv.close();
   }
+
+  secao('9b. O assunto aberto se refaz quando o pacote dele chega');
+  const pa = await celular(ctxVazio, 390, 844);
+  await irParaBiblioteca(pa, 3);
+  await marcar(pa, 'trazendo 1/15');
+  await buscar(pa);
+  await abrirAssunto(pa);
+  conf('(arranjo) antes do pacote, o assunto diz que ainda não chegou', await textoDa(pa, '.cel-bib-assunto .bte-vazio'),
+    'A teoria e os exercícios deste assunto ainda não chegaram a este celular.');
+  // o pacote chega ao aparelho (aqui pelo tablet do mesmo perfil), e a série avisa a tela, como a A1 faz
+  const chegou = await semear(ctxVazio, true, []);
+  conf('(arranjo) o pacote do 9º ano entrou no aparelho', chegou.importou, true);
+  await pa.evaluate(() => window.__provaPacoteChegou());
+  const refeito = await esperar('o assunto se refez com o pacote', () => pa.evaluate(() =>
+    !!document.querySelector('#cel-biblioteca.ativa .cel-bib-assunto .bte-secao[data-secao="teoria"]')), v => v === true, 15000);
+  conf('o assunto aberto se refez sozinho com a teoria, sem "não chegou", e continua aberto', refeito.ok + '|' +
+    await pa.evaluate(() => /não cheg(ou|aram)/.test(document.querySelector('.cel-bib-assunto').innerText)) + '|' +
+    await pa.evaluate(a => !!document.querySelector('.cel-bib-assunto[data-assunto="' + a + '"]'), ASSUNTO), 'true|false|true');
+  await juntarEscritas(pa);
+  conf('nenhum erro de página no assunto que se refez', pa.errosDePagina.join(' | '), '');
+  await pa.close();
 
   secao('10. Só lê: o banco igual byte a byte, nenhuma gravação');
   await pausa(1000);
