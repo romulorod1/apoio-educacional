@@ -4774,3 +4774,9 @@ body.modo-celular .celular .cel-bib-lista .ajuda { margin: 0; max-width: 100%; }
 .cel-bib-lista-titulo { margin: 8px 0 8px; overflow-wrap: anywhere; }
 .cel-bib-ver-lista .cel-bib-lista-conta { margin: 10px 0 0; }
 .cel-bib-exercicios { margin-top: 16px; }
+/* a linha curta do cartão que espera os exercícios, e o Ver lista apagado com contraste (revisão do #245) */
+.cel-bib-lista-motivo { display: flex; align-items: center; gap: 6px; max-width: 100%; font-size: var(--letra-14); line-height: 1.4;
+  color: var(--novidades-subtitulo); font-weight: var(--peso-forte); overflow-wrap: anywhere; }
+.cel-bib-ver-lista .cel-bib-lista-motivo { margin: 8px 0 0; }
+body.modo-celular .celular .cel-bib-lista .btn:disabled { opacity: 1; color: var(--novidades-subtitulo); background: var(--soft);
+  border-color: var(--fio); }
