@@ -194,6 +194,8 @@ const cobre = pag => pag.evaluate(() => {
     .then(js => {
       const t = {};
       js.forEach(j => (j.grupos || []).forEach(g => (g.blocos || []).forEach(b => (b.ids || []).forEach((id, i) => { t[id] = b.topicos[i]; }))));
+      // a matemática tem outra forma: a lista de temas, com o título em pt
+      js.forEach(j => (j.temas || []).forEach(x => { if (x && x.id && x.pt) t[x.id] = x.pt.titulo; }));
       return t;
     }));
   conf('os ids da prova estão no índice servido, e o FISEM1-T99 não',
