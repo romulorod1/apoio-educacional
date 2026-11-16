@@ -2,8 +2,8 @@
  * GERADO por ferramentas/subconjunto_fonte.py. Não editar à mão: rode o script.
  *
  * A fonte de reserva do pdf.js: o subconjunto da DejaVu Sans Condensed 2.37
- * (licença em fontes/LICENSE-DejaVu.txt; o TTF reduzido em
- * fontes/DejaVuSansCondensed-subconjunto.ttf). Só o que a Helvetica e a
+ * (licença em vendor/dejavu-2.37/LICENSE-DejaVu.txt; o TTF reduzido em
+ * vendor/dejavu-2.37/DejaVuSansCondensed-subconjunto.ttf). Só o que a Helvetica e a
  * Symbol da base-14 não desenham: expoentes e índices, conjuntos, setas,
  * grego, frações e marcas.
  *

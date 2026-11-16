@@ -10,8 +10,8 @@ mudaria os glifos e as larguras em silêncio.
 
 Escreve três arquivos, todos versionados:
 
-  fontes/DejaVuSansCondensed-subconjunto.ttf   o TTF reduzido (a fonte da verdade)
-  fontes/LICENSE-DejaVu.txt                    a licença, copiada do pacote
+  vendor/dejavu-2.37/DejaVuSansCondensed-subconjunto.ttf   o TTF reduzido (a fonte da verdade)
+  vendor/dejavu-2.37/LICENSE-DejaVu.txt                    a licença, copiada do pacote
   fonte-unicode.js                             o que o aplicativo carrega: o TTF
                                                comprimido em zlib e em base64, e a
                                                tabela caractere -> [glifo, largura]
@@ -145,14 +145,14 @@ def principal(caminho):
     }
     flate = zlib.compress(ttf, 9)
 
-    os.makedirs(os.path.join(RAIZ, 'fontes'), exist_ok=True)
-    with open(os.path.join(RAIZ, 'fontes', NOME + '-subconjunto.ttf'), 'wb') as s:
+    os.makedirs(os.path.join(RAIZ, 'vendor', 'dejavu-2.37'), exist_ok=True)
+    with open(os.path.join(RAIZ, 'vendor', 'dejavu-2.37', NOME + '-subconjunto.ttf'), 'wb') as s:
         s.write(ttf)
     licenca = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(caminho))), 'LICENSE')
     if os.path.exists(licenca):
-        shutil.copyfile(licenca, os.path.join(RAIZ, 'fontes', 'LICENSE-DejaVu.txt'))
+        shutil.copyfile(licenca, os.path.join(RAIZ, 'vendor', 'dejavu-2.37', 'LICENSE-DejaVu.txt'))
     else:
-        print('aviso: não achei o LICENSE ao lado da pasta ttf/; o fontes/LICENSE-DejaVu.txt ficou como estava')
+        print('aviso: não achei o LICENSE ao lado da pasta ttf/; o vendor/dejavu-2.37/LICENSE-DejaVu.txt ficou como estava')
     js = escrever_js(ttf, flate, glifos, metr, upm)
     with open(os.path.join(RAIZ, 'fonte-unicode.js'), 'w', encoding='utf-8', newline='\n') as s:
         s.write(js)
@@ -173,8 +173,8 @@ def escrever_js(ttf, flate, glifos, metr, upm):
         " * GERADO por ferramentas/subconjunto_fonte.py. Não editar à mão: rode o script.\n"
         " *\n"
         " * A fonte de reserva do pdf.js: o subconjunto da DejaVu Sans Condensed 2.37\n"
-        " * (licença em fontes/LICENSE-DejaVu.txt; o TTF reduzido em\n"
-        " * fontes/DejaVuSansCondensed-subconjunto.ttf). Só o que a Helvetica e a\n"
+        " * (licença em vendor/dejavu-2.37/LICENSE-DejaVu.txt; o TTF reduzido em\n"
+        " * vendor/dejavu-2.37/DejaVuSansCondensed-subconjunto.ttf). Só o que a Helvetica e a\n"
         " * Symbol da base-14 não desenham: expoentes e índices, conjuntos, setas,\n"
         " * grego, frações e marcas.\n"
         " *\n"

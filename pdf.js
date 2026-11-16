@@ -140,7 +140,7 @@
   //
   // Todo caractere que a Helvetica (WinAnsi) e os 11 glifos da Symbol não
   // desenham, e que a fonte de reserva tem, sai por ela: o subconjunto da DejaVu
-  // Sans Condensed 2.37 (licença em fontes/LICENSE-DejaVu.txt), embutido como
+  // Sans Condensed 2.37 (licença em vendor/dejavu-2.37/LICENSE-DejaVu.txt), embutido como
   // Type0 com CIDFontType2, Identity-H, FontFile2, /W, /CIDToGIDMap e ToUnicode.
   // O subconjunto é cortado ANTES, por ferramentas/subconjunto_fonte.py, e vem
   // pronto no fonte-unicode.js: o código de cada caractere, o glifo, a largura

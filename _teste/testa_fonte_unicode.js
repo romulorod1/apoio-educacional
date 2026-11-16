@@ -12,7 +12,7 @@
  *   B. extração: um PDF de duas páginas com todos eles abre no MuPDF sem aviso,
  *      e o texto extraído devolve cada caractere (só é verdade com o ToUnicode
  *      certo); a fonte entra UMA vez, como Type0 com TrueType embutida, e o
- *      FontFile2 descomprimido é byte a byte o fontes/...-subconjunto.ttf;
+ *      FontFile2 descomprimido é byte a byte o vendor/dejavu-2.37/...-subconjunto.ttf;
  *   C. largura: a medida de cada caractere da reserva é a do hmtx do próprio
  *      TTF (lido aqui, sem passar pelo pdf.js), o /W do PDF diz o mesmo, e uma
  *      palavra só de setas quebra no número de linhas que o hmtx manda;
@@ -219,7 +219,7 @@ secao('A. Cobertura: a lista do brief inteira desenha');
 
 // ================================================================ B
 secao('B. Extração: o PDF com todos os caracteres');
-const TTF = fs.readFileSync(path.join(RAIZ, 'fontes', 'DejaVuSansCondensed-subconjunto.ttf'));
+const TTF = fs.readFileSync(path.join(RAIZ, 'vendor', 'dejavu-2.37', 'DejaVuSansCondensed-subconjunto.ttf'));
 let todos = null;
 {
   const doc = new G.Doc();
@@ -264,7 +264,7 @@ let todos = null;
     const ini = m.index + m[0].length;
     ttfDoPdf = zlib.inflateSync(Buffer.from(todos).subarray(ini, ini + Number(m[2])));
   }
-  conf('extracao', 'o FontFile2 descomprimido é o fontes/DejaVuSansCondensed-subconjunto.ttf', !!ttfDoPdf && ttfDoPdf.equals(TTF), true);
+  conf('extracao', 'o FontFile2 descomprimido é o vendor/dejavu-2.37/DejaVuSansCondensed-subconjunto.ttf', !!ttfDoPdf && ttfDoPdf.equals(TTF), true);
   conf('extracao', 'e o /Length1 diz o tamanho dele', m ? Number(m[1]) : -1, TTF.length);
 }
 
