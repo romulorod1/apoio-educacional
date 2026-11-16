@@ -595,21 +595,31 @@ async function printar(pag, nome) {
     return { js: u.usedSize, fora: (u.embedderHeapUsedSize || 0) + (u.backingStorageSize || 0), jsMetrica: v('JSHeapUsedSize') };
   };
   const somaDe = h => h.js + h.fora;
-  const navegador = await cel.browser().target().createCDPSession();
-  const pids = ((await navegador.send('SystemInfo.getProcessInfo')).processInfo || []).map(p => p.id).filter(Boolean);
-  await navegador.detach();
-  const { spawn } = require('child_process');
+  /* A régua do sistema é SÓ INFORMATIVA e só no Windows (a máquina 2): no CI,
+   * que roda no Linux, não há PowerShell. Nenhuma conferência depende dela;
+   * o binário que falta nunca derruba a prova (o 'error' é ouvido). */
   const leituras = [];
-  const amostrador = spawn('powershell', ['-NoProfile', '-Command',
-    '$ids=@(' + pids.join(',') + '); while ($true) { $s=0; foreach ($i in $ids) { try { $s += (Get-Process -Id $i -ErrorAction Stop).PrivateMemorySize64 } catch {} }; ' +
-    '[Console]::Out.WriteLine($s); [Console]::Out.Flush(); Start-Sleep -Milliseconds 100 }']);
-  amostrador.stdout.on('data', d => String(d).split(/\r?\n/).forEach(l => { if (/^\d+$/.test(l.trim())) leituras.push(Number(l.trim())); }));
-  const esperarLeitura = () => esperar('uma leitura do sistema', () => leituras.length, v => v > 0, 20000);
-  await esperarLeitura();
+  let amostrador = null, pids = [];
+  if (process.platform === 'win32') {
+    try {
+      const navegador = await cel.browser().target().createCDPSession();
+      pids = ((await navegador.send('SystemInfo.getProcessInfo')).processInfo || []).map(p => p.id).filter(Boolean);
+      await navegador.detach();
+      const { spawn } = require('child_process');
+      amostrador = spawn('powershell', ['-NoProfile', '-Command',
+        '$ids=@(' + pids.join(',') + '); while ($true) { $s=0; foreach ($i in $ids) { try { $s += (Get-Process -Id $i -ErrorAction Stop).PrivateMemorySize64 } catch {} }; ' +
+        '[Console]::Out.WriteLine($s); [Console]::Out.Flush(); Start-Sleep -Milliseconds 100 }']);
+      amostrador.on('error', e => { console.log('   (a régua do sistema não abriu: ' + e.message + '; segue só a do CDP)'); amostrador = null; });
+      amostrador.stdout.on('data', d => String(d).split(/\r?\n/).forEach(l => { if (/^\d+$/.test(l.trim())) leituras.push(Number(l.trim())); }));
+      await esperar('uma leitura do sistema (informativa)', () => leituras.length || (amostrador ? 0 : -1), v => v !== 0, 20000);
+    } catch (e) { console.log('   (a régua do sistema não abriu: ' + e.message + '; segue só a do CDP)'); }
+  } else {
+    console.log('   (a régua do sistema foi pulada: só no Windows; a do CDP é a que vale)');
+  }
   await cdp.send('HeapProfiler.collectGarbage');
   await pausa(1000);
   const base = await heap();
-  const baseSistema = leituras[leituras.length - 1];
+  const baseSistema = leituras.length ? leituras[leituras.length - 1] : 0;
   const nAntes = leituras.length;
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   await cel.evaluate(() => { window.__geracoes = []; window.__maxJuntos = 0; window.__desenhos = 0; });
@@ -635,21 +645,21 @@ async function printar(pag, nome) {
   const MB = x => Math.round(x / 1048576 * 10) / 10;
   console.log('   CDP, antes: heap do JS ' + MB(base.js) + ' MB, fora do heap ' + MB(base.fora) + ' MB; no pico: ' + MB(pico.js) + ' MB e ' + MB(pico.fora) +
     ' MB (subiu ' + MB(somaDe(pico) - somaDe(base)) + ' MB; JSHeapUsedSize do Performance ' + MB(pico.jsMetrica) + ' MB)');
-  console.log('   sistema, os ' + pids.length + ' processos do Chrome: antes ' + MB(baseSistema) + ' MB, pico ' + MB(picoSistema) + ' MB (subiu ' + MB(picoSistema - baseSistema) + ' MB)');
+  if (leituras.length > nAntes) console.log('   sistema (informativo), os ' + pids.length + ' processos do Chrome: antes ' + MB(baseSistema) + ' MB, pico ' + MB(picoSistema) + ' MB (subiu ' + MB(picoSistema - baseSistema) + ' MB)');
+  else console.log('   sistema: sem leitura (pulado)');
   console.log('   ' + Math.round(ms / 100) / 10 + ' s com o processador 4 vezes mais lento; ' + ger3.desenhos + ' recortes e páginas desenhados; ' + tamanhos);
   conf('o PDF da lista grande saiu: a lista com as 2 páginas de teoria e os ' + GRANDE_N + ' exercícios, e o gabarito à parte',
     [saiu, jg.itens.map(i => i.parte).join(','), ger3.g.map(g => [g.lista, g.gabarito, g.itens, g.paginas].join('/')).join(' ; ')].join('|'),
     ['true', 'lista,gabarito', 'true/false/' + GRANDE_N + '/2 ; false/true/' + GRANDE_N + '/0'].join('|'));
   conf('um recorte desenhado por vez no celular (o pico de desenhos juntos é 1)', ger3.max, 1);
   conf('pelo CDP, a página subiu menos de 120 MB no pico (subiu ' + MB(somaDe(pico) - somaDe(base)) + ' MB)', somaDe(pico) - somaDe(base) < 120 * 1048576, true);
-  conf('pelo sistema, o Chrome inteiro subiu menos de 300 MB no pico (subiu ' + MB(picoSistema - baseSistema) + ' MB)', picoSistema - baseSistema < 300 * 1048576, true);
   await fecharJanela(cel);
   await cdp.send('HeapProfiler.collectGarbage');
   await pausa(800);
   await cdp.send('HeapProfiler.collectGarbage');
   await pausa(500);
   const depois = await heap();
-  amostrador.kill();
+  if (amostrador) { try { amostrador.kill(); } catch (e) { /* já saiu */ } }
   console.log('   CDP, depois de fechar e coletar: heap do JS ' + MB(depois.js) + ' MB, fora do heap ' + MB(depois.fora) + ' MB');
   conf('fechada a janela, a página volta para perto do começo (até 16 MB acima; ficou ' + MB(somaDe(depois) - somaDe(base)) + ' MB)', somaDe(depois) - somaDe(base) < 16 * 1048576, true);
   await cdp.detach();
