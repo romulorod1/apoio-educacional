@@ -97,7 +97,7 @@ const VENENOS = {
   '--envenenado-celular-grava-ao-navegar': ['/app.js',
     '        if (aparelhoSoLe()) return dataUrl;   // 12b A2: no celular a miniatura só aparece, sem guardar: nada grava\n', ''],
   '--envenenado-diz-que-sumiu': ['/app.js',
-    'return fraseDoCartaoNoCelular(e);   // nunca o "não está mais na biblioteca" do tablet (r.conta)', 'return r.conta;']
+    'return fraseDoCartaoNoCelular(e, r.vazia);   // nunca o "não está mais na biblioteca" do tablet (r.conta)', 'return r.conta;']
 };
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && !VENENOS[a]);
@@ -136,7 +136,8 @@ const ESTADOS = [
   ['faltam', FRASE.parcial, CARTAO.parcial, false],
   ['nada', FRASE.parcial, CARTAO.parcial, false],
   ['prontos', FRASE.parcial, CARTAO.parcial, false],
-  [null, FRASE.tablet, CARTAO.tablet, false]
+  // sem a marca, no celular que não recebe pacotes: a lista com parte aqui diz isso e abre; a sem nada fica apagada
+  [null, FRASE.tablet, CARTAO.tablet, false, 'Alguns exercícios ficam no tablet.']
 ];
 
 /* ---------- as páginas ---------- */
@@ -149,7 +150,7 @@ async function novaPagina(ctx) {
   p.on('dialog', async d => { try { await d.accept(); } catch (e) { /* ok */ } });
   return p;
 }
-async function semear(ctx, comPacote, listas) {
+async function semear(ctx, comPacote, listas, comMirim) {
   const tab = await novaPagina(ctx);
   await tab.setViewport({ width: 1280, height: 800 });
   await H.abrirApp(tab, amb.ORIGEM);
@@ -162,6 +163,17 @@ async function semear(ctx, comPacote, listas) {
     imp = (await esperar('a importação', () => tab.evaluate(() => {
       const c = document.querySelector('#estado-importacao-biblioteca'); return c ? c.innerText.trim() : '';
     }), v => /^Biblioteca importada\.|não foi importado/.test(v || ''), 90000)).valor || '';
+    if (comMirim) {
+      // a Mirim 2 traz a OBMEP de um assunto do 4º ano (MAT04-09), sem teoria nem lista
+      const mirim = path.join(TMP, 'mirim2.zip');
+      Sintetico.gerarProva(mirim, { serie: 'm2' });
+      await tab.evaluate(() => { const c = document.querySelector('#estado-importacao-biblioteca'); if (c) c.textContent = ''; });
+      await (await tab.$('#arquivo-biblioteca')).uploadFile(mirim);
+      const im2 = (await esperar('a importação da Mirim 2', () => tab.evaluate(() => {
+        const c = document.querySelector('#estado-importacao-biblioteca'); return c ? c.innerText.trim() : '';
+      }), v => /^Biblioteca importada\.|não foi importado/.test(v || ''), 90000)).valor || '';
+      if (!/^Biblioteca importada\./.test(im2)) imp = im2;
+    }
   }
   const r = await tab.evaluate(async quais => {
     const d = Store.bancoVazio();
@@ -274,8 +286,8 @@ const cartoes = pag => pag.evaluate(() => Array.from(document.querySelectorAll('
 })));
 const porId = (cs, id) => cs.filter(c => c.id === id)[0] || {};
 const linhaEstado = pag => pag.evaluate(() => { const l = document.querySelector('#cel-bib-estado'); return !l || l.hidden ? null : l.innerText.trim(); });
-async function abrirAssunto(pag) {
-  await clicar(pag, '#cel-bib-assuntos .item-lista[data-assunto="' + ASSUNTO + '"]');
+async function abrirAssunto(pag, id) {
+  await clicar(pag, '#cel-bib-assuntos .item-lista[data-assunto="' + (id || ASSUNTO) + '"]');
   return (await esperar('a página do assunto no celular', () => pag.evaluate(() => !!document.querySelector('#cel-biblioteca .cel-bib-assunto .bte')),
     v => v === true, 20000)).ok;
 }
@@ -385,7 +397,7 @@ async function printar(pag, nome) {
   const s1 = await semear(null, true, ['revisao', 'desafio', 'area']);
   conf('o principal: o pacote sintético, o aluno e as três listas (com uma página de teoria)', s1.importou && s1.pagina && s1.listas === 3, true);
   const ctxCompleto = await nav.createBrowserContext();
-  const s2 = await semear(ctxCompleto, true, ['revisao']);
+  const s2 = await semear(ctxCompleto, true, ['revisao'], true);
   conf('o completo: o pacote e só a lista completa', s2.importou && s2.listas === 1, true);
   const ctxVazio = await nav.createBrowserContext();
   const s3 = await semear(ctxVazio, false, ['revisao', 'desafio', 'area']);
@@ -424,7 +436,7 @@ async function printar(pag, nome) {
     Array.from(document.querySelectorAll('#cel-biblioteca button')).some(b => /PDF/.test(b.textContent))), false);
   conf('os livros ficam no tablet, numa linha no fim', await textoDa(cel, '#cel-bib-livros'), 'Os livros ficam no tablet.');
   const vistos = [];
-  for (const [m, linha, motivo, apagaIncompleta] of ESTADOS) {
+  for (const [m, linha, motivo, apagaIncompleta, motivoDaIncompleta] of ESTADOS) {
     await marcar(cel, m);
     await pausa(500);
     const tela = await textoDa(cel, '#cel-biblioteca');
@@ -435,7 +447,7 @@ async function printar(pag, nome) {
     conf((m === null ? 'sem marca (o celular sem a conta)' : m) + ': a linha, o motivo nos dois cartões, o assunto mantido, e o Ver lista ' +
       (apagaIncompleta ? 'apagado' : 'aceso') + ' na incompleta',
       [await linhaEstado(cel), d.motivo, a.motivo, d.assunto, d.apagado, a.apagado, r.apagado || !!r.motivo].join(' | '),
-      [linha, motivo, motivo, 'Equações do Segundo Grau', apagaIncompleta, true, false].join(' | '));
+      [linha, motivoDaIncompleta || motivo, motivo, 'Equações do Segundo Grau', apagaIncompleta, true, false].join(' | '));
     if (m === 'trazendo 6/15') {
       await printar(cel, '390x844_2_linha_trazendo.png');
       await clicar(cel, '#cel-bib-miolo .cel-bib-lista[data-lista="lista-desafio"] [data-acao="ver-lista"]');
@@ -711,6 +723,25 @@ async function printar(pag, nome) {
   linhasCompleto.push(await linhaEstado(pc));
   conf('com a lista toda no aparelho: sem linha em prontos, sem Wi-Fi, faltam e sem marca; com a série andando, a linha do andamento',
     linhasCompleto.map(String).join(' | '), 'null | null | null | null | Trazendo os exercícios pelo Wi-Fi: 3 de 15.');
+  // com tudo no aparelho e fora do Wi-Fi (o caso de todo dia), nenhum assunto diz que algo não chegou
+  await marcar(pc, 'sem-wifi');
+  for (const [id, termo, rotulo] of [['MAT04-09', 'perímetro', 'com OBMEP (a Mirim 2) e sem teoria'], [ASSUNTO, TERMO, 'com teoria e lista, sem OBMEP'],
+    ['MAT09-01', 'números reais', 'sem material nenhum']]) {
+    await clicar(pc, '#cel-abas .cel-aba[data-cel="hoje"]');
+    await pausa(300);
+    await irParaBiblioteca(pc, 1);
+    await buscar(pc, termo);
+    await abrirAssunto(pc, id);
+    const t = await pc.evaluate(() => {
+      const p = document.querySelector('.cel-bib-assunto');
+      return { chegou: /não cheg(ou|aram)/.test(p.innerText), linha: !!(document.querySelector('#cel-bib-estado') && !document.querySelector('#cel-bib-estado').hidden),
+        vazio: (p.querySelector('.bte-vazio:not(.bte-faltam)') || {}).textContent || '', secoes: Array.from(p.querySelectorAll('.bte-secao')).map(x => x.dataset.secao).join(',') };
+    });
+    console.log('   ' + id + ': ' + JSON.stringify(t));
+    conf('sem Wi-Fi com tudo no aparelho, o assunto ' + rotulo + ' (' + id + '): nada diz que não chegou, e nenhuma linha', t.chegou + '|' + t.linha, 'false|false');
+    if (id === 'MAT04-09') conf('(arranjo) o assunto da Mirim 2 tem a OBMEP', /obmep/.test(t.secoes), true);
+    if (id === 'MAT09-01') conf('o assunto sem material diz que não tem material neste celular', t.vazio, 'Este assunto não tem teoria nem exercícios neste celular.');
+  }
   conf('nenhum erro de página no perfil completo', pc.errosDePagina.join(' | '), '');
   await pc.close();
   for (const [w, hh] of [[390, 844], [412, 915]]) {
@@ -720,6 +751,7 @@ async function printar(pag, nome) {
       const cv = await cartoes(pv);
       conf('sem pacote e sem a conta: a linha e os cartões dizem que os exercícios ficam no tablet, sem prometer o Wi-Fi',
         [await linhaEstado(pv)].concat(cv.map(c => c.motivo)).join(' | '), [FRASE.tablet, CARTAO.tablet, CARTAO.tablet, CARTAO.tablet].join(' | '));
+      conf('e, sem nada delas aqui, o Ver lista das três fica apagado (o "ficam no tablet" não convida ao toque)', cv.map(c => c.apagado).join(','), 'true,true,true');
       conf('e nada diz que sumiu', SUMIU.test(await textoDa(pv, '#cel-biblioteca')), false);
       await buscar(pv);
       conf('a busca sem pacote: o assunto aparece com "sem material neste celular"', await pv.evaluate(a =>

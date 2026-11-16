@@ -32321,12 +32321,16 @@
     prontos: ['Alguns exercícios ainda não chegaram a este celular.', 'Alguns exercícios ainda não chegaram.'],
     'no-tablet': ['Os exercícios ficam no tablet.', 'Os exercícios ficam no tablet.']
   };
-  function fraseDoCartaoNoCelular(e) {
+  /* vazia: nada da lista está no aparelho. No celular que não recebe pacotes,
+   * a lista com parte aqui diz isso (o Ver lista mostra a parte), e a sem nada
+   * fica apagada. */
+  function fraseDoCartaoNoCelular(e, vazia) {
+    if (e.qual === 'no-tablet' && !vazia) return 'Alguns exercícios ficam no tablet.';
     return e.qual === 'trazendo' ? 'Os exercícios estão chegando.' : FRASES_DO_QUE_FALTA[e.qual][1];
   }
   // a frase da lista dela que tem exercício fora do aparelho (r: o resumoDaMinhaLista)
   function motivoDaListaNoCelular(r, e) {
-    return fraseDoCartaoNoCelular(e);   // nunca o "não está mais na biblioteca" do tablet (r.conta)
+    return fraseDoCartaoNoCelular(e, r.vazia);   // nunca o "não está mais na biblioteca" do tablet (r.conta)
   }
   function algoFaltaNoCelular() {
     if (!bib || !bib.pacotes.length) return true;
@@ -32339,13 +32343,16 @@
     if (!bib || !algoFaltaNoCelular()) return '';
     return FRASES_DO_QUE_FALTA[e.qual][0];
   }
-  /* A página do assunto sem pacote nenhum no aparelho, ou com pacotes ainda a
-   * chegar: o vazio diz que o material não chegou (ou que fica no tablet). */
+  /* A página do assunto diz "ainda não chegou" só quando a linha discreta diz
+   * que algo ainda vem (a mesma conta: fraseDosExerciciosNoCelular); com nada
+   * faltando, o assunto sem material diz que não tem material neste celular. */
+  function materialAindaChegaNoCelular() {
+    return estadoDosExerciciosNoCelular().qual !== 'no-tablet' && !!fraseDosExerciciosNoCelular();
+  }
   function fraseDoAssuntoSemMaterialNoCelular() {
-    var e = estadoDosExerciciosNoCelular();
-    if (e.qual === 'no-tablet') return bib && bib.pacotes.length ? '' : 'A teoria e os exercícios ficam no tablet.';
-    if (bib && bib.pacotes.length && e.qual === 'prontos') return '';
-    return 'A teoria e os exercícios deste assunto ainda não chegaram a este celular.';
+    if (estadoDosExerciciosNoCelular().qual === 'no-tablet' && !(bib && bib.pacotes.length)) return 'A teoria e os exercícios ficam no tablet.';
+    if (materialAindaChegaNoCelular()) return 'A teoria e os exercícios deste assunto ainda não chegaram a este celular.';
+    return 'Este assunto não tem teoria nem exercícios neste celular.';
   }
   function atualizarLinhaDosExercicios(linha) {
     var frase = fraseDosExerciciosNoCelular();
@@ -32590,7 +32597,6 @@
       pagina.appendChild(el('p', { class: 'vazio', texto: nomes ? 'Este assunto não está no índice deste aplicativo.' : 'Não consegui abrir o índice de assuntos agora. Tente de novo daqui a pouco.' }));
       return;
     }
-    var e = estadoDosExerciciosNoCelular();
     montarPaginaDoAssunto(pagina, a, nomes, [], { celular: {
       rotuloVoltar: String(celBib.termo || '').trim() ? 'Voltar à busca' : 'Voltar',
       voltar: voltarDoAssuntoCelular,
@@ -32599,7 +32605,7 @@
       // escondida enquanto não falta nada; a marca dos pacotes a acende aqui também
       antesDoBloco: linhaDosExerciciosCelular(),
       fraseDoVazio: fraseDoAssuntoSemMaterialNoCelular(),
-      aindaChegando: e.qual !== 'prontos' && e.qual !== 'no-tablet'
+      aindaChegando: materialAindaChegaNoCelular()
     } });
   }
 
