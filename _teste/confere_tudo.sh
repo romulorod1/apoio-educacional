@@ -1265,6 +1265,7 @@ roda "publicador de arquivos --envenenado-grava-token" node "_teste/testa_public
 roda "publicador de arquivos --envenenado-catalogo-antes" node "_teste/testa_publicador_arquivos.js" --envenenado-catalogo-antes
 roda "publicador de arquivos --envenenado-aceita-token" node "_teste/testa_publicador_arquivos.js" --envenenado-aceita-token
 roda "publicador de arquivos --envenenado-sem-md5"  node "_teste/testa_publicador_arquivos.js" --envenenado-sem-md5
+roda "publicador de arquivos --envenenado-sem-conteudo" node "_teste/testa_publicador_arquivos.js" --envenenado-sem-conteudo
 # Fase 1c (13/11/2026): o mapa novo chega ao tablet pelo catalogo, de ponta a
 # ponta no emulador: o publicador da 1b publica os metas vivos; o "Atualizar a
 # biblioteca" troca so o meta dos livros de mesmo arquivo; a defasagem da
