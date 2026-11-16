@@ -26378,12 +26378,24 @@
   /* OS VÍNCULOS DO ASSUNTO NOS LIVROS: os capítulos e os livros inteiros
    * (obra inteira) ligados a ele no mapa, com a correção dela. É a MESMA
    * conta na busca e na página, com a mesma lista de livros (Store.listarLivros),
-   * para os dois números baterem. Os do ano do assunto vêm primeiro. */
+   * para os dois números baterem. Os do ano do assunto vêm primeiro.
+   *
+   * Item 12c: o livro de OUTRA MATÉRIA (pelo índice do mapa dele) leva o nome
+   * da matéria em outraMateria ("Química"), e não o outroAno. A ordem: a
+   * matéria e o ano do assunto, depois a matéria de outro ano, e por último a
+   * outra matéria. */
   function vinculosDoAssunto(livros, a) {
     var lista = Biblioteca.livrosComAssunto(livros, correcoesDosLivros(), a.id, null);
     var doAno = function (c) { return a.eixo !== 'ano' || Biblioteca.livroDoAno(c.meta, a.serie) ? 0 : 1; };
-    return lista.map(function (c) { return { id: c.id, meta: c.meta, entrada: c.entrada, outroAno: !!doAno(c) }; })
-      .sort(function (x, y) { return (x.outroAno ? 1 : 0) - (y.outroAno ? 1 : 0); });
+    var materiaDe = function (c) {
+      var d = disciplinaDoMapa(c.meta);
+      return d && a.disciplina && d !== a.disciplina ? nomeDaDisciplina(d) : null;
+    };
+    var grupo = function (x) { return x.outraMateria ? 2 : x.outroAno ? 1 : 0; };
+    return lista.map(function (c) {
+      var outra = materiaDe(c);
+      return { id: c.id, meta: c.meta, entrada: c.entrada, outroAno: !outra && !!doAno(c), outraMateria: outra };
+    }).sort(function (x, y) { return grupo(x) - grupo(y); });
   }
 
   // "1 capítulo nos livros", "1 livro inteiro", "2 capítulos e 1 livro inteiro"
@@ -26600,7 +26612,7 @@
     var cartoes = el('div', { class: 'bib-assunto-livros' });
     var cartaoDoVinculo = function (c) {
       var e = c.entrada, epub = c.meta.formato === 'epub';
-      var obra = tituloDoLivro(c.meta) + (c.outroAno ? ', de outro ano' : '');
+      var obra = tituloDoLivro(c.meta) + (c.outraMateria ? ', livro de ' + c.outraMateria : c.outroAno ? ', de outro ano' : '');
       if (e.obraInteira) {
         return el('div', { class: 'bib-assunto-livro', 'data-livro': c.id, 'data-obra-inteira': 'true' }, [
           el('p', { class: 'bib-busca-obra', texto: obra }),

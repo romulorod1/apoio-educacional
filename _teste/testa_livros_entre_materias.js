@@ -12,7 +12,11 @@
  *              3 Estrutura atômica     QUIEM1-T01 (só química)
  *              4 Capítulo de id fora   FISEM1-T99 (o prefixo de física, sem
  *                                      o assunto no índice)
+ *              5 pH e logaritmos       MATEM1-08 (matemática)
  *   livro-fis  Física de prova: 1 Medidas, FISEM1-T01.
+ *   livro-mat  Álgebra de prova, 1ª série: 1 Logaritmos, MATEM1-08.
+ *   livro-mat2 Matemática de prova, 2ª série: 1 Revisão de logaritmos,
+ *              MATEM1-08 (o livro de outro ano).
  * Nenhum aluno, nenhum livro de verdade.
  *
  * O que se prova:
@@ -31,7 +35,11 @@
  *      FISEM1-T01 na 1ª série; o lado a lado do FISEM1-T01 tem as duas
  *      colunas, e a do livro de química diz "livro de Química" (e não "de
  *      outro ano"), com o resumo contando a de outra matéria;
- *   5. nenhum travessão na tela, nenhum erro de página.
+ *   5. a página do assunto de Matemática (MATEM1-08), "Nos livros": o
+ *      cartão do livro de química diz "livro de Química" (e não "de outro
+ *      ano"); a ordem é a matéria e o ano do assunto, depois a matéria de
+ *      outro ano ("de outro ano"), e por último a outra matéria;
+ *   6. nenhum travessão na tela, nenhum erro de página.
  *
  * Venenos (cada um TEM de ser visto: "VENENO visto"):
  *   --envenenado-sem-materia-no-nome  o nome do assunto de outra matéria sai
@@ -42,7 +50,11 @@
  *   --envenenado-propria-materia-marcada  todo assunto ganha a matéria, até o
  *                                     da química num livro de química;
  *   --envenenado-corrigir-sem-a-de-fora   o Corrigir lista só a química: o
- *                                     assunto de física some da escolha.
+ *                                     assunto de física some da escolha;
+ *   --envenenado-pagina-sem-materia   o cartão do livro de outra matéria, na
+ *                                     página do assunto, diz "de outro ano";
+ *   --envenenado-outra-materia-na-frente  o livro de outra matéria vem antes
+ *                                     dos da própria matéria em "Nos livros".
  */
 'use strict';
 const fs = require('fs');
@@ -52,7 +64,8 @@ const { conf, secao, pausa, esperar } = H;
 
 const PORTA = 8993;
 const VENENOS = ['--envenenado-sem-materia-no-nome', '--envenenado-materia-pelo-prefixo',
-  '--envenenado-propria-materia-marcada', '--envenenado-corrigir-sem-a-de-fora'];
+  '--envenenado-propria-materia-marcada', '--envenenado-corrigir-sem-a-de-fora',
+  '--envenenado-pagina-sem-materia', '--envenenado-outra-materia-na-frente'];
 const MODO = VENENOS.filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && VENENOS.indexOf(a) < 0);
 
@@ -64,8 +77,16 @@ const ANCORAS = {
   '--envenenado-propria-materia-marcada': ['return !!(a && a.disciplina && d && a.disciplina !== d);', 'return !!(a && a.disciplina);'],
   '--envenenado-corrigir-sem-a-de-fora': ['return deFora.concat(daMateria);', 'return daMateria;']
 };
+// os venenos da página do assunto (passo 1 do 12c) moram no app.js
+const APP = fs.readFileSync(path.join(H.RAIZ, 'app.js'), 'utf8').replace(/\r\n/g, '\n');
+const ANCORAS_APP = {
+  '--envenenado-pagina-sem-materia': ["(c.outraMateria ? ', livro de ' + c.outraMateria : c.outroAno ? ', de outro ano' : '')",
+    "(c.outraMateria || c.outroAno ? ', de outro ano' : '')"],
+  '--envenenado-outra-materia-na-frente': ['return x.outraMateria ? 2 : x.outroAno ? 1 : 0;', 'return x.outraMateria ? -1 : x.outroAno ? 1 : 0;']
+};
 const trocas = {};
-if (MODO) trocas['/biblioteca.js'] = BIB.split(ANCORAS[MODO][0]).join(ANCORAS[MODO][1]);
+if (ANCORAS[MODO]) trocas['/biblioteca.js'] = BIB.split(ANCORAS[MODO][0]).join(ANCORAS[MODO][1]);
+if (ANCORAS_APP[MODO]) trocas['/app.js'] = APP.split(ANCORAS_APP[MODO][0]).join(ANCORAS_APP[MODO][1]);
 const amb = H.criarAmbiente(PORTA, 'perfil_entre_materias', trocas);
 
 async function venenoVisto(rotulo, visto, detalhe) {
@@ -97,9 +118,9 @@ function pdfDePaginas(n) {
 }
 
 // um livro sintético da 1ª série: capítulos [titulo, pagina, pagina_fim, [ids]], o mapa da orquestradora
-function livro(id, titulo, materia, caps, paginas) {
+function livro(id, titulo, materia, caps, paginas, series) {
   return {
-    id, titulo, formato: 'pdf', paginas, materia, series: ['em1'], series_origem: 'mapa', mapa_disciplina: materia, hash: 'sintetico-' + id,
+    id, titulo, formato: 'pdf', paginas, materia, series: series || ['em1'], series_origem: 'mapa', mapa_disciplina: materia, hash: 'sintetico-' + id,
     sumario: caps.map((c, i) => ({ n: i + 1, nivel: 1, titulo: c[0], pagina: c[1], pagina_fim: c[2] })), sumario_origem: 'marcadores',
     mapa: caps.map((c, i) => ({ n: i + 1, titulo: c[0], pagina: c[1], pagina_fim: c[2], assuntos: c[3].map(x => ({ id: x, confianca: 'alta' })), origem: 'mapa' })),
     mapa_origem: 'mapa'
@@ -110,8 +131,11 @@ const LIVROS = [
     ['Grandezas e medidas', 1, 2, ['QUIEM1-T02', 'FISEM1-T01']],
     ['Ácidos nucleicos', 3, 4, ['BIOEM1-T07']],
     ['Estrutura atômica', 5, 6, ['QUIEM1-T01']],
-    ['Capítulo de id fora', 7, 8, ['FISEM1-T99']]], 8),
-  livro('livro-fis', 'Física de prova', 'fisica', [['Medidas', 1, 2, ['FISEM1-T01']]], 2)
+    ['Capítulo de id fora', 7, 8, ['FISEM1-T99']],
+    ['pH e logaritmos', 9, 10, ['MATEM1-08']]], 10),
+  livro('livro-fis', 'Física de prova', 'fisica', [['Medidas', 1, 2, ['FISEM1-T01']]], 2),
+  livro('livro-mat', 'Álgebra de prova', 'matematica', [['Logaritmos', 1, 2, ['MATEM1-08']]], 2),
+  livro('livro-mat2', 'Matemática de prova', 'matematica', [['Revisão de logaritmos', 1, 2, ['MATEM1-08']]], 2, ['em2'])
 ];
 
 async function gravarLivros(pag, livros) {
@@ -155,7 +179,9 @@ const cobre = pag => pag.evaluate(() => {
   secao('0. A prova se confere');
   conf('nenhum veneno desconhecido foi pedido', desconhecidos.join(','), '');
   Object.keys(ANCORAS).forEach(m => conf('a âncora de ' + m.slice(2) + ' aparece uma vez só no biblioteca.js', BIB.split(ANCORAS[m][0]).length - 1, 1));
-  if (MODO) conf('o biblioteca.js servido está envenenado', trocas['/biblioteca.js'] !== BIB, true);
+  Object.keys(ANCORAS_APP).forEach(m => conf('a âncora de ' + m.slice(2) + ' aparece uma vez só no app.js', APP.split(ANCORAS_APP[m][0]).length - 1, 1));
+  if (ANCORAS[MODO]) conf('o biblioteca.js servido está envenenado', trocas['/biblioteca.js'] !== BIB, true);
+  if (ANCORAS_APP[MODO]) conf('o app.js servido está envenenado', trocas['/app.js'] !== APP, true);
 
   await amb.subir();
   const pag = await amb.pagina();
@@ -164,7 +190,7 @@ const cobre = pag => pag.evaluate(() => {
   pag.on('console', m => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) erros.push(m.text()); });
   await pag.setViewport({ width: 1280, height: 800, hasTouch: true });
   await H.abrirApp(pag, amb.ORIGEM);
-  const nomes = await pag.evaluate(() => Promise.all(['fisica', 'quimica', 'biologia'].map(k => fetch('banco/topicos/' + k + '.json').then(r => r.json())))
+  const nomes = await pag.evaluate(() => Promise.all(['fisica', 'quimica', 'biologia', 'matematica'].map(k => fetch('banco/topicos/' + k + '.json').then(r => r.json())))
     .then(js => {
       const t = {};
       js.forEach(j => (j.grupos || []).forEach(g => (g.blocos || []).forEach(b => (b.ids || []).forEach((id, i) => { t[id] = b.topicos[i]; }))));
@@ -173,7 +199,9 @@ const cobre = pag => pag.evaluate(() => {
   conf('os ids da prova estão no índice servido, e o FISEM1-T99 não',
     ['FISEM1-T01', 'BIOEM1-T07', 'QUIEM1-T01', 'QUIEM1-T02'].every(id => !!nomes[id]) && !nomes['FISEM1-T99'], true);
   const FIS = 'Física: ' + nomes['FISEM1-T01'], BIO = 'Biologia: ' + nomes['BIOEM1-T07'];
-  conf('os dois livros sintéticos entraram', await gravarLivros(pag, LIVROS), 2);
+  const MAT = 'Matemática: ' + nomes['MATEM1-08'];
+  conf('o MATEM1-08 está no índice servido de matemática', !!nomes['MATEM1-08'], true);
+  conf('os quatro livros sintéticos entraram', await gravarLivros(pag, LIVROS), 4);
   await H.abrirApp(pag, amb.ORIGEM);
 
   // ================================================================
@@ -188,6 +216,7 @@ const cobre = pag => pag.evaluate(() => {
   conf('capítulo 2: o de biologia com a matéria', tela.split(' ; ')[1], '2=' + BIO);
   conf('capítulo 3: o da própria matéria sem mudança, sem matéria nenhuma', tela.split(' ; ')[2], '3=' + nomes['QUIEM1-T01']);
   conf('capítulo 4: o id fora do índice como veio, sem "Física:" pelo prefixo', tela.split(' ; ')[3], '4=FISEM1-T99');
+  conf('capítulo 5: o de matemática com a matéria', tela.split(' ; ')[4], '5=' + MAT);
   conf('nenhum travessão na tela do livro', await pag.evaluate(() => /—|–/.test(document.querySelector('#bib-livro').innerText)), false);
 
   // ================================================================
@@ -241,9 +270,9 @@ const cobre = pag => pag.evaluate(() => {
   await abrirLivroNaBiblioteca(pag);
   const depois = (await esperar('a tela do livro depois de recarregar', () => assuntosDaTela(pag), v => !!v && v.indexOf(nomes['QUIEM1-T01']) >= 0, 10000)).valor;
   conf('depois de recarregar, o capítulo 1 corrigido diz só "Física: ..."', depois.split(' ; ')[0], '1=' + FIS);
-  conf('e os outros capítulos ficam como estavam', depois.split(' ; ').slice(1).join(' ; '), '2=' + BIO + ' ; 3=' + nomes['QUIEM1-T01'] + ' ; 4=FISEM1-T99');
+  conf('e os outros capítulos ficam como estavam', depois.split(' ; ').slice(1).join(' ; '), '2=' + BIO + ' ; 3=' + nomes['QUIEM1-T01'] + ' ; 4=FISEM1-T99 ; 5=' + MAT);
   conf('o mapa do pacote, no depósito dos livros, não mudou', await pag.evaluate(() => Store.lerLivro('livro-qui').then(r =>
-    r.meta.mapa.map(e => e.assuntos.map(a => a.id).join('+')).join(' | '))), 'QUIEM1-T02+FISEM1-T01 | BIOEM1-T07 | QUIEM1-T01 | FISEM1-T99');
+    r.meta.mapa.map(e => e.assuntos.map(a => a.id).join('+')).join(' | '))), 'QUIEM1-T02+FISEM1-T01 | BIOEM1-T07 | QUIEM1-T01 | FISEM1-T99 | MATEM1-08');
 
   // ================================================================
   secao('4. "Abrir no livro" e o lado a lado pelo assunto de física');
@@ -265,6 +294,33 @@ const cobre = pag => pag.evaluate(() => {
   conf('o resumo conta a de outra matéria', /1 de outra matéria, com capítulo ligado/.test(lado.resumo), true);
   conf('nenhum travessão no lado a lado', lado.travessao, false);
 
-  secao('5. Nenhum erro de página');
+  // ================================================================
+  secao('5. A página do assunto de Matemática: "Nos livros" com o livro de química');
+  await H.abrirApp(pag, amb.ORIGEM);
+  await H.irParaAba(pag, 'biblioteca');
+  const termoMat = 'logaritmos';
+  await pag.evaluate(t => { const c = document.querySelector('#busca-biblioteca'); c.value = t; c.dispatchEvent(new Event('input', { bubbles: true })); }, termoMat);
+  await esperar('o MATEM1-08 no bloco Assuntos', () => pag.evaluate(() => !!document.querySelector('#bib-assuntos-da-busca:not([hidden]) [data-assunto="MATEM1-08"]')), v => v, 15000);
+  await clicar(pag, '#bib-assuntos-da-busca [data-assunto="MATEM1-08"]');
+  const pagina = (await esperar('a página do MATEM1-08 com os cartões', () => pag.evaluate(() => {
+    const p = document.querySelector('#bib-corpo .bib-assunto[data-assunto="MATEM1-08"]');
+    if (!p) return null;
+    const cs = Array.from(p.querySelectorAll('[data-secao="livros"] .bib-assunto-livro'));
+    if (!cs.length) return null;
+    return { cartoes: cs.map(c => c.dataset.livro + '=' + c.querySelector('.bib-busca-obra').textContent + '|' + c.querySelector('strong').textContent),
+      verOutros: !!p.querySelector('.bib-assunto-ver-outros'), travessao: /—|–/.test(p.innerText) };
+  }), v => !!v && v.cartoes.length >= 3, 10000)).valor || { cartoes: [] };
+  console.log('   ' + pagina.cartoes.join(' ; '));
+  const doQui = pagina.cartoes.filter(x => x.indexOf('livro-qui=') === 0)[0] || '';
+  if (MODO === '--envenenado-pagina-sem-materia') return venenoVisto('o livro de química diz "de outro ano"', /de outro ano/.test(doQui), doQui);
+  if (MODO === '--envenenado-outra-materia-na-frente') return venenoVisto('o livro de química veio antes dos de matemática',
+    pagina.cartoes.length > 0 && pagina.cartoes[0].indexOf('livro-qui=') === 0, pagina.cartoes.join(' ; '));
+  conf('o cartão do livro de química diz "livro de Química", e não "de outro ano"', doQui, 'livro-qui=Química de prova, livro de Química|pH e logaritmos');
+  conf('a ordem: a matéria e o ano do assunto, a matéria de outro ano, e por último a outra matéria', pagina.cartoes.join(' ; '),
+    'livro-mat=Álgebra de prova|Logaritmos ; livro-mat2=Matemática de prova, de outro ano|Revisão de logaritmos ; livro-qui=Química de prova, livro de Química|pH e logaritmos');
+  conf('com 3 cartões, nenhum "Ver outros"', pagina.verOutros, false);
+  conf('nenhum travessão na página do assunto', pagina.travessao, false);
+
+  secao('6. Nenhum erro de página');
   conf('nenhum erro de página', erros.join(' | ') || 'nenhum', 'nenhum');
 })().then(() => H.fim(amb)(), e => H.fim(amb)(e));

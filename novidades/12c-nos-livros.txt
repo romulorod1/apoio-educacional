@@ -1,0 +1,1 @@
+Na página do assunto, o capítulo de um livro de outra matéria aparece em "Nos livros" com a matéria dele, como "livro de Química", depois dos livros da própria matéria.
