@@ -32916,7 +32916,6 @@
       return;
     }
     var chegada = chegadaDoAssuntoNoCelular(a);
-    celBibAssuntoDesenhado = retratoDoAssuntoNoCelular();
     montarPaginaDoAssunto(pagina, a, nomes, [], { celular: {
       rotuloVoltar: String(celBib.termo || '').trim() ? 'Voltar à busca' : 'Voltar',
       voltar: voltarDoAssuntoCelular,
