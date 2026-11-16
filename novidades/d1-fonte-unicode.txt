@@ -1,0 +1,1 @@
+# Fase D1 das listas: o pdf.js ganha uma fonte de reserva embutida (DejaVu Sans Condensed, 23 KB) para símbolos matemáticos fora da Helvetica. PDFs de hoje saem idênticos; para ela não há novidade até as listas usarem a notação.
