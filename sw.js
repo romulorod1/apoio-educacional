@@ -146,9 +146,10 @@
  * + Aula; o v119 atualiza a descrição de ausência de vínculo no mapa. O v120
  * recolhe a gestão da Biblioteca em Ajustes e isola a conferência de cada livro
  * em Worker com prazo. O v121 inclui o atalho de pagamento pendente. O v122
- * inclui Vagos, a disponibilidade semanal no celular.
+ * inclui a página impressa na leitura dos livros. O v123 traz Vagos, a
+ * disponibilidade semanal no celular.
  */
-var CACHE = 'apoio-educacional-v122';
+var CACHE = 'apoio-educacional-v123';
 var BAIXADOS = 'apoio-educacional-baixados';
 
 var ARQUIVOS = [
