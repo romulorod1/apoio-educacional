@@ -2885,7 +2885,8 @@
       var acoes = [];
       if (podeCompartilharPdf(a)) {
         acoes.push(botao('compartilhar', 'compartilhar', 'Compartilhar ' + artigo,
-          function () { compartilharPdfPronto(a, titulo, noCelular ? 'celular' : null); }, k === 0, 'Compartilhar'));
+          function () { compartilharPdfPronto(a, (noCelular && a.titulo) || titulo, noCelular ? 'celular' : null); }, k === 0,
+          parte === 'gabarito' ? 'Compartilhar o gabarito' : 'Compartilhar'));
       }
       acoes.push(botao('baixar', 'download', 'Baixar ' + artigo, function () {
         baixar(a.nome, a.blob);
@@ -25821,6 +25822,14 @@
           { nome: Core.nomeArquivo(nomeBase + ' lista' + daLista) + '.pdf', blob: new Blob([sl.bytes], { type: 'application/pdf' }), parte: 'lista' },
           { nome: Core.nomeArquivo(nomeBase + ' gabarito' + daLista) + '.pdf', blob: new Blob([sg.bytes], { type: 'application/pdf' }), parte: 'gabarito' }
         ];
+        /* No celular, o nome e o título do envio começam pelo que o arquivo é,
+         * como as listas no Drive ("Lista, ..." e "Gabarito, ..."): no
+         * WhatsApp, os dois nunca chegam com o mesmo nome. */
+        if (op.soLer) {
+          arquivos[0].titulo = 'Lista, ' + nomeBase + daLista;
+          arquivos[1].titulo = 'Gabarito, ' + nomeBase + daLista;
+          arquivos.forEach(function (a) { a.nome = Core.nomeArquivo(a.titulo) + '.pdf'; });
+        }
       } else {
         saida = PDFGen.gerarMaterialBiblioteca(base);
         arquivos = [{ nome: Core.nomeArquivo(nomeBase) + '_biblioteca.pdf', blob: new Blob([saida.bytes], { type: 'application/pdf' }) }];
@@ -32336,7 +32345,9 @@
    * lê: monta pelo mesmo gerarEAnexar do tablet, com op.soLer (sem o material
    * marcado, sem o registro de uso, sem anexo), e abre a janela PDF pronto do
    * celular. Fica apagado quando falta exercício da lista neste celular (o
-   * motivo é a mesma linha curta do cartão): o PDF nunca sai pela metade. */
+   * motivo é a mesma linha curta do cartão): o PDF não sai sem o que ainda
+   * vai chegar. O exercício que a curadoria tirou de um pacote que já está
+   * aqui fica de fora, como no tablet. */
   var celBib = { termo: '', assunto: null, lista: null };   // lista: { tipo: 'minha' | 'base', id, assunto }
   var celBibVez = 0;
   var celBibNomes = null;   // o índice de assuntos da última abertura da aba
@@ -32708,7 +32719,7 @@
     // só o que ainda vem conta; o que saiu de um pacote que está aqui fica com a conta do tablet
     var falta = aCaminhoDaLista(l) > 0;
     var apagado = r.vazia || (falta && !!ESTADOS_QUE_ANDAM[e.qual]);
-    // o PDF (A3) não sai pela metade: apagado também com a lista aberta pelo que veio
+    // o PDF (A3) não sai sem o que ainda chega: apagado também com a lista aberta pelo que veio (o retirado pela curadoria fica de fora, como no tablet)
     var semPdf = apagado || listaSemPdfNoCelular(l, r);
     var idDoMotivo = 'cel-bib-motivo-' + Core.nomeArquivo(l.id);
     return el('div', { class: 'cartao cel-bib-lista' + (falta ? ' esperando' : ''), 'data-lista': l.id }, [

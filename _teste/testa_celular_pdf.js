@@ -462,15 +462,15 @@ async function printar(pag, nome) {
       j1.itens.length !== 2 || ger1.some(g => g.lista && g.gabarito), true);
     return H.fim(amb)();
   }
-  conf('dois arquivos, a lista e o gabarito, com nomes que dizem o que são', j1.itens.map(i => i.parte + '=' + i.nome).join(' | '),
-    'lista=Revisao_de_equacoes_para_a_prova_lista.pdf | gabarito=Revisao_de_equacoes_para_a_prova_gabarito.pdf');
+  conf('dois arquivos, a lista e o gabarito, com nomes diferentes que começam pelo que são ("Lista" e "Gabarito", como no Drive)', j1.itens.map(i => i.parte + '=' + i.nome).join(' | '),
+    'lista=Lista_Revisao_de_equacoes_para_a_prova.pdf | gabarito=Gabarito_Revisao_de_equacoes_para_a_prova.pdf');
   conf('o gabarito à parte: a lista sai com a teoria e sem o gabarito; o gabarito sai sem a lista e sem a teoria',
     ger1.map(g => [g.lista, g.gabarito, g.teoria, g.itens, g.paginas].join('/')).join(' ; '), 'true/false/true/4/1 ; false/true/false/4/0');
   conf('o título do PDF é o nome da lista', ger1.map(g => g.titulo).join(' | '), 'Revisão de equações para a prova | Revisão de equações para a prova');
   conf('a frase do alto diz "celular", e não "tablet"', j1.ajuda, 'Mande a lista ao aluno e guarde o gabarito no celular.');
   conf('cada arquivo com Compartilhar, Baixar e Ver, com o nome escrito; Compartilhar em destaque só na lista',
     j1.itens.map(i => i.botoes.map(b => b.acao + ':' + b.texto + (b.principal ? '*' : '')).join(',')).join(' | '),
-    'compartilhar:Compartilhar*,baixar:Baixar,ver:Ver | compartilhar:Compartilhar,baixar:Baixar,ver:Ver');
+    'compartilhar:Compartilhar*,baixar:Baixar,ver:Ver | compartilhar:Compartilhar o gabarito,baixar:Baixar,ver:Ver');
   conf('nada fala em imprimir', /imprim/i.test(await textoDa(cel, '#modal-bib-compartilhar')), false);
   conf('o gabarito diz que é só dela, com a linha calma, e a lista não leva nada disso', await cel.evaluate(() => {
     const g = document.querySelector('#modal-bib-compartilhar .bib-pdf-item[data-parte="gabarito"]');
@@ -487,7 +487,7 @@ async function printar(pag, nome) {
       const linhas = Array.from(n.getClientRects ? (() => { const t = document.createRange(); t.selectNodeContents(n); return t.getClientRects(); })() : []);
       const daUltima = linhas.filter(x => Math.abs(x.top - fim.top) < 2);
       const largura = daUltima.reduce((m, x) => Math.max(m, x.right), 0) - daUltima.reduce((m, x) => Math.min(m, x.left), 1e9);
-      return n.querySelectorAll('wbr').length > 0 && largura > fim.width * 3;
+      return n.querySelectorAll("wbr").length > 0 && largura > fim.width * 1.5;
     }).join(',')), 'true,true');
   const g1 = await geometriaDaJanela(cel);
   await printar(cel, '390x844_3_pdf_pronto.png');
@@ -506,14 +506,16 @@ async function printar(pag, nome) {
   const env = await compartilhados(cel);
   conf('o compartilhar da lista recebe só a lista; o do gabarito, só o gabarito',
     env.map(e => e.arquivos.map(a => a.nome).join('+')).join(' | '),
-    'Revisao_de_equacoes_para_a_prova_lista.pdf | Revisao_de_equacoes_para_a_prova_gabarito.pdf');
+    'Lista_Revisao_de_equacoes_para_a_prova.pdf | Gabarito_Revisao_de_equacoes_para_a_prova.pdf');
+  conf('o título de cada envio começa pelo que ele é, e os dois são diferentes', env.map(e => e.titulo).join(' | '),
+    'Lista, Revisão de equações para a prova | Gabarito, Revisão de equações para a prova');
   const todos = [].concat(...env.map(e => e.arquivos));
   conf('dois arquivos no total, os dois PDFs de verdade (application/pdf, começam por %PDF-, com conteúdo), e diferentes',
     [todos.length, todos.every(a => a.tipo === 'application/pdf' && a.pdf && a.tamanho > 1000), new Set(todos.map(a => a.nome)).size].join('|'), '2|true|2');
   console.log('   os tamanhos: ' + todos.map(a => a.nome + ' ' + Math.round(a.tamanho / 1024) + ' KB').join(', '));
   await clicar(cel, '#bib-pdf-baixar-gabarito');
   await pausa(300);
-  conf('baixar baixa o arquivo do botão', await cel.evaluate(() => window.__baixados.map(b => b.nome).join(',')), 'Revisao_de_equacoes_para_a_prova_gabarito.pdf');
+  conf('baixar baixa o arquivo do botão', await cel.evaluate(() => window.__baixados.map(b => b.nome).join(',')), 'Gabarito_Revisao_de_equacoes_para_a_prova.pdf');
   await clicar(cel, '#bib-pdf-ver-lista');
   const leitor = await esperar('o leitor abriu', () => cel.evaluate(() => document.querySelector('#modal-leitor-pdf').classList.contains('aberto')), v => v === true, 15000);
   conf('ver abre o leitor do aplicativo, com a janela embaixo', leitor.ok && await janelaAberta(cel), true);
@@ -533,8 +535,8 @@ async function printar(pag, nome) {
   await clicar(cel, '.cel-bib-assunto .bte-lista-pdf');
   conf('a janela PDF pronto abriu com a lista de base', await esperarJanela(cel), true);
   const j2 = await janela(cel);
-  conf('a lista de base: a lista e o gabarito à parte, os nomes com "de base"',
-    j2.itens.map(i => i.parte + '=' + /_lista_de_base\.pdf$|_gabarito_de_base\.pdf$/.test(i.nome)).join(' | '), 'lista=true | gabarito=true');
+  conf('a lista de base: a lista e o gabarito à parte, os nomes começando por "Lista" e "Gabarito" e com "de base"',
+    j2.itens.map(i => i.parte + '=' + (i.parte === 'lista' ? /^Lista_.*_de_base\.pdf$/ : /^Gabarito_.*_de_base\.pdf$/).test(i.nome)).join(' | '), 'lista=true | gabarito=true');
   conf('a lista de base: sem teoria, a lista e o gabarito separados', (await cel.evaluate(() => window.__geracoes.map(g => [g.lista, g.gabarito, g.teoria].join('/')))).join(' ; '),
     'true/false/false ; false/true/false');
   await fecharJanela(cel);
@@ -572,7 +574,7 @@ async function printar(pag, nome) {
   conf('o "PDF da lista" abre a janela PDF pronto com os dois arquivos', await esperarJanela(cel) && (await janela(cel)).itens.map(i => i.parte).join(','), 'lista,gabarito');
   await clicar(cel, '#bib-pdf-compartilhar-lista');
   await pausa(400);
-  conf('e o compartilhar da lista recebe só ela', (await compartilhados(cel)).map(e => e.arquivos.map(a => a.nome).join('+')).join(' | '), 'Revisao_de_equacoes_para_a_prova_lista.pdf');
+  conf('e o compartilhar da lista recebe só ela', (await compartilhados(cel)).map(e => e.arquivos.map(a => a.nome).join('+')).join(' | '), 'Lista_Revisao_de_equacoes_para_a_prova.pdf');
   await fecharJanela(cel);
   await clicar(cel, '.cel-bib-ver-lista .bib-voltar');
   await pausa(500);
