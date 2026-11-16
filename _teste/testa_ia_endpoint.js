@@ -324,10 +324,49 @@ const SIMPLES = { rota: 'teste', messages: [{ role: 'user', content: 'diga oi ' 
     const schema = { type: 'json_schema', schema: { type: 'object', properties: {}, additionalProperties: false } };
     await N.atender(pedido({ rota: 'planejamento', formato: schema, system: 'regras', messages: SIMPLES.messages }), a.dep);
     const p = a.chamadas[0] || {};
-    conf('planejamento com formato e system: os dois chegam ao modelo', !!p.output_config && JSON.stringify(p.output_config.format) === JSON.stringify(schema) && p.system === 'regras');
+    conf('planejamento com formato e system: os dois chegam ao modelo', !!p.output_config && JSON.stringify(p.output_config.format) === JSON.stringify(schema) &&
+      Array.isArray(p.system) && p.system.length === 1 && p.system[0].text === 'regras');
     const b = novoAmbiente();
     await N.atender(pedido({ rota: 'assistente', tools: [{ name: 'listar_aulas', input_schema: { type: 'object' } }], messages: SIMPLES.messages }), b.dep);
     conf('assistente com ferramentas: chegam ao modelo', ((b.chamadas[0] || {}).tools || []).length === 1);
+  }
+
+  /* Item 19a (16/11/2026): o automático grava só no fim do pedido, e um caso
+   * novo não lia nem o system, que é igual em toda chamada da rota (avaliações
+   * de 12/11: dois casos com um minuto de diferença abriam com leitura 0). O
+   * servidor põe um ponto explícito no fim do system; o automático do fim fica.
+   * O aparelho continua sem poder mandar cache_control. */
+  console.log('\n=== ponto de cache no fim do system (19a) ===');
+  {
+    const pontos = (p) => JSON.stringify(p).split('"cache_control"').length - 1;
+    for (const rota of ['planejamento', 'assistente']) {
+      const a = novoAmbiente();
+      const r = await N.atender(pedido({ rota, system: 'regras fixas da rota', messages: SIMPLES.messages }), a.dep);
+      const p = a.chamadas[0] || {};
+      const s = Array.isArray(p.system) ? p.system : [];
+      conf(rota + ': o system vira um bloco de texto só, com o texto intacto', r.status === 200 && s.length === 1 && s[0].type === 'text' && s[0].text === 'regras fixas da rota', JSON.stringify(p.system));
+      conf(rota + ': o bloco do system tem cache_control ephemeral de 5 min (sem ttl)', !!s[0] && JSON.stringify(s[0].cache_control) === JSON.stringify({ type: 'ephemeral' }), JSON.stringify(s[0]));
+      conf(rota + ': o automático do fim continua', p.cache_control && p.cache_control.type === 'ephemeral');
+      conf(rota + ': dois pontos de cache no pedido, abaixo do limite de 4', pontos(p) === 2, pontos(p));
+    }
+    const t = novoAmbiente();
+    await N.atender(pedido({ rota: 'teste', system: 'regras', messages: SIMPLES.messages }), t.dep);
+    const pt = t.chamadas[0] || {};
+    conf('rota teste: system continua texto e nenhum ponto de cache', pt.system === 'regras' && pontos(pt) === 0, JSON.stringify(pt));
+    const sem = novoAmbiente();
+    await N.atender(pedido({ rota: 'planejamento', messages: SIMPLES.messages }), sem.dep);
+    conf('sem system: nenhum system inventado, só o automático', (sem.chamadas[0] || {}).system === undefined && pontos(sem.chamadas[0] || {}) === 1);
+    const vazio = novoAmbiente();
+    await N.atender(pedido({ rota: 'planejamento', system: '', messages: SIMPLES.messages }), vazio.dep);
+    conf('system vazio: fica como veio (bloco de texto vazio a API recusa)', (vazio.chamadas[0] || {}).system === '');
+    // o aparelho não ganha o direito de mandar cache_control: system em blocos é recusado
+    const blocos = novoAmbiente();
+    const rb = await N.atender(pedido({ rota: 'planejamento', system: [{ type: 'text', text: 'x', cache_control: { type: 'ephemeral', ttl: '1h' } }], messages: SIMPLES.messages }), blocos.dep);
+    conf('system em blocos vindo do aparelho (com cache_control de 1 h): 400 sem chamar o modelo', rb.status === 400 && rb.corpo.codigo === 'pedido_invalido' && blocos.chamadas.length === 0, JSON.stringify(rb.corpo));
+    const ferr = novoAmbiente();
+    await N.atender(pedido({ rota: 'assistente', system: 'regras', tools: [{ name: 'f', input_schema: { type: 'object' }, cache_control: { type: 'ephemeral', ttl: '1h' } }], messages: SIMPLES.messages }), ferr.dep);
+    const pf = ferr.chamadas[0] || {};
+    conf('cache_control numa ferramenta do aparelho sai; ficam só os dois pontos do servidor, sem ttl', pontos(pf) === 2 && JSON.stringify(pf).indexOf('1h') < 0, JSON.stringify(pf));
   }
 
   console.log('\n=== frequência por uid ===');

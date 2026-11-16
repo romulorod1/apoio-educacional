@@ -1,0 +1,1 @@
+# Item 19a (16/11/2026): o servidor de IA guarda no cache as regras fixas de cada rota, para um pedido novo ler em vez de gravar de novo. Ela não nota nada na tela: só a conta da API fica menor.
