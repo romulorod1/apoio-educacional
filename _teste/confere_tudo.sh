@@ -267,6 +267,15 @@ ${2:-}"
 # verificador e a das fontes de portugues) saiu no B14 com o material autoral.
 titulo "sem navegador"
 roda "notacao"        node _teste/testa_notacao.js
+# D1: a fonte de reserva do pdf.js (fonte-unicode.js). A lista de notacao do
+# brief desenha, a extracao do MuPDF devolve cada caractere (ToUnicode), a
+# largura e a do hmtx, a fonte entra uma vez so, e o PDF sem caractere novo
+# (fechamento, folha, planejamento, lista da Biblioteca) sai byte a byte igual
+# ao da base do merge. Um veneno por regra.
+roda "fonte unicode"  node _teste/testa_fonte_unicode.js
+roda "fonte unicode --envenenado-sem-tounicode" node _teste/testa_fonte_unicode.js --envenenado-sem-tounicode
+roda "fonte unicode --envenenado-largura-errada" node _teste/testa_fonte_unicode.js --envenenado-largura-errada
+roda "fonte unicode --envenenado-fonte-sempre" node _teste/testa_fonte_unicode.js --envenenado-fonte-sempre
 roda "busca (regras)" node _teste/testa_busca_regras.js
 # FRENTE 2: bloco de citacao com numero de linha, fio e credito, italico por F4/F5,
 # alternativas e gabarito em criterio, e a folha legada byte a byte igual a base do merge.

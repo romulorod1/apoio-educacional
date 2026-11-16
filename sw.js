@@ -192,6 +192,11 @@ var ARQUIVOS = [
   './core.js',
   './busca.js',
   './pdf.js',
+  /* A fonte de reserva do pdf.js (D1): expoente Unicode, conjunto, seta,
+   * grego, fração e marca, 23 KB. Fora da lista, a lista de exercícios gerada
+   * sem sinal voltaria a recusar a notação, porque o index.html pede o arquivo
+   * e o cache não o teria. */
+  './fonte-unicode.js',
   './store.js',
   './draw.js',
   /* O leitor de zip e a conferência do pacote da biblioteca. O pacote em si

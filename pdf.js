@@ -1,6 +1,9 @@
 /* pdf.js
  * Gerador de PDF sem dependencias, com a identidade visual do Apoio Educacional.
  * Fontes base-14 (Helvetica / Helvetica-Bold) com WinAnsiEncoding: acentuacao pt-BR completa.
+ * O que a base-14 não desenha (expoente Unicode, conjunto, seta, grego, fração,
+ * marca) sai pela fonte de reserva embutida, a do fonte-unicode.js: veja a seção
+ * "fonte de reserva", logo abaixo da notação matemática.
  * Roda no navegador e no Node (para testes).
  *
  * Regra da casa aplicada aos textos fixos: nunca usar travessao.
@@ -130,7 +133,162 @@
    * Helvetica ao lado vai para /F2, então "**Δ ≥ 0**" sai com peso misturado na
    * folha. Resolver isso exigiria embutir uma fonte matemática, o que muda o
    * tamanho do arquivo. Enquanto não houver, título, subtítulo e trecho em
-   * negrito não devem carregar π √ Δ Σ α β θ ≥ ≤ ≠ ∞. */
+   * negrito não devem carregar π √ Δ Σ α β θ ≥ ≤ ≠ ∞. A fonte de reserva, logo
+   * abaixo, tem a mesma limitação para o que ela desenha. */
+
+  // ================= fonte de reserva =================
+  //
+  // Todo caractere que a Helvetica (WinAnsi) e os 11 glifos da Symbol não
+  // desenham, e que a fonte de reserva tem, sai por ela: o subconjunto da DejaVu
+  // Sans Condensed 2.37 (licença em fontes/LICENSE-DejaVu.txt), embutido como
+  // Type0 com CIDFontType2, Identity-H, FontFile2, /W, /CIDToGIDMap e ToUnicode.
+  // O subconjunto é cortado ANTES, por ferramentas/subconjunto_fonte.py, e vem
+  // pronto no fonte-unicode.js: o código de cada caractere, o glifo, a largura
+  // do hmtx em milésimos e o TTF já comprimido em zlib. O pdf.js só embute.
+  //
+  // Três regras, e cada uma tem prova no _teste/testa_fonte_unicode.js:
+  //   1. o que a Helvetica e a Symbol já desenhavam continua saindo por elas,
+  //      do mesmo jeito: a reserva nunca compete com a base-14;
+  //   2. a fonte só entra no arquivo quando alguma página escreveu com ela, e
+  //      entra uma vez só. Documento sem caractere novo (fechamento, folha de
+  //      aula, planejamento, lista da Biblioteca) sai byte a byte igual;
+  //   3. sem o fonte-unicode.js (página que não o carregou, cópia do pdf.js
+  //      sozinha numa pasta), tudo é como antes: o caractere novo volta a ser
+  //      recusado pelo caracteresQueNaoDesenha, e nada quebra.
+  //
+  // Limitação conhecida, a mesma da Symbol: a reserva não tem negrito nem
+  // itálico. Dentro de ** ou de * o caractere novo sai no traço regular e reto,
+  // ao lado da Helvetica em negrito ou oblíqua. A medida usa a largura do
+  // regular, que é o glifo que de fato sai, então a quebra de linha continua
+  // certa; só o peso fica misturado. Título e trecho em negrito com caractere
+  // novo saem assim até existir uma reserva em negrito.
+  //
+  // Por que um arquivo à parte, e não embutido aqui: o pdf.js roda inteiro em
+  // todo carregamento, e a fonte só serve a quem escreve notação. No navegador
+  // o fonte-unicode.js entra por <script> (síncrono, como o pdf.js, e no cache
+  // do sw.js para abrir sem sinal) e vira o global FonteUnicode; os bytes da
+  // fonte só são decodificados do base64 na primeira folha que precisa deles.
+  // No Node ele é pedido por require na primeira vez que um caractere fora da
+  // base-14 aparece.
+  var cacheUnicode = null, tentouRequireUnicode = false, bytesUnicode = null;
+  function fonteUnicode() {
+    if (cacheUnicode) return cacheUnicode;
+    if (typeof FonteUnicode !== 'undefined' && FonteUnicode && FonteUnicode.glifos) {
+      cacheUnicode = FonteUnicode;
+      return cacheUnicode;
+    }
+    /* Sem o global (página que não carregou o arquivo), procura uma vez só pelo
+     * require, que no navegador nem existe. A falha fica lembrada: medir() roda
+     * em toda palavra, e um require que estoura a cada chamada pesaria. */
+    if (tentouRequireUnicode || typeof require !== 'function') return null;
+    tentouRequireUnicode = true;
+    try {
+      var m = require('./fonte-unicode.js');
+      if (m && m.glifos) cacheUnicode = m;
+    } catch (e) {
+      cacheUnicode = null;
+    }
+    return cacheUnicode;
+  }
+
+  /* O glifo e a largura de um código Unicode na reserva, ou null. */
+  function glifoUnicode(codigo) {
+    var f = fonteUnicode();
+    var g = f ? f.glifos[codigo] : null;
+    return g || null;
+  }
+  /* A largura em milésimos do corpo: a do hmtx, que o script já converteu. É a
+   * mesma conta para medir a linha e para o /W do PDF, de propósito: uma
+   * largura no medir() e outra no papel é a quebra de linha torta. */
+  function larguraUnicode(g) { return g[1]; }
+
+  /* Decodifica o base64 sem depender de atob nem de Buffer: o mesmo código no
+   * tablet e no Node. Roda uma vez por sessão. */
+  function deBase64(s) {
+    var tab = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    var val = {};
+    for (var i = 0; i < tab.length; i++) val[tab.charAt(i)] = i;
+    s = s.replace(/[^A-Za-z0-9+\/]/g, '');
+    var n = Math.floor(s.length * 3 / 4);
+    var out = new Uint8Array(n), p = 0, acc = 0, bits = 0;
+    for (var j = 0; j < s.length; j++) {
+      acc = (acc << 6) | val[s.charAt(j)];
+      bits += 6;
+      if (bits >= 8) { bits -= 8; if (p < n) out[p++] = (acc >> bits) & 0xFF; }
+    }
+    return p === n ? out : out.subarray(0, p);
+  }
+  function bytesDaFonteUnicode() {
+    if (!bytesUnicode) bytesUnicode = deBase64(fonteUnicode().flate);
+    return bytesUnicode;
+  }
+
+  /* Algum caractere do texto sai pela reserva? É a pergunta de todo texto(), e
+   * o caminho comum (só Latin-1) responde sem olhar caractere por caractere. */
+  var RE_FORA_DO_LATIN1 = /[^\u0000-ÿ]/;
+  function temUnicode(texto) {
+    if (!RE_FORA_DO_LATIN1.test(texto)) return false;
+    for (var i = 0; i < texto.length; i++) {
+      var c = texto.charCodeAt(i);
+      if (c < 256 || CP1252[c] !== undefined) continue;
+      if (SIMBOLOS[texto.charAt(i)] !== undefined) continue;
+      if (glifoUnicode(c)) return true;
+    }
+    return false;
+  }
+
+  /* O caractere vai para a reserva? Só se nem a Symbol nem a Helvetica o
+   * desenham e a reserva o tem. Recebe um caractere de uma unidade só: metade de
+   * um par substituto nunca está na tabela. */
+  function vaiParaReserva(ch) {
+    if (SIMBOLOS[ch] !== undefined || desenhaNaHelvetica(ch)) return null;
+    return glifoUnicode(ch.charCodeAt(0));
+  }
+
+  function hex4(n) { return ('0000' + n.toString(16).toUpperCase()).slice(-4); }
+
+  /* Os cinco objetos da reserva no arquivo, e o número do Type0, que é o que a
+   * página cita como /F6.
+   *
+   * O /W e o ToUnicode cobrem a tabela inteira, e não só o que a folha usou: a
+   * fonte embutida é sempre o mesmo subconjunto pronto, e a tabela inteira
+   * deixa o arquivo igual para a mesma fonte, qualquer que seja a folha.
+   *
+   * O ToUnicode é o que devolve o caractere certo a quem copia ou busca o texto
+   * do PDF: sem ele, o leitor só vê números de glifo. A /CIDToGIDMap é
+   * /Identity porque o código escrito na página já é o glifo do TTF. */
+  function registrarFonteUnicode(w) {
+    var f = fonteUnicode();
+    var porGlifo = {};
+    Object.keys(f.glifos).forEach(function (cod) {
+      var g = f.glifos[cod];
+      porGlifo[g[0]] = { cod: Number(cod), larg: larguraUnicode(g) };
+    });
+    var gids = Object.keys(porGlifo).map(Number).sort(function (a, b) { return a - b; });
+    var larguras = gids.map(function (gid) { return gid + ' [' + porGlifo[gid].larg + ']'; });
+    var mapa = [];
+    for (var i = 0; i < gids.length; i += 100) {
+      var bloco = gids.slice(i, i + 100);
+      mapa.push(bloco.length + ' beginbfchar\n' + bloco.map(function (gid) {
+        return '<' + hex4(gid) + '> <' + hex4(porGlifo[gid].cod) + '>';
+      }).join('\n') + '\nendbfchar');
+    }
+    var cmap = '/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n' +
+      '/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n' +
+      '/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n' +
+      '1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n' +
+      mapa.join('\n') + '\nendcmap\nCMapName currentdict /CMap defineresource pop\nend\nend';
+    var arquivo = w.addStream('/Length1 ' + f.tamanhoTTF + ' /Filter /FlateDecode', bytesDaFonteUnicode());
+    var descritor = w.add('<< /Type /FontDescriptor /FontName /' + f.nome + ' /Flags 4 /FontBBox [' +
+      f.bbox.join(' ') + '] /ItalicAngle 0 /Ascent ' + f.ascendente + ' /Descent ' + f.descendente +
+      ' /CapHeight ' + f.maiuscula + ' /StemV 80 /FontFile2 ' + arquivo + ' 0 R >>');
+    var cid = w.add('<< /Type /Font /Subtype /CIDFontType2 /BaseFont /' + f.nome +
+      ' /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor ' +
+      descritor + ' 0 R /DW 1000 /W [' + larguras.join(' ') + '] /CIDToGIDMap /Identity >>');
+    var paraUnicode = w.addStream('', cmap);
+    return w.add('<< /Type /Font /Subtype /Type0 /BaseFont /' + f.nome + ' /Encoding /Identity-H' +
+      ' /DescendantFonts [' + cid + ' 0 R] /ToUnicode ' + paraUnicode + ' 0 R >>');
+  }
 
   // Expoente e índice. A chave é obrigatória mesmo com um caractere só, porque
   // sem ela não dá para saber onde o expoente termina.
@@ -179,13 +337,16 @@
 
   function medir(texto, tamanho, bold, tracking) {
     texto = String(texto == null ? '' : texto);
-    if (!RE_SIMBOLO.test(texto)) return medirWA(paraWinAnsi(texto), tamanho, bold, tracking);
+    if (!RE_SIMBOLO.test(texto) && !temUnicode(texto)) return medirWA(paraWinAnsi(texto), tamanho, bold, tracking);
     // Com símbolo a conta é caractere a caractere, porque cada um puxa a largura
-    // da sua própria fonte.
+    // da sua própria fonte. O caractere da reserva mede a largura do regular
+    // dela mesmo dentro do negrito, porque é o regular que sai na folha.
     var soma = 0, n = 0;
     for (var i = 0; i < texto.length; i++) {
       var ch = texto.charAt(i);
       if (W_SIM[ch] !== undefined) { soma += W_SIM[ch]; n++; continue; }
+      var res = vaiParaReserva(ch);
+      if (res) { soma += larguraUnicode(res); n++; continue; }
       var pedaco = ch;
       if (texto.codePointAt(i) > 0xFFFF) { pedaco = texto.substr(i, 2); i++; }
       var wa = paraWinAnsi(pedaco);
@@ -196,28 +357,48 @@
     return w;
   }
 
-  /* Parte o texto nos trechos que vão para a fonte de símbolo e nos que ficam na
-   * fonte de texto. O trecho de símbolo já sai com o byte da Symbol. */
+  /* Parte o texto nos trechos que vão para a fonte de símbolo, nos que vão para
+   * a reserva e nos que ficam na fonte de texto. O trecho de símbolo já sai com
+   * o byte da Symbol; o da reserva, com o glifo de cada caractere em quatro
+   * dígitos hexadecimais (Identity-H: o código é o próprio glifo). Sem caractere
+   * da reserva, os trechos são exatamente os de antes dela. */
   function partirSimbolo(txt) {
-    var trechos = [], atual = '', simAtual = false;
+    var trechos = [], atual = '', tipoAtual = 'texto';
+    function fecha() {
+      if (atual) trechos.push({ txt: atual, sim: tipoAtual === 'sim', uni: tipoAtual === 'uni' });
+      atual = '';
+    }
     for (var i = 0; i < txt.length; i++) {
       var ch = txt.charAt(i);
-      var eh = SIMBOLOS[ch] !== undefined;
-      if (atual && eh !== simAtual) { trechos.push({ txt: atual, sim: simAtual }); atual = ''; }
-      simAtual = eh;
-      atual += eh ? String.fromCharCode(SIMBOLOS[ch]) : ch;
+      var tipo = 'texto', res = null;
+      if (SIMBOLOS[ch] !== undefined) tipo = 'sim';
+      else if ((res = vaiParaReserva(ch))) tipo = 'uni';
+      if (atual && tipo !== tipoAtual) fecha();
+      tipoAtual = tipo;
+      atual += tipo === 'sim' ? String.fromCharCode(SIMBOLOS[ch]) : (tipo === 'uni' ? hex4(res[0]) : ch);
     }
-    if (atual) trechos.push({ txt: atual, sim: simAtual });
+    fecha();
     return trechos;
   }
 
-  /* Um caractere que o PDF sabe desenhar, seja pela fonte de texto ou pela de
-   * símbolo. */
-  function desenhavel(ch) {
-    if (SIMBOLOS[ch] !== undefined) return true;
+  /* Um caractere que a Helvetica desenha (o WinAnsi, menos os bytes vazios). */
+  function desenhaNaHelvetica(ch) {
     var wa = paraWinAnsi(ch);
     if (wa === '?' && ch !== '?') return false;
     return !WINANSI_VAZIO[wa.charCodeAt(0)];
+  }
+
+  /* Um caractere que a base-14 sabe desenhar, seja pela fonte de texto ou pela
+   * de símbolo. É a regra de antes da reserva, e ainda serve a quem escreve
+   * direto em /F1 sem passar pelo texto(), como o texto invisível do livro. */
+  function desenhavelNaBase14(ch) {
+    return SIMBOLOS[ch] !== undefined || desenhaNaHelvetica(ch);
+  }
+
+  /* Um caractere que o PDF sabe desenhar: pela base-14 ou pela reserva. */
+  function desenhavel(ch) {
+    if (desenhavelNaBase14(ch)) return true;
+    return ch.length === 1 && !!glifoUnicode(ch.charCodeAt(0));
   }
 
   /* Lista, sem repetir, os caracteres que sairiam como interrogação. É a trava de
@@ -393,6 +574,7 @@
     this.fonteSimbolo = 0;
     this.fonteItalico = 0;
     this.fonteBoldItalico = 0;
+    this.fonteReserva = 0;
     this.pag = null;
     /* Metadados das fontes citadas pelo tema, id por id, como o gerador de banco
      * os monta. Nasce vazio porque quase todo documento desta casa (fechamento,
@@ -406,7 +588,7 @@
 
   Doc.prototype.novaPagina = function (opcoes) {
     opcoes = opcoes || {};
-    this.pag = { ops: [], usaImg: {}, usaSim: false, usaIta: false, semMoldura: !!opcoes.semMoldura,
+    this.pag = { ops: [], usaImg: {}, usaSim: false, usaIta: false, usaUni: false, semMoldura: !!opcoes.semMoldura,
       marcaPorCima: false };
     this.paginas.push(this.pag);
     this.y = Y_TOPO;
@@ -432,7 +614,7 @@
     var px = x;
     if (opcoes.align === 'centro') px = x - largura / 2;
     else if (opcoes.align === 'direita') px = x - largura;
-    if (!RE_SIMBOLO.test(txt)) {
+    if (!RE_SIMBOLO.test(txt) && !temUnicode(txt)) {
       var wa = paraWinAnsi(txt);
       if (!wa.length) return;
       if (italico && this.pag) this.pag.usaIta = true;
@@ -444,15 +626,28 @@
     }
     // Dentro do mesmo BT cada Tj continua de onde o anterior parou, então para
     // sair "π · r" basta trocar a fonte entre os Tj, sem recalcular o x.
-    var trechos = partirSimbolo(txt), ops = [];
+    var trechos = partirSimbolo(txt), ops = [], usouSim = false, usouUni = false;
     for (var i = 0; i < trechos.length; i++) {
+      /* A reserva é Identity-H: o trecho já vem com os glifos em hexadecimal,
+       * dois bytes por caractere, e vai entre < >, não entre parênteses. */
+      if (trechos[i].uni) {
+        ops.push('/F6 ' + tam + ' Tf <' + trechos[i].txt + '> Tj');
+        usouUni = true;
+        continue;
+      }
       var bytes = trechos[i].sim ? trechos[i].txt : paraWinAnsi(trechos[i].txt);
       if (!bytes.length) continue;
+      if (trechos[i].sim) usouSim = true;
       ops.push('/' + (trechos[i].sim ? 'F3' : fonteDeEstilo(bold, italico)) + ' ' + tam + ' Tf (' +
         escapar(bytes) + ') Tj');
     }
     if (!ops.length) return;
-    if (this.pag) this.pag.usaSim = true;
+    /* Cada página anota a fonte que usou, e só por essa marca o finalizar() a
+     * registra. Antes da reserva este caminho só era tomado com símbolo, e a
+     * marca da Symbol era incondicional; agora ela só vale com trecho de
+     * símbolo de fato, senão a folha com seta e sem pi ganharia a Symbol. */
+    if (this.pag && usouSim) this.pag.usaSim = true;
+    if (this.pag && usouUni) this.pag.usaUni = true;
     /* A Symbol não tem oblíqua na base-14: dentro de um trecho em itálico o
      * glifo de símbolo continua saindo reto, do mesmo jeito que já sai fino
      * dentro de um trecho em negrito. */
@@ -721,6 +916,11 @@
       this.fonteItalico = w.add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique /Encoding /WinAnsiEncoding >>');
       this.fonteBoldItalico = w.add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-BoldOblique /Encoding /WinAnsiEncoding >>');
     }
+    /* A reserva, pelo mesmo critério: só quando alguma página escreveu com ela,
+     * e uma vez só para o documento inteiro, por mais páginas que a usem. */
+    var precisaUnicode = false;
+    for (var u = 0; u < this.paginas.length; u++) if (this.paginas[u].usaUni) precisaUnicode = true;
+    this.fonteReserva = precisaUnicode ? registrarFonteUnicode(w) : 0;
     /* O estado grafico da multiplicacao so entra no arquivo se alguma pagina
      * usou: os outros documentos continuam byte a byte iguais. */
     var gsMultiplica = 0;
@@ -738,7 +938,8 @@
       }
       var recursos = '/Font << /F1 ' + this.fonteRegular + ' 0 R /F2 ' + this.fonteBold + ' 0 R' +
         (pg.usaSim ? ' /F3 ' + this.fonteSimbolo + ' 0 R' : '') +
-        (pg.usaIta ? ' /F4 ' + this.fonteItalico + ' 0 R /F5 ' + this.fonteBoldItalico + ' 0 R' : '') + ' >>' +
+        (pg.usaIta ? ' /F4 ' + this.fonteItalico + ' 0 R /F5 ' + this.fonteBoldItalico + ' 0 R' : '') +
+        (pg.usaUni ? ' /F6 ' + this.fonteReserva + ' 0 R' : '') + ' >>' +
         (xo.length ? ' /XObject << ' + xo.join(' ') + ' >>' : '') +
         (pg.marcaPorCima ? ' /ExtGState << /GSm ' + gsMultiplica + ' 0 R >>' : '');
       var pgNum = w.add('<< /Type /Page /Parent ' + numPaginas + ' 0 R /MediaBox [0 0 ' +
@@ -4330,13 +4531,16 @@
    * Devolve { bytes, total, paginas: { capitulo: [i], gabarito: [i] } }, com
    * os índices das páginas de cada parte. */
   var RE_TRACOS_LIVRO = new RegExp('[' + String.fromCharCode(0x2013, 0x2014) + ']', 'g');
-  function textoDoLivro(t) {
+  /* soBase14: o texto invisível vai direto para /F1, sem passar pelo texto(),
+   * então ele fica com a regra de antes da reserva. O caractere da reserva
+   * continua saindo dele como saía (descartado), e o texto visível o ganha. */
+  function textoDoLivro(t, soBase14) {
     var s = String(t == null ? '' : t).replace(RE_TRACOS_LIVRO, '-').replace(/\s+/g, ' ');
     var saida = '';
     for (var i = 0; i < s.length; i++) {
       var ch = s.charAt(i);
       if (s.codePointAt(i) > 0xFFFF) { i++; continue; }
-      if (desenhavel(ch)) saida += ch;
+      if (soBase14 ? desenhavelNaBase14(ch) : desenhavel(ch)) saida += ch;
     }
     return saida;
   }
@@ -4372,7 +4576,7 @@
      * para a seleção cobrir a palavra certa. */
     function textoInvisivel(pg, x0, y0, k) {
       (pg.textos || []).forEach(function (t) {
-        var s = textoDoLivro(t.str).trim();
+        var s = textoDoLivro(t.str, true).trim();
         if (!s || !(t.tam > 0)) return;
         var tam = t.tam * k;
         var wa = paraWinAnsi(s);
