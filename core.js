@@ -1137,7 +1137,7 @@
    */
   /* A aula tem registro de como foi: assunto, área, relato, nota só minha,
    * folha ou anexo. É o critério com que o ultimoEncontro pula a aula vazia
-   * (o "Relato da aula anterior" do tablet e da folha do celular), e o
+   * (o "No último relato" do tablet e o "Último relato" da folha do celular), e o
    * mesmo que diz, no Hoje do celular (D6c, lote 4), "falta registrar como
    * foi". */
   function aulaTemRegistro(au) {
@@ -1166,9 +1166,9 @@
     return a.hora <= pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 
-  /* A REGRA ÚNICA DA "AULA ANTERIOR" (polimento da 12b): o "Na última aula"
-   * da janela da aula, o "Relato da aula anterior" do celular e a "Última
-   * aula" do seletor de assunto (F5) saem todos daqui, e por isso falam da
+  /* A REGRA ÚNICA DA "AULA ANTERIOR" (polimento da 12b): o "No último relato"
+   * da janela da aula, o "Último relato" do celular e o "Último relato"
+   * do seletor de assunto (F5) saem todos daqui, e por isso falam da
    * mesma aula. É a aula do aluno antes desta, que já aconteceu (nem
    * cancelada, nem falta, e com a data e o horário já passados), e com
    * registro de como foi (aulaTemRegistro). agora (opcional): o Date de
