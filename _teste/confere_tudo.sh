@@ -1872,6 +1872,12 @@ roda "chaves dos capitulos --envenenado-chave-pela-pagina" python _teste/testa_c
 roda "chaves dos capitulos --envenenado-sem-heranca" python _teste/testa_chaves_capitulos.py --envenenado-sem-heranca
 roda "chaves dos capitulos --envenenado-titulo-sem-unicidade" python _teste/testa_chaves_capitulos.py --envenenado-titulo-sem-unicidade
 roda "chaves dos capitulos --envenenado-repetido-sem-ordem" python _teste/testa_chaves_capitulos.py --envenenado-repetido-sem-ordem
+# Item 12c, passo 2: a ligacao de outra materia num mapa nao muda as chaves dos
+# capitulos, os ids dos livros nem os pacotes; so o metaHash daquele livro; e a
+# correcao dela continua valendo (pelo biblioteca.js). Pelo caminho real do
+# publicador (gerador e planejar), com dados sinteticos. Sem Chrome e sem rede.
+roda "estabilidade do publicador"              python _teste/testa_estabilidade_publicador.py
+roda "estabilidade do publicador --envenenado-chave-pelos-assuntos" python _teste/testa_estabilidade_publicador.py --envenenado-chave-pelos-assuntos
 # A revisao do C15.1: o pacote cortado recusado ja na espiada, sem ler o
 # arquivo inteiro, e o teto de 160 MB do aplicativo. Sem Chrome.
 roda "livros (regras)"                          node "_teste/testa_livros_regras.js"
