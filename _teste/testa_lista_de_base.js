@@ -18,6 +18,8 @@
  *      põe os exercícios no material, na ordem dela.
  *   C13: no módulo, as listas prontas vêm antes do "Marcar os N" (UX07); na
  *      janela Gerar material, a caixa desligada tem a frase do porquê (UX08).
+ *   5c. o PDF da lista de base, gerado no tablet, se chama "..._lista_de_base.pdf"
+ *      (e o gabarito, "..._gabarito_de_base.pdf"), como o do celular.
  *
  * Modos envenenados:
  *   --envenenado-base-recusada  o aplicativo não conhece a base-v1 e recusa o
@@ -189,6 +191,19 @@ const fim = () => Object.assign(new Error('fim do modo envenenado'), { jaContado
   pq = await porQue();
   conf('sem a Lista e sem aula, a Folha pede as duas coisas', pq.folha,
     'true (liga quando a Lista estiver marcada e você escolher a aula, logo abaixo)');
+
+  // ================================================================
+  /* 5c. O NOME DO ARQUIVO DA LISTA DE BASE (polimento da 12b): o tablet diz
+   * "de base", como o celular, e não os desafios dela ("sem desafio"). */
+  secao('5c. O PDF da lista de base, no tablet, se chama "..._lista_de_base.pdf"');
+  await pag.evaluate(() => document.querySelector('#bib-gerar-lista').click());
+  await pag.evaluate(() => document.querySelector('#bib-gerar-baixar').click());
+  const nomesDoPdf = (await esperar('a janela PDF pronto', () => pag.evaluate(() =>
+    document.querySelector('#modal-bib-compartilhar.aberto') ? Array.from(document.querySelectorAll('#corpo-modal-bib-compartilhar .bib-pdf-item'))
+      .map(i => i.dataset.parte + '=' + i.querySelector('.bib-compartilhar-nome').textContent) : null), v => !!v && v.length === 2, 30000)).valor || [];
+  console.log('   ' + nomesDoPdf.join(' | '));
+  conf('a lista e o gabarito da lista de base levam "de base" no nome, como no celular',
+    nomesDoPdf.map(n => /^(lista=.*_lista_de_base\.pdf|gabarito=.*_gabarito_de_base\.pdf)$/.test(n)).join(','), 'true,true');
 
   // ================================================================
   secao('6. Nenhum erro');

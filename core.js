@@ -1148,7 +1148,25 @@
       au.temNota || (au.anexos || []).length);
   }
 
-  function ultimoEncontro(db, alunoId, aulaAtual) {
+  /* A aula JÁ ACONTECEU: a data e o horário dela já passaram (agora: um Date,
+   * o relógio de agora quando falta). A de hoje sem horário ainda não conta, e
+   * a das 15h de hoje, às 11h, também não. */
+  function aulaJaAconteceu(a, agora) {
+    if (!a || !a.data) return false;
+    var d = agora || new Date();
+    var hoje = isoDe(d);
+    if (a.data !== hoje) return a.data < hoje;
+    return !!a.hora && a.hora <= pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+
+  /* A REGRA ÚNICA DA "AULA ANTERIOR" (polimento da 12b): o "Na última aula"
+   * da janela da aula, o "Relato da aula anterior" do celular e a "Última
+   * aula" do seletor de assunto (F5) saem todos daqui, e por isso falam da
+   * mesma aula. É a aula do aluno antes desta, que já aconteceu (nem
+   * cancelada, nem falta, e com a data e o horário já passados), e com
+   * registro de como foi (aulaTemRegistro). agora (opcional): o Date de
+   * agora. */
+  function ultimoEncontro(db, alunoId, aulaAtual, agora) {
     /* "Antes" é por data E horário, e não só por data: quando ela divide um
      * encontro em dois, as duas metades ficam no mesmo dia, e a primeira é
      * mesmo o encontro anterior da segunda. */
@@ -1161,6 +1179,8 @@
       if (idAtual && a.id === idAtual) return false;
       if (!a.data || ordenarAulas(a, referencia) >= 0) return false;
       if (a.status === 'cancelada' || a.status === 'falta') return false;
+      // só o que já passou: a aula marcada à frente, mesmo com anotação adiantada, não é onde os dois pararam
+      if (!aulaJaAconteceu(a, agora)) return false;
       return true;
     }).sort(ordenarAulas);
 
@@ -5919,7 +5939,7 @@
     textoDoMes: textoDoMes, gravarTextoDoMes: gravarTextoDoMes, quandoDoCarimbo: quandoDoCarimbo, origemDoTextoDoMes: origemDoTextoDoMes,
     versaoDeForaDoMes: versaoDeForaDoMes, versaoAntes: versaoAntes,
     AREAS: AREAS, rotuloArea: rotuloArea, rotuloAreaFamilia: rotuloAreaFamilia, areasPara: areasPara, temasDaAula: temasDaAula,
-    ultimoEncontro: ultimoEncontro,
+    ultimoEncontro: ultimoEncontro, aulaJaAconteceu: aulaJaAconteceu,
     MAPA: MAPA, NIVEIS: NIVEIS, itemDoMapa: itemDoMapa, rotulosDoMapa: rotulosDoMapa,
     rotuloNivel: rotuloNivel, mapeamentoNovo: mapeamentoNovo, mapeamentosDe: mapeamentosDe,
     mapeamentoAtual: mapeamentoAtual, mapeado: mapeado,

@@ -114,6 +114,30 @@ conf('a metade da tarde vê a metade da manhã',
 conf('a aula de outro aluno não entra',
   Core.ultimoEncontro(bancoUm, 'a2', aula({ alunoId: 'a2', data: '2026-09-01' })), 'null');
 
+/* UMA REGRA SÓ DA AULA ANTERIOR (polimento da 12b): a mesma do "Na última
+ * aula" da janela, do relato do celular e da "Última aula" do seletor (F5).
+ * Só o que JÁ ACONTECEU: às 11h, a aula das 15h de hoje (com anotação
+ * adiantada) e a marcada no meio da semana não são onde os dois pararam. */
+const AS_11H = new Date(2026, 8, 1, 11, 0);
+const bancoAgora = {
+  aulas: [
+    aula({ id: 'h1', data: '2026-09-01', hora: '10:00', notaTexto: 'Dada às 10h.' }),
+    aula({ id: 'h2', data: '2026-09-01', hora: '15:00', notaTexto: 'Planejada para as 15h.' }),
+    aula({ id: 'h3', data: '2026-09-01', hora: '17:00' }),
+    aula({ id: 'h4', data: '2026-09-05', hora: '10:00', notaTexto: 'Marcada à frente, com anotação.' }),
+    aula({ id: 'h5', data: '2026-09-10', hora: '10:00' })
+  ]
+};
+conf('às 11h, a aula das 17h vê a das 10h, e não a das 15h, que ainda não aconteceu',
+  Core.ultimoEncontro(bancoAgora, 'a1', bancoAgora.aulas[2], AS_11H).aulaId, 'h1');
+conf('a aula de 10/09 vê a das 10h de hoje, e não a de 05/09, marcada à frente com anotação',
+  Core.ultimoEncontro(bancoAgora, 'a1', bancoAgora.aulas[4], AS_11H).aulaId, 'h1');
+conf('às 16h, a das 15h já aconteceu e vale',
+  Core.ultimoEncontro(bancoAgora, 'a1', bancoAgora.aulas[2], new Date(2026, 8, 1, 16, 0)).aulaId, 'h2');
+conf('a aula de hoje sem horário ainda não aconteceu; a de ontem, sim; a das 10h, às 11h, sim',
+  [Core.aulaJaAconteceu({ data: '2026-09-01' }, AS_11H), Core.aulaJaAconteceu({ data: '2026-08-31' }, AS_11H),
+    Core.aulaJaAconteceu({ data: '2026-09-01', hora: '10:00' }, AS_11H)].join('|'), 'false|true|true');
+
 // ================================================================
 secao('2. A anotação só dela nunca sai do aparelho');
 

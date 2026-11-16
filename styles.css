@@ -755,6 +755,9 @@ label.campo-checkbox {
 .tema-topo { position: sticky; top: -18px; z-index: 2; margin: -18px -18px 0; padding: 18px 18px 2px; background: var(--branco);
   /* um fio e uma sombra leve embaixo: a lista que rola passa POR BAIXO do alto, e não parece cortada */
   border-bottom: 1px solid var(--fio); box-shadow: 0 4px 6px -4px var(--navy-a18); }
+/* F5, polimento: o Voltar de Outras matérias (o primeiro da lista) não encosta na linha do alto fixo;
+   a folga é a mesma do título "Escrever o assunto" da raiz */
+#lista-assuntos > .barra:first-child { margin-top: 14px; }
 /* o display acima venceria o atributo hidden: a legenda e os sinais escondidos somem de verdade */
 .tema-legenda[hidden], .tema-legenda > span[hidden], .tema-sinais[hidden], .tema-sinal[hidden] { display: none; }
 .irmao-aninhado { margin-left: 20px; width: calc(100% - 20px); }
@@ -936,7 +939,8 @@ table.dados tr.total td { font-weight: 600; color: var(--navy); background: var(
     pointer-events: auto;
   }
   #corpo-modal-tema.seletor-assunto { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-  #corpo-modal-tema.seletor-assunto > .tema-topo { flex: 0 0 auto; position: static; }
+  /* a lista rola numa caixa própria, a uma folga da linha do alto: rolada, o cartão não encosta na linha */
+  #corpo-modal-tema.seletor-assunto > .tema-topo { flex: 0 0 auto; position: static; margin-bottom: 6px; }
   #lista-assuntos { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; }
 }
 .fechar {

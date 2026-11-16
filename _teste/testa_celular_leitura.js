@@ -744,7 +744,8 @@ const ONTEM = RELOGIO.dia(-1);
     }, id);
     conf('e com mudança pendente (' + id + ')', await pag.evaluate(() => Nuvem.estado().pendente), true);
   }
-  const FRASE_TELA = 'Neste aparelho a cópia de segurança não sobe sozinha (tela de celular).';
+  // a faixa do celular sem conta, numa linha curta (polimento da 12b): os dados são só daqui, nada vem nem sobe
+  const FRASE_TELA = 'Dados só daqui: nada vem do tablet nem sobe.';
 
   secao('7b. O celular que restaurou como tablet na versão de antes, agora deitado (tela 844 x 390): modo celular, nada sobe, e diz por quê');
   const D = await peloCartao('o celular de antes', 1280, 800, false, 'delta', 'nenhum');

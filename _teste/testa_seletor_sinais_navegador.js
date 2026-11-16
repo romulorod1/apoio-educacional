@@ -32,7 +32,8 @@
  *
  * 1b. O Voltar do aparelho dentro de "Outras matérias" sobe um nível: do
  *    grupo à matéria, da matéria à raiz do seletor, com o painel aberto e a
- *    entrada dele no histórico; da grade de Matemática, volta à raiz.
+ *    entrada dele no histórico; da grade de Matemática, volta à raiz. O
+ *    Voltar do grupo fica a uma folga da linha do alto fixo (polimento).
  * 3. O sinal herdado (do vizinho, ou todo de outro ano) diz de onde vem, como
  *    a página do assunto: traço pontilhado, nome do sinal, fim do texto da
  *    linha e a entrada da legenda.
@@ -137,11 +138,14 @@ function textoBate(texto, secoes) {
   const nomes = secoes.map(s => NOMES_DAS_SECOES[s]).filter(Boolean);
   if (!nomes.length) return !/No tablet|Módulo relacionado/.test(texto);
   const esperado = 'No tablet: ' + juntarComE(nomes);
-  const i = texto.indexOf(esperado);
+  /* a seção toda de outro ano diz isso junto do nome dela ("teoria de outro
+   * ano e OBMEP"), e não repetida no fim (polimento do F5) */
+  const semMarca = texto.replace(/(teoria|lista de base|exercícios|OBMEP|ENEM) de outro ano/g, '$1');
+  const i = semMarca.indexOf(esperado);
   if (i < 0) return false;
-  // depois das seções: o módulo entre parênteses e, no material herdado, de onde ele vem
-  const resto = texto.slice(i + esperado.length);
-  return /^( \([^)]+\))?(, de outro ano|, de assuntos? vizinhos?|; [^;]+ de outro ano)?$/.test(resto);
+  // depois das seções: o módulo entre parênteses e, no material todo herdado, de onde ele vem
+  const resto = semMarca.slice(i + esperado.length);
+  return /^( \([^)]+\))?(, de outro ano|, de assuntos? vizinhos?)?$/.test(resto);
 }
 // o sinal dos exercícios junta as três seções de exercício da página
 const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exercicios', 'enem'], obmep: ['obmep'] };
@@ -319,6 +323,17 @@ function legendaDizOsAcesos(legenda, porId) {
   await pag.evaluate(() => { const l = document.querySelector('#lista-assuntos .item-assunto'); if (l) l.click(); });
   const grupo = await esperar('um grupo da matéria', ondeEsta, v => !!v && v.titulo !== materia.titulo && v.titulo.indexOf(materia.titulo + ', ') === 0, 5000);
   conf('(arranjo) a matéria abre um grupo (' + (grupo.valor || {}).titulo + ')', grupo.ok, true);
+  /* A folga sob o alto fixo (polimento do F5): o Voltar, o primeiro da lista,
+   * não encosta na linha do alto; fica à mesma folga do título "Escrever o
+   * assunto" da raiz (14 px), e a lista que rola começa abaixo da linha. */
+  const folga = await pag.evaluate(() => {
+    const topo = document.querySelector('.tema-topo').getBoundingClientRect();
+    const voltar = document.querySelector('#lista-assuntos > .barra:first-child');
+    const lista = document.querySelector('#lista-assuntos').getBoundingClientRect();
+    return { voltar: voltar ? Math.round(voltar.getBoundingClientRect().top - topo.bottom) : -1, lista: Math.round(lista.top - topo.bottom) };
+  });
+  conf('o Voltar do grupo fica a uma folga da linha do alto fixo (' + folga.voltar + ' px), e a lista que rola começa abaixo dela (' + folga.lista + ' px)',
+    (folga.voltar >= 14) + '|' + (folga.lista >= 4), 'true|true');
   await pag.evaluate(() => history.back());
   const v1 = await esperar('o 1º Voltar', ondeEsta, v => !!v && (v.titulo === materia.titulo || !v.tema), 4000);
   const p1 = v1.valor || {};
@@ -534,8 +549,9 @@ function legendaDizOsAcesos(legenda, porId) {
     conf('a teoria toda de outro ano tem o traço e diz isso', o.herdado + '|' + o.origem + '|' + /, de outro ano$/.test(o.nome || ''), 'true|outro-ano|true');
     conf('a OBMEP do próprio ano, na mesma linha, fica sem o traço', p.herdado + '|' + p.traco, 'false|none');
     // a linha diz qual parte é de outro ano, e não diz que tudo é
-    conf('o texto da linha diz que a teoria é de outro ano, e só ela (' + origem.textoOutroAno + ')',
-      /No tablet: teoria e OBMEP \(Módulo da prova\); teoria de outro ano$/.test(origem.textoOutroAno) && !/, de outro ano/.test(origem.textoOutroAno), true);
+    // e diz junto do nome da seção, sem repetir a teoria no fim (polimento do F5)
+    conf('o texto da linha diz que a teoria é de outro ano, e só ela, junto do nome (' + origem.textoOutroAno + ')',
+      /No tablet: teoria de outro ano e OBMEP \(Módulo da prova\)$/.test(origem.textoOutroAno) && !/OBMEP de outro ano|, de outro ano|; /.test(origem.textoOutroAno), true);
     conf('(controle) o assunto com material próprio fica sem o traço', !!origem.controle && c.herdado, false);
     conf('a legenda explica o traço, no plural do que está na tela (' + origem.legenda + ')', origem.legenda, 'De outro ano ou de assuntos vizinhos');
     await pag.evaluate(() => { window.__fontesDaProva = null; });

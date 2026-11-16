@@ -79,6 +79,10 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
     dados.aulas = [aula('f5_aula', Core.hojeIso(), 'realizada', '10:00'),
       antiga,
       aula('f5_falta', '2026-11-12', 'falta', '10:00', [{ titulo: 'Assunto da falta de teste', fonte: 'livre' }]),
+      /* uma aula dada, mas sem registro nenhum (nem assunto, nem relato): a
+       * janela da aula a pula no "Na última aula", e o seletor, pela mesma
+       * regra (Core.ultimoEncontro, polimento da 12b), também */
+      aula('f5_vazia', '2026-11-13', 'realizada', '10:00'),
       // a das 15h de hoje, de Português: às 11h ela ainda não aconteceu, e não é a "última aula"
       aula('f5_tarde', Core.hojeIso(), 'realizada', '15:00', [{ titulo: 'Leitura de texto de teste', fonte: 'livre', disciplina: 'portugues' }]),
       // duas aulas marcadas à frente: abrindo a de 20/11, a de 18/11 ainda não aconteceu
@@ -196,6 +200,13 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
   conf('o contexto diz a última aula dada, sem contar a falta, e a matéria pelo id do assunto antigo (' + painel.contexto + ')',
     /Última aula de Matemática: 09\/11/.test(painel.contexto), true);
   conf('e o ano do aluno, na etiqueta, sem supor menino ou menina', painel.ano, 'Está no 7º ano');
+  /* UMA REGRA SÓ DA AULA ANTERIOR (polimento da 12b): o seletor e o quadro
+   * "Na última aula" da janela da aula, logo atrás dele, falam da MESMA aula.
+   * A de 13/11, dada e sem registro, fica de fora dos dois. */
+  const naJanela = await p2.evaluate(() => ((document.querySelector('#modal-aula #ultimo-encontro .rotulo-ultimo') || {}).textContent || '').trim());
+  conf('o seletor e a janela da aula falam da mesma aula anterior, e pulam a de 13/11 sem registro (' + naJanela + ')',
+    /^Na última aula, 09\/11\/2026,/.test(naJanela) + '|' + /Última aula[^:]*: 09\/11/.test(painel.contexto) + '|' + /13\/11/.test(painel.contexto + naJanela),
+    'true|true|false');
   /* "já dado em": só aula dada. O assunto da aula antiga entra; o da falta, o
    * das 15h de hoje e o de 18/11 não, e nenhum diz a data de hoje. */
   const linhaDe = (linhas, t) => linhas.filter(l => l.indexOf(t) >= 0).join(' / ');

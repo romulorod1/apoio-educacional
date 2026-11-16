@@ -1405,6 +1405,8 @@ roda "celular, Biblioteca --envenenado-resto-pelo-pacote-do-modulo" node "_teste
 roda "celular, Biblioteca --envenenado-pacote-pelo-prefixo" node "_teste/testa_celular_biblioteca.js" --envenenado-pacote-pelo-prefixo
 # (regra conservadora) o assunto sem material so diz "nao tem" com a serie pronta
 roda "celular, Biblioteca --envenenado-nao-tem-antes-de-prontos" node "_teste/testa_celular_biblioteca.js" --envenenado-nao-tem-antes-de-prontos
+# (polimento da 12b) o redesenho leve rele o assunto e o Ver lista abertos, e nao deixa a frase de antes da marca
+roda "celular, Biblioteca --envenenado-redesenho-leve-velho" node "_teste/testa_celular_biblioteca.js" --envenenado-redesenho-leve-velho
 # 12b, parte A3 (16/11/2026): o PDF da lista no celular. O botao PDF no cartao,
 # na lista de base e preso no pe do Ver lista, apagado pela regra do cartao (e
 # tambem na lista que abre so com o que veio); a lista e o gabarito em arquivos

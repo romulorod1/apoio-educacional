@@ -55,6 +55,16 @@
  *      130%, nada passa da borda, nada rola de lado e a página não rola de
  *      lado, em cada uma das cinco telas;
  *  10. nenhum erro de página, e o nome de verdade em lugar nenhum.
+ *  POLIMENTO DA 12B:
+ *  11. a faixa do celular sem conta é uma linha curta;
+ *  12. o redesenho leve relê o que mostra: o assunto aberto, o Ver lista
+ *      aberto e a busca mudam com a marca dos pacotes, sem trocar de tela;
+ *  13. o assunto com material de outro pacote (os vizinhos) segue a regra
+ *      do vazio: fora do "prontos", o material próprio ainda pode chegar;
+ *  14. a miniatura fica na memória: reabrir o Ver lista não a desenha de
+ *      novo, e a memória cheia solta o endereço da mais antiga;
+ *  15. o id fora dos formatos dos geradores ("banco:2019:n2", "enem")
+ *      conta como a caminho, mesmo com o pacote do começo dele aqui.
  *
  * Venenos (a prova TEM de ver o defeito e passa dizendo que viu):
  *   --envenenado-celular-mostra-no-material  a página do assunto do celular
@@ -71,6 +81,9 @@
  *   --envenenado-nao-tem-antes-de-prontos  o assunto sem material diz "não
  *                         tem" antes de a série ficar pronta (9 vê, no caso
  *                         b, o primeiro em que a série não está pronta);
+ *   --envenenado-redesenho-leve-velho  o redesenho leve não refaz o assunto nem
+ *                         o Ver lista abertos: a falta parcial do assunto fica
+ *                         com a frase de antes da marca (12 vê);
  *   --envenenado-diz-que-sumiu  o cartão do celular usa a conta do tablet, que
  *                         diz que o exercício não está mais na biblioteca (3
  *                         vê, em todos os valores da marca).
@@ -101,25 +114,38 @@ const NOME_TESTE = 'Professora Teste';
 // a linha só da prova: o desenho de quando chega mudança da nuvem
 const ANCORA_GANCHO = '  function desenharTudo() {\n';
 const GANCHO = '  window.__provaRedesenhar = function () { desenharTudo(); };\n' +
-  '  window.__provaPacoteChegou = function () { bibliotecaMudou(); };\n';
+  '  window.__provaPacoteChegou = function () { bibliotecaMudou(); };\n' +
+  // a memória das miniaturas do celular (o tamanho, e guardar uma promessa feita pela prova)
+  '  window.__provaMemoria = function () { return { n: miniaturasNaMemoria.ordem.length, max: MAX_MINIATURAS_NA_MEMORIA }; };\n' +
+  '  window.__provaGuardarNaMemoria = function (k, p) { guardarMiniaturaNaMemoria(k, p); };\n';
+/* As fontes de um assunto feitas pela prova (o acervo sintético não tem
+ * assunto com vizinhos), e a conta dos desenhos de miniatura: só no app.js
+ * servido a esta prova. */
+const ENTRADA_FONTES = '  function fontesDoAssuntoNoApp(assuntoId, vinculos, anoDoAssunto) {\n';
+const GANCHO_FONTES = '    if (window.__fontesDaProva && window.__fontesDaProva[assuntoId]) return JSON.parse(JSON.stringify(window.__fontesDaProva[assuntoId]));\n';
+const ENTRADA_DESENHO = '  function desenharAssetBib(pacote, caminho, largura, altura) {\n';
+const GANCHO_DESENHO = '    window.__desenhosBib = (window.__desenhosBib || 0) + 1;\n';
 
 const VENENOS = {
   '--envenenado-celular-mostra-no-material': ['/app.js',
     '      if (cx.soLer) return null;   // 12b A2: o celular só lê, e a caixa "No material" mexe no material\n', ''],
   '--envenenado-celular-grava-ao-navegar': ['/app.js',
-    '        if (aparelhoSoLe()) return dataUrl;   // 12b A2: no celular a miniatura só aparece, sem guardar: nada grava\n', ''],
+    '        if (aparelhoSoLe()) return enderecoDoDesenho(c, comoBlob);   // 12b A2: no celular a miniatura só aparece, sem guardar: nada grava\n', ''],
   '--envenenado-resto-pelo-pacote-do-modulo': ['/app.js',
     "      aindaChegando: ['prontos', 'no-tablet'].indexOf(estadoDosExerciciosNoCelular().qual) < 0", "      aindaChegando: chegada === 'chegando'"],
   '--envenenado-pacote-pelo-prefixo': ['/app.js',
     '    var fonte = partes[0];\n    if (fonte === \'banco\')', '    return partes[0];\n    var fonte = partes[0];\n    if (fonte === \'banco\')'],
   '--envenenado-nao-tem-antes-de-prontos': ['/app.js',
     "    if (e.qual !== 'prontos') return 'A teoria e os exercícios deste assunto ainda podem chegar a este celular.';\n", ''],
+  '--envenenado-redesenho-leve-velho': ['/app.js',
+    '        if (celBibRetratoDesenhado !== null && celBibRetratoDesenhado !== retratoDaTelaDaBibliotecaCelular()) desenharBibliotecaCelular(rolagem);\n', ''],
   '--envenenado-diz-que-sumiu': ['/app.js',
     'return fraseDoCartaoNoCelular(e, r.vazia);   // nunca o "não está mais na biblioteca" do tablet (r.conta)', 'return r.conta;']
 };
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && !VENENOS[a]);
-const APP_COM_GANCHO = APP.split(ANCORA_GANCHO).join(GANCHO + ANCORA_GANCHO);
+const APP_COM_GANCHO = APP.split(ANCORA_GANCHO).join(GANCHO + ANCORA_GANCHO)
+  .split(ENTRADA_FONTES).join(ENTRADA_FONTES + GANCHO_FONTES).split(ENTRADA_DESENHO).join(ENTRADA_DESENHO + GANCHO_DESENHO);
 let appServido = APP_COM_GANCHO;
 if (MODO) appServido = appServido.split(VENENOS[MODO][1]).join(VENENOS[MODO][2]);
 const trocas = { '/index.html': NOME_REAL ? INDEX.split(NOME_REAL).join(NOME_TESTE) : INDEX, '/app.js': appServido };
@@ -407,6 +433,8 @@ async function printar(pag, nome) {
   conf('nenhum veneno desconhecido foi pedido', desconhecidos.join(','), '');
   for (const m of Object.keys(VENENOS)) conf('a âncora de ' + m + ' aparece uma vez só no app.js', APP.split(VENENOS[m][1]).length - 1, 1);
   conf('o gancho da prova entrou uma vez no app.js servido', appServido.split(GANCHO).length - 1, 1);
+  conf('o gancho das fontes e o da conta dos desenhos entraram uma vez cada', (appServido.split(GANCHO_FONTES).length - 1) + '|' +
+    (appServido.split(GANCHO_DESENHO).length - 1), '1|1');
   if (MODO) conf('o veneno ' + MODO + ' foi aplicado', appServido !== APP_COM_GANCHO, true);
   conf('o nome do alto do index.html foi achado, e o servidor entrega "' + NOME_TESTE + '" no lugar dele',
     !!NOME_REAL && trocas['/index.html'].indexOf(NOME_REAL) < 0 && trocas['/index.html'].indexOf(NOME_TESTE) >= 0, true);
@@ -454,12 +482,14 @@ async function printar(pag, nome) {
       await lista('lista-banco', 'Banco: n2 e n3', [n2, 'banco:2019:n3:7'], 1700000003000);
       await lista('lista-mirim', 'Mirim: m2 e m1', [m2, 'mirim:2099:f1:m1:3'], 1700000002000);
       await lista('lista-retirado', 'Banco: um retirado do n2', [n2, 'banco:2020:n2:999'], 1700000001000);
+      // ids que nenhum gerador escreve, com o pacote do começo deles aqui (o Banco n2 e o ENEM): a caminho, nunca retirados
+      await lista('lista-estranha', 'Ids fora dos formatos', [n2, 'banco:2019:n2', 'enem', 'enem:2099'], 1700000000000);
       return { n2: !!n2, m2: !!m2, listas: (await Store.listasDaBiblioteca()).length };
     });
     await tab.close();
     return Object.assign(r, { importou: ok });
   })();
-  conf('o misto: o Banco n2, a Mirim m2, os cadernos e o ENEM no aparelho, e três listas', s4.importou && s4.n2 && s4.m2 && s4.listas === 3, true);
+  conf('o misto: o Banco n2, a Mirim m2, os cadernos e o ENEM no aparelho, e quatro listas', s4.importou && s4.n2 && s4.m2 && s4.listas === 4, true);
 
   secao('2. O celular a 390 x 844: a aba Biblioteca, com o mesmo ícone');
   const cel = await celular(null, 390, 844);
@@ -493,6 +523,13 @@ async function printar(pag, nome) {
   conf('o PDF (A3) está em cada cartão, ao lado do Ver lista', await cel.evaluate(() =>
     Array.from(document.querySelectorAll('#cel-bib-miolo .cel-bib-lista')).every(c => !!c.querySelector('.cel-bib-lista-acoes [data-acao="ver-lista"] + [data-acao="pdf"]'))), true);
   conf('os livros ficam no tablet, numa linha no fim', await textoDa(cel, '#cel-bib-livros'), 'Os livros ficam no tablet.');
+  // 11. a faixa do alto do celular sem conta: uma frase curta, que diz que nada vem nem sobe
+  const faixa = await cel.evaluate(() => {
+    const o = document.querySelector('#cel-origem');
+    return o ? o.textContent.trim() : '';
+  });
+  conf('a faixa do celular sem conta é uma frase curta (' + faixa.length + ' letras): os dados são só daqui, nada vem nem sobe',
+    faixa + '|' + (faixa.length <= 50), 'Dados só daqui: nada vem do tablet nem sobe.|true');
   const vistos = [];
   for (const [m, linha, motivo, apagaIncompleta, motivoDaIncompleta] of ESTADOS) {
     await marcar(cel, m);
@@ -645,7 +682,26 @@ async function printar(pag, nome) {
   }
   conf('(c) faltam, com o pacote do assunto aqui: a falta parcial segue a regra do vazio (o resto ainda pode chegar)',
     casoC, 'true|' + FRASE.parcial + '|O resto do material deste assunto ainda pode chegar a este celular.');
+  /* 12. O REDESENHO LEVE RELÊ O QUE MOSTRA: com o assunto aberto, a marca
+   * muda e a frase da falta parcial muda junto, sem ela trocar de tela. Antes,
+   * o retrato do assunto era só o número de pacotes e a chegada pelo módulo, e
+   * a frase de "faltam" ficava na tela depois de "prontos". */
+  const faltaDoAssunto = () => cel.evaluate(() => ((document.querySelector('.cel-bib-assunto .bte-faltam') || {}).textContent || ''));
   await marcar(cel, 'prontos');
+  const leveProntos = await esperar('o assunto aberto relido em prontos', faltaDoAssunto, v => /^Ainda sem /.test(v || ''), 8000);
+  if (MODO === '--envenenado-redesenho-leve-velho') {
+    conf('VENENO visto: em prontos, o assunto aberto ficou com a frase de antes (' + leveProntos.valor + ')',
+      leveProntos.ok === false && /pode chegar/.test(leveProntos.valor || ''), true);
+    return H.fim(amb)();
+  }
+  conf('(12) faltam e depois prontos, com o assunto aberto: a falta parcial de sempre volta, sem trocar de tela',
+    leveProntos.valor + '|' + await noAssunto(cel), 'Ainda sem questões da OBMEP para este assunto.|true');
+  await marcar(cel, 'sem-wifi');
+  const leveSemWifi = await esperar('o assunto aberto relido sem Wi-Fi', faltaDoAssunto, v => /pode chegar/.test(v || ''), 8000);
+  conf('(12) e sem Wi-Fi, o resto ainda pode chegar, no mesmo assunto', leveSemWifi.valor + '|' + await noAssunto(cel),
+    'O resto do material deste assunto ainda pode chegar a este celular.|true');
+  await marcar(cel, 'prontos');
+  await esperar('o assunto em prontos de novo', faltaDoAssunto, v => /^Ainda sem /.test(v || ''), 8000);
   await pausa(400);
 
   secao('6. O Ver lista, e o Voltar do Android');
@@ -681,6 +737,67 @@ async function printar(pag, nome) {
     return [t.querySelector('.bib-voltar').textContent.trim(), t.querySelector('.cel-bib-lista-titulo').textContent,
       t.querySelectorAll('.cel-bib-pagina').length, t.querySelectorAll('.cel-bib-ex').length, !!t.querySelector('#cel-bib-lista-nota')].join('|');
   }), 'Voltar às listas|Revisão de equações para a prova|1|4|false');
+  /* 14. A MINIATURA FICA NA MEMÓRIA: reabrir o mesmo Ver lista não desenha
+   * de novo nenhuma miniatura (antes, cada desenho as refazia). */
+  const desenhos = () => cel.evaluate(() => window.__desenhosBib || 0);
+  const prontas = () => cel.evaluate(() => document.querySelectorAll('.cel-bib-ver-lista img.bib-mini.pronta').length);
+  await esperar('as miniaturas da lista dela', prontas, v => v >= 3, 15000);
+  await pausa(800);
+  const antesDeReabrir = { desenhos: await desenhos(), prontas: await prontas() };
+  await clicar(cel, '.cel-bib-ver-lista .bib-voltar');
+  await esperar('voltou às listas', () => cel.evaluate(() => document.querySelectorAll('#cel-bib-miolo .cel-bib-lista').length), v => v >= 3, 10000);
+  await clicar(cel, '#cel-bib-miolo .cel-bib-lista[data-lista="lista-revisao"] [data-acao="ver-lista"]');
+  const reaberta = await esperar('as miniaturas da lista reaberta', prontas, v => v >= antesDeReabrir.prontas, 15000);
+  await pausa(800);
+  conf('(14) a lista reaberta mostra as ' + antesDeReabrir.prontas + ' miniaturas sem desenhar nenhuma de novo (' + antesDeReabrir.desenhos + ' desenhos antes)',
+    reaberta.ok + '|' + (await desenhos() - antesDeReabrir.desenhos), 'true|0');
+  conf('(arranjo) as miniaturas foram desenhadas uma vez', antesDeReabrir.desenhos > 0, true);
+  // a memória cheia solta o endereço da mais antiga, e fica no teto
+  const memoria = await cel.evaluate(async () => {
+    const soltos = [];
+    const revogar = URL.revokeObjectURL;
+    URL.revokeObjectURL = function (u) { soltos.push(u); return revogar.call(URL, u); };
+    const teto = window.__provaMemoria().max;
+    for (let i = 0; i < 2 * teto; i++) window.__provaGuardarNaMemoria('prova:' + i, Promise.resolve('blob:prova-' + i));
+    await new Promise(r => setTimeout(r, 300));
+    URL.revokeObjectURL = revogar;
+    const daProva = soltos.filter(u => /^blob:prova-/.test(u));
+    return { teto, n: window.__provaMemoria().n, primeiro: daProva[0], soltosDaProva: daProva.length,
+      oQueFica: daProva.indexOf('blob:prova-' + teto) < 0 };
+  });
+  conf('(14) a memória cheia fica no teto (' + memoria.teto + ') e solta o endereço das mais antigas, a começar pela primeira',
+    [memoria.n === memoria.teto, memoria.primeiro, memoria.soltosDaProva, memoria.oQueFica].join('|'), ['true', 'blob:prova-0', memoria.teto, 'true'].join('|'));
+  /* 12. O Ver lista e a busca abertos também releem: a lista incompleta, em
+   * "faltam", abre com a nota do resto; sem Wi-Fi, a nota e o PDF mudam sem
+   * trocar de tela; na busca, o cartão da lista muda o motivo. */
+  await clicar(cel, '.cel-bib-ver-lista .bib-voltar');
+  await esperar('voltou às listas', () => cel.evaluate(() => document.querySelectorAll('#cel-bib-miolo .cel-bib-lista').length), v => v >= 3, 10000);
+  await marcar(cel, 'faltam');
+  await pausa(500);
+  await clicar(cel, '#cel-bib-miolo .cel-bib-lista[data-lista="lista-desafio"] [data-acao="ver-lista"]');
+  await esperar('o Ver lista da lista incompleta', () => cel.evaluate(() => document.querySelectorAll('.cel-bib-ver-lista .cel-bib-ex').length), v => v >= 1, 10000);
+  const notaDaLista = () => cel.evaluate(() => [((document.querySelector('#cel-bib-lista-nota') || {}).textContent || ''),
+    !!(document.querySelector('#cel-bib-pdf-lista') || {}).disabled, !!document.querySelector('.cel-bib-ver-lista[data-lista="lista-desafio"]')].join('|'));
+  conf('(arranjo) faltam: o Ver lista da incompleta com a nota do resto e o PDF apagado', await notaDaLista(), CARTAO.parcial + '|true|true');
+  await marcar(cel, 'sem-wifi');
+  const notaSemWifi = await esperar('o Ver lista relido sem Wi-Fi', notaDaLista, v => (v || '').indexOf(CARTAO.wifi) === 0, 8000);
+  conf('(12) sem Wi-Fi, o Ver lista aberto troca a nota, no mesmo lugar', notaSemWifi.valor, CARTAO.wifi + '|true|true');
+  await clicar(cel, '.cel-bib-ver-lista .bib-voltar');
+  await esperar('voltou às listas', () => cel.evaluate(() => document.querySelectorAll('#cel-bib-miolo .cel-bib-lista').length), v => v >= 3, 10000);
+  await marcar(cel, 'faltam');
+  await pausa(500);
+  await buscar(cel);
+  const motivoNaBusca = () => cel.evaluate(() => { const c = document.querySelector('#cel-bib-miolo .cel-bib-lista[data-lista="lista-desafio"]');
+    return c ? ((c.querySelector('.cel-bib-lista-motivo') || {}).textContent || '') + '|' + !!(c.querySelector('[data-acao="ver-lista"]') || {}).disabled : ''; });
+  conf('(arranjo) faltam: na busca, o cartão da incompleta diz que alguns não chegaram, com o Ver lista aceso', await motivoNaBusca(), CARTAO.parcial + '|false');
+  const campoAntes = await cel.evaluate(() => { const c = document.querySelector('#cel-bib-busca'); c.__daProva12 = true; return c.value; });
+  await marcar(cel, 'sem-wifi');
+  const buscaSemWifi = await esperar('a busca relida sem Wi-Fi', motivoNaBusca, v => (v || '').indexOf(CARTAO.wifi) === 0, 8000);
+  conf('(12) sem Wi-Fi, a busca aberta troca o motivo do cartão e apaga o Ver lista, com o mesmo campo e o mesmo termo',
+    buscaSemWifi.valor + '|' + await cel.evaluate(() => { const c = document.querySelector('#cel-bib-busca'); return !!c.__daProva12 + '|' + c.value; }),
+    CARTAO.wifi + '|true|true|' + campoAntes);
+  await marcar(cel, 'prontos');
+  await pausa(500);
   await pausa(1500);
   await juntarEscritas(cel);
   conf('nenhum erro de página no celular a 390', cel.errosDePagina.join(' | '), '');
@@ -852,6 +969,29 @@ async function printar(pag, nome) {
   }
   conf('(b) sem Wi-Fi, o Portal do 9º ano aqui e o Banco a caminho: o resto ainda pode chegar', b1.faltam, 'O resto do material deste assunto ainda pode chegar a este celular.');
   conf('(b) sem Wi-Fi, o assunto do pacote que ainda não veio: ainda pode chegar', b2.vazio, 'A teoria e os exercícios deste assunto ainda podem chegar a este celular.');
+  /* 13. PACOTES MISTOS: o assunto sem material próprio mostra o de um vizinho
+   * (o MAT08-15, que o índice liga ao MAT06-12). O material veio de um
+   * pacote, e o próprio pode vir de outro, que ainda anda: sem Wi-Fi, a linha
+   * dos vizinhos diz que o próprio ainda pode chegar, como a falta parcial
+   * logo abaixo; com a série pronta, que não tem. Nunca as duas coisas juntas. */
+  await pc.evaluate(() => {
+    const mod = { chave: '6ano:prova', titulo: 'Módulo de exemplo' };
+    window.__fontesDaProva = { 'MAT08-15': { assunto: 'MAT08-15', listaBase: null, exercicios: [], obmep: [], enem: [],
+      teoria: [{ id: 'prova:teo:vizinho', tipo: 'teoria', titulo: 'Teoria do vizinho', quantidade: 2, deVizinho: 'MAT06-12', modulo: mod }],
+      vizinhos: [{ id: 'MAT06-12', titulo: 'Volume e unidades de medida', serie: '06' }] } };
+  });
+  const VIZINHO = 'Abaixo, o de “Volume e unidades de medida” (6º ano).';
+  const misto = await assuntoNoCompleto('MAT08-15', 'volume');
+  const linhaDosVizinhos = () => textoDa(pc, '.cel-bib-assunto .bte-vizinhos');
+  conf('(13) sem Wi-Fi, o assunto com material do vizinho: o próprio ainda pode chegar, como a falta parcial (sem "não tem")',
+    (await linhaDosVizinhos()) + '|' + misto.faltam,
+    'O material próprio deste assunto ainda pode chegar a este celular. ' + VIZINHO + '|O resto do material deste assunto ainda pode chegar a este celular.');
+  await marcar(pc, 'prontos');
+  const vizinhoPronto = await esperar('o assunto misto relido em prontos', linhaDosVizinhos, v => /^Este assunto ainda não tem/.test(v || ''), 8000);
+  conf('(13) com a série pronta, o mesmo assunto: não tem material próprio neste celular, e a falta parcial de sempre',
+    vizinhoPronto.valor + '|' + /^Ainda sem /.test(await textoDa(pc, '.cel-bib-assunto .bte-faltam')),
+    'Este assunto ainda não tem material próprio neste celular. ' + VIZINHO + '|true');
+  await pc.evaluate(() => { window.__fontesDaProva = null; });
   conf('nenhum erro de página no perfil completo', pc.errosDePagina.join(' | '), '');
   await pc.close();
   for (const [w, hh] of [[390, 844], [412, 915]]) {
@@ -889,7 +1029,7 @@ async function printar(pag, nome) {
 
   secao('9c. O pacote do exercício pelo formato do id: o Banco n3 e a Mirim m1 ainda vêm, com o n2 e a m2 aqui');
   const pm = await celular(ctxMisto, 390, 844);
-  await irParaBiblioteca(pm, 3);
+  await irParaBiblioteca(pm, 4);
   for (const m of ['sem-wifi', 'faltam']) {
     await marcar(pm, m);
     await pausa(500);
@@ -907,6 +1047,10 @@ async function printar(pag, nome) {
       [andando ? CARTAO.wifi : CARTAO.parcial, andando ? CARTAO.wifi : CARTAO.parcial, false, false, andando, andando].join('|'));
     conf(m + ': (controle) o retirado do n2, com o n2 aqui, fica com a conta do tablet, sem motivo e aceso',
       [ret.motivo, /1 não está mais na biblioteca/.test(ret.texto), ret.apagado].join('|'), '|true|false');
+    // 15. o id fora dos formatos ("banco:2019:n2" sem o número, "enem" e "enem:2099" sem a questão) só não chegou
+    const est = porId(cm, 'lista-estranha');
+    conf(m + ': os ids fora dos formatos, com o Banco n2 e o ENEM aqui, estão a caminho (motivo, sem "não está mais")',
+      [est.motivo, SUMIU.test(est.texto), est.apagado].join('|'), [andando ? CARTAO.wifi : CARTAO.parcial, false, andando].join('|'));
     if (!andando) {
       for (const id of ['lista-banco', 'lista-mirim']) {
         await clicar(pm, '#cel-bib-miolo .cel-bib-lista[data-lista="' + id + '"] [data-acao="ver-lista"]');
