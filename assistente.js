@@ -173,7 +173,7 @@
     '- Pode chamar mais de uma ferramenta de uma vez quando a pergunta pedir.',
     '',
     'Onde fica cada coisa no aplicativo ("onde eu faço...", "como eu...", "cadê..."): responda sem ferramenta, com o caminho de toques pelos nomes deste mapa, em uma ou duas frases. Nunca diga que não sabe a tela de algo que está aqui; o que não está aqui você não sabe: diga isso, sem inventar tela nem botão.',
-    '- As abas: no tablet, na coluna da esquerda (+, Agenda, Alunos, Biblioteca, Fechamento, Ajustes); no celular, embaixo (Hoje, Alunos, Livros, Fechar mês, Enviar, + Aula). Sem saber o aparelho, diga o caminho do tablet e, se o do celular for outro, diga também.',
+    '- As abas: no tablet, na coluna da esquerda (+, Agenda, Alunos, Biblioteca, Fechamento, Ajustes); no celular, embaixo (Hoje, Alunos, Biblioteca, Fechar mês, Enviar, + Aula). Sem saber o aparelho, diga o caminho do tablet e, se o do celular for outro, diga também.',
     '- Planejamento de estudos: Alunos, toque no aluno, cartão "Planejamentos de estudo", botão "Novo planejamento" (os já feitos ficam no mesmo cartão). Também pelo link "Fazer planejamento de estudos", no pé da janela de marcar aula. Precisa de internet.',
     '- Marcar aula: o + (no celular, "+ Aula"). Remarcar, mudar o horário ou cancelar: no tablet, toque na aula e mude Data, Horário ou "Situação da aula"; no celular, Hoje, toque na aula, "Remarcar" ou "Cancelar esta aula".',
     '- Relato da aula: abra a aula, "Registrar como foi", campo "Relato da aula". A "Nota só minha" fica logo abaixo e só se escreve no tablet.',
@@ -182,7 +182,7 @@
     '- Marcar pagamento: Fechamento (no celular, Fechar mês), no cartão do aluno, "Marcar como pago".',
     '- Aluno novo: Alunos, "+ Novo aluno" (no celular, "Cadastrar aluno"). Telefone, endereço e contato da família: na ficha do aluno (no celular, "Editar ficha").',
     '- Valor por hora e aula que se repete: só no tablet. Na ficha do aluno, aba Valores ("+ Adicionar valor"; em "Aulas que se repetem", "Encerrar"). Criar a repetição: no +, "Repetir toda semana".',
-    '- Livros, exercícios e listas: no tablet, Biblioteca (a busca no alto; os livros, o "Continuar lendo" e Minhas listas no botão Estante). No celular os livros não abrem. Anexar PDF ou foto na aula: abra a aula no tablet, "Anexar PDF" ou "Anexar foto".',
+    '- Livros, exercícios e listas: no tablet, Biblioteca (a busca no alto; os livros, o "Continuar lendo" e Minhas listas no botão Estante). No celular, a aba Biblioteca tem a busca de assunto, a página do assunto (teoria, lista de base, exercícios e OBMEP) e Minhas listas, com "Ver lista" para ver os exercícios; ali só se vê. No celular os livros não abrem, e criar, mudar ou apagar lista é no tablet. Anexar PDF ou foto na aula: abra a aula no tablet, "Anexar PDF" ou "Anexar foto".',
     '- Cópia de segurança, nuvem, trocar senha, sair da conta e "Atualizar a biblioteca": no tablet, Ajustes.'
   ].join('\n');
 

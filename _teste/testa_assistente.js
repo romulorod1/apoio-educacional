@@ -575,6 +575,17 @@ function respostaTexto(t) { return { ok: true, resposta: { stop_reason: 'end_tur
     [A.SISTEMA, A.SISTEMA_GRAVA].map(s => s.split('\n').filter(l => /^O que você ainda NÃO faz/.test(l)).every(l => /em que tela do aplicativo isso se faz \(pelo mapa abaixo\)/.test(l))), [true, true]);
   conf('(arranjo) o mapa cita pelo menos 25 rótulos entre aspas', (mapa.join('\n').match(/"[^"]+"/g) || []).length >= 25, true);
   conf('todo rótulo entre aspas no mapa existe na tela de hoje', rotulosQueNaoExistem(mapa), []);
+  /* 12b A2 (a Biblioteca no celular, 15/11/2026): o mapa diz a verdade de
+   * hoje sobre o celular, e não só rótulos que existem: a aba de baixo se chama
+   * Biblioteca (e não mais Livros), Minhas listas e a página do assunto se veem
+   * nela, e os livros continuam fora do celular. */
+  const linhaDasAbas = mapa.filter(l => /^- As abas:/.test(l))[0] || '';
+  const linhaDaBiblioteca = mapa.filter(l => /^- Livros, exercícios e listas:/.test(l))[0] || '';
+  conf('o mapa: a aba de baixo do celular é Biblioteca, e não Livros',
+    [/no celular, embaixo \([^)]*\bBiblioteca\b/.test(linhaDasAbas), /no celular, embaixo \([^)]*\bLivros\b/.test(linhaDasAbas)], [true, false]);
+  conf('o mapa: no celular, a aba Biblioteca mostra a página do assunto e Minhas listas com "Ver lista", só para ver; os livros não abrem',
+    [/No celular, a aba Biblioteca/, /página do assunto/, /Minhas listas, com "Ver lista"/, /só se vê/, /No celular os livros não abrem/].map(r => r.test(linhaDaBiblioteca)),
+    [true, true, true, true, true]);
   conf('o mapa não tem travessão nem data', /[–—]|\d{4}-\d{2}-\d{2}/.test(mapa.join('\n')), false);
   /* A prova de privacidade do navegador (testa_assistente_navegador.js)
    * reprova o pedido que contenha "Responsável", o marcador do dado do

@@ -1386,6 +1386,18 @@ roda "celular, pacotes da nuvem --envenenado-continua-sem-wifi" node "_teste/tes
 # (lente contra o pedido) o pacote que falha sempre fica anotado por sha256 e nao
 # baixa de novo a cada mudanca da conexao nem a cada abertura
 roda "celular, pacotes da nuvem --envenenado-pacote-falho-em-laco" node "_teste/testa_celular_pacotes.js" --envenenado-pacote-falho-em-laco
+# 12b, parte A2 (15/11/2026): a aba Biblioteca do celular, so para ler. A aba
+# de baixo vira "Biblioteca" (o mesmo icone); o comeco com a busca e Minhas
+# listas, a linha dos exercicios pela marca da A1 (trazendo, sem Wi-Fi, tudo
+# dentro), o resultado da busca com os sinais, a pagina do assunto em uma
+# coluna (sem Nos livros, No material, Anexar e Comparar) e o Ver lista, com o
+# Voltar do Android. O IndexedDB inteiro igual byte a byte antes e depois de
+# andar por tudo, e a trava de transbordo a 360, 390 e 412 px com a letra a
+# 130%. Pacote sintetico, sem nuvem. Porta 9131.
+roda "celular, Biblioteca so leitura (A2)"          node "_teste/testa_celular_biblioteca.js"
+roda "celular, Biblioteca --envenenado-celular-mostra-no-material" node "_teste/testa_celular_biblioteca.js" --envenenado-celular-mostra-no-material
+roda "celular, Biblioteca --envenenado-celular-grava-ao-navegar" node "_teste/testa_celular_biblioteca.js" --envenenado-celular-grava-ao-navegar
+roda "celular, Biblioteca --envenenado-diz-que-sumiu" node "_teste/testa_celular_biblioteca.js" --envenenado-diz-que-sumiu
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve

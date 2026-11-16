@@ -4733,3 +4733,44 @@ body.modo-celular #modal-assistente .ass-modal { height: 100%; max-height: 100%;
 .ass-poupada-fora { background: var(--soft); border-color: var(--fio); }
 .ass-marca-fora { opacity: .4; }
 .ass-opcao-aviso { display: block; margin-top: 2px; font-size: var(--letra-14); font-weight: var(--peso-forte); color: var(--aviso-texto); }
+
+/* ==================== 12b, parte A2: a aba Biblioteca do celular (só lê) ==================== */
+/* a busca no alto: a lupa, o campo e o Limpar numa caixa só, como no desenho */
+.cel-bib-busca { display: flex; align-items: center; gap: 6px; min-width: 0; padding-left: 14px; border: 1px solid var(--fio);
+  border-radius: 14px; background: var(--branco); }
+.cel-bib-busca:focus-within { border-color: var(--acao); box-shadow: 0 0 0 2px var(--acao-clara); }
+.cel-bib-busca > .ico { width: 22px; height: 22px; flex: none; color: var(--muted); }
+body.modo-celular .celular .cel-bib-busca input.cel-bib-busca-campo { flex: 1 1 0; width: auto; min-width: 0; min-height: 56px; margin: 0;
+  padding: 0 4px; border: 0; background: transparent; box-shadow: none; font-size: var(--letra-16); }
+body.modo-celular .celular .cel-bib-busca input.cel-bib-busca-campo:focus { outline: none; }
+.cel-bib-limpar { flex: none; margin: 4px; }
+.cel-bib-limpar[hidden] { display: none; }
+/* a linha discreta dos exercícios que ainda chegam (A1) */
+.cel-bib-estado { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 0; font-size: var(--letra-14); line-height: 1.4;
+  color: var(--novidades-subtitulo); overflow-wrap: anywhere; }
+.cel-bib-estado[hidden] { display: none; }
+.cel-bib-estado .ico { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.cel-bib-secao { margin: 18px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--fio); font-size: var(--letra-16); color: var(--navy); }
+/* o cartão da lista: nome, nível, assunto, conta e o Ver lista; esperando, só nome e nível */
+.cel-bib-lista { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; margin-bottom: 12px;
+  padding: 14px 16px; overflow-wrap: anywhere; }
+.cel-bib-lista-nome { max-width: 100%; color: var(--navy); font-size: var(--letra-16); }
+.cel-bib-nivel { display: inline-block; max-width: 100%; box-sizing: border-box; padding: 2px 10px; border-radius: 999px; background: var(--acao-clara);
+  color: var(--navy); font-size: var(--letra-14); font-weight: var(--peso-forte); overflow-wrap: anywhere; }
+body.modo-celular .celular .cel-bib-lista .ajuda { margin: 0; max-width: 100%; }
+.cel-bib-lista-acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; max-width: 100%; }
+.cel-bib-lista-acoes .btn { min-width: 112px; white-space: normal; }
+.cel-bib-assuntos { min-width: 0; }
+.cel-bib-assuntos .item-lista { min-height: var(--alvo-celular); box-sizing: border-box; overflow-wrap: anywhere; }
+.cel-bib-mais { margin-top: 4px; white-space: normal; }
+.cel-bib-livros { margin-top: 20px; }
+/* a página do assunto e o Ver lista, em uma coluna; o que só mostra não parece botão */
+.cel-bib-assunto, .cel-bib-ver-lista { min-width: 0; overflow-wrap: anywhere; }
+.cel-bib-assunto .bte { margin-bottom: 0; }
+.cel-bib-assunto .bte-lista-acoes .btn, .cel-bib-assunto .bte-mais { white-space: normal; max-width: 100%; }
+.cel-bib-assunto .bib-assunto-secao { padding: 12px 14px; }
+.bte-ex-abrir.bte-so-ler, .bte-teoria-abrir.bte-so-ler { cursor: default; }
+.bte-ex-abrir.bte-so-ler:hover { border-color: var(--fio); }
+.cel-bib-lista-titulo { margin: 8px 0 8px; overflow-wrap: anywhere; }
+.cel-bib-ver-lista .cel-bib-lista-conta { margin: 10px 0 0; }
+.cel-bib-exercicios { margin-top: 16px; }
