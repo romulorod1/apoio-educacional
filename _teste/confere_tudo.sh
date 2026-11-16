@@ -1400,6 +1400,8 @@ roda "celular, Biblioteca --envenenado-celular-grava-ao-navegar" node "_teste/te
 roda "celular, Biblioteca --envenenado-diz-que-sumiu" node "_teste/testa_celular_biblioteca.js" --envenenado-diz-que-sumiu
 # (lente do caso dela, #245) o assunto decide o "ainda nao chegou" pelo pacote dele, e nao pelas listas
 roda "celular, Biblioteca --envenenado-chegando-pelas-listas" node "_teste/testa_celular_biblioteca.js" --envenenado-chegando-pelas-listas
+# (lente do caso dela) o pacote do exercicio pelo formato do id: o Banco e a Mirim repartem o comeco entre pacotes
+roda "celular, Biblioteca --envenenado-pacote-pelo-prefixo" node "_teste/testa_celular_biblioteca.js" --envenenado-pacote-pelo-prefixo
 roda "nuvem fase 0"                                 node "_teste/testa_nuvem.js"
 roda "nuvem fase 0 --envenenado-regra-aberta"       node "_teste/testa_nuvem.js" --envenenado-regra-aberta
 roda "nuvem fase 0 --envenenado-leitor-escreve"     node "_teste/testa_nuvem.js" --envenenado-leitor-escreve

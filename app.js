@@ -32333,26 +32333,58 @@
   function motivoDaListaNoCelular(r, e) {
     return fraseDoCartaoNoCelular(e, r.vazia);   // nunca o "não está mais na biblioteca" do tablet (r.conta)
   }
-  /* DE QUE PACOTE É UM ID (exercício, página de teoria ou módulo), pelo
-   * começo dele: "9ano:equacoes-do-segundo-grau:..." é do módulo
-   * "9ano:equacoes-do-segundo-grau", que vem no pacote do 9º ano. O pacote
-   * está no celular quando o módulo está, ou quando há no aparelho qualquer
-   * coisa com o mesmo começo ("9ano:"). Com o pacote aqui, o que falta dele
-   * saiu do pacote (a curadoria) e NUNCA está a caminho; sem o pacote, ainda
-   * não chegou. */
-  var memoDasSeriesNoCelular = { bib: null, series: {} };
-  function seriesNoCelular() {
-    if (memoDasSeriesNoCelular.bib !== bib) {
-      var series = {};
-      if (bib) Object.keys(bib.itemPorId).concat(Object.keys(bib.teoriaPorId)).forEach(function (id) { series[String(id).split(':')[0]] = true; });
-      memoDasSeriesNoCelular = { bib: bib, series: series };
-    }
-    return memoDasSeriesNoCelular.series;
-  }
-  function pacoteDoIdNoCelular(id) {
-    if (!bib) return false;
+  /* DE QUE PACOTE É UM ID. O exercício que falta não está no aparelho, e
+   * por isso o pacote dele sai do próprio id, no formato dos geradores
+   * (biblioteca/): o Portal e a teoria, "<série>:<módulo>:..." (um pacote por
+   * série, "9ano"); o Banco, "banco:<ano>:<n1|n2|n3>:<n>" (um pacote por
+   * nível, banco.py); a Mirim, "mirim:<ano>:f<fase>:<m1|m2>:<n>" e
+   * "mirim:<ano>:a:<n>" (da m2), um pacote por nível (provas.py); o ENEM,
+   * "enem:<ano>:<n>"; os cadernos, "sme:<série>:...". O começo sozinho não
+   * basta: o Banco e a Mirim repartem o "banco:" e o "mirim:" entre pacotes.
+   * O id fora desses formatos não tem pacote conhecido (null), e conta como a
+   * caminho, nunca como "não está mais". */
+  function chaveDoPacoteDoId(id) {
     var partes = String(id || '').split(':');
-    return temChave(bib.modulos, partes.slice(0, 2).join(':')) || seriesNoCelular()[partes[0]] === true;
+    var fonte = partes[0];
+    if (fonte === 'banco') return /^n\d$/.test(partes[2] || '') ? 'banco:' + partes[2] : null;
+    if (fonte === 'mirim') return /^m\d$/.test(partes[3] || '') ? 'mirim:' + partes[3] : partes[2] === 'a' ? 'mirim:m2' : null;
+    if (fonte === 'enem') return 'enem';
+    if (fonte === 'sme') return partes[1] ? 'sme:' + partes[1] : null;
+    return partes.length > 1 && fonte ? fonte : null;
+  }
+  // as chaves dos pacotes que estão no celular, pelos exercícios e páginas que estão aqui
+  var memoDosPacotesNoCelular = { bib: null, chaves: {} };
+  function pacotesNoCelularPorChave() {
+    if (memoDosPacotesNoCelular.bib !== bib) {
+      var chaves = {};
+      if (bib) Object.keys(bib.itemPorId).concat(Object.keys(bib.teoriaPorId)).forEach(function (id) {
+        var k = chaveDoPacoteDoId(id);
+        if (k) chaves[k] = true;
+      });
+      memoDosPacotesNoCelular = { bib: bib, chaves: chaves };
+    }
+    return memoDosPacotesNoCelular.chaves;
+  }
+  /* Com o pacote do id aqui, o que falta dele saiu do pacote (a curadoria) e
+   * NUNCA está a caminho; sem o pacote (ou sem saber qual é), ainda não chegou. */
+  function pacoteDoIdNoCelular(id) {
+    var k = bib ? chaveDoPacoteDoId(id) : null;
+    return !!k && pacotesNoCelularPorChave()[k] === true;
+  }
+  /* O módulo do índice ("9ano:equacoes-do-segundo-grau", "m2:mirim-...",
+   * "n2:...") vem do pacote da série dele (o começo da chave do módulo): o
+   * pacote está aqui quando o módulo está, ou quando há aqui outro módulo da
+   * mesma série. */
+  var memoDasSeriesDosModulos = { bib: null, series: {} };
+  function pacoteDoModuloNoCelular(mod) {
+    if (!bib || !mod) return false;
+    if (temChave(bib.modulos, mod)) return true;
+    if (memoDasSeriesDosModulos.bib !== bib) {
+      var series = {};
+      Object.keys(bib.modulos).forEach(function (k) { series[k.split(':')[0]] = true; });
+      memoDasSeriesDosModulos = { bib: bib, series: series };
+    }
+    return memoDasSeriesDosModulos.series[String(mod).split(':')[0]] === true;
   }
   // quantos exercícios e páginas da lista ainda vêm: os que não estão aqui e cujo pacote não está aqui
   function aCaminhoDaLista(l) {
@@ -32389,7 +32421,7 @@
   }
   function chegadaDoAssuntoNoCelular(a) {
     var mod = moduloDoIndiceDoAssunto(a.id);
-    if (mod && pacoteDoIdNoCelular(mod)) return 'aqui';
+    if (mod && pacoteDoModuloNoCelular(mod)) return 'aqui';
     if (!mod) return 'sem-pacote';
     var e = estadoDosExerciciosNoCelular();
     if (e.qual === 'no-tablet') return 'no-tablet';

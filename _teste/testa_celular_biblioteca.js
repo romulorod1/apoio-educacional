@@ -63,6 +63,9 @@
  *   --envenenado-chegando-pelas-listas  a página do assunto volta a decidir o
  *                         "ainda não chegou" pelas listas dela, e não pelo
  *                         pacote do assunto (9 vê, nos casos a, b e c);
+ *   --envenenado-pacote-pelo-prefixo  o pacote do exercício volta a ser só o
+ *                         começo do id ("banco:", "mirim:"), e o do Banco n3 que
+ *                         ainda vem parece retirado do n2 que está aqui (9c vê);
  *   --envenenado-diz-que-sumiu  o cartão do celular usa a conta do tablet, que
  *                         diz que o exercício não está mais na biblioteca (3
  *                         vê, em todos os valores da marca).
@@ -101,14 +104,17 @@ const VENENOS = {
   '--envenenado-celular-grava-ao-navegar': ['/app.js',
     '        if (aparelhoSoLe()) return dataUrl;   // 12b A2: no celular a miniatura só aparece, sem guardar: nada grava\n', ''],
   '--envenenado-chegando-pelas-listas': ['/app.js',
-    "    var mod = moduloDoIndiceDoAssunto(a.id);\n    if (mod && pacoteDoIdNoCelular(mod)) return 'aqui';\n",
+    "    var mod = moduloDoIndiceDoAssunto(a.id);\n    if (mod && pacoteDoModuloNoCelular(mod)) return 'aqui';\n",
     "    if (estadoDosExerciciosNoCelular().qual === 'no-tablet') return 'no-tablet';\n    return fraseDosExerciciosNoCelular() ? 'chegando' : 'sem-pacote';\n"],
+  '--envenenado-pacote-pelo-prefixo': ['/app.js',
+    '    var fonte = partes[0];\n    if (fonte === \'banco\')', '    return partes[0];\n    var fonte = partes[0];\n    if (fonte === \'banco\')'],
   '--envenenado-diz-que-sumiu': ['/app.js',
     'return fraseDoCartaoNoCelular(e, r.vazia);   // nunca o "não está mais na biblioteca" do tablet (r.conta)', 'return r.conta;']
 };
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && !VENENOS[a]);
-let appServido = APP.split(ANCORA_GANCHO).join(GANCHO + ANCORA_GANCHO);
+const APP_COM_GANCHO = APP.split(ANCORA_GANCHO).join(GANCHO + ANCORA_GANCHO);
+let appServido = APP_COM_GANCHO;
 if (MODO) appServido = appServido.split(VENENOS[MODO][1]).join(VENENOS[MODO][2]);
 const trocas = { '/index.html': NOME_REAL ? INDEX.split(NOME_REAL).join(NOME_TESTE) : INDEX, '/app.js': appServido };
 const amb = H.criarAmbiente(PORTA, 'perfil_celular_biblioteca', trocas);
@@ -395,7 +401,7 @@ async function printar(pag, nome) {
   conf('nenhum veneno desconhecido foi pedido', desconhecidos.join(','), '');
   for (const m of Object.keys(VENENOS)) conf('a âncora de ' + m + ' aparece uma vez só no app.js', APP.split(VENENOS[m][1]).length - 1, 1);
   conf('o gancho da prova entrou uma vez no app.js servido', appServido.split(GANCHO).length - 1, 1);
-  if (MODO) conf('o veneno ' + MODO + ' foi aplicado', appServido.indexOf(VENENOS[MODO][1]) < 0, true);
+  if (MODO) conf('o veneno ' + MODO + ' foi aplicado', appServido !== APP_COM_GANCHO, true);
   conf('o nome do alto do index.html foi achado, e o servidor entrega "' + NOME_TESTE + '" no lugar dele',
     !!NOME_REAL && trocas['/index.html'].indexOf(NOME_REAL) < 0 && trocas['/index.html'].indexOf(NOME_TESTE) >= 0, true);
   if (H.placar.falhas) return H.fim(amb)();
@@ -411,6 +417,42 @@ async function printar(pag, nome) {
   const ctxVazio = await nav.createBrowserContext();
   const s3 = await semear(ctxVazio, false, ['revisao', 'desafio', 'area']);
   conf('o vazio: as três listas, sem pacote nenhum', s3.listas, 3);
+  const ctxMisto = await nav.createBrowserContext();
+  const s4 = await (async () => {
+    const tab = await novaPagina(ctxMisto);
+    await tab.setViewport({ width: 1280, height: 800 });
+    await H.abrirApp(tab, amb.ORIGEM);
+    const zips = [['banco-n2.zip', z => Sintetico.gerarBanco(z)], ['mirim-m2.zip', z => Sintetico.gerarProva(z, { serie: 'm2' })]];
+    let ok = true;
+    for (const [nome, gerar] of zips) {
+      const z = path.join(TMP, nome);
+      if (!fs.existsSync(z)) gerar(z);
+      await H.irParaAba(tab, 'ajustes');
+      await tab.evaluate(() => { const c = document.querySelector('#estado-importacao-biblioteca'); if (c) c.textContent = ''; });
+      await (await tab.$('#arquivo-biblioteca')).uploadFile(z);
+      const v = (await esperar('a importação de ' + nome, () => tab.evaluate(() => {
+        const c = document.querySelector('#estado-importacao-biblioteca'); return c ? c.innerText.trim() : '';
+      }), x => /^Biblioteca importada\.|não foi importado/.test(x || ''), 90000)).valor || '';
+      ok = ok && /^Biblioteca importada\./.test(v);
+    }
+    const r = await tab.evaluate(async () => {
+      const d = Store.bancoVazio();
+      d.alunos = [{ id: 'alfa', nome: 'Aluno Alfa Teste', ativo: true, cor: '#1F3A5F', precos: [{ id: 'p1', inicio: '2026-01-01', fim: null, valorHora: 100 }], mapeamentos: [] }];
+      await Store.salvar(d);
+      const ids = (await Store.itensDaBiblioteca()).map(i => i.id);
+      const n2 = ids.filter(i => /^banco:\d+:n2:/.test(i)).sort()[0], m2 = ids.filter(i => /^mirim:\d+:f\d:m2:/.test(i)).sort()[0];
+      const lista = (id, titulo, itens, quando) => Store.gravarListaBiblioteca({ id, titulo, nivel: null, itens, paginas: [], origem: null,
+        automatica: false, criadaEm: quando, editadaEm: quando });
+      // um do n2 (aqui) e um do n3 (ainda vem); um da m2 (aqui) e um da m1 (ainda vem); e um do n2 que a curadoria tirou
+      await lista('lista-banco', 'Banco: n2 e n3', [n2, 'banco:2019:n3:7'], 1700000003000);
+      await lista('lista-mirim', 'Mirim: m2 e m1', [m2, 'mirim:2099:f1:m1:3'], 1700000002000);
+      await lista('lista-retirado', 'Banco: um retirado do n2', [n2, 'banco:2020:n2:999'], 1700000001000);
+      return { n2: !!n2, m2: !!m2, listas: (await Store.listasDaBiblioteca()).length };
+    });
+    await tab.close();
+    return Object.assign(r, { importou: ok });
+  })();
+  conf('o misto: o Banco n2 e a Mirim m2 no aparelho, e três listas', s4.importou && s4.n2 && s4.m2 && s4.listas === 3, true);
 
   secao('2. O celular a 390 x 844: a aba Biblioteca, com o mesmo ícone');
   const cel = await celular(null, 390, 844);
@@ -836,6 +878,44 @@ async function printar(pag, nome) {
     conf('nenhum erro de página no perfil vazio a ' + w + ' px', pv.errosDePagina.join(' | '), '');
     await pv.close();
   }
+
+  secao('9c. O pacote do exercício pelo formato do id: o Banco n3 e a Mirim m1 ainda vêm, com o n2 e a m2 aqui');
+  const pm = await celular(ctxMisto, 390, 844);
+  await irParaBiblioteca(pm, 3);
+  for (const m of ['sem-wifi', 'faltam']) {
+    await marcar(pm, m);
+    await pausa(500);
+    const cm = await cartoes(pm);
+    const b = porId(cm, 'lista-banco'), mi = porId(cm, 'lista-mirim'), ret = porId(cm, 'lista-retirado');
+    const tela = await textoDa(pm, '#cel-bib-miolo');
+    if (MODO === '--envenenado-pacote-pelo-prefixo') {
+      conf('VENENO visto: com o n2 aqui, o exercício do n3 que ainda vem parece retirado (' + b.texto.split('\n').slice(-2).join(' / ') + ')',
+        SUMIU.test(b.texto) && !b.motivo, true);
+      return H.fim(amb)();
+    }
+    const andando = m === 'sem-wifi';
+    conf(m + ': o do Banco n3 e o da Mirim m1 estão a caminho (motivo, sem "não está mais", Ver lista ' + (andando ? 'apagado' : 'aceso') + ')',
+      [b.motivo, mi.motivo, SUMIU.test(b.texto), SUMIU.test(mi.texto), b.apagado, mi.apagado].join('|'),
+      [andando ? CARTAO.wifi : CARTAO.parcial, andando ? CARTAO.wifi : CARTAO.parcial, false, false, andando, andando].join('|'));
+    conf(m + ': (controle) o retirado do n2, com o n2 aqui, fica com a conta do tablet, sem motivo e aceso',
+      [ret.motivo, /1 não está mais na biblioteca/.test(ret.texto), ret.apagado].join('|'), '|true|false');
+    if (!andando) {
+      for (const id of ['lista-banco', 'lista-mirim']) {
+        await clicar(pm, '#cel-bib-miolo .cel-bib-lista[data-lista="' + id + '"] [data-acao="ver-lista"]');
+        await esperar('o Ver lista de ' + id, () => pm.evaluate(() => document.querySelectorAll('.cel-bib-ver-lista .cel-bib-ex').length), v => v >= 1, 10000);
+        conf('faltam, Ver lista de ' + id + ': o que está aqui e a nota do que ainda vem, sem "não está mais"', await pm.evaluate(() => {
+          const t = document.querySelector('.cel-bib-ver-lista');
+          return [t.querySelectorAll('.cel-bib-ex').length, (t.querySelector('#cel-bib-lista-nota') || {}).textContent, /não est(á|ão) mais/.test(t.innerText)].join('|');
+        }), '1|' + CARTAO.parcial + '|false');
+        await clicar(pm, '.cel-bib-ver-lista .bib-voltar');
+        await esperar('voltou às listas', () => pm.evaluate(() => document.querySelectorAll('#cel-bib-miolo .cel-bib-lista').length), v => v >= 3, 10000);
+      }
+    }
+    if (andando) conf('(sem Wi-Fi) e a tela não diz que algo sumiu, fora o retirado', SUMIU.test(tela.split(ret.texto).join('')), false);
+  }
+  await juntarEscritas(pm);
+  conf('nenhum erro de página no perfil misto', pm.errosDePagina.join(' | '), '');
+  await pm.close();
 
   secao('9b. O assunto aberto se refaz quando o pacote dele chega');
   const pa = await celular(ctxVazio, 390, 844);
