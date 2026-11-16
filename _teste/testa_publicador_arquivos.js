@@ -41,6 +41,12 @@
  *  12. o objeto que já está lá com os bytes trocados (o mesmo tamanho, o mesmo
  *      nome e o sha256 certo nos metadados) é recusado pelo md5, com o
  *      remédio, e o catálogo fica igual.
+ *  13. o pacote diz o que ele é: o índice ganha `conteudo`, lido do manifest.json
+ *      de dentro de cada zip (aberto só para leitura): o pacote de livros fica
+ *      'livros', o de exercícios fica com o valor dele, o manifest sem o campo
+ *      (e o zip que nem abre) fica sem o campo; e o `conteudo` que falta num
+ *      pacote já publicado, com o mesmo sha256, entra no índice SEM subir o
+ *      arquivo de novo.
  *
  * Venenos (a prova TEM de ver o defeito e passa dizendo que viu):
  *   --envenenado-reenvia           a conferência do que já está no Storage some:
@@ -54,7 +60,10 @@
  *                                  download passa na conferência (11);
  *   --envenenado-sem-md5           a conferência do md5 some: o objeto com os
  *                                  bytes trocados, do mesmo tamanho e com o
- *                                  sha256 certo nos metadados, passa (12).
+ *                                  sha256 certo nos metadados, passa (12);
+ *   --envenenado-sem-conteudo      o publicador deixa de gravar o `conteudo` no
+ *                                  índice: o pacote de livros fica igual ao de
+ *                                  exercícios (13).
  *
  * O envio retomável em pedaços (308, Range, consulta de estado, 410, 412 e o
  * ifGenerationMatch) não roda no emulador: a prova dele é a
@@ -94,7 +103,8 @@ const VENENOS = {
   '--envenenado-catalogo-antes': ['            enviados, existiam = st.subir(faltam) if faltam else ([], [])\n            publicado = gravar_catalogo()\n',
     '            publicado = gravar_catalogo()\n            enviados, existiam = st.subir(faltam) if faltam else ([], [])\n'],
   '--envenenado-aceita-token': ["        if 'firebaseStorageDownloadTokens' in meta:\n", '        if False:\n'],
-  '--envenenado-sem-md5': ["        if obj.get('md5Hash') != md5:\n", '        if False:\n']
+  '--envenenado-sem-md5': ["        if obj.get('md5Hash') != md5:\n", '        if False:\n'],
+  '--envenenado-sem-conteudo': ["        if p.get('conteudo'):\n", '        if False:\n']
 };
 const MODO = Object.keys(VENENOS).filter(m => process.argv.indexOf(m) !== -1)[0] || '';
 const desconhecidos = process.argv.filter(a => /^--envenenado-/.test(a) && !VENENOS[a]);
@@ -488,6 +498,62 @@ const adminApaga = nome => fetch(ST + '/storage/v1/b/' + BUCKET + '/o/' + encode
   conf('o --ensaio também mostra a recusa', r.st + '|' + /bytes diferentes/.test(r.saida), '2|true');
   conf('apagado o objeto errado, a rodada seguinte sobe o certo', await adminApaga(caminhoC) + '|' +
     publicador(['--manifesto', M6, '--publicar'].concat(comuns())).st + '|' + ((await objetos()).filter(o => o.name === caminhoC)[0] || {}).md5Hash, '204|0|' + md5(arqC));
+
+  secao('13. O índice diz se o pacote é de exercícios ou de livros');
+  // zips SINTÉTICOS de verdade (com manifest.json), numa pasta só deles
+  const CONTEUDO = path.join(TMP, 'pacotes-conteudo');
+  fs.mkdirSync(CONTEUDO, { recursive: true });
+  const fazZip = (nome, manifest) => {
+    const gerar = ['import sys, zipfile', 'z = zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED)',
+      'if sys.argv[2] != "-": z.writestr("manifest.json", sys.argv[2])', 'z.writestr("dados.json", "[]")', 'z.close()'].join('\n');
+    const x = spawnSync(PYTHON, ['-I', '-c', gerar, path.join(CONTEUDO, nome), manifest === null ? '-' : JSON.stringify(manifest)], { encoding: 'utf8' });
+    return x.status === 0 ? fs.readFileSync(path.join(CONTEUDO, nome)) : null;
+  };
+  const zl = fazZip('prova-livros-v1.zip', { esquema: 1, pacote: 'prova-livros', versao: 1, conteudo: 'livros' });
+  const ze = fazZip('prova-ex-v1.zip', { esquema: 1, pacote: 'prova-ex', versao: 1, conteudo: 'exercicios' });
+  const zs = fazZip('prova-sem-v1.zip', { esquema: 1, pacote: 'prova-sem', versao: 1 });
+  const zn = fazZip('prova-nada-v1.zip', null);
+  conf('os 4 zips sintéticos foram montados', [zl, ze, zs, zn].every(b => b && b.length > 0), true);
+  const com13 = () => comuns().concat(['--pacotes', CONTEUDO]);
+  r = publicador(['--manifesto', M6, '--publicar'].concat(com13()));
+  conf('publicado, com os 4 pacotes novos enviados', r.st + '|' + /ARQUIVOS: 4 enviado\(s\)/.test(r.saida), '0|true');
+  const i13 = await indice();
+  const p13 = i13.pacotes || {};
+  if (MODO === '--envenenado-sem-conteudo') {
+    conf('VENENO visto: o pacote de livros ficou sem `conteudo` no índice, igual ao de exercícios',
+      ('conteudo' in (p13['prova-livros'] || {})) + '|' + ('conteudo' in (p13['prova-ex'] || {})), 'false|false');
+    return fim();
+  }
+  conf('o pacote de livros tem conteudo "livros" no índice', (p13['prova-livros'] || {}).conteudo, 'livros');
+  conf('o pacote de exercícios tem o valor do manifest', (p13['prova-ex'] || {}).conteudo, 'exercicios');
+  conf('o manifest sem o campo fica sem o campo', 'conteudo' in (p13['prova-sem'] || {}), false);
+  conf('o zip sem manifest fica sem o campo, e sobe como antes', ('conteudo' in (p13['prova-nada'] || {})) + '|' + !!(p13['prova-nada'] || {}).caminhoNuvem, 'false|true');
+  conf('os pacotes de antes (bytes que nem são zip) seguem sem o campo, com o mesmo sha256',
+    ['prova-x', 'prova-y', 'prova-z'].map(n => ('conteudo' in p13[n]) + '/' + p13[n].sha256.slice(0, 8)).join(','),
+    [px2, py2, pz1].map(b => 'false/' + hex(b).slice(0, 8)).join(','));
+  conf('o resto da entrada segue igual: versão, sha256, tamanho e caminho do pacote de livros',
+    [p13['prova-livros'].versao, p13['prova-livros'].sha256, p13['prova-livros'].tamanho, p13['prova-livros'].caminhoNuvem].join('|'),
+    [1, hex(zl), zl.length, noPacote(hex(zl))].join('|'));
+  const an13 = await livroDoc('livro-a');
+  conf('o metaHash dos livros não muda por isso', an13.metaHash === hex(Buffer.from(an13.metaJson)), true);
+
+  // o índice de antes deste PR (sem `conteudo`), com os mesmos arquivos: só o índice muda, nada sobe
+  const bruto = (await doc('usuarios/' + uid + '/config/catalogo')).json.fields;
+  const antigo = JSON.parse(JSON.stringify(bruto.pacotes));
+  delete antigo.mapValue.fields['prova-livros'].mapValue.fields.conteudo;
+  const publicadoAntes = (p13['prova-livros'] || {}).publicadoEm;
+  const pr = await rest(DOCS + '/usuarios/' + uid + '/config/catalogo?updateMask.fieldPaths=pacotes', { metodo: 'PATCH', token: 'owner', corpo: { fields: { pacotes: antigo } } });
+  conf('o índice foi posto como o de antes (sem o campo no pacote de livros)', pr.status + '|' + ('conteudo' in ((await indice()).pacotes['prova-livros'])), '200|false');
+  const g13b = await geracoes();
+  r = publicador(['--manifesto', M6, '--ensaio'].concat(com13()));
+  conf('o ensaio vê a mudança no índice e nenhum arquivo a enviar', r.st + '|' + /pacote prova-livros: conteúdo no índice/.test(r.saida) + '|' + /0 arquivo\(s\) novos a enviar/.test(r.saida), '0|true|true');
+  r = publicador(['--manifesto', M6, '--publicar'].concat(com13()));
+  conf('publicado, sem enviar nenhum arquivo', r.st + '|' + /ARQUIVOS: 0 enviado\(s\) ao Storage/.test(r.saida) + '|' + (await geracoes() === g13b), '0|true|true');
+  const f13 = ((await indice()).pacotes || {})['prova-livros'] || {};
+  conf('o índice voltou a ter conteudo "livros", e o publicadoEm do arquivo é o de antes', f13.conteudo + '|' + (f13.publicadoEm === publicadoAntes), 'livros|true');
+  r = publicador(['--manifesto', M6, '--publicar'].concat(com13()));
+  conf('e a rodada seguinte não muda mais nada', r.st + '|' + /nada mudaria/.test(r.saida), '0|true');
+
 
   conf('no fim, nenhum objeto tem token de download', (await comToken()).join(','), '');
   if (MODO) conf('o veneno pedido foi visto pela seção dele', 'não visto', 'visto');

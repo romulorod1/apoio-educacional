@@ -37,7 +37,9 @@ com token é recusa. O envio é retomável (pedaços de 8 MiB), refeito em erro 
 rede; depois de subir, os metadados são relidos e o tamanho e o md5 conferidos.
 SÓ DEPOIS de todos os arquivos conferidos o catálogo é gravado: o livro e o
 índice ganham caminhoNuvem, e o índice ganha pacotes {nome: {versao, sha256,
-tamanho, caminhoNuvem, publicadoEm}}. Esses campos são novos e ficam FORA do
+tamanho, caminhoNuvem, publicadoEm[, conteudo]}}. O `conteudo` ('exercicios', 'livros'...)
+vem do manifest.json de dentro de cada zip (aberto só para leitura) e fica de fora quando o
+manifest não o diz; o aplicativo pula, antes de baixar, o pacote marcado 'livros'. Esses campos são novos e ficam FORA do
 metaJson (o metaHash não muda, e o aplicativo de hoje não vê diferença). Um envio
 que falha deixa o catálogo como estava; o que já subiu fica (pelo hash, a
 rodada seguinte não o reenvia).
@@ -97,6 +99,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 if AQUI not in sys.path:
@@ -119,6 +122,8 @@ LIMITE_DO_PACOTE = 100 * 1024 * 1024
 PEDACO = 8 * 1024 * 1024          # múltiplo de 256 KiB, como o envio retomável pede
 TENTATIVAS = 5
 NOME_DE_PACOTE = re.compile(r'([a-z0-9][a-z0-9-]*?)-v([0-9]{1,6})[.]zip')
+LIMITE_DO_MANIFEST = 5 * 1024 * 1024   # o manifest.json de um pacote passa disso nunca; maior que isso nem é lido
+CONTEUDO_VALIDO = re.compile(r'[a-z0-9][a-z0-9_-]{0,31}')
 
 
 class Recusa(Exception):
@@ -538,6 +543,24 @@ class Storage:
         return self.enviados, self.existiam
 
 
+def conteudo_do_pacote(caminho):
+    """O `conteudo` que o manifest.json de DENTRO do zip declara ('exercicios',
+    'livros'...), lido sem extrair nada e sem alterar o arquivo (leitura só).
+    None quando o zip não abre, não tem manifest, o manifest é grande demais
+    ou torto, ou não diz `conteudo`: o campo então fica fora do índice, como
+    antes. Nunca levanta erro nem escreve o nome do pacote em lugar nenhum."""
+    try:
+        with zipfile.ZipFile(caminho, 'r') as z:
+            info = z.getinfo('manifest.json')
+            if info.file_size > LIMITE_DO_MANIFEST:
+                return None
+            manifest = json.loads(z.read(info).decode('utf-8'))
+    except (OSError, KeyError, ValueError, RuntimeError, zipfile.BadZipFile, zipfile.LargeZipFile):
+        return None
+    valor = manifest.get('conteudo') if isinstance(manifest, dict) else None
+    return valor if isinstance(valor, str) and CONTEUDO_VALIDO.fullmatch(valor) else None
+
+
 def pacotes_das_pastas(pastas):
     """Os pacotes de exercícios, só na versão VIGENTE: o maior -vN de cada nome,
     entre os .zip soltos nas pastas dadas. Subpasta nenhuma é lida (as cópias de
@@ -579,7 +602,8 @@ def pacotes_das_pastas(pastas):
             recusas.append('o pacote %s v%d tem %d bytes, acima do limite de %d (100 MiB); não sobe' % (nome, maior, tamanho, LIMITE_DO_PACOTE))
             continue
         sha, md5, _n = hashes_do_arquivo(vigentes[0])
-        pacotes.append({'nome': nome, 'versao': maior, 'disco': vigentes[0], 'sha256': sha, 'md5': md5, 'tamanho': tamanho})
+        pacotes.append({'nome': nome, 'versao': maior, 'disco': vigentes[0], 'sha256': sha, 'md5': md5, 'tamanho': tamanho,
+                        'conteudo': conteudo_do_pacote(vigentes[0])})
     if antigas:
         linhas.append('- pacotes: %d versão(ões) antiga(s) ficam de fora (só a vigente de cada pacote sobe)' % antigas)
     if subpastas:
@@ -918,11 +942,20 @@ def planejar(livros_novos, indice, registro_ids, trocas=None, retirar=None, banc
         caminho = caminho_no_storage(uid, sha, 'zip')
         envios.append({'rotulo': 'pacote %s v%d' % (nome, versao), 'caminho': caminho, 'disco': p['disco'], 'sha256': sha,
                        'md5': p.get('md5'), 'tamanho': p['tamanho'], 'contentType': TIPOS['zip']})
-        if a.get('sha256') == sha and a.get('versao') == versao and a.get('caminhoNuvem') == caminho:
+        mesmo_arquivo = a.get('sha256') == sha and a.get('versao') == versao and a.get('caminhoNuvem') == caminho
+        if mesmo_arquivo and a.get('conteudo') == p.get('conteudo'):
             continue
-        novos_pacotes[nome] = {'versao': versao, 'sha256': sha, 'tamanho': p['tamanho'], 'caminhoNuvem': caminho, 'publicadoEm': agora}
+        entrada = {'versao': versao, 'sha256': sha, 'tamanho': p['tamanho'], 'caminhoNuvem': caminho,
+                   'publicadoEm': (a.get('publicadoEm') or agora) if mesmo_arquivo else agora}
+        if p.get('conteudo'):
+            entrada['conteudo'] = p['conteudo']
+        novos_pacotes[nome] = entrada
         mudou_pacotes = True
-        linhas.append('- pacote %s: %s (v%d, %d bytes)' % (nome, 'novo' if not a else 'versão nova', versao, p['tamanho']))
+        if mesmo_arquivo:
+            # o arquivo é o mesmo (mesmo sha256): só o índice muda, e o envio acima já confere que nada sobe de novo
+            linhas.append('- pacote %s: conteúdo no índice (v%d, o arquivo não muda)' % (nome, versao))
+        else:
+            linhas.append('- pacote %s: %s (v%d, %d bytes)' % (nome, 'novo' if not a else 'versão nova', versao, p['tamanho']))
     plano = {'recusas': recusas, 'linhas': linhas, 'docs': docs, 'registro_ids': registro_ids,
              'registros_chaves': registros_chaves, 'indice': None, 'reconstruidos': reconstruidos,
              'registro_da_nuvem': registro_da_nuvem, 'envios': envios}
