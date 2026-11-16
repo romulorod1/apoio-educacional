@@ -145,6 +145,18 @@ function textoBate(texto, secoes) {
 }
 // o sinal dos exercícios junta as três seções de exercício da página
 const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exercicios', 'enem'], obmep: ['obmep'] };
+/* A legenda diz exatamente os sinais acesos na lista: o nome de cada sinal
+ * aceso está nela, e o de sinal apagado não. No veneno dos sinais do módulo
+ * não há OBMEP acesa, e a legenda certa não tem OBMEP: a conta segue os sinais
+ * que estão na tela, e quem prova que os três aparecem na rodada normal são os
+ * "(arranjo) há na tela um assunto com o sinal de ... aceso". */
+const NOME_NA_LEGENDA = { teoria: /(^| )Teoria( |$)/, exercicios: /Lista de base|Exercícios/, obmep: /OBMEP/ };
+function legendaDizOsAcesos(legenda, porId) {
+  const acesos = t => Object.keys(porId).some(id => porId[id][t]);
+  const algum = Object.keys(NOME_NA_LEGENDA).some(acesos);
+  return algum && !/biblioteca/i.test(legenda) &&
+    Object.keys(NOME_NA_LEGENDA).every(t => NOME_NA_LEGENDA[t].test(legenda) === acesos(t));
+}
 
 (async () => {
   secao('0. O acervo sintético');
@@ -211,9 +223,8 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
   console.log('   no seletor: ' + JSON.stringify(seletor.porId));
   /* A legenda usa as palavras do texto das linhas ("No tablet: teoria, lista
    * de base e exercícios"): teoria; lista de base ou exercícios; OBMEP. */
-  conf('a legenda está à vista e diz teoria, lista de base ou exercícios, e OBMEP (' + seletor.legenda + ')',
-    /(^| )Teoria( |$)/.test(seletor.legenda) && /Lista de base|Exercícios/.test(seletor.legenda) &&
-    /OBMEP/.test(seletor.legenda) && !/biblioteca/i.test(seletor.legenda), true);
+  conf('a legenda está à vista e diz teoria, lista de base ou exercícios, e OBMEP, os sinais acesos (' + seletor.legenda + ')',
+    legendaDizOsAcesos(seletor.legenda, seletor.porId), true);
   // toda seção de exercício que o texto de uma linha nomeia está no nome da legenda
   const semLegenda = await pag.evaluate(() => {
     const nome = ((document.querySelector('#tema-legenda [data-legenda="exercicios"]') || {}).textContent || '').toLowerCase();
@@ -358,7 +369,8 @@ const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exerci
   const idsGrade = Object.keys(grade.porId);
   console.log('   na grade: ' + JSON.stringify(grade.porId));
   conf('(arranjo) a grade tem o MAT04-09, o da OBMEP', idsGrade.indexOf('MAT04-09') >= 0, true);
-  conf('na grade, a legenda está à vista', /OBMEP/.test(grade.legenda), true);
+  conf('na grade, a legenda está à vista e diz os sinais acesos (' + grade.legenda + ')', legendaDizOsAcesos(grade.legenda, grade.porId), true);
+  if (!VENENO) conf('(arranjo) na grade há OBMEP acesa, e a legenda a explica', /OBMEP/.test(grade.legenda), true);
   conf('na grade, só o sinal que existe está à vista', grade.visivelErrado.join(', '), '');
   // o Voltar devolve a raiz do seletor, depois fecha o painel e depois a aula
   await pag.evaluate(() => history.back());
