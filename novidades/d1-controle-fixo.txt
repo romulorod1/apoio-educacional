@@ -1,0 +1,1 @@
+# Conserto de prova: o controle da fonte de reserva (testa_fonte_unicode) compara com o pdf.js de antes da D1, num commit fixo, e não com a base do merge, que depois do #253 já tinha a reserva. Só teste; para ela não há novidade.
