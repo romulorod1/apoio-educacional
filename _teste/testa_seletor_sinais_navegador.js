@@ -137,15 +137,22 @@ const juntarComE = p => p.length < 2 ? p.join('') : p.slice(0, -1).join(', ') + 
 function textoBate(texto, secoes) {
   const nomes = secoes.map(s => NOMES_DAS_SECOES[s]).filter(Boolean);
   if (!nomes.length) return !/No tablet|Módulo relacionado/.test(texto);
-  const esperado = 'No tablet: ' + juntarComE(nomes);
-  /* a seção toda de outro ano diz isso junto do nome dela ("teoria de outro
-   * ano e OBMEP"), e não repetida no fim (polimento do F5) */
-  const semMarca = texto.replace(/(teoria|lista de base|exercícios|OBMEP|ENEM) de outro ano/g, '$1');
-  const i = semMarca.indexOf(esperado);
-  if (i < 0) return false;
-  // depois das seções: o módulo entre parênteses e, no material todo herdado, de onde ele vem
-  const resto = semMarca.slice(i + esperado.length);
-  return /^( \([^)]+\))?(, de outro ano|, de assuntos? vizinhos?)?$/.test(resto);
+  /* A seção toda de outro ano diz isso junto do nome DELA ("teoria de outro
+   * ano e OBMEP"), e não repetida no fim (polimento do F5). A marca só vale
+   * no lugar de cada nome, na ordem da página; e o grupo dos exercícios (lista
+   * de base, exercícios e ENEM, um sinal só) leva a marca em todas as seções
+   * dele ou em nenhuma (revisão do #249). */
+  const escapa = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pedacos = nomes.map(n => '(' + escapa(n) + ')( de outro ano)?');
+  const lista = pedacos.length < 2 ? pedacos.join('') : pedacos.slice(0, -1).join(', ') + ' e ' + pedacos[pedacos.length - 1];
+  const m = new RegExp('No tablet: ' + lista + '( \\([^)]+\\))?(, de outro ano|, de assuntos? vizinhos?)?$').exec(texto);
+  if (!m) return false;
+  const marcados = nomes.map((n, k) => !!m[2 * k + 2]);
+  const fim = m[2 * nomes.length + 2];
+  // a marca junto do nome e a do fim ("tudo de outro ano") não vêm juntas
+  if (fim && marcados.some(Boolean)) return false;
+  const doGrupo = nomes.map((n, k) => ['lista de base', 'exercícios', 'ENEM'].indexOf(n) >= 0 ? marcados[k] : null).filter(x => x !== null);
+  return doGrupo.every(x => x === doGrupo[0]);
 }
 // o sinal dos exercícios junta as três seções de exercício da página
 const SECOES_DO_SINAL = { teoria: ['teoria'], exercicios: ['lista-base', 'exercicios', 'enem'], obmep: ['obmep'] };
@@ -334,6 +341,11 @@ function legendaDizOsAcesos(legenda, porId) {
   });
   conf('o Voltar do grupo fica a uma folga da linha do alto fixo (' + folga.voltar + ' px), e a lista que rola começa abaixo dela (' + folga.lista + ' px)',
     (folga.voltar >= 14) + '|' + (folga.lista >= 4), 'true|true');
+  /* Dentro da lista de outra matéria, a "Última aula" não diz "de
+   * Matemática": parecia ser a matéria da lista (revisão do #249). */
+  const ultimaAula = () => pag.evaluate(() => ((document.querySelector('#tema-contexto .tema-ultima-aula') || {}).textContent || '').trim());
+  const ultimaNaMateria = await ultimaAula();
+  conf('na lista de ' + materia.titulo + ', a última aula fica sem a matéria (' + ultimaNaMateria + ')', /^Última aula: \d\d\/\d\d$/.test(ultimaNaMateria), true);
   await pag.evaluate(() => history.back());
   const v1 = await esperar('o 1º Voltar', ondeEsta, v => !!v && (v.titulo === materia.titulo || !v.tema), 4000);
   const p1 = v1.valor || {};
@@ -354,6 +366,7 @@ function legendaDizOsAcesos(legenda, porId) {
   conf('no grupo, o 1º Voltar do aparelho devolve a matéria, com o painel e a entrada dele', p1.tema + '|' + p1.titulo + '|' + p1.noHistorico,
     'true|' + materia.titulo + '|true');
   conf('na matéria, o 2º Voltar devolve a raiz do seletor, com o painel aberto', p2.tema + '|' + p2.raiz + '|' + p2.noHistorico, 'true|true|true');
+  conf('e, de volta à raiz, a última aula diz a matéria de novo', /^Última aula de Matemática: 09\/11$/.test(await ultimaAula()), true);
   conf('a aula atrás continua aberta', p2.aula, true);
   // e a grade de Matemática, aberta da raiz: o Voltar devolve a raiz
   await pag.evaluate(() => {
@@ -477,7 +490,13 @@ function legendaDizOsAcesos(legenda, porId) {
           enem: [{ id: 'enem:2099:1', tipo: 'exercicio', titulo: 'Questão 1', fonte: 'enem' }] },
         'MAT04-09': { assunto: 'MAT04-09', listaBase: null, exercicios: [], enem: [], vizinhos: [],
           teoria: [{ id: 'prova:teo:1', tipo: 'teoria', titulo: 'Teoria 1', outroAno: true, modulo: mod }],
-          obmep: [{ id: 'prova:ob:1', tipo: 'exercicio', titulo: 'OBMEP 1', outroAno: false }] }
+          obmep: [{ id: 'prova:ob:1', tipo: 'exercicio', titulo: 'OBMEP 1', outroAno: false }] },
+        // os exercícios todos de outro ano (lista de base, exercícios e ENEM), com a OBMEP do próprio ano no meio deles
+        'MAT04-01': { assunto: 'MAT04-01', teoria: [], vizinhos: [],
+          listaBase: { id: 'prova:base:1', tipo: 'lista', titulo: 'Lista de base', quantidade: 3, outroAno: true, modulo: mod },
+          exercicios: [{ id: 'prova:ex:9', tipo: 'exercicio', titulo: 'Exercício 9', outroAno: true, modulo: mod }],
+          obmep: [{ id: 'prova:ob:2', tipo: 'exercicio', titulo: 'OBMEP 2', outroAno: false }],
+          enem: [{ id: 'enem:2098:1', tipo: 'exercicio', titulo: 'Questão 1', fonte: 'enem', outroAno: true }] }
       };
       window.__zerarSinais = true;
       document.querySelector('[data-aula-id="f5_hoje"]').click();
@@ -500,6 +519,7 @@ function legendaDizOsAcesos(legenda, porId) {
       return {
         vizinho: sinal('MAT07-01', 'exercicios'), textoVizinho: texto('MAT07-01'), teoriaDoVizinho: sinal('MAT07-01', 'teoria'),
         outroAno: sinal('MAT04-09', 'teoria'), proprio: sinal('MAT04-09', 'obmep'), textoOutroAno: texto('MAT04-09'),
+        textoGrupoOutroAno: texto('MAT04-01'),
         controle: sinal('MAT09-04', 'teoria') || sinal('MAT09-04', 'exercicios'),
         legenda: herdado && !herdado.hidden ? herdado.textContent.trim() : '',
         enem: { teoria: !!sinal('MAT09-07', 'teoria'), exercicios: !!sinal('MAT09-07', 'exercicios'), obmep: !!sinal('MAT09-07', 'obmep'),
@@ -552,6 +572,14 @@ function legendaDizOsAcesos(legenda, porId) {
     // e diz junto do nome da seção, sem repetir a teoria no fim (polimento do F5)
     conf('o texto da linha diz que a teoria é de outro ano, e só ela, junto do nome (' + origem.textoOutroAno + ')',
       /No tablet: teoria de outro ano e OBMEP \(Módulo da prova\)$/.test(origem.textoOutroAno) && !/OBMEP de outro ano|, de outro ano|; /.test(origem.textoOutroAno), true);
+    /* O grupo dos exercícios todo de outro ano, com a OBMEP do próprio ano
+     * entre a lista e o ENEM: cada seção do grupo diz a marca, e a OBMEP não
+     * (revisão do #249: "OBMEP e ENEM de outro ano" diria que só o ENEM é). */
+    conf('os exercícios todos de outro ano, com a OBMEP própria no meio: a marca em cada seção do grupo (' + origem.textoGrupoOutroAno + ')',
+      /No tablet: lista de base de outro ano, exercícios de outro ano, OBMEP e ENEM de outro ano \(Módulo da prova\)$/.test(origem.textoGrupoOutroAno) + '|' +
+      textoBate(origem.textoGrupoOutroAno, ['lista-base', 'exercicios', 'obmep', 'enem']) + '|' +
+      textoBate('No tablet: lista de base, exercícios, OBMEP e ENEM de outro ano (Módulo da prova)', ['lista-base', 'exercicios', 'obmep', 'enem']),
+      'true|true|false');
     conf('(controle) o assunto com material próprio fica sem o traço', !!origem.controle && c.herdado, false);
     conf('a legenda explica o traço, no plural do que está na tela (' + origem.legenda + ')', origem.legenda, 'De outro ano ou de assuntos vizinhos');
     await pag.evaluate(() => { window.__fontesDaProva = null; });

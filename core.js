@@ -1149,14 +1149,19 @@
   }
 
   /* A aula JÁ ACONTECEU: a data e o horário dela já passaram (agora: um Date,
-   * o relógio de agora quando falta). A de hoje sem horário ainda não conta, e
-   * a das 15h de hoje, às 11h, também não. */
+   * o relógio de agora quando falta). A das 15h de hoje, às 11h, ainda não. A
+   * de hoje SEM HORÁRIO (o app oferece "sem hora") aconteceu quando já tem
+   * registro de como foi (aulaTemRegistro: relato, nota, assunto, folha...):
+   * sem isso, a aula dada ao meio-dia e relatada só contaria à meia-noite, e
+   * a ficha do celular e a segunda aula do dia mostrariam a da semana passada
+   * (revisão do #249). Sem registro, ela ainda não conta. */
   function aulaJaAconteceu(a, agora) {
     if (!a || !a.data) return false;
     var d = agora || new Date();
     var hoje = isoDe(d);
     if (a.data !== hoje) return a.data < hoje;
-    return !!a.hora && a.hora <= pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    if (!a.hora) return aulaTemRegistro(a);
+    return a.hora <= pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 
   /* A REGRA ÚNICA DA "AULA ANTERIOR" (polimento da 12b): o "Na última aula"

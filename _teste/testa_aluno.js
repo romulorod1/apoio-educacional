@@ -14,8 +14,28 @@
  * A trava que mais importa neste arquivo é a da anotação só dela: nenhum texto
  * escrito ali pode aparecer no Markdown do fechamento, no do mês inteiro nem
  * nas linhas que o gerador de PDF recebe.
+ *
+ * Veneno (a prova TEM de ver o defeito e passa dizendo que viu):
+ *   --envenenado-sem-hora-nunca-aconteceu  o core volta a dizer que a aula de
+ *     hoje sem horário só acontece à meia-noite, mesmo relatada: a ficha do
+ *     celular às 18h mostra a da semana passada (revisão do #249).
  */
-const Core = require('../core.js');
+const VENENO_SEM_HORA = process.argv.indexOf('--envenenado-sem-hora-nunca-aconteceu') >= 0;
+const ANCORA_SEM_HORA = '    if (!a.hora) return aulaTemRegistro(a);\n';
+const Core = (() => {
+  if (!VENENO_SEM_HORA) return require('../core.js');
+  const fs = require('fs');
+  const path = require('path');
+  const Module = require('module');
+  const arq = path.join(__dirname, '..', 'core.js');
+  const fonte = fs.readFileSync(arq, 'utf8').replace(/\r\n/g, '\n');
+  if (fonte.split(ANCORA_SEM_HORA).length !== 2) throw new Error('a âncora do veneno não aparece uma vez só no core.js');
+  const m = new Module(arq, module);
+  m.filename = arq;
+  m.paths = Module._nodeModulePaths(path.dirname(arq));
+  m._compile(fonte.replace(ANCORA_SEM_HORA, '    if (!a.hora) return false;\n'), arq);
+  return m.exports;
+})();
 
 let passes = 0, falhas = 0;
 const erros = [];
@@ -134,9 +154,37 @@ conf('a aula de 10/09 vê a das 10h de hoje, e não a de 05/09, marcada à frent
   Core.ultimoEncontro(bancoAgora, 'a1', bancoAgora.aulas[4], AS_11H).aulaId, 'h1');
 conf('às 16h, a das 15h já aconteceu e vale',
   Core.ultimoEncontro(bancoAgora, 'a1', bancoAgora.aulas[2], new Date(2026, 8, 1, 16, 0)).aulaId, 'h2');
-conf('a aula de hoje sem horário ainda não aconteceu; a de ontem, sim; a das 10h, às 11h, sim',
+conf('a aula de hoje sem horário e sem registro ainda não aconteceu; a de ontem, sim; a das 10h, às 11h, sim',
   [Core.aulaJaAconteceu({ data: '2026-09-01' }, AS_11H), Core.aulaJaAconteceu({ data: '2026-08-31' }, AS_11H),
     Core.aulaJaAconteceu({ data: '2026-09-01', hora: '10:00' }, AS_11H)].join('|'), 'false|true|true');
+
+/* A AULA DE HOJE "SEM HORA" COM REGISTRO JÁ ACONTECEU (revisão do #249): dada
+ * ao meio-dia, sem horário, e relatada, ela é a última aula às 18h, e não a
+ * da semana passada. Os dois caminhos: a ficha do celular (sem aula aberta,
+ * "Último relato") e a segunda aula do mesmo dia, no tablet. */
+const AS_18H = new Date(2026, 8, 1, 18, 0);
+const bancoSemHora = {
+  aulas: [
+    aula({ id: 's0', data: '2026-08-25', hora: '10:00', notaTexto: 'Semana passada.' }),
+    aula({ id: 's1', data: '2026-09-01', hora: '', notaTexto: 'Dada ao meio-dia, sem horário.' }),
+    aula({ id: 's2', data: '2026-09-01', hora: '19:00' }),
+    // a outra aula de hoje sem horário e sem registro nenhum ainda não é onde os dois pararam
+    aula({ id: 's3', data: '2026-09-01', hora: '' })
+  ]
+};
+const fichaSemHora = Core.ultimoEncontro({ aulas: bancoSemHora.aulas.slice(0, 2) }, 'a1', null, AS_18H);
+if (VENENO_SEM_HORA) {
+  conf('VENENO visto: a ficha do celular às 18h mostra a aula da semana passada (' + (fichaSemHora && fichaSemHora.aulaId) + ')',
+    !!fichaSemHora && fichaSemHora.aulaId === 's0', true);
+  console.log('\n' + passes + ' verificações passaram, ' + falhas + ' falharam.');
+  process.exit(falhas ? 1 : 0);
+}
+conf('a ficha do celular às 18h: o último relato é o da aula de hoje sem horário, e não o da semana passada',
+  fichaSemHora && fichaSemHora.aulaId + '|' + fichaSemHora.oQueRendeu, 's1|Dada ao meio-dia, sem horário.');
+conf('a segunda aula do dia (19h) vê a de hoje sem horário, relatada, no "Na última aula"',
+  Core.ultimoEncontro(bancoSemHora, 'a1', bancoSemHora.aulas[2], AS_18H).aulaId, 's1');
+conf('a aula de hoje sem horário: com registro, aconteceu; sem registro, ainda não',
+  Core.aulaJaAconteceu(bancoSemHora.aulas[1], AS_18H) + '|' + Core.aulaJaAconteceu(bancoSemHora.aulas[3], AS_18H), 'true|false');
 
 // ================================================================
 secao('2. A anotação só dela nunca sai do aparelho');

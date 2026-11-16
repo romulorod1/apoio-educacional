@@ -421,6 +421,8 @@ for t in testa_registro testa_mapeamento testa_exclusoes testa_feriados \
          testa_vocabulario testa_dominio testa_sondagem testa_pagamentos; do
   roda "$t" node "_teste/$t.js"
 done
+# (revisao do #249) a aula de hoje sem horario, ja relatada, conta como dada: o veneno a deixa para a meia-noite
+roda "aluno --envenenado-sem-hora-nunca-aconteceu" node "_teste/testa_aluno.js" --envenenado-sem-hora-nunca-aconteceu
 # C9: o documento do ciclo. Os numeros do periodo, o dominio, o rascunho das
 # quatro secoes, so os pontos de atencao marcados, o texto e o PDF sem nada
 # interno; e dois venenos (ponto nao marcado, rotulo interno) que TEM de

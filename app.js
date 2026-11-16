@@ -13282,6 +13282,14 @@
     var anoDoAluno = aluno && Core.anoEscolarDe(aluno);
     var aulaAnterior = ultimaAulaDada(aula);
     var materiaAnterior = aulaAnterior ? materiaUnicaDaAula(aulaAnterior) : null;
+    /* "Última aula de Matemática: 09/11". Dentro da lista de outra matéria
+     * (Português, por exemplo), a matéria sai da linha, que fica "Última aula:
+     * 09/11": o nome de outra matéria ali parecia ser a da lista (revisão do
+     * #249). nomeDaLista: o nome da matéria da lista aberta, ou null na raiz. */
+    function textoDaUltimaAula(nomeDaLista) {
+      var materia = materiaAnterior && (!nomeDaLista || nomeDaLista === materiaAnterior) ? materiaAnterior : null;
+      return 'Última aula' + (materia ? ' de ' + materia : '') + ': ' + Core.ddmm(aulaAnterior.data);
+    }
     /* O nome já está no título da janela ("Assunto da aula, Nome"): aqui, o
      * ano do aluno ("Está no 9º ano", sem supor menino ou menina, e dito como
      * dele, para não se confundir com o ano de um assunto de outra matéria) e
@@ -13291,8 +13299,7 @@
        * diz o que está na ficha: "No cursinho", e não "Está no 3º médio". */
       anoDoAluno ? el('span', { class: 'tag tema-ano-aluno', texto: anoEscolarCadastrado(aluno).ano === 'cursinho'
         ? 'No cursinho' : 'Está no ' + nomeDoAno(anoDoAluno) }) : null,
-      aulaAnterior ? el('span', { class: 'tema-ultima-aula', texto: 'Última aula' +
-        (materiaAnterior ? ' de ' + materiaAnterior : '') + ': ' + Core.ddmm(aulaAnterior.data) }) : null
+      aulaAnterior ? el('span', { class: 'tema-ultima-aula', texto: textoDaUltimaAula(null) }) : null
     ].filter(Boolean);
     /* O alto do seletor (contexto, busca e legenda) fica preso no alto também
      * na janela centrada: a legenda não some rolando, e os sinais continuam
@@ -13444,6 +13451,10 @@
       else desenharRaiz();
       // a legenda só com sinal na tela (a busca e a raiz podem não ter nenhum)
       atualizarLegendaDosSinais(legenda, lista);
+      // a "Última aula" diz a matéria só fora da lista de outra matéria
+      var ultimaAula = topo.querySelector('.tema-ultima-aula');
+      var naMateria = !termo && (nivel.tipo === 'disciplina' || nivel.tipo === 'grupo') && nivel.d ? (nivel.d.nome || '') : null;
+      if (ultimaAula && aulaAnterior) ultimaAula.textContent = textoDaUltimaAula(naMateria);
     }
 
     function desenharRaiz() {
@@ -20676,14 +20687,16 @@
      * que leva o traço) diz isso junto do nome da seção, e não repetido no fim
      * (polimento do F5): "No tablet: teoria de outro ano e OBMEP", e não
      * "teoria e OBMEP; teoria de outro ano". No grupo dos exercícios, a marca
-     * vai na última seção dele ("lista de base e exercícios de outro ano"). */
+     * vai em CADA seção dele (revisão do #249): com a OBMEP do próprio ano no
+     * meio, "lista de base, exercícios, OBMEP e ENEM de outro ano" diria que
+     * só o ENEM é de outro ano. */
     if (!de) {
       var exerc = (f.listaBase ? [f.listaBase] : []).concat(f.exercicios || [], f.enem || []);
       var doOutroAno = {};
       [[['teoria'], f.teoria || []], [SECOES_DOS_EXERCICIOS.map(function (x) { return x[0]; }), exerc], [['obmep'], f.obmep || []]].forEach(function (g) {
         if (!g[1].length || origemDasFontes(g[1]) !== 'outro-ano') return;
         var doGrupo = secoes.filter(function (s) { return g[0].indexOf(s[0]) >= 0; });
-        if (doGrupo.length) doOutroAno[doGrupo[doGrupo.length - 1][0]] = true;
+        doGrupo.forEach(function (s) { doOutroAno[s[0]] = true; });
       });
       partes = secoes.map(function (s) { return s[1] + (doOutroAno[s[0]] ? ' de outro ano' : ''); });
     }
