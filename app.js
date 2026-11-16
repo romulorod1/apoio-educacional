@@ -32410,7 +32410,8 @@
    * pacote (os cadernos, o ENEM e a lista curada criam módulos com a série do
    * Portal), e por isso o pacote do módulo só serve para dizer que o material
    * CHEGOU quando há material ('aqui': a seção que falta só não existe), e
-   * nunca para concluir que não tem. 'chegando': a série não acabou e o módulo
+   * nunca para concluir que não tem (nem que a seção que falta não vem: a
+   * linha da falta parcial segue a mesma regra). 'chegando': a série não acabou e o módulo
    * não está aqui; 'no-tablet': o celular não recebe pacotes (fica no tablet);
    * 'sem-pacote': a série está pronta sem o módulo dele. */
   var memoDosModulosDoIndice = { indice: null, porId: {} };
@@ -32709,7 +32710,8 @@
       // escondida enquanto não falta nada; a marca dos pacotes a acende aqui também
       antesDoBloco: linhaDosExerciciosCelular(),
       fraseDoVazio: fraseDoAssuntoSemMaterialNoCelular(),
-      aindaChegando: chegada === 'chegando'
+      // a falta parcial segue a mesma regra do vazio: fora do "prontos" (e do celular sem pacotes), o resto ainda pode chegar
+      aindaChegando: ['prontos', 'no-tablet'].indexOf(estadoDosExerciciosNoCelular().qual) < 0
     } });
   }
 

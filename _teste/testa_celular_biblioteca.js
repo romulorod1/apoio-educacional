@@ -60,9 +60,10 @@
  *                         volta a ter a caixa "No material" (5 vê);
  *   --envenenado-celular-grava-ao-navegar  a miniatura volta a ser guardada no
  *                         celular, e andar pelas telas chama a gravação (8 vê);
- *   --envenenado-chegando-pelas-listas  a página do assunto volta a decidir o
- *                         "ainda não chegou" pelas listas dela, e não pelo
- *                         pacote do assunto (9 vê, nos casos a, b e c);
+ *   --envenenado-resto-pelo-pacote-do-modulo  a linha da falta parcial volta a
+ *                         seguir o pacote do módulo, e não a regra do vazio: com
+ *                         o pacote do assunto aqui, a série andando diz "Ainda
+ *                         sem..." (5 vê, no caso c);
  *   --envenenado-pacote-pelo-prefixo  o pacote do exercício volta a ser só o
  *                         começo do id ("banco:", "mirim:"), e o do Banco n3 que
  *                         ainda vem parece retirado do n2 que está aqui (9c vê);
@@ -106,9 +107,8 @@ const VENENOS = {
     '      if (cx.soLer) return null;   // 12b A2: o celular só lê, e a caixa "No material" mexe no material\n', ''],
   '--envenenado-celular-grava-ao-navegar': ['/app.js',
     '        if (aparelhoSoLe()) return dataUrl;   // 12b A2: no celular a miniatura só aparece, sem guardar: nada grava\n', ''],
-  '--envenenado-chegando-pelas-listas': ['/app.js',
-    "    var mod = moduloDoIndiceDoAssunto(a.id);\n    if (mod && pacoteDoModuloNoCelular(mod)) return 'aqui';\n",
-    "    if (estadoDosExerciciosNoCelular().qual === 'no-tablet') return 'no-tablet';\n    return fraseDosExerciciosNoCelular() ? 'chegando' : 'sem-pacote';\n"],
+  '--envenenado-resto-pelo-pacote-do-modulo': ['/app.js',
+    "      aindaChegando: ['prontos', 'no-tablet'].indexOf(estadoDosExerciciosNoCelular().qual) < 0", "      aindaChegando: chegada === 'chegando'"],
   '--envenenado-pacote-pelo-prefixo': ['/app.js',
     '    var fonte = partes[0];\n    if (fonte === \'banco\')', '    return partes[0];\n    var fonte = partes[0];\n    if (fonte === \'banco\')'],
   '--envenenado-nao-tem-antes-de-prontos': ['/app.js',
@@ -638,12 +638,12 @@ async function printar(pag, nome) {
     const corpo = l && !l.hidden ? p.innerText.split(l.innerText).join('') : p.innerText;
     return [/não cheg(ou|aram)|pode chegar/.test(corpo), l && !l.hidden ? l.innerText.trim() : null, (p.querySelector('.bte-faltam') || {}).textContent || ''].join('|');
   });
-  if (MODO === '--envenenado-chegando-pelas-listas') {
-    conf('VENENO visto: com uma lista dela incompleta, o assunto que tem o pacote aqui diz que o resto não chegou (' + casoC + ')', /^true\|/.test(casoC), true);
+  if (MODO === '--envenenado-resto-pelo-pacote-do-modulo') {
+    conf('VENENO visto: em faltam, com o pacote do assunto aqui, a falta parcial diz "Ainda sem" (' + casoC + ')', /Ainda sem questões da OBMEP/.test(casoC), true);
     return H.fim(amb)();
   }
-  conf('(c) faltam, com uma lista dela incompleta: o assunto com o pacote aqui não diz que algo não chegou, e a falta da OBMEP é a de sempre',
-    casoC, 'false|' + FRASE.parcial + '|Ainda sem questões da OBMEP para este assunto.');
+  conf('(c) faltam, com o pacote do assunto aqui: a falta parcial segue a regra do vazio (o resto ainda pode chegar)',
+    casoC, 'true|' + FRASE.parcial + '|O resto do material deste assunto ainda pode chegar a este celular.');
   await marcar(cel, 'prontos');
   await pausa(400);
 
@@ -824,7 +824,7 @@ async function printar(pag, nome) {
     const t = await pc.evaluate(() => {
       const p = document.querySelector('.cel-bib-assunto');
       return { chegou: /não cheg(ou|aram)|pode chegar/.test(p.innerText), vazio: (p.querySelector('.bte-vazio:not(.bte-faltam)') || {}).textContent || '',
-        secoes: Array.from(p.querySelectorAll('.bte-secao')).map(x => x.dataset.secao).join(',') };
+        secoes: Array.from(p.querySelectorAll('.bte-secao')).map(x => x.dataset.secao).join(','), faltam: (p.querySelector('.bte-faltam') || {}).textContent || '' };
     });
     console.log('   ' + id + ' (' + await pc.evaluate(() => document.querySelector('#modo-celular').getAttribute('data-pacotes')) + '): ' + JSON.stringify(t));
     return t;
@@ -834,6 +834,7 @@ async function printar(pag, nome) {
     const t = await assuntoNoCompleto(id, termo);
     conf('(a) prontos, o assunto ' + rotulo + ' (' + id + '): nada diz que não chegou', t.chegou, false);
     if (id === 'MAT04-09') conf('(arranjo) o assunto da Mirim 2 tem a OBMEP', /obmep/.test(t.secoes), true);
+    if (id === ASSUNTO) conf('(a) prontos: a falta parcial de sempre volta', t.faltam, 'Ainda sem questões da OBMEP para este assunto.');
     if (id === 'MAT09-01') conf('com a série pronta e sem o pacote dele, o assunto diz que não tem material neste celular', t.vazio, 'Este assunto não tem teoria nem exercícios neste celular.');
   }
   /* (b) sem Wi-Fi, com as listas completas e um pacote ainda a vir: o assunto
@@ -843,17 +844,12 @@ async function printar(pag, nome) {
   await pausa(300);
   const b1 = await assuntoNoCompleto(ASSUNTO, TERMO);
   const b2 = await assuntoNoCompleto('MAT09-01', 'números reais');
-  if (MODO === '--envenenado-chegando-pelas-listas') {
-    conf('VENENO visto: sem Wi-Fi e com as listas completas, o assunto do pacote que não veio diz que não tem material (' + b2.vazio + ')',
-      b2.vazio === 'Este assunto não tem teoria nem exercícios neste celular.', true);
-    return H.fim(amb)();
-  }
   if (MODO === '--envenenado-nao-tem-antes-de-prontos') {
     conf('VENENO visto: sem Wi-Fi, com a série ainda andando, o assunto sem material diz que não tem (' + b2.vazio + ')',
       b2.vazio === 'Este assunto não tem teoria nem exercícios neste celular.', true);
     return H.fim(amb)();
   }
-  conf('(b) sem Wi-Fi, o assunto do pacote que está aqui: nada de chegar', b1.chegou, false);
+  conf('(b) sem Wi-Fi, o Portal do 9º ano aqui e o Banco a caminho: o resto ainda pode chegar', b1.faltam, 'O resto do material deste assunto ainda pode chegar a este celular.');
   conf('(b) sem Wi-Fi, o assunto do pacote que ainda não veio: ainda pode chegar', b2.vazio, 'A teoria e os exercícios deste assunto ainda podem chegar a este celular.');
   conf('nenhum erro de página no perfil completo', pc.errosDePagina.join(' | '), '');
   await pc.close();
@@ -934,16 +930,23 @@ async function printar(pag, nome) {
     await irParaBiblioteca(pm, 3);
     await buscar(pm, termo);
     await abrirAssunto(pm, id);
-    return pm.evaluate(() => (document.querySelector('.cel-bib-assunto .bte-vazio:not(.bte-faltam)') || {}).textContent || '');
+    return pm.evaluate(() => ({ vazio: (document.querySelector('.cel-bib-assunto .bte-vazio:not(.bte-faltam)') || {}).textContent || '',
+      faltam: (document.querySelector('.cel-bib-assunto .bte-faltam') || {}).textContent || '' }));
   };
   const NAO_TEM = 'Este assunto não tem teoria nem exercícios neste celular.';
   await marcar(pm, 'sem-wifi');
-  const cad = await assuntoNoMisto('MAT07-01', 'números inteiros');
+  const cad = (await assuntoNoMisto('MAT07-01', 'números inteiros')).vazio;
   conf('sem Wi-Fi, os cadernos do 7º ano aqui e o Portal do 7º ano a caminho: o assunto sem material ainda pode chegar', cad, 'A teoria e os exercícios deste assunto ainda podem chegar a este celular.');
   conf('sem Wi-Fi, o ENEM aqui e o Portal da 3ª série a caminho: o assunto sem material ainda pode chegar',
-    await assuntoNoMisto('MATEM3-01', 'geometria analítica ponto'), 'A teoria e os exercícios deste assunto ainda podem chegar a este celular.');
+    (await assuntoNoMisto('MATEM3-01', 'geometria analítica ponto')).vazio, 'A teoria e os exercícios deste assunto ainda podem chegar a este celular.');
+  // com material dos cadernos e do ENEM, a falta parcial também ainda pode chegar
+  conf('sem Wi-Fi, o assunto com os cadernos e o Portal do 7º ano a caminho: o resto ainda pode chegar',
+    (await assuntoNoMisto('MAT07-08', 'sequências')).faltam, 'O resto do material deste assunto ainda pode chegar a este celular.');
+  conf('sem Wi-Fi, o assunto com o ENEM e o Portal a caminho: o resto ainda pode chegar',
+    (await assuntoNoMisto('MATEM3-11', 'contagem e probabilidade')).faltam, 'O resto do material deste assunto ainda pode chegar a este celular.');
   await marcar(pm, 'prontos');
-  conf('com a série pronta, o mesmo assunto sem material: não tem teoria nem exercícios neste celular', await assuntoNoMisto('MAT07-01', 'números inteiros'), NAO_TEM);
+  conf('com a série pronta, o mesmo assunto sem material: não tem teoria nem exercícios neste celular', (await assuntoNoMisto('MAT07-01', 'números inteiros')).vazio, NAO_TEM);
+  conf('com a série pronta, o dos cadernos volta à falta parcial de sempre', /^Ainda sem /.test((await assuntoNoMisto('MAT07-08', 'sequências')).faltam), true);
   await juntarEscritas(pm);
   conf('nenhum erro de página no perfil misto', pm.errosDePagina.join(' | '), '');
   await pm.close();
@@ -963,7 +966,7 @@ async function printar(pag, nome) {
   const refeito = await esperar('o assunto se refez com o pacote', () => pa.evaluate(() =>
     !!document.querySelector('#cel-biblioteca.ativa .cel-bib-assunto .bte-secao[data-secao="teoria"]')), v => v === true, 15000);
   conf('o assunto aberto se refez sozinho com a teoria, sem "não chegou", e continua aberto', refeito.ok + '|' +
-    await pa.evaluate(() => /não cheg(ou|aram)|pode chegar/.test(document.querySelector('.cel-bib-assunto').innerText)) + '|' +
+    await pa.evaluate(() => !!document.querySelector('.cel-bib-assunto .bte-vazio:not(.bte-faltam)')) + '|' +
     await pa.evaluate(a => !!document.querySelector('.cel-bib-assunto[data-assunto="' + a + '"]'), ASSUNTO), 'true|false|true');
   await juntarEscritas(pa);
   conf('nenhum erro de página no assunto que se refez', pa.errosDePagina.join(' | '), '');

@@ -1398,8 +1398,8 @@ roda "celular, Biblioteca so leitura (A2)"          node "_teste/testa_celular_b
 roda "celular, Biblioteca --envenenado-celular-mostra-no-material" node "_teste/testa_celular_biblioteca.js" --envenenado-celular-mostra-no-material
 roda "celular, Biblioteca --envenenado-celular-grava-ao-navegar" node "_teste/testa_celular_biblioteca.js" --envenenado-celular-grava-ao-navegar
 roda "celular, Biblioteca --envenenado-diz-que-sumiu" node "_teste/testa_celular_biblioteca.js" --envenenado-diz-que-sumiu
-# (lente do caso dela, #245) o assunto decide o "ainda nao chegou" pelo pacote dele, e nao pelas listas
-roda "celular, Biblioteca --envenenado-chegando-pelas-listas" node "_teste/testa_celular_biblioteca.js" --envenenado-chegando-pelas-listas
+# (regra conservadora) a falta parcial do assunto tambem "ainda pode chegar" fora do "prontos", e nao pelo pacote do modulo
+roda "celular, Biblioteca --envenenado-resto-pelo-pacote-do-modulo" node "_teste/testa_celular_biblioteca.js" --envenenado-resto-pelo-pacote-do-modulo
 # (lente do caso dela) o pacote do exercicio pelo formato do id: o Banco e a Mirim repartem o comeco entre pacotes
 roda "celular, Biblioteca --envenenado-pacote-pelo-prefixo" node "_teste/testa_celular_biblioteca.js" --envenenado-pacote-pelo-prefixo
 # (regra conservadora) o assunto sem material so diz "nao tem" com a serie pronta
