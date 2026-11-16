@@ -13282,13 +13282,16 @@
     var anoDoAluno = aluno && Core.anoEscolarDe(aluno);
     var aulaAnterior = ultimaAulaDada(aula);
     var materiaAnterior = aulaAnterior ? materiaUnicaDaAula(aulaAnterior) : null;
-    /* "Última aula de Matemática: 09/11". Dentro da lista de outra matéria
-     * (Português, por exemplo), a matéria sai da linha, que fica "Última aula:
-     * 09/11": o nome de outra matéria ali parecia ser a da lista (revisão do
-     * #249). nomeDaLista: o nome da matéria da lista aberta, ou null na raiz. */
+    /* "Último relato de Matemática: 09/11". É o que a regra mede (a última
+     * aula COM registro, Core.ultimoEncontro): dada ontem e sem registro, a
+     * aula de ontem não entra, e "Última aula: <a da semana passada>" seria
+     * falso (revisão do #249). Dentro da lista de outra matéria (Português,
+     * por exemplo), a matéria sai da linha, que fica "Último relato: 09/11": o
+     * nome de outra matéria ali parecia ser a da lista. nomeDaLista: o nome da
+     * matéria da lista aberta, ou null na raiz. */
     function textoDaUltimaAula(nomeDaLista) {
       var materia = materiaAnterior && (!nomeDaLista || nomeDaLista === materiaAnterior) ? materiaAnterior : null;
-      return 'Última aula' + (materia ? ' de ' + materia : '') + ': ' + Core.ddmm(aulaAnterior.data);
+      return 'Último relato' + (materia ? ' de ' + materia : '') + ': ' + Core.ddmm(aulaAnterior.data);
     }
     /* O nome já está no título da janela ("Assunto da aula, Nome"): aqui, o
      * ano do aluno ("Está no 9º ano", sem supor menino ou menina, e dito como
@@ -13451,7 +13454,7 @@
       else desenharRaiz();
       // a legenda só com sinal na tela (a busca e a raiz podem não ter nenhum)
       atualizarLegendaDosSinais(legenda, lista);
-      // a "Última aula" diz a matéria só fora da lista de outra matéria
+      // o "Último relato" diz a matéria só fora da lista de outra matéria
       var ultimaAula = topo.querySelector('.tema-ultima-aula');
       var naMateria = !termo && (nivel.tipo === 'disciplina' || nivel.tipo === 'grupo') && nivel.d ? (nivel.d.nome || '') : null;
       if (ultimaAula && aulaAnterior) ultimaAula.textContent = textoDaUltimaAula(naMateria);
@@ -27684,8 +27687,24 @@
       var velha = miniaturasNaMemoria.ordem.shift();
       var p = miniaturasNaMemoria.porChave[velha];
       delete miniaturasNaMemoria.porChave[velha];
-      if (p) p.then(function (url) { if (/^blob:/.test(url)) URL.revokeObjectURL(url); }, function () { /* já saiu */ });
+      if (p) p.then(function (url) {
+        if (/^blob:/.test(url)) { miniaturasASoltar.push(url); soltarMiniaturasForaDaTela(); }
+      }, function () { /* já saiu */ });
     }
+    soltarMiniaturasForaDaTela();
+  }
+  /* O endereço que saiu da memória só é solto quando nenhuma imagem do
+   * documento o usa (revisão do #249): a imagem ainda à vista, ou que acabou
+   * de receber o endereço enquanto carregava, não pode ficar quebrada. O que
+   * ainda está na tela espera a próxima saída da memória. */
+  var miniaturasASoltar = [];
+  function soltarMiniaturasForaDaTela() {
+    if (!miniaturasASoltar.length) return;
+    miniaturasASoltar = miniaturasASoltar.filter(function (url) {
+      var naTela = Array.prototype.some.call(document.images, function (i) { return i.getAttribute('src') === url; });
+      if (!naTela) URL.revokeObjectURL(url);
+      return naTela;
+    });
   }
   function miniaturaPronta(m) {
     var chave = Store.chaveMiniatura(m.pacote, m.versao, m.caminho) + '#' + m.largura;

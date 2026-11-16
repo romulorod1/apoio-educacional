@@ -758,15 +758,27 @@ async function printar(pag, nome) {
     const revogar = URL.revokeObjectURL;
     URL.revokeObjectURL = function (u) { soltos.push(u); return revogar.call(URL, u); };
     const teto = window.__provaMemoria().max;
+    // uma imagem na tela com o endereço da segunda: ele sai da memória, mas só é solto quando a imagem sai da tela
+    const naTela = document.createElement('img');
+    naTela.setAttribute('src', 'blob:prova-1');
+    document.body.appendChild(naTela);
+    const daVistaAntes = Array.from(document.images).map(i => i.getAttribute('src')).filter(s => /^blob:/.test(s || '') && !/prova/.test(s));
     for (let i = 0; i < 2 * teto; i++) window.__provaGuardarNaMemoria('prova:' + i, Promise.resolve('blob:prova-' + i));
     await new Promise(r => setTimeout(r, 300));
-    URL.revokeObjectURL = revogar;
     const daProva = soltos.filter(u => /^blob:prova-/.test(u));
+    const segundaPresa = daProva.indexOf('blob:prova-1') < 0;
+    naTela.remove();
+    window.__provaGuardarNaMemoria('prova:extra', Promise.resolve('blob:prova-extra'));
+    await new Promise(r => setTimeout(r, 300));
+    URL.revokeObjectURL = revogar;
     return { teto, n: window.__provaMemoria().n, primeiro: daProva[0], soltosDaProva: daProva.length,
-      oQueFica: daProva.indexOf('blob:prova-' + teto) < 0 };
+      oQueFica: daProva.indexOf('blob:prova-' + teto) < 0, segundaPresa, segundaSolta: soltos.indexOf('blob:prova-1') >= 0,
+      vistaSolta: daVistaAntes.filter(u => soltos.indexOf(u) >= 0).length, vistas: daVistaAntes.length };
   });
   conf('(14) a memória cheia fica no teto (' + memoria.teto + ') e solta o endereço das mais antigas, a começar pela primeira',
-    [memoria.n === memoria.teto, memoria.primeiro, memoria.soltosDaProva, memoria.oQueFica].join('|'), ['true', 'blob:prova-0', memoria.teto, 'true'].join('|'));
+    [memoria.n === memoria.teto, memoria.primeiro, memoria.soltosDaProva, memoria.oQueFica].join('|'), ['true', 'blob:prova-0', memoria.teto - 1, 'true'].join('|'));
+  conf('(14) o endereço de uma imagem ainda na tela só é solto quando ela sai, e as ' + memoria.vistas + ' miniaturas à vista ficam inteiras',
+    [memoria.segundaPresa, memoria.segundaSolta, memoria.vistaSolta].join('|'), 'true|true|0');
   /* 12. O Ver lista e a busca abertos também releem: a lista incompleta, em
    * "faltam", abre com a nota do resto; sem Wi-Fi, a nota e o PDF mudam sem
    * trocar de tela; na busca, o cartão da lista muda o motivo. */

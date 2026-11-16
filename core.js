@@ -1150,17 +1150,19 @@
 
   /* A aula JÁ ACONTECEU: a data e o horário dela já passaram (agora: um Date,
    * o relógio de agora quando falta). A das 15h de hoje, às 11h, ainda não. A
-   * de hoje SEM HORÁRIO (o app oferece "sem hora") aconteceu quando já tem
-   * registro de como foi (aulaTemRegistro: relato, nota, assunto, folha...):
-   * sem isso, a aula dada ao meio-dia e relatada só contaria à meia-noite, e
-   * a ficha do celular e a segunda aula do dia mostrariam a da semana passada
-   * (revisão do #249). Sem registro, ela ainda não conta. */
+   * de hoje SEM HORÁRIO (o app oferece "sem hora") aconteceu quando o RELATO
+   * dela já está escrito (revisão do #249): sem isso, a aula dada ao meio-dia
+   * e relatada só contaria à meia-noite, e a ficha do celular mostraria a da
+   * semana passada. Só o assunto anotado de antemão não basta: ele é plano, e
+   * não sinal de que a aula aconteceu. A aula com horário, no mesmo dia,
+   * depois dela, também a vê. Duas aulas de hoje SEM horário não se veem: o
+   * ordenarAulas não sabe qual veio antes (as duas têm o mesmo "sem hora"). */
   function aulaJaAconteceu(a, agora) {
     if (!a || !a.data) return false;
     var d = agora || new Date();
     var hoje = isoDe(d);
     if (a.data !== hoje) return a.data < hoje;
-    if (!a.hora) return aulaTemRegistro(a);
+    if (!a.hora) return !!(a.notaTexto || '').trim();
     return a.hora <= pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 

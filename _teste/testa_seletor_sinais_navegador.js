@@ -341,11 +341,11 @@ function legendaDizOsAcesos(legenda, porId) {
   });
   conf('o Voltar do grupo fica a uma folga da linha do alto fixo (' + folga.voltar + ' px), e a lista que rola começa abaixo dela (' + folga.lista + ' px)',
     (folga.voltar >= 14) + '|' + (folga.lista >= 4), 'true|true');
-  /* Dentro da lista de outra matéria, a "Última aula" não diz "de
+  /* Dentro da lista de outra matéria, o "Último relato" não diz "de
    * Matemática": parecia ser a matéria da lista (revisão do #249). */
   const ultimaAula = () => pag.evaluate(() => ((document.querySelector('#tema-contexto .tema-ultima-aula') || {}).textContent || '').trim());
   const ultimaNaMateria = await ultimaAula();
-  conf('na lista de ' + materia.titulo + ', a última aula fica sem a matéria (' + ultimaNaMateria + ')', /^Última aula: \d\d\/\d\d$/.test(ultimaNaMateria), true);
+  conf('na lista de ' + materia.titulo + ', o último relato fica sem a matéria (' + ultimaNaMateria + ')', /^Último relato: \d\d\/\d\d$/.test(ultimaNaMateria), true);
   await pag.evaluate(() => history.back());
   const v1 = await esperar('o 1º Voltar', ondeEsta, v => !!v && (v.titulo === materia.titulo || !v.tema), 4000);
   const p1 = v1.valor || {};
@@ -366,7 +366,7 @@ function legendaDizOsAcesos(legenda, porId) {
   conf('no grupo, o 1º Voltar do aparelho devolve a matéria, com o painel e a entrada dele', p1.tema + '|' + p1.titulo + '|' + p1.noHistorico,
     'true|' + materia.titulo + '|true');
   conf('na matéria, o 2º Voltar devolve a raiz do seletor, com o painel aberto', p2.tema + '|' + p2.raiz + '|' + p2.noHistorico, 'true|true|true');
-  conf('e, de volta à raiz, a última aula diz a matéria de novo', /^Última aula de Matemática: 09\/11$/.test(await ultimaAula()), true);
+  conf('e, de volta à raiz, o último relato diz a matéria de novo', /^Último relato de Matemática: 09\/11$/.test(await ultimaAula()), true);
   conf('a aula atrás continua aberta', p2.aula, true);
   // e a grade de Matemática, aberta da raiz: o Voltar devolve a raiz
   await pag.evaluate(() => {

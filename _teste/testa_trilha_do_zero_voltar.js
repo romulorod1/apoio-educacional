@@ -198,14 +198,14 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
   });
   conf('o painel fica à direita, da altura da tela', painel.lateral, true);
   conf('o contexto diz a última aula dada, sem contar a falta, e a matéria pelo id do assunto antigo (' + painel.contexto + ')',
-    /Última aula de Matemática: 09\/11/.test(painel.contexto), true);
+    /Último relato de Matemática: 09\/11/.test(painel.contexto) && !/Última aula/.test(painel.contexto), true);
   conf('e o ano do aluno, na etiqueta, sem supor menino ou menina', painel.ano, 'Está no 7º ano');
   /* UMA REGRA SÓ DA AULA ANTERIOR (polimento da 12b): o seletor e o quadro
    * "Na última aula" da janela da aula, logo atrás dele, falam da MESMA aula.
    * A de 13/11, dada e sem registro, fica de fora dos dois. */
   const naJanela = await p2.evaluate(() => ((document.querySelector('#modal-aula #ultimo-encontro .rotulo-ultimo') || {}).textContent || '').trim());
   conf('o seletor e a janela da aula falam da mesma aula anterior, e pulam a de 13/11 sem registro (' + naJanela + ')',
-    /^Na última aula, 09\/11\/2026,/.test(naJanela) + '|' + /Última aula[^:]*: 09\/11/.test(painel.contexto) + '|' + /13\/11/.test(painel.contexto + naJanela),
+    /^Na última aula, 09\/11\/2026,/.test(naJanela) + '|' + /Último relato[^:]*: 09\/11/.test(painel.contexto) + '|' + /13\/11/.test(painel.contexto + naJanela),
     'true|true|false');
   /* "já dado em": só aula dada. O assunto da aula antiga entra; o da falta, o
    * das 15h de hoje e o de 18/11 não, e nenhum diz a data de hoje. */
@@ -291,8 +291,8 @@ const amb = H.criarAmbiente(8885, 'nath_f5_trilha_zero', trocas);
   /* A última aula é a das 10h de hoje, e só tem o assunto escrito à mão, sem
    * matéria: a linha diz só a data, e não "de Português" (a das 15h, que não
    * aconteceu) nem "de Matemática" (que seria mentira). */
-  conf('numa aula futura, a "Última aula" é a das 10h de hoje, e o assunto escrito sem matéria não vira matéria (' + futura + ')',
-    /Última aula: 16\/11/.test(futura) && !/Última aula de/.test(futura), true);
+  conf('numa aula futura, o "Último relato" é o da aula das 10h de hoje, e o assunto escrito sem matéria não vira matéria (' + futura + ')',
+    /Último relato: 16\/11/.test(futura) && !/Último relato de/.test(futura), true);
   const linhasFutura = await p2.evaluate(() => Array.from(document.querySelectorAll('#lista-assuntos .item-assunto')).map(l => l.textContent.replace(/\s+/g, ' ').trim()));
   conf('na aula futura, o assunto da aula das 10h de hoje é "já dado em 16/11", e o das 15h não volta',
     /já dado em 16\/11/.test(linhasFutura.filter(l => l.indexOf('Assunto escrito de teste') >= 0).join('')) + '|' +

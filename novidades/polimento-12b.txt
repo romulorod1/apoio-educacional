@@ -1,2 +1,2 @@
-# Polimento da Biblioteca no celular e do F5: a aula anterior pela mesma regra da janela da aula, o "de outro ano" junto da seção, a folga sob o alto do seletor, a faixa curta do celular sem conta e a tela da Biblioteca do celular sempre com a conta de agora.
-No assunto da aula, a "Última aula" é a mesma do quadro da aula anterior.
+# Polimento da Biblioteca no celular e do F5: o último relato pela mesma regra da janela da aula, o "de outro ano" junto da seção, a folga sob o alto do seletor, a faixa curta do celular sem conta e a tela da Biblioteca do celular sempre com a conta de agora.
+No assunto da aula, o alto mostra o "Último relato", com a data da última aula que tem registro.

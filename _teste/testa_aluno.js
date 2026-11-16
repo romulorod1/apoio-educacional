@@ -21,7 +21,7 @@
  *     celular às 18h mostra a da semana passada (revisão do #249).
  */
 const VENENO_SEM_HORA = process.argv.indexOf('--envenenado-sem-hora-nunca-aconteceu') >= 0;
-const ANCORA_SEM_HORA = '    if (!a.hora) return aulaTemRegistro(a);\n';
+const ANCORA_SEM_HORA = "    if (!a.hora) return !!(a.notaTexto || '').trim();\n";
 const Core = (() => {
   if (!VENENO_SEM_HORA) return require('../core.js');
   const fs = require('fs');
@@ -169,7 +169,9 @@ const bancoSemHora = {
     aula({ id: 's1', data: '2026-09-01', hora: '', notaTexto: 'Dada ao meio-dia, sem horário.' }),
     aula({ id: 's2', data: '2026-09-01', hora: '19:00' }),
     // a outra aula de hoje sem horário e sem registro nenhum ainda não é onde os dois pararam
-    aula({ id: 's3', data: '2026-09-01', hora: '' })
+    aula({ id: 's3', data: '2026-09-01', hora: '' }),
+    // a de hoje sem horário com só o assunto anotado de antemão: plano, e não aula dada
+    aula({ id: 's4', data: '2026-09-01', hora: '', temas: [{ titulo: 'Assunto planejado de teste', fonte: 'livre' }] })
   ]
 };
 const fichaSemHora = Core.ultimoEncontro({ aulas: bancoSemHora.aulas.slice(0, 2) }, 'a1', null, AS_18H);
@@ -183,8 +185,12 @@ conf('a ficha do celular às 18h: o último relato é o da aula de hoje sem hor�
   fichaSemHora && fichaSemHora.aulaId + '|' + fichaSemHora.oQueRendeu, 's1|Dada ao meio-dia, sem horário.');
 conf('a segunda aula do dia (19h) vê a de hoje sem horário, relatada, no "Na última aula"',
   Core.ultimoEncontro(bancoSemHora, 'a1', bancoSemHora.aulas[2], AS_18H).aulaId, 's1');
-conf('a aula de hoje sem horário: com registro, aconteceu; sem registro, ainda não',
-  Core.aulaJaAconteceu(bancoSemHora.aulas[1], AS_18H) + '|' + Core.aulaJaAconteceu(bancoSemHora.aulas[3], AS_18H), 'true|false');
+conf('a aula de hoje sem horário: com o relato escrito, aconteceu; sem nada, ou com só o assunto anotado de antemão, ainda não',
+  [Core.aulaJaAconteceu(bancoSemHora.aulas[1], AS_18H), Core.aulaJaAconteceu(bancoSemHora.aulas[3], AS_18H),
+    Core.aulaJaAconteceu(bancoSemHora.aulas[4], AS_18H)].join('|'), 'true|false|false');
+conf('às 10h, a aula das 19h não vê a de hoje sem horário com só o assunto anotado (vê a da semana passada)',
+  Core.ultimoEncontro({ aulas: [bancoSemHora.aulas[0], bancoSemHora.aulas[4], bancoSemHora.aulas[2]] }, 'a1', bancoSemHora.aulas[2],
+    new Date(2026, 8, 1, 10, 0)).aulaId, 's0');
 
 // ================================================================
 secao('2. A anotação só dela nunca sai do aparelho');
