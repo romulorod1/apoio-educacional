@@ -2815,7 +2815,8 @@
   }
   var compartilharPdfAberto = 0;   // o número do envio aberto; 0 = nenhum
   var compartilharPdfVez = 0;
-  function compartilharPdfPronto(a, titulo) {
+  // aparelho: 'celular' na janela do celular (12b A3); sem ele, o tablet de sempre
+  function compartilharPdfPronto(a, titulo, aparelho) {
     // uma janela de compartilhar por vez: a segunda o Android recusa
     if (compartilharPdfAberto) { avisar('O compartilhar ainda está aberto.'); return; }
     var envio;
@@ -2841,7 +2842,7 @@
       if (nome === 'AbortError') { a.recusas = 0; avisar('Envio cancelado. O PDF continua aqui.'); }
       else if (nome === 'NotAllowedError') {
         a.recusas = (a.recusas || 0) + 1;
-        avisar(a.recusas > 1 ? 'O compartilhar não abriu. Toque em baixar para guardar o PDF no tablet.' : 'Toque de novo em compartilhar.');
+        avisar(a.recusas > 1 ? 'O compartilhar não abriu. Toque em baixar para guardar o PDF no ' + (aparelho || 'tablet') + '.' : 'Toque de novo em compartilhar.');
       }
       else avisar('Não consegui abrir o compartilhar. O PDF continua aqui para baixar ou ver.');
     });
@@ -2858,39 +2859,47 @@
     var corpo = $('#corpo-modal-bib-compartilhar');
     if (corpo) corpo.innerHTML = '';
   }
+  /* opcoes.celular (12b, parte A3): a janela no celular. A frase do alto diz
+   * "celular", e cada arquivo ganha os botões com o nome escrito:
+   * Compartilhar na linha inteira (em destaque só no primeiro, a lista), e
+   * Baixar e Ver dividindo a linha de baixo. A 390 px, os três numa linha só
+   * cortavam o "Compartilhar". O tablet fica com os botões só de símbolo. */
   function abrirPdfPronto(arquivos, titulo, opcoes) {
     var corpo = $('#corpo-modal-bib-compartilhar');
+    var noCelular = !!(opcoes && opcoes.celular);
+    var aparelho = noCelular ? 'celular' : 'tablet';
     corpo.innerHTML = '';
     corpo.appendChild(el('p', { class: 'ajuda u-margem-topo-0', id: 'bib-pdf-ajuda', texto: (opcoes && opcoes.ajuda) || (arquivos.length > 1
-      ? 'Mande a lista ao aluno e guarde o gabarito no tablet.'
-      : 'Mande ao aluno ou guarde no tablet.') }));
+      ? 'Mande a lista ao aluno e guarde o gabarito no ' + aparelho + '.'
+      : 'Mande ao aluno ou guarde no ' + aparelho + '.') }));
     var verNoLeitor = !$('#modal-leitor-pdf').classList.contains('aberto');
     arquivos.forEach(function (a, k) {
       var parte = PARTES_DO_PDF[a.parte] ? a.parte : 'material';
       var artigo = PARTES_DO_PDF[parte].artigo;
-      function botao(acao, nomeIcone, rotulo, aoTocar, principal) {
+      // no celular, o nome escrito no botão (o rótulo do leitor de tela começa por ele)
+      function botao(acao, nomeIcone, rotulo, aoTocar, principal, escrito) {
         return el('button', { type: 'button', class: 'btn bib-pdf-acao' + (principal ? ' principal' : ''),
           id: 'bib-pdf-' + acao + '-' + parte, 'aria-label': rotulo, title: rotulo, 'data-acao': acao,
-          icone: nomeIcone, aoClick: aoTocar });
+          icone: nomeIcone, texto: noCelular ? escrito : undefined, aoClick: aoTocar });
       }
       var acoes = [];
       if (podeCompartilharPdf(a)) {
         acoes.push(botao('compartilhar', 'compartilhar', 'Compartilhar ' + artigo,
-          function () { compartilharPdfPronto(a, titulo); }, k === 0));
+          function () { compartilharPdfPronto(a, titulo, noCelular ? 'celular' : null); }, k === 0, 'Compartilhar'));
       }
       acoes.push(botao('baixar', 'download', 'Baixar ' + artigo, function () {
         baixar(a.nome, a.blob);
         avisar('O PDF foi para a pasta Downloads.');
-      }));
+      }, false, 'Baixar'));
       if (verNoLeitor) acoes.push(botao('ver', 'olho', 'Ver ' + artigo, function () {
         abrirLeitorPdf(a.blob, { titulo: a.nome, nome: a.nome, comoFolha: false,
           /* o "Abrir fora do aplicativo" do leitor que não abriu volta a esta
            * janela, que continua aberta embaixo, em vez de baixar sozinho */
           abrirFora: function () { avisar('O PDF continua aqui para compartilhar ou baixar.'); } });
-      }));
-      corpo.appendChild(el('div', { class: 'item-lista bib-pdf-item', 'data-parte': parte }, [
+      }, false, 'Ver'));
+      corpo.appendChild(el('div', { class: 'item-lista bib-pdf-item' + (noCelular ? ' bib-pdf-item-celular' : ''), 'data-parte': parte }, [
         el('div', { class: 'cresce' }, [el('div', { class: 'nome bib-compartilhar-nome', texto: a.nome })]),
-        el('div', { class: 'bib-pdf-acoes' }, acoes)
+        el('div', { class: 'bib-pdf-acoes' + (noCelular ? ' bib-pdf-acoes-celular' : '') }, acoes)
       ]));
     });
     esconderAviso();
@@ -25590,14 +25599,19 @@
   /* Um item virando o que o compositor recebe. Solução que o pacote diz que
    * não existe vai como semSolucao; solução que devia existir e não abriu faz
    * a folha inteira parar (o compositor recusa), em vez de sair em branco. */
-  function pecasDoItem(it, comSolucao) {
+  /* umPorVez (o celular, 12b A3): a solução só começa a desenhar depois do
+   * enunciado, e nunca há dois recortes na memória ao mesmo tempo. */
+  function pecasDoItem(it, comSolucao, umPorVez) {
     var enun = blobDoAsset(it.pacote, it.assets.enunciado).then(function (b) {
       return Biblioteca.rasterizarRecorte(b, it.medidas.enunciado, it.origem && it.origem.enunciado && it.origem.enunciado.pedacos);
     });
-    var sol = (!comSolucao || it.sem_solucao || !it.assets.solucao) ? Promise.resolve(null)
-      : blobDoAsset(it.pacote, it.assets.solucao).then(function (b) {
+    var desenharSolucao = function () {
+      return blobDoAsset(it.pacote, it.assets.solucao).then(function (b) {
         return Biblioteca.rasterizarRecorte(b, it.medidas.solucao, it.origem && it.origem.solucao && it.origem.solucao.pedacos);
       });
+    };
+    var sol = (!comSolucao || it.sem_solucao || !it.assets.solucao) ? Promise.resolve(null)
+      : umPorVez ? enun.then(desenharSolucao) : desenharSolucao();
     return Promise.all([enun, sol]).then(function (r) {
       return { id: it.id, origem: origemCurta(it), credito: creditoDaLicenca(it), enunciado: r[0], solucao: r[1],
         semSolucao: !!(it.sem_solucao || !it.assets.solucao), resposta: respostaSemSolucao(it),
@@ -25721,26 +25735,37 @@
     return fn;
   }
 
+  /* op.soLer (o celular, 12b A3): o MESMO caminho de montar o PDF, sem nada
+   * do tablet. Só o "Só gerar PDF" (sem aula): não lê nem mexe no material
+   * marcado (o carrinho), não registra uso, não grava anexo nem lista, e não
+   * toca a janela Gerar material. O nome do arquivo leva op.sufixoDoArquivo
+   * (e não a lista pronta em edição do tablet), a fila desenha um recorte por
+   * vez (a memória do celular) e a janela PDF pronto abre com o jeito do
+   * celular. Pedir aula com soLer é erro de quem chama. */
   function gerarEAnexar(aulaId, itens, paginas, op) {
+    if (op.soLer && (aulaId || op.cabecalhoDaAula || op.folha)) return Promise.reject(new Error('o celular só gera o PDF, sem aula'));
     if (gerandoMaterial) { avisar('Ainda estou montando o material anterior. Espere um instante.'); return Promise.resolve(); }
     gerandoMaterial = true;
     var aula = aulaId ? db.aulas.filter(function (a) { return a.id === aulaId; })[0] : null;
     var daCabeca = aula || (op.cabecalhoDaAula ? db.aulas.filter(function (a) { return a.id === op.cabecalhoDaAula; })[0] : null);
     var aluno = daCabeca ? alunoPorId(daCabeca.alunoId) : null;
-    $$('#rodape-modal-bib-gerar button').forEach(function (b) { b.disabled = true; });
-    var botao = $('#bib-gerar-anexar');
-    if (botao) botao.textContent = 'Montando...';
-    if (!op.semAvisoDeMontagem) avisar('Montando o material. Isso leva alguns segundos.');
+    if (!op.soLer) {
+      $$('#rodape-modal-bib-gerar button').forEach(function (b) { b.disabled = true; });
+      var botao = $('#bib-gerar-anexar');
+      if (botao) botao.textContent = 'Montando...';
+    }
+    if (!op.semAvisoDeMontagem) avisar(op.soLer ? 'Montando o PDF da lista. Isso leva alguns segundos.' : 'Montando o material. Isso leva alguns segundos.');
     var usaItens = (op.lista || op.gabarito) ? itens : [];
-    // o material é, exatamente, uma das Minhas listas? o uso guarda qual (C2a)
-    var listaId = minhaListaDoMaterial();
+    // o material é, exatamente, uma das Minhas listas? o uso guarda qual (C2a); o celular não olha o material marcado
+    var listaId = op.soLer ? null : minhaListaDoMaterial();
+    var juntos = op.soLer ? 1 : 2;
     var pecas, teoria, anexado = false, id = null, saida = null, etapa = 'montar', assuntosNovos = [];
     // na série, qualquer aviso final espera o Desfazer dela vencer
     function avisarNaHora(t, r, f, r2, f2) {
       var espera = Math.max(0, (op.avisoDepoisDe || 0) - Date.now());
       if (espera) setTimeout(function () { avisar(t, r, f, r2, f2); }, espera); else avisar(t, r, f, r2, f2);
     }
-    return emFila(usaItens, function (it, i) { return comNomeDoExercicio(pecasDoItem(it, op.gabarito), it, i + 1); }).then(function (r) {
+    return emFila(usaItens, function (it, i) { return comNomeDoExercicio(pecasDoItem(it, op.gabarito, juntos === 1), it, i + 1); }, juntos).then(function (r) {
       pecas = r;
       return emFila(op.teoria ? paginas : [], function (p) {
         return blobDoAsset(p.aula.pacote, p.pagina.asset).then(function (b) { return Biblioteca.rasterizarPagina(b, p.pagina.medidas); })
@@ -25749,7 +25774,7 @@
             err.pagina = (p.pagina.capa ? 'A capa' : 'A página ' + p.pagina.n) + ' de ' + p.aula.aula.titulo;
             throw err;
           });
-      });
+      }, juntos);
     }).then(function (r) {
       teoria = r;
       var base = {
@@ -25762,8 +25787,9 @@
       var nomeBase = op.titulo + (op.subtitulo ? ' ' + op.subtitulo : '');
       /* Material de lista pronta: o nome do arquivo leva a lista
        * ("..._lista_1_desafio.pdf"), para ela saber qual é sem abrir. */
-      var lpDoArquivo = lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
-      var daLista = lpDoArquivo && listaProntaEmEdicao(lpDoArquivo) ? ' ' + comoSeChama(lpDoArquivo).replace(/^com /, '') : '';
+      var lpDoArquivo = !op.soLer && lpEmEdicao() ? listaProntaPorId(lpEmEdicao()) : null;
+      var daLista = op.soLer ? (op.sufixoDoArquivo ? ' ' + op.sufixoDoArquivo : '')
+        : lpDoArquivo && listaProntaEmEdicao(lpDoArquivo) ? ' ' + comoSeChama(lpDoArquivo).replace(/^com /, '') : '';
       /* O GABARITO VAI EM ARQUIVO SEPARADO QUANDO ELA ANEXA LISTA COM GABARITO:
        * no mesmo PDF, mandar a lista ao aluno era mandar as respostas junto
        * (a página do gabarito é quase igual à da lista, e numa impressora preto
@@ -25784,6 +25810,11 @@
         arquivos = [{ nome: Core.nomeArquivo(nomeBase) + '_biblioteca.pdf', blob: new Blob([saida.bytes], { type: 'application/pdf' }) }];
       }
       if (!aula) {
+        if (op.soLer) {
+          // o celular: só a janela, com o jeito dele; nada do material do tablet
+          abrirPdfPronto(arquivos, op.titulo, { celular: true });
+          return null;
+        }
         fecharModal('modal-bib-gerar');
         // o material saiu: a próxima abertura não sugere aula sozinha (como depois do anexo)
         bibSugestaoGasta = true;
@@ -25912,11 +25943,14 @@
           avisarNaHora(msgRemarcar);
         }
       }
+      // no celular não há o que desmarcar nem anexo: o PDF só não saiu
+      else if (op.soLer) avisarNaHora(((e && (e.exercicio || e.pagina)) ? (e.exercicio || e.pagina) + ' não abriu, e o PDF não saiu.' : 'Não consegui montar o PDF.') + ' Tente de novo daqui a pouco.');
       else if (e && e.exercicio) avisarNaHora(e.exercicio + ' não abriu. Desmarque esse exercício e gere de novo. Nada foi anexado.');
       else if (e && e.pagina) avisarNaHora(e.pagina + ' não abriu. Desmarque essa página e gere de novo. Nada foi anexado.');
       else avisarNaHora('Não consegui montar o material. Nada foi anexado; tente de novo daqui a pouco.');
     }).then(function () {
       gerandoMaterial = false;
+      if (op.soLer) return;
       $$('#rodape-modal-bib-gerar button').forEach(function (b) { b.disabled = false; });
       if (abrirModalGerar.atualizar) abrirModalGerar.atualizar();
     });
@@ -26593,7 +26627,7 @@
      * página (o título da seção é o da página; o bloco não repete o dele). */
     var caixaT2 = el('div', { class: 'bib-assunto-teoria' });
     if (bib) desenharBlocoTeoriaExercicios(caixaT2, fontesDoAssuntoNoApp(a.id, null, a.serie),
-      cel ? { semTitulo: true, soLer: true, verLista: cel.verLista, fraseDoVazio: cel.fraseDoVazio, aindaChegando: cel.aindaChegando }
+      cel ? { semTitulo: true, soLer: true, verLista: cel.verLista, pdfDaLista: cel.pdfDaLista, fraseDoVazio: cel.fraseDoVazio, aindaChegando: cel.aindaChegando }
         : { semTitulo: true });
     else caixaT2.appendChild(el('p', { class: 'ajuda bib-assunto-vazio', texto: 'Não consegui abrir os exercícios agora. Tente de novo daqui a pouco.' }));
     // no celular, a linha dos exercícios que ainda chegam fica logo acima do bloco
@@ -27386,7 +27420,11 @@
         ]),
         el('div', { class: 'bte-lista-acoes' }, cx.soLer ? [
           el('button', { type: 'button', class: 'btn bte-lista-ver', icone: 'olho', texto: 'Ver lista',
-            aoClick: function () { if (typeof cx.verLista === 'function') cx.verLista(base); } })
+            aoClick: function () { if (typeof cx.verLista === 'function') cx.verLista(base); } }),
+          // o PDF da lista de base (o celular, 12b A3), quando quem desenha o oferece
+          typeof cx.pdfDaLista === 'function' ? el('button', { type: 'button', class: 'btn principal bte-lista-pdf', 'data-acao': 'pdf',
+            icone: 'compartilhar', texto: 'PDF', 'aria-label': 'PDF da lista de base',
+            aoClick: function () { cx.pdfDaLista(base); } }) : null
         ] : [
           el('button', { type: 'button', class: 'btn bte-lista-ver', icone: 'olho', texto: 'Ver',
             'aria-label': 'Ver a lista de base em tela cheia', aoClick: function () { abrir(base); } }),
@@ -32277,8 +32315,12 @@
    * nunca recebe pacotes (sem a conta dela, ou o observador) diz que os
    * exercícios ficam no tablet, e não promete o próximo Wi-Fi.
    *
-   * O PDF da lista (o botão PDF do cartão e o "PDF da lista" do Ver lista) é
-   * da parte A3, com a janela do PDF pronto do celular; aqui ele não aparece. */
+   * O PDF DA LISTA (parte A3): o botão PDF do cartão, o da lista de base na
+   * página do assunto e o "PDF da lista" preso no pé do Ver lista. Também só
+   * lê: monta pelo mesmo gerarEAnexar do tablet, com op.soLer (sem o material
+   * marcado, sem o registro de uso, sem anexo), e abre a janela PDF pronto do
+   * celular. Fica apagado quando falta exercício da lista neste celular (o
+   * motivo é a mesma linha curta do cartão): o PDF nunca sai pela metade. */
   var celBib = { termo: '', assunto: null, lista: null };   // lista: { tipo: 'minha' | 'base', id, assunto }
   var celBibVez = 0;
   var celBibNomes = null;   // o índice de assuntos da última abertura da aba
@@ -32595,6 +32637,50 @@
     }
   }
 
+  /* O PDF DA LISTA NO CELULAR (12b, parte A3). Sem opção nenhuma, o padrão
+   * do tablet: a lista (com a teoria, se a lista tiver) e o gabarito em
+   * arquivo separado, que é dela. O título é o nome da lista dela; na lista de
+   * base, o do tablet (o módulo e a aula), e o arquivo leva "de base". */
+  function materialDaListaNoCelular(alvo) {
+    if (!bib) return null;
+    if (alvo.tipo === 'base') {
+      var lp = listaProntaPorId(alvo.id);
+      if (!lp) return null;
+      var itensDaBase = lp.itens.filter(Boolean);
+      var padrao = tituloPadraoDoCarrinho(itensDaBase, []);
+      return { itens: itensDaBase, paginas: [], titulo: padrao.titulo, subtitulo: padrao.subtitulo, lista: null,
+        sufixo: lp.regra === 'base-v1' ? 'de base' : comoSeChama(lp).replace(/^com /, '') };
+    }
+    var t = listasParaMostrar();
+    var l = t.dela.concat(t.doAplicativo).filter(function (x) { return x.id === alvo.id; })[0];
+    if (!l) return null;
+    var r = resumoDaMinhaLista(l);
+    return { itens: r.itens, paginas: r.paginas, titulo: nomeDaMinhaLista(l), subtitulo: '', lista: l, sufixo: '' };
+  }
+  /* A lista sem PDF no celular: a vazia e a que ainda espera exercício (o
+   * mesmo "a caminho" do cartão). A lista de base só existe com o pacote dela. */
+  function listaSemPdfNoCelular(l, r) {
+    return (r || resumoDaMinhaLista(l)).vazia || aCaminhoDaLista(l) > 0;
+  }
+  function pdfDaListaCelular(alvo) {
+    var m = materialDaListaNoCelular(alvo);
+    if (!m || (!m.itens.length && !m.paginas.length) || (m.lista && listaSemPdfNoCelular(m.lista))) {
+      avisar('Esta lista ainda não tem todos os exercícios neste celular.');
+      return Promise.resolve();
+    }
+    // o celular não passa pelo material marcado nem pelo registro de uso: só monta o PDF
+    var temExercicio = m.itens.length > 0;
+    return gerarEAnexar(null, m.itens, m.paginas, { soLer: true, titulo: m.titulo, subtitulo: m.subtitulo,
+      sufixoDoArquivo: m.sufixo, teoria: m.paginas.length > 0, lista: temExercicio, gabarito: temExercicio,
+      espaco: false, origem: false, folha: false, semAssuntos: true });
+  }
+  function botaoPdfDaListaCelular(alvo, texto, nome, apagado, idDoMotivo) {
+    return el('button', { type: 'button', class: 'btn principal', 'data-acao': 'pdf',
+      icone: 'compartilhar', texto: texto, 'aria-label': texto + (nome ? ': ' + nome : ''),
+      disabled: apagado ? 'disabled' : null, 'aria-describedby': apagado && idDoMotivo ? idDoMotivo : null,
+      aoClick: function () { pdfDaListaCelular(alvo); } });
+  }
+
   /* O cartão da lista no celular: o nome, o nível, o assunto, a conta e o
    * tempo, e o Ver lista. A lista com exercício fora do aparelho diz por quê,
    * numa linha curta, no lugar da conta; enquanto os pacotes andam, ou se não
@@ -32606,16 +32692,20 @@
     // só o que ainda vem conta; o que saiu de um pacote que está aqui fica com a conta do tablet
     var falta = aCaminhoDaLista(l) > 0;
     var apagado = r.vazia || (falta && !!ESTADOS_QUE_ANDAM[e.qual]);
+    // o PDF (A3) não sai pela metade: apagado também com a lista aberta pelo que veio
+    var semPdf = apagado || listaSemPdfNoCelular(l, r);
+    var idDoMotivo = 'cel-bib-motivo-' + Core.nomeArquivo(l.id);
     return el('div', { class: 'cartao cel-bib-lista' + (falta ? ' esperando' : ''), 'data-lista': l.id }, [
       el('strong', { class: 'cel-bib-lista-nome', texto: nomeDaMinhaLista(l) }),
       l.nivel ? el('span', { class: 'cel-bib-nivel', texto: 'Nível ' + nomeDoNivel(l.nivel) }) : null,
       r.assuntos.length ? el('div', { class: 'ajuda cel-bib-lista-assunto', texto: r.assuntos.join(', ') }) : null,
-      falta ? el('div', { class: 'cel-bib-lista-motivo', texto: motivoDaListaNoCelular(r, e) })
-        : el('div', { class: 'ajuda cel-bib-lista-conta', texto: r.conta + r.textoTempo }),
+      falta ? el('div', { class: 'cel-bib-lista-motivo', id: idDoMotivo, texto: motivoDaListaNoCelular(r, e) })
+        : el('div', { class: 'ajuda cel-bib-lista-conta', id: idDoMotivo, texto: r.conta + r.textoTempo }),
       el('div', { class: 'cel-bib-lista-acoes' }, [
         el('button', { type: 'button', class: 'btn', 'data-acao': 'ver-lista', texto: 'Ver lista',
-          disabled: apagado ? 'disabled' : null,
-          aoClick: function () { abrirListaCelular({ tipo: 'minha', id: l.id }); } })
+          disabled: apagado ? 'disabled' : null, 'aria-describedby': apagado ? idDoMotivo : null,
+          aoClick: function () { abrirListaCelular({ tipo: 'minha', id: l.id }); } }),
+        botaoPdfDaListaCelular({ tipo: 'minha', id: l.id }, 'PDF', nomeDaMinhaLista(l), semPdf, idDoMotivo)
       ])
     ]);
   }
@@ -32707,6 +32797,7 @@
       voltar: voltarDoAssuntoCelular,
       abrirAssunto: abrirAssuntoCelular,
       verLista: function (base) { abrirListaCelular({ tipo: 'base', id: base.id, assunto: id }); },
+      pdfDaLista: function (base) { pdfDaListaCelular({ tipo: 'base', id: base.id, assunto: id }); },
       // escondida enquanto não falta nada; a marca dos pacotes a acende aqui também
       antesDoBloco: linhaDosExerciciosCelular(),
       fraseDoVazio: fraseDoAssuntoSemMaterialNoCelular(),
@@ -32727,7 +32818,7 @@
     var alvo = celBib.lista;
     var tela = el('article', { class: 'cel-bib-ver-lista', 'data-lista': alvo.id });
     caixa.appendChild(tela);
-    var titulo = '', nivel = '', resumo = '', caminho = [], itens = [], paginas = [], nota = '';
+    var titulo = '', nivel = '', resumo = '', caminho = [], itens = [], paginas = [], nota = '', semPdf = false;
     if (alvo.tipo === 'base') {
       var lp = listaProntaPorId(alvo.id);
       var a = nomes && alvo.assunto ? nomes.porId[alvo.assunto] : null;
@@ -32754,6 +32845,7 @@
       // o que ainda vem fica na nota; o que saiu de um pacote que está aqui, na conta do tablet
       resumo = aCaminho ? (r.vazia ? '' : r.contaDoQueHa + r.textoTempo) : r.conta + r.textoTempo;
       if (aCaminho) nota = motivoDaListaNoCelular(r, estadoDosExerciciosNoCelular());
+      semPdf = listaSemPdfNoCelular(l, r);
     }
     if (caminho.length) {
       tela.appendChild(el('p', { class: 'bib-assunto-caminho' }, caminho.map(function (p, i) {
@@ -32784,6 +32876,10 @@
     });
     tela.appendChild(coluna);
     observarMiniaturasDoBloco(coluna);
+    // o "PDF da lista", preso no pé da tela enquanto ela rola (padrão 3); apagado pela regra do cartão
+    var botaoDoPe = botaoPdfDaListaCelular(alvo, 'PDF da lista', titulo, semPdf || (!itens.length && !paginas.length), nota ? 'cel-bib-lista-nota' : null);
+    botaoDoPe.id = 'cel-bib-pdf-lista';
+    tela.appendChild(el('div', { class: 'cel-bib-pe-pdf', id: 'cel-bib-pe-pdf' }, [botaoDoPe]));
   }
 
   function desenharAlunosCelular() {

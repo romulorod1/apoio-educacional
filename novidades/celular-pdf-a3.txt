@@ -1,0 +1,2 @@
+# Biblioteca no celular, A3: o PDF da lista e do gabarito no celular, pela janela PDF pronto.
+No celular, a lista abre e vira PDF para mandar ao aluno, com o gabarito à parte.

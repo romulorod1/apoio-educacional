@@ -5,8 +5,9 @@
  * "Biblioteca", com o mesmo ícone; no começo, a busca de assunto e Minhas
  * listas; o resultado da busca, com o ano e os sinais do #239; a página do
  * assunto em uma coluna (a mesma montarPaginaDoAssunto do tablet, com a opção
- * do celular); e o Ver lista, com os exercícios um embaixo do outro. O PDF é
- * da A3 e não aparece aqui.
+ * do celular); e o Ver lista, com os exercícios um embaixo do outro. O PDF da
+ * lista é da A3, e a prova dele é a testa_celular_pdf.js; aqui só se confere
+ * que o botão está onde deve.
  *
  * No Chrome de verdade, sem nuvem: o modo celular vem do tamanho da tela (a
  * mesma regra das testa_celular_*), e a Biblioteca do aparelho é a do pacote
@@ -24,7 +25,7 @@
  *
  * O que se prova:
  *   1. a aba se chama Biblioteca, com o mesmo ícone de antes;
- *   2. o começo: a busca no alto e Minhas listas embaixo; nenhum PDF (A3);
+ *   2. o começo: a busca no alto e Minhas listas embaixo; o PDF da A3 no cartão;
  *   3. NO CELULAR, O QUE FALTA SÓ NÃO CHEGOU: em TODOS os valores da marca
  *      (trazendo, conferindo, sem-wifi, sem-internet, parou, falhou,
  *      sem-espaco, faltam, nada, prontos e sem marca) a tela nunca diz "não
@@ -489,8 +490,8 @@ async function printar(pag, nome) {
   conf('os três cartões, a mais nova primeiro', cs.map(c => c.id).join(','), 'lista-revisao,lista-desafio,lista-area');
   conf('o cartão da lista completa: nome, nível, assunto, conta e o Ver lista aceso',
     /^Revisão de equações para a prova\nNível Regular\nEquações do Segundo Grau\n4 exercícios e 1 página de teoria/.test(cs[0].texto) && !cs[0].apagado && !cs[0].motivo, true);
-  conf('nenhum botão de PDF na aba (o PDF é da A3)', await cel.evaluate(() =>
-    Array.from(document.querySelectorAll('#cel-biblioteca button')).some(b => /PDF/.test(b.textContent))), false);
+  conf('o PDF (A3) está em cada cartão, ao lado do Ver lista', await cel.evaluate(() =>
+    Array.from(document.querySelectorAll('#cel-bib-miolo .cel-bib-lista')).every(c => !!c.querySelector('.cel-bib-lista-acoes [data-acao="ver-lista"] + [data-acao="pdf"]'))), true);
   conf('os livros ficam no tablet, numa linha no fim', await textoDa(cel, '#cel-bib-livros'), 'Os livros ficam no tablet.');
   const vistos = [];
   for (const [m, linha, motivo, apagaIncompleta, motivoDaIncompleta] of ESTADOS) {
@@ -662,7 +663,7 @@ async function printar(pag, nome) {
   conf('a lista de base: Voltar ao assunto, o título e o nível', verBase.voltar + '|' + verBase.titulo + '|' + verBase.nivel, 'Voltar ao assunto|Lista de base|Nível Base');
   conf('os exercícios da lista, um embaixo do outro, na ordem (' + BASE_N + ')',
     verBase.nomes.join(',') + '|' + verBase.imagens, Array.from({ length: BASE_N }, (x, i) => 'Exercício ' + (i + 1)).join(',') + '|' + BASE_N);
-  conf('sem PDF na tela (A3)', verBase.pdf, false);
+  conf('o "PDF da lista" (A3) no pé da tela', verBase.pdf, true);
   await printar(cel, '390x844_5_ver_lista.png');
   await voltar(cel);
   conf('o Voltar do Android devolve o assunto', await noAssunto(cel), true);
