@@ -116,8 +116,16 @@ const janelaNoHistorico = pag => pag.evaluate(() => (history.state && history.st
   for (let i = 0; i < 3; i++) {
     await pag.click('[data-aula-id="ev_aula"]');
     await esperar('aula aberta para a corrida', () => pag.$eval('#modal-aula', e => e.classList.contains('aberto')), Boolean, 5000);
-    await pag.evaluate(() => { document.querySelector('#modal-aula .fechar').click(); location.reload(); });
-    await esperar('o app de pé depois da recarga', () => pag.evaluate(() => !!document.querySelector('#abas .aba') && typeof Store === 'object'), Boolean, 20000);
+    /* O location.reload() é assíncrono: logo depois dele, o documento à vista
+     * ainda é o de antes, com as abas e o Store de pé. Esperar só "o app de
+     * pé" aceitava esse documento velho (em 9 ms, uma vez ou outra), e a
+     * leitura seguinte caía no meio da navegação ("Execution context was
+     * destroyed"). A marca fica no documento de antes; só o documento novo,
+     * que nasce sem ela, satisfaz a espera. */
+    await pag.evaluate(() => { window.__antesDaRecarga = true; document.querySelector('#modal-aula .fechar').click(); location.reload(); });
+    const dePe = await esperar('o app de pé depois da recarga (no documento novo)', () => pag.evaluate(() =>
+      !window.__antesDaRecarga && !!document.querySelector('#abas .aba') && typeof Store === 'object'), Boolean, 20000);
+    if (!dePe.ok) throw new Error('corrida ' + (i + 1) + ': o documento novo não ficou de pé em 20 s');
     if (await pag.evaluate(() => window.__estadoAoNascer)) corridas++;
     const limpo = await esperar('histórico sem janela depois da corrida', () => janelaNoHistorico(pag), v => v === null, 3000);
     checa('corrida ' + (i + 1) + ': o histórico fica sem janela', limpo.ok, true, ['entrada-velha']);
