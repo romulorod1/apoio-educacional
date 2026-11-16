@@ -246,7 +246,19 @@ export function montarParametros(corpo) {
   if (conta.texto > LIMITES.texto) return { codigo: 'texto_demais' };
   // Cache de prompt automático: o prefixo estável (sistema e ferramentas) é
   // reaproveitado entre os turnos de ajuste. Na fumaça não vale a pena.
-  if (corpo.rota !== 'teste') params.cache_control = { type: 'ephemeral' };
+  // Ponto explícito no fim do system (item 19a, 16/11/2026): o automático
+  // grava só no fim do pedido, e um caso novo (outras imagens, outra pergunta)
+  // não achava nada para ler, nem o system, que é igual em toda chamada da
+  // rota. Com o ponto aqui, ferramentas e system viram uma entrada própria do
+  // cache. Nasce só no servidor, depois da validação: o aparelho continua sem
+  // poder mandar cache_control (validarConteudo e limparFerramentas recusam), e
+  // o system dele continua tendo de ser texto.
+  if (corpo.rota !== 'teste') {
+    params.cache_control = { type: 'ephemeral' };
+    if (typeof params.system === 'string' && params.system.length > 0) {
+      params.system = [{ type: 'text', text: params.system, cache_control: { type: 'ephemeral' } }];
+    }
+  }
   return { params };
 }
 
