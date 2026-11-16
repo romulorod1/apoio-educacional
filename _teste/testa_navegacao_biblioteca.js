@@ -356,10 +356,10 @@ async function abrirCelular(w, h) {
     await pausa(250);
     const m = await medirBarra(cel);
     console.log('   ' + nome + ': rótulos a ' + m.folga + ' px um do outro no mais apertado');
-    conf(nome + ': os destinos, na ordem, com rótulos compactos', m.rotulos, 'Hoje,Alunos,Livros,Fechar mês,Enviar');
+    conf(nome + ': os destinos, na ordem, com rótulos compactos', m.rotulos, 'Hoje,Alunos,Biblioteca,Fechar mês,Enviar');
     conf(nome + ': os nomes completos continuam acessíveis', await cel.evaluate(() =>
       document.querySelector('.cel-aba[data-cel="biblioteca"]').getAttribute('aria-label') + ',' +
-      document.querySelector('.cel-aba[data-cel="fechamento"]').getAttribute('aria-label')), 'Biblioteca de livros,Fechar mês: fechamento mensal');
+      document.querySelector('.cel-aba[data-cel="fechamento"]').getAttribute('aria-label')), 'Biblioteca: assuntos e listas,Fechar mês: fechamento mensal');
     conf(nome + ': a grade reservou espaço visível para + Aula', m.maisOculto, false);
     conf(nome + ': um ativo só, Hoje, com aria-current', m.ativos + '|' + m.atuais, 'hoje|hoje');
     conf(nome + ': rótulos sem corte nem sobreposição, alvo de 48 px (' + (m.ruins.join('; ') || 'nada') + ')', m.ruins.length, 0);

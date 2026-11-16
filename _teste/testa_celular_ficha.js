@@ -451,7 +451,7 @@ const ENDERECO_ALFA = 'Rua Fictícia, 100, Bairro Teste';
 
   secao('3. A aba Alunos: a lista dos ativos');
   conf('a aba Alunos está nas abas de baixo, depois de Hoje', await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-abas .cel-aba')).filter(b => !b.hidden).map(b => b.textContent).join(',')),
-    'Hoje,Alunos,Livros,Fechar mês,Enviar,+ Aula'); // B1: a Biblioteca entrou; F2 encurtou os rótulos na barra
+    'Hoje,Alunos,Biblioteca,Fechar mês,Enviar,+ Aula'); // B1: a Biblioteca entrou; F2 encurtou os rótulos; 12b A2: Livros virou Biblioteca
   await aba(pagC, 'alunos');
   const lista = await pagC.evaluate(() => Array.from(document.querySelectorAll('#cel-alunos-lista .cel-aluno-item')).map(b => b.dataset.aluno + '=' + b.querySelector('.cel-aluno-nome').textContent));
   conf('a lista traz os ativos em ordem de nome, sem o inativo', lista.join(', '),
