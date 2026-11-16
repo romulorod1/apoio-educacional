@@ -276,6 +276,15 @@ roda "fonte unicode"  node _teste/testa_fonte_unicode.js
 roda "fonte unicode --envenenado-sem-tounicode" node _teste/testa_fonte_unicode.js --envenenado-sem-tounicode
 roda "fonte unicode --envenenado-largura-errada" node _teste/testa_fonte_unicode.js --envenenado-largura-errada
 roda "fonte unicode --envenenado-fonte-sempre" node _teste/testa_fonte_unicode.js --envenenado-fonte-sempre
+# D2: a formula LaTeX em vetor (formula.js, svg-para-pdf.js, MathJax 4.1.3 em
+# vendor/). O corpus de notacao inteiro (396) na folha e no gabarito, o
+# controle sem formula byte a byte igual ao pdf.js da bcc9371 e sem carregar o
+# MathJax, cada glifo uma vez por documento (Form XObject) e a falha alta entre
+# colchetes. Um veneno por regra.
+roda "formula mathjax" node _teste/testa_formula_mathjax.js
+roda "formula mathjax --envenenado-glifo-sem-xobject" node _teste/testa_formula_mathjax.js --envenenado-glifo-sem-xobject
+roda "formula mathjax --envenenado-falha-calada" node _teste/testa_formula_mathjax.js --envenenado-falha-calada
+roda "formula mathjax --envenenado-mathjax-na-abertura" node _teste/testa_formula_mathjax.js --envenenado-mathjax-na-abertura
 roda "busca (regras)" node _teste/testa_busca_regras.js
 # FRENTE 2: bloco de citacao com numero de linha, fio e credito, italico por F4/F5,
 # alternativas e gabarito em criterio, e a folha legada byte a byte igual a base do merge.
@@ -1186,6 +1195,10 @@ roda "preparar e enviar --envenenado-folhas-direto" node "_teste/testa_preparar_
 # pre-cache), pagina e zoom, a pagina vira folha com o traco salvo, e a segunda
 # abertura funciona com a rede cortada.
 roda "leitor de pdf"                              node "_teste/testa_leitor_pdf.js"
+# D2: o MathJax das formulas (vendor/mathjax-4.1.3/) nao vem na abertura nem no
+# PDF sem formula; a primeira lista com formula com a CPU 4x e 6x mais lenta,
+# vendor fora e dentro do BAIXADOS, 33 formulas, e o aviso de 3 s. Porta 8883.
+roda "formula no navegador"                       node "_teste/testa_formula_navegador.js"
 # C3: a foto e o PDF anexados viram folha da MESMA aula, sem perguntar qual
 # (a foto direto, o PDF pelo leitor na pagina escolhida), com o traco salvo;
 # o .docx nao ganha a acao, e os tres anexos ficam byte a byte iguais.

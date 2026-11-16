@@ -1,0 +1,1 @@
+# Fase D2 das listas: o pdf.js desenha fórmula LaTeX em vetor pelo MathJax 4.1.3 (formula.js e svg-para-pdf.js; o MathJax só é baixado na primeira vez que um documento tem fórmula). PDFs de hoje saem idênticos; para ela não há novidade até a D3 gerar listas com fórmula.

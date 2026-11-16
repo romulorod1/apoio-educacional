@@ -406,8 +406,12 @@
    * marcação ^{} e _{} não conta, porque ela nunca chega até a fonte, e o
    * asterisco também não: desde o itálico, o partirEstilo consome "***", "**" e
    * "*" como interruptor de estilo, e nenhum deles chega à Helvetica. */
+  /* A fórmula em linha ("\(" até "\)", D2) é desenhada pelo MathJax, e não pela
+   * fonte do texto: as duas travas abaixo não a leem. */
+  var RE_FORMULA_EM_LINHA = /\\\([\s\S]*?(?:\\\)|$)/g;
+
   function caracteresQueNaoDesenha(texto) {
-    var limpo = String(texto == null ? '' : texto)
+    var limpo = String(texto == null ? '' : texto).replace(RE_FORMULA_EM_LINHA, ' ')
       .replace(RE_NIVEL_G, '$2').replace(/\*+/g, '');
     var fora = [], visto = {};
     for (var i = 0; i < limpo.length; i++) {
@@ -431,7 +435,7 @@
     /* O asterisco sai antes da busca pelo mesmo motivo do caracteresQueNaoDesenha:
      * ele é interruptor de estilo e não chega à folha, então não pode aparecer no
      * trecho ofensor que esta função devolve. */
-    var limpo = String(texto == null ? '' : texto)
+    var limpo = String(texto == null ? '' : texto).replace(RE_FORMULA_EM_LINHA, ' ')
       .replace(RE_NIVEL_G, '$2').replace(/\*+/g, '');
     var achado = /[\^_]\{|[{}]/.exec(limpo);
     if (!achado) return null;
@@ -864,6 +868,37 @@
     return this.imagens[ref];
   };
 
+  // ================= formas (Form XObject) =================
+  /* Um desenho vetorial registrado UMA vez por documento e citado por nome a
+   * cada uso: é como cada glifo das fórmulas (formula.js) entra no arquivo. Com
+   * o contorno repetido a cada uso, o PDF do corpus de notação saía 3 vezes
+   * maior, com a mesma imagem.
+   *
+   * Mora num mapa próprio, e não no this.imagens, de propósito: o nome das
+   * imagens é contado pelo tamanho daquele mapa ('Im' + n), e uma forma lá
+   * dentro mudaria o nome da imagem seguinte. Documento que não usa forma não
+   * passa por aqui e sai byte a byte igual ao de antes: o mapa nasce no
+   * primeiro registro e o finalizar() só o lê se a página marcou uso.
+   *
+   * O Form herda o estado gráfico de quem o chama, então a cor de
+   * preenchimento em vigor (preto na folha, vermelho no gabarito) vale dentro
+   * dele. caixa: [x0, y0, x1, y1] no espaço do próprio Form. */
+  Doc.prototype.registraForma = function (ref, conteudo, caixa) {
+    if (!this.formas) { this.formas = {}; this.nFormas = 0; }
+    if (this.formas[ref]) return this.formas[ref].nome;
+    var bbox = (caixa || [-10000, -10000, 10000, 10000]).join(' ');
+    var obj = this.w.addStream('/Type /XObject /Subtype /Form /BBox [' + bbox + ']', conteudo);
+    this.formas[ref] = { obj: obj, nome: 'Fm' + (++this.nFormas) };
+    return this.formas[ref].nome;
+  };
+
+  /* Marca a forma como recurso da página em vigor: o nome só vale na página
+   * que o declara. */
+  Doc.prototype.usaForma = function (ref) {
+    if (!this.pag || !this.formas || !this.formas[ref]) return;
+    (this.pag.usaForma = this.pag.usaForma || {})[ref] = true;
+  };
+
   Doc.prototype.desenhaImagem = function (ref, x, y, largura, altura) {
     var im = this.imagens[ref];
     if (!im) return;
@@ -935,6 +970,9 @@
       var xo = [];
       for (var ref in pg.usaImg) {
         if (this.imagens[ref]) xo.push('/' + this.imagens[ref].nome + ' ' + this.imagens[ref].obj + ' 0 R');
+      }
+      for (var rf in (pg.usaForma || {})) {
+        xo.push('/' + this.formas[rf].nome + ' ' + this.formas[rf].obj + ' 0 R');
       }
       var recursos = '/Font << /F1 ' + this.fonteRegular + ' 0 R /F2 ' + this.fonteBold + ' 0 R' +
         (pg.usaSim ? ' /F3 ' + this.fonteSimbolo + ' 0 R' : '') +
@@ -1689,6 +1727,19 @@
       atual = '';
     }
     for (var i = 0; i < s.length; i++) {
+      /* Fórmula dentro da frase (D2): "\(" até "\)" é LaTeX, e vira um pedaço
+       * próprio, que o formula.js desenha em vetor. O asterisco de dentro dela é
+       * multiplicação, e não interruptor de estilo. Sem "\)" de fechar, a fórmula
+       * vai até o fim e sai com aviso (semFechar). Texto sem "\(" não passa por
+       * aqui, e o resto do laço é o de antes. */
+      if (s.charAt(i) === '\\' && s.charAt(i + 1) === '(') {
+        var fimF = s.indexOf('\\)', i + 2);
+        var latexF = s.slice(i + 2, fimF < 0 ? s.length : fimF);
+        fechar();
+        if (latexF.trim()) partes.push({ txt: '', formula: latexF.trim(), bold: bold, italic: italico, semFechar: fimF < 0 });
+        i = fimF < 0 ? s.length : fimF + 1;
+        continue;
+      }
       if (s.charAt(i) !== '*') { atual += s.charAt(i); continue; }
       fechar();
       if (s.substr(i, 3) === '***') { bold = !bold; italico = !italico; i += 2; continue; }
@@ -1705,6 +1756,8 @@
   function partirNivel(partes) {
     var saida = [];
     for (var i = 0; i < partes.length; i++) {
+      // a fórmula em linha passa inteira: o ^{} e o _{} dela são do LaTeX
+      if (partes[i].formula != null) { partes[i].nivel = 0; saida.push(partes[i]); continue; }
       var resto = partes[i].txt, bold = partes[i].bold, italico = !!partes[i].italic;
       var achado = RE_NIVEL.exec(resto);
       while (achado) {
@@ -1729,7 +1782,19 @@
 
   /* Largura de um pedaço já no corpo do nível dele. */
   function medirSeg(s, tam, bold) {
+    if (s.formula != null) return medidaEmLinha(s.formula, tam).largura;
     return medir(s.txt, s.nivel ? corpoNivel(tam) : tam, bold || s.bold);
+  }
+
+  /* A medida da fórmula em linha, no corpo do texto. Sem o módulo de fórmula,
+   * a medida é a do TeX entre colchetes, que é o que sai na folha (falha alta,
+   * veja escreverSegmentos). */
+  function medidaEmLinha(latex, tam) {
+    var mod = moduloFormula();
+    if (mod) {
+      try { return mod.medir(latex, tam, { display: false }); } catch (e) { /* cai no colchete */ }
+    }
+    return { largura: medir('[' + latex + ']', tam, false), altura: tam * 0.75, profundidade: tam * 0.25, falhou: true };
   }
 
   /* Largura em pontos de um texto com marcação: expoente, índice e símbolo.
@@ -1749,6 +1814,13 @@
   function palavrasRicas(partes) {
     var itens = [], palavra = null;
     partes.forEach(function (parte) {
+      /* A fórmula em linha é um pedaço que não se parte, colado ao que vem
+       * junto dela sem espaço ("\(x^{2}\)," fica com a vírgula). */
+      if (parte.formula != null) {
+        if (!palavra) palavra = [];
+        palavra.push(parte);
+        return;
+      }
       parte.txt.split(/(\s+)/).forEach(function (tok) {
         if (!tok) return;
         var seg = { txt: tok, bold: parte.bold, italic: !!parte.italic, nivel: parte.nivel || 0 };
@@ -1773,6 +1845,15 @@
     var linhas = [], atual = [], usado = 0;
     for (var i = 0; i < segs.length; i++) {
       var s = segs[i], corrente = '';
+      /* A fórmula não se parte por caractere: vai inteira, numa linha nova se
+       * a atual já tem coisa. Mais larga que a coluna, ela passa da margem e o
+       * escreverRico avisa. */
+      if (s.formula != null) {
+        var wf = medirSeg(s, tam);
+        if (usado > 0 && usado + wf > largura) { linhas.push(atual); atual = []; usado = 0; }
+        atual.push(s); usado += wf;
+        continue;
+      }
       for (var c = 0; c < s.txt.length; c++) {
         var ch = s.txt.charAt(c);
         var w = medirSeg({ txt: ch, bold: s.bold, nivel: s.nivel }, tam);
@@ -1816,6 +1897,19 @@
     return linhas;
   }
 
+  /* Quanto as fórmulas em linha de uma linha passam da letra do texto: acima
+   * de 0,9 do corpo e abaixo de 0,35 (a entrelinha de 1,45 absorve isso). */
+  function folgaDaFormula(segmentos, tam) {
+    var cima = 0, baixo = 0;
+    for (var i = 0; i < segmentos.length; i++) {
+      if (segmentos[i].formula == null) continue;
+      var m = medidaEmLinha(segmentos[i].formula, tam);
+      cima = Math.max(cima, (m.altura || 0) - tam * 0.9);
+      baixo = Math.max(baixo, (m.profundidade || 0) - tam * 0.35);
+    }
+    return { cima: cima, baixo: baixo };
+  }
+
   /* Desenha uma linha já quebrada. O expoente e o índice saem daqui: mesmo
    * glifo, corpo menor, linha de base deslocada. */
   Doc.prototype.escreverSegmentos = function (segmentos, x, y, opcoes) {
@@ -1824,6 +1918,7 @@
     var px = x;
     for (var i = 0; i < segmentos.length; i++) {
       var s = segmentos[i];
+      if (s.formula != null) { px += this.formulaEmLinha(s, px, y, tam, opcoes.cor); continue; }
       var bold = s.bold || !!opcoes.bold;
       /* O itálico do segmento e o de quem chamou se somam, como já acontece com
        * o negrito: a mini-citação da âncora do gabarito pede a linha inteira em
@@ -1837,6 +1932,30 @@
       px += medir(s.txt, corpo, bold);
     }
     return px - x;
+  };
+
+  /* Desenha uma fórmula em linha com a linha de base na do texto e devolve a
+   * largura. A cor é a do texto em volta (vermelho no gabarito). Falha alta:
+   * sem o módulo, ou com fórmula que não monta, sai o TeX entre colchetes em
+   * cinza, e o aviso vai para o avisoDeFigura; nunca some, nunca sai cru. */
+  Doc.prototype.formulaEmLinha = function (s, x, y, tam, cor) {
+    var mod = moduloFormula();
+    if (s.semFechar) this.avisoDeFigura('fórmula em linha sem o \\) de fechar: \\(' + s.formula);
+    if (!mod) {
+      this.avisoDeFigura(porqueSemFormula() + ', fórmula em linha saiu entre colchetes: \\(' + s.formula + '\\)');
+      (this.formulasQueFalharam = this.formulasQueFalharam || []).push({ latex: s.formula, motivo: porqueSemFormula() });
+      return this.texto('[' + s.formula + ']', x, y, { tam: tam, cor: COR.muted }) || 0;
+    }
+    var r;
+    try {
+      r = mod.desenhar(this, s.formula, x, y, tam, { display: false, cor: cor || COR.texto, lingua: this.lingua });
+    } catch (e) {
+      this.avisoDeFigura('não deu para desenhar a fórmula em linha: ' + (e && e.message ? e.message : e));
+      return medidaEmLinha(s.formula, tam).largura;
+    }
+    var avisos = (r && r.avisos) || [];
+    for (var a = 0; a < avisos.length; a++) this.avisoDeFigura('fórmula: ' + avisos[a]);
+    return r ? r.largura : 0;
   };
 
   /* O texto() cru desenha a marcação como se fosse letra: um título "Potências de
@@ -1879,12 +1998,25 @@
     var linhas = quebrarRico(partirRico(texto), largura, tam);
     linhas.forEach(function (segmentos, k) {
       var ultima = (k === linhas.length - 1);
-      var precisa = alturaLinha + (ultima ? reservaFinal : 0);
+      /* A linha com fórmula alta (fração, raiz, índice duplo) ganha o que a
+       * fórmula passa da letra, em cima e embaixo, para não encostar na linha
+       * vizinha. Linha sem fórmula: zero e zero, como antes. */
+      var extra = folgaDaFormula(segmentos, tam);
+      for (var f = 0; f < segmentos.length; f++) {
+        if (segmentos[f].formula == null) continue;
+        var wf = medirSeg(segmentos[f], tam);
+        if (wf > largura + 0.01) {
+          self.avisoDeFigura('fórmula em linha mais larga que a coluna (' + Math.round(wf) + ' pt contra ' +
+            Math.round(largura) + '): \\(' + segmentos[f].formula + '\\)');
+        }
+      }
+      var precisa = alturaLinha + extra.cima + extra.baixo + (ultima ? reservaFinal : 0);
       /* O teto evita o absurdo de pedir mais do que uma folha inteira, que
        * mandaria o parágrafo para uma página em branco atrás da outra. */
       self.garanteEspaco(Math.min(precisa, Y_TOPO - Y_LIMITE));
-      self.y -= alturaLinha;
+      self.y -= alturaLinha + extra.cima;
       self.escreverSegmentos(segmentos, x, self.y, { tam: tam, cor: opcoes.cor });
+      self.y -= extra.baixo;
     });
     return linhas.length;
   };
@@ -1927,7 +2059,12 @@
   }
 
   /* O renderizador de fórmula, carregado tarde pelo mesmo motivo do de figuras:
-   * o pdf.js precisa continuar servindo quem não tem o figuras/ ao lado. */
+   * o pdf.js precisa continuar servindo quem não tem o módulo ao lado.
+   *
+   * Desde a D2 é o formula.js da raiz (MathJax 4 em vetor; o figuras/formula.js,
+   * renderizador próprio, saiu no B14). Este arquivo só o procura quando acha
+   * uma fórmula: documento sem fórmula nunca carrega o módulo, e muito menos o
+   * MathJax, que só o Formula.pronto() pede. */
   var cacheFormula = null, falhaFormula = '';
   function moduloFormula() {
     if (cacheFormula) return cacheFormula;
@@ -1935,7 +2072,7 @@
       cacheFormula = Formula;
     } else if (typeof require === 'function') {
       try {
-        cacheFormula = require('./figuras/formula.js');
+        cacheFormula = require('./formula.js');
       } catch (e) {
         cacheFormula = null;
         falhaFormula = (e && e.message) ? String(e.message) : String(e);
@@ -1980,17 +2117,30 @@
     }
     var m;
     try {
-      m = mod.medir(latex, tam, { lingua: this.lingua });
+      m = mod.medir(latex, tam, { lingua: this.lingua, display: true });
     } catch (e) {
       this.avisoDeFigura('não deu para medir a fórmula: ' + (e && e.message ? e.message : e));
       return null;
+    }
+    /* Mais larga que a coluna: o corpo encolhe até caber, mas não abaixo de
+     * ENCOLHE_EQ do pedido (abaixo disso o expoente some na fotocópia). Centrada
+     * e larga demais, ela passava da margem pelos DOIS lados, cortada no papel
+     * (a expansão do binômio, a equação redox, o limite em display do corpus).
+     * O aviso continua, com o quanto encolheu, porque quebrar a expressão em
+     * duas linhas é escolha de quem escreve, não daqui. */
+    var larguraPedida = m.largura, tamDesenho = tam;
+    if (m.largura > largura && !m.falhou) {
+      tamDesenho = Math.max(tam * ENCOLHE_EQ, tam * largura / m.largura);
+      try { m = mod.medir(latex, tamDesenho, { lingua: this.lingua, display: true }); } catch (e) { tamDesenho = tam; }
     }
     var alto = (m.altura || 0) + (m.profundidade || 0);
     this.garanteEspaco(alto + FOLGA_EQ * 2);
     this.y -= FOLGA_EQ + (m.altura || 0);
     var r = null;
     try {
-      r = mod.desenhar(this, latex, xEsq + largura / 2, this.y, tam, { align: 'centro', lingua: this.lingua });
+      /* A cor vem de quem pede: vermelho no gabarito, a do texto na folha. */
+      r = mod.desenhar(this, latex, xEsq + largura / 2, this.y, tamDesenho,
+        { align: 'centro', lingua: this.lingua, cor: opcoes.cor || COR.texto, display: true });
     } catch (e) {
       this.avisoDeFigura('não deu para desenhar a fórmula: ' + (e && e.message ? e.message : e));
     }
@@ -2001,12 +2151,18 @@
     var avisos = (r && r.avisos) || m.avisos || [];
     for (var a = 0; a < avisos.length; a++) this.avisoDeFigura('fórmula: ' + avisos[a]);
 
-    if (m.largura > largura) {
+    if (larguraPedida > largura) {
       this.avisoDeFigura('fórmula mais larga que a coluna (' +
-        Math.round(m.largura) + ' pt contra ' + Math.round(largura) + '): @eq ' + latex);
+        Math.round(larguraPedida) + ' pt contra ' + Math.round(largura) + ')' +
+        (tamDesenho < tam ? ', encolhida a ' + Math.round(100 * tamDesenho / tam) + '% do corpo' +
+          (m.largura > largura + 0.01 ? ' e ainda passa da margem' : '') : '') + ': @eq ' + latex);
     }
     return r;
   };
+
+  /* O menor corpo a que uma equação larga demais é encolhida, em fração do
+   * pedido. */
+  var ENCOLHE_EQ = 0.7;
 
   /* Quanto de folha a equação vai gastar, sem desenhar. Serve à reserva do
    * subtítulo, pelo mesmo motivo da figura: subtítulo sozinho no pé da página
@@ -2016,7 +2172,13 @@
     var mod = moduloFormula();
     if (!mod) return 0;
     try {
-      var m = mod.medir(latex, (opcoes && opcoes.tam) || 11, { lingua: this.lingua });
+      var tam = (opcoes && opcoes.tam) || 11;
+      var m = mod.medir(latex, tam, { lingua: this.lingua, display: true });
+      /* A mesma conta do equacao(): a larga demais sai encolhida, e mais baixa. */
+      var largura = (opcoes && opcoes.largura != null) ? opcoes.largura : UTIL;
+      if (m.largura > largura && !m.falhou) {
+        m = mod.medir(latex, Math.max(tam * ENCOLHE_EQ, tam * largura / m.largura), { lingua: this.lingua, display: true });
+      }
       return (m.altura || 0) + (m.profundidade || 0) + FOLGA_EQ * 2;
     } catch (e) { return 0; }
   };
