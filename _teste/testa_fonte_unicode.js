@@ -19,7 +19,7 @@
  *   D. controle: o fechamento, a folha de aula, o planejamento, a lista da
  *      Biblioteca, uma folha com os símbolos que a base-14 já desenhava e o
  *      livro exportado (com seta no texto invisível) saem byte a byte iguais
- *      aos do pdf.js da base do merge; e sem o fonte-unicode.js ao lado, o
+ *      aos do pdf.js de antes da D1 (c8bc1e6, fixo); e sem o fonte-unicode.js ao lado, o
  *      pdf.js volta a ser o de antes.
  *
  *   node _teste/testa_fonte_unicode.js [--guarda-pdfs <pasta>]
@@ -121,28 +121,34 @@ if (VENENO) {
   G = require('../pdf.js');
 }
 
-/* O pdf.js da BASE DO MERGE, que é o de antes da reserva. Comparar com o HEAD
- * não afirmaria nada no portão, onde o commit já está feito. Rodando na
- * própria main (sem base distinta), a comparação é com o pdf.js do HEAD, e isso
- * é dito em voz alta; os venenos continuam mordendo, porque eles trocam só a
- * cópia. */
-function shaDaBase() {
-  const git = args => execFileSync('git', args, { cwd: RAIZ, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  const cabeca = git(['rev-parse', 'HEAD']);
-  for (const ref of ['origin/main', 'main']) {
-    try {
-      const b = git(['merge-base', 'HEAD', ref]);
-      if (b) return { sha: b, cabeca };
-    } catch (e) { /* tenta o próximo */ }
+/* O pdf.js de ANTES DA RESERVA, num commit FIXO: c8bc1e6, a main de logo antes
+ * da D1 entrar (o #252, pai que a D1 tinha). Não o merge-base com a origin/main:
+ * depois do merge da D1, na main e em todo PR que a traz, o merge-base já tem a
+ * reserva, e o controle passaria a comparar o pdf.js com ele mesmo (ou, na
+ * regra 3, reprovaria sem defeito nenhum). Mesma solução do #220 (e1929b9) e do
+ * testa_leitor_voltar (PAI fixo). O portão clona com fetch-depth 0; se o commit
+ * não estiver no clone, a prova falha alto, nunca compara com outra coisa.
+ * Se um PR futuro mudar de propósito os bytes do pdf.js para documento sem
+ * caractere novo, o controle D cai, e quem muda move este commit e diz por quê. */
+const BASE_ANTES_DA_RESERVA = 'c8bc1e6';
+function pdfDaBase() {
+  try {
+    execFileSync('git', ['cat-file', '-e', BASE_ANTES_DA_RESERVA + '^{commit}'], { cwd: RAIZ, stdio: 'ignore' });
+  } catch (e) {
+    console.log('FALHA: o commit ' + BASE_ANTES_DA_RESERVA + ' (a main de antes da D1) não está neste clone; o controle não tem com o que comparar. Clone com o histórico inteiro (git fetch --unshallow).');
+    console.log('0 passaram, 1 falharam.');
+    process.exit(1);
   }
-  return { sha: null, cabeca };
+  const fonte = execFileSync('git', ['show', BASE_ANTES_DA_RESERVA + ':pdf.js'], { cwd: RAIZ, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  if (/fonte-unicode|FontFile2/.test(fonte)) {
+    console.log('FALHA: o pdf.js da ' + BASE_ANTES_DA_RESERVA + ' já tem a reserva; a base do controle está errada.');
+    console.log('0 passaram, 1 falharam.');
+    process.exit(1);
+  }
+  return fonte;
 }
-const base = shaDaBase();
-if (!base.sha) { console.log('FALHA: sem base do merge (nem origin/main nem main)'); console.log('0 passaram, 1 falharam.'); process.exit(1); }
-if (base.sha === base.cabeca) console.log('  sem base distinta: o HEAD é a própria base do merge; o controle compara com o pdf.js do HEAD');
-const B = require(gravaNaRaiz('_pdf_base_fonte.js',
-  execFileSync('git', ['show', base.sha + ':pdf.js'], { cwd: RAIZ, maxBuffer: 64 * 1024 * 1024 })));
-console.log('  base do controle: ' + base.sha.slice(0, 7) + (VENENO ? '; veneno: ' + VENENO : ''));
+const B = require(gravaNaRaiz('_pdf_base_fonte.js', pdfDaBase()));
+console.log('  base do controle: ' + BASE_ANTES_DA_RESERVA + ' (fixa, antes da D1)' + (VENENO ? '; veneno: ' + VENENO : ''));
 
 // ---------------------------------------------------------------- utilidades
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'fonte_unicode_'));
