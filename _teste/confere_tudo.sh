@@ -1125,12 +1125,17 @@ roda "livros nuvem posicao --envenenado-desfazer-tudo" node "_teste/testa_livros
 # quimica ligado ao assunto de fisica diz "Fisica: ..." na tela do livro, na
 # busca, na faixa e no Corrigir; a correcao dela com o id de fisica vale; o id
 # fora do indice nao ganha materia pelo prefixo; o da propria materia fica
-# igual; o lado a lado diz "livro de Quimica". Quatro venenos. Porta 8993.
+# igual; o lado a lado diz "livro de Quimica". 16/11/2026, passo 1: a pagina
+# do assunto diz "livro de Quimica" em Nos livros, com a outra materia por
+# ultimo; o livro de filosofia diz o nome do indice. Sete venenos. Porta 8993.
 roda "livros entre materias"                      node "_teste/testa_livros_entre_materias.js"
 roda "livros entre materias --envenenado-sem-materia-no-nome" node "_teste/testa_livros_entre_materias.js" --envenenado-sem-materia-no-nome
 roda "livros entre materias --envenenado-materia-pelo-prefixo" node "_teste/testa_livros_entre_materias.js" --envenenado-materia-pelo-prefixo
 roda "livros entre materias --envenenado-propria-materia-marcada" node "_teste/testa_livros_entre_materias.js" --envenenado-propria-materia-marcada
 roda "livros entre materias --envenenado-corrigir-sem-a-de-fora" node "_teste/testa_livros_entre_materias.js" --envenenado-corrigir-sem-a-de-fora
+roda "livros entre materias --envenenado-pagina-sem-materia" node "_teste/testa_livros_entre_materias.js" --envenenado-pagina-sem-materia
+roda "livros entre materias --envenenado-outra-materia-na-frente" node "_teste/testa_livros_entre_materias.js" --envenenado-outra-materia-na-frente
+roda "livros entre materias --envenenado-materia-pela-chave" node "_teste/testa_livros_entre_materias.js" --envenenado-materia-pela-chave
 # C15.4 e C15.5: "Exportar em PDF" do capitulo 2 com o gabarito dele no mesmo
 # arquivo, anexado na aula: o texto do capitulo e DEPOIS o do gabarito do 2 (e
 # nao o do 1), o rodape de fonte, nenhum travessao; sem o gabarito; paginas

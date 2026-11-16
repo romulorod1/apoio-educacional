@@ -22311,9 +22311,14 @@
     return disciplinaDoMapa(meta) === a.disciplina && (a.eixo !== 'ano' || Biblioteca.livroDoAno(meta, a.serie));
   }
   function serieDoAssunto(a) { return a.eixo === 'ano' ? nomeDoAno(a.serie) : (a.serieNome || a.serie || ''); }
+  /* O nome da matéria: o do Core; sem ele, o do assunto; sem os dois, o do
+   * índice de tópicos (banco/topicos/indice.json). A chave do índice que o
+   * Core não tem ("filosofia-sociologia", a do mapa dos livros de filosofia e
+   * de sociologia) sai "Filosofia e Sociologia", e não a chave crua (12c). */
   function nomeDaDisciplina(id, a) {
     var m = Core.materiaPorId(id);
-    return (m && m.rotulo) || (a && a.disciplinaNome) || id;
+    var doIndice = (indiceTopicos || []).filter(function (d) { return d && d.chave === id; })[0];
+    return (m && m.rotulo) || (a && a.disciplinaNome) || (doIndice && doIndice.nome) || id;
   }
   /* Quantos livros têm vínculo registrado para cada assunto: um passe pelos
    * mapas. Conta também o livro de ano vizinho cujo mapa liga o assunto da
@@ -26378,12 +26383,24 @@
   /* OS VÍNCULOS DO ASSUNTO NOS LIVROS: os capítulos e os livros inteiros
    * (obra inteira) ligados a ele no mapa, com a correção dela. É a MESMA
    * conta na busca e na página, com a mesma lista de livros (Store.listarLivros),
-   * para os dois números baterem. Os do ano do assunto vêm primeiro. */
+   * para os dois números baterem. Os do ano do assunto vêm primeiro.
+   *
+   * Item 12c: o livro de OUTRA MATÉRIA (pelo índice do mapa dele) leva o nome
+   * da matéria em outraMateria ("Química"), e não o outroAno. A ordem: a
+   * matéria e o ano do assunto, depois a matéria de outro ano, e por último a
+   * outra matéria. */
   function vinculosDoAssunto(livros, a) {
     var lista = Biblioteca.livrosComAssunto(livros, correcoesDosLivros(), a.id, null);
     var doAno = function (c) { return a.eixo !== 'ano' || Biblioteca.livroDoAno(c.meta, a.serie) ? 0 : 1; };
-    return lista.map(function (c) { return { id: c.id, meta: c.meta, entrada: c.entrada, outroAno: !!doAno(c) }; })
-      .sort(function (x, y) { return (x.outroAno ? 1 : 0) - (y.outroAno ? 1 : 0); });
+    var materiaDe = function (c) {
+      var d = disciplinaDoMapa(c.meta);
+      return d && a.disciplina && d !== a.disciplina ? nomeDaDisciplina(d) : null;
+    };
+    var grupo = function (x) { return x.outraMateria ? 2 : x.outroAno ? 1 : 0; };
+    return lista.map(function (c) {
+      var outra = materiaDe(c);
+      return { id: c.id, meta: c.meta, entrada: c.entrada, outroAno: !outra && !!doAno(c), outraMateria: outra };
+    }).sort(function (x, y) { return grupo(x) - grupo(y); });
   }
 
   // "1 capítulo nos livros", "1 livro inteiro", "2 capítulos e 1 livro inteiro"
@@ -26600,7 +26617,7 @@
     var cartoes = el('div', { class: 'bib-assunto-livros' });
     var cartaoDoVinculo = function (c) {
       var e = c.entrada, epub = c.meta.formato === 'epub';
-      var obra = tituloDoLivro(c.meta) + (c.outroAno ? ', de outro ano' : '');
+      var obra = tituloDoLivro(c.meta) + (c.outraMateria ? ', livro de ' + c.outraMateria : c.outroAno ? ', de outro ano' : '');
       if (e.obraInteira) {
         return el('div', { class: 'bib-assunto-livro', 'data-livro': c.id, 'data-obra-inteira': 'true' }, [
           el('p', { class: 'bib-busca-obra', texto: obra }),
