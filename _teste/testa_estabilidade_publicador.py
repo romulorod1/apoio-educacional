@@ -16,8 +16,13 @@ de verdade. Os ids de assunto são os do banco do repositório.
 
     mapa A  química: 1 Grandezas e medidas  QUIEM1-T02
                      2 Produto iônico e pH  QUIEM1-T01
+                     3 Exercícios           QUIEM1-T01 (página 5)
+                     4 Exercícios           QUIEM1-T02 (página 6, o mesmo título)
             matemática: 1 Logaritmos        MATEM1-08
-    mapa B  o mesmo, e o MATEM1-08 de matemática nos capítulos 1 e 2 da química
+    mapa B  o mesmo, e o MATEM1-08 de matemática nos capítulos 1, 2 e 4 da
+            química (só um dos dois "Exercícios" ganha a ligação: o título
+            repetido é o caso em que a chave depende do desempate, e o
+            desempate não pode olhar os assuntos)
 
 O que se prova:
   1. o gerador aceita a ligação: o capítulo 2 de química passa a ter o
@@ -142,7 +147,9 @@ def capitulo(n, titulo, ini, fim, ids):
 
 MAPA_QUI_A = [{'livro': 'qui-prova', 'arquivo': 'quimica-de-prova.pdf', 'serie': 'em1', 'deslocamento': 0, 'capitulos': [
     capitulo(1, 'Grandezas e medidas', 1, 2, ['QUIEM1-T02']),
-    capitulo(2, 'Produto iônico e pH', 3, 4, ['QUIEM1-T01'])]}]
+    capitulo(2, 'Produto iônico e pH', 3, 4, ['QUIEM1-T01']),
+    capitulo(3, 'Exercícios', 5, 5, ['QUIEM1-T01']),
+    capitulo(4, 'Exercícios', 6, 6, ['QUIEM1-T02'])]}]
 MAPA_MAT = [{'livro': 'mat-prova', 'arquivo': 'matematica-de-prova.pdf', 'serie': 'em1', 'deslocamento': 0, 'capitulos': [
     capitulo(1, 'Logaritmos', 1, 2, ['MATEM1-08'])]}]
 
@@ -150,7 +157,8 @@ MAPA_MAT = [{'livro': 'mat-prova', 'arquivo': 'matematica-de-prova.pdf', 'serie'
 def mapa_qui_b():
     m = copy.deepcopy(MAPA_QUI_A)
     for cap in m[0]['capitulos']:
-        cap['assuntos'].append({'id': 'MATEM1-08', 'confianca': 'media'})
+        if cap['n'] in (1, 2, 4):
+            cap['assuntos'].append({'id': 'MATEM1-08', 'confianca': 'media'})
     return m
 
 
@@ -164,7 +172,7 @@ def escrever_mapas(pasta, mapa_qui):
 
 def fixtures(tmp):
     livros = os.path.join(tmp, 'Livros')
-    pdf_de_paginas(os.path.join(livros, 'quimica', 'quimica-de-prova.pdf'), 'Química de prova', 4)
+    pdf_de_paginas(os.path.join(livros, 'quimica', 'quimica-de-prova.pdf'), 'Química de prova', 6)
     pdf_de_paginas(os.path.join(livros, 'matematica', 'matematica-de-prova.pdf'), 'Matemática de prova', 2)
     planilha = os.path.join(livros, 'livros_prova.csv')
     with open(planilha, 'w', encoding='utf-8-sig', newline='') as f:
@@ -278,8 +286,9 @@ def principal():
         LQ, LM = qa['id'], mat_a['id']
 
         secao('1. O gerador aceita a ligação de outra matéria')
-        conf('mapa A: os assuntos dos capítulos de química', ids_do_mapa(qa), [['QUIEM1-T02'], ['QUIEM1-T01']])
-        conf('mapa B: o MATEM1-08 entra nos capítulos 1 e 2 de química', ids_do_mapa(qb), [['QUIEM1-T02', 'MATEM1-08'], ['QUIEM1-T01', 'MATEM1-08']])
+        conf('mapa A: os assuntos dos capítulos de química', ids_do_mapa(qa), [['QUIEM1-T02'], ['QUIEM1-T01'], ['QUIEM1-T01'], ['QUIEM1-T02']])
+        conf('mapa B: o MATEM1-08 entra nos capítulos 1, 2 e 4 de química, e não no 3', ids_do_mapa(qb),
+             [['QUIEM1-T02', 'MATEM1-08'], ['QUIEM1-T01', 'MATEM1-08'], ['QUIEM1-T01'], ['QUIEM1-T02', 'MATEM1-08']])
         conf('a nota do livro conta a ligação de outra matéria', '1 assunto(s) de outra matéria: MATEM1-08.' in (qb.get('mapa_nota') or ''), True)
         conf('nenhum assunto do meta ganha campo de disciplina', any('disciplina' in a for e in qb['mapa'] for a in e['assuntos']), False)
         conf('o arquivo dos livros não muda (o mesmo sha256 e o mesmo tamanho)',
@@ -294,7 +303,10 @@ def principal():
         conf('o registro de chaves dos dois livros é o mesmo', plano_b['registros_chaves'], plano_a['registros_chaves'])
         meta_qa, meta_qb = meta_do_plano(plano_a, LQ), meta_do_plano(plano_b, LQ)
         conf('as chaves dos capítulos de química, no meta publicado, são as mesmas', chaves_do_meta(meta_qb), chaves_do_meta(meta_qa))
-        conf('todo capítulo tem chave', all(c for _t, c in chaves_do_meta(meta_qa)) and len(chaves_do_meta(meta_qa)) == 2, True)
+        conf('todo capítulo tem chave', all(c for _t, c in chaves_do_meta(meta_qa)) and len(chaves_do_meta(meta_qa)) == 4, True)
+        ex_a = [c for t, c in chaves_do_meta(meta_qa) if t == 'Exercícios']
+        ex_b = [c for t, c in chaves_do_meta(meta_qb) if t == 'Exercícios']
+        conf('os dois "Exercícios" têm chaves diferentes, e cada um fica com a sua', (len(set(ex_a)), ex_b), (2, ex_a))
         conf('os ids dos livros são os mesmos', sorted(plano_b['indice']['livros']), sorted(plano_a['indice']['livros']))
         conf('o registro de ids é o mesmo', plano_b['registro_ids'], plano_a['registro_ids'])
 
@@ -337,8 +349,8 @@ def principal():
              (['QUIEM1-T01', 'QUIEM1-T02'], 'corrigido'))
         conf('o capítulo 1, que ela não corrigiu, mostra a ligação nova', (b[1]['assuntos'], b[1]['estado']),
              (['QUIEM1-T02', 'MATEM1-08'], 'do_mapa'))
-        conf('"Abrir no livro" acha o MATEM1-08 no capítulo 1 da química e no livro de matemática, e não no 2',
-             sorted(app['abrir']), sorted([LQ + '#1', LM + '#1']))
+        conf('"Abrir no livro" acha o MATEM1-08 nos capítulos 1 e 4 da química e no livro de matemática, e não no 2 nem no 3',
+             sorted(app['abrir']), sorted([LQ + '#1', LQ + '#4', LM + '#1']))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     terminar()
