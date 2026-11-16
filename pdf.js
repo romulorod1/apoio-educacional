@@ -408,7 +408,7 @@
    * "*" como interruptor de estilo, e nenhum deles chega à Helvetica. */
   /* A fórmula em linha ("\(" até "\)", D2) é desenhada pelo MathJax, e não pela
    * fonte do texto: as duas travas abaixo não a leem. */
-  var RE_FORMULA_EM_LINHA = /\\\([\s\S]*?(?:\\\)|$)/g;
+  var RE_FORMULA_EM_LINHA = /\\\([\s\S]*?\\\)/g;
 
   function caracteresQueNaoDesenha(texto) {
     var limpo = String(texto == null ? '' : texto).replace(RE_FORMULA_EM_LINHA, ' ')
@@ -1729,15 +1729,16 @@
     for (var i = 0; i < s.length; i++) {
       /* Fórmula dentro da frase (D2): "\(" até "\)" é LaTeX, e vira um pedaço
        * próprio, que o formula.js desenha em vetor. O asterisco de dentro dela é
-       * multiplicação, e não interruptor de estilo. Sem "\)" de fechar, a fórmula
-       * vai até o fim e sai com aviso (semFechar). Texto sem "\(" não passa por
-       * aqui, e o resto do laço é o de antes. */
-      if (s.charAt(i) === '\\' && s.charAt(i + 1) === '(') {
+       * multiplicação, e não interruptor de estilo. Só com o "\)" de fechar: um
+       * "\(" solto ("C:\Users\nath\(2026) foi salvo; **negrito**") engolia o
+       * resto do parágrafo e o negrito, e agora fica texto, como antes da D2.
+       * Texto sem "\(...\)" não passa por aqui, e o resto do laço é o de antes. */
+      if (s.charAt(i) === '\\' && s.charAt(i + 1) === '(' && s.indexOf('\\)', i + 2) >= 0) {
         var fimF = s.indexOf('\\)', i + 2);
-        var latexF = s.slice(i + 2, fimF < 0 ? s.length : fimF);
+        var latexF = s.slice(i + 2, fimF);
         fechar();
-        if (latexF.trim()) partes.push({ txt: '', formula: latexF.trim(), bold: bold, italic: italico, semFechar: fimF < 0 });
-        i = fimF < 0 ? s.length : fimF + 1;
+        if (latexF.trim()) partes.push({ txt: '', formula: latexF.trim(), bold: bold, italic: italico });
+        i = fimF + 1;
         continue;
       }
       if (s.charAt(i) !== '*') { atual += s.charAt(i); continue; }
@@ -1940,7 +1941,6 @@
    * cinza, e o aviso vai para o avisoDeFigura; nunca some, nunca sai cru. */
   Doc.prototype.formulaEmLinha = function (s, x, y, tam, cor) {
     var mod = moduloFormula();
-    if (s.semFechar) this.avisoDeFigura('fórmula em linha sem o \\) de fechar: \\(' + s.formula);
     if (!mod) {
       this.avisoDeFigura(porqueSemFormula() + ', fórmula em linha saiu entre colchetes: \\(' + s.formula + '\\)');
       (this.formulasQueFalharam = this.formulasQueFalharam || []).push({ latex: s.formula, motivo: porqueSemFormula() });
@@ -2443,6 +2443,34 @@
         j = fim;
       }
     }
+    return saida;
+  }
+
+  /* As fórmulas que um texto vai pedir ao formula.js, na forma do
+   * Formula.pronto({ formulas }): as @eq em bloco (display true), lidas pela
+   * MESMA regra do expandirEquacoes (até o fim do trecho ou da próxima
+   * diretiva, com a prosa engolida devolvida ao texto), e as em linha "\( \)"
+   * (display false), pela mesma do partirEstilo. Linha por linha, que é como o
+   * markdown deste arquivo lê. As @fig saem antes, como no partesDeFigura sem o
+   * módulo de figuras. Serve à conversão de antemão: fórmula que ficasse de fora
+   * daqui seria convertida na hora da geração, síncrona, sem o aviso. */
+  function formulasDoTexto(texto) {
+    var saida = [];
+    String(texto == null ? '' : texto).split(/\r?\n/).forEach(function (linha) {
+      var partes = [], i = 0;
+      while (i < linha.length) {
+        var pos = acharFigCru(linha, i);
+        if (pos < 0) { empurrarTextoCru(partes, linha.slice(i)); break; }
+        empurrarTextoCru(partes, linha.slice(i, pos));
+        i = fimDaDiretivaCrua(linha, pos);
+      }
+      expandirEquacoes(null, partes).forEach(function (p) {
+        if (p.tipo === 'equacao') { saida.push({ latex: p.latex, display: true }); return; }
+        partirEstilo(p.valor).forEach(function (q) {
+          if (q.formula != null) saida.push({ latex: q.formula, display: false });
+        });
+      });
+    });
     return saida;
   }
 
@@ -4862,6 +4890,8 @@
     Doc: Doc, COR: COR, medir: medir, medirRico: medirRico, paraWinAnsi: paraWinAnsi,
     SIMBOLOS: SIMBOLOS, caracteresQueNaoDesenha: caracteresQueNaoDesenha,
     marcacaoQueSobrou: marcacaoQueSobrou,
+    /* D2: as fórmulas de um texto, para o Formula.pronto({ formulas }). */
+    formulasDoTexto: formulasDoTexto,
     gerarFechamento: gerarFechamento, gerarResumoMes: gerarResumoMes, gerarCiclo: gerarCiclo,
     gerarMaterialTema: gerarMaterialTema, gerarFichaMapeamento: gerarFichaMapeamento,
     gerarMaterialBiblioteca: gerarMaterialBiblioteca,

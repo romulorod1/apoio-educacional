@@ -725,7 +725,14 @@ self.addEventListener('fetch', function (e) {
     e.respondWith(caches.open(BAIXADOS).then(function (baixados) {
       return baixados.match(e.request).then(function (achado) {
         if (achado) return achado;
-        return fetch(e.request).then(function (resposta) {
+        /* O MathJax vai pelo redeComPrazo, como o resto do que vem da rede: sem
+         * prazo, com o sinal de uma barrinha o <script> não acabava nem dava
+         * erro, e o Formula.pronto() ficava pendurado (a revisão do #256). O
+         * leitor de PDF segue sem prazo aqui de propósito: o prazo dele é o de
+         * 15 s do aplicativo, com o "Abrir fora", e 3 s aqui o cortaria antes
+         * (testa_leitor_pdf, 2b). */
+        var pedido = /\/vendor\/mathjax-/.test(url.pathname) ? redeComPrazo(e.request) : fetch(e.request);
+        return pedido.then(function (resposta) {
           if (resposta && resposta.status === 200 && resposta.type === 'basic') {
             var copia = resposta.clone();
             baixados.put(e.request, copia);

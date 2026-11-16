@@ -85,7 +85,35 @@
   var DIGITOS = /^(?:[0-9]+(?:(?:\{,\}|,)[0-9]+)*(?:(?:\{:\}|:)[0-9]{2}(?![0-9]))?(?:\.[0-9]*)?|\.[0-9]+)/;
 
   var estado = { cargas: 0, conversor: null, promessa: null, falhaCarga: '' };
-  var cacheSvg = {}, nCache = 0, LIMITE_CACHE = 3000;
+  /* O cache do SVG: até LIMITE_CACHE fórmulas (cada SVG pesa até uns 18 KB; 300
+   * dão uns 5 MB no pior caso, uma lista inteira com folga). A chave leva a
+   * geração das macros: fórmula que define ou redefine comando (\newcommand,
+   * \renewcommand, \def...) muda o que as seguintes significam, e a mesma
+   * fórmula depois dela não pode sair do cache de antes.
+   *
+   * A geração é o ESTADO das definições (que fórmula definiu cada comando por
+   * último), e não um contador: a mesma definição vista de novo (a fórmula
+   * medida e depois desenhada, o documento gerado duas vezes) não muda nada, e
+   * o cache continua valendo; voltar a uma definição de antes volta à geração
+   * de antes. Por isso a fórmula que define nunca sai do cache: o MathJax tem
+   * de passar por ela de novo, para o estado dele andar junto com o daqui. */
+  var cacheSvg = new Map(), LIMITE_CACHE = 300, geracao = 0;
+  var RE_DEFINE = /\\(?:re)?newcommand\b|\\(?:re)?newenvironment\b|\\def\b|\\let\b|\\DeclareMathOperator\b/;
+  var RE_NOME_DEFINIDO = /\\(?:(?:re)?newcommand|(?:re)?newenvironment|DeclareMathOperator\*?)\s*\{?\s*\\?([A-Za-z]+)|\\(?:def|let)\s*\\([A-Za-z]+)/g;
+  var definidas = {}, idDaDefinicao = {}, nDefinicoes = 0, estadosVistos = { '': 0 }, nEstados = 0;
+  function anotarDefinicoes(latex) {
+    if (!idDaDefinicao.hasOwnProperty(latex)) idDaDefinicao[latex] = ++nDefinicoes;
+    var id = idDaDefinicao[latex], mudou = false, m;
+    RE_NOME_DEFINIDO.lastIndex = 0;
+    while ((m = RE_NOME_DEFINIDO.exec(latex))) {
+      var nome = m[1] || m[2];
+      if (definidas[nome] !== id) { definidas[nome] = id; mudou = true; }
+    }
+    if (!mudou) return;
+    var chave = Object.keys(definidas).sort().map(function (n) { return n + '=' + definidas[n]; }).join(',');
+    if (!estadosVistos.hasOwnProperty(chave)) estadosVistos[chave] = ++nEstados;
+    geracao = estadosVistos[chave];
+  }
 
   // ---------------------------------------------------------------- vizinhos
   function tradutor() {
@@ -99,20 +127,40 @@
   }
 
   // ---------------------------------------------------------------- carga
+  /* O prazo da carga do vendor (rede), e a frase que ela lê quando ele vence ou
+   * a rede falha. O sw.js já corta em 3 s o pedido que não começa a responder;
+   * este prazo pega o que começa e não termina (o sinal de uma barrinha). */
+  var PRAZO_DA_CARGA = 40000;
+  var SEM_SINAL = 'Não consegui preparar as fórmulas: a internet está lenta ou fora. Tente de novo com sinal melhor.';
+  var COM_DEFEITO = 'Não consegui preparar as fórmulas: o arquivo das fórmulas chegou com defeito. Tente de novo.';
+  /* Quanto cada lote da conversão de antemão segura a página, em ms. */
+  var LOTE_MS = 40;
+
+  /* Uma volta ao navegador: deixa o temporizador do aviso disparar e a tela
+   * desenhar entre um pedaço pesado e o seguinte. */
+  function ceder() { return new Promise(function (r) { setTimeout(r, 0); }); }
+
+  /* Em dois passos, com uma volta entre eles: criar o conversor e o primeiro
+   * uso (que aquece a fonte) são os dois blocos mais pesados depois do script. */
   function montarConversor() {
     var MJ = root && root.MathJaxDoApp;
     if (!MJ || !MJ.criar) throw new Error('o vendor do MathJax não expôs MathJaxDoApp');
     MJ.aoMhchem(empilharCarga);
     var c = MJ.criar({ macros: MACROS, digits: DIGITOS });
-    c.latexParaSvg('x', true);   // aquece a fonte: o primeiro uso é o mais lento
-    estado.conversor = c;
-    estado.versao = MJ.versao;
+    return ceder().then(function () {
+      c.latexParaSvg('x', true);   // aquece a fonte: o primeiro uso é o mais lento
+      estado.conversor = c;
+      estado.versao = MJ.versao;
+    });
   }
 
   function carregarNoNavegador() {
     return new Promise(function (ok, falha) {
       var doc = root.document;
       if (!doc || !doc.createElement) { falha(new Error('sem document para injetar o vendor')); return; }
+      /* Uma carga anterior que venceu o prazo pode ter terminado depois: o
+       * global já está aqui, e outro <script> seria o mesmo arquivo de novo. */
+      if (root.MathJaxDoApp && root.MathJaxDoApp.criar) { ok(); return; }
       var s = doc.createElement('script');
       s.src = VENDOR;
       s.async = true;
@@ -133,41 +181,61 @@
    *
    * opcoes.aoDemorar(): chamado uma vez se a carga mais a conversão passarem de
    * opcoes.depoisDe ms (padrão 3000). É o gancho do "Preparando as fórmulas...".
+   * Para ele disparar NA HORA, e não quando a conversão inteira acabar, nenhum
+   * pedaço segura a página por muito tempo: o script, o criar(), o primeiro uso
+   * e cada lote de LOTE_MS têm uma volta ao navegador entre eles, e o lote em
+   * que o prazo vence para ali mesmo e cede.
    *
-   * Falha de carga rejeita e é esquecida: o pronto() seguinte tenta de novo (o
-   * sinal pode ter voltado). */
+   * opcoes.prazo: o prazo da CARGA do vendor (padrão PRAZO_DA_CARGA). Vencido,
+   * ou com a rede falhando, rejeita com a frase SEM_SINAL (a mensagem do erro;
+   * o motivo técnico fica em erro.detalhe e em estado().falhaCarga). Falha de
+   * carga é esquecida: o pronto() seguinte tenta de novo (o sinal pode ter
+   * voltado). */
   function pronto(opcoes) {
     opcoes = opcoes || {};
-    var p = carregar();
+    var espera = opcoes.depoisDe == null ? ESPERA_DO_AVISO : Number(opcoes.depoisDe);
+    var aviso = typeof opcoes.aoDemorar === 'function' ? { limite: Date.now() + espera, disparado: false } : null;
+    var p = carregar(opcoes.prazo == null ? PRAZO_DA_CARGA : Number(opcoes.prazo));
     var lista = opcoes.formulas;
-    if (lista && lista.length) p = p.then(function () { return preconverter(lista); }).then(function () { return estado; });
-    if (typeof opcoes.aoDemorar === 'function') {
+    if (lista && lista.length) p = p.then(function () { return preconverter(lista, aviso); }).then(function () { return estado; });
+    if (aviso) {
       var acabou = false;
-      var espera = opcoes.depoisDe == null ? ESPERA_DO_AVISO : Number(opcoes.depoisDe);
-      var t = setTimeout(function () { if (!acabou) opcoes.aoDemorar(); }, espera);
+      var t = setTimeout(function () { if (!acabou) { aviso.disparado = true; opcoes.aoDemorar(); } }, espera);
       var fim = function () { acabou = true; clearTimeout(t); };
       p.then(fim, fim);
     }
     return p;
   }
 
-  function preconverter(lista) {
+  /* aviso: { limite, disparado } do pronto(), ou null. Começa cedendo (a
+   * carga pode ter acabado de segurar a página) e cede entre os lotes; o lote
+   * em que o prazo do aviso vence para na hora, para o temporizador rodar. */
+  function preconverter(lista, aviso) {
     return new Promise(function (ok) {
       var i = 0;
-      (function lote() {
+      function lote() {
         var t0 = Date.now();
-        while (i < lista.length && Date.now() - t0 < 40) {
+        while (i < lista.length && Date.now() - t0 < LOTE_MS) {
           var f = lista[i++];
-          if (f == null) continue;
-          if (typeof f === 'string') converter(f, true);
-          else converter(String(f.latex), f.display !== false);
+          if (f != null) {
+            if (typeof f === 'string') converter(f, true);
+            else converter(String(f.latex), f.display !== false);
+          }
+          if (aviso && !aviso.disparado && Date.now() >= aviso.limite) break;
         }
         if (i < lista.length) setTimeout(lote, 0); else ok();
-      })();
+      }
+      setTimeout(lote, 0);
     });
   }
 
-  function carregar() {
+  function erroDeCarga(frase, motivo) {
+    var e = new Error(frase);
+    e.detalhe = motivo;
+    return e;
+  }
+
+  function carregar(prazo) {
     if (estado.conversor) return Promise.resolve(estado);
     if (!estado.promessa) {
       estado.cargas++;
@@ -180,34 +248,50 @@
       } else {
         carga = carregarNoNavegador();
       }
-      estado.promessa = carga.then(function () {
-        montarConversor();
+      var vence;
+      var limite = new Promise(function (ok, falha) {
+        vence = setTimeout(function () { falha(new Error('a carga do vendor passou de ' + prazo + ' ms')); }, prazo);
+      });
+      estado.promessa = Promise.race([carga, limite]).then(function () {
+        clearTimeout(vence);
+        return ceder();
+      }, function (e) {
+        clearTimeout(vence);
+        throw erroDeCarga(SEM_SINAL, e && e.message ? String(e.message) : String(e));
+      }).then(function () {
+        return Promise.resolve().then(montarConversor).catch(function (e) {
+          throw erroDeCarga(COM_DEFEITO, e && e.message ? String(e.message) : String(e));
+        });
+      }).then(function () {
         estado.falhaCarga = '';
         return estado;
       }).catch(function (e) {
         estado.promessa = null;
-        estado.falhaCarga = e && e.message ? String(e.message) : String(e);
+        estado.falhaCarga = e.detalhe || (e && e.message ? String(e.message) : String(e));
         throw e;
       });
     }
     return estado.promessa;
   }
 
-  /* Se o texto pede o MathJax: fórmula em linha ("\(") ou a diretiva @eq
-   * isolada. É a pergunta que quem gera o documento faz antes de chamar o
-   * pronto(): documento sem fórmula não carrega nada. */
+  /* Se o texto pede o MathJax: fórmula em linha ("\(" com o "\)" de fechar) ou
+   * a diretiva @eq isolada. É a pergunta que quem gera o documento faz antes
+   * de chamar o pronto(): documento sem fórmula não carrega nada. */
   function temFormula(texto) {
     var s = String(texto == null ? '' : texto);
-    return s.indexOf('\\(') >= 0 || /(^|\s)@eq(\s|$)/.test(s);
+    return /\\\([\s\S]*?\\\)/.test(s) || /(^|\s)@eq(\s|$)/.test(s);
   }
 
-  /* As fórmulas em linha de um texto, no formato do pronto({ formulas }). */
+  /* As fórmulas de um texto, no formato do pronto({ formulas }): as em linha
+   * ("\( ... \)", display false) e as @eq (display true). Quem lê é o pdf.js
+   * (PDFGen.formulasDoTexto), pela mesma regra com que ele desenha: duas regras
+   * em dois lugares dariam fórmula convertida de antemão que a folha não usa.
+   * Sem o pdf.js ao lado, só as em linha. */
   function formulasDoTexto(texto) {
-    var s = String(texto == null ? '' : texto), saida = [], re = /\\\(([\s\S]*?)(?:\\\)|$)/g, m;
-    while ((m = re.exec(s))) {
-      if (m[1].trim()) saida.push({ latex: m[1].trim(), display: false });
-      if (m[0] === '') re.lastIndex++;
-    }
+    var G = gerador();
+    if (G && G.formulasDoTexto) return G.formulasDoTexto(texto);
+    var s = String(texto == null ? '' : texto), saida = [], re = /\\\(([\s\S]*?)\\\)/g, m;
+    while ((m = re.exec(s))) if (m[1].trim()) saida.push({ latex: m[1].trim(), display: false });
     return saida;
   }
 
@@ -241,8 +325,9 @@
    * SVG não depende de corpo nem de cor. Erro também fica no cache, para a
    * fórmula quebrada repetida não ir ao MathJax de novo. */
   function converter(latex, display) {
-    var chave = (display ? 'D|' : 'I|') + latex;
-    if (cacheSvg.hasOwnProperty(chave)) return cacheSvg[chave];
+    var chave = geracao + (display ? '|D|' : '|I|') + latex;
+    var define = RE_DEFINE.test(latex);
+    if (!define && cacheSvg.has(chave)) return cacheSvg.get(chave);
     var r;
     if (!estado.conversor) {
       r = { erro: 'o MathJax não foi carregado (falta await Formula.pronto() antes de gerar' +
@@ -256,8 +341,15 @@
     } catch (e) {
       r = { erro: e && e.message ? String(e.message) : String(e) };
     }
-    if (++nCache > LIMITE_CACHE) { cacheSvg = {}; nCache = 1; }
-    cacheSvg[chave] = r;
+    estado.convertidas = (estado.convertidas || 0) + 1;
+    /* Cheio, sai a mais antiga (o Map guarda a ordem de entrada): apagar
+     * tudo jogaria fora o que o pronto() acabou de converter. */
+    if (!define) {
+      if (cacheSvg.size >= LIMITE_CACHE) cacheSvg.delete(cacheSvg.keys().next().value);
+      cacheSvg.set(chave, r);
+    }
+    /* Depois de uma definição nova, o que vier é de outra geração. */
+    if (define && estado.conversor) anotarDefinicoes(latex);
     return r;
   }
 
@@ -324,7 +416,7 @@
     var corpo = corpoDaFormula(tam);
     var cor = opcoes.cor || [0, 0, 0];
     var dd = doDocumento(doc);
-    var chave = corpo + '|' + cor.join(',') + '|' + (display ? 'D' : 'I') + '|' + latex;
+    var chave = geracao + '|' + corpo + '|' + cor.join(',') + '|' + (display ? 'D' : 'I') + '|' + latex;
     r = dd.pdf[chave];
     if (!r) {
       var T = tradutor();
@@ -354,7 +446,7 @@
      * versão, e os blocos de fonte que o MathJax já carregou. */
     estado: function () {
       var MJ = root && root.MathJaxDoApp;
-      return { cargas: estado.cargas, carregado: !!estado.conversor, versao: estado.versao || null, noCache: nCache,
+      return { cargas: estado.cargas, carregado: !!estado.conversor, versao: estado.versao || null, noCache: cacheSvg.size, convertidas: estado.convertidas || 0, geracao: geracao,
         falhaCarga: estado.falhaCarga, blocos: MJ && MJ.blocosCarregados ? MJ.blocosCarregados.slice() : [] };
     },
     /* O SVG que o MathJax dá para a fórmula, já com as escolhas da casa (para

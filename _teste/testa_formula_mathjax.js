@@ -71,6 +71,11 @@ const MODOS = {
     de: 'desenharFalha(doc, latex, px, y, tam);',
     para: 'return { largura: 0, altura: 0, profundidade: 0, avisos: [], falhou: false, x: px, y: y };'
   },
+  '--envenenado-sem-cessao': {
+    grupo: 'carga', arquivo: 'formula.js',
+    de: 'if (i < lista.length) setTimeout(lote, 0); else ok();',
+    para: 'if (i < lista.length) lote(); else ok();'
+  },
   '--envenenado-mathjax-na-abertura': {
     grupo: 'controle', arquivo: 'pdf.js',
     de: 'function Doc() {',
@@ -87,7 +92,7 @@ const GUARDA = iGuarda > 0 ? process.argv[iGuarda + 1] : null;
 if (GUARDA) fs.mkdirSync(GUARDA, { recursive: true });
 
 // ---------------------------------------------------------------- placar por grupo
-const GRUPOS = ['controle', 'corpus', 'xobject', 'falha', 'casa'];
+const GRUPOS = ['controle', 'corpus', 'xobject', 'falha', 'casa', 'carga'];
 const placar = {};
 GRUPOS.forEach(g => { placar[g] = { ok: 0, falha: 0 }; });
 const erros = [];
@@ -276,7 +281,16 @@ compara('reserva_da_d1', P => {
   return d.finalizar();
 });
 function MARG_E_DE(P) { return P.MARG_E; }
-conf('controle', 'depois dos 7 documentos sem fórmula: nem o formula.js, nem o vendor, nem o MathJaxDoApp', oQueCarregou(), { formula: 0, vendor: 0, global: false });
+/* Item 4 da revisão do #256: "\(" sem o "\)" de fechar continua texto, com o
+ * negrito, byte a byte como antes da D2. */
+compara('barra_parentese_sem_fechar', P => {
+  const d = new P.Doc();
+  d.novaPagina();
+  d.escreverRico('C:\\Users\\nath\\(2026) foi salvo; **negrito**', { tam: 11 });
+  d.escreverRico('Outro: \\( aberto e *itálico* até o fim.', { tam: 11 });
+  return d.finalizar();
+});
+conf('controle', 'depois dos 8 documentos sem fórmula: nem o formula.js, nem o vendor, nem o MathJaxDoApp', oQueCarregou(), { formula: 0, vendor: 0, global: false });
 
 // ---------------------------------------------------------------- daqui em diante, com fórmula
 const F = require(ARQ_FORMULA);
@@ -465,21 +479,25 @@ function docDoCorpus(itens, cor, titulo) {
   {
     /* O gancho do "Preparando as fórmulas...": o pronto() com as fórmulas do
      * documento converte de antemão, em lotes, e o aoDemorar dispara se passar
-     * do prazo. As 396 do corpus EM LINHA ainda não estão no cache (o corpus
-     * foi em bloco), e levam mais de um lote. */
-    const emLinha = corpus.map(i => ({ latex: i.latex, display: false }));
-    const antes = F.estado().noCache;
+     * do prazo. 250 do corpus EM LINHA (cabem no cache de 300) ainda não estão
+     * no cache (o corpus foi em bloco), e levam mais de um lote. */
+    const emLinha = corpus.slice(0, 250).map(i => ({ latex: i.latex, display: false }));
+    const antes = F.estado().convertidas;
     let disparou = 0;
     await F.pronto({ formulas: emLinha, depoisDe: 0, aoDemorar: () => { disparou++; } });
-    const depois = F.estado().noCache;
+    const depois = F.estado().convertidas;
     emLinha.forEach(f => F.medir(f.latex, 11, { display: false }));
-    conf('casa', 'pronto({ formulas }) converte de antemão as 396 em linha: medir depois não converte mais nada',
-      [depois - antes > 300, F.estado().noCache - depois], [true, 0]);
+    /* Só a fórmula que define comando (o \newcommand{\sen} do corpus) passa
+     * de novo pelo MathJax, de propósito; a definição repetida não muda a
+     * geração, e as outras continuam no cache. */
+    const definem = emLinha.filter(f => /\\(re)?newcommand/.test(f.latex)).length;
+    conf('casa', 'pronto({ formulas }) converte de antemão 250 em linha: medir depois só refaz a que define comando (' + definem + ')',
+      [depois - antes > 200, definem > 0, F.estado().convertidas - depois], [true, true, definem]);
     conf('casa', 'e o aoDemorar dispara uma vez quando passa do prazo (depoisDe 0)', disparou, 1);
     let calado = 0;
     await F.pronto({ formulas: emLinha, depoisDe: 60000, aoDemorar: () => { calado++; } });
     await new Promise(r => setTimeout(r, 20));
-    conf('casa', 'controle: já no cache e com prazo de 60 s, não dispara nem converte de novo', [calado, F.estado().noCache - depois], [0, 0]);
+    conf('casa', 'controle: já no cache e com prazo de 60 s, não dispara nem converte de novo (fora a que define)', [calado, F.estado().convertidas - depois], [0, 2 * definem]);
     /* Equação mais larga que a coluna: encolhe até caber, até 70% do corpo, e
      * avisa; além disso, avisa que ainda passa da margem. */
     const soma = n => Array.from({ length: n }, (v, k) => 'a_{' + (k + 1) + '}').join(' + ');
@@ -496,10 +514,41 @@ function docDoCorpus(itens, cor, titulo) {
       [rl.largura <= G.UTIL + 0.01, rl.largura > G.UTIL * 0.98, avUm.map(a => /encolhida a 8\d% do corpo: @eq/.test(a) && !/ainda passa/.test(a))], [true, true, [true]]);
     conf('casa', 'e a que nem a 70% cabe sai a 70% e avisa que ainda passa da margem',
       [Math.abs(rl2.largura / F.medir(largaDemais, 11, {}).largura - 0.7) < 0.001, avDois.map(a => /encolhida a 70% do corpo e ainda passa da margem/.test(a))], [true, [true]]);
-    conf('casa', 'temFormula: \\( e @eq isolada sim; texto, e-mail e expoente da casa não',
-      ['a \\(x\\) b', 'veja @eq x^2', 'só texto', 'contato@eq.com', 'x^{2} e π'].map(F.temFormula), [true, true, false, false, false]);
-    conf('casa', 'formulasDoTexto devolve as fórmulas em linha do texto',
-      F.formulasDoTexto('a \\( x^{2} \\) b \\(\\frac{1}{2}\\) c \\(y'), [{ latex: 'x^{2}', display: false }, { latex: '\\frac{1}{2}', display: false }, { latex: 'y', display: false }]);
+    conf('casa', 'temFormula: \\(...\\) e @eq isolada sim; \\( sem fechar, texto, e-mail e expoente da casa não',
+      ['a \\(x\\) b', 'veja @eq x^2', 'C:\\Users\\nath\\(2026) foi salvo', 'só texto', 'contato@eq.com', 'x^{2} e π'].map(F.temFormula),
+      [true, true, false, false, false, false]);
+    /* Item 2 da revisão do #256: o @eq entra na conversão de antemão, pela
+     * mesma leitura do pdf.js (até o fim do trecho, a prosa engolida volta ao
+     * texto), junto com as em linha, linha a linha. */
+    const misto = 'Calcule \\(x^{2}\\) e veja @eq \\frac{a}{b} = c\nDepois \\(y_{1}\\) e @eq \\sqrt{2} e explique o método usado.\nSó texto, \\( sem fechar.';
+    const doMisto = F.formulasDoTexto(misto);
+    conf('casa', 'formulasDoTexto lê as @eq (bloco) e as \\(...\\) (em linha), na ordem, sem o \\( solto',
+      doMisto, [{ latex: 'x^{2}', display: false }, { latex: '\\frac{a}{b} = c', display: true },
+        { latex: 'y_{1}', display: false }, { latex: '\\sqrt{2}', display: true }]);
+    const dm = new G.Doc();
+    dm.novaPagina();
+    conf('casa', 'e as @eq são as mesmas que o separarFiguras do pdf.js desenha',
+      misto.split('\n').map(l => dm.separarFiguras(l).equacoes).reduce((a, b) => a.concat(b), []), doMisto.filter(f => f.display).map(f => f.latex));
+    const antesM = F.estado().convertidas;
+    await F.pronto({ formulas: doMisto });
+    const depoisM = F.estado().convertidas;
+    doMisto.forEach(f => F.medir(f.latex, 11, { display: f.display }));
+    conf('casa', 'depois do pronto() com elas, medir as quatro não converte mais nada', [depoisM - antesM, F.estado().convertidas - depoisM], [4, 0]);
+    /* Item 5: \renewcommand muda o que a mesma fórmula significa; o cache não
+     * pode devolver a de antes. Com a chave sem a geração, as duas medidas do
+     * \vvD saíam iguais. */
+    F.medir('\\newcommand{\\vvD}{x}', 11, {});
+    const vvAntes = w('\\vvD');
+    F.medir('\\renewcommand{\\vvD}{x + y + z + w}', 11, {});
+    const vvDepois = w('\\vvD');
+    conf('casa', 'a mesma fórmula antes e depois de um \\renewcommand sai diferente (a chave do cache tem a geração)',
+      [vvAntes > 0, vvDepois > vvAntes * 3], [true, true]);
+    const dr = new G.Doc();
+    dr.novaPagina();
+    const r1 = dr.equacao('\\vvD', { tam: 11 });
+    F.medir('\\renewcommand{\\vvD}{x}', 11, {});
+    const r2 = dr.equacao('\\vvD', { tam: 11 });
+    conf('casa', 'e no mesmo documento também (o cache do documento tem a geração)', r2.largura < r1.largura / 3, true);
   }
   {
     const d = new G.Doc();
@@ -518,6 +567,55 @@ function docDoCorpus(itens, cor, titulo) {
     conf('casa', 'o asterisco dentro da fórmula não vira itálico: "itálico depois" segue em itálico', /\/F4 11 Tf/.test(latin1(bytes)) && txt.indexOf('itálico depois') >= 0, true);
     conf('casa', 'as travas de caractere e de marcação não leem a fórmula em linha',
       [G.caracteresQueNaoDesenha('a \\(\\wp \\in \\mathbb{R}\\) b'), G.marcacaoQueSobrou('a \\(x^{2}_{3}\\) b')], [[], null]);
+  }
+
+  // ================================================================ carga
+  secao('Carga: o prazo da rede e o aviso na hora');
+  {
+    /* Item 1 da revisão do #256: um carregador que nunca responde (o sinal de
+     * uma barrinha: o <script> não termina nem dá erro). O pronto() tem de
+     * rejeitar no prazo, com a frase dela, e esquecer a falha. */
+    const fonte = fs.readFileSync(ARQ_FORMULA, 'utf8');
+    const ancora = "require('./' + VENDOR);";
+    conf('carga', 'a âncora do carregador aparece uma vez no formula.js', fonte.split(ancora).length - 1, 1);
+    const Pend = require(gravaNaRaiz('_formula_pendurada_d2.js', fonte.split(ancora).join('return;')));
+    const t0 = Date.now();
+    let erro = null;
+    try { await Pend.pronto({ prazo: 400 }); } catch (e) { erro = e; }
+    const levou = Date.now() - t0;
+    console.log('  o pronto() pendurado rejeitou em ' + levou + ' ms (prazo de 400)');
+    conf('carga', 'com o carregador que nunca responde, o pronto() rejeita no prazo (400 ms; entre 350 e 1500)', [!!erro, levou >= 350 && levou < 1500], [true, true]);
+    conf('carga', 'com a frase dela', erro && erro.message,
+      'Não consegui preparar as fórmulas: a internet está lenta ou fora. Tente de novo com sinal melhor.');
+    conf('carga', 'o motivo técnico fica no detalhe e no estado', [/400 ms/.test(erro && erro.detalhe), /400 ms/.test(Pend.estado().falhaCarga)], [true, true]);
+    let erro2 = null;
+    try { await Pend.pronto({ prazo: 50 }); } catch (e) { erro2 = e; }
+    conf('carga', 'e a falha é esquecida: o pronto() seguinte tenta de novo', [Pend.estado().cargas, !!erro2], [2, true]);
+  }
+  {
+    /* Item 3: o aviso NA HORA. Um conversor falso que gasta 30 ms por fórmula
+     * (40 fórmulas, 1,2 s) e o aviso para 300 ms: o aoDemorar tem de chegar
+     * perto dos 300 ms, ANTES do fim da conversão. Sem a volta ao navegador
+     * entre os lotes (o veneno sem-cessao), o temporizador só roda no fim, e
+     * o aviso nem chega. */
+    const Lento = require(gravaNaRaiz('_formula_lenta_d2.js', fs.readFileSync(ARQ_FORMULA, 'utf8')));
+    const real = globalThis.MathJaxDoApp;
+    const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -500 500 600"><g></g></svg>';
+    const gasta = ms => { const t = Date.now(); while (Date.now() - t < ms) { /* o lote lento */ } };
+    globalThis.MathJaxDoApp = { versao: 'falso', aoMhchem() {}, criar: () => ({ latexParaSvg: () => { gasta(30); return SVG; } }) };
+    let tAviso = null, tFim = null;
+    const t0 = Date.now();
+    try {
+      await Lento.pronto({ formulas: Array.from({ length: 40 }, (v, k) => 'a_{' + k + '}'), depoisDe: 300,
+        aoDemorar: () => { tAviso = Date.now() - t0; } });
+      tFim = Date.now() - t0;
+    } finally {
+      globalThis.MathJaxDoApp = real;   // o vendor de verdade volta para o resto da prova
+    }
+    console.log('  conversão lenta: aviso aos ' + tAviso + ' ms, fim aos ' + tFim + ' ms (prazo do aviso: 300)');
+    conf('carga', 'controle: a conversão lenta passa bem do prazo do aviso', tFim > 900, true);
+    conf('carga', 'o aoDemorar chegou ANTES do fim da conversão', tAviso !== null && tAviso < tFim - 300, true);
+    conf('carga', 'e perto do prazo (até 150 ms depois dos 300)', tAviso !== null && tAviso >= 300 && tAviso <= 450, true);
   }
 
   // ================================================================ placar

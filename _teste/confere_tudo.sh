@@ -285,6 +285,7 @@ roda "formula mathjax" node _teste/testa_formula_mathjax.js
 roda "formula mathjax --envenenado-glifo-sem-xobject" node _teste/testa_formula_mathjax.js --envenenado-glifo-sem-xobject
 roda "formula mathjax --envenenado-falha-calada" node _teste/testa_formula_mathjax.js --envenenado-falha-calada
 roda "formula mathjax --envenenado-mathjax-na-abertura" node _teste/testa_formula_mathjax.js --envenenado-mathjax-na-abertura
+roda "formula mathjax --envenenado-sem-cessao" node _teste/testa_formula_mathjax.js --envenenado-sem-cessao
 roda "busca (regras)" node _teste/testa_busca_regras.js
 # FRENTE 2: bloco de citacao com numero de linha, fio e credito, italico por F4/F5,
 # alternativas e gabarito em criterio, e a folha legada byte a byte igual a base do merge.
