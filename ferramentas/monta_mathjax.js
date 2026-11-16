@@ -83,6 +83,12 @@ const r = esbuild.buildSync({
   absWorkingDir: trabalho,
   bundle: true, minify: true, format: 'iife', platform: 'browser', target: 'es2017',
   legalComments: 'none', charset: 'utf8', write: false, logLevel: 'warning',
+  /* Sem template literal no pacote: o esbuild minificado deixa quebra de linha
+   * DENTRO de `...` (o fim do comentário % do TeX compara com `\n`), e num
+   * clone do Windows com core.autocrlf a cópia de trabalho troca essa quebra
+   * por CRLF, mudando o texto da string. Com aspas comuns a quebra vira "\n",
+   * escrita, e o arquivo só tem a quebra do fim da linha da licença e a final. */
+  supported: { 'template-literal': false },
   banner: { js: banner }
 });
 const codigo = Buffer.from(r.outputFiles[0].contents);
@@ -100,7 +106,11 @@ if (confere) {
   const arq = path.join(DESTINO, PACOTE);
   const atual = fs.existsSync(arq) ? fs.readFileSync(arq) : Buffer.alloc(0);
   const licAtual = fs.existsSync(path.join(DESTINO, 'LICENSE')) ? fs.readFileSync(path.join(DESTINO, 'LICENSE')) : Buffer.alloc(0);
-  const igual = atual.equals(codigo) && licAtual.equals(licenca);
+  /* Num clone do Windows com core.autocrlf, o git entrega a cópia de trabalho
+   * com CRLF (no repositório o arquivo é LF, e o site publica o LF): a
+   * comparação é com o final de linha do repositório. */
+  const lf = b => Buffer.from(b.toString('latin1').replace(/\r\n/g, '\n'), 'latin1');
+  const igual = lf(atual).equals(lf(codigo)) && lf(licAtual).equals(lf(licenca));
   console.log(igual ? 'CONFERE: o vendor versionado é byte a byte o que a montagem gera'
     : 'DIFERE: o vendor versionado (sha256 ' + sha(atual) + ') não é o que a montagem gera');
   process.exit(igual ? 0 : 1);
