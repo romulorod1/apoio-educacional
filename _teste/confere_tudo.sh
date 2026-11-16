@@ -421,6 +421,8 @@ for t in testa_registro testa_mapeamento testa_exclusoes testa_feriados \
          testa_vocabulario testa_dominio testa_sondagem testa_pagamentos; do
   roda "$t" node "_teste/$t.js"
 done
+# (revisao do #249) a aula de hoje sem horario, ja relatada, conta como dada: o veneno a deixa para a meia-noite
+roda "aluno --envenenado-sem-hora-nunca-aconteceu" node "_teste/testa_aluno.js" --envenenado-sem-hora-nunca-aconteceu
 # C9: o documento do ciclo. Os numeros do periodo, o dominio, o rascunho das
 # quatro secoes, so os pontos de atencao marcados, o texto e o PDF sem nada
 # interno; e dois venenos (ponto nao marcado, rotulo interno) que TEM de
@@ -1410,6 +1412,8 @@ roda "celular, Biblioteca --envenenado-resto-pelo-pacote-do-modulo" node "_teste
 roda "celular, Biblioteca --envenenado-pacote-pelo-prefixo" node "_teste/testa_celular_biblioteca.js" --envenenado-pacote-pelo-prefixo
 # (regra conservadora) o assunto sem material so diz "nao tem" com a serie pronta
 roda "celular, Biblioteca --envenenado-nao-tem-antes-de-prontos" node "_teste/testa_celular_biblioteca.js" --envenenado-nao-tem-antes-de-prontos
+# (polimento da 12b) o redesenho leve rele o assunto e o Ver lista abertos, e nao deixa a frase de antes da marca
+roda "celular, Biblioteca --envenenado-redesenho-leve-velho" node "_teste/testa_celular_biblioteca.js" --envenenado-redesenho-leve-velho
 # 12b, parte A3 (16/11/2026): o PDF da lista no celular. O botao PDF no cartao,
 # na lista de base e preso no pe do Ver lista, apagado pela regra do cartao (e
 # tambem na lista que abre so com o que veio); a lista e o gabarito em arquivos
