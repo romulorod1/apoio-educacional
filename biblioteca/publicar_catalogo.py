@@ -92,6 +92,7 @@ import http.client
 import json
 import os
 import re
+import struct
 import subprocess
 import sys
 import tempfile
@@ -100,6 +101,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+import zlib
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 if AQUI not in sys.path:
@@ -554,8 +556,15 @@ def conteudo_do_pacote(caminho):
             info = z.getinfo('manifest.json')
             if info.file_size > LIMITE_DO_MANIFEST:
                 return None
-            manifest = json.loads(z.read(info).decode('utf-8'))
-    except (OSError, KeyError, ValueError, RuntimeError, zipfile.BadZipFile, zipfile.LargeZipFile):
+            # o tamanho do cabeçalho pode mentir (zip que declara 100 bytes e expande a centenas de MiB):
+            # a leitura tem limite de verdade, e passar dele é o mesmo que não ter manifest
+            with z.open(info) as f:
+                bruto = f.read(LIMITE_DO_MANIFEST + 1)
+            if len(bruto) > LIMITE_DO_MANIFEST:
+                return None
+            manifest = json.loads(bruto.decode('utf-8'))
+    except (OSError, EOFError, KeyError, ValueError, RuntimeError, NotImplementedError, struct.error, zlib.error,
+            zipfile.BadZipFile, zipfile.LargeZipFile):
         return None
     valor = manifest.get('conteudo') if isinstance(manifest, dict) else None
     return valor if isinstance(valor, str) and CONTEUDO_VALIDO.fullmatch(valor) else None
@@ -945,10 +954,13 @@ def planejar(livros_novos, indice, registro_ids, trocas=None, retirar=None, banc
         mesmo_arquivo = a.get('sha256') == sha and a.get('versao') == versao and a.get('caminhoNuvem') == caminho
         if mesmo_arquivo and a.get('conteudo') == p.get('conteudo'):
             continue
-        entrada = {'versao': versao, 'sha256': sha, 'tamanho': p['tamanho'], 'caminhoNuvem': caminho,
-                   'publicadoEm': (a.get('publicadoEm') or agora) if mesmo_arquivo else agora}
+        # o mesmo arquivo: a entrada de antes segue inteira (um campo posto à mão, como retiradoEm, não se perde)
+        entrada = dict(a) if mesmo_arquivo else {'versao': versao, 'sha256': sha, 'tamanho': p['tamanho'],
+                                                 'caminhoNuvem': caminho, 'publicadoEm': agora}
         if p.get('conteudo'):
             entrada['conteudo'] = p['conteudo']
+        else:
+            entrada.pop('conteudo', None)
         novos_pacotes[nome] = entrada
         mudou_pacotes = True
         if mesmo_arquivo:

@@ -44,7 +44,8 @@
  *  13. o pacote diz o que ele é: o índice ganha `conteudo`, lido do manifest.json
  *      de dentro de cada zip (aberto só para leitura): o pacote de livros fica
  *      'livros', o de exercícios fica com o valor dele, o manifest sem o campo
- *      (e o zip que nem abre) fica sem o campo; e o `conteudo` que falta num
+ *      (e o zip que nem abre, o de fluxo estragado e o de cabeçalho mentiroso, que
+ *      declara 100 bytes e expande a 40 MiB) fica sem o campo e sobe como antes; e o `conteudo` que falta num
  *      pacote já publicado, com o mesmo sha256, entra no índice SEM subir o
  *      arquivo de novo.
  *
@@ -513,10 +514,31 @@ const adminApaga = nome => fetch(ST + '/storage/v1/b/' + BUCKET + '/o/' + encode
   const ze = fazZip('prova-ex-v1.zip', { esquema: 1, pacote: 'prova-ex', versao: 1, conteudo: 'exercicios' });
   const zs = fazZip('prova-sem-v1.zip', { esquema: 1, pacote: 'prova-sem', versao: 1 });
   const zn = fazZip('prova-nada-v1.zip', null);
-  conf('os 4 zips sintéticos foram montados', [zl, ze, zs, zn].every(b => b && b.length > 0), true);
+  // o manifest com o fluxo deflate estragado no meio (zlib.error ao ler) e o que declara 100 bytes mas expande a 40 MiB (o cabeçalho mente)
+  const estraga = (nome) => {
+    const gerar = ['import sys, json, struct, zipfile', 'd = sys.argv[1]', 'z = zipfile.ZipFile(d, "w", zipfile.ZIP_DEFLATED)',
+      'z.writestr("manifest.json", json.dumps({"esquema": 1, "conteudo": "livros", "x": "".join("abcdefghij%d" % i for i in range(300))}))',
+      'z.writestr("dados.json", "[]")', 'z.close()', 'b = bytearray(open(d, "rb").read())', 'n, e = struct.unpack("<HH", b[26:30])',
+      'for i in range(30 + n + e + 8, 30 + n + e + 40): b[i] = 0xff', 'open(d, "wb").write(bytes(b))'].join('\n');
+    const x = spawnSync(PYTHON, ['-I', '-c', gerar, path.join(CONTEUDO, nome)], { encoding: 'utf8' });
+    return x.status === 0 ? fs.readFileSync(path.join(CONTEUDO, nome)) : null;
+  };
+  const mente = (nome) => {
+    const gerar = ['import sys, struct, zipfile', 'd = sys.argv[1]', 'z = zipfile.ZipFile(d, "w", zipfile.ZIP_DEFLATED)',
+      'z.writestr("manifest.json", \'{"conteudo": "livros", "x": "\' + "a" * (40 * 1024 * 1024) + \'"}\')', 'z.close()',
+      'b = bytearray(open(d, "rb").read())', 'b[22:26] = struct.pack("<I", 100)', 'c = bytes(b).index(b"PK\\x01\\x02")',
+      'b[c + 24:c + 28] = struct.pack("<I", 100)', 'open(d, "wb").write(bytes(b))'].join('\n');
+    const x = spawnSync(PYTHON, ['-I', '-c', gerar, path.join(CONTEUDO, nome)], { encoding: 'utf8' });
+    return x.status === 0 ? fs.readFileSync(path.join(CONTEUDO, nome)) : null;
+  };
+  const zc = estraga('prova-estragado-v1.zip');
+  const zm = mente('prova-mentiroso-v1.zip');
+  conf('os 6 zips sintéticos foram montados (e o do cabeçalho mentiroso é pequeno)', [zl, ze, zs, zn, zc, zm].every(b => b && b.length > 0) + '|' + (zm && zm.length < 1024 * 1024), 'true|true');
   const com13 = () => comuns().concat(['--pacotes', CONTEUDO]);
+  r = publicador(['--manifesto', M6, '--ensaio'].concat(com13()));
+  conf('o ensaio não cai com o zip estragado nem com o do cabeçalho mentiroso', r.st + '|' + /Traceback/.test(r.saida) + '|' + /6 arquivo\(s\) novos a enviar/.test(r.saida), '0|false|true');
   r = publicador(['--manifesto', M6, '--publicar'].concat(com13()));
-  conf('publicado, com os 4 pacotes novos enviados', r.st + '|' + /ARQUIVOS: 4 enviado\(s\)/.test(r.saida), '0|true');
+  conf('publicado, com os 6 pacotes novos enviados, sem erro do Python', r.st + '|' + /Traceback/.test(r.saida) + '|' + /ARQUIVOS: 6 enviado\(s\)/.test(r.saida), '0|false|true');
   const i13 = await indice();
   const p13 = i13.pacotes || {};
   if (MODO === '--envenenado-sem-conteudo') {
@@ -528,6 +550,8 @@ const adminApaga = nome => fetch(ST + '/storage/v1/b/' + BUCKET + '/o/' + encode
   conf('o pacote de exercícios tem o valor do manifest', (p13['prova-ex'] || {}).conteudo, 'exercicios');
   conf('o manifest sem o campo fica sem o campo', 'conteudo' in (p13['prova-sem'] || {}), false);
   conf('o zip sem manifest fica sem o campo, e sobe como antes', ('conteudo' in (p13['prova-nada'] || {})) + '|' + !!(p13['prova-nada'] || {}).caminhoNuvem, 'false|true');
+  conf('o zip com o fluxo deflate estragado fica sem o campo, e sobe como antes', ('conteudo' in (p13['prova-estragado'] || {})) + '|' + !!(p13['prova-estragado'] || {}).caminhoNuvem, 'false|true');
+  conf('o zip que declara 100 bytes e expande a 40 MiB fica sem o campo, e sobe como antes', ('conteudo' in (p13['prova-mentiroso'] || {})) + '|' + !!(p13['prova-mentiroso'] || {}).caminhoNuvem, 'false|true');
   conf('os pacotes de antes (bytes que nem são zip) seguem sem o campo, com o mesmo sha256',
     ['prova-x', 'prova-y', 'prova-z'].map(n => ('conteudo' in p13[n]) + '/' + p13[n].sha256.slice(0, 8)).join(','),
     [px2, py2, pz1].map(b => 'false/' + hex(b).slice(0, 8)).join(','));
@@ -541,6 +565,7 @@ const adminApaga = nome => fetch(ST + '/storage/v1/b/' + BUCKET + '/o/' + encode
   const bruto = (await doc('usuarios/' + uid + '/config/catalogo')).json.fields;
   const antigo = JSON.parse(JSON.stringify(bruto.pacotes));
   delete antigo.mapValue.fields['prova-livros'].mapValue.fields.conteudo;
+  antigo.mapValue.fields['prova-livros'].mapValue.fields.retiradoEm = { stringValue: 'posto-a-mao' };   // um campo que o publicador não conhece
   const publicadoAntes = (p13['prova-livros'] || {}).publicadoEm;
   const pr = await rest(DOCS + '/usuarios/' + uid + '/config/catalogo?updateMask.fieldPaths=pacotes', { metodo: 'PATCH', token: 'owner', corpo: { fields: { pacotes: antigo } } });
   conf('o índice foi posto como o de antes (sem o campo no pacote de livros)', pr.status + '|' + ('conteudo' in ((await indice()).pacotes['prova-livros'])), '200|false');
@@ -551,6 +576,7 @@ const adminApaga = nome => fetch(ST + '/storage/v1/b/' + BUCKET + '/o/' + encode
   conf('publicado, sem enviar nenhum arquivo', r.st + '|' + /ARQUIVOS: 0 enviado\(s\) ao Storage/.test(r.saida) + '|' + (await geracoes() === g13b), '0|true|true');
   const f13 = ((await indice()).pacotes || {})['prova-livros'] || {};
   conf('o índice voltou a ter conteudo "livros", e o publicadoEm do arquivo é o de antes', f13.conteudo + '|' + (f13.publicadoEm === publicadoAntes), 'livros|true');
+  conf('e o campo posto à mão na entrada não se perdeu', f13.retiradoEm, 'posto-a-mao');
   r = publicador(['--manifesto', M6, '--publicar'].concat(com13()));
   conf('e a rodada seguinte não muda mais nada', r.st + '|' + /nada mudaria/.test(r.saida), '0|true');
 
